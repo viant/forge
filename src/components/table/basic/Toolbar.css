@@ -1,0 +1,33 @@
+
+
+.toolbar-container {
+    display: flex;
+    justify-content: space-between; /* Push items to the far ends */
+    align-items: center;
+    width: 100%; /* Ensure it spans the full width */
+}
+
+.toolbar-left {
+    display: flex;
+    align-items: center;
+}
+
+.toolbar-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1; /* Takes up remaining space for center alignment */
+    text-align: center;
+}
+
+.toolbar-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+td .pagination-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}

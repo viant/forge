@@ -1,0 +1,251 @@
+package window
+
+import (
+	"context"
+	"fmt"
+	"github.com/viant/afs"
+	"github.com/viant/afs/file"
+	"github.com/viant/afs/storage"
+	"github.com/viant/afs/url"
+	"gopkg.in/yaml.v3"
+	"strconv"
+	"strings"
+)
+
+// Service represents a YAML loader that can resolve $import directives.
+type Service struct {
+	fs      afs.Service
+	baseURL string
+	options []storage.Option
+}
+
+// Load reads the YAML file at the given path, resolves $import directives,
+// and decodes the result into the provided Go variable v.
+func (l *Service) Load(ctx context.Context, path string, v interface{}) error {
+	URL := url.Join(l.baseURL, path)
+	// Read the file content using the filesystem service.
+	data, err := l.fs.DownloadWithURL(ctx, URL, l.options...)
+	if err != nil {
+		return err
+	}
+	object, _ := l.fs.Object(ctx, URL, l.options)
+
+	// Parse the YAML into a yaml.Node.
+	var node yaml.Node
+	if err := yaml.Unmarshal(data, &node); err != nil {
+		return err
+	}
+
+	// Resolve $import directives recursively.
+	baseDir, _ := url.Split(object.URL(), file.Scheme)
+
+	if err := l.resolveImports(ctx, &node, baseDir); err != nil {
+		return err
+	}
+
+	// Decode the resolved YAML node into the provided Go variable.
+	return node.Decode(v)
+}
+
+func (l *Service) Exists(ctx context.Context, path string) (bool, error) {
+	URL := url.Join(l.baseURL, path)
+	return l.fs.Exists(ctx, URL, l.options...)
+}
+
+func (l *Service) Download(ctx context.Context, path string) ([]byte, error) {
+	URL := url.Join(l.baseURL, path)
+	return l.fs.DownloadWithURL(ctx, URL, l.options...)
+}
+
+// resolveImports recursively resolves $import directives within a YAML node.
+func (l *Service) resolveImports(ctx context.Context, node *yaml.Node, baseDir string) error {
+	switch node.Kind {
+	case yaml.DocumentNode:
+		// Recursively resolve imports in document content.
+		for _, contentNode := range node.Content {
+			if err := l.resolveImports(ctx, contentNode, baseDir); err != nil {
+				return err
+			}
+		}
+	case yaml.MappingNode:
+		// Mapping nodes have content in key-value pairs.
+		for i := 0; i < len(node.Content); i += 2 {
+			keyNode := node.Content[i]
+			valueNode := node.Content[i+1]
+
+			// Resolve imports in the key and value nodes.
+			if err := l.processNode(ctx, keyNode, baseDir); err != nil {
+				return err
+			}
+			if err := l.processNode(ctx, valueNode, baseDir); err != nil {
+				return err
+			}
+		}
+	case yaml.SequenceNode:
+		// Resolve imports in each item of the sequence.
+		for i := 0; i < len(node.Content); i++ {
+			itemNode := node.Content[i]
+			if err := l.processNode(ctx, itemNode, baseDir); err != nil {
+				return err
+			}
+		}
+	case yaml.AliasNode:
+		// Resolve imports in the referenced node.
+		if node.Alias != nil {
+			if err := l.resolveImports(ctx, node.Alias, baseDir); err != nil {
+				return err
+			}
+		}
+	default:
+		// ScalarNode or others; do nothing here.
+	}
+	return nil
+}
+
+// processNode checks if the node contains an $import directive and processes it.
+func (l *Service) processNode(ctx context.Context, node *yaml.Node, baseDir string) error {
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!str" {
+		if isImportDirective(node.Value) {
+			importPath, key, err := getImportPathAndKey(node.Value)
+			if err != nil {
+				return err
+			}
+			// Resolve the full path of the imported file.
+			fullPath := url.Join(baseDir, importPath)
+			// Read and parse the imported file.
+			data, err := l.fs.DownloadWithURL(ctx, fullPath, l.options...)
+			if err != nil {
+				return err
+			}
+			var importedNode yaml.Node
+			if err := yaml.Unmarshal(data, &importedNode); err != nil {
+				return err
+			}
+			parent, _ := url.Split(fullPath, file.Scheme)
+			// Resolve imports in the imported node recursively.
+			if err := l.resolveImports(ctx, &importedNode, parent); err != nil {
+				return err
+			}
+
+			var replacementNode *yaml.Node
+			if key == "" {
+				// No specific key requested; use the entire imported content.
+				replacementNode = getContentNode(&importedNode)
+			} else {
+				// Extract the node under the specified key.
+				extractedNode, err := getNodeByKey(&importedNode, key)
+				if err != nil {
+					return err
+				}
+				replacementNode = extractedNode
+			}
+
+			// Replace the current node with the imported content or the extracted node.
+			*node = *replacementNode
+		}
+	} else {
+		// Recursively resolve imports in this node.
+		if err := l.resolveImports(ctx, node, baseDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// getImportPathAndKey extracts the path and key from an $import directive.
+func getImportPathAndKey(value string) (path string, key string, err error) {
+	value = strings.TrimSpace(value)
+	if !isImportDirective(value) {
+		return "", "", fmt.Errorf("not an import directive: %s", value)
+	}
+	// Extract the path inside the parentheses.
+	start := strings.Index(value, "(")
+	end := strings.LastIndex(value, ")")
+	if start == -1 || end == -1 || start >= end {
+		return "", "", fmt.Errorf("invalid import directive syntax: %s", value)
+	}
+	pathValue := strings.TrimSpace(value[start+1 : end])
+	// Remove surrounding quotes if present.
+	pathValue = strings.Trim(pathValue, "\"'")
+
+	// Check if a key is specified after a colon.
+	parts := strings.SplitN(pathValue, ":", 2)
+	path = parts[0]
+	if len(parts) > 1 {
+		key = parts[1]
+	}
+	if !strings.HasSuffix(path, ".yaml") {
+		path += ".yaml"
+	}
+	return path, key, nil
+}
+
+// isImportDirective checks if a string is an $import directive.
+func isImportDirective(value string) bool {
+	return strings.HasPrefix(strings.TrimSpace(value), "$import")
+}
+
+// getNodeByKey navigates through the YAML node to find the node under the specified key path.
+func getNodeByKey(node *yaml.Node, key string) (*yaml.Node, error) {
+	keys := strings.Split(key, ".")
+	currentNode := node
+
+	for _, k := range keys {
+		if currentNode.Kind == yaml.DocumentNode {
+			if len(currentNode.Content) > 0 {
+				currentNode = currentNode.Content[0]
+			} else {
+				return nil, fmt.Errorf("document node has no content")
+			}
+		}
+
+		if currentNode.Kind == yaml.MappingNode {
+			found := false
+			for i := 0; i < len(currentNode.Content); i += 2 {
+				keyNode := currentNode.Content[i]
+				valueNode := currentNode.Content[i+1]
+				if keyNode.Value == k {
+					currentNode = valueNode
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("key '%s' not found in mapping", k)
+			}
+		} else if currentNode.Kind == yaml.SequenceNode {
+			// Allow numeric keys for sequences.
+			index, err := parseIndex(k)
+			if err != nil {
+				return nil, fmt.Errorf("invalid sequence index '%s': %v", k, err)
+			}
+			if index < 0 || index >= len(currentNode.Content) {
+				return nil, fmt.Errorf("sequence index '%d' out of range", index)
+			}
+			currentNode = currentNode.Content[index]
+		} else {
+			return nil, fmt.Errorf("cannot navigate through node of kind %d", currentNode.Kind)
+		}
+	}
+
+	return currentNode, nil
+}
+
+// parseIndex converts a string to an integer index.
+func parseIndex(s string) (int, error) {
+	return strconv.Atoi(s)
+}
+
+// getContentNode extracts the content node from a YAML node,
+// handling DocumentNode and other cases.
+func getContentNode(node *yaml.Node) *yaml.Node {
+	if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
+		return node.Content[0]
+	}
+	return node
+}
+
+// New creates a new Service with the provided filesystem service.
+func New(fs afs.Service, baseURL string, options ...storage.Option) *Service {
+	return &Service{fs: fs, baseURL: baseURL, options: options}
+}
