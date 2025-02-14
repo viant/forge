@@ -1,0 +1,77 @@
+
+
+.table-scroll-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.table-container {
+    min-width: 100%;
+}
+
+
+.table-pending {
+        display: flex;
+        justify-content: center; /* Center horizontally */
+        align-items: center;    /* Center vertically */
+        height: 100%;           /* Ensure it spans the row height */
+        min-height: 20vh;       /* Optional: Set a minimum height */
+}
+
+
+.truncate-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: inherit;
+}
+
+
+.cell-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0;
+    margin: 0;
+}
+
+
+.show-more-icon {
+    cursor: pointer;
+}
+
+
+/* ============ NEW for Empty Rows ============ */
+.empty-row {
+    pointer-events: none; /* No click or hover highlight */
+}
+
+.empty-row td {
+    /* If you want to hide borders or lighten them */
+    border: none;
+    background-color: transparent;
+
+}
+
+.row:hover {
+    cursor: pointer; /* Indicate interactivity */
+}
+
+.empty-row:hover td {
+    background-color: transparent !important;
+    cursor: default !important;
+}
+
+.row td {
+    padding: 0;
+    margin: 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+
+.selected-row td {
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: bold;
+}
+
+

@@ -1,0 +1,357 @@
+import React, {useState} from 'react';
+import {useSignalEffect} from '@preact/signals-react';
+import {
+    InputGroup,
+    Checkbox,
+    RadioGroup,
+    Radio,
+    TextArea,
+    Label,
+    FormGroup,
+    Switch,
+    NumericInput,
+    ProgressBar,
+    MenuItem,
+    Button,
+} from '@blueprintjs/core';
+import {DateInput3} from '@blueprintjs/datetime2';
+import {Select} from '@blueprintjs/select';
+import {enUS} from 'date-fns/locale';
+import {format, parse} from "date-fns";
+import {addStyles, EditableMathField} from "react-mathquill";
+
+function adjustProperties(item, properties) {
+    if (!properties) {
+        return; // Safeguard to avoid null/undefined errors
+    }
+
+    const hasPlaceholder = Object.prototype.hasOwnProperty.call(properties, 'placeholder');
+    const hasTimePrecision = Object.prototype.hasOwnProperty.call(properties, 'timePrecision');
+
+    switch (item.type) {
+        case 'datetime':
+            if (!hasPlaceholder) {
+                properties['placeholder'] = 'Select a time...';
+            }
+            if (!hasTimePrecision) {
+                properties['timePrecision'] = 'minute';
+            }
+            break;
+        case 'date':
+            if (!hasPlaceholder) {
+                properties['placeholder'] = 'Select a date...';
+            }
+            break;
+        case 'text':
+        case 'math':
+        case 'string':
+        case 'number':
+        case 'textarea':
+        case 'currency':
+            if (!hasPlaceholder) {
+                properties['placeholder'] = `Enter ${item.label}...`;
+            }
+            break;
+        default:
+            // No placeholder logic for other types
+            break;
+    }
+}
+
+
+const ControlRenderer = ({item, context, container, events = {}, stateEvents = {}, state}) => {
+        const {layout} = container;
+        const columns = layout?.columns || 1;
+        let properties = item?.properties ? {...item.properties} : {};
+        let style = item?.style ? {...item.style} : {};
+        const labelPosition = item.labelPosition || layout?.labelPosition || 'top';
+        const isInline = labelPosition === 'left';
+        const span = Math.min(item.columnSpan || 1, columns);
+
+
+        const itemId = context.itemId(container, item)
+        adjustProperties(item, properties);
+
+        const itemStyle = {
+            gridColumn: `span ${span}`,
+            ...style,
+        };
+
+        const [formData, setFormData] = state ? state : useState({});
+        if (!state) {
+            useSignalEffect(() => {
+                const data = context.handlers.dataSource.getFormData();
+                setFormData(data);
+            });
+        }
+        let readOnly = item.readOnly || false;
+        let layoutItem;
+        let isItemControl = false;
+
+        let value = formData[item.id] || ''
+
+        if (stateEvents.onReadOnly) {
+            readOnly = stateEvents.onReadOnly.execute({data: formData, item: item});
+        }
+        if (stateEvents.onProperties) {
+            properties = stateEvents.onProperties.execute({data: formData, item: item});
+        }
+
+
+        switch (item.type) {
+            case 'button':
+                isItemControl = true;
+                layoutItem = (
+                    <Button
+                        {...properties}
+                        {...events}
+                        intent={item.intent}
+                    >
+                        {item.label}
+                    </Button>
+                );
+                break;
+
+            case 'text':
+            case 'string':
+            case undefined:
+                layoutItem = (
+                    <InputGroup
+                        id={itemId}
+                        {...properties}
+                        {...events}
+                        value={value}
+                        readOnly={readOnly}
+                    />
+                );
+                break;
+            case 'math':
+                layoutItem = (
+                    <EditableMathField id={itemId}  {...properties} {...events} latex={value}/>)
+            case 'number':
+                layoutItem = (
+                    <NumericInput
+                        id={itemId}
+                        {...properties}
+                        {...events}
+                        value={value}
+                        readOnly={readOnly}
+                    />
+                );
+                break;
+
+            case 'checkbox':
+                layoutItem = (
+                    <Checkbox
+                        id={itemId}
+                        {...properties}
+                        {...events}
+                        checked={!!value}
+                        readOnly={readOnly}
+                    />
+                );
+                break;
+
+            case 'toggle':
+                layoutItem = (
+                    <Switch
+                        id={itemId}
+                        {...properties}
+                        checked={!!value}
+                        {...events}
+                        disabled={readOnly}
+                    />
+                );
+                break;
+
+            case 'radio': {
+                const options = item.options || [];
+                layoutItem = (
+                    <RadioGroup
+                        name={itemId}
+                        {...properties}
+                        {...events}
+                        disabled={readOnly}
+                        selectedValue={`${value}`}
+                    >
+                        {options.map((option) => (
+                            <Radio key={itemId + option.value} label={option.label} value={option.value}/>
+                        ))}
+                    </RadioGroup>
+                );
+                break;
+            }
+
+            case 'select':
+            case 'dropdown':
+                layoutItem = (
+                    <Select
+                        items={item.options}
+                        itemRenderer={(selectItem, {handleClick, modifiers}) => (
+                            <MenuItem
+                                key={itemId + selectItem.value}
+                                text={selectItem.label}
+                                onClick={handleClick}
+                                active={modifiers.active}
+                            />
+                        )}
+                        {...properties}
+                        {...events}
+                        filterable={false}
+                        disabled={readOnly}
+                    >
+                        <Button
+                            text={
+                                item.options.find((opt) => opt.value === (formData[item.id] || ''))?.label ||
+                                `Select ${item.label}`
+                            }
+                            rightIcon="caret-down"
+                            disabled={readOnly}
+                        />
+                    </Select>
+                );
+                break;
+
+            case 'textarea':
+                layoutItem = (
+                    <TextArea
+                        id={itemId}
+                        {...properties}
+                        {...events}
+                        value={value}
+                        readOnly={readOnly}
+                    />
+                );
+                break;
+
+            case 'datetime':
+                layoutItem = (
+                    <DateInput3
+                        id={itemId}
+                        {...properties}
+                        formatDate={(date) => {
+                            if (item.dateFnsFormat) {
+                                return format(date, item.dateFnsFormat)
+                            }
+                            return date.toLocaleDateString()
+                        }}
+                        parseDate={(str) => {
+                            if (item.dateFnsFormat) {
+                                return parse(str, item.dateFnsFormat, new Date())
+                            }
+                            return new Date(str)
+                        }}
+                        value={value || null}
+                        {...events}
+
+                        disabled={readOnly}
+                        locale={enUS}
+                    />
+                );
+                break;
+
+            case 'date':
+                layoutItem = (
+                    <DateInput3
+                        id={itemId}
+                        {...properties}
+                        formatDate={(date) => {
+                            if (item.dateFnsFormat) {
+                                return format(date, item.dateFnsFormat)
+                            }
+                            return date.toLocaleDateString()
+                        }}
+                        parseDate={(str) => {
+                            if (item.dateFnsFormat) {
+                                return parse(str, item.dateFnsFormat, new Date())
+                            }
+                            return new Date(str)
+                        }}
+                        {...events}
+                        value={value || null}
+                        disabled={readOnly}
+                        locale={enUS}
+                    />
+                );
+                break;
+
+            case 'label':
+                layoutItem = (
+                    <Label className={"label-data"} {...properties}>
+                        {value}
+                    </Label>
+                );
+                break;
+
+            case 'progressBar':
+                layoutItem = (
+                    <ProgressBar
+                        id={itemId}
+                        {...properties}
+                        value={value || 0}
+                    />
+                );
+                break;
+
+            case 'currency':
+                layoutItem = (
+                    <NumericInput
+                        id={itemId}
+                        {...properties}
+                        {...events}
+                        value={value}
+                        readOnly={readOnly}
+                        leftIcon="dollar"
+                    />
+                );
+                break;
+
+            case 'keyValuePairs':
+                // Example custom component:
+                layoutItem = (
+                    <KeyValuePairsComponent
+                        id={itemId}
+                        {...properties}
+                        {...events}
+                        data={value || {}}
+                        disabled={readOnly}
+                    />
+                );
+                break;
+
+            default:
+                // Retains the original default case
+                layoutItem = (
+                    <InputGroup
+                        id={itemId}
+                        {...properties}
+                        {...events}
+                        value={value || ''}
+                        readOnly={readOnly}
+                    />
+                );
+                break;
+        }
+
+
+        // If it's a standalone control (e.g., a button), return it directly within the styled div
+        if (isItemControl) {
+            return (
+                <div key={item.id} style={itemStyle}>
+                    {layoutItem}
+                </div>
+            );
+        }
+
+
+        return (
+            <div key={item.id} style={itemStyle}>
+                <FormGroup label={item.label} labelFor={item.id} inline={isInline}>
+                    {layoutItem}
+                </FormGroup>
+            </div>
+        );
+    }
+;
+
+export default ControlRenderer;

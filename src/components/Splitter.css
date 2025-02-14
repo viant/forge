@@ -1,0 +1,33 @@
+.splitter-container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+}
+
+.splitter-container.vertical {
+    flex-direction: column;
+}
+
+.splitter-panel {
+    flex-grow: 1;
+    position: relative;
+    overflow: auto; /* Ensure panels are scrollable if content overflows */
+}
+
+.splitter-resizer {
+    background-color: #ccc;
+    flex-shrink: 0;
+    cursor: col-resize;
+    width: 5px; /* Increased width for better user experience */
+}
+
+.splitter-resizer.vertical {
+    cursor: row-resize;
+    height: 5px; /* Increased height for better user experience */
+    width: 100%;
+}
+
+.splitter-resizer:hover {
+    background-color: #999; /* Darker color on hover */
+}
