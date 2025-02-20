@@ -9,13 +9,12 @@ import (
 	"github.com/viant/forge/backend/types"
 	"gopkg.in/yaml.v3"
 	"net/http"
-	"time"
 )
 
 // NavigationHandler fetches navigation data using the file.Service.
 func NavigationHandler(fs *file.Service, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		navigation, err := fetchNavigationData(r.Context(), fs, baseURL)
+		navigation, err := FetchNavigationData(r.Context(), fs, baseURL)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -26,8 +25,8 @@ func NavigationHandler(fs *file.Service, baseURL string) http.HandlerFunc {
 	}
 }
 
-// Fetches navigation data using the file.Service.
-func fetchNavigationData(ctx context.Context, fs *file.Service, baseURL string) ([]types.NavigationItem, error) {
+// FetchNavigationData navigation data using the file.Service.
+func FetchNavigationData(ctx context.Context, fs *file.Service, baseURL string) ([]types.NavigationItem, error) {
 	URL := url.Join(baseURL, "navigation.yaml")
 	data, err := fs.Download(ctx, URL) // Fetch as a file
 	if err != nil {
@@ -38,7 +37,5 @@ func fetchNavigationData(ctx context.Context, fs *file.Service, baseURL string) 
 	if err := yaml.Unmarshal(data, &navigation); err != nil {
 		return nil, fmt.Errorf("failed to parse navigation data: %w", err)
 	}
-
-	time.Sleep(100 * time.Millisecond) // Simulate network delay
 	return navigation, nil
 }

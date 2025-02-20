@@ -106,9 +106,6 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const initialSelectionValue =
                 dataSource.selectionMode === 'multi' ? {selection: []} : {selected: null, rowIndex: -1};
             const hasSelection = dataSource.selectionMode !== 'none'
-
-            console.log('ds:', identity.dataSourceRef, hasSelection)
-
             const selectionSignals = hasSelection ? {
                 collection: getCollectionSignal(identity.dataSourceId),
                 collectionInfo: getCollectionInfoSignal(identity.dataSourceId),

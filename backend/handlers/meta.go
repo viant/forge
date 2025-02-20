@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/viant/afs/url"
-	"github.com/viant/forge/backend/service/window"
+	"github.com/viant/forge/backend/service/meta"
 	"github.com/viant/forge/backend/types"
 	"net/http"
 
@@ -13,7 +13,7 @@ import (
 )
 
 // WindowHandler fetches window data using the file.Service.
-func WindowHandler(loader *window.Service, baseURL string, baseURI string) http.HandlerFunc {
+func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, baseURI), "/")
@@ -23,7 +23,7 @@ func WindowHandler(loader *window.Service, baseURL string, baseURI string) http.
 		}
 		path := pathParts[0]
 		subPath := strings.Join(pathParts[1:], "/")
-		aWindow, err := loadWindow(r.Context(), loader, baseURL, path, subPath)
+		aWindow, err := LoadWindow(r.Context(), loader, baseURL, path, subPath)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -34,8 +34,8 @@ func WindowHandler(loader *window.Service, baseURL string, baseURI string) http.
 	}
 }
 
-// Loads window data using the file.Service.
-func loadWindow(ctx context.Context, loader *window.Service, baseURL, key, subKey string) (*types.Window, error) {
+// LoadWindow loads window data using the file.Service.
+func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey string) (*types.Window, error) {
 	subPath := "main"
 	if subKey != "" {
 		subPath = subKey + "/main"

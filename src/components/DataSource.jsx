@@ -117,7 +117,6 @@ export default function DataSource({context}) {
     const handleUpstream = () => {
         if (upstream.value.selected) {
             let {records} = extractData(selectors, paging, upstream.value.selected);
-            console.log('records', records)
 
             if (events.onFetch.isDefined() && records.length > 0) {
                 records = events.onFetch.execute({collection: records})
@@ -138,11 +137,7 @@ export default function DataSource({context}) {
     useSignalEffect(() => {
         const inputVal = input.value || {};
         const {fetch, refresh = false} = inputVal;
-
-        console.log(inputVal, fetch, refresh)
         if (!fetch && ! refresh) return;
-
-
         if (refresh) {
             if (dataSource.dataSourceRef) {
                 handleUpstream()
@@ -175,7 +170,6 @@ export default function DataSource({context}) {
         let {refreshFilter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters)
 
-        console.log('refreshRecords', refreshFilter, hasDeps)
         if (!hasDeps) {
             flagReadDone()
             return;
@@ -195,16 +189,14 @@ export default function DataSource({context}) {
                 records = events.onFetch.execute({collection: records})
             }
 
-            console.log('refreshRecords', records)
-
             if (records.length > 0) {
-                const uid = getUniqueKeyValue(records[0]);
 
-                console.log('refreshRecords', uid)
+
+                const uid = getUniqueKeyValue(records[0]);
                 let selectedIndex = selection.peek()?.rowIndex || -1
                 const snapshot = collection.peek()
                 if (selectedIndex >= 0 && selectedIndex < snapshot.length) {
-                    if (getUniqueKeyValue(collection[selectedIndex]) !== uid) {
+                    if (getUniqueKeyValue(snapshot[selectedIndex]) !== uid) {
                         selectedIndex = -1
                     }
                 }
@@ -236,10 +228,7 @@ export default function DataSource({context}) {
                 }
 
                 const updated = updateRecordInSnapshot(snapshot, uid, records[0]);
-
-                console.log('refreshRecords', uid, updated)
                 if (updated) {
-                    console.log('updating collection values', collection.value, context.identity)
                     collection.value = snapshot
                     if (selectedIndex >= 0) {
                         setSelected({selected: records[0], rowIndex: selectedIndex})
@@ -327,7 +316,7 @@ export default function DataSource({context}) {
             }
             // 4) Post-Fetch Hook
         } catch (err) {
-            console.log('doFetchRecords error', err)
+            console.warn('doFetchRecords error', err)
             setError(err);
             collection.value = [];
 

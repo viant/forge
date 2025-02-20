@@ -17,16 +17,13 @@ export const toUTC = (date) => {
         ('' + date.getSeconds()).padStart(2, '0') + 'Z';
 };
 
+
 export const fromUTC = (value) => {
     const offset = getZoneOffset();
     if (value === null) {
-        const now = new Date();
-        const inHour = new Date();
-        inHour.setHours(inHour.getHours() + 1 + (now.getTimezoneOffset() / 60));
-        return inHour;
+        return new Date();
     }
-
-    if (value.endsWith('Z')) {
+    if ((typeof(value) === 'string') && value.endsWith('Z')) {
         value = value.replace('Z', `-${offset}`);
     }
     return new Date(value);
@@ -165,24 +162,6 @@ export function timeAt(literal) {
     // -----------------------------
     // 4) Apply offset to baseTime
     // -----------------------------
-    let finalTime = new Date(baseTime.getTime() + offsetMs);
-
-    // -----------------------------
-    // 5) If phrase includes "in utc" or ends with "utc",
-    //    interpret finalTime in UTC
-    // -----------------------------
-    if (str.indexOf("in utc") !== -1 || str.endsWith("utc")) {
-        finalTime = new Date(Date.UTC(
-            finalTime.getUTCFullYear(),
-            finalTime.getUTCMonth(),
-            finalTime.getUTCDate(),
-            finalTime.getUTCHours(),
-            finalTime.getUTCMinutes(),
-            finalTime.getUTCSeconds(),
-            finalTime.getUTCMilliseconds()
-        ));
-    }
-
-    return finalTime;
+    return new Date(baseTime.getTime() + offsetMs);
 }
 

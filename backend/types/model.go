@@ -375,7 +375,8 @@ type Execute struct {
 	Init       string       `json:"init,omitempty" yaml:"init,omitempty"`
 	Handler    string       `json:"handler,omitempty" yaml:"handler,omitempty"`
 	OnError    string       `json:"onError,omitempty" yaml:"onError,omitempty"`
-	OnDone     string       `json:"onDone" yaml:"onDone"`
+	OnDone     string       `json:"onDone,omitempty" yaml:"onDone,omitempty"`
+	OnSuccess  string       `json:"onSuccess,omitempty" yaml:"onSuccess,omitempty"`
 }
 
 type Option struct {
