@@ -1,4 +1,4 @@
-package window
+package meta
 
 import (
 	"context"
@@ -22,7 +22,11 @@ type Service struct {
 // Load reads the YAML file at the given path, resolves $import directives,
 // and decodes the result into the provided Go variable v.
 func (l *Service) Load(ctx context.Context, path string, v interface{}) error {
-	URL := url.Join(l.baseURL, path)
+	URL := l.getURL(path)
+	return l.LoadWithURL(ctx, URL, v)
+}
+
+func (l *Service) LoadWithURL(ctx context.Context, URL string, v interface{}) error {
 	// Read the file content using the filesystem service.
 	data, err := l.fs.DownloadWithURL(ctx, URL, l.options...)
 	if err != nil {
@@ -44,16 +48,35 @@ func (l *Service) Load(ctx context.Context, path string, v interface{}) error {
 	}
 
 	// Decode the resolved YAML node into the provided Go variable.
-	return node.Decode(v)
+	err = node.Decode(v)
+
+	return err
 }
 
 func (l *Service) Exists(ctx context.Context, path string) (bool, error) {
-	URL := url.Join(l.baseURL, path)
+	URL := l.getURL(path)
+
 	return l.fs.Exists(ctx, URL, l.options...)
 }
 
+func (l *Service) List(ctx context.Context, path string) ([]string, error) {
+	var result []string
+	URL := l.getURL(path)
+	objects, err := l.fs.List(ctx, URL, l.options...)
+	if err != nil {
+		return nil, err
+	}
+	for _, object := range objects {
+		if object.IsDir() {
+			continue
+		}
+		result = append(result, object.URL())
+	}
+	return result, nil
+}
+
 func (l *Service) Download(ctx context.Context, path string) ([]byte, error) {
-	URL := url.Join(l.baseURL, path)
+	URL := l.getURL(path)
 	return l.fs.DownloadWithURL(ctx, URL, l.options...)
 }
 
@@ -229,6 +252,14 @@ func getNodeByKey(node *yaml.Node, key string) (*yaml.Node, error) {
 	}
 
 	return currentNode, nil
+}
+
+func (l *Service) getURL(path string) string {
+	URL := path
+	if l.baseURL != "" {
+		URL = url.Join(l.baseURL, path)
+	}
+	return URL
 }
 
 // parseIndex converts a string to an integer index.

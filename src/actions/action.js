@@ -33,8 +33,6 @@ export function injectActions(metadata) {
         const actionCode = metadata.actions.code;
         const fn = new Function('context', 'utilities', 'with(context,utilities) { return ' + actionCode + ';}')
         metadata.actions['import'] = (context) => {
-            console.log('context', context)
-
             const result = fn(context, utilities)
             return {[namespace]: result}
         }

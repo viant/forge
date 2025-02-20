@@ -31,9 +31,9 @@ const WindowContent = ({window, isInTab = false}) => {
     const connector = useDataConnector(config)
     const metadata = metadataSignal.peek();
     connector.get({}).then(
-        (data) => {
-            injectActions(data);
-            metadataSignal.value = data
+        (response) => {
+            injectActions(response.data);
+            metadataSignal.value = response.data
         }
     ).catch((error) => {
             console.error("Error fetching metadata", error)

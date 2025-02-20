@@ -27,27 +27,32 @@ function adjustProperties(item, properties) {
 
     const hasPlaceholder = Object.prototype.hasOwnProperty.call(properties, 'placeholder');
     const hasTimePrecision = Object.prototype.hasOwnProperty.call(properties, 'timePrecision');
+    let placeholder = properties['placeholder'];
 
     switch (item.type) {
         case 'datetime':
-            if (!hasPlaceholder) {
-                properties['placeholder'] = 'Select a time...';
-            }
             if (!hasTimePrecision) {
                 properties['timePrecision'] = 'minute';
             }
+            properties['inputProps'] = {name: item.id, placeholder:placeholder || 'Select a time...'};
+            delete (properties['placeholder']);
+
             break;
         case 'date':
             if (!hasPlaceholder) {
                 properties['placeholder'] = 'Select a date...';
             }
+            properties['inputProps'] = {name: item.id, placeholder:placeholder || 'Select a date...'};
+            delete (properties['placeholder']);
             break;
         case 'text':
         case 'math':
         case 'string':
         case 'number':
+        case '':
         case 'textarea':
         case 'currency':
+            properties['name'] = item.id;
             if (!hasPlaceholder) {
                 properties['placeholder'] = `Enter ${item.label}...`;
             }
@@ -69,7 +74,11 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
         const span = Math.min(item.columnSpan || 1, columns);
 
 
+        // properties['name'] = item.id;
         const itemId = context.itemId(container, item)
+        // properties['aria-label'] = item.label || item.id;
+
+
         adjustProperties(item, properties);
 
         const itemStyle = {
@@ -117,7 +126,7 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case undefined:
                 layoutItem = (
                     <InputGroup
-                        id={itemId}
+
                         {...properties}
                         {...events}
                         value={value}
@@ -127,11 +136,10 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 break;
             case 'math':
                 layoutItem = (
-                    <EditableMathField id={itemId}  {...properties} {...events} latex={value}/>)
+                    <EditableMathField  {...properties} {...events} latex={value}/>)
             case 'number':
                 layoutItem = (
                     <NumericInput
-                        id={itemId}
                         {...properties}
                         {...events}
                         value={value}
@@ -143,7 +151,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case 'checkbox':
                 layoutItem = (
                     <Checkbox
-                        id={itemId}
                         {...properties}
                         {...events}
                         checked={!!value}
@@ -155,7 +162,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case 'toggle':
                 layoutItem = (
                     <Switch
-                        id={itemId}
                         {...properties}
                         checked={!!value}
                         {...events}
@@ -168,7 +174,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 const options = item.options || [];
                 layoutItem = (
                     <RadioGroup
-                        name={itemId}
                         {...properties}
                         {...events}
                         disabled={readOnly}
@@ -215,7 +220,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case 'textarea':
                 layoutItem = (
                     <TextArea
-                        id={itemId}
                         {...properties}
                         {...events}
                         value={value}
@@ -225,9 +229,12 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 break;
 
             case 'datetime':
+
+                console.log('datetime', item, properties)
+
                 layoutItem = (
                     <DateInput3
-                        id={itemId}
+
                         {...properties}
                         formatDate={(date) => {
                             if (item.dateFnsFormat) {
@@ -253,7 +260,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case 'date':
                 layoutItem = (
                     <DateInput3
-                        id={itemId}
                         {...properties}
                         formatDate={(date) => {
                             if (item.dateFnsFormat) {
@@ -286,7 +292,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case 'progressBar':
                 layoutItem = (
                     <ProgressBar
-                        id={itemId}
                         {...properties}
                         value={value || 0}
                     />
@@ -296,7 +301,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case 'currency':
                 layoutItem = (
                     <NumericInput
-                        id={itemId}
                         {...properties}
                         {...events}
                         value={value}
@@ -310,7 +314,7 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 // Example custom component:
                 layoutItem = (
                     <KeyValuePairsComponent
-                        id={itemId}
+
                         {...properties}
                         {...events}
                         data={value || {}}
@@ -323,7 +327,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 // Retains the original default case
                 layoutItem = (
                     <InputGroup
-                        id={itemId}
                         {...properties}
                         {...events}
                         value={value || ''}

@@ -6,6 +6,6 @@ dist/
 *.log
 package-lock.json
 yarn.lock
-test_local.go
+thtest_local.go
 
 

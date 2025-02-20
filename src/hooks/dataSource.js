@@ -115,7 +115,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
      */
     function getUniqueKeyValue(record) {
         const uniqueKey = dataSource.uniqueKey || [];
-        if (!record || !uniqueKey.length) {
+        if (!uniqueKey.length) {
             throw new Error("No unique key found in dataSource");
         }
 
@@ -252,13 +252,12 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         if (args.length === 0) {
             throw new Error('pushLocalState requires dest argument');
         }
-        console.log('args', data);
         switch (args[0]) {
             case "filter":
                 pushFilterValues({filter: data});
                 break;
             case "form":
-                setFormValues(data);
+                setFormData(data);
                 break;
             default:
                 throw new Error(`Unknown pushLocalState destination: ${args[0]}`);
@@ -304,7 +303,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         const currentSelection = getSelection();
 
         if (dataSource.selfReference) {
-            console.log('currentSelection', currentSelection);
             if (selectionMode === 'multi') {
                 const selectedItems = currentSelection.selection || [];
                 return selectedItems.some(
@@ -312,7 +310,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
                 );
             }
             const selectedItem = currentSelection.selected;
-            console.log('selectedItem', selectedItem);
             return selectedItem && arrayEquals(currentSelection.nodePath, nodePath);
         }
         // Existing flat data handling
@@ -477,7 +474,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
     const pushFilterValues = ({filter = {}}) => {
         input.value = {...input.value, fetch: true, filter: filter};
-        console.log('input', input, filter);
     };
 
 
@@ -494,8 +490,22 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         form.value = {...form.peek(), [item.id]: value};
     }
 
-    const setFormValues = ({values = {}}) => {
+    const setSilentFormField = ({item, value}) => {
+        const form =  form.peek()
+        form[item.id] = value;
+    }
+
+
+
+    const setFormData = ({values = {}}) => {
         form.value = values;
+    }
+
+    const setSilentFormData = ({values = {}}) => {
+        const silentForm =  form.peek()
+        for (const key in values) {
+            silentForm[key] = values[key];
+        }
     }
 
     const getFormData = () => {
@@ -503,9 +513,11 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     };
 
 
+
     const peekFormData = () => {
         return form.peek() || {};
     };
+
 
 
     const peekCollection = () => {
@@ -575,7 +587,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     }
 
     const getFilterSet = () => {
-        console.log('dataSource', dataSource);
         return dataSource.filterSet || [];
 
     }
@@ -616,7 +627,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
     const refreshSelection = ({filter = {}}) => {
         const snapshot = peekSelection()
-        console.log('refreshSelection', snapshot)
         if (snapshot.rowIndex < 0) {
             return
         }
@@ -625,7 +635,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         if (!selectedRecord) {
             return
         }
-        console.log('refreshSelection', selectedRecord)
         input.value = {
             ...input.value,
             refreshFilter: {...filter},
@@ -660,8 +669,11 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         getUniqueKeyFilter,
         getUniqueKeyValue,
         getFormData,
+        setFormData,
+        setSilentFormData,
         peekFormData,
         setFormField,
+        setSilentFormField,
         setError,
         setLoading,
         getError,

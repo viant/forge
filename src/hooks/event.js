@@ -1,10 +1,13 @@
 // useGenericDataSourceHandlers.js
-import { resolveParameters } from "./parameters.js";
+import {resolveParameters} from "./parameters.js";
 
 const Execution = (context, messageBus) => {
     const executions = [];
 
     const executeHandler = (execution, args = {}) => {
+
+        let result = null;
+        let error = null;
         try {
             let parameters = {};
             // Resolve parameters before executing handler
@@ -14,29 +17,38 @@ const Execution = (context, messageBus) => {
 
             const initHandler = execution.initHandler;
             if (initHandler) {
-                if (!initHandler({ execution, ...args, parameters })) {
+                const success = initHandler({execution, ...args, parameters})
+                if(!success) {
                     return false;
                 }
             }
+
             const handler = execution.handler;
-            const result = handler({ execution, ...args, parameters });
-            if (execution.onDoneHandler) {
-                return execution.onDoneHandler({ execution, ...args, result, parameters });
+            result = handler({execution, ...args, parameters});
+
+            if (execution.onSuccessHandler) {
+                return execution.onSuccessHandler({execution, ...args, result, parameters});
             }
+
             return result;
         } catch (e) {
+            error = e;
             console.error("executeHandler error", execution.id, e);
             const onErrorHandler = execution.onErrorHandler;
             if (onErrorHandler) {
-                onErrorHandler({ execution, ...args, error: e });
+                onErrorHandler({execution, ...args, error: e});
             } else {
                 throw e;
+            }
+        } finally {
+            if (execution.onDoneHandler) {
+                return execution.onDoneHandler({execution, ...args, result, error, parameters});
             }
         }
     };
 
     const scheduleHandler = (execution, args = {}) => {
-        messageBus.value = [...messageBus.peek(), { execution: execution, args }];
+        messageBus.value = [...messageBus.peek(), {execution: execution, args}];
     };
 
     let inited = false;
@@ -57,6 +69,10 @@ const Execution = (context, messageBus) => {
             if (execution.onDone) {
                 execution.onDoneHandler = context.lookupHandler(execution.onDone);
             }
+            if (execution.onSuccess) {
+                execution.onSuccessHandler = context.lookupHandler(execution.onSuccess);
+            }
+
             if (!execution.handler) {
                 execution.handler = context.lookupHandler(execution.id);
             }
@@ -96,15 +112,15 @@ const Execution = (context, messageBus) => {
 
     const size = () => executions.length;
     const hasExecution = () => (executions?.length || 0) > 0;
-    return { execute, push, size, handlerName, isDefined: hasExecution };
+    return {execute, push, size, handlerName, isDefined: hasExecution};
 };
 
 function indexExecution(context, on, handlers, messageBus) {
-    on.forEach(({ event, init, handler, onError, onDone, async, args, parameters }) => {
+    on.forEach(({event, init, handler, onError, onDone, onSuccess, async, args, parameters}) => {
         if (!handlers[event]) {
             handlers[event] = Execution(context, messageBus);
         }
-        handlers[event].push({ id: handler, init, onError, onDone, async, args, parameters, handler: null });
+        handlers[event].push({id: handler, init, onError, onSuccess, onDone, async, args, parameters, handler: null});
     });
 }
 
@@ -113,8 +129,8 @@ const isStateEvent = (key) => {
 };
 
 export const useControlEvents = (context, items = [], state) => {
-    const { signals } = context;
-    const { message } = signals;
+    const {signals} = context;
+    const {message} = signals;
     const result = {};
 
     items.forEach((item) => {
@@ -145,7 +161,7 @@ export const useControlEvents = (context, items = [], state) => {
                 break;
         }
         if (on.length === 0 && Object.keys(handlers).length === 0) {
-            result[item.id] = { events: {}, stateEvents: {} };
+            result[item.id] = {events: {}, stateEvents: {}};
             return;
         }
         indexExecution(context, on, handlers, message);
@@ -153,9 +169,9 @@ export const useControlEvents = (context, items = [], state) => {
             const [data, setData] = state;
             const execution = {
                 id: "setData",
-                handler: ({ item, value }) => {
+                handler: ({item, value}) => {
                     setData((prevData) => {
-                        return { ...prevData, [item.id]: value };
+                        return {...prevData, [item.id]: value};
                     });
                 },
             };
@@ -179,13 +195,13 @@ export const useControlEvents = (context, items = [], state) => {
             }
         } else {
             if (handlers.onChange && !handlers.onChange.isDefined()) {
-                handlers.onChange.push({ id: "dataSource.setFormField" });
+                handlers.onChange.push({id: "dataSource.setFormField"});
             }
             if (handlers.onValueChange && !handlers.onValueChange.isDefined()) {
-                handlers.onValueChange.push({ id: "dataSource.setFormField" });
+                handlers.onValueChange.push({id: "dataSource.setFormField"});
             }
             if (handlers.onItemSelect && !handlers.onItemSelect.isDefined()) {
-                handlers.onItemSelect.push({ id: "dataSource.setFormField" });
+                handlers.onItemSelect.push({id: "dataSource.setFormField"});
             }
         }
 
@@ -194,7 +210,7 @@ export const useControlEvents = (context, items = [], state) => {
         for (const key in handlers) {
             if (handlers[key] && handlers[key].isDefined()) {
                 if (isStateEvent(key)) {
-                    stateEvents[key] = () => handlers[key].execute({ item, state });
+                    stateEvents[key] = () => handlers[key].execute({item, state});
                     continue;
                 }
                 switch (key) {
@@ -202,7 +218,7 @@ export const useControlEvents = (context, items = [], state) => {
                     case "onClick":
                         events["onClick"] = (event) => {
                             const value = event.target?.value;
-                            return handlers[key].execute({ event, item, value, state });
+                            return handlers[key].execute({event, item, value, state});
                         };
                         break;
                     case "onChange":
@@ -211,32 +227,32 @@ export const useControlEvents = (context, items = [], state) => {
                             case "date": // fallthrough
                             case "datetime":
                                 events["onChange"] = (value) => {
-                                    return handlers[key].execute({ item, value, state });
+                                    return handlers[key].execute({item, value, state});
                                 };
                                 break;
                             case "checkbox":
                             case "toggle":
                                 events["onChange"] = (event) => {
                                     const value = event.target?.checked;
-                                    return handlers[key].execute({ event, item, value, state });
+                                    return handlers[key].execute({event, item, value, state});
                                 };
                                 break;
                             default:
                                 events["onChange"] = (event) => {
                                     const value = event.target?.value;
-                                    return handlers[key].execute({ event, item, value, state });
+                                    return handlers[key].execute({event, item, value, state});
                                 };
                         }
                         break;
                     case "onValueChange":
                         events["onValueChange"] = (value) => {
-                            return handlers[key].execute({ item, value, state });
+                            return handlers[key].execute({item, value, state});
                         };
                         break;
                     case "onItemSelect":
                         events["onItemSelect"] = (event) => {
                             const value = event.target?.value;
-                            return handlers[key].execute({ event, item, value, state });
+                            return handlers[key].execute({event, item, value, state});
                         };
                         break;
                     default:
@@ -246,20 +262,17 @@ export const useControlEvents = (context, items = [], state) => {
             }
         }
 
-        result[item.id] = { events, stateEvents };
+        result[item.id] = {events, stateEvents};
     });
 
     return result;
 };
 
 
-
-
-
 export const fileBrowserHandlers = (context, container) => {
-    const { signals } = context;
-    const { message } = signals;
-    const { on = [] } = container.fileBrowser;
+    const {signals} = context;
+    const {message} = signals;
+    const {on = []} = container.fileBrowser;
     const handlers = {
         onInit: Execution(context, message),
         onNodeSelect: Execution(context, message),
@@ -270,11 +283,11 @@ export const fileBrowserHandlers = (context, container) => {
 
     if (!handlers.onInit.isDefined()) {
         // Default behavior to fetch collection
-        handlers.onInit.push({ id: "dataSource.fetchCollection" });
+        handlers.onInit.push({id: "dataSource.fetchCollection"});
     }
     if (!handlers.onNodeSelect.isDefined()) {
         // Default onSelect behavior
-        handlers.onNodeSelect.push({ id: "dataSource.toggleSelection" });
+        handlers.onNodeSelect.push({id: "dataSource.toggleSelection"});
     }
 
     return handlers;
@@ -282,9 +295,9 @@ export const fileBrowserHandlers = (context, container) => {
 
 
 export const editorHandlers = (context, container) => {
-    const { signals } = context;
-    const { message } = signals;
-    const { on = [] } = container.editor;
+    const {signals} = context;
+    const {message} = signals;
+    const {on = []} = container.editor;
     const handlers = {
         onInit: Execution(context, message),
     };
@@ -293,12 +306,10 @@ export const editorHandlers = (context, container) => {
 };
 
 
-
-
 export const tableHandlers = (context, container) => {
-    const { signals } = context;
-    const { message } = signals;
-    const { on = [] } = container.table;
+    const {signals} = context;
+    const {message} = signals;
+    const {on = []} = container.table;
     const handlers = {
         onInit: Execution(context, message),
         onRowSelect: Execution(context, message),
@@ -308,22 +319,22 @@ export const tableHandlers = (context, container) => {
 
     if (!handlers.onInit.isDefined()) {
         // TODO if has dependency refresh only if parent is set
-        handlers.onInit.push({ id: "dataSource.fetchCollection" });
+        handlers.onInit.push({id: "dataSource.fetchCollection"});
     }
     if (!handlers.onRowSelect.isDefined()) {
-        handlers.onRowSelect.push({ id: "dataSource.toggleSelection" });
+        handlers.onRowSelect.push({id: "dataSource.toggleSelection"});
     }
     if (!handlers.onApplyFilter.isDefined()) {
-        handlers.onApplyFilter.push({ id: "dataSource.setFilter" });
+        handlers.onApplyFilter.push({id: "dataSource.setFilter"});
     }
 
     return handlers;
 };
 
 export const dialogHandlers = (context, container) => {
-    const { signals } = context;
-    const { message } = signals;
-    const { actions = [], items = [], on = [] } = container;
+    const {signals} = context;
+    const {message} = signals;
+    const {actions = [], items = [], on = []} = container;
     const handlers = {
         onInit: Execution(context, message),
         onOpen: Execution(context, message),
@@ -348,9 +359,9 @@ export const dialogHandlers = (context, container) => {
 };
 
 export const dataSourceEvents = (context, dataSource) => {
-    const { signals } = context;
-    const { message } = signals;
-    const { on = [] } = dataSource;
+    const {signals} = context;
+    const {message} = signals;
+    const {on = []} = dataSource;
     const handlers = {
         onFetch: Execution(context, message),
     };
@@ -358,38 +369,38 @@ export const dataSourceEvents = (context, dataSource) => {
     return handlers;
 };
 
-export const useCellEvents = ({ context, cellSelection, columnHandlers = {}, onRowClick }) => {
+export const useCellEvents = ({context, cellSelection, columnHandlers = {}, onRowClick}) => {
     const keys = Object.keys(columnHandlers);
     const events = {};
     const stateEvents = {};
     if (keys.length === 0) {
-        return { events, stateEvents };
+        return {events, stateEvents};
     }
-    const { isSelected } = context.handlers.dataSource;
+    const {isSelected} = context.handlers.dataSource;
     for (const key of keys) {
         const handler = columnHandlers[key];
         if (handler && handler.isDefined()) {
             if (isStateEvent(key)) {
-                stateEvents[key] = () => handler.execute({ ...cellSelection });
+                stateEvents[key] = () => handler.execute({...cellSelection});
                 continue;
             }
             events[key] = (event) => {
                 if (event && event.stopPropagation) {
                     event.stopPropagation();
-                    if (!isSelected({ ...cellSelection })) {
-                        onRowClick({ event, ...cellSelection });
+                    if (!isSelected({...cellSelection})) {
+                        onRowClick({event, ...cellSelection});
                     }
                 }
-                return handler.execute({ event, ...cellSelection });
+                return handler.execute({event, ...cellSelection});
             };
         }
     }
-    return { events, stateEvents };
+    return {events, stateEvents};
 };
 
 export const useColumnsHandlers = (context, columns = []) => {
-    const { signals } = context;
-    const { message } = signals;
+    const {signals} = context;
+    const {message} = signals;
     const cellHandlers = {};
     columns.forEach((col) => {
         if (!col.id) {
@@ -407,11 +418,11 @@ export const useColumnsHandlers = (context, columns = []) => {
         if (col.multiSelect) {
             if (!handlers.onClick) {
                 handlers.onClick = Execution(context, message);
-                handlers.onClick.push({ id: "dataSource.toggleSelection" });
+                handlers.onClick.push({id: "dataSource.toggleSelection"});
             }
             if (!handlers.onValue) {
                 handlers.onValue = Execution(context, message);
-                handlers.onValue.push({ id: "dataSource.isSelected" });
+                handlers.onValue.push({id: "dataSource.isSelected"});
             }
         }
 
@@ -431,11 +442,9 @@ export const useColumnsHandlers = (context, columns = []) => {
 };
 
 
-
-
 export const useToolbarControlEvents = (context, items = []) => {
-    const { signals } = context;
-    const { message } = signals;
+    const {signals} = context;
+    const {message} = signals;
     const result = {};
 
     items.forEach((item) => {
@@ -451,11 +460,11 @@ export const useToolbarControlEvents = (context, items = []) => {
         } else {
             // Default event handlers for some items
             if (item.id === "filterList") {
-                handlers.onClick.push({ id: "dataSource.openFilter" });
+                handlers.onClick.push({id: "dataSource.openFilter"});
             } else if (item.id === "refresh") {
-                handlers.onClick.push({ id: "dataSource.fetchCollection" });
+                handlers.onClick.push({id: "dataSource.fetchCollection"});
             } else if (item.id === "settings") {
-                handlers.onClick.push({ id: "table.openSetting" });
+                handlers.onClick.push({id: "table.openSetting"});
             }
         }
 
@@ -470,17 +479,17 @@ export const useToolbarControlEvents = (context, items = []) => {
             const handler = handlers[key];
             if (handler && handler.isDefined()) {
                 if (isStateEvent(key)) {
-                    stateEvents[key] = () => handler.execute({ item });
+                    stateEvents[key] = () => handler.execute({item});
                     continue;
                 }
                 if (key === "onClick") {
                     events["onClick"] = (event) => {
-                        return handler.execute({ event, item });
+                        return handler.execute({event, item});
                     };
                 }
             }
         }
-        result[item.id] = { events, stateEvents };
+        result[item.id] = {events, stateEvents};
     });
 
     return result;
