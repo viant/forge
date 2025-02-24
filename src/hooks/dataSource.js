@@ -337,12 +337,18 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     const noSelection = () => {
+       return ! hasSelection()
+    }
+
+    const hasSelection = () => {
         const currentSelection = getSelection();
         if (selectionMode === 'multi') {
-            return (!currentSelection.selection) || currentSelection.selection?.length === 0;
+            return  currentSelection.selection && currentSelection.selection?.length > 0;
         }
-        return !currentSelection.selected;
+        return !!currentSelection.selected;
     }
+
+
 
     const setAllSelection = () => {
         if (selectionMode !== 'multi') return;
@@ -680,6 +686,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         setAllSelection,
         resetSelection,
         isSelected,
+        hasSelection,
         noSelection,
         setPage,
         getPage,

@@ -75,7 +75,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             }
             const ctx = this.Context(dataSourceRef)
             const result = {...ctx, handlers: {...ctx.handlers, dialog: useDialogHandlers(windowId, dialog.id)}}
-            result.lookupHandler = (name) => resolveActionHandler(result.actions, result.handlers, name);
+            result.lookupHandler = (name) => {
+                return resolveActionHandler(result.actions, result.handlers, name);
+            }
             dialogContextCache[key] = result
             return dialogContextCache[key]
         },
@@ -153,7 +155,10 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 window: windowHandlers,
             }
             result.actions = metadata.actions.import(result) || {}
-            result.lookupHandler = (name) => resolveActionHandler(result.actions, result.handlers, name);
+
+            result.lookupHandler = (name) => {
+                return resolveActionHandler(result.actions, result.handlers, name);
+            }
             dataSourceContextCache[dataSourceRef] = result
             this.dataSources[dataSourceRef] = dataSourceContextCache[dataSourceRef];
             return dataSourceContextCache[dataSourceRef];

@@ -36,6 +36,7 @@ export function injectActions(metadata) {
             const result = fn(context, utilities)
             return {[namespace]: result}
         }
+
     } catch (error) {
         console.error("Error injecting actions:", error);
         throw error;
