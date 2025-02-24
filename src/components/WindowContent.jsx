@@ -23,7 +23,6 @@ const WindowContent = ({window, isInTab = false}) => {
     const metadataSignal = getMetadataSignal(windowId);
     const {connectorConfig = {},  services={}} = useSetting();
     if (!connectorConfig.window) {
-        console.log(connectorConfig)
         throw new Error("No connectorConfig.window found")
     }
     const {service} = connectorConfig.window || {};
@@ -109,7 +108,6 @@ const WindowContent = ({window, isInTab = false}) => {
                 title={`${windowKey.toUpperCase()}${windowData ? ` (${windowData})` : ''}`}
                 context={context}
                 onClose={() => {
-                    console.log('Closing window:', windowId);
                     removeWindow(windowId);
                     removeSignalsForKey(windowId);
                 }}
