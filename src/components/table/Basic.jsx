@@ -15,6 +15,7 @@ import Toolbar from "./basic/Toolbar.jsx";
 const defaultCellWidth = 30; // Adjust as needed
 
 export const resolveKey = (holder, name) => {
+
     const keys = name.split(".");
     if (keys.length === 1) {
         return holder[name];
@@ -22,6 +23,9 @@ export const resolveKey = (holder, name) => {
     let result = holder;
     for (const key of keys) {
         result = result[key];
+        if(result === undefined) {
+            break;
+        }
     }
     return result;
 };
@@ -167,6 +171,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const numeralFormats = {
         int: "0,0",
         numeric: "0,0.00",
+        precision: "0,0.00000000",
         usdCurrency: "$0,0.00",
         percent: "0.00%",
     };
@@ -181,13 +186,23 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             for (let colIndex = 0; colIndex < columnsToUse.length; colIndex++) {
                 const col = columnsToUse[colIndex];
                 const rawValue = resolveKey(item, col.id);
-                const displayedText = col.numericFormat
-                    ? numeral(rawValue).format(
-                        numeralFormats[col.numericFormat] || col.numericFormat
-                    )
-                    : rawValue;
-                const cellKey = `${rowIndex}-${col.id}`;
 
+
+                let displayedText = rawValue
+                if (col.numericFormat) {
+                    const format = numeralFormats[col.numericFormat] || col.numericFormat
+                    let numeralValue = 0.0
+                    if (typeof rawValue !== 'number') {
+                        numeralValue = parseFloat(rawValue).toFixed(10);
+                    } else {
+                        numeralValue = rawValue.toFixed(10)
+                    }
+                    displayedText = numeral(numeralValue).format(format)
+                    if(displayedText === "NaN") {
+                        displayedText = numeralValue + ''
+                    }
+                }
+                const cellKey = `${rowIndex}-${col.id}`;
                 let align = col.align;
                 if (!align && col.numericFormat) {
                     align = "right";
@@ -213,7 +228,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
 
     const handleApplyFilters = (args) => {
         const { filter = {} } = args;
-        handlers.dataSource.setFilterValues(filter);
+        handlers.dataSource.setSilentFilterValues(filter);
         return events.onApplyFilter.execute(args);
     };
 
@@ -269,7 +284,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             <Toolbar
                 context={context}
                 toolbarItems={container?.table?.toolbar?.items || []}
-                loading={loading}
             />
 
             <HTMLTable style={{ width: "100%", tableLayout: "fixed" }}>
@@ -301,7 +315,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                     <TableFooter
                         columnsLength={columnsToUse.length}
                         pagination={pagination}
-                        loading={loading}
                         context={context}
                         pagingEnabled={pagingEnabled}
                     />

@@ -234,25 +234,25 @@ type UnitedSize struct {
 }
 
 type Container struct {
-	ID            string           `json:"id" yaml:"id"`
-	DataSourceRef string           `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	State         *Parameter       `json:"state,omitempty" yaml:"state,omitempty"`
-	Title         string           `json:"title,omitempty" yaml:"title,omitempty"`
-	Layout        *Layout          `json:"layout,omitempty" yaml:"layout,omitempty"`
-	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	Table         *Table           `json:"table,omitempty" yaml:"table,omitempty"`
-	FileBrowser   *FileBrowser     `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
-	Editor        *Editor          `json:"editor,omitempty" yaml:"editor,omitempty"`
-	Chart         *Chart           `json:"chart,omitempty" yaml:"chart,omitempty"`
-	Section       *Section         `json:"section,omitempty" yaml:"section,omitempty"`
-	Items         []Item           `json:"items,omitempty" yaml:"items,omitempty"`
-	Card          *Card            `json:"card,omitempty" yaml:"card,omitempty"`
-	Footer        *Container       `json:"footer,omitempty" yaml:"footer,omitempty"`
-	Containers    []Container      `json:"containers,omitempty" yaml:"containers,omitempty"`
-	On            []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
-	Tabs          *Tabs            `json:"tabs,omitempty" yaml:"tabs,omitempty"`
-	Dialogs       []string         `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
-	Repeat        *Repeat          `json:"repeat,omitempty" yaml:"repeat,omitempty"`
+	ID          string `json:"id" yaml:"id"`
+	Binding     `yaml:",inline"`
+	State       *Parameter       `json:"state,omitempty" yaml:"state,omitempty"`
+	Title       string           `json:"title,omitempty" yaml:"title,omitempty"`
+	Layout      *Layout          `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Style       *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	Table       *Table           `json:"table,omitempty" yaml:"table,omitempty"`
+	FileBrowser *FileBrowser     `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
+	Editor      *Editor          `json:"editor,omitempty" yaml:"editor,omitempty"`
+	Chart       *Chart           `json:"chart,omitempty" yaml:"chart,omitempty"`
+	Section     *Section         `json:"section,omitempty" yaml:"section,omitempty"`
+	Items       []Item           `json:"items,omitempty" yaml:"items,omitempty"`
+	Card        *Card            `json:"card,omitempty" yaml:"card,omitempty"`
+	Footer      *Container       `json:"footer,omitempty" yaml:"footer,omitempty"`
+	Containers  []Container      `json:"containers,omitempty" yaml:"containers,omitempty"`
+	On          []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
+	Tabs        *Tabs            `json:"tabs,omitempty" yaml:"tabs,omitempty"`
+	Dialogs     []string         `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
+	Repeat      *Repeat          `json:"repeat,omitempty" yaml:"repeat,omitempty"`
 }
 
 type FileBrowser struct {
@@ -345,13 +345,19 @@ type SettingsConfig struct {
 
 type Section struct {
 	Collapsible bool                   `json:"collapsible" yaml:"collapsible"`
-	Padded      string                 `json:"padded,omitempty" yaml:"padded,omitempty"`
 	Properties  map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`
 }
 
+type Binding struct {
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Scope         string `json:"scope,omitempty" yaml:"scope,omitempty"`
+	MutationMode  string `json:"mutationMode,omitempty" yaml:"mutationMode,omitempty"`
+}
+
 type Item struct {
-	ID            string                 `json:"id" yaml:"id"`
-	DataSourceRef string                 `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	ID            string `json:"id" yaml:"id"`
+	Binding       `yaml:",inline"`
+	Value         interface{}            `json:"value,omitempty" yaml:"value,omitempty"`
 	Style         *StyleProperties       `json:"style,omitempty" yaml:"style,omitempty"`
 	Label         string                 `json:"label" yaml:"label"`
 	LabelPosition string                 `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
@@ -386,7 +392,7 @@ type Option struct {
 
 type DataSource struct {
 	Service       *Service       `json:"service,omitempty" yaml:"service,omitempty"`
-	SataSourceRef string         `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	DataSourceRef string         `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	UniqueKey     []*UniqueKey   `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
 	Parameters    []Parameter    `json:"parameters" yaml:"parameters"`
 	On            []*Execute     `json:"on,omitempty" yaml:"on,omitempty"`

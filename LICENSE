@@ -199,3 +199,13 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+# Third-Party Licenses
+
+This project includes dependencies under the MIT License. The following libraries are MIT-licensed:
+- CoreMirror
+
+This project includes dependencies under the Apcache2 License. The following libraries are Apcache2-licensed:
+- Blueprint.js
+
+Each dependency retains its original license, found in its respective source files.

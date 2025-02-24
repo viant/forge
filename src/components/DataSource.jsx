@@ -109,7 +109,7 @@ export default function DataSource({context}) {
     const {dataSource, signals, connector, handlers, identity} = context
     const {paging, selectors} = dataSource;
     const {input, collection, selection, collectionInfo, metrics, form} = signals
-    const {getUniqueKeyValue, setSelected, setLoading, setError} = handlers.dataSource
+    const {getUniqueKeyValue, setSelected, setLoading, setError, setInactive} = handlers.dataSource
     const events = dataSourceEvents(context, dataSource);
     const upstream = dataSource.dataSourceRef ? getSelectionSignal(identity.getDataSourceId(dataSource.dataSourceRef)) : null;
 
@@ -172,7 +172,10 @@ export default function DataSource({context}) {
 
         if (!hasDeps) {
             flagReadDone()
+            setInactive(true);
             return;
+        } else {
+            setInactive(false);
         }
 
 
@@ -255,12 +258,17 @@ export default function DataSource({context}) {
         const inputVal = input.value || {};
         let {page, filter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters)
+
         if (!hasDeps) {
             setSelected({selected: null, rowIndex: -1})
             collection.value = [];
             flagReadDone()
+            setInactive(true);
             return;
+        } else {
+            setInactive(false);
         }
+
 
         if (paging) {
             page = page || 1

@@ -7,9 +7,12 @@ import { useToolbarControlEvents } from '../../../hooks/event.js';
 const Toolbar = ({
                      context,
                      toolbarItems = [],
-                     loading
                  }) => {
+
     const toolbarEvents = useToolbarControlEvents(context, toolbarItems);
+    const { signals } = context;
+    const { control } = signals;
+    const disabled = control.value?.inactive || false;
 
     return (
         <div className="toolbar-container">
@@ -18,13 +21,10 @@ const Toolbar = ({
                 {toolbarItems
                     .filter((item) => item.align === 'left')
                     .map((item) => {
-
-
-
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
                         // Determine if the button is readonly (disabled)
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const isDisabled = loading || isReadonly;
+                        const isDisabled = disabled || isReadonly;
 
                         return (
                             <span key={item.id} style={{ marginRight: "10px" }}>
@@ -48,7 +48,7 @@ const Toolbar = ({
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
 
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const isDisabled = loading || isReadonly;
+                        const isDisabled = disabled || isReadonly;
                         return (
                             <span key={item.id} style={{margin: "0 10px"}}>
                                 <Button
@@ -70,7 +70,7 @@ const Toolbar = ({
                     .map((item) => {
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const isDisabled = loading || isReadonly;
+                        const isDisabled = disabled || isReadonly;
                         return (
                             <span key={item.id} style={{ marginLeft: "10px" }}>
                                 <Button

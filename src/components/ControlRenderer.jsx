@@ -34,7 +34,7 @@ function adjustProperties(item, properties) {
             if (!hasTimePrecision) {
                 properties['timePrecision'] = 'minute';
             }
-            properties['inputProps'] = {name: item.id, placeholder:placeholder || 'Select a time...'};
+            properties['inputProps'] = {name: item.id, placeholder: placeholder || 'Select a time...'};
             delete (properties['placeholder']);
 
             break;
@@ -42,13 +42,14 @@ function adjustProperties(item, properties) {
             if (!hasPlaceholder) {
                 properties['placeholder'] = 'Select a date...';
             }
-            properties['inputProps'] = {name: item.id, placeholder:placeholder || 'Select a date...'};
+            properties['inputProps'] = {name: item.id, placeholder: placeholder || 'Select a date...'};
             delete (properties['placeholder']);
             break;
         case 'text':
         case 'math':
         case 'string':
         case 'number':
+        case 'numeric':
         case '':
         case 'textarea':
         case 'currency':
@@ -86,13 +87,26 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             ...style,
         };
 
+
         const [formData, setFormData] = state ? state : useState({});
         if (!state) {
             useSignalEffect(() => {
-                const data = context.handlers.dataSource.getFormData();
-                setFormData(data);
+                switch (item.scope) {
+                    case 'filter':
+                        const filterData = context.handlers.dataSource.getFilter();
+                        setFormData(filterData);
+                        break;
+                    default:
+                        const data = context.handlers.dataSource.getFormData();
+                        setFormData(data);
+                }
             });
         }
+
+        if (item.value && !(item.id in formData)) {
+            formData[item.id] = item.value;
+        }
+
         let readOnly = item.readOnly || false;
         let layoutItem;
         let isItemControl = false;
@@ -126,7 +140,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case undefined:
                 layoutItem = (
                     <InputGroup
-
                         {...properties}
                         {...events}
                         value={value}
@@ -137,7 +150,8 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
             case 'math':
                 layoutItem = (
                     <EditableMathField  {...properties} {...events} latex={value}/>)
-            case 'number':
+            case 'number': //fallthrough
+            case 'numeric':
                 layoutItem = (
                     <NumericInput
                         {...properties}
@@ -163,8 +177,8 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 layoutItem = (
                     <Switch
                         {...properties}
-                        checked={!!value}
                         {...events}
+                        checked={!!value}
                         disabled={readOnly}
                     />
                 );
@@ -229,9 +243,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 break;
 
             case 'datetime':
-
-                console.log('datetime', item, properties)
-
                 layoutItem = (
                     <DateInput3
 

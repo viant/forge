@@ -25,6 +25,7 @@ const TableBody = ({
         return (
             <tbody>
             <TableBackfill
+                context={context}
                 rowCount={backfillCount}
                 colSpan={columns.length}
                 loading={loading}
@@ -58,6 +59,7 @@ const TableBody = ({
         <tbody>
         {rows}
         <TableBackfill
+            context={context}
             rowCount={backfillCount}
             colSpan={columns.length}
             loading={loading}
