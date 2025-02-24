@@ -13,7 +13,6 @@ const onMessage = async (context, message) => {
             if (execution.init) {
                 const initHandler = context.lookupHandler(execution.init);
                 if (initHandler) {
-                    console.log(`Running init for event="${message.event}"`);
                     await initHandler(message);
                 }
             }
@@ -22,7 +21,6 @@ const onMessage = async (context, message) => {
             if (execution.handler) {
                 const handler = context.lookupHandler(execution.handler);
                 if (handler) {
-                    console.log(`Running handler for event="${message.event}"`);
                     output = await handler(message);
                 }
             }
@@ -30,7 +28,6 @@ const onMessage = async (context, message) => {
             if (execution.onDone) {
                 const onDoneHandler = context.lookupHandler(execution.onDone);
                 if (onDoneHandler) {
-                    console.log(`Running onDone for event="${message.event}"`);
                      return await onDoneHandler(message, output);
                 }
             }
