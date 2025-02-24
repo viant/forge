@@ -57,6 +57,14 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
     const dependencyInputs = {};
 
+    const setInactive = (inactive) => {
+        control.value = { ...control.peek(), inactive };
+    };
+
+    const isInactive = () => {
+        return control.value?.inactive || false;
+    }
+
     const setLoading = (loading) => {
         control.value = {...control.peek(), loading};
     }
@@ -466,11 +474,16 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         };
     };
 
-    const setFilterValues = ({filter = {}}) => {
+    const setSilentFilterValues = ({filter = {}}) => {
         for (const key in filter) {
             input.peek().filter[key] = filter[key];
         }
     };
+
+
+
+
+
 
     const pushFilterValues = ({filter = {}}) => {
         input.value = {...input.value, fetch: true, filter: filter};
@@ -491,10 +504,25 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     }
 
     const setSilentFormField = ({item, value}) => {
-        const form =  form.peek()
-        form[item.id] = value;
+        const prev =  form.peek()
+        prev[item.id] = value;
     }
 
+    const setFilterValue = ({item, value}) => {
+        const prev = input.peek()
+        input.value = {
+            ...input.value,
+            filter: {...prev.filter, [item.id]: value},
+        };
+        return true
+    };
+
+
+    const setSilentFilterValue = ({item, value}) => {
+        const snapshot = input.peek()
+        snapshot.filter[item.id] = value;
+        return true
+    };
 
 
     const setFormData = ({values = {}}) => {
@@ -502,10 +530,11 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     }
 
     const setSilentFormData = ({values = {}}) => {
-        const silentForm =  form.peek()
+        const snapshot =  form.peek()
         for (const key in values) {
-            silentForm[key] = values[key];
+            snapshot[key] = values[key];
         }
+        return true
     }
 
     const getFormData = () => {
@@ -513,11 +542,9 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     };
 
 
-
     const peekFormData = () => {
         return form.peek() || {};
     };
-
 
 
     const peekCollection = () => {
@@ -545,6 +572,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
                 return getFormData();
         }
     }
+
 
     const peekDataSourceValue = (scope) => {
         switch (scope) {
@@ -656,7 +684,11 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         setPage,
         getPage,
         setFilter,
-        setFilterValues,
+        setSilentFilterValues,
+
+
+        setFilterValue,
+        setSilentFilterValue,
         getFilter,
         peekFilter,
         fetchCollection,
@@ -675,6 +707,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         setFormField,
         setSilentFormField,
         setError,
+        setInactive,
+        isInactive,
         setLoading,
         getError,
         peekError,

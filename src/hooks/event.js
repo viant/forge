@@ -18,7 +18,7 @@ const Execution = (context, messageBus) => {
             const initHandler = execution.initHandler;
             if (initHandler) {
                 const success = initHandler({execution, ...args, parameters})
-                if(!success) {
+                if (!success) {
                     return false;
                 }
             }
@@ -148,7 +148,8 @@ export const useControlEvents = (context, items = [], state) => {
             case "dropdown":
                 handlers.onItemSelect = Execution(context, message);
                 break;
-            case "number": // fallthrough
+            case "number":
+            case "numeric": // fallthrough
             case "currency":
                 handlers.onValueChange = Execution(context, message);
                 break;
@@ -194,14 +195,29 @@ export const useControlEvents = (context, items = [], state) => {
                 handlers.onItemSelect.push(execution);
             }
         } else {
+
+            const scope = item.scope || 'form';
+            let changeHandler = ""
+
+
+            switch (scope) {
+                case 'filter':
+                    changeHandler = 'dataSource.setFilterValue';
+                    break;
+                default:
+                    changeHandler = 'dataSource.setFormField';
+                    break;
+            }
+
+
             if (handlers.onChange && !handlers.onChange.isDefined()) {
-                handlers.onChange.push({id: "dataSource.setFormField"});
+                handlers.onChange.push({id: changeHandler});
             }
             if (handlers.onValueChange && !handlers.onValueChange.isDefined()) {
-                handlers.onValueChange.push({id: "dataSource.setFormField"});
+                handlers.onValueChange.push({id: changeHandler});
             }
             if (handlers.onItemSelect && !handlers.onItemSelect.isDefined()) {
-                handlers.onItemSelect.push({id: "dataSource.setFormField"});
+                handlers.onItemSelect.push({id: changeHandler});
             }
         }
 

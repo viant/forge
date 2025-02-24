@@ -8,6 +8,7 @@ import {resolveParameterValue} from "../utils/selector.js";
 import {expandRepeatItems} from "../utils/repeat.js";
 import FileBrowser from "./FileBrowser.jsx";
 import Editor from "./Editor.jsx";
+import './Container.css';
 
 const Container = ({context, container, isActive}) => {
     const {items = [], containers = [], layout, table, chart} = container;
@@ -104,7 +105,6 @@ const Container = ({context, container, isActive}) => {
 
             <div style={gridStyle}>
                 {renderedItems.map((item) => {
-
                     const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
                     return (
                         <ControlRenderer

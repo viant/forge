@@ -29,7 +29,6 @@ const LayoutRenderer = ({context, container}) => {
         if(cTitle.indexOf('{') > -1) {
 
             const data = context.handlers.dataSource.getDataSourceValue('form')
-            console.log('setting title', data)
 
             setTitle(resolveTemplate(cTitle, data))
         }
@@ -78,12 +77,24 @@ const LayoutRenderer = ({context, container}) => {
 
 
     let content = renderContent();
+    if(container.items && containers && containers.length > 0) {
+        const {items, layout, dataSourceRef} = container
+        content = (<>
+                <Container context={context.Context(dataSourceRef)} container={{items, layout, dataSourceRef}}/>
+                {content}
+            </>)
+    }
 
 
     if (section) {
-        const properties = section.properties || {}
+
+        const sectionProperties = section.properties || {}
+        const properties = {
+            ...sectionProperties,
+            collapsible: sectionProperties.collapsible || false,
+        }
         content = (
-            <Section title={title} {...properties} {...section} >
+            <Section title={title} {...properties}  >
                 <Card {...card}>
                     {content}
                 </Card>
@@ -96,6 +107,7 @@ const LayoutRenderer = ({context, container}) => {
             </Card>
         );
     }
+
 
     return content;
 };

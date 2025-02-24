@@ -6,7 +6,6 @@ const TableFooter = ({
                          columnsLength,
                          pagination,
                          context,
-                         loading,
                          events,
                          pagingEnabled
                      }) => {
@@ -16,12 +15,11 @@ const TableFooter = ({
         <tr>
             <td colSpan={columnsLength} align="center">
                 {pagingEnabled ?
-                <PaginationBar
-                    context={context}
-                    loading={loading}
-                    pagination={pagination}
-                    events={events}
-                />:<hr/>}
+                    <PaginationBar
+                        context={context}
+                        pagination={pagination}
+                        events={events}
+                    /> : <hr/>}
             </td>
         </tr>
         </tfoot>

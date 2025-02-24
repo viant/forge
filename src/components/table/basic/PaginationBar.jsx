@@ -1,28 +1,38 @@
 // src/components/table/basic/PaginationBar.jsx
 
-import React, { useState } from "react";
-import { Button } from "@blueprintjs/core";
-import { useSignalEffect } from "@preact/signals-react";
+import React, {useState} from "react";
+import {Button} from "@blueprintjs/core";
+import {useSignalEffect} from "@preact/signals-react";
 
 const buttonProperties = {
-    'pagination.first': { label: "First Page", icon: "double-chevron-left" },
-    'pagination.previous': { label: "Previous Page", icon: "chevron-left" },
-    'pagination.next': { label: "Next Page", icon: "chevron-right" },
-    'pagination.last': { label: "Last Page", icon: "double-chevron-right" },
+    'pagination.first': {label: "First Page", icon: "double-chevron-left"},
+    'pagination.previous': {label: "Previous Page", icon: "chevron-left"},
+    'pagination.next': {label: "Next Page", icon: "chevron-right"},
+    'pagination.last': {label: "Last Page", icon: "double-chevron-right"},
 };
 
 const PaginationBar = ({
                            context,
-                           loading,
                            pagination,
                        }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [recordCount, setRecordCount] = useState(0);
+    const [inactive, setInactive] = useState(false);
     const handlers = context.handlers;
 
     useSignalEffect(() => {
         const info = handlers.dataSource.getCollectionInfo();
-        const newTotalPages = info?.pageCount || 1;
+        const isInactive = handlers.dataSource.isInactive();
+        setInactive(isInactive);
+
+        let newTotalPages = info?.pageCount || 1;
+        let totalCount = info?.totalCount || 0;
+        if (isInactive) {
+            newTotalPages = 0;
+            totalCount = 0;
+        }
+
         if (totalPages !== newTotalPages) {
             setTotalPages(newTotalPages);
             // Optional: Reset current page if total pages change
@@ -30,6 +40,7 @@ const PaginationBar = ({
                 setCurrentPage(newTotalPages);
             }
         }
+        setRecordCount(totalCount);
     });
 
     const onFirstPage = () => {
@@ -73,13 +84,18 @@ const PaginationBar = ({
     return (
         <div className="pagination-bar">
             <div>
-                {renderActionButton("pagination.first", onFirstPage, loading || currentPage === 1)}
-                {renderActionButton("pagination.previous", onPreviousPage, loading || currentPage === 1)}
-                <span>
-                    Page {currentPage} of {totalPages}&nbsp;
-                </span>
-                {renderActionButton("pagination.next", onNextPage, loading || currentPage >= totalPages)}
-                {renderActionButton("pagination.last", onLastPage, loading || currentPage >= totalPages)}
+                {renderActionButton("pagination.first", onFirstPage, inactive || currentPage === 1)}
+                {renderActionButton("pagination.previous", onPreviousPage, inactive || currentPage === 1)}
+
+
+                    <span>
+                        Page {currentPage} of {totalPages}&nbsp;({recordCount})
+                    </span>
+
+
+
+                {renderActionButton("pagination.next", onNextPage, inactive || currentPage >= totalPages)}
+                {renderActionButton("pagination.last", onLastPage, inactive || currentPage >= totalPages)}
             </div>
         </div>
     );
