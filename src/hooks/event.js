@@ -42,6 +42,11 @@ const Execution = (context, messageBus) => {
             }
         } finally {
             if (execution.onDoneHandler) {
+                let parameters = {};
+                // Resolve parameters before executing handler
+                if (execution.parameters && execution.parameters.length > 0) {
+                    parameters = resolveParameters(execution.parameters, context);
+                }
                 return execution.onDoneHandler({execution, ...args, result, error, parameters});
             }
         }
@@ -198,8 +203,6 @@ export const useControlEvents = (context, items = [], state) => {
 
             const scope = item.scope || 'form';
             let changeHandler = ""
-
-
             switch (scope) {
                 case 'filter':
                     changeHandler = 'dataSource.setFilterValue';
@@ -208,8 +211,6 @@ export const useControlEvents = (context, items = [], state) => {
                     changeHandler = 'dataSource.setFormField';
                     break;
             }
-
-
             if (handlers.onChange && !handlers.onChange.isDefined()) {
                 handlers.onChange.push({id: changeHandler});
             }
@@ -226,7 +227,7 @@ export const useControlEvents = (context, items = [], state) => {
         for (const key in handlers) {
             if (handlers[key] && handlers[key].isDefined()) {
                 if (isStateEvent(key)) {
-                    stateEvents[key] = () => handlers[key].execute({item, state});
+                    stateEvents[key] = (props) => handlers[key].execute({...props, item, state});
                     continue;
                 }
                 switch (key) {
@@ -310,16 +311,7 @@ export const fileBrowserHandlers = (context, container) => {
 };
 
 
-export const editorHandlers = (context, container) => {
-    const {signals} = context;
-    const {message} = signals;
-    const {on = []} = container.editor;
-    const handlers = {
-        onInit: Execution(context, message),
-    };
 
-    return handlers;
-};
 
 
 export const tableHandlers = (context, container) => {

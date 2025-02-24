@@ -65,6 +65,32 @@ function adjustProperties(item, properties) {
 }
 
 
+function getDateProperties(properties, item, events, value, readOnly) {
+    const dateProperties = {
+        ...properties,
+        formatDate: (date) => {
+            if (item.dateFnsFormat) {
+                const formatted = format(date, item.dateFnsFormat, {locale: enUS})
+                return formatted
+
+            }
+            return date.toLocaleDateString()
+        },
+        parseDate: (str) => {
+            if (item.dateFnsFormat) {
+                const parsed = parse(str, item.dateFnsFormat, new Date(), {locale: enUS})
+                return parsed
+            }
+            return new Date(str)
+        },
+        ...events,
+        value: (value || ''),
+        disabled: readOnly,
+        locale: enUS
+    }
+    return dateProperties;
+}
+
 const ControlRenderer = ({item, context, container, events = {}, stateEvents = {}, state}) => {
         const {layout} = container;
         const columns = layout?.columns || 1;
@@ -73,8 +99,9 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
         const labelPosition = item.labelPosition || layout?.labelPosition || 'top';
         const isInline = labelPosition === 'left';
         const span = Math.min(item.columnSpan || 1, columns);
-
-
+        const [dynamicReadOnly, setDynamicReadOnly] = useState(null);
+        const [dynamicProperties, setDynamicProperties] = useState(null);
+        const [dynamicValue, setDynamicValue] = useState(null);
         // properties['name'] = item.id;
         const itemId = context.itemId(container, item)
         // properties['aria-label'] = item.label || item.id;
@@ -89,8 +116,11 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
 
 
         const [formData, setFormData] = state ? state : useState({});
-        if (!state) {
-            useSignalEffect(() => {
+        let value = formData[item.id] || ''
+
+        useSignalEffect(() => {
+
+            if (!state) {
                 switch (item.scope) {
                     case 'filter':
                         const filterData = context.handlers.dataSource.getFilter();
@@ -99,27 +129,44 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                     default:
                         const data = context.handlers.dataSource.getFormData();
                         setFormData(data);
+                        value = data[item.id] || ''
                 }
-            });
-        }
+            }
+
+
+            if (stateEvents.onValue) {
+                const evaluatedValue = stateEvents.onValue({data: formData, item: item, value});
+                setDynamicValue(evaluatedValue);
+            }
+            if (stateEvents.onReadonly) {
+                const evaluatedReadonly = stateEvents.onReadonly({data: formData, item: item, value});
+                setDynamicReadOnly(evaluatedReadonly);
+            }
+
+            if (stateEvents.onProperties) {
+                const evaluatedProperties = stateEvents.onProperties({data: formData, item: item, value});
+                setDynamicProperties(evaluatedProperties);
+            }
+
+        });
+
 
         if (item.value && !(item.id in formData)) {
             formData[item.id] = item.value;
         }
 
-        let readOnly = item.readOnly || false;
+
+        let readOnly = dynamicReadOnly !== null ? dynamicReadOnly : (item.readOnly || false);
+        if (dynamicProperties !== null) {
+            properties = {...properties, ...dynamicProperties}
+        }
+        if(dynamicValue !== null) {
+            value = dynamicValue
+        }
+
         let layoutItem;
         let isItemControl = false;
-
-        let value = formData[item.id] || ''
-
-        if (stateEvents.onReadOnly) {
-            readOnly = stateEvents.onReadOnly.execute({data: formData, item: item});
-        }
-        if (stateEvents.onProperties) {
-            properties = stateEvents.onProperties.execute({data: formData, item: item});
-        }
-
+        let dateProperties = {}
 
         switch (item.type) {
             case 'button':
@@ -129,6 +176,7 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                         {...properties}
                         {...events}
                         intent={item.intent}
+                        disabled={readOnly}
                     >
                         {item.label}
                     </Button>
@@ -243,52 +291,11 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                 break;
 
             case 'datetime':
-                layoutItem = (
-                    <DateInput3
-
-                        {...properties}
-                        formatDate={(date) => {
-                            if (item.dateFnsFormat) {
-                                return format(date, item.dateFnsFormat)
-                            }
-                            return date.toLocaleDateString()
-                        }}
-                        parseDate={(str) => {
-                            if (item.dateFnsFormat) {
-                                return parse(str, item.dateFnsFormat, new Date())
-                            }
-                            return new Date(str)
-                        }}
-                        value={value || null}
-                        {...events}
-
-                        disabled={readOnly}
-                        locale={enUS}
-                    />
-                );
-                break;
-
+                dateProperties = getDateProperties(properties, item, events, value, readOnly);
             case 'date':
+                dateProperties = getDateProperties(properties, item, events, value, readOnly);
                 layoutItem = (
-                    <DateInput3
-                        {...properties}
-                        formatDate={(date) => {
-                            if (item.dateFnsFormat) {
-                                return format(date, item.dateFnsFormat)
-                            }
-                            return date.toLocaleDateString()
-                        }}
-                        parseDate={(str) => {
-                            if (item.dateFnsFormat) {
-                                return parse(str, item.dateFnsFormat, new Date())
-                            }
-                            return new Date(str)
-                        }}
-                        {...events}
-                        value={value || null}
-                        disabled={readOnly}
-                        locale={enUS}
-                    />
+                    <DateInput3 {...dateProperties}/>
                 );
                 break;
 
