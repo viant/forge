@@ -8,10 +8,15 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
     const activeDividerIndexRef = useRef(null);
 
     const isVertical = orientation === 'vertical';
+
+
+
     const [sizes, setSizes] = useState(() => {
+        if(divider.sizes) {
+            return divider.sizes
+        }
         const initialSize = (100 / React.Children.count(children));
-        return Array(React.Children.count(children)).fill(
-            initialSize);
+        return Array(React.Children.count(children)).fill(initialSize);
     });
 
 
