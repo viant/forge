@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect} from "react";
 import {
     Button,
     MenuItem,
     RadioGroup,
     Radio,
 } from "@blueprintjs/core";
-import { MultiSelect } from "@blueprintjs/select";
+import {MultiSelect} from "@blueprintjs/select";
 import {
     LineChart,
     Line,
@@ -16,11 +16,12 @@ import {
     Legend,
     ResponsiveContainer,
 } from "recharts";
-import { format } from "date-fns";
+import {format} from "date-fns";
+import {useSignalEffect} from "@preact/signals-react";
 
 // Function to transform rawData into chartData
 export function transformData(rawData, chart, valueKey) {
-    const { xAxis, series } = chart;
+    const {xAxis, series} = chart;
     const groupedData = {};
     const keysSet = new Set();
 
@@ -31,7 +32,7 @@ export function transformData(rawData, chart, valueKey) {
         keysSet.add(seriesName);
 
         if (!groupedData[timestamp]) {
-            groupedData[timestamp] = { [xAxis.dataKey]: timestamp };
+            groupedData[timestamp] = {[xAxis.dataKey]: timestamp};
         }
 
         groupedData[timestamp][seriesName] = value;
@@ -42,7 +43,7 @@ export function transformData(rawData, chart, valueKey) {
         (a, b) => new Date(a[xAxis.dataKey]) - new Date(b[xAxis.dataKey])
     );
     const keys = Array.from(keysSet);
-    return { data, keys };
+    return {data, keys};
 }
 
 function formatTimestamp(timestamp, fmt = "MM/dd") {
@@ -67,9 +68,9 @@ function formatLargeNumber(value) {
     }
 }
 
-const Chart = ({ container, context }) => {
-    const { chart } = container;
-    const { handlers } = context;
+const Chart = ({container, context}) => {
+    const {chart} = container;
+    const {handlers} = context;
 
     // Extract chart configuration
     const {
@@ -80,7 +81,7 @@ const Chart = ({ container, context }) => {
         height,
         series,
     } = chart;
-    const { palette } = series;
+    const {palette} = series;
 
     const [chartData, setChartData] = useState([]);
     const [selectedDataKeys, setSelectedDataKeys] = useState([]);
@@ -89,9 +90,11 @@ const Chart = ({ container, context }) => {
     const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || "");
     const [yAxisLabel, setYAxisLabel] = useState(yAxis.label || "");
 
+    const [collection, setCollection] = useState([]);
+
     function prepareData() {
         const collection = handlers.dataSource.getCollection();
-        const { data, keys } = transformData(collection, chart, selectedValueKey);
+        const {data, keys} = transformData(collection, chart, selectedValueKey);
         setChartData(data);
         setAvailableDataKeys(keys); // Update available data keys
 
@@ -105,7 +108,7 @@ const Chart = ({ container, context }) => {
     useEffect(() => {
         prepareData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [handlers.dataSource.getCollection(), selectedValueKey]);
+    }, [collection, selectedValueKey]);
 
     useEffect(() => {
         // Keep selectedDataKeys in sync with availableDataKeys
@@ -122,6 +125,11 @@ const Chart = ({ container, context }) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableDataKeys]);
 
+
+    useSignalEffect(() => {
+        setCollection(handlers.dataSource.getCollection())
+    })
+
     // Function to handle selection changes for dataKeys
     const handleDataKeySelect = (dataKey) => {
         if (selectedDataKeys.includes(dataKey)) {
@@ -137,7 +145,7 @@ const Chart = ({ container, context }) => {
         setSelectedDataKeys([]);
     };
 
-    const renderDataKeyItem = (dataKey, { modifiers, handleClick }) => {
+    const renderDataKeyItem = (dataKey, {modifiers, handleClick}) => {
         return (
             <MenuItem
                 key={dataKey}
@@ -160,10 +168,10 @@ const Chart = ({ container, context }) => {
     const lineChart = (
         <LineChart
             data={chartData}
-            margin={{ top: 10, right: 60, left: 10, bottom: 10 }}
+            margin={{top: 10, right: 60, left: 10, bottom: 10}}
         >
             {/* CARTESIAN GRID */}
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} />
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray}/>
 
             {/* X-AXIS */}
             <XAxis
@@ -194,7 +202,7 @@ const Chart = ({ container, context }) => {
             />
 
             {/* LEGEND */}
-            <Legend />
+            <Legend/>
 
             {/* Dynamically create <Line> components for each selected dataKey */}
             {selectedDataKeys.map((dataKey, index) => (
@@ -211,7 +219,7 @@ const Chart = ({ container, context }) => {
     );
 
     return (
-        <div style={{ width: width, height: height }}>
+        <div style={{width: width, height: height}}>
             {/* RadioGroup component for valueKey selection */}
             <RadioGroup
                 inline={true}
@@ -220,7 +228,7 @@ const Chart = ({ container, context }) => {
                 selectedValue={selectedValueKey}
             >
                 {series.values.map((option, index) => (
-                    <Radio key={option.value + index} label={option.label} value={option.value} />
+                    <Radio key={option.value + index} label={option.label} value={option.value}/>
                 ))}
             </RadioGroup>
 
@@ -233,7 +241,7 @@ const Chart = ({ container, context }) => {
                 selectedItems={selectedDataKeys}
                 fill={true}
                 placeholder="Select data keys..."
-                popoverProps={{ minimal: true }}
+                popoverProps={{minimal: true}}
                 resetOnSelect={false}
                 tagInputProps={{
                     onRemove: (dataKey) => {

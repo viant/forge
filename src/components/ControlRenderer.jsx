@@ -116,6 +116,9 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
 
 
         const [formData, setFormData] = state ? state : useState({});
+        if (item.value && !(item.id in formData)) {
+            formData[item.id] = item.value;
+        }
         let value = formData[item.id] || ''
 
         useSignalEffect(() => {
@@ -150,10 +153,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
 
         });
 
-
-        if (item.value && !(item.id in formData)) {
-            formData[item.id] = item.value;
-        }
 
 
         let readOnly = dynamicReadOnly !== null ? dynamicReadOnly : (item.readOnly || false);
