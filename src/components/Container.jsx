@@ -5,6 +5,8 @@ import TablePanel from "./TablePanel.jsx";
 import FormPanel from "./FormPanel.jsx";
 import Chart from "./Chart.jsx";
 import {resolveParameterValue} from "../utils/selector.js";
+import Splitter from './Splitter';
+
 import {expandRepeatItems} from "../utils/repeat.js";
 import FileBrowser from "./FileBrowser.jsx";
 import Editor from "./Editor.jsx";
@@ -13,6 +15,8 @@ import './Container.css';
 const Container = ({context, container, isActive}) => {
     const {items = [], containers = [], layout, table, chart} = container;
     const columns = layout?.columns || 1;
+    const orientation = layout?.orientation || 'vertical';
+
     const {identity} = context
     const dataSourceRef = container.dataSourceRef || identity.dataSourceRef
 
@@ -102,41 +106,45 @@ const Container = ({context, container, isActive}) => {
     const handlers = (renderedItems?.length || 0) > 0 ? useControlEvents(context, renderedItems, state) : {}
 
     return (<>
-
-            <div style={gridStyle}>
-                {renderedItems.map((item) => {
-                    const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
-                    return (
-                        <ControlRenderer
-                            key={item.id}
-                            item={item}
-                            context={subCtx}
-                            events={handlers[item.id]?.events || {}}
-                            stateEvents={handlers[item.id]?.stateEvents || {}}
-                            container={container}
-                            state={state}
-                        />
-                    )
-                })}
-
+            <div>
+                <div style={gridStyle}>
+                    {renderedItems.map((item) => {
+                        const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
+                        return (
+                            <ControlRenderer
+                                key={item.id}
+                                item={item}
+                                context={subCtx}
+                                events={handlers[item.id]?.events || {}}
+                                stateEvents={handlers[item.id]?.stateEvents || {}}
+                                container={container}
+                                state={state}
+                            />
+                        )
+                    })}
+                </div>
                 {chartPanel}
                 {tablePanel}
                 {fileBrowserPanel}
                 {editorPanel}
-                {formPanel}
-                {containers.map((subContainer) => {
-                        return (
-                            <div>
-                                <Container
-                                    key={subContainer.id}
-                                    context={context.Context(subContainer.dataSourceRef || dataSourceRef)}
-                                    container={subContainer}
-                                    isActive={isActive}
-                                />
-                            </div>
-                        )
-                    }
-                )}
+                {formPanel ? formPanel :
+
+                    <Splitter orientation={orientation} divider={layout?.divider}>
+                        {containers.map((subContainer) => {
+                            return (
+                                <div>
+                                    <Container
+                                        key={subContainer.id}
+                                        context={context.Context(subContainer.dataSourceRef || dataSourceRef)}
+                                        container={subContainer}
+                                        isActive={isActive}
+                                    />
+                                </div>
+                            )
+                        })}
+                    </Splitter>
+                }
+
             </div>
         </>
     );

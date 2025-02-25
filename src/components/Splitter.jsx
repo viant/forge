@@ -14,6 +14,19 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
             initialSize);
     });
 
+
+    if (isVertical) {
+        return (<> {React.Children.map(children, (child, index) => {
+            return (
+                <div>
+                    {child}
+                </div>
+            )
+        })}
+        </>)
+    }
+
+
     const isVisible = divider.visible || false;
     const handleMouseDown = (index, event) => {
         event.preventDefault();
