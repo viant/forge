@@ -116,15 +116,11 @@ export default function DataSource({context}) {
 
     const handleUpstream = () => {
         if (upstream.value.selected) {
-            console.log('upstream', upstream.value.selected)
             let {records} = extractData(selectors, paging, upstream.value.selected);
-            console.log('upstream records', records)
 
             if (events.onFetch.isDefined() && records.length > 0) {
                 records = events.onFetch.execute({collection: records})
             }
-            console.log('upstream after fetch records', records)
-
             collection.value = records;
             const selected = records?.length > 0 ? records[0] : null;
             const rowIndex = selected ? 0 : -1;

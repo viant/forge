@@ -102,13 +102,14 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
                 return (
                     <>
                         <div
+                            key={'kv' + (child.id|| index)}
                             className="splitter-panel"
                             style={style}
                         >
                             {child}
                         </div>
                         {index < children.length - 1 && isVisible && (
-                            <Divider
+                            <Divider key={'kvd' + (child.id|| index)}
                                 className={`splitter-resizer ${isVertical ? 'vertical' : 'horizontal'}`}
                                 onMouseDown={(e) => handleMouseDown(index, e)}
                             />

@@ -127,6 +127,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         }
     }, []);
 
+
     useSignalEffect(() => {
         const { loading, error } = control.value || {};
         setLoading(loading);
@@ -135,6 +136,8 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         setCollection(data);
         setSelectedRecord(handlers.dataSource.getSelection());
     });
+
+
 
     useEffect(() => {
         if (enforceColumnSize && tableWidth > 0) {
@@ -145,6 +148,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         }
     }, [enforceColumnSize, tableWidth, visibleColumns]);
 
+    
     // Added useEffect to update tableWidth when the table's width changes
     useEffect(() => {
         const div = tableRef.current;
@@ -168,6 +172,9 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         };
     }, [tableRef]);
 
+
+
+
     const numeralFormats = {
         int: "0,0",
         numeric: "0,0.00",
@@ -186,8 +193,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             for (let colIndex = 0; colIndex < columnsToUse.length; colIndex++) {
                 const col = columnsToUse[colIndex];
                 const rawValue = resolveKey(item, col.id);
-
-
                 let displayedText = rawValue
                 if (col.numericFormat) {
                     const format = numeralFormats[col.numericFormat] || col.numericFormat
@@ -207,7 +212,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                 if (!align && col.numericFormat) {
                     align = "right";
                 }
-
                 rowArray.push({
                     id: cellKey,
                     align: align || "left",
@@ -218,7 +222,10 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             newPreparedData.push(rowArray);
         }
         return newPreparedData;
-    }, [collection, columnsToUse]);
+    }, [collection, columnsToUse, loading]);
+
+
+
 
     const handleOpenFilter = () => setIsFilterOpen(true);
     const handleCloseFilter = () => setIsFilterOpen(false);

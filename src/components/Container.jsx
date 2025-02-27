@@ -129,12 +129,13 @@ const Container = ({context, container, isActive}) => {
                 {editorPanel}
                 {formPanel ? formPanel :
 
-                    <Splitter orientation={orientation} divider={layout?.divider}>
+                    <Splitter key={'s' + identity.id}  orientation={orientation} divider={layout?.divider}>
                         {containers.map((subContainer) => {
+                            const subId = 'Sc' + subContainer.id
                             return (
-                                <div>
+                                <div key={'d' + subId}>
                                     <Container
-                                        key={subContainer.id}
+                                        key={subId}
                                         context={context.Context(subContainer.dataSourceRef || dataSourceRef)}
                                         container={subContainer}
                                         isActive={isActive}
