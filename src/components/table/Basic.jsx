@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { HTMLTable, Dialog } from "@blueprintjs/core";
 import numeral from "numeral";
@@ -15,7 +14,6 @@ import Toolbar from "./basic/Toolbar.jsx";
 const defaultCellWidth = 30; // Adjust as needed
 
 export const resolveKey = (holder, name) => {
-
     const keys = name.split(".");
     if (keys.length === 1) {
         return holder[name];
@@ -127,17 +125,47 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         }
     }, []);
 
+    // Apply sorting to collection when it changes or when sort parameters change
+    const sortedCollection = useMemo(() => {
+        if (!sortColumnId || !collection?.length) {
+            return collection;
+        }
+
+        return [...collection].sort((a, b) => {
+            const aVal = resolveKey(a, sortColumnId);
+            const bVal = resolveKey(b, sortColumnId);
+
+            // Handle null/undefined values
+            if (aVal === undefined || aVal === null) return sortDirection === "asc" ? -1 : 1;
+            if (bVal === undefined || bVal === null) return sortDirection === "asc" ? 1 : -1;
+
+            // Case insensitive sort for strings
+            if (typeof aVal === 'string' && typeof bVal === 'string') {
+                return sortDirection === "asc"
+                    ? aVal.localeCompare(bVal)
+                    : bVal.localeCompare(aVal);
+            }
+
+            if (aVal < bVal) return sortDirection === "asc" ? -1 : 1;
+            if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
+            return 0;
+        });
+    }, [collection, sortColumnId, sortDirection]);
 
     useSignalEffect(() => {
         const { loading, error } = control.value || {};
         setLoading(loading);
         setError(error);
         const data = handlers.dataSource.getCollection();
-        setCollection(data);
+
+        if (data?.length > 0) {
+            setCollection(data);
+        } else {
+            setCollection([]);
+        }
+
         setSelectedRecord(handlers.dataSource.getSelection());
     });
-
-
 
     useEffect(() => {
         if (enforceColumnSize && tableWidth > 0) {
@@ -148,7 +176,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         }
     }, [enforceColumnSize, tableWidth, visibleColumns]);
 
-    
     // Added useEffect to update tableWidth when the table's width changes
     useEffect(() => {
         const div = tableRef.current;
@@ -172,9 +199,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         };
     }, [tableRef]);
 
-
-
-
     const numeralFormats = {
         int: "0,0",
         numeric: "0,0.00",
@@ -183,11 +207,11 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         percent: "0.00%",
     };
 
-    // Use useMemo to compute preparedData
+    // Use useMemo to compute preparedData from sortedCollection instead of collection
     const preparedData = useMemo(() => {
         const newPreparedData = [];
-        for (let rowIndex = 0; rowIndex < collection.length; rowIndex++) {
-            const item = collection[rowIndex];
+        for (let rowIndex = 0; rowIndex < sortedCollection.length; rowIndex++) {
+            const item = sortedCollection[rowIndex];
             const rowArray = [];
 
             for (let colIndex = 0; colIndex < columnsToUse.length; colIndex++) {
@@ -222,10 +246,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             newPreparedData.push(rowArray);
         }
         return newPreparedData;
-    }, [collection, columnsToUse, loading]);
-
-
-
+    }, [sortedCollection, columnsToUse, loading]);
 
     const handleOpenFilter = () => setIsFilterOpen(true);
     const handleCloseFilter = () => setIsFilterOpen(false);
@@ -258,19 +279,12 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         }
         setSortColumnId(columnId);
         setSortDirection(newDirection);
-
-        const sortedData = [...collection].sort((a, b) => {
-            if (a[columnId] < b[columnId]) return newDirection === "asc" ? -1 : 1;
-            if (a[columnId] > b[columnId]) return newDirection === "asc" ? 1 : -1;
-            return 0;
-        });
-        setCollection(sortedData);
     };
 
     const pagingEnabled = dataSource?.paging?.enabled || false;
     const pagingSize = dataSource?.paging?.size || 0;
     const backfillCount =
-        pagingSize > collection.length ? pagingSize - collection.length : 0;
+        pagingSize > sortedCollection.length ? pagingSize - sortedCollection.length : 0;
 
     const tableTitle = container?.table?.title || "";
     handlers["table"] = {
@@ -305,7 +319,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                 {/* Table Body */}
                 <TableBody
                     context={context}
-                    collection={collection}
+                    collection={sortedCollection}
                     preparedData={preparedData}
                     columns={columnsToUse}
                     events={events}
