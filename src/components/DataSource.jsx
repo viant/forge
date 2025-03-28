@@ -258,7 +258,7 @@ export default function DataSource({context}) {
         const inputVal = input.value || {};
         let {page, filter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters)
-
+        setError('');
         if (!hasDeps) {
             setSelected({selected: null, rowIndex: -1})
             collection.value = [];
