@@ -320,9 +320,9 @@ type Column struct {
 	MultiSelect    bool                   `json:"multiSelect,omitempty" yaml:"multiSelect,omitempty"`
 	CellProperties map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
 	HeadProperties map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
-
-	Progress *Progress  `json:"progress,omitempty" yaml:"progress,omitempty"`
-	On       []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
+	Progress       *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`
+	On             []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
+	ToolTip        string                 `json:"tooltip" yaml:"tooltip"`
 }
 
 // TemplateItem represents a single template item with an ID and an operator.

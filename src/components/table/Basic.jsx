@@ -94,6 +94,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     useEffect(() => {
         const key = context.tableSettingKey(container.id);
         const savedColumns = localStorage.getItem(key);
+
         if (savedColumns) {
             try {
                 const parsedColumns = JSON.parse(savedColumns);

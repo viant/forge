@@ -11,6 +11,8 @@ import {
     Tab,
     NumericInput,
     HTMLSelect,
+    InputGroup,
+    FormGroup,
 } from "@blueprintjs/core";
 
 const SettingsDialog = ({
@@ -18,7 +20,7 @@ const SettingsDialog = ({
                             onClose,
                             columns,
                             onSaveColumnSettings,
-                            onResetColumns, // Accept onResetColumns as a prop
+                            onResetColumns,
                         }) => {
     const [localColumns, setLocalColumns] = useState(columns || []);
     const [selectedTabId, setSelectedTabId] = useState('visibility');
@@ -50,6 +52,13 @@ const SettingsDialog = ({
     const handleAlignChange = (colId, newAlign) => {
         const updated = localColumns.map((c) =>
             c.id === colId ? { ...c, align: newAlign } : c
+        );
+        setLocalColumns(updated);
+    };
+
+    const handleTooltipChange = (colId, newTooltip) => {
+        const updated = localColumns.map((c) =>
+            c.id === colId ? { ...c, tooltip: newTooltip } : c
         );
         setLocalColumns(updated);
     };
@@ -92,7 +101,7 @@ const SettingsDialog = ({
             {localColumns
                 .filter((col) => !col.nonExcludable) // Exclude non-excludable columns
                 .map((col, index) => (
-                    <div key={col.id} style={{ marginBottom: '10px' }}>
+                    <div key={col.id} style={{ marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <h5>{col.displayName || col.name}</h5>
                             <div>
@@ -110,23 +119,40 @@ const SettingsDialog = ({
                                 />
                             </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center' }}>
-                            <NumericInput
-                                min={0}
-                                value={col.width || ''}
-                                onValueChange={(valueAsNumber) => handleWidthChange(col.id, valueAsNumber)}
-                                placeholder="Width (px)"
-                                style={{ marginRight: '10px' }}
-                            />
-                            <HTMLSelect
-                                options={[
-                                    { label: 'Left', value: 'left' },
-                                    { label: 'Center', value: 'center' },
-                                    { label: 'Right', value: 'right' },
-                                ]}
-                                value={col.align || 'left'}
-                                onChange={(e) => handleAlignChange(col.id, e.currentTarget.value)}
-                            />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <FormGroup label="Width" labelFor={`width-${col.id}`}>
+                                <NumericInput
+                                    id={`width-${col.id}`}
+                                    min={0}
+                                    value={col.width || ''}
+                                    onValueChange={(valueAsNumber) => handleWidthChange(col.id, valueAsNumber)}
+                                    placeholder="Width (px)"
+                                />
+                            </FormGroup>
+                            <FormGroup label="Alignment" labelFor={`align-${col.id}`}>
+                                <HTMLSelect
+                                    id={`align-${col.id}`}
+                                    options={[
+                                        { label: 'Left', value: 'left' },
+                                        { label: 'Center', value: 'center' },
+                                        { label: 'Right', value: 'right' },
+                                    ]}
+                                    value={col.align || 'left'}
+                                    onChange={(e) => handleAlignChange(col.id, e.currentTarget.value)}
+                                />
+                            </FormGroup>
+                            <FormGroup
+                                label="Tooltip"
+                                labelFor={`tooltip-${col.id}`}
+                                style={{ gridColumn: '1 / -1' }}
+                            >
+                                <InputGroup
+                                    id={`tooltip-${col.id}`}
+                                    value={col.tooltip || ''}
+                                    onChange={(e) => handleTooltipChange(col.id, e.target.value)}
+                                    placeholder="Tooltip text (optional)"
+                                />
+                            </FormGroup>
                         </div>
                     </div>
                 ))}

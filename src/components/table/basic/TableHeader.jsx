@@ -1,7 +1,9 @@
 import React from "react";
-import { Checkbox, Icon } from "@blueprintjs/core";
+import { Checkbox, Icon, Tooltip, Position } from "@blueprintjs/core";
 
 const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
+//    console.log('columns=>',columns)
+
     const { onSort, sortColumnId, sortDirection } = sortConfig;
     const { handlers, dataSource } = context;
     const {
@@ -39,12 +41,55 @@ const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
         }
     };
 
+    const renderHeaderContent = (col) => {
+        const { multiSelect, displayName, name } = col;
+
+        // Create the header content with checkbox if needed
+        const content = (
+            <>
+                {multiSelect && selectionMode === "multi" ? (
+                    <Checkbox
+                        inline={true}
+                        checked={selectedAll}
+                        onChange={handleHeaderCheckboxClick}
+                    />
+                ) : null}
+                {displayName || name}
+                {col.sortable && (
+                    <Icon
+                        icon={
+                            sortColumnId === col.id
+                                ? sortDirection === "asc"
+                                    ? "chevron-up"
+                                    : "chevron-down"
+                                : "double-caret-vertical"
+                        }
+                        intent="primary"
+                        style={{ marginLeft: 4 }}
+                    />
+                )}
+            </>
+        );
+
+        // If tooltip is provided, wrap the content in a Tooltip component
+        if (col.tooltip) {
+            return (
+                <Tooltip content={col.tooltip} position={Position.TOP}>
+                    <span>{content}</span>
+                </Tooltip>
+            );
+        }
+
+        return content;
+    };
+
     return (
         <thead>
         {tableTitle && <caption>{tableTitle}</caption>}
         <tr>
             {columns.map((col) => {
-                const { id, sortable, minWidth, align, displayName, name, multiSelect } = col;
+                const { id, sortable, minWidth, align } = col;
+//                console.log('col =>',col)
                 const style = {
                     cursor: sortable ? "pointer" : "default",
                     textAlign: align || "left",
@@ -52,27 +97,7 @@ const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
                 };
                 return (
                     <th key={id} style={style} onClick={() => handleSort(col)}>
-                        {multiSelect && selectionMode === "multi" ? (
-                            <Checkbox
-                                inline={true}
-                                checked={selectedAll}
-                                onChange={handleHeaderCheckboxClick}
-                            />
-                        ) : null}
-                        {displayName || name}
-                        {sortable && (
-                            <Icon
-                                icon={
-                                    sortColumnId === id
-                                        ? sortDirection === "asc"
-                                            ? "chevron-up"
-                                            : "chevron-down"
-                                        : "double-caret-vertical"
-                                }
-                                intent="primary"
-                                style={{ marginLeft: 4 }}
-                            />
-                        )}
+                        {renderHeaderContent(col)}
                     </th>
                 );
             })}
