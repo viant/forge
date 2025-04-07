@@ -31,7 +31,7 @@
     "@codemirror/lang-sql": "^6.8.0",
     "@codemirror/lang-yaml": "^6.1.2",
     "@codemirror/theme-one-dark": "^6.1.2",
-    "@preact/signals-react": "^2.2.0",
+    "@preact/signals-react": "^2.3.0",
     "@react-oauth/google": "^0.12.1",
     "@react-router/node": "^7.0.2",
     "@react-router/serve": "^7.0.2",
