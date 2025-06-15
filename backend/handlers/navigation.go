@@ -11,6 +11,11 @@ import (
 	"net/http"
 )
 
+type NavigationResponse struct {
+	Status int                    `json:"status"`
+	Data   []types.NavigationItem `json:"data"`
+}
+
 // NavigationHandler fetches navigation data using the file.Service.
 func NavigationHandler(fs *file.Service, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -19,9 +24,12 @@ func NavigationHandler(fs *file.Service, baseURL string) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
+		resp := NavigationResponse{
+			Status: http.StatusOK,
+			Data:   navigation,
+		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(navigation)
+		json.NewEncoder(w).Encode(resp)
 	}
 }
 
