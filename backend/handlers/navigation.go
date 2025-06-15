@@ -12,7 +12,7 @@ import (
 )
 
 type NavigationResponse struct {
-	Status int                    `json:"status"`
+	Status string                 `json:"status"`
 	Data   []types.NavigationItem `json:"data"`
 }
 
@@ -25,7 +25,7 @@ func NavigationHandler(fs *file.Service, baseURL string) http.HandlerFunc {
 			return
 		}
 		resp := NavigationResponse{
-			Status: http.StatusOK,
+			Status: "ok",
 			Data:   navigation,
 		}
 		w.Header().Set("Content-Type", "application/json")

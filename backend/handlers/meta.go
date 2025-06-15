@@ -13,7 +13,7 @@ import (
 )
 
 type WindowResponse struct {
-	Status int           `json:"status"`
+	Status string        `json:"status"`
 	Data   *types.Window `json:"data"`
 }
 
@@ -35,7 +35,7 @@ func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.Ha
 		}
 
 		resp := WindowResponse{
-			Status: http.StatusOK,
+			Status: "ok",
 			Data:   aWindow,
 		}
 		w.Header().Set("Content-Type", "application/json")
