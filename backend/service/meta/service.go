@@ -256,7 +256,7 @@ func getNodeByKey(node *yaml.Node, key string) (*yaml.Node, error) {
 
 func (l *Service) getURL(path string) string {
 	URL := path
-	if l.baseURL != "" {
+	if l.baseURL != "" && url.Scheme(path, "") == "" {
 		URL = url.Join(l.baseURL, path)
 	}
 	return URL
