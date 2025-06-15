@@ -46,7 +46,7 @@ func (f *Service) List(ctx context.Context, opts ...Option) ([]File, error) {
 	options := newOptions(opts...)
 	uri := options.uri
 
-	parentURL := url.Join(f.root, uri)
+	parentURL := f.ensureURL(uri)
 	if uri == "" {
 		parentURL = f.root
 	}
@@ -126,14 +126,22 @@ func (f *Service) List(ctx context.Context, opts ...Option) ([]File, error) {
 
 // Exists checks if a file exists at the specified uri.
 func (f *Service) Exists(ctx context.Context, requestedPath string) (bool, error) {
-	URL := url.Join(f.root, requestedPath)
+	URL := f.ensureURL(requestedPath)
 	return f.service.Exists(ctx, URL, f.options...)
 }
 
 // Download downloads a file from the specified uri.
 func (f *Service) Download(ctx context.Context, uri string) ([]byte, error) {
-	URL := url.Join(f.root, uri)
+	URL := f.ensureURL(uri)
 	return f.service.DownloadWithURL(ctx, URL, f.options...)
+}
+
+func (f *Service) ensureURL(uri string) string {
+	URL := uri
+	if url.IsRelative(uri) {
+		URL = url.Join(f.root, uri)
+	}
+	return URL
 }
 
 // Upload uploads a file to the specified uri.
