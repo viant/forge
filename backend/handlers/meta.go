@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+type WindowResponse struct {
+	Status int           `json:"status"`
+	Data   *types.Window `json:"data"`
+}
+
 // WindowHandler fetches window data using the file.Service.
 func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.HandlerFunc {
 
@@ -29,8 +34,12 @@ func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.Ha
 			return
 		}
 
+		resp := WindowResponse{
+			Status: http.StatusOK,
+			Data:   aWindow,
+		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(aWindow)
+		json.NewEncoder(w).Encode(resp)
 	}
 }
 
