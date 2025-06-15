@@ -138,7 +138,7 @@ func (f *Service) Download(ctx context.Context, uri string) ([]byte, error) {
 
 func (f *Service) ensureURL(uri string) string {
 	URL := uri
-	if url.IsRelative(uri) {
+	if url.Scheme(uri, "") == "" || url.IsRelative(uri) {
 		URL = url.Join(f.root, uri)
 	}
 	return URL
