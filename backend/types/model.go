@@ -244,6 +244,7 @@ type Container struct {
 	FileBrowser *FileBrowser     `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
 	Editor      *Editor          `json:"editor,omitempty" yaml:"editor,omitempty"`
 	Chart       *Chart           `json:"chart,omitempty" yaml:"chart,omitempty"`
+	Chat        *Chat            `json:"chat,omitempty" yaml:"chat,omitempty"`
 	Section     *Section         `json:"section,omitempty" yaml:"section,omitempty"`
 	Items       []Item           `json:"items,omitempty" yaml:"items,omitempty"`
 	Card        *Card            `json:"card,omitempty" yaml:"card,omitempty"`
@@ -253,6 +254,30 @@ type Container struct {
 	Tabs        *Tabs            `json:"tabs,omitempty" yaml:"tabs,omitempty"`
 	Dialogs     []string         `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
 	Repeat      *Repeat          `json:"repeat,omitempty" yaml:"repeat,omitempty"`
+}
+
+// Chat describes configuration for chat panel within a container.
+// ChatAdapter allows metadata to specify handlers that transform outgoing / incoming payloads
+// without hard-coding them in the front-end. Handlers are referenced by name and resolved via
+// Context.lookupHandler at runtime.
+type ChatAdapter struct {
+	// ToOutbound is a handler name that converts a Forge message to the payload expected by the backend.
+	ToOutbound string `json:"toOutbound,omitempty" yaml:"toOutbound,omitempty"`
+	// FromInbound is a handler name that converts backend response into one or more Forge messages.
+	FromInbound string `json:"fromInbound,omitempty" yaml:"fromInbound,omitempty"`
+}
+
+type Chat struct {
+	// DataSourceRef points to the data source that supplies messages.
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	// Tools lists tool names available to the user.
+	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty"`
+	// ShowTools controls visibility of the tool selector (default true).
+	ShowTools bool `json:"showTools,omitempty" yaml:"showTools,omitempty"`
+	// ShowUpload controls whether file upload input should be displayed (default true).
+	ShowUpload bool `json:"showUpload,omitempty" yaml:"showUpload,omitempty"`
+	// On defines event handlers such as submit, upload
+	On []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type FileBrowser struct {

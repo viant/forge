@@ -1,9 +1,9 @@
 module github.com/viant/forge
 
-go 1.23.1
+go 1.24.1
 
 require (
-	github.com/viant/afs v1.25.1
+	github.com/viant/afs v1.26.2
 	gopkg.in/yaml.v3 v3.0.1
 )
 
