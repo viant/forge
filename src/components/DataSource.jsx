@@ -11,6 +11,7 @@ import {
     dataSourceEvents,
 } from "../hooks";
 
+import {useRef} from "react";
 
 
 /**
@@ -105,6 +106,7 @@ function getNodeByPath(nodes, path, selfReference) {
  */
 export default function DataSource({context}) {
     let prevFilter = {};
+    const prevQuerySig = useRef('');
 
     const {dataSource, signals, connector, handlers, identity} = context
     const {paging, selectors} = dataSource;
@@ -138,6 +140,7 @@ export default function DataSource({context}) {
         const inputVal = input.value || {};
         const {fetch, refresh = false} = inputVal;
         if (!fetch && ! refresh) return;
+
         if (refresh) {
             if (dataSource.dataSourceRef) {
                 handleUpstream()
@@ -154,14 +157,21 @@ export default function DataSource({context}) {
         }
 
         return doFetchRecords().finally(() => {
-            input.peek().fetch = false;
+            // Publish a new object so that the change propagates.
+            input.value = {
+                ...input.peek(),
+                fetch: false,
+            };
         });
     });
 
 
     function flagReadDone() {
-        input.peek().fetch = false;
-        input.peek().refresh = false;
+        input.value = {
+            ...input.peek(),
+            fetch: false,
+            refresh: false,
+        };
     }
 
 
@@ -232,7 +242,7 @@ export default function DataSource({context}) {
 
                 const updated = updateRecordInSnapshot(snapshot, uid, records[0]);
                 if (updated) {
-                    collection.value = snapshot
+                    collection.value = [...snapshot]
                     if (selectedIndex >= 0) {
                         setSelected({selected: records[0], rowIndex: selectedIndex})
                     }
@@ -241,6 +251,7 @@ export default function DataSource({context}) {
         } catch
             (err) {
             setError(err);
+            console.log("Error - reseting collection",  err);
             collection.value = [];
         } finally {
             setLoading(false);
@@ -257,29 +268,41 @@ export default function DataSource({context}) {
     async function doFetchRecords() {
         const inputVal = input.value || {};
         let {page, filter, parameters} = inputVal || {};
-        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters)
+
+        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters);
         setError('');
         if (!hasDeps) {
-            setSelected({selected: null, rowIndex: -1})
+            setSelected({selected: null, rowIndex: -1});
             collection.value = [];
-            flagReadDone()
+            flagReadDone();
             setInactive(true);
             return;
-        } else {
-            setInactive(false);
         }
 
+        // ------------------------------------------------------------------
+        // Compute the request signature (captures everything that influences
+        // the result). If unchanged, we keep existing collection; otherwise
+        // we optimistically clear.
+        // ------------------------------------------------------------------
+        const requestSig = JSON.stringify({filter, parameters, page});
+        const queryChanged = requestSig !== prevQuerySig.current;
+
+        if (queryChanged) {
+            setSelected({selected: null, rowIndex: -1});
+            collection.value = [];
+        } else {
+            // No meaningful change → skip network call
+            return Promise.resolve();
+        }
 
         if (paging) {
-            page = page || 1
-            inputVal[page] = page
+            page = page || 1;
+            inputVal[page] = page;
         }
+
         setLoading(true);
         try {
-            // 1) gather dependency data
-            // const depObj = collectDependencies(dataSourceId, context, dataSources);
-            //  ...depObj
-
+            // If filter changed, reset to first page
             if (!isMapEquals(filter, prevFilter)) {
                 page = 1;
             }
@@ -287,11 +310,7 @@ export default function DataSource({context}) {
 
             // 2) Merge into filter
             const finalFilter = {...filter};
-            const currentSelection = {...selection.peek()}
-
-            // collectionInfo.value = {};
-            setSelected({selected: null, rowIndex: -1})
-            collection.value = [];
+            const currentSelection = {...selection.peek()};
 
             // 3) Perform GET
             const payload = await connector.get({
@@ -303,10 +322,12 @@ export default function DataSource({context}) {
             if (events.onFetch.isDefined() && records.length > 0) {
                 records = events.onFetch.execute({collection: records})
             }
-
             collection.value = records;
             collectionInfo.value = info;
             metrics.value = stats;
+
+            // Mark this signature as the latest successful fetch
+            prevQuerySig.current = requestSig;
 
             if (currentSelection?.rowIndex >= 0) {
                 const currentCollection = collection.peek()
