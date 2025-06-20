@@ -40,19 +40,27 @@ function useDataConnector(dataSource) {
         return finalUrl;
     }
 
-    function getUrlAndHeaders() {
+    function getUrlAndHeaders(requestMethod) {
         const {service = {}} = dataSource;
         let url = service.URL || "";
-
+        const method = requestMethod || service.method || "GET";
         if (service.uri && service.endpoint) {
             const baseEndpoint = endpoints[service.endpoint];
             if (!baseEndpoint) {
                 throw new Error(`Endpoint config not found for: ${service.endpoint}`);
             }
-            url = baseEndpoint.baseURL + service.uri;
+
+            // Remove trailing slash from baseURL and leading slash from uri to avoid '//'
+            const base = (baseEndpoint.baseURL || '').replace(/\/+$/, '');
+            let uri = (service.uri || '')
+            const methoSetting = service[method.toLowerCase()]
+            if(methoSetting && methoSetting.uri) {
+                uri = methoSetting.uri
+            }
+            uri = uri.replace(/^\/+/, '');
+            url = base + '/' + uri;
         }
 
-        const method = service.method || "GET";
 
         // Auth header if token
         const headers = {};
@@ -151,9 +159,13 @@ function useDataConnector(dataSource) {
     /**
      * POST
      */
-    async function post({body = {}}) {
+    async function post({body = {}, inputParameters = {}}) {
         try {
-            const {url, headers} = getUrlAndHeaders();
+            let {url, headers} = getUrlAndHeaders('POST');
+            const queryParams = new URLSearchParams();
+
+            // apply path/query/header/body parameters
+            url = applyParameters({url, headers, queryParams, body}, inputParameters);
             const resp = await fetch(url, {
                 method: "POST",
                 headers: {...headers, "Content-Type": "application/json"},
@@ -175,7 +187,7 @@ function useDataConnector(dataSource) {
      */
     async function patch({body = {}}) {
         try {
-            const {url, headers} = getUrlAndHeaders();
+            const {url, headers} = getUrlAndHeaders('PATCH');
             const resp = await fetch(url, {
                 method: "PATCH",
                 headers: {...headers, "Content-Type": "application/json"},
@@ -199,7 +211,7 @@ function useDataConnector(dataSource) {
             throw new Error("PUT requires 'id'");
         }
         try {
-            const {url, headers} = getUrlAndHeaders();
+            const {url, headers} = getUrlAndHeaders('PUT');
             const finalUrl = `${url}/${id}`;
             const resp = await fetch(finalUrl, {
                 method: "PUT",
@@ -224,7 +236,7 @@ function useDataConnector(dataSource) {
             throw new Error("DELETE requires 'id'");
         }
         try {
-            const {url, headers} = getUrlAndHeaders();
+            const {url, headers} = getUrlAndHeaders('DELETE');
             const finalUrl = `${url}/${id}`;
             const resp = await fetch(finalUrl, {method: "DELETE", headers});
             if (!resp.ok) {

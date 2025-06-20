@@ -254,6 +254,8 @@ type Container struct {
 	Tabs        *Tabs            `json:"tabs,omitempty" yaml:"tabs,omitempty"`
 	Dialogs     []string         `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
 	Repeat      *Repeat          `json:"repeat,omitempty" yaml:"repeat,omitempty"`
+	SelectFirst bool             `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
+	FetchData   bool             `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
 }
 
 // Chat describes configuration for chat panel within a container.
@@ -495,3 +497,76 @@ type Parameter struct {
 	Scope    string `json:"scope,omitempty" yaml:"scope,omitempty"`
 	Codec    *Codec `json:"codec,omitempty" yaml:"codec,omitempty"`
 }
+
+// JSONSchema mirrors the very small subset we need for
+// runtime form generation: object-schemas with simple
+// top-level properties, required list, enums, default.
+type JSONSchema struct {
+	Type       string                    `json:"type" yaml:"type"` // “object”
+	Properties map[string]SchemaProperty `json:"properties" yaml:"properties"`
+	Required   []string                  `json:"required,omitempty" yaml:"required,omitempty"`
+}
+
+type SchemaProperty struct {
+	Type        string      `json:"type,omitempty" yaml:"type,omitempty"` // string, integer, …
+	Description string      `json:"description,omitempty" yaml:"description,omitempty"`
+	Enum        []string    `json:"enum,omitempty" yaml:"enum,omitempty"`
+	Default     interface{} `json:"default,omitempty" yaml:"default,omitempty"`
+}
+
+// Interaction is delivered by the event/data-source so that binding expressions can reference .Schema, .Message, .ID …
+type Interaction struct {
+	Id          string     `json:"id"`
+	Message     string     `json:"message"`
+	Schema      JSONSchema `json:"schema"` // draft-07
+	StepId      string     `json:"stepId"`
+	CreatedAt   string     `json:"createdAt"`
+	CallbackURL string     `json:"callbackURL"`
+}
+
+// SchemaBasedForm renders a list of explicit FormField items
+// instead of blindly consuming an entire JSON-Schema document.
+type SchemaBasedForm struct {
+	// Optional name so other widgets can reference the answers via
+	// {{window.state.<Id>}}
+	Id string `json:"id,omitempty"   yaml:"id,omitempty"`
+	// Where to persist the collected answers (same semantics as Chat/Editor)
+	DataBinding string `json:"dataBinding"    yaml:"dataBinding"`
+	// Fields are rendered in slice order; you can still override per-field
+	// order later via Field.Order.
+	Fields []FormField      `json:"fields"         yaml:"fields"`
+	Layout *Layout          `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Style  *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	On     []*Execute       `json:"on,omitempty"   yaml:"on,omitempty"`
+}
+
+// FormField describes a single control in the form.
+type FormField struct {
+	// Core
+	Name     string      `json:"name"        yaml:"name"` // JSON key in the outgoing payload
+	Label    string      `json:"label"       yaml:"label"`
+	Type     string      `json:"type"        yaml:"type"` // string, integer, boolean …
+	Required bool        `json:"required,omitempty" yaml:"required,omitempty"`
+	Enum     []string    `json:"enum,omitempty"     yaml:"enum,omitempty"`
+	Default  interface{} `json:"default,omitempty"  yaml:"default,omitempty"`
+
+	// Ordering & grouping
+	Order int    `json:"order,omitempty"    yaml:"order,omitempty"` // larger = later
+	Group string `json:"group,omitempty"    yaml:"group,omitempty"` // accordion/fieldset key
+
+	// Visuals / behaviour
+	Widget      string           `json:"widget,omitempty"      yaml:"widget,omitempty"` // e.g. “textarea”, “datePicker”
+	Placeholder string           `json:"placeholder,omitempty" yaml:"placeholder,omitempty"`
+	Style       *StyleProperties `json:"style,omitempty"       yaml:"style,omitempty"`
+
+	// Validation / dynamic UI
+	Pattern   string   `json:"pattern,omitempty"     yaml:"pattern,omitempty"` // regex
+	Min       *float64 `json:"min,omitempty"         yaml:"min,omitempty"`
+	Max       *float64 `json:"max,omitempty"         yaml:"max,omitempty"`
+	VisibleIf string   `json:"visibleIf,omitempty"   yaml:"visibleIf,omitempty"` // expression evaluated in UI
+}
+
+const (
+	EventInteractionCreated  = "interaction.created"
+	EventInteractionResolved = "interaction.resolved"
+)

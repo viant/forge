@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { HTMLTable, Dialog } from "@blueprintjs/core";
 import numeral from "numeral";
 import { useColumnsHandlers, tableHandlers } from "../../hooks/event.js";
-import { useSignalEffect } from "@preact/signals-react";
+import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import TableBody from "./basic/TableBody.jsx";
 import TableFooter from "./basic/TableFooter.jsx";
 import TableHeader from "./basic/TableHeader.jsx";
@@ -55,17 +55,23 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [columnsHandlers, setColumnsHandlers] = useState({});
 
-    const [collection, setCollection] = useState([]);
+    const { collection: collectionData, loading, error, selection } = useDataSourceState(context);
+    const collection = collectionData; // keep old variable name for compatibility
     const [selectedRecord, setSelectedRecord] = useState({});
+
+    // keep selectedRecord in sync with DataSource selection
+    useEffect(() => {
+        if (selection) {
+            setSelectedRecord(selection);
+        }
+    }, [selection]);
 
     const [sortColumnId, setSortColumnId] = useState(null);
     const [sortDirection, setSortDirection] = useState("asc");
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
+    // loading & error come from useDataSourceState hook
 
-    const { dataSource, handlers, signals } = context;
-    const { control } = signals;
+    const { dataSource, handlers } = context;
 
     const events = tableHandlers(context, container);
 
@@ -119,9 +125,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     useEffect(() => {
         setColumnsHandlers(useColumnsHandlers(context, columns));
         const data = handlers.dataSource.getCollection();
-        if (data?.length > 0) {
-            setCollection(data);
-        } else if (collection?.length === 0) {
+        if (!data?.length && collection?.length === 0) {
             events.onInit.execute({});
         }
     }, []);
@@ -153,20 +157,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         });
     }, [collection, sortColumnId, sortDirection]);
 
-    useSignalEffect(() => {
-        const { loading, error } = control.value || {};
-        setLoading(loading);
-        setError(error);
-        const data = handlers.dataSource.getCollection();
 
-        if (data?.length > 0) {
-            setCollection(data);
-        } else {
-            setCollection([]);
-        }
-
-        setSelectedRecord(handlers.dataSource.getSelection());
-    });
 
     useEffect(() => {
         if (enforceColumnSize && tableWidth > 0) {
@@ -293,12 +284,14 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     };
     handlers["dataSource"]["openFilter"] = handleOpenFilter;
 
+    const fullWidth = container?.table?.fullWidth === true;
+
     return (
         <div
             className="basic-table-wrapper"
             style={{
                 overflow: "auto",
-                width: "90%",
+                width: fullWidth ? "100%" : "90%",
                 boxSizing: "border-box",
             }}
             ref={tableRef}

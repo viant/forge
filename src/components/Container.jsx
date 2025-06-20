@@ -9,7 +9,9 @@ import Splitter from './Splitter';
 
 import {expandRepeatItems} from "../utils/repeat.js";
 import FileBrowser from "./FileBrowser.jsx";
+import DataSourceFetcher from "./DataSourceFetcher.jsx";
 import Editor from "./Editor.jsx";
+import Chat from "./Chat.jsx";
 import './Container.css';
 
 const Container = ({context, container, isActive}) => {
@@ -46,6 +48,19 @@ const Container = ({context, container, isActive}) => {
         chartPanel = (<>
             <Chart context={context.Context(dataSourceRef)} container={container} isActive={isActive}></Chart>
         </>);
+    }
+
+    // Chat panel support
+    let chatPanel = null;
+    if (container.chat) {
+        const dsRef = container.chat.dataSourceRef || dataSourceRef;
+        chatPanel = (
+            <Chat
+                context={context.Context(dsRef)}
+                container={container}
+                isActive={isActive}
+            />
+        );
     }
 
 
@@ -103,12 +118,21 @@ const Container = ({context, container, isActive}) => {
         }, [collection]);
     }
 
-    const handlers = (renderedItems?.length || 0) > 0 ? useControlEvents(context, renderedItems, state) : {}
+
+    // All items are now visual – legacy "fetcher" items have been removed.
+    const visualItems = renderedItems;
+
+    // ------------------------------------------------------------------
+    // Container-level auto-fetch / selectFirst support
+    // ------------------------------------------------------------------
+    const containerWantsFetcher = container.fetchData === true || container.selectFirst === true;
+
+    const handlers = (visualItems?.length || 0) > 0 ? useControlEvents(context, visualItems, state) : {}
 
     return (<>
             <div>
                 <div style={gridStyle}>
-                    {renderedItems.map((item) => {
+                    {visualItems.map((item) => {
                         const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
                         return (
                             <ControlRenderer
@@ -124,6 +148,7 @@ const Container = ({context, container, isActive}) => {
                     })}
                 </div>
                 {chartPanel}
+                {chatPanel}
                 {tablePanel}
                 {fileBrowserPanel}
                 {editorPanel}
@@ -147,6 +172,15 @@ const Container = ({context, container, isActive}) => {
                 }
 
             </div>
+            {/* Container-level fetcher */}
+            {containerWantsFetcher && (
+                <DataSourceFetcher
+                    key={`auto-fetcher-${container.id}`}
+                    context={context.Context(container.dataSourceRef || dataSourceRef)}
+                    selectFirst={container.selectFirst === true}
+                    fetchData={container.fetchData === true}
+                />
+            )}
         </>
     );
 };
