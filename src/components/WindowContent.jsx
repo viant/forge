@@ -21,7 +21,7 @@ import {injectActions} from "../actions";
 // 2. Applying initial parameters ONLY ONCE to the underlying signals.
 // 3. Rendering DataSource & MessageBus children.
 const DataSourceContainer = ({windowContext, dsKey, initialParams = {}}) => {
-    const dsContext = useMemo(() => windowContext.Context(dsKey), [windowContext, dsKey]);
+    const dsContext = windowContext.Context(dsKey); // Context caches internally so safe per render
 
     // Apply initial parameters once, after dsContext stabilises.
     useEffect(() => {
