@@ -1,7 +1,7 @@
 // useGenericDataSourceHandlers.js
 import {
     addWindow,
-    getDialogSignal,
+    getDialogSignal, removeSignalsForKey,
 } from "../core";
 
 const openViewDialog = (dialogSignal, props) => {
@@ -66,6 +66,7 @@ export function useWindowHandlers(windowId) {
 
     const closeWindow = (props = {}) => {
         console.log('Closing window:', windowId, ' TODO ... removeWindow');
+        removeSignalsForKey(windowId);
     }
 
 

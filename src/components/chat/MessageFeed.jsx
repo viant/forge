@@ -1,8 +1,28 @@
 // MessageFeed.jsx – simple lazy loader list without virtualisation
 import React, { useState, useEffect, useRef } from "react";
 import MessageCard from "./MessageCard.jsx";
+import {range} from "lodash";
 
-export default function MessageFeed({ messages, batchSize = 50, context }) {
+// ---------------------------------------------------------------------------
+// Default rendering helpers used when the parent Chat component does not
+// provide a custom mapping.
+// ---------------------------------------------------------------------------
+
+const DefaultBubbleRenderer = ({ message, context }) => (
+    <MessageCard msg={message} context={context} />
+);
+
+export const defaultClassifier = () => 'bubble';
+export const defaultRenderers  = { bubble: DefaultBubbleRenderer };
+
+export default function MessageFeed({
+    messages,
+    batchSize = 50,
+    context,
+    classifyMessage = defaultClassifier,
+    renderers = defaultRenderers,
+    fallback = defaultRenderers.bubble,
+}) {
     const [visibleCount, setVisibleCount] = useState(batchSize);
 
     const containerRef = useRef(null);
@@ -22,6 +42,7 @@ export default function MessageFeed({ messages, batchSize = 50, context }) {
         bottomRef.current?.scrollIntoView({ behavior: "auto" });
     }, [messages.length]);
 
+
     return (
         <div ref={containerRef} className="chat-feed space-y-2 pr-2">
             {visibleCount < messages.length && (
@@ -34,9 +55,11 @@ export default function MessageFeed({ messages, batchSize = 50, context }) {
                     </button>
                 </div>
             )}
-            {slice.map((m, i) => (
-                <MessageCard key={i} msg={m} context={context} />
-            ))}
+            {slice.map((m, i) => {
+                const kind = classifyMessage(m);
+                const Renderer = renderers[kind] || fallback;
+                return <Renderer key={i} message={m} context={context} />;
+            })}
             <div ref={bottomRef} />
         </div>
     );
