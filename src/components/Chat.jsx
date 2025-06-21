@@ -6,9 +6,11 @@ import { Spinner } from "@blueprintjs/core";
 // Re-exported building blocks living under src/components/chat
 import MessageFeed from "./chat/MessageFeed.jsx";
 import Composer     from "./chat/Composer.jsx";
+import MessageCard  from "./chat/MessageCard.jsx";
+import FormRenderer from "./FormRenderer.jsx";
 
 import { chatHandlers } from "../hooks/event.js";
-
+import {useEffect} from "react";
 // Shared chat styles (avatars, bubbles, etc.)
 import "./chat.css";
 
@@ -18,7 +20,31 @@ import "./chat.css";
 //           presentational chat sub-components (MessageFeed & Composer).
 // ---------------------------------------------------------------------------
 
-export default function Chat({ context, container = {} }) {
+export const defaultClassifier = (msg) =>
+    msg?.elicitation?.requestedSchema ? 'form' : 'bubble';
+
+// Our default bubble renderer simply delegates to the existing MessageCard.
+function BubbleRenderer({ message, context }) {
+    return <MessageCard msg={message} context={context} />;
+}
+
+export const defaultRenderers = {
+    bubble: BubbleRenderer,
+    form:   FormRenderer,
+};
+
+
+function defaultNormalizeMessages(rawMessages= []) {
+    return rawMessages.map((m) => ({...m}));
+}
+
+export default function Chat({
+    context,
+    container = {},
+    classifyMessage: classifyMessageProp,
+    renderers: renderersProp,
+    fallback: fallbackProp,
+}) {
     // ---------------------------------------------------------------------
     // 📡  Resolve Forge runtime context
     // ---------------------------------------------------------------------
@@ -27,6 +53,14 @@ export default function Chat({ context, container = {} }) {
     }
 
     const { handlers } = context;
+
+    // Resolve classifier / renderer strategy – props > service > defaults
+    const chatService = context?.handlers?.chat || {};
+
+
+    const classifyMessage = classifyMessageProp || chatService.classifyMessage || defaultClassifier;
+    const renderers = renderersProp || chatService.renderers || defaultRenderers;
+    const fallback = fallbackProp || chatService.fallback || renderers?.bubble || defaultRenderers.bubble;
 
     // chat configuration fragment coming from container metadata (optional)
     const chatCfg = container?.chat || {};
@@ -38,18 +72,16 @@ export default function Chat({ context, container = {} }) {
     // 🛑  Local component state reflecting incoming signals
     // ---------------------------------------------------------------------
     const [messages, setMessages] = useState([]);
-    // Keep local state in sync with collection coming from hook
-    React.useEffect(() => {
-        const norm = (rawMessages || []).map((m) => ({
-            role:        m.role      ?? m.Role ?? (m.toolName || m.ToolName ? "tool" : undefined),
-            content:     m.content   ?? m.Content,
-            createdAt:   m.createdAt ?? m.CreatedAt,
-            toolName:    m.toolName  ?? m.ToolName,
-            attachments: m.attachments ?? m.Attachments,
-            executions:  m.executions ?? m.execution ?? m.Executions ?? m.Execution,
-        }));
+
+
+    const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages
+    
+    useEffect(() => {
+        const norm = normalizeMessages(rawMessages);
         setMessages(norm);
     }, [rawMessages]);
+
+
 
     // ---------------------------------------------------------------------
     // 📤  Submit / Upload handlers delegated to Composer
@@ -120,7 +152,14 @@ export default function Chat({ context, container = {} }) {
             {error && <div className="text-red-500 text-sm py-1">{error}</div>}
 
             {/* Message list */}
-            <MessageFeed messages={messages} batchSize={chatCfg.batchSize || 50} context={context} />
+            <MessageFeed
+                messages={messages}
+                batchSize={chatCfg.batchSize || 50}
+                context={context}
+                classifyMessage={classifyMessage}
+                renderers={renderers}
+                fallback={fallback}
+            />
 
             {/* Prompt composer */}
             <Composer

@@ -512,6 +512,11 @@ type SchemaProperty struct {
 	Description string      `json:"description,omitempty" yaml:"description,omitempty"`
 	Enum        []string    `json:"enum,omitempty" yaml:"enum,omitempty"`
 	Default     interface{} `json:"default,omitempty" yaml:"default,omitempty"`
+
+	// ---------- UI vendor extensions (forge) -----------------
+	UIOrder  int    `json:"x-ui-order,omitempty" yaml:"x-ui-order,omitempty"`
+	UIWidget string `json:"x-ui-widget,omitempty" yaml:"x-ui-widget,omitempty"`
+	UIGroup  string `json:"x-ui-group,omitempty"  yaml:"x-ui-group,omitempty"`
 }
 
 // Interaction is delivered by the event/data-source so that binding expressions can reference .Schema, .Message, .ID …
