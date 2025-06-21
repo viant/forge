@@ -153,6 +153,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             result.handlers = {
                 dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector),
                 window: windowHandlers,
+                ...(services || {}), // expose global service namespaces (e.g., chat)
             }
             result.actions = metadata.actions.import(result) || {}
 

@@ -20,6 +20,28 @@ export const viewSignals = signal({});
 export const messageSignals = signal({});
 
 
+// ---------------------------------------------------------------------------
+//  Message-Bus signals (client-side, window-scoped)
+// ---------------------------------------------------------------------------
+
+// Each active window gets its own bus signal that stores an **array** of
+// arbitrary message objects.  Components can push to the array (sending a
+// message) and watch the signal re-actively (receiving messages).
+
+export const busSignals = signal({});
+
+export const getBusSignal = (windowId) => {
+    if (!busSignals.value[windowId]) {
+        const newSignal = signal([]);
+        busSignals.value = {
+            ...busSignals.peek(),
+            [windowId]: newSignal,
+        };
+    }
+    return busSignals.value[windowId];
+};
+
+
 export const controlSignals = signal({});
 
 
@@ -188,6 +210,8 @@ export const removeSignalsForKey = (windowId) => {
     const newDataControlSignals = {...controlSignals.value};
     const newDataInputSignals = {...inputSignals.value};
 
+    const newBusSignals = {...busSignals.value};
+
 
     for (const key in newDataSignals) {
         if (key.startsWith(windowId)) {
@@ -198,10 +222,14 @@ export const removeSignalsForKey = (windowId) => {
         }
     }
 
+    // Remove bus signal for this window (exact match, not startsWith)
+    delete newBusSignals[windowId];
+
 
     dataSignals.value = newDataSignals;
     controlSignals.value = newDataControlSignals;
     inputSignals.value = newDataInputSignals;
+    busSignals.value = newBusSignals;
 };
 
 
