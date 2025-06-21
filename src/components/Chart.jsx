@@ -17,7 +17,7 @@ import {
     ResponsiveContainer,
 } from "recharts";
 import {format} from "date-fns";
-import {useSignalEffect} from "@preact/signals-react";
+import { useDataSourceState } from "../hooks/useDataSourceState.js";
 
 // Function to transform rawData into chartData
 export function transformData(rawData, chart, valueKey) {
@@ -90,10 +90,9 @@ const Chart = ({container, context}) => {
     const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || "");
     const [yAxisLabel, setYAxisLabel] = useState(yAxis.label || "");
 
-    const [collection, setCollection] = useState([]);
+    const { collection, loading, error } = useDataSourceState(context);
 
     function prepareData() {
-        const collection = handlers.dataSource.getCollection();
         const {data, keys} = transformData(collection, chart, selectedValueKey);
         setChartData(data);
         setAvailableDataKeys(keys); // Update available data keys
@@ -126,9 +125,7 @@ const Chart = ({container, context}) => {
     }, [availableDataKeys]);
 
 
-    useSignalEffect(() => {
-        setCollection(handlers.dataSource.getCollection())
-    })
+
 
     // Function to handle selection changes for dataKeys
     const handleDataKeySelect = (dataKey) => {
@@ -256,6 +253,13 @@ const Chart = ({container, context}) => {
                     ),
                 }}
             />
+            {loading && (
+                <div style={{textAlign: 'center', padding: 4}}>Loading…</div>
+            )}
+            {error && (
+                <div style={{color: 'red', padding: 4}}>{`${error}`}</div>
+            )}
+
             <ResponsiveContainer width="100%" height="100%">
                 {lineChart}
             </ResponsiveContainer>

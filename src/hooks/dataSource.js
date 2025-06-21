@@ -480,10 +480,18 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         };
     };
 
+    // Update filter values without triggering a remote fetch but still
+    // propagate the change to any UI subscribers by publishing a fresh
+    // input object (immutability keeps reactivity alive).
     const setSilentFilterValues = ({filter = {}}) => {
-        for (const key in filter) {
-            input.peek().filter[key] = filter[key];
-        }
+        const current = input.peek();
+        input.value = {
+            ...current,
+            filter: {
+                ...(current.filter || {}),
+                ...filter,
+            },
+        };
     };
 
 
@@ -510,8 +518,11 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     }
 
     const setSilentFormField = ({item, value}) => {
-        const prev =  form.peek()
-        prev[item.id] = value;
+        const prev = form.peek();
+        form.value = {
+            ...prev,
+            [item.id]: value,
+        };
     }
 
     const setFilterValue = ({item, value}) => {
@@ -525,9 +536,15 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     const setSilentFilterValue = ({item, value}) => {
-        const snapshot = input.peek()
-        snapshot.filter[item.id] = value;
-        return true
+        const snapshot = input.peek();
+        input.value = {
+            ...snapshot,
+            filter: {
+                ...(snapshot.filter || {}),
+                [item.id]: value,
+            },
+        };
+        return true;
     };
 
 
@@ -536,11 +553,11 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     }
 
     const setSilentFormData = ({values = {}}) => {
-        const snapshot =  form.peek()
-        for (const key in values) {
-            snapshot[key] = values[key];
-        }
-        return true
+        form.value = {
+            ...form.peek(),
+            ...values,
+        };
+        return true;
     }
 
     const getFormData = () => {
@@ -632,11 +649,12 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     const fetchCollection = (props) => {
         const {filter = {}} = props || {}
         const inputFilter = input.value.filter || {};
-        input.value = {
-            ...input.value,
+        const newValue =  {
+            ...input.peek(),
             filter: {...inputFilter, ...filter},
             fetch: true,
         };
+        input.value =newValue
     };
 
 
