@@ -4,12 +4,51 @@ import {resolveSelector} from "../utils/selector.js";
 export function resolveParameters(parameterDefinitions = [], context) {
     const resolved = {};
     parameterDefinitions.forEach((param) => {
-        const {name, kind, in: inWhere, location} = param;
-        if (!resolved[kind]) {
-            resolved[kind] = {};
+        // 'to' is the preferred attribute naming the destination DataSourceRef.
+        // Fallback to legacy 'kind' for backward-compatibility.
+        const toDataSource = param.to || param.kind;
+        if (!toDataSource) {
+            throw new Error("Parameter definition must specify 'to' (or legacy 'kind') – none provided");
         }
+
+        // Emit soft deprecation warning once per session when 'kind' is used.
+        if (!param.to && param.kind && typeof window !== 'undefined') {
+            if (!window.__forgeKindDeprecationPrinted) {
+                console.warn("[Forge] 'kind' in parameters is deprecated; use 'to' instead.");
+                window.__forgeKindDeprecationPrinted = true;
+            }
+        }
+
+        if (!resolved[toDataSource]) {
+            resolved[toDataSource] = {};
+        }
+        const {name, in: inWhere, location} = param;
         const value = resolveParameter(context, inWhere, location);
-        resolved[kind][name] = value;
+        if(name === "...") {
+            resolved[toDataSource] = {...value}
+        } else if(name.startsWith("[]")) {
+            const key = name.substring(2);
+            resolved[toDataSource][key] = [value];
+        } else if(name.includes(".")) {
+            const parts = name.split(".");
+            let selected = resolved[toDataSource]
+
+            for(let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if(!selected[part])  {
+                    selected[part] = {}
+                }
+                if (i === parts.length - 1) {
+                    selected[part] = value;
+                }
+                selected = selected[part]
+
+            }
+
+        } else {
+
+            resolved[toDataSource][name] = value;
+        }
     });
     return resolved;
 }

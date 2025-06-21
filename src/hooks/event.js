@@ -339,6 +339,24 @@ export const tableHandlers = (context, container) => {
     return handlers;
 };
 
+// ---------------------------------------------------------------------------
+// Chat Handlers
+// ---------------------------------------------------------------------------
+export const chatHandlers = (context, container) => {
+    const { signals } = context;
+    const { message } = signals;
+    const on = (container.chat && container.chat.on) || [];
+
+    const handlers = {
+        onSubmit: Execution(context, message),
+        onUpload: Execution(context, message),
+    };
+
+    indexExecution(context, on, handlers, message);
+
+    return handlers;
+};
+
 export const dialogHandlers = (context, container) => {
     const {signals} = context;
     const {message} = signals;
