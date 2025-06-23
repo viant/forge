@@ -377,27 +377,30 @@ type Section struct {
 
 type Binding struct {
 	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	DataField     string `json:"dataField,omitempty" yaml:"dataField,omitempty"`
+	Path          string `json:"bindingPath,omitempty" yaml:"bindingPath,omitempty"`
 	Scope         string `json:"scope,omitempty" yaml:"scope,omitempty"`
 	MutationMode  string `json:"mutationMode,omitempty" yaml:"mutationMode,omitempty"`
 }
-
 type Item struct {
 	ID            string `json:"id" yaml:"id"`
 	Binding       `yaml:",inline"`
-	Value         interface{}            `json:"value,omitempty" yaml:"value,omitempty"`
-	Style         *StyleProperties       `json:"style,omitempty" yaml:"style,omitempty"`
-	Label         string                 `json:"label" yaml:"label"`
-	LabelPosition string                 `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
-	Align         string                 `json:"align,omitempty" yaml:"align,omitempty"`
-	Options       []Option               `json:"options,omitempty" yaml:"options,omitempty"`
-	DateFnsFormat string                 `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
-	NumericFormat string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	Icon          string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
-	Type          string                 `json:"type,omitempty" yaml:"type,omitempty"`
-	ColumnSpan    int                    `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
-	RowSpan       int                    `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
-	Properties    map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`
-	On            []*Execute             `json:"on,omitempty" yaml:"on,omitempty"` // For message-bus events
+	Value         interface{}      `json:"value,omitempty" yaml:"value,omitempty"`
+	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	Label         string           `json:"label" yaml:"label"`
+	LabelPosition string           `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
+	Align         string           `json:"align,omitempty" yaml:"align,omitempty"`
+	Options       []Option         `json:"options,omitempty" yaml:"options,omitempty"`
+	DateFnsFormat string           `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
+	NumericFormat string           `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	Icon          string           `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Type          string           `json:"type,omitempty" yaml:"type,omitempty"`
+	// ColumnSpan defines how many columns this item occupies in a grid layout.
+	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
+	ColumnSpan int                    `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
+	RowSpan    int                    `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
+	Properties map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`
+	On         []*Execute             `json:"on,omitempty" yaml:"on,omitempty"` // For message-bus events
 }
 
 type Execute struct {
@@ -428,7 +431,7 @@ type DataSource struct {
 	SelectionMode *SelectionMode `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
 	Paging        *PagingConfig  `json:"paging,omitempty" yaml:"paging,omitempty"`
 	FilterSet     []Filter       `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
-	AutoSelect    bool           `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
+	AutoSelect    *bool          `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
 	SelfReference string         `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
 }
 
@@ -447,6 +450,7 @@ type UniqueKey struct {
 
 type Selectors struct {
 	Data     string `json:"data,omitempty" yaml:"data,omitempty"`
+	Scope    string `json:"scope,omitempty" yaml:"scope,omitempty"`
 	DataInfo string `json:"dataInfo,omitempty" yaml:"dataInfo,omitempty"`
 	Metrics  string `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }

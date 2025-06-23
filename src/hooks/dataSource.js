@@ -2,7 +2,7 @@
 import {
     getInputSignal,
 } from "../core";
-import {resolveSelector} from "../utils/selector.js";
+import {resolveSelector, setSelector} from "../utils/selector.js";
 
 import {arrayEquals} from "../utils/equal.js";
 
@@ -148,6 +148,9 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
      */
     function pushDependencies(record = {}) {
         Object.entries(dataSourceDependencies).forEach(([depRef, depParameters]) => {
+
+
+            console.log("pushDependencies", depRef, depParameters)
             let depInput = dependencyInputs[depRef];
             if (!depInput) {
                 const childDataSourceId = identity.getDataSourceId(depRef);
@@ -247,6 +250,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         form.value = {...newSelection.selected};
 
         if (selectionMode === 'single') {
+
             // Push updates to dependencies
             pushDependencies(newSelection.selected);
         }
@@ -446,7 +450,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     const handleAddNew = () => {
-        //selection.value = {selected: null, index: -1};
+        resetSelection()
         form.value = {};
     };
 
@@ -514,35 +518,34 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     const setFormField = ({item, value}) => {
-        form.value = {...form.peek(), [item.id]: value};
+        const fieldKey = item.dataField || item.bindingPath || item.id;
+        const previous = form.peek();
+        form.value = setSelector(previous, fieldKey, value);
     }
 
     const setSilentFormField = ({item, value}) => {
+        const fieldKey = item.dataField || item.bindingPath || item.id;
         const prev = form.peek();
-        form.value = {
-            ...prev,
-            [item.id]: value,
-        };
+        form.value = setSelector(prev, fieldKey, value);
     }
 
     const setFilterValue = ({item, value}) => {
-        const prev = input.peek()
+        const fieldKey = item.dataField || item.bindingPath || item.id;
+        const prev = input.peek();
         input.value = {
             ...input.value,
-            filter: {...prev.filter, [item.id]: value},
+            filter: setSelector(prev.filter || {}, fieldKey, value),
         };
         return true
     };
 
 
     const setSilentFilterValue = ({item, value}) => {
+        const fieldKey = item.dataField || item.bindingPath || item.id;
         const snapshot = input.peek();
         input.value = {
             ...snapshot,
-            filter: {
-                ...(snapshot.filter || {}),
-                [item.id]: value,
-            },
+            filter: setSelector(snapshot.filter || {}, fieldKey, value),
         };
         return true;
     };
@@ -577,6 +580,12 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     const getCollection = () => {
         return collection.value || [];
     };
+
+    
+    const setCollection = (collection) => {
+        collection.value  = collection;
+    };
+
 
 
     const getDataSourceValue = (scope) => {
@@ -720,6 +729,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         refreshSelected,
         refreshSelection,
         getCollection,
+        setCollection,
         peekCollection,
         getCollectionInfo,
         pushFormDependencies,

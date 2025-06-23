@@ -1,5 +1,6 @@
 // useGenericDataSourceHandlers.js
 import {resolveParameters} from "./parameters.js";
+import {setSelector} from "../utils/selector.js";
 
 const Execution = (context, messageBus) => {
     const executions = [];
@@ -177,7 +178,8 @@ export const useControlEvents = (context, items = [], state) => {
                 id: "setData",
                 handler: ({item, value}) => {
                     setData((prevData) => {
-                        return {...prevData, [item.id]: value};
+                        const fieldKey = item.dataField || item.bindingPath || item.id;
+                        return setSelector(prevData, fieldKey, value);
                     });
                 },
             };
@@ -227,7 +229,7 @@ export const useControlEvents = (context, items = [], state) => {
         for (const key in handlers) {
             if (handlers[key] && handlers[key].isDefined()) {
                 if (isStateEvent(key)) {
-                    stateEvents[key] = (props) => handlers[key].execute({...props, item, state});
+                    stateEvents[key] = (props) => handlers[key].execute({...props, item, state, context});
                     continue;
                 }
                 switch (key) {
@@ -235,7 +237,7 @@ export const useControlEvents = (context, items = [], state) => {
                     case "onClick":
                         events["onClick"] = (event) => {
                             const value = event.target?.value;
-                            return handlers[key].execute({event, item, value, state});
+                            return handlers[key].execute({event, item, value, state, context});
                         };
                         break;
                     case "onChange":
@@ -244,32 +246,32 @@ export const useControlEvents = (context, items = [], state) => {
                             case "date": // fallthrough
                             case "datetime":
                                 events["onChange"] = (value) => {
-                                    return handlers[key].execute({item, value, state});
+                                    return handlers[key].execute({item, value, state, context});
                                 };
                                 break;
                             case "checkbox":
                             case "toggle":
                                 events["onChange"] = (event) => {
                                     const value = event.target?.checked;
-                                    return handlers[key].execute({event, item, value, state});
+                                    return handlers[key].execute({event, item, value, state, context});
                                 };
                                 break;
                             default:
                                 events["onChange"] = (event) => {
                                     const value = event.target?.value;
-                                    return handlers[key].execute({event, item, value, state});
+                                    return handlers[key].execute({event, item, value, state, context});
                                 };
                         }
                         break;
                     case "onValueChange":
                         events["onValueChange"] = (value) => {
-                            return handlers[key].execute({item, value, state});
+                            return handlers[key].execute({item, value, state, context});
                         };
                         break;
                     case "onItemSelect":
                         events["onItemSelect"] = (event) => {
                             const value = event.target?.value;
-                            return handlers[key].execute({event, item, value, state});
+                            return handlers[key].execute({event, item, value, state, context});
                         };
                         break;
                     default:
@@ -489,6 +491,8 @@ export const useToolbarControlEvents = (context, items = []) => {
                 handlers.onClick.push({id: "dataSource.openFilter"});
             } else if (item.id === "refresh") {
                 handlers.onClick.push({id: "dataSource.fetchCollection"});
+            } else if (item.id === "addNew") {
+                    handlers.onClick.push({id: "dataSource.handleAddNew"});
             } else if (item.id === "settings") {
                 handlers.onClick.push({id: "table.openSetting"});
             }
@@ -505,12 +509,12 @@ export const useToolbarControlEvents = (context, items = []) => {
             const handler = handlers[key];
             if (handler && handler.isDefined()) {
                 if (isStateEvent(key)) {
-                    stateEvents[key] = () => handler.execute({item});
+                    stateEvents[key] = () => handler.execute({context, item});
                     continue;
                 }
                 if (key === "onClick") {
                     events["onClick"] = (event) => {
-                        return handler.execute({event, item});
+                        return handler.execute({context, event, item});
                     };
                 }
             }

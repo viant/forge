@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import {resolveSelector} from "../utils/selector.js";
 import {useSignalEffect} from '@preact/signals-react';
 import {
     InputGroup,
@@ -116,10 +117,28 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
 
 
         const [formData, setFormData] = state ? state : useState({});
-        if (item.value && !(item.id in formData)) {
-            formData[item.id] = item.value;
+
+        // Determine the key representing where this control stores its value
+        const fieldKey = item.dataField || item.bindingPath || item.id;
+
+        // If the component has a default value defined on the schema but it is
+        // still missing in the form data, initialise it.
+        if (item.value && resolveSelector(formData, fieldKey) === undefined) {
+            // Mutate the local formData object to inject the default value in
+            // the same way the old flat implementation did.
+            const keys = fieldKey.split('.');
+            let target = formData;
+            for (let i = 0; i < keys.length - 1; i++) {
+                if (typeof target[keys[i]] !== 'object' || target[keys[i]] === null) {
+                    target[keys[i]] = {};
+                }
+                target = target[keys[i]];
+            }
+            target[keys[keys.length - 1]] = item.value;
         }
-        let value = formData[item.id] || ''
+
+        // Resolve current value (falling back to empty string for undefined)
+        let value = resolveSelector(formData, fieldKey) || '';
 
         useSignalEffect(() => {
 
@@ -132,22 +151,22 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                     default:
                         const data = context.handlers.dataSource.getFormData();
                         setFormData(data);
-                        value = data[item.id] || ''
+                        value = resolveSelector(data, fieldKey) || ''
                 }
             }
 
 
             if (stateEvents.onValue) {
-                const evaluatedValue = stateEvents.onValue({data: formData, item: item, value});
+                const evaluatedValue = stateEvents.onValue({data: formData, item: item, value, context});
                 setDynamicValue(evaluatedValue);
             }
             if (stateEvents.onReadonly) {
-                const evaluatedReadonly = stateEvents.onReadonly({data: formData, item: item, value});
+                const evaluatedReadonly = stateEvents.onReadonly({data: formData, item: item, value, context});
                 setDynamicReadOnly(evaluatedReadonly);
             }
 
             if (stateEvents.onProperties) {
-                const evaluatedProperties = stateEvents.onProperties({data: formData, item: item, value});
+                const evaluatedProperties = stateEvents.onProperties({data: formData, item: item, value, context});
                 setDynamicProperties(evaluatedProperties);
             }
 
@@ -268,7 +287,7 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                     >
                         <Button
                             text={
-                                item.options.find((opt) => opt.value === (formData[item.id] || ''))?.label ||
+                                item.options.find((opt) => opt.value === (resolveSelector(formData, fieldKey) || ''))?.label ||
                                 `Select ${item.label}`
                             }
                             rightIcon="caret-down"
