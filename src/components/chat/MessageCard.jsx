@@ -2,7 +2,6 @@
 import React from "react";
 import { Icon } from "@blueprintjs/core";
 import { format as formatDate } from "date-fns";
-import ExecutionDetails from "./ExecutionDetails.jsx";
 
 // ---------------------------------------------------------------------------
 // 🛠️  Minimal, safe-ish markdown → HTML converter (no external deps)
@@ -51,13 +50,13 @@ export default function MessageCard({ msg, context }) {
     const iconName = msg.role === "assistant" ? "chat" : msg.role === "tool" ? "wrench" : "person";
     const iconColour = msg.role === "assistant" ? "var(--black)" :  "var(--black)" ;
 
-    const hasExec = msg.executions?.length > 0;
+    // Generic bubble – no execution specific UX in Forge default build.
     const bubbleClass =
         (msg.role === "user"
             ? "chat-bubble chat-user"
             : msg.role === "assistant"
                 ? "chat-bubble chat-bot"
-                : "chat-bubble chat-tool") + (hasExec ? " has-executions" : "");
+                : "chat-bubble chat-tool");
 
     return (
         <div className={`chat-row ${msg.role}`}> {/* alignment flex row */}
@@ -68,14 +67,7 @@ export default function MessageCard({ msg, context }) {
                 <div className={bubbleClass} data-ts={formatDate(new Date(msg.createdAt), "HH:mm")}>
                     <div className="prose max-w-full text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
 
-                    {hasExec && (
-                        <details className="mt-2">
-                            <summary className="cursor-pointer text-xs text-blue-500">
-                                Execution details ({msg.executions.length})
-                            </summary>
-                            <ExecutionDetails executions={msg.executions} context={context} messageId={msg.id} />
-                        </details>
-                    )}
+                    {/* Execution details are rendered by application-specific bubble renderers. */}
                 </div>
             </div>
         </div>
