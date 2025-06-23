@@ -124,9 +124,20 @@ export default function DataSource({context}) {
                 records = events.onFetch.execute({collection: records})
             }
             collection.value = records;
-            const selected = records?.length > 0 ? records[0] : null;
-            const rowIndex = selected ? 0 : -1;
-            setSelected({selected: selected, rowIndex: rowIndex})
+
+            // ----------------------------------------------------------
+            // Auto-selection behaviour
+            // If dataSource.autoSelect === false we leave every row
+            // unselected; otherwise (default) keep the legacy behaviour
+            // of picking the first record.
+            // ----------------------------------------------------------
+            if (dataSource.autoSelect === false) {
+                setSelected({selected: null, rowIndex: -1});
+            } else {
+                const selected = records?.length > 0 ? records[0] : null;
+                const rowIndex = selected ? 0 : -1;
+                setSelected({selected, rowIndex});
+            }
         } else {
             collection.value = [];
             setSelected({selected: null, rowIndex: -1})

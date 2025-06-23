@@ -58,16 +58,46 @@ export function resolveParameterValue(item, context, container, state, init = fa
  * Resolve dot separated selector
  */
 export const resolveSelector = (holder, selector) => {
-    if (!selector) {
+    // Return early if no selector or holder itself is null/undefined
+    if (!selector || holder == null) {
         return holder;
     }
-    const keys = selector.split(".");
-    if (keys.length === 1) {
-        return holder[selector]
-    }
-    let result = holder;
+
+    const keys = selector.split('.')
+
+    let current = holder;
     for (const key of keys) {
-        result = result[key]
+        if (current == null) {
+            return undefined; // path breaks – stay safe
+        }
+        current = current[key];
     }
-    return result;
+    return current;
+};
+
+
+/**
+ * Clone an object and set the value at a dotted path.
+ * This helper keeps immutability guarantees expected by the store hooks.
+ * @param {Object} holder base object to clone from (may be undefined)
+ * @param {String} path dot separated property path, e.g. "options.provider"
+ * @param {*} value value to set
+ * @returns {Object} new cloned object with the desired value set
+ */
+export const setSelector = (holder, path, value) => {
+    if (!path || typeof path !== 'string' || path.indexOf('.') === -1) {
+        return {
+            ...(holder || {}),
+            [path]: value,
+        };
+    }
+
+    const keys = path.split('.');
+    const [head, ...tail] = keys;
+    const existing = holder && typeof holder === 'object' ? holder[head] : undefined;
+
+    return {
+        ...(holder || {}),
+        [head]: setSelector(existing || {}, tail.join('.'), value),
+    };
 };

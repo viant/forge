@@ -11,6 +11,10 @@ function useDataConnector(dataSource) {
     function applyParameters({url, headers, queryParams, body}, inputParameters) {
         let finalUrl = url;
         if (!parameters || parameters.length === 0) {
+            for(const k in inputParameters) {
+                const value = inputParameters[k];
+                finalUrl = finalUrl.replace(`{${k}}`, value);
+            }
             return finalUrl;
         }
         for (const paramDef of parameters) {
@@ -35,6 +39,10 @@ function useDataConnector(dataSource) {
                 default:
                     // no-op
                     break;
+            }
+            for(const k in inputParameters) {
+                const value = inputParameters[k];
+                finalUrl = finalUrl.replace(`{${k}}`, value);
             }
         }
         return finalUrl;
@@ -150,8 +158,9 @@ function useDataConnector(dataSource) {
             }
             return await resp.json();
         } catch (err) {
-            console.error("Failed to get error", err);
+            console.error("Failed to fetch data", err);
             throw err;
+
         }
     }
 
@@ -176,8 +185,9 @@ function useDataConnector(dataSource) {
             }
             return await resp.json();
         } catch (err) {
-            setError && setError(err);
+            console.error("Failed to fetch data", err);
             throw err;
+
         }
     }
 
@@ -185,9 +195,13 @@ function useDataConnector(dataSource) {
     /**
      * Patch
      */
-    async function patch({body = {}}) {
+    async function patch({body = {}, inputParameters = {}}) {
         try {
-            const {url, headers} = getUrlAndHeaders('PATCH');
+            let {url, headers} = getUrlAndHeaders('PATCH');
+            const queryParams = new URLSearchParams();
+            url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            console.log("PATCH url: " + url);
+
             const resp = await fetch(url, {
                 method: "PATCH",
                 headers: {...headers, "Content-Type": "application/json"},
@@ -198,22 +212,25 @@ function useDataConnector(dataSource) {
             }
             return await resp.json();
         } catch (err) {
-            setError && setError(err);
+            console.error("Failed to fetch data", err);
             throw err;
+
         }
     }
 
     /**
      * Put
      */
-    async function put({id, body = {}}) {
-        if (!id) {
-            throw new Error("PUT requires 'id'");
-        }
+    async function put({body = {}, inputParameters={}}) {
         try {
-            const {url, headers} = getUrlAndHeaders('PUT');
-            const finalUrl = `${url}/${id}`;
-            const resp = await fetch(finalUrl, {
+            let {url, headers} = getUrlAndHeaders('PUT');
+            const queryParams = new URLSearchParams();
+
+
+            console.log('inputParameters', inputParameters);
+
+            url = applyParameters({url, headers,  body}, inputParameters);
+            const resp = await fetch(url, {
                 method: "PUT",
                 headers: {...headers, "Content-Type": "application/json"},
                 body: JSON.stringify(body),
