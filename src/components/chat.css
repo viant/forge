@@ -78,8 +78,9 @@
 
 /* The scroll-area */
 .chat-feed {
-  flex: 1 1 auto;   /* can grow *and* shrink */
-  min-height: 0;    /* <-- CRUCIAL: let it shrink */
+  /* Grow to fill left-over space even when empty */
+  flex: 1 1 0%;
+  min-height: 0;
   overflow-y: auto;
 }
 
