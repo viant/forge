@@ -1,7 +1,7 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useState } from "react";
 import { Button, TextArea, FileInput } from "@blueprintjs/core";
-import ToolSelector from "./ToolSelector.jsx";
+
 
 export default function Composer({
     tools = [],
@@ -47,14 +47,6 @@ export default function Composer({
             </div>
 
             <div className="flex items-center gap-2">
-                {showTools && (
-                    <ToolSelector
-                        tools={tools}
-                        value={selectedTools}
-                        onChange={setSelectedTools}
-                        disabled={disabled}
-                    />
-                )}
                 {showUpload && (
                     <FileInput text="Upload" onInputChange={(e) => onUpload?.(e)} disabled={disabled} />
                 )}

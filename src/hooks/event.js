@@ -269,9 +269,10 @@ export const useControlEvents = (context, items = [], state) => {
                         };
                         break;
                     case "onItemSelect":
-                        events["onItemSelect"] = (event) => {
-                            const value = event.target?.value;
-                            return handlers[key].execute({event, item, value, state, context});
+                        events["onItemSelect"] = (selected) => {
+                            // Blueprint Select passes the entire selected object; extract value when present.
+                            const value = (selected && selected.value !== undefined) ? selected.value : selected;
+                            return handlers[key].execute({selected, item, value, state, context});
                         };
                         break;
                     default:

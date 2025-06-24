@@ -757,5 +757,33 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         pushLocalState,
         getDataSourceValue,
         peekDataSourceValue,
+
+        // Utility: buildOptions – returns {options:[{value,label}]}
+        buildOptions: (props) => {
+            const  {execution = {}, parameters = {}, args = [], context} = props;
+            try {
+                const {args: execArgs = []} = execution;
+                let dataSourceRef = execArgs[0];
+                let labelField    = execArgs[1] || 'label';
+                let valueField    = execArgs[2] || 'id';
+                let noneLabel     = execArgs[3] || '— default —';
+                if (!dataSourceRef) {
+                    throw new Error('dataSourceRef is required');
+                }
+                const dsCtx = context.Context(dataSourceRef);
+                const recs = dsCtx?.signals?.collection?.peek() || [];
+                const opts = [
+                    {value: '', label: noneLabel},
+                    ...recs.map((rec) => ({
+                        value: rec[valueField],
+                        label: rec[labelField] ?? rec[valueField],
+                    })),
+                ];
+                return {options: opts};
+            } catch (e) {
+                console.error('buildOptions error', e);
+                return {};
+            }
+        },
     };
 }

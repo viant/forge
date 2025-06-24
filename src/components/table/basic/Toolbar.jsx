@@ -14,6 +14,7 @@ const Toolbar = ({
     const { control } = signals;
     const disabled = control.value?.inactive || false;
 
+    console.log('toolbar control ', control.value, context)
     return (
         <div className="toolbar-container">
             {/* Items aligned to the left */}
@@ -22,17 +23,15 @@ const Toolbar = ({
                     .filter((item) => item.align === 'left')
                     .map((item) => {
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
-                        // Determine if the button is readonly (disabled)
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const isDisabled = disabled || isReadonly;
-
+                        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
                         return (
                             <span key={item.id} style={{ marginRight: "10px" }}>
                                 <Button
                                     key={item.id}
                                     icon={item.icon}
                                     {...events}
-                                    disabled={isDisabled}
+                                    disabled={effectiveDisabled}
                                 >
                                     {item.label || ""}
                                 </Button>
@@ -48,14 +47,14 @@ const Toolbar = ({
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
 
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const isDisabled = disabled || isReadonly;
+                        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
                         return (
                             <span key={item.id} style={{margin: "0 10px"}}>
                                 <Button
                                     key={item.id}
                                     icon={item.icon}
                                     {...events}
-                                    disabled={isDisabled}
+                                    disabled={effectiveDisabled}
                                 >
                                     {item.label || ""}
                                 </Button>
@@ -70,14 +69,14 @@ const Toolbar = ({
                     .map((item) => {
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const isDisabled = disabled || isReadonly;
+                        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
                         return (
                             <span key={item.id} style={{ marginLeft: "10px" }}>
                                 <Button
                                     key={item.id}
                                     icon={item.icon}
                                     {...events}
-                                    disabled={isDisabled}
+                                    disabled={effectiveDisabled}
                                 >
                                     {item.label || ""}
                                 </Button>
