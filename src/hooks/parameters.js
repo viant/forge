@@ -7,21 +7,10 @@ export function resolveParameters(parameterDefinitions = [], context) {
         // 'to' is the preferred attribute naming the destination DataSourceRef.
         // Fallback to legacy 'kind' for backward-compatibility.
         const toDataSource = param.to || param.kind;
-        if (!toDataSource) {
-            throw new Error("Parameter definition must specify 'to' (or legacy 'kind') – none provided");
-        }
-
-        // Emit soft deprecation warning once per session when 'kind' is used.
-        if (!param.to && param.kind && typeof window !== 'undefined') {
-            if (!window.__forgeKindDeprecationPrinted) {
-                console.warn("[Forge] 'kind' in parameters is deprecated; use 'to' instead.");
-                window.__forgeKindDeprecationPrinted = true;
-            }
-        }
-
-        if (!resolved[toDataSource]) {
+        if (toDataSource && !resolved[toDataSource]) {
             resolved[toDataSource] = {};
         }
+
         const {name, in: inWhere, location} = param;
         const value = resolveParameter(context, inWhere, location);
         if(name === "...") {
@@ -31,8 +20,10 @@ export function resolveParameters(parameterDefinitions = [], context) {
             resolved[toDataSource][key] = [value];
         } else if(name.includes(".")) {
             const parts = name.split(".");
-            let selected = resolved[toDataSource]
-
+            let selected = resolved
+            if(toDataSource) {
+                selected = resolved[toDataSource]
+            }
             for(let i = 0; i < parts.length; i++) {
                 const part = parts[i];
                 if(!selected[part])  {
@@ -46,8 +37,11 @@ export function resolveParameters(parameterDefinitions = [], context) {
             }
 
         } else {
-
-            resolved[toDataSource][name] = value;
+            if(toDataSource) {
+                resolved[toDataSource][name] = value;
+            } else {
+                resolved[name] = value;
+            }
         }
     });
     return resolved;
@@ -67,6 +61,8 @@ function resolveParameter(context, inWhere, location) {
             return resolveFromFilterSet(context, location);
         case 'tableSetting':
             return resolveFromTableSetting(context, location);
+        case 'const':
+            return location;
         default:
             throw new Error(`Unknown 'in' value: ${inWhere}`);
     }

@@ -319,7 +319,8 @@ type Table struct {
 }
 
 type Toolbar struct {
-	Items []Item `json:"items" yaml:"items"`
+	Items         []Item `json:"items" yaml:"items"`
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 }
 
 type Column struct {
@@ -370,23 +371,25 @@ type Binding struct {
 	MutationMode  string `json:"mutationMode,omitempty" yaml:"mutationMode,omitempty"`
 }
 type Item struct {
-	ID            string `json:"id" yaml:"id"`
-	Binding       `yaml:",inline"`
-	Value         interface{}      `json:"value,omitempty" yaml:"value,omitempty"`
-	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	Label         string           `json:"label" yaml:"label"`
-	LabelPosition string           `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
-	Align         string           `json:"align,omitempty" yaml:"align,omitempty"`
-	Options       []Option         `json:"options,omitempty" yaml:"options,omitempty"`
-	DateFnsFormat string           `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
-	NumericFormat string           `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	Icon          string           `json:"icon,omitempty" yaml:"icon,omitempty"`
-	Type          string           `json:"type,omitempty" yaml:"type,omitempty"`
+	ID                   string `json:"id" yaml:"id"`
+	Binding              `yaml:",inline"`
+	OptionDataSourceRets []string         `json:"optionDataSourceRets,omitempty" yaml:"optionDataSourceRets,omitempty"`
+	Value                interface{}      `json:"value,omitempty" yaml:"value,omitempty"`
+	Style                *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	Label                string           `json:"label" yaml:"label"`
+	LabelPosition        string           `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
+	Align                string           `json:"align,omitempty" yaml:"align,omitempty"`
+	Options              []Option         `json:"options,omitempty" yaml:"options,omitempty"`
+	DateFnsFormat        string           `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
+	NumericFormat        string           `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	Icon                 string           `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Type                 string           `json:"type,omitempty" yaml:"type,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
 	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
 	ColumnSpan int                    `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
 	RowSpan    int                    `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
 	Properties map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Enabled    bool                   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	On         []*Execute             `json:"on,omitempty" yaml:"on,omitempty"` // For message-bus events
 }
 
@@ -482,8 +485,9 @@ type Codec struct {
 
 type Parameter struct {
 	Name     string `json:"name" yaml:"name"`
-	Kind     string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	In       string `json:"in" yaml:"in"`
+	To       string `json:"to,omitempty" yaml:"to,omitempty"`
+	Kind     string `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Location string `json:"location,omitempty" yaml:"location,omitempty"`
 	Scope    string `json:"scope,omitempty" yaml:"scope,omitempty"`
 	Codec    *Codec `json:"codec,omitempty" yaml:"codec,omitempty"`

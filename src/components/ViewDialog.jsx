@@ -35,7 +35,6 @@ const ViewDialog = ({context, dialog}) => {
 
 
 
-   const collection =  handlers.dataSource.peekCollection()
     const input = handlers.dataSource.peekInput()
 
     const title = resolveTemplate(dialog.title, {input})

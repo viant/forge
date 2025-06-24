@@ -174,8 +174,13 @@ export default function Chat({
 
         // Descriptor object from YAML (expects { items:[...] })
         if (typeof effectiveToolbar === 'object' && Array.isArray(effectiveToolbar.items)) {
+            let toolbarContext = context
+            if(effectiveToolbar.dataSourceRef) {
+                toolbarContext = context.Context(effectiveToolbar.dataSourceRef)
+            }
+            console.log(effectiveToolbar)
             return (
-                <TableToolbar context={context} toolbarItems={effectiveToolbar.items} />
+                <TableToolbar context={toolbarContext} toolbarItems={effectiveToolbar.items} />
             );
         }
 
@@ -219,8 +224,6 @@ export default function Chat({
 
             {/* Prompt composer */}
             <Composer
-                tools={chatCfg.tools || []}
-                showTools={chatCfg.showTools && (chatCfg.tools || []).length > 0}
                 showUpload={chatCfg.showUpload}
                 onSubmit={handleSubmit}
                 onUpload={handleUpload}

@@ -109,7 +109,6 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
 
 
         adjustProperties(item, properties);
-
         const itemStyle = {
             gridColumn: `span ${span}`,
             ...style,
@@ -269,9 +268,10 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
 
             case 'select':
             case 'dropdown':
+                const opts = (dynamicProperties && dynamicProperties.options) || item.options || [];
                 layoutItem = (
                     <Select
-                        items={item.options}
+                        items={opts}
                         itemRenderer={(selectItem, {handleClick, modifiers}) => (
                             <MenuItem
                                 key={itemId + selectItem.value}
@@ -287,7 +287,7 @@ const ControlRenderer = ({item, context, container, events = {}, stateEvents = {
                     >
                         <Button
                             text={
-                                item.options.find((opt) => opt.value === (resolveSelector(formData, fieldKey) || ''))?.label ||
+                                (opts.find((opt) => opt.value === (resolveSelector(formData, fieldKey) || ''))?.label) ||
                                 `Select ${item.label}`
                             }
                             rightIcon="caret-down"
