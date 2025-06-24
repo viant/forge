@@ -9,10 +9,14 @@ import Composer     from "./chat/Composer.jsx";
 import MessageCard  from "./chat/MessageCard.jsx";
 import FormRenderer from "./FormRenderer.jsx";
 
-import { chatHandlers } from "../hooks/event.js";
-import {useEffect} from "react";
+import { chatHandlers } from "../hooks";
+import { useEffect } from "react";
+
 // Shared chat styles (avatars, bubbles, etc.)
 import "./chat.css";
+
+// Reuse the existing table toolbar for chat when descriptor provided
+import TableToolbar from "./table/basic/Toolbar.jsx";
 
 
 // ---------------------------------------------------------------------------
@@ -41,6 +45,13 @@ function defaultNormalizeMessages(rawMessages= []) {
 export default function Chat({
     context,
     container = {},
+
+    /* optional React node (or function returning node) rendered as toolbar */
+    toolbar = null,
+
+    /* height of Chat component – CSS string (e.g. "60vh" or "50%") or fraction 0–1 */
+    height,
+
     classifyMessage: classifyMessageProp,
     renderers: renderersProp,
     fallback: fallbackProp,
@@ -54,6 +65,13 @@ export default function Chat({
 
     const { handlers } = context;
 
+    // chat config from container metadata
+    const chatCfg = container?.chat || {};
+
+    // Determine effective toolbar / height (prop overrides metadata)
+    const effectiveToolbar = toolbar !== null ? toolbar : chatCfg.toolbar;
+    const effectiveHeight  = height !== undefined ? height : chatCfg.height;
+
     // Resolve classifier / renderer strategy – props > service > defaults
     const chatService = context?.handlers?.chat || {};
 
@@ -61,9 +79,6 @@ export default function Chat({
     const classifyMessage = classifyMessageProp || chatService.classifyMessage || defaultClassifier;
     const renderers = renderersProp || chatService.renderers || defaultRenderers;
     const fallback = fallbackProp || chatService.fallback || renderers?.bubble || defaultRenderers.bubble;
-
-    // chat configuration fragment coming from container metadata (optional)
-    const chatCfg = container?.chat || {};
 
     // use unified hook for reactive data
     const { collection: rawMessages, loading, error } = useDataSourceState(context);
@@ -141,8 +156,49 @@ export default function Chat({
     // ---------------------------------------------------------------------
     // 🖼️  Render
     // ---------------------------------------------------------------------
+
+    const heightStyle = effectiveHeight !== undefined ?
+        { height: typeof effectiveHeight === 'number' ? `${effectiveHeight * 100}%` : String(effectiveHeight) } : {};
+
+    // Helper to render toolbar depending on kind
+    const renderToolbar = () => {
+        if (!effectiveToolbar) return null;
+
+        if (React.isValidElement(effectiveToolbar)) {
+            return effectiveToolbar;
+        }
+
+        if (typeof effectiveToolbar === 'function') {
+            return effectiveToolbar();
+        }
+
+        // Descriptor object from YAML (expects { items:[...] })
+        if (typeof effectiveToolbar === 'object' && Array.isArray(effectiveToolbar.items)) {
+            return (
+                <TableToolbar context={context} toolbarItems={effectiveToolbar.items} />
+            );
+        }
+
+        // Fallback: render nothing
+        return null;
+    };
+
     return (
-        <div className="flex h-full w-full flex-col p-4 gap-3">
+        <div
+            className="w-full px-4 pt-4 gap-3"
+            style={{
+                ...heightStyle,
+                display: 'grid',
+                gridTemplateRows: 'auto 1fr auto',
+            }}
+        >
+
+            {/* Optional toolbar */}
+            {effectiveToolbar && (
+                <div className="flex-none mb-1">
+                    {renderToolbar()}
+                </div>
+            )}
             {/* Loading / Error banners */}
             {loading && (
                 <div className="flex items-center justify-center py-2">

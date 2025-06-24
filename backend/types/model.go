@@ -258,24 +258,11 @@ type Container struct {
 	FetchData   bool             `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
 }
 
-// Chat describes configuration for chat panel within a container.
-// ChatAdapter allows metadata to specify handlers that transform outgoing / incoming payloads
-// without hard-coding them in the front-end. Handlers are referenced by name and resolved via
-// Context.lookupHandler at runtime.
-type ChatAdapter struct {
-	// ToOutbound is a handler name that converts a Forge message to the payload expected by the backend.
-	ToOutbound string `json:"toOutbound,omitempty" yaml:"toOutbound,omitempty"`
-	// FromInbound is a handler name that converts backend response into one or more Forge messages.
-	FromInbound string `json:"fromInbound,omitempty" yaml:"fromInbound,omitempty"`
-}
-
 type Chat struct {
 	// DataSourceRef points to the data source that supplies messages.
-	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	// Tools lists tool names available to the user.
-	Tools []string `json:"tools,omitempty" yaml:"tools,omitempty"`
-	// ShowTools controls visibility of the tool selector (default true).
-	ShowTools bool `json:"showTools,omitempty" yaml:"showTools,omitempty"`
+	DataSourceRef string   `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Toolbar       *Toolbar `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	Height        string   `json:"height,omitempty" yaml:"height,omitempty"`
 	// ShowUpload controls whether file upload input should be displayed (default true).
 	ShowUpload bool `json:"showUpload,omitempty" yaml:"showUpload,omitempty"`
 	// On defines event handlers such as submit, upload
