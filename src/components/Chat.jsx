@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 
-import { Spinner } from "@blueprintjs/core";
 
 // Re-exported building blocks living under src/components/chat
 import MessageFeed from "./chat/MessageFeed.jsx";
@@ -9,8 +8,11 @@ import Composer     from "./chat/Composer.jsx";
 import MessageCard  from "./chat/MessageCard.jsx";
 import FormRenderer from "./FormRenderer.jsx";
 
+import { useSetting } from "../core";
+
 import { chatHandlers } from "../hooks";
 import { useEffect } from "react";
+
 
 // Shared chat styles (avatars, bubbles, etc.)
 import "./chat.css";
@@ -95,7 +97,6 @@ export default function Chat({
         const norm = normalizeMessages(rawMessages);
         setMessages(norm);
     }, [rawMessages]);
-
 
 
     // ---------------------------------------------------------------------
@@ -204,12 +205,7 @@ export default function Chat({
                     {renderToolbar()}
                 </div>
             )}
-            {/* Loading / Error banners */}
-            {loading && (
-                <div className="flex items-center justify-center py-2">
-                    <Spinner size={20} />
-                </div>
-            )}
+            {/* Error banner */}
             {error && <div className="text-red-500 text-sm py-1">{error}</div>}
 
             {/* Message list */}

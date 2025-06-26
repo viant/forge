@@ -43,6 +43,36 @@ function WindowContentInner({window, metadata, services}) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [windowId, metadata]);
 
+    /* ------------------------------------------------------------
+     * Execute window-level onInit events (declared in metadata.window.on)
+     * ---------------------------------------------------------- */
+
+    useEffect(() => {
+        const windowCfg   = metadata.window || {};
+        const windowOnArr = [
+            ...(Array.isArray(windowCfg.on) ? windowCfg.on : []),
+            ...(Array.isArray(metadata.on) ? metadata.on : []), // fallback top-level
+        ];
+
+        const initEvents = windowOnArr.filter((e) => e.event === 'onInit');
+        if (initEvents.length === 0) return;
+
+        initEvents.forEach((ev) => {
+            try {
+                const { handler: handlerId, args = [], parameters = [] } = ev;
+
+                console.log('window.onInit',context, ev.handler, args, parameters);
+                const fn = context.lookupHandler(handlerId);
+
+                fn({ execution: { id: handlerId, args, parameters }, context });
+            } catch (err) {
+                console.error('window.onInit handler failed', ev.handler, err);
+            }
+        });
+        // we want this effect to run only once when context stabilises
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [context]);
+
     const dataSources = metadata.dataSource || {};
     const dialogs     = metadata.dialogs   || [];
 

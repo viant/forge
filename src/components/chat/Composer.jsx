@@ -22,7 +22,8 @@ export default function Composer({
         setDraft("");
     };
 
-    const actionDisabled = disabled; // only disable while global lock (loading) is active
+    // Reflect global loading lock by disabling the action controls and showing a spinner
+    const actionDisabled = disabled;
 
     return (
         <form className="flex flex-col gap-1 mt-2" onSubmit={handleSubmit}>
@@ -37,11 +38,12 @@ export default function Composer({
                         disabled={disabled}
                     />
                     <Button
-                        icon={disabled ? "automatic-updates" : "send-message"}
+                        icon="send-message"
                         minimal
                         type="submit"
                         className="composer-send"
                         disabled={actionDisabled}
+                        loading={disabled}
                     />
                 </div>
             </div>

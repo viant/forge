@@ -47,7 +47,7 @@ export function injectActions(metadata) {
 /**
  * Resolve a dot-separated action name to the corresponding function in the registry.
  */
-export const resolveHandler = (registry, name) => {
+export const resolveHandler = (registry = {}, name) => {
     const keys = name.split(".");
     let result = registry;
     for (const key of keys) {

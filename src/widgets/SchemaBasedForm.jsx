@@ -2,7 +2,7 @@
 // fields or a minimal JSON-schema (object with properties).
 
 import React, { useMemo, useState } from 'react';
-import { getWidget } from '../registry/widgets.js';
+import WidgetRenderer from '../runtime/WidgetRenderer.jsx';
 import { jsonSchemaToFields } from '../utils/schema.js';
 
 /*
@@ -30,6 +30,8 @@ const SchemaBasedForm = (props) => {
         schema,
         requestedSchema,
         onSubmit,
+        context: windowContext,
+        dataSourceRef,
         style,
         on,
     } = props;
@@ -53,8 +55,8 @@ const SchemaBasedForm = (props) => {
     const [values, setValues] = useState(initialValues);
     const [errors, setErrors] = useState({});
 
-    const handleChange = (name, val) => {
-        setValues({ ...values, [name]: val });
+    const handleChangeDirect = (name, val) => {
+        setValues((prev) => ({ ...prev, [name]: val }));
     };
 
     const basicValidate = () => {
@@ -79,26 +81,41 @@ const SchemaBasedForm = (props) => {
         onSubmit?.(values);
     };
 
+    // Determine rendering context & adapter
+    let renderContext = null;
+    let stateArg = null;
+    let scope = 'local';
+
+    if (windowContext && dataSourceRef) {
+        try {
+            renderContext = windowContext.Context(dataSourceRef);
+            scope = 'form';
+        } catch (e) {
+            console.error('SchemaBasedForm: unable to resolve dataSourceRef', dataSourceRef, e);
+        }
+    }
+
+    if (scope === 'local') {
+        stateArg = [values, setValues];
+    }
+
     return (
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', ...(style || {}) }}>
-            {derivedFields.map((field) => {
-                const Widget = getWidget(field);
-                return (
-                    <div key={field.name} style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label style={{ marginBottom: 4 }}>
-                            {field.label} {field.required && '*'}
-                        </label>
-                        <Widget
-                            value={values[field.name]}
-                            onChange={(val) => handleChange(field.name, val)}
-                            field={field}
-                        />
-                        {errors[field.name] && (
-                            <span style={{ color: 'red', fontSize: 12 }}>{errors[field.name]}</span>
-                        )}
-                    </div>
-                );
-            })}
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, ...(style || {}) }}>
+            {derivedFields.map((field) => (
+                <WidgetRenderer
+                    key={field.name}
+                    item={{ ...field, scope }}
+                    container={{ layout: { columns: 1 } }}
+                    state={stateArg}
+                    context={renderContext}
+                />
+            ))}
+            {/* simple validation message */}
+            {Object.keys(errors).length > 0 && (
+                <div style={{ color: 'red', fontSize: 12 }}>
+                    Please fix highlighted fields.
+                </div>
+            )}
             <button type="submit" className="bp4-button bp4-intent-primary" style={{ alignSelf: 'flex-start' }}>
                 Submit
             </button>
