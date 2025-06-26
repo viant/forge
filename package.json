@@ -8,6 +8,11 @@
     "./components": "./src/components/index.js",
     "./actions": "./src/actions/index.js",
     "./utils": "./src/utils/index.js",
+    "./utils/*": "./src/utils/*.js",
+    "./utils/schema": "./src/utils/schema.js",
+    "./runtime/widgetRegistry": "./src/runtime/widgetRegistry.js",
+    "./runtime/widgetClassifier": "./src/runtime/widgetClassifier.js",
+    "./runtime/binding": "./src/runtime/binding.js",
     ".": "./index.js"
   },
   "scripts": {

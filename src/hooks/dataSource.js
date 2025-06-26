@@ -228,6 +228,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             return
         }
 
+
         // Existing flat data handling
         if (!newSelection || (selectionMode !== 'multi' && newSelection.rowIndex === -1)) {
             // For single selection, clear selection
@@ -248,6 +249,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         // For single selection
         selection.value = newSelection;
         form.value = {...newSelection.selected};
+        console.log("setting Form value ", newSelection.selected)
 
         if (selectionMode === 'single') {
 
@@ -552,6 +554,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     const setFormData = ({values = {}}) => {
+        console.log("setFormData", values)
         form.value = values;
     }
 

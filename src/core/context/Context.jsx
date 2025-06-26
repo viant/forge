@@ -54,9 +54,11 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         identity: {windowId, getDataSourceId, dataSourceRef, getDialogId},
         metadata: metadata,
         dataSourceRef: dataSourceRef,
+        _globalServices: services || {},
         services,
         handlers: {
             window: windowHandlers,
+            ...(services || {}),
         },
         actions: {},
         dialogs: {},
@@ -82,7 +84,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             return dialogContextCache[key]
         },
 
-        lookupHandler: (name) => resolveActionHandler(this.actions, this.handlers, name),
+        lookupHandler:function (name)  {
+            return resolveActionHandler(this.actions, this.handlers, name)
+        },
 
         Context: function (dataSourceRef) {
             if (!dataSourceRef) {
@@ -133,7 +137,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const connector = useDataConnector(dataSource);
             result = {
                 ...this,
-                handlers: {},
+                handlers: {
+                    ...this._globalServices,
+                },
                 identity,
                 connector,
                 signals,
@@ -153,8 +159,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             result.handlers = {
                 dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector),
                 window: windowHandlers,
-                ...(services || {}), // expose global service namespaces (e.g., chat)
+                ...this._globalServices,
             }
+            console.log("result.handlers", result.handlers)
             result.actions = metadata.actions.import(result) || {}
 
             result.lookupHandler = (name) => {

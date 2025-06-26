@@ -66,10 +66,26 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
 
         // -------- widget (default mapping) ------------------------
         let widget = p['x-ui-widget'];
+
+        // ------------------------------------------------------------------
+        // Default widget inference
+        // ------------------------------------------------------------------
+        // Priority order:
+        //   1. Explicit x-ui-widget (if provided)
+        //   2. Format-specific mapping (e.g. uri-reference -> file)
+        //   3. Enum → select
+        //   4. Fallback based on primitive type
+        // ------------------------------------------------------------------
+
         if (!widget || widget === '') {
-            if (Array.isArray(p.enum) && p.enum.length > 0) {
+            // 2. Format-specific mapping -----------------------------------
+            if (p.format === 'uri-reference') {
+                widget = 'file';
+            } else if (Array.isArray(p.enum) && p.enum.length > 0) {
+                // 3. Enum mapping ------------------------------------------
                 widget = 'select';
             } else {
+                // 4. Primitive type fallback -------------------------------
                 switch (p.type) {
                     case 'boolean':
                         widget = 'checkbox';

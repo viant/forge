@@ -38,12 +38,13 @@ type ChartSeriesValue struct {
 }
 
 type NavigationItem struct {
-	ID          string           `json:"id" yaml:"id"`
-	Label       string           `json:"label" yaml:"label"`
-	Icon        string           `json:"icon" yaml:"icon"`
-	WindowKey   string           `json:"windowKey" yaml:"windowKey"`
-	WindowTitle string           `json:"windowTitle" yaml:"windowTitle"`
-	ChildNodes  []NavigationItem `json:"childNodes,omitempty" yaml:"childNodes,omitempty"`
+	ID            string           `json:"id" yaml:"id"`
+	Label         string           `json:"label" yaml:"label"`
+	Icon          string           `json:"icon" yaml:"icon"`
+	WindowKey     string           `json:"windowKey" yaml:"windowKey"`
+	WindowTitle   string           `json:"windowTitle" yaml:"windowTitle"`
+	MultiInstance bool             `json:"multiInstance,omitempty" yaml:"multiInstance,omitempty"`
+	ChildNodes    []NavigationItem `json:"childNodes,omitempty" yaml:"childNodes,omitempty"`
 }
 
 // Dialog represents a dialog with a title, content, actions, and on events.
@@ -64,6 +65,7 @@ type Window struct {
 	View       View                  `json:"view" yaml:"view"`
 	Dialogs    []Dialog              `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
 	Actions    *Actions              `json:"actions,omitempty" yaml:"actions,omitempty"`
+	On         []*Execute            `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 func (w *Window) SetCode(code []byte) {
@@ -382,7 +384,7 @@ type Item struct {
 	Options              []Option         `json:"options,omitempty" yaml:"options,omitempty"`
 	DateFnsFormat        string           `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
 	NumericFormat        string           `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	Icon                 string           `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Icon                 string           `json:"double ,omitempty" yaml:"icon,omitempty"`
 	Type                 string           `json:"type,omitempty" yaml:"type,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
 	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
@@ -532,6 +534,8 @@ type SchemaBasedForm struct {
 	Id string `json:"id,omitempty"   yaml:"id,omitempty"`
 	// Where to persist the collected answers (same semantics as Chat/Editor)
 	DataBinding string `json:"dataBinding"    yaml:"dataBinding"`
+
+	DatasourceRef string `json:"datasourceRef,omitempty" yaml:"datasourceRef,omitempty"`
 	// Fields are rendered in slice order; you can still override per-field
 	// order later via Field.Order.
 	Fields []FormField      `json:"fields"         yaml:"fields"`
