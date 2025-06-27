@@ -179,7 +179,6 @@ export default function Chat({
             if(effectiveToolbar.dataSourceRef) {
                 toolbarContext = context.Context(effectiveToolbar.dataSourceRef)
             }
-            console.log(effectiveToolbar)
             return (
                 <TableToolbar context={toolbarContext} toolbarItems={effectiveToolbar.items} />
             );

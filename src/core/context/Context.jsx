@@ -7,6 +7,7 @@ import {
     getSelectionSignal,
     getMetricsSignal,
     getMessageSignal,
+    getFormStatusSignal,
     getFormSignal
 } from "../store/signals.js";
 
@@ -33,6 +34,33 @@ function resolveActionHandler(actions, handlers, name) {
 
 
 export const Context = (windowId, metadata, dataSourceRef, services) => {
+    // ------------------------------------------------------------------
+    // Inject default global services when not supplied
+    // ------------------------------------------------------------------
+    if (!services) services = {};
+
+    // Ensure form.updateItemProperties exists
+    if (!services.form) services.form = {};
+    if (typeof services.form.updateItemProperties !== 'function') {
+        services.form.updateItemProperties = (props = {}) => {
+            const { args = [], context, item, value } = props;
+            // bump control signal for the referenced control -> triggers re-eval of onProperties
+            try {
+                const targetId = args[0];
+                if (targetId) {
+                    const ctlSignal = context?.signals?.control;
+                    if (ctlSignal) {
+                        const snapshot = ctlSignal.peek();
+                        ctlSignal.value = { ...snapshot, [targetId]: Date.now() };
+                    }
+                }
+            } catch (e) {
+                console.error('form.updateItemProperties bump error', e);
+            }
+
+            return true; // allow default handler to proceed
+        };
+    }
     const dataSourceContextCache = {};
     const dialogContextCache = {}
     const signalIds = {}
@@ -51,7 +79,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
     const {ns} = metadata || [];
     return {
+
         identity: {windowId, getDataSourceId, dataSourceRef, getDialogId},
+        resources: {},
         metadata: metadata,
         dataSourceRef: dataSourceRef,
         _globalServices: services || {},
@@ -117,6 +147,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 collectionInfo: getCollectionInfoSignal(identity.dataSourceId),
                 selection: getSelectionSignal(identity.dataSourceId, initialSelectionValue),
                 metrics: getMetricsSignal(identity.dataSourceId),
+                formStatus: getFormStatusSignal(identity.dataSourceId),
             } : {}
 
             const standardSignals = {
@@ -161,7 +192,6 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 window: windowHandlers,
                 ...this._globalServices,
             }
-            console.log("result.handlers", result.handlers)
             result.actions = metadata.actions.import(result) || {}
 
             result.lookupHandler = (name) => {

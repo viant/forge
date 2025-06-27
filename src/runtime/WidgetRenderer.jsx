@@ -24,6 +24,7 @@ export default function WidgetRenderer({
     item,
     context = {},
     container = {},
+    events: externalEvents = {}, // from useControlEvents
     stateEvents = {},
     state = undefined, // optional override pair {get,set}
 }) {
@@ -57,11 +58,9 @@ export default function WidgetRenderer({
                 context?.signals?.selection?.value;
                 break;
             default:
+                context?.signals?.control?.value;
                 break;
         }
-
-        console.log('useSignalEffect', scope, context)
-
         forceRender((c) => c + 1);
     });
     const adapterFactory = resolveStateAdapter(scope) || resolveStateAdapter('noop');
@@ -102,6 +101,20 @@ export default function WidgetRenderer({
 
     const combinedProps = { ...dynPropsGlobal, ...dynPropsLocal };
 
+    // Merge events: if same key exists in both, chain them
+    const mergedEvents = { ...events };
+    for (const [k, extFn] of Object.entries(externalEvents)) {
+        if (mergedEvents[k]) {
+            const internalFn = mergedEvents[k];
+            mergedEvents[k] = (...args) => {
+                try { extFn?.(...args); } catch (e) { console.error(e); }
+                try { internalFn?.(...args); } catch (e) { console.error(e); }
+            };
+        } else {
+            mergedEvents[k] = extFn;
+        }
+    }
+
     const widgetProps = {
         value: dynValue !== undefined ? dynValue : adapter.get(),
         readOnly:
@@ -114,8 +127,27 @@ export default function WidgetRenderer({
         onChange: events.onChange,
         ...item.properties,
         ...combinedProps,
-        ...events,
+        ...mergedEvents,
     };
+
+    // Compatibility: when a widget supplies only `onChange` handler but the
+    // event adapter produced `onItemSelect`, map it.
+    if (!widgetProps.onChange && mergedEvents.onItemSelect) {
+        widgetProps.onChange = mergedEvents.onItemSelect;
+    }
+
+    // ------------------------------------------------------------------
+    // 5. Pass-through of common display properties present directly on item
+    // ------------------------------------------------------------------
+    ['icon', 'leftIcon', 'rightIcon', 'intent'].forEach((k) => {
+        if (item?.[k] !== undefined && widgetProps[k] === undefined) {
+            widgetProps[k] = item[k];
+        }
+    });
+    // Temporary compatibility for legacy metadata where icon is stored under key "double "
+    if (item?.['double '] && widgetProps.icon === undefined) {
+        widgetProps.icon = item['double '];
+    }
 
     // pass static options array when present (used by select-like widgets)
     if (item.options && !widgetProps.options) {
@@ -127,9 +159,6 @@ export default function WidgetRenderer({
     if (validationMsg) {
         widgetProps.intent = 'danger';
     }
-
-    console.log('WidgetRenderer', itemWithError, widgetProps)
-
     return (
         <ControlWrapper item={itemWithError} container={container} framework={framework}>
             <Widget {...widgetProps} />

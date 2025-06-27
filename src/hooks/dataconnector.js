@@ -200,8 +200,6 @@ function useDataConnector(dataSource) {
             let {url, headers} = getUrlAndHeaders('PATCH');
             const queryParams = new URLSearchParams();
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
-            console.log("PATCH url: " + url);
-
             const resp = await fetch(url, {
                 method: "PATCH",
                 headers: {...headers, "Content-Type": "application/json"},
@@ -226,8 +224,6 @@ function useDataConnector(dataSource) {
             let {url, headers} = getUrlAndHeaders('PUT');
             const queryParams = new URLSearchParams();
 
-
-            console.log('inputParameters', inputParameters);
 
             url = applyParameters({url, headers,  body}, inputParameters);
             const resp = await fetch(url, {

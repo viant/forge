@@ -2,8 +2,6 @@ import React from "react";
 import { Checkbox, Icon, Tooltip, Position } from "@blueprintjs/core";
 
 const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
-//    console.log('columns=>',columns)
-
     const { onSort, sortColumnId, sortDirection } = sortConfig;
     const { handlers, dataSource } = context;
     const {

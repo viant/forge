@@ -100,23 +100,34 @@ const SchemaBasedForm = (props) => {
     }
 
     return (
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12, ...(style || {}) }}>
-            {derivedFields.map((field) => (
-                <WidgetRenderer
-                    key={field.name}
-                    item={{ ...field, scope }}
-                    container={{ layout: { columns: 1 } }}
-                    state={stateArg}
-                    context={renderContext}
-                />
-            ))}
+        <form
+            onSubmit={submit}
+            style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 12,
+                ...(style || {}),
+            }}
+        >
+            {derivedFields.map((field) => {
+                const colSpan = field.columnSpan || (field.type === 'textarea' ? 2 : 1);
+                return (
+                    <WidgetRenderer
+                        key={field.name}
+                        item={{ ...field, scope, columnSpan: colSpan }}
+                        container={{ layout: { columns: 2 } }}
+                        state={stateArg}
+                        context={renderContext}
+                    />
+                );
+            })}
             {/* simple validation message */}
             {Object.keys(errors).length > 0 && (
                 <div style={{ color: 'red', fontSize: 12 }}>
                     Please fix highlighted fields.
                 </div>
             )}
-            <button type="submit" className="bp4-button bp4-intent-primary" style={{ alignSelf: 'flex-start' }}>
+            <button type="submit" className="bp4-button bp4-intent-primary" style={{ gridColumn: 'span 2', justifySelf: 'start' }}>
                 Submit
             </button>
         </form>

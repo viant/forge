@@ -182,6 +182,22 @@ export const getControlSignal = (sourceId) => {
     return controlSignals.value[sourceId];
 };
 
+// -------------------------------------------------------------
+// Form status (dirty flag) signal
+// -------------------------------------------------------------
+const formStatusSignals = signal({}); // map id → signal
+
+export const getFormStatusSignal = (sourceId) => {
+    if (!formStatusSignals.value[sourceId]) {
+        const newSignal = signal({ dirty: false, version: 0 });
+        formStatusSignals.value = {
+            ...formStatusSignals.peek(),
+            [sourceId]: newSignal,
+        };
+    }
+    return formStatusSignals.value[sourceId];
+};
+
 
 // Get or create data signal for a unique window key
 export const getViewSignal = (sourceId) => {

@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Tree } from '@blueprintjs/core';
-import { Switch } from '@blueprintjs/core';
+import { Tree, Switch, NonIdealState, Tooltip } from '@blueprintjs/core';
 
 /* -------------------------------------------------------------------
  * TreeMultiSelect – hierarchical multi–select control based on
@@ -18,7 +17,7 @@ import { Switch } from '@blueprintjs/core';
 function buildTree(options, separator) {
     const rootMap = new Map();
 
-    options.forEach(({ value, label }) => {
+    options.forEach(({ value, label, tooltip }) => {
         const parts = value.split(separator);
         let currentLevel = rootMap;
 
@@ -26,12 +25,14 @@ function buildTree(options, separator) {
             const isLeaf = idx === parts.length - 1;
             const key = parts.slice(0, idx + 1).join(separator);
             if (!currentLevel.has(part)) {
+                const initialLabel = isLeaf ? (label === value ? part : label) : part;
                 currentLevel.set(part, {
                     id: key,
-                    label: part,
+                    label: initialLabel,
                     fullValue: isLeaf ? value : null,
                     childrenMap: new Map(),
-                    optionLabel: isLeaf ? label : part,
+                    optionLabel: isLeaf ? initialLabel : part,
+                    tooltip: isLeaf ? tooltip : undefined,
                 });
             }
             const node = currentLevel.get(part);
@@ -49,6 +50,7 @@ function buildTree(options, separator) {
                 label: n.optionLabel,
                 childNodes: childNodes,
                 fullValue: n.fullValue, // undefined for non-leaf
+                tooltip: n.tooltip,
                 hasCaret: hasChildren,
                 isExpanded: false,
             };
@@ -62,11 +64,13 @@ export default function TreeMultiSelect({
     options = [],
     value: selectedValues = [],
     onChange,
-    separator = '_',
+    separator = '-',
     readOnly = false,
     ...rest
 }) {
+
     const [nodes, setNodes] = useState([]);
+    const [expanded, setExpanded] = useState(new Set());
 
     // Build tree once options change
     useEffect(() => {
@@ -105,13 +109,25 @@ export default function TreeMultiSelect({
 
         if (isLeaf) {
             const checked = isLeafSelected(node);
-            return (
+            const sw = (
                 <Switch
+                    style={{ margin: '4px 2px' }}
                     checked={checked}
                     disabled={readOnly}
-                    onChange={() => toggleLeaf(node)}
+                    onChange={(e) => {
+                        e.stopPropagation();
+                        toggleLeaf(node);
+                    }}
                     label={node.label}
+                    alignIndicator="right"
                 />
+            );
+            return node.tooltip ? (
+                <Tooltip content={node.tooltip} placement="right" hoverOpenDelay={250}>
+                    {sw}
+                </Tooltip>
+            ) : (
+                sw
             );
         }
 
@@ -120,8 +136,8 @@ export default function TreeMultiSelect({
         const partial = areSomeChildrenSelected(node);
         const boxStyle = {
             display: 'inline-block',
-            width: 12,
-            height: 12,
+            width: 14,
+            height: 14,
             marginRight: 6,
             border: '1px solid currentColor',
             backgroundColor: all ? 'currentColor' : 'transparent',
@@ -130,11 +146,12 @@ export default function TreeMultiSelect({
 
         const dotStyle = {
             position: 'absolute',
-            top: 3,
-            left: 3,
+            top: '50%',
+            left: '50%',
             width: 6,
             height: 6,
             borderRadius: '50%',
+            transform: 'translate(-50%, -50%)',
             backgroundColor: partial ? 'currentColor' : 'transparent',
         };
 
@@ -188,30 +205,35 @@ export default function TreeMultiSelect({
             const newNode = { ...node };
             newNode.label = renderLabelForNode(node);
             newNode.isSelected = false; // we handle visuals ourselves
+            newNode.isExpanded = expanded.has(node.id);
             if (node.childNodes) {
                 newNode.childNodes = node.childNodes.map(decorate);
             }
             return newNode;
         };
         return nodes.map(decorate);
-    }, [nodes, selectedValues, readOnly]);
+    }, [nodes, selectedValues, readOnly, expanded]);
 
     // Tree expand/collapse handlers – keep simple local state
     const handleNodeExpand = (nodeData) => {
-        nodeData.isExpanded = true;
-        setNodes([...nodes]);
+        setExpanded(new Set(expanded).add(nodeData.id));
     };
     const handleNodeCollapse = (nodeData) => {
-        nodeData.isExpanded = false;
-        setNodes([...nodes]);
+        const next = new Set(expanded);
+        next.delete(nodeData.id);
+        setExpanded(next);
     };
 
     return (
-        <Tree
-            {...rest}
-            contents={decoratedNodes}
-            onNodeCollapse={handleNodeCollapse}
-            onNodeExpand={handleNodeExpand}
-        />
+        decoratedNodes.length === 0 ? (
+            <NonIdealState icon="box" description="No options" layout="horizontal" />
+        ) : (
+            <Tree
+                {...rest}
+                contents={decoratedNodes}
+                onNodeCollapse={handleNodeCollapse}
+                onNodeExpand={handleNodeExpand}
+            />
+        )
     );
 }

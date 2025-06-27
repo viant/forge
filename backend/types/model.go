@@ -384,7 +384,7 @@ type Item struct {
 	Options              []Option         `json:"options,omitempty" yaml:"options,omitempty"`
 	DateFnsFormat        string           `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
 	NumericFormat        string           `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	Icon                 string           `json:"double ,omitempty" yaml:"icon,omitempty"`
+	Icon                 string           `json:"icon,omitempty" yaml:"icon,omitempty"`
 	Type                 string           `json:"type,omitempty" yaml:"type,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
 	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
@@ -408,8 +408,9 @@ type Execute struct {
 }
 
 type Option struct {
-	Value string `json:"value" yaml:"value"`
-	Label string `json:"label" yaml:"label"`
+	Value   string `json:"value" yaml:"value"`
+	Label   string `json:"label" yaml:"label"`
+	Tooltip string `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`
 }
 
 type DataSource struct {
