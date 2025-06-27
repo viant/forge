@@ -54,22 +54,26 @@ function WindowContentInner({window, metadata, services}) {
             ...(Array.isArray(metadata.on) ? metadata.on : []), // fallback top-level
         ];
 
-        const initEvents = windowOnArr.filter((e) => e.event === 'onInit');
-        if (initEvents.length === 0) return;
+        const runHandlers = (eventName) => {
+            const evts = windowOnArr.filter((e) => e.event === eventName);
+            evts.forEach((ev) => {
+                try {
+                    const { handler: handlerId, args = [], parameters = [] } = ev;
+                    const fn = context.lookupHandler(handlerId);
+                    fn({ execution: { id: handlerId, args, parameters }, context });
+                } catch (err) {
+                    console.error(`window.${eventName} handler failed`, ev.handler, err);
+                }
+            });
+        };
 
-        initEvents.forEach((ev) => {
-            try {
-                const { handler: handlerId, args = [], parameters = [] } = ev;
+        // onInit equivalent
+        runHandlers('onInit');
 
-                console.log('window.onInit',context, ev.handler, args, parameters);
-                const fn = context.lookupHandler(handlerId);
-
-                fn({ execution: { id: handlerId, args, parameters }, context });
-            } catch (err) {
-                console.error('window.onInit handler failed', ev.handler, err);
-            }
-        });
-        // we want this effect to run only once when context stabilises
+        // cleanup → onDestroy
+        return () => {
+            runHandlers('onDestroy');
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [context]);
 

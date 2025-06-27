@@ -127,6 +127,28 @@ const Container = ({context, container, isActive}) => {
     // ------------------------------------------------------------------
     const containerWantsFetcher = container.fetchData === true || container.selectFirst === true;
 
+    // ------------------------------------------------------------------
+    // Early exit: container used only for auto-fetch (no visual output)
+    // ------------------------------------------------------------------
+    const hasVisual =
+        (visualItems?.length || 0) > 0 ||
+        tablePanel || chartPanel || chatPanel || fileBrowserPanel || editorPanel || formPanel || (containers && containers.length > 0);
+
+    if (!hasVisual) {
+        return (
+            <>
+                {containerWantsFetcher && (
+                    <DataSourceFetcher
+                        key={`auto-fetcher-${container.id}`}
+                        context={context.Context(container.dataSourceRef || dataSourceRef)}
+                        selectFirst={container.selectFirst === true}
+                        fetchData={container.fetchData === true}
+                    />
+                )}
+            </>
+        );
+    }
+
     const handlers = (visualItems?.length || 0) > 0 ? useControlEvents(context, visualItems, state) : {}
 
     return (<>

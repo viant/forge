@@ -5,6 +5,7 @@ import {
 import {resolveSelector, setSelector} from "../utils/selector.js";
 
 import {arrayEquals} from "../utils/equal.js";
+import equal from 'fast-deep-equal';
 
 function findDataSourceDependencies(dataSourceRef, dataSources) {
     const dependencies = {};
@@ -51,7 +52,17 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     if (!dataSource) {
         throw new Error(`No config found for DS ${identity.dataSourceRef}`);
     }
-    const {control, form, selection, collection, input, collectionInfo} = signals
+    const {control, form, selection, collection, input, collectionInfo, formStatus} = signals
+
+    let formSnapshot = form.peek();
+
+    const updateDirtyFlag = () => {
+        const dirtyNow = !equal(formSnapshot, form.peek());
+        const current  = formStatus.peek();
+        if (dirtyNow !== current.dirty) {
+            formStatus.value = { dirty: dirtyNow, version: current.version + (dirtyNow ? 0 : 1) };
+        }
+    };
     const dataSourceDependencies = findDataSourceDependencies(identity.dataSourceRef, dataSources)
     const selectionMode = dataSource.selectionMode || 'single';
 
@@ -148,9 +159,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
      */
     function pushDependencies(record = {}) {
         Object.entries(dataSourceDependencies).forEach(([depRef, depParameters]) => {
-
-
-            console.log("pushDependencies", depRef, depParameters)
             let depInput = dependencyInputs[depRef];
             if (!depInput) {
                 const childDataSourceId = identity.getDataSourceId(depRef);
@@ -204,6 +212,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
                 // For single selection, clear selection
                 selection.value = selectionMode === 'multi' ? {selection: []} : {selected: null, nodePath: null};
                 form.value = {};
+                formSnapshot = {};
+                formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
                 if (selectionMode === 'single') {
                     pushDependencies(null);
                 }
@@ -219,6 +229,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             // For single selection
             selection.value = newSelection;
             form.value = {...newSelection.selected};
+            formSnapshot = form.peek();
+            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
 
             if (selectionMode === 'single') {
                 // Push updates to dependencies
@@ -234,6 +246,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             // For single selection, clear selection
             selection.value = selectionMode === 'multi' ? {selection: []} : {selected: null, rowIndex: -1};
             form.value = {};
+            formSnapshot = {};
+            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
             if (selectionMode === 'single') {
                 pushDependencies(null);
             }
@@ -249,11 +263,10 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         // For single selection
         selection.value = newSelection;
         form.value = {...newSelection.selected};
-        console.log("setting Form value ", newSelection.selected)
-
+        formSnapshot = form.peek();
+        formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
         if (selectionMode === 'single') {
-
-            // Push updates to dependencies
+          // Push updates to dependencies
             pushDependencies(newSelection.selected);
         }
 
@@ -454,6 +467,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     const handleAddNew = () => {
         resetSelection()
         form.value = {};
+        formSnapshot = {};
+        formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
     };
 
 
@@ -523,12 +538,14 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         const fieldKey = item.dataField || item.bindingPath || item.id;
         const previous = form.peek();
         form.value = setSelector(previous, fieldKey, value);
+        updateDirtyFlag();
     }
 
     const setSilentFormField = ({item, value}) => {
         const fieldKey = item.dataField || item.bindingPath || item.id;
         const prev = form.peek();
         form.value = setSelector(prev, fieldKey, value);
+        updateDirtyFlag();
     }
 
     const setFilterValue = ({item, value}) => {
@@ -554,8 +571,9 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     const setFormData = ({values = {}}) => {
-        console.log("setFormData", values)
         form.value = values;
+        formSnapshot = values;
+        formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
     }
 
     const setSilentFormData = ({values = {}}) => {
@@ -564,6 +582,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             ...values,
         };
         return true;
+        // note: snapshot not updated for silent sets
     }
 
     const getFormData = () => {
@@ -744,6 +763,13 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         peekFormData,
         setFormField,
         setSilentFormField,
+        // dirty helpers
+        isFormDirty: () => formStatus.peek().dirty,
+        isFormNotDirty: () => !formStatus.peek().dirty,
+        resetFormDirty: () => {
+            formSnapshot = form.peek();
+            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+        },
         setError,
         setInactive,
         isInactive,

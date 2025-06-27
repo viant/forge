@@ -7,7 +7,12 @@ import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
 
 export default function WindowContentDataSourceContainer({windowContext, dsKey, initialParams = {}}) {
-    const dsContext = windowContext.Context(dsKey);
+    // Call Context exactly once to avoid violating Rules of Hooks when cached paths skip hooks.
+    const dsContextRef = React.useRef(null);
+    if (!dsContextRef.current) {
+        dsContextRef.current = windowContext.Context(dsKey);
+    }
+    const dsContext = dsContextRef.current;
 
     // Apply initial parameters exactly once when dsContext stabilises.
     useEffect(() => {

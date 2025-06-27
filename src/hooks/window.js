@@ -65,7 +65,6 @@ export function useWindowHandlers(windowId) {
 
 
     const closeWindow = (props = {}) => {
-        console.log('Closing window:', windowId, ' TODO ... removeWindow');
         removeSignalsForKey(windowId);
     }
 

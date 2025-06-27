@@ -14,7 +14,6 @@ const Toolbar = ({
     const { control } = signals;
     const disabled = control.value?.inactive || false;
 
-    console.log('toolbar control ', control.value, context)
     return (
         <div className="toolbar-container">
             {/* Items aligned to the left */}

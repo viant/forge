@@ -123,10 +123,13 @@ const Execution = (context, messageBus) => {
 
 function indexExecution(context, on, handlers, messageBus) {
     on.forEach(({event, init, handler, onError, onDone, onSuccess, async, args, parameters}) => {
-        if (!handlers[event]) {
-            handlers[event] = Execution(context, messageBus);
+        // Alias handling for common event names
+        let evtKey = event;
+        if (event === 'onSelection') evtKey = 'onItemSelect';
+        if (!handlers[evtKey]) {
+            handlers[evtKey] = Execution(context, messageBus);
         }
-        handlers[event].push({id: handler, init, onError, onSuccess, onDone, async, args, parameters, handler: null});
+        handlers[evtKey].push({id: handler, init, onError, onSuccess, onDone, async, args, parameters, handler: null});
     });
 }
 
