@@ -13,6 +13,15 @@ import {
 
 
 import {resolveHandler} from "../../actions";
+
+// -------------------------------------------------------------
+// Global window-context registry (windowId → Context instance)
+// -------------------------------------------------------------
+const windowContextRegistry = new Map();
+
+export function getWindowContext(windowId) {
+    return windowContextRegistry.get(windowId);
+}
 import {useDialogHandlers, useWindowHandlers} from "../../hooks";
 import useDataConnector from "../../hooks/dataconnector";
 
@@ -31,6 +40,7 @@ function resolveActionHandler(actions, handlers, name) {
     }
     return result;
 }
+
 
 
 export const Context = (windowId, metadata, dataSourceRef, services) => {
@@ -198,6 +208,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 return resolveActionHandler(result.actions, result.handlers, name);
             }
             dataSourceContextCache[dataSourceRef] = result
+            windowContextRegistry.set(windowId, this); // register top-level window context
             this.dataSources[dataSourceRef] = dataSourceContextCache[dataSourceRef];
             return dataSourceContextCache[dataSourceRef];
         }

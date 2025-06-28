@@ -64,7 +64,6 @@ export const resolveSelector = (holder, selector) => {
     }
 
     const keys = selector.split('.')
-
     let current = holder;
     for (const key of keys) {
         if (current == null) {

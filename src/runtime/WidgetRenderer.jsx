@@ -35,7 +35,6 @@ export default function WidgetRenderer({
     // ------------------------------------------------------------------
     const widgetKey = item.widget || classify(item);
     const { factory: Widget, framework } = getWidgetEntry(widgetKey);
-
     // ------------------------------------------------------------------
     // 2. State adapter (scope-aware)
     // ------------------------------------------------------------------
@@ -116,6 +115,7 @@ export default function WidgetRenderer({
     }
 
     const widgetProps = {
+        context,
         value: dynValue !== undefined ? dynValue : adapter.get(),
         readOnly:
             dynReadonlyLocal !== undefined
@@ -144,10 +144,7 @@ export default function WidgetRenderer({
             widgetProps[k] = item[k];
         }
     });
-    // Temporary compatibility for legacy metadata where icon is stored under key "double "
-    if (item?.['double '] && widgetProps.icon === undefined) {
-        widgetProps.icon = item['double '];
-    }
+
 
     // pass static options array when present (used by select-like widgets)
     if (item.options && !widgetProps.options) {
@@ -160,8 +157,8 @@ export default function WidgetRenderer({
         widgetProps.intent = 'danger';
     }
     return (
-        <ControlWrapper item={itemWithError} container={container} framework={framework}>
-            <Widget {...widgetProps} />
+        <ControlWrapper item={itemWithError} container={container} framework={framework} >
+            <Widget { ...widgetProps} />
         </ControlWrapper>
     );
 }

@@ -18,15 +18,17 @@ const getNodeAtPath = (nodes, path) => {
     }
     return node;
 };
-const FileBrowser = ({context, container, isActive}) => {
+
+
+const FileBrowser = (props) => {
+    const {context, config={}, isActive} = props;
     const {handlers, signals} = context;
     const {control} = signals;
-    const {fileBrowser} = container
     const [fileTreeData, setFileTreeData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const events = fileBrowserHandlers(context, container);
+    const events = fileBrowserHandlers(context, config);
 
 
     // Whenever the collection signal changes, rebuild tree data
@@ -173,7 +175,7 @@ const FileBrowser = ({context, container, isActive}) => {
         return <Spinner/>;
     }
 
-    const style = fileBrowser.style || {}
+    const style = config.style || {}
     const {width= '100%', height = '70vh'} = style
 
 

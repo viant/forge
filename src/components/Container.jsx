@@ -71,7 +71,7 @@ const Container = ({context, container, isActive}) => {
         fileBrowserPanel = (
             <FileBrowser
                 context={context.Context(dsRef)}
-                container={container}
+                config={container.fileBrowser}
                 isActive={isActive}
             />
         );

@@ -18,7 +18,7 @@ const ViewDialog = ({context, dialog}) => {
         if(isDialogOpen && ! isOpen) {
             handlers.dataSource.setInputArgs(handlers.dialog.callerArgs())
             if(events.onOpen.isDefined()) {
-                events.onOpen.execute()
+                events.onOpen.execute({context,dialog})
             }
         }
         if(isOpen !== isDialogOpen) {
@@ -74,7 +74,7 @@ const ViewDialog = ({context, dialog}) => {
 
                             const handler = events.actions[action.id]
                             if (handler.onClick) {
-                                return handler.onClick.execute({event: e, action: action.id})
+                                return handler.onClick.execute({event: e, action: action.id, context})
                             }
                         }}
                     >{action.label}</Button>

@@ -494,11 +494,13 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     const setFilter = ({filter = {}}) => {
-        input.value = {
-            ...input.value,
-            filter: filter,
-            fetch: true,
-        };
+        const value  = {
+        ...input.value,
+                filter: filter,
+                fetch: true,
+        }
+        input.value = value
+        console.log("SetFilter", value)
     };
 
     // Update filter values without triggering a remote fetch but still
