@@ -19,9 +19,13 @@ import {useRef} from "react";
  *  - Returns true if all defined parameters can be resolved from their locations.
  *  - If at least one parameter is missing, returns false.
  */
-function hasResolvedDependencies(parameters = [], values = {}) {
+function hasResolvedDependencies(parameters = [], values = {}, filter={}) {
     if (!parameters || parameters?.length === 0) return true; // no parameters => no dependencies
     for (const paramDef of parameters) {
+        if(paramDef?.from === 'const') {
+            filter[paramDef.name] = paramDef.location;
+            continue;
+        }
         const isDefined = (paramDef.name in values) && values[paramDef.name] !== undefined;
         if (!isDefined) {
             return false;
@@ -150,6 +154,8 @@ export default function DataSource({context}) {
     useSignalEffect(() => {
         const inputVal = input.value || {};
         const {fetch, refresh = false} = inputVal;
+
+
         if (!fetch && ! refresh) return;
 
         if (refresh) {
@@ -157,7 +163,6 @@ export default function DataSource({context}) {
                 handleUpstream()
                 return
             }
-
             return refreshRecords().finally(() => {
                 flagReadDone();
             });
@@ -189,8 +194,7 @@ export default function DataSource({context}) {
     async function refreshRecords() {
         const inputVal = input.value || {};
         let {refreshFilter, parameters} = inputVal || {};
-        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters)
-
+        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, refreshFilter)
         if (!hasDeps) {
             flagReadDone()
             setInactive(true);
@@ -198,6 +202,7 @@ export default function DataSource({context}) {
         } else {
             setInactive(false);
         }
+
 
 
         const finalFilter = {...refreshFilter};
@@ -209,6 +214,7 @@ export default function DataSource({context}) {
 
 
             let {records} = extractData(selectors, paging, payload);
+
             if (events.onFetch.isDefined() && records.length > 0) {
                 records = events.onFetch.execute({collection: records})
             }
@@ -229,6 +235,8 @@ export default function DataSource({context}) {
                 // Updated code: recursively match and update the record
                 function updateRecordInSnapshot(snapshot, uid, newRecord) {
                     for (let i = 0; i < snapshot.length; i++) {
+
+
                         if (getUniqueKeyValue(snapshot[i]) === uid) {
                             if (dataSource.selfReference) {
                                 snapshot[i] = { ...snapshot[i], ...newRecord };
@@ -279,8 +287,7 @@ export default function DataSource({context}) {
     async function doFetchRecords() {
         const inputVal = input.value || {};
         let {page, filter, parameters} = inputVal || {};
-
-        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters);
+        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
         setError('');
         if (!hasDeps) {
             setSelected({selected: null, rowIndex: -1});

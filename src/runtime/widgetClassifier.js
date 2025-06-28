@@ -23,6 +23,7 @@ export function registerClassifier(fn, { priority = 100 } = {}) {
  * Run classifiers to find a widget key.
  */
 export function classify(item) {
+    console.assert(item, 'classify requires a non-null item');
     if (item && item.widget) return item.widget; // explicit override
 
     for (const { fn } of classifiers) {

@@ -292,10 +292,10 @@ export const useControlEvents = (context, items = [], state) => {
 };
 
 
-export const fileBrowserHandlers = (context, container) => {
+export const fileBrowserHandlers = (context, config) => {
     const {signals} = context;
     const {message} = signals;
-    const {on = []} = container.fileBrowser;
+    const {on = []} = config;
     const handlers = {
         onInit: Execution(context, message),
         onNodeSelect: Execution(context, message),

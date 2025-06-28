@@ -487,13 +487,19 @@ type Codec struct {
 }
 
 type Parameter struct {
-	Name     string `json:"name" yaml:"name"`
-	In       string `json:"in" yaml:"in"`
-	To       string `json:"to,omitempty" yaml:"to,omitempty"`
-	Kind     string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Location string `json:"location,omitempty" yaml:"location,omitempty"`
-	Scope    string `json:"scope,omitempty" yaml:"scope,omitempty"`
-	Codec    *Codec `json:"codec,omitempty" yaml:"codec,omitempty"`
+	From      string `json:"from" yaml:"from"`                             //source [dataSource]:store
+	Location  string `json:"location,omitempty" yaml:"location,omitempty"` //source selector
+	To        string `json:"to" yaml:"to"`                                 //dest [dataSource]:store
+	Name      string `json:"name" yaml:"name"`                             //dest selector
+	Direction string `json:"direction,omitempty" yaml:"direction,omitempty"`
+	Codec     *Codec `json:"codec,omitempty" yaml:"codec,omitempty"`
+
+	//Deprecated
+	In string `json:"in,omitempty" yaml:"in,omitempty"`
+	//Deprecated
+	Kind string `json:"kind,omitempty" yaml:"kind,omitempty"`
+	//Deprecated
+	Scope string `json:"scope,omitempty" yaml:"scope,omitempty"`
 }
 
 // JSONSchema mirrors the very small subset we need for

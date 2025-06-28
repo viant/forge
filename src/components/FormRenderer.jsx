@@ -28,12 +28,12 @@ export default function FormRenderer({ message, context }) {
     };
 
     return (
-        <fieldset className="space-y-2" style={{"border-radius": "10px", "padding": "1rem"}}>
+        <fieldset className="space-y-2" style={{borderRadius: "10px", padding: "1rem"}}>
             {prompt && <legend>{prompt}</legend>}
 
             <SchemaBasedForm
                 requestedSchema={requestedSchema}
-                dataBinding={`window.state.answers.${message.id}`}
+                context={context}
                 onSubmit={handleSubmit}
             />
         </fieldset>

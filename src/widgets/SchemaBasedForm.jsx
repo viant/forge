@@ -8,7 +8,6 @@ import { jsonSchemaToFields } from '../utils/schema.js';
 /*
 Props:
   id?: string
-  dataBinding: string           // window.state.* path – opaque for now
   fields?: FormField[]          // explicit definition (preferred from backend)
   schema?: JSONSchema           // legacy: raw schema
   requestedSchema?: JSONSchema  // new alias for `schema` – mirrors chat backend
@@ -30,7 +29,7 @@ const SchemaBasedForm = (props) => {
         schema,
         requestedSchema,
         onSubmit,
-        context: windowContext,
+        context,
         dataSourceRef,
         style,
         on,
@@ -82,13 +81,13 @@ const SchemaBasedForm = (props) => {
     };
 
     // Determine rendering context & adapter
-    let renderContext = null;
+    let renderContext = context
     let stateArg = null;
     let scope = 'local';
 
-    if (windowContext && dataSourceRef) {
+    if (context && dataSourceRef) {
         try {
-            renderContext = windowContext.Context(dataSourceRef);
+            renderContext = context.Context(dataSourceRef);
             scope = 'form';
         } catch (e) {
             console.error('SchemaBasedForm: unable to resolve dataSourceRef', dataSourceRef, e);
