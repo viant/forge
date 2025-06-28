@@ -8,6 +8,27 @@
 
 const classifiers = [];
 
+// ---------------------------------------------------------------------
+// Link classifier – format:"uri" + default starting with http/https → link
+// Higher priority (50) so it overrides the generic classifier below.
+// ---------------------------------------------------------------------
+
+registerClassifier(
+    (item) => {
+        try {
+            if (
+                item?.format === 'uri' &&
+                typeof item?.default === 'string' &&
+                /^https?:\/\//i.test(item.default)
+            ) {
+                return 'link';
+            }
+        } catch {}
+        return undefined;
+    },
+    { priority: 50 },
+);
+
 /**
  * Register a classifier.
  *

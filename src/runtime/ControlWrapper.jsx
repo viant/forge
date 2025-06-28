@@ -27,7 +27,10 @@ export default function ControlWrapper({ item, container, framework = 'core', ch
     return (
         <div style={style} className="forge-control-wrapper">
             {item?.label && !item.hideLabel && (
-                <label style={{ display: inline ? 'inline-block' : 'block', marginRight: inline ? 8 : 0 }}>
+                <label
+                    style={{ display: inline ? 'inline-block' : 'block', marginRight: inline ? 8 : 0 }}
+                    title={item.tooltip || undefined}
+                >
                     {item.label}
                 </label>
             )}

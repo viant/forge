@@ -38,8 +38,36 @@ const FileBrowser = (props) => {
         setError(error);
         const data = handlers.dataSource.getCollection();
         if (data) {
-            // Build tree data from the collection
-            const treeData = buildTree(data);
+            // Build tree data from the collection and prepend ".." when we
+            // are inside a sub-folder so the user can navigate up.
+
+            let treeData = buildTree(data);
+
+            try {
+                const currentUri = handlers.dataSource.peekFilter()?.uri || '';
+                const parentUri = currentUri.replace(/\/?[^/]+$/, '') || '/';
+                const hasParent = currentUri && currentUri !== '/' && currentUri !== '';
+
+                if (hasParent) {
+                    const parentNode = {
+                        id: `${parentUri}__parent`,
+                        label: '..',
+                        icon: 'folder-open',
+                        isExpanded: false,
+                        hasCaret: false,
+                        nodeData: {
+                            uri: parentUri,
+                            isFolder: true,
+                            isParent: true,
+                        },
+                    };
+                    treeData = [parentNode, ...treeData];
+                }
+            } catch (e) {
+                /* eslint-disable-next-line no-console */
+                console.warn('FileBrowser – unable to compute parent folder', e);
+            }
+
             setFileTreeData(treeData);
             setLoading(false);
         }
@@ -52,7 +80,33 @@ const FileBrowser = (props) => {
         setLoading(true);
         const data = handlers.dataSource.getCollection();
         if (data?.length > 0) {
-            const treeData = buildTree(data);
+            let treeData = buildTree(data);
+
+            try {
+                const currentUri = handlers.dataSource.peekFilter()?.uri || '';
+                const parentUri = currentUri.replace(/\/?[^/]+$/, '') || '/';
+                const hasParent = currentUri && currentUri !== '/' && currentUri !== '';
+
+                if (hasParent) {
+                    const parentNode = {
+                        id: `${parentUri}__parent`,
+                        label: '..',
+                        icon: 'folder-open',
+                        isExpanded: false,
+                        hasCaret: false,
+                        nodeData: {
+                            uri: parentUri,
+                            isFolder: true,
+                            isParent: true,
+                        },
+                    };
+                    treeData = [parentNode, ...treeData];
+                }
+            } catch (e) {
+                /* eslint-disable-next-line no-console */
+                console.warn('FileBrowser – unable to compute parent folder (init)', e);
+            }
+
             setFileTreeData(treeData);
             setLoading(false);
         } else if (data?.length === 0) {
@@ -141,6 +195,14 @@ const FileBrowser = (props) => {
 
     const handleNodeClick = (node, nodePath, e) => {
         const nodeToUpdate = getNodeAtPath(fileTreeData, nodePath);
+
+        // Special case – parent folder navigation via ".." entry
+        if (nodeToUpdate?.nodeData?.isParent) {
+            handlers.dataSource.setFilter({ filter: { uri: nodeToUpdate.nodeData.uri } });
+            // Force fetch of new collection
+            events.onInit.execute({});
+            return;
+        }
 
         const args = { item: nodeToUpdate, node:nodeToUpdate, nodePath, ...node.nodeData, handleNodeCollapse, handleNodeExpand }
         if(events.onNodeSelect && events.onNodeSelect.isDefined()) {
