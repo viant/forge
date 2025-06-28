@@ -98,6 +98,27 @@ const SchemaBasedForm = (props) => {
         stateArg = [values, setValues];
     }
 
+    // ---------------------------------------------------------------
+    // Dirty flag – submit enabled only when something changed
+    // ---------------------------------------------------------------
+    const isLinkOnlyForm =
+        derivedFields.length === 1 &&
+        derivedFields[0]?.format === 'uri' &&
+        typeof derivedFields[0]?.default === 'string' &&
+        /^https?:\/\//i.test(derivedFields[0].default);
+
+    let isDirty = false;
+    if (isLinkOnlyForm) {
+        isDirty = true; // always enable submit when only link present
+    } else if (scope === 'form') {
+        try {
+            isDirty = !!renderContext?.signals?.formStatus?.peek()?.dirty;
+        } catch {}
+    } else {
+        // Local form: shallow compare via JSON string (cheap for small forms)
+        isDirty = JSON.stringify(values) !== JSON.stringify(initialValues);
+    }
+
     return (
         <form
             onSubmit={submit}
@@ -126,8 +147,13 @@ const SchemaBasedForm = (props) => {
                     Please fix highlighted fields.
                 </div>
             )}
-            <button type="submit" className="bp4-button bp4-intent-primary" style={{ gridColumn: 'span 2', justifySelf: 'start' }}>
-                Submit
+            <button
+                type="submit"
+                className="bp4-button bp4-intent-primary"
+                style={{ gridColumn: 'span 2', justifySelf: 'start' }}
+                disabled={!isDirty}
+            >
+                {isLinkOnlyForm ? 'Accept' : 'Submit'}
             </button>
         </form>
     );

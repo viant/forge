@@ -18,6 +18,9 @@ import {
     Radio,
     ProgressBar,
     Label,
+    Tooltip,
+    FormGroup,
+    AnchorButton,
 } from '@blueprintjs/core';
 import { Select } from '@blueprintjs/select';
 import { DateInput3 } from '@blueprintjs/datetime2';
@@ -29,7 +32,6 @@ import { registerEventAdapter } from '../../runtime/binding.js';
 import { registerClassifier } from '../../runtime/widgetClassifier.js';
 import { buildDateProps } from './dateUtils.js';
 import { registerWrapper } from '../../runtime/wrapperRegistry.js';
-import { FormGroup } from '@blueprintjs/core';
 import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
 
 /* ------------------------ Widget implementation ----------------------- */
@@ -60,13 +62,15 @@ export function registerPack() {
     });
 
     /* -------------------- Numeric / Number -------------------------- */
+
+    /* -------------------- Number / Numeric input ------------------- */
     registerWidget(
         'number',
-        ({ value = '', onChange, readOnly, ...rest }) => (
+        ({ value = '', onValueChange, readOnly, ...rest }) => (
             <NumericInput
                 {...rest}
                 value={value ?? ''}
-                onValueChange={(vAsNumber) => onChange?.(vAsNumber)}
+                onValueChange={(v) => onValueChange?.(v)}
                 readOnly={readOnly}
             />
         ),
@@ -151,6 +155,27 @@ export function registerPack() {
     registerEventAdapter('select', {
         onItemSelect: ({ adapter }) => (val) => adapter.set(val.value ?? val),
     });
+
+    /* -------------------- Read-only Link ---------------------------- */
+    registerWidget(
+        'link',
+        ({ value = '', readOnly, ...rest }) => {
+            if (!value) return null;
+            return (
+                <AnchorButton
+                    href={value}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    text={value}
+                    minimal
+                    {...rest}
+                />
+            );
+        },
+        { framework: 'blueprint' }
+    );
+
+    // Link is read-only – no event adapter needed
 
     /* -------------------- Currency ---------------------------------- */
     registerWidget(
@@ -331,9 +356,19 @@ registerWrapper('blueprint', (item, container, children) => {
         // Stand-alone controls like button can disable FormGroup
         if (item.isStandalone) return children;
 
+        const labelContent = item.hideLabel ? undefined : (
+            item.tooltip ? (
+                <Tooltip content={item.tooltip} hoverOpenDelay={250}>
+                    <span>{item.label}</span>
+                </Tooltip>
+            ) : (
+                item.label
+            )
+        );
+
         return (
             <FormGroup
-                label={item.hideLabel ? undefined : item.label}
+                label={labelContent}
                 inline={inline}
                 labelFor={item.id}
                 helperText={item.validationError}

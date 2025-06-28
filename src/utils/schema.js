@@ -55,13 +55,22 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
     return keys.map((k) => {
         const p = properties[k] ?? {};
 
-        // -------- label -------------------------------------------
-        let label = p.description;
-        if (!label || label.trim() === '') {
-            label = k
-                .replace(/[_\-]+/g, ' ')
-                .replace(/([a-z])([A-Z])/g, '$1 $2')
-                .replace(/^./, (c) => c.toUpperCase());
+        // -------- label & tooltip ---------------------------------
+        let label;
+        let tooltip;
+
+        if (typeof p.title === 'string' && p.title.trim() !== '') {
+            label = p.title.trim();
+            tooltip = p.description && p.description.trim() !== '' ? p.description : undefined;
+        } else {
+            // No custom title – fall back to description for label
+            label = p.description;
+            if (!label || label.trim() === '') {
+                label = k
+                    .replace(/[_\-]+/g, ' ')
+                    .replace(/([a-z])([A-Z])/g, '$1 $2')
+                    .replace(/^./, (c) => c.toUpperCase());
+            }
         }
 
         // -------- widget (default mapping) ------------------------
@@ -78,8 +87,10 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
         // ------------------------------------------------------------------
 
         if (!widget || widget === '') {
+            const info = (p?.title || p.description || '').toLowerCase();
             // 2. Format-specific mapping -----------------------------------
-            if (p.format === 'uri-reference') {
+            if (p.format === 'uri-reference' ||
+                (p.format === 'uri' && !(p.default && /^https?:\/\//i.test(p.default)))) {
                 widget = 'file';
             } else if (Array.isArray(p.enum) && p.enum.length > 0) {
                 // 3. Enum mapping ------------------------------------------
@@ -114,11 +125,22 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
             label,
             type: p.type,
             enum: p.enum,
+            format: p.format,
             required: Array.isArray(schema.required) && schema.required.includes(k),
             default: p.default,
             widget,
             group: p['x-ui-group'] || '',
             order: p['x-ui-order'] || 0,
+            columnSpan:
+                p['x-ui-span'] ??
+                p['x-ui-column-span'] ??
+                p['x-ui-col-span'] ??
+                undefined,
+            // Convert enum -> options array for select-like widgets
+            options: Array.isArray(p.enum)
+                ? p.enum.map((v) => ({ value: v, label: String(v) }))
+                : undefined,
+            tooltip,
         };
 
         // allow mappers to adjust
