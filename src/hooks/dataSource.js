@@ -6,23 +6,43 @@ import {resolveSelector, setSelector} from "../utils/selector.js";
 
 import {arrayEquals} from "../utils/equal.js";
 import equal from 'fast-deep-equal';
+import { mapParameters } from '../utils/parameterMapper.js';
 
 function findDataSourceDependencies(dataSourceRef, dataSources) {
     const dependencies = {};
     Object.entries(dataSources).forEach(([ref, dataSource]) => {
         if (dataSourceRef === ref) return; // Skip self
-
-
-        const {parameters = []} = dataSource;
-        if (!parameters) return;
+        const { parameters = [] } = dataSource;
+        if ((!parameters || parameters.length === 0) && dataSourceRef === dataSource.dataSourceRef) {//parent 
+            const parameter = {
+                from: dataSourceRef + ':',
+                to: ':selection',
+                name: '...',
+                location: dataSource.selectors.data
+            }
+            if (!dependencies[ref]) dependencies[ref] = [];
+            dependencies[ref].push(parameter);
+            return;
+        }
+        if(!parameters) {
+            return;
+        }
 
         parameters.forEach((param) => {
-            const {location, in: inWhere} = param;
-            const isDependent = inWhere === "dataSource" && location.startsWith(`${dataSourceRef}.`)
-            if (isDependent) {
-                if (!dependencies[ref]) {
-                    dependencies[ref] = [];
-                }
+            // Legacy check
+            const { location, in: inWhere } = param;
+            const legacyDependent = inWhere === 'dataSource' && location?.startsWith(`${dataSourceRef}.`);
+
+            // New parameter syntax check – if param.from contains this dataSource
+            let compactDependent = false;
+            if (param.from && param.from.includes(':')) {
+                const [dsPrefix] = param.from.split(':');
+                // dsPrefix '' means same DS, or explicit match
+                compactDependent = dsPrefix === '' || dsPrefix === dataSourceRef;
+            }
+
+            if (legacyDependent || compactDependent) {
+                if (!dependencies[ref]) dependencies[ref] = [];
                 dependencies[ref].push(param);
             }
         });
@@ -64,6 +84,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         }
     };
     const dataSourceDependencies = findDataSourceDependencies(identity.dataSourceRef, dataSources)
+
     const selectionMode = dataSource.selectionMode || 'single';
 
     const dependencyInputs = {};
@@ -158,42 +179,58 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
      *  - If `record` is null, we can push empty/undefined parameters (so the child won't fetch).
      */
     function pushDependencies(record = {}) {
+
+
+
+
         Object.entries(dataSourceDependencies).forEach(([depRef, depParameters]) => {
+
             let depInput = dependencyInputs[depRef];
+
+            console.log('pushDependencies', depRef, depParameters, depInput)
+
+
             if (!depInput) {
                 const childDataSourceId = identity.getDataSourceId(depRef);
                 depInput = getInputSignal(childDataSourceId);
                 dependencyInputs[depRef] = depInput
             }
-            // Prepare new param values
+            // Prepare new param values (start with existing to avoid nuking others)
             const newParamValues = {...(depInput.peek().parameters || {})};
 
-            // For each param referencing us
-            depParameters.forEach((depParameter) => {
-                let paramVal;
-                if (record) {
-                    const index = depParameter.location.indexOf(".")
-                    let fieldName = depParameter.location
-                    if (index > 0) {
-                        fieldName = depParameter.location.substring(index + 1, depParameter.location.length);
-                    }
-                    paramVal = resolveSelector(record, fieldName)
+            // Decide mapping strategy – compact/new if any param uses colon syntax
+            const useCompact = depParameters.some((p) => (p.from && p.from.includes(':')) || (p.to && p.to.includes(':')));
 
-                } else {
-                    paramVal = undefined;
-                }
-                newParamValues[depParameter.name] = paramVal;
-            });
+            if (useCompact) {
+                // Rely on shared util – treat current record as source data
+                mapParameters(depParameters, record || {}, newParamValues);
+            } else {
+                // Legacy per-field logic
+                depParameters.forEach((depParameter) => {
+                    let paramVal;
+                    if (record) {
+                        const index = depParameter.location.indexOf('.')
+                        let fieldName = depParameter.location
+                        if (index > 0) {
+                            fieldName = depParameter.location.substring(index + 1);
+                        }
+                        paramVal = resolveSelector(record, fieldName);
+                    } else {
+                        paramVal = undefined;
+                    }
+                    newParamValues[depParameter.name] = paramVal;
+                });
+            }
 
             // Decide if we automatically set fetch=true or let the child’s DataSource do the check
             // Typically we do set fetch=true if we have a valid record
-            const hasAnyParam = Object.values(newParamValues).some((v) => v != null);
-            const newFetchVal = !!record && hasAnyParam; // example logic
+            const hasAnyParam = Object.values(newParamValues).some((v) => v != null && v !== '');
+            const newFetchVal = !!record && hasAnyParam;
 
             // Update child's input
             depInput.value = {
                 ...depInput.peek(),
-                fetch: true,
+                fetch: newFetchVal,
                 parameters: newParamValues,
             };
         });
@@ -472,6 +509,65 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     };
 
 
+    /**
+     * handleSave
+     * -----------------------------------------------------------------
+     * Persist current form data through the connector.
+     * – If the record contains a non-empty unique key *or* a row is selected
+     *   (single-selection mode) a PUT request is sent (update).
+     * – Otherwise a POST request is sent (create).
+     * After a successful save the collection is refreshed and the form dirty
+     * flag reset so UI reflects latest data.
+     */
+    const handleSave = async () => {
+        const record = getFormData();
+        if (!record || Object.keys(record).length === 0) {
+            console.warn('handleSave: no form data to save');
+            return false;
+        }
+
+        let usePut = false;
+        try {
+            // Presence of unique key value indicates update.
+            const uid = getUniqueKeyValue(record);
+            if (uid !== undefined && uid !== null && uid !== '') {
+                usePut = true;
+            }
+        } catch (e) {
+            // If unique key not configured, fall back to selection state.
+            const sel = peekSelection();
+            if (sel && sel.rowIndex >= 0) {
+                usePut = true;
+            }
+        }
+
+        setLoading(true);
+        try {
+            const body = record;
+            if (usePut) {
+                await connector.put({ body });
+            } else {
+                await connector.post({ body });
+            }
+
+            // Refresh collection so UI stays in sync.
+            fetchCollection();
+
+            // Reset dirty flag – saved state is now source of truth.
+            formSnapshot = { ...body };
+            formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+
+            return true;
+        } catch (err) {
+            setError(err);
+            console.error('handleSave error', err);
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
     const setInputArgs = (args) => {
         input.value = {
             ...input.peek(),
@@ -500,7 +596,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
                 fetch: true,
         }
         input.value = value
-        console.log("SetFilter", value)
     };
 
     // Update filter values without triggering a remote fetch but still
@@ -773,6 +868,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
         },
         setError,
+
+        handleSave,
         setInactive,
         isInactive,
         setLoading,

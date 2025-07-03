@@ -35,7 +35,6 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
     if (!schema || schema.type !== 'object') return [];
 
     const properties = schema.properties || {};
-
     // Stable iteration over property keys.
     const keys = Object.keys(properties);
     keys.sort((a, b) => {
@@ -89,9 +88,16 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
         if (!widget || widget === '') {
             const info = (p?.title || p.description || '').toLowerCase();
             // 2. Format-specific mapping -----------------------------------
-            if (p.format === 'uri-reference' ||
-                (p.format === 'uri' && !(p.default && /^https?:\/\//i.test(p.default)))) {
+            if (p.format === 'uri' && !(p.default && /^http/i.test(p.default))) {
                 widget = 'file';
+            } else if (p.format === 'password') {
+                widget = 'password';
+            } else if (p.format === 'date') {
+                widget = 'date';
+            } else if (p.format === 'date-time' || p.format === 'datetime') {
+                widget = 'datetime';
+            } else if (p.format === 'json') {
+                widget = 'object';
             } else if (Array.isArray(p.enum) && p.enum.length > 0) {
                 // 3. Enum mapping ------------------------------------------
                 widget = 'select';
@@ -114,6 +120,12 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
                         }
                         break;
                     }
+                    case 'object':
+                        widget = 'object';
+                        break;
+                    case 'password':
+                        widget = 'password';
+                        break;
                     default:
                         widget = 'text';
                 }

@@ -62,8 +62,6 @@ export function resolveParameters(parameterDefinitions = [], context) {
                     return;
             }
 
-            console.log('srcVal', srcStore, srcPath, srcVal)
-
             if (dstStore === 'input' || dstStore === 'query' || dstStore === 'path') {
                 // Simplistic handling: write into input store
                 const dsRes = resolved[dstDs] = resolved[dstDs] || {};
@@ -117,13 +115,9 @@ export function resolveParameters(parameterDefinitions = [], context) {
                 }
 
             }
-            console.log('old-style param', resolved)
-
             return; // processed new row
         }
     }); // end first forEach (new rows)
-
-    console.log('resolved',JSON.stringify( resolved))
 
     // -----------------------------------
     // Legacy path (original implementation)

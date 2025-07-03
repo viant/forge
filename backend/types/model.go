@@ -393,6 +393,17 @@ type Item struct {
 	Properties map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`
 	Enabled    bool                   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	On         []*Execute             `json:"on,omitempty" yaml:"on,omitempty"` // For message-bus events
+	Lookup     *Lookup                `json:"lookup,omitempty" yaml:"lookup,omitempty"`
+}
+
+// Lookup metadata enables text-input widgets to open a search window and map
+// selected record fields back to the caller form.
+
+type Lookup struct {
+	WindowId string      `json:"windowId" yaml:"windowId"`
+	Title    string      `json:"title,omitempty" yaml:"title,omitempty"`
+	Inputs   []Parameter `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Outputs  []Parameter `json:"outputs" yaml:"outputs"`
 }
 
 type Execute struct {

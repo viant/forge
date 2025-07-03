@@ -85,8 +85,6 @@ function WindowContentInner({window, metadata, services}) {
      * ---------------------------------------------------------- */
 
     const renderDataSources = () => {
-
-        console.log('renderDataSources', dataSources, parameters);
         return (
             <>
                 {Object.keys(dataSources).map((key) => (

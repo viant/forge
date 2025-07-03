@@ -116,6 +116,8 @@ export default function WidgetRenderer({
 
     const widgetProps = {
         context,
+        adapter,
+        item,
         value: dynValue !== undefined ? dynValue : adapter.get(),
         readOnly:
             dynReadonlyLocal !== undefined

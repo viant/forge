@@ -9,8 +9,7 @@ import { jsonSchemaToFields } from '../utils/schema.js';
 Props:
   id?: string
   fields?: FormField[]          // explicit definition (preferred from backend)
-  schema?: JSONSchema           // legacy: raw schema
-  requestedSchema?: JSONSchema  // new alias for `schema` – mirrors chat backend
+  schema?: JSONSchema  // new alias for `schema` – mirrors chat backend
   onSubmit?: (payload)=>void
   layout?, style?               // ignored in this first cut
 
@@ -23,25 +22,17 @@ A **FormField** mirrors backend struct:
 
 const SchemaBasedForm = (props) => {
     const {
-        id,
-        dataBinding,
         fields,
         schema,
-        requestedSchema,
         onSubmit,
         context,
         dataSourceRef,
         style,
-        on,
     } = props;
-
     const derivedFields = useMemo(() => {
         if (fields && fields.length) return fields;
-
-        const rawSchema = schema || requestedSchema;
-        return jsonSchemaToFields(rawSchema);
-    }, [fields, schema, requestedSchema]);
-
+        return jsonSchemaToFields(schema);
+    }, [fields, schema, schema]);
     // state object keyed by field.name
     const initialValues = useMemo(() => {
         const obj = {};
@@ -101,11 +92,24 @@ const SchemaBasedForm = (props) => {
     // ---------------------------------------------------------------
     // Dirty flag – submit enabled only when something changed
     // ---------------------------------------------------------------
+    const onlyField = derivedFields.length === 1 ? derivedFields[0] : null;
+
+    const looksLikeUrl =
+        onlyField &&
+        typeof onlyField.default === 'string' &&
+        /^https?:\/\//i.test(onlyField.default);
+
     const isLinkOnlyForm =
-        derivedFields.length === 1 &&
-        derivedFields[0]?.format === 'uri' &&
-        typeof derivedFields[0]?.default === 'string' &&
-        /^https?:\/\//i.test(derivedFields[0].default);
+        !!onlyField &&
+        looksLikeUrl &&
+        (onlyField.format === 'uri' || (!onlyField.format && onlyField.type === 'string'));
+
+    // ensure widget renders as 'link'
+    if (isLinkOnlyForm) {
+        onlyField.widget = 'link';
+        onlyField.readOnly = true;
+    }
+
 
     let isDirty = false;
     if (isLinkOnlyForm) {
@@ -118,7 +122,6 @@ const SchemaBasedForm = (props) => {
         // Local form: shallow compare via JSON string (cheap for small forms)
         isDirty = JSON.stringify(values) !== JSON.stringify(initialValues);
     }
-
     return (
         <form
             onSubmit={submit}

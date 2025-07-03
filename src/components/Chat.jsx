@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 
 
@@ -57,6 +57,7 @@ export default function Chat({
     classifyMessage: classifyMessageProp,
     renderers: renderersProp,
     fallback: fallbackProp,
+    avatarIcons: avatarIconsProp,
 }) {
     // ---------------------------------------------------------------------
     // 📡  Resolve Forge runtime context
@@ -81,6 +82,44 @@ export default function Chat({
     const classifyMessage = classifyMessageProp || chatService.classifyMessage || defaultClassifier;
     const renderers = renderersProp || chatService.renderers || defaultRenderers;
     const fallback = fallbackProp || chatService.fallback || renderers?.bubble || defaultRenderers.bubble;
+
+    // -----------------------------------------------------------------
+    // 🎭  Avatar icon mapping resolution hierarchy
+    //      1. Prop  (highest priority)
+    //      2. Container metadata (YAML)  -> chatCfg.avatarIcons / avatarIconsFn
+    //      3. Context service  (global defaults)
+    // -----------------------------------------------------------------
+
+    let metaAvatarIcons = undefined;
+    if (chatCfg.avatarIcons !== undefined) {
+        metaAvatarIcons = chatCfg.avatarIcons;
+    } else if (chatCfg.avatarIconsFn !== undefined) {
+        if (typeof chatCfg.avatarIconsFn === 'function') {
+            metaAvatarIcons = chatCfg.avatarIconsFn;
+        } else if (typeof chatCfg.avatarIconsFn === 'string') {
+            try {
+                /* eslint-disable no-new-func */
+                metaAvatarIcons = new Function('msg', `return (${chatCfg.avatarIconsFn})(msg);`);
+                /* eslint-enable no-new-func */
+            } catch (e) {
+                console.error('Failed to compile avatarIconsFn:', e);
+            }
+        }
+    }
+
+    const avatarIcons =
+        avatarIconsProp !== undefined ? avatarIconsProp :
+        metaAvatarIcons  !== undefined ? metaAvatarIcons  :
+        chatService.avatarIcons;
+
+    const resolveAvatarIcon = useCallback((msg) => {
+        if (msg.iconName) return msg.iconName;
+        if (typeof avatarIcons === 'function') return avatarIcons(msg);
+        if (avatarIcons && typeof avatarIcons === 'object') {
+            return avatarIcons[msg.role];
+        }
+        return undefined; // Let MessageCard fallback
+    }, [avatarIcons]);
 
     // use unified hook for reactive data
     const { collection: rawMessages, loading, error } = useDataSourceState(context);
@@ -215,6 +254,7 @@ export default function Chat({
                 classifyMessage={classifyMessage}
                 renderers={renderers}
                 fallback={fallback}
+                resolveIcon={resolveAvatarIcon}
             />
 
             {/* Prompt composer */}

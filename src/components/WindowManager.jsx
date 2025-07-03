@@ -1,6 +1,7 @@
 import {useState, useEffect, useRef} from 'react';
 import {Tabs, Tab, Card} from '@blueprintjs/core';
 import WindowContent from './WindowContent';
+import {selectedWindowId, getWindowStatusSignal, appStatusSignal} from '../core';
 import {
     activeWindows,
     selectedTabId,
@@ -25,6 +26,14 @@ const WindowManager = () => {
     useSignalEffect(() => {
         setWindows(activeWindows.value);
         setTabId(selectedTabId.value);
+    });
+
+    // Sync global app status into the focused window whenever focus changes
+    useSignalEffect(() => {
+        const winId = selectedWindowId.value;
+        if (!winId) return;
+        const winStatus = getWindowStatusSignal(winId);
+        winStatus.value = appStatusSignal.peek();
     });
 
     useEffect(() => {
@@ -55,6 +64,9 @@ const WindowManager = () => {
 
     const handleTabChange = (newTabId) => {
         selectedTabId.value = newTabId || null;
+        if (newTabId) {
+            selectedWindowId.value = newTabId;
+        }
     };
 
     const handleTabClose = (windowId, e) => {

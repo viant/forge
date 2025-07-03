@@ -29,6 +29,43 @@ registerClassifier(
     { priority: 50 },
 );
 
+// ---------------------------------------------------------------------
+// Date / Date-time classifier – maps JSON-schema formats to widgets
+// ---------------------------------------------------------------------
+
+registerClassifier(
+    (item) => {
+        try {
+            if (!item) return undefined;
+            switch (item.format) {
+                case 'json':
+                    return 'object';
+                case 'password':
+                    return 'password';
+                case 'date':
+                    return 'date';
+                case 'date-time':
+                case 'datetime':
+                    return 'datetime';
+                default:
+                    return undefined;
+            }
+        } catch {
+            /* ignore */
+        }
+        return undefined;
+    },
+    { priority: 60 },
+);
+
+// ---------------------------------------------------------------------
+// Object classifier – plain JSON data
+// ---------------------------------------------------------------------
+
+registerClassifier((item) => {
+    if (item?.type === 'object') return 'object';
+}, { priority: 70 });
+
 /**
  * Register a classifier.
  *
@@ -78,6 +115,8 @@ registerClassifier((item) => {
             return 'checkbox';
         case 'textarea':
             return 'textarea';
+        case 'password':
+            return 'password';
         case 'currency':
             return 'currency';
         case 'date':
@@ -95,6 +134,8 @@ registerClassifier((item) => {
             return 'progressBar';
         case 'math':
             return 'math';
+        case 'object':
+            return 'object';
         case 'button':
             return 'button';
         default:

@@ -23,6 +23,7 @@ Forge has been **built with LLMs**, leveraging AI-powered capabilities to enhanc
 # Documentation
 - [Parameter passing between windows](docs/window-parameter-passing.md)
 - [Schema-driven forms](docs/jsonschema-forms.md)
+- [Widgets reference](docs/widgets.md)
 
 ## Introduction
 
@@ -135,7 +136,73 @@ With both the frontend and backend servers running, you can access the applicati
 - **Table Panel (`TablePanel.jsx`)**: Displays data in table format with features like sorting, filtering, and pagination.
 - **Control Renderer (`ControlRenderer.jsx`)**: Dynamically renders form controls based on configuration.
 - **Chart (`Chart.jsx`)**: Visualizes data using chart components.
+- **Layout Renderer (`LayoutRenderer.jsx`)**: Builds complex nested page layouts declared in metadata.
+- **Splitter (`Splitter.jsx`)**: Adds resizable split-pane layouts.
+- **Form Renderer (`FormRenderer.jsx`)**: Auto-generates forms from JSON-Schema or UI metadata.
+- **Tree Multi-Select (`TreeMultiSelect.jsx`)**: Hierarchical multi-select control.
+- **Avatar Icon (`AvatarIcon.jsx`)**: Lightweight Phosphor-icon wrapper used by Chat.
 - **Dialog and Modal Components (`ViewDialog.jsx`)**: Manages dialogs and modals within the application.
+- **Chat (`Chat.jsx`)**: High-level chat UI with message feed, composer and *dynamic avatar icons* (see below).
+
+#### Dynamic avatar icons in Chat
+
+`Chat` renders an avatar next to every message.  Starting with Forge 1.1 you
+can fully control which icon is shown.
+
+1. **Per-message override** – set `iconName` on the message object.
+
+   ```js
+   handlers.dataSource.setFormData({
+     role: 'assistant',
+     iconName: 'Crown',   // <- any icon name from @phosphor-icons/react
+     content: 'Welcome back, your Majesty!',
+   });
+   ```
+
+2. **Per-chat mapping** – pass a static map or function via the `avatarIcons`
+   prop:
+
+   ```jsx
+   <Chat
+     avatarIcons={{
+       user: 'UserCircle',
+       assistant: 'Smiley',
+       tool: 'UserGear',
+     }}
+   />
+
+   // or
+   const pickIcon = (msg) =>
+     msg.role === 'assistant' && msg.metadata?.vip ? 'Crown' : 'Smiley';
+
+   <Chat avatarIcons={pickIcon} />
+   ```
+
+3. **App-wide default** – set once during bootstrap:
+
+   ```js
+   context.handlers.chat.avatarIcons = { user: 'User', assistant: 'Student' };
+   ```
+
+4. **YAML screen descriptor** – declare in the container metadata:
+
+   ```yaml
+   chat:
+     avatarIcons:
+       user: UserCircle
+       assistant: Student
+       tool: SealCheck
+
+   # or dynamic
+   chat:
+     avatarIconsFn: |
+       (msg) => msg.role === 'assistant' && msg.meta?.admin ? 'Crown' : 'Smiley'
+   ```
+
+Icons are provided by the
+[`@phosphor-icons/react`](https://www.npmjs.com/package/@phosphor-icons/react)
+package.  Browse the full catalogue at <https://phosphoricons.com/> and use
+the component name (e.g. `SmileyWink`, `UserGear`) as the icon string.
 
 ### Backend Services
 

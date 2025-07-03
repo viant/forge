@@ -31,7 +31,35 @@ export function useDialogHandlers(windowId, dialogId) {
     }
 
     const commit = (props = {}) => {
-        const { payload } = props;
+        let { payload } = props;
+
+        // Attempt to derive selection context once to use in fallback logic
+        let selectionCtx = null;
+        try {
+            const dialogCtxBase = getWindowContext(windowId);
+            if (dialogCtxBase) {
+                selectionCtx = dialogCtxBase.Context(dialogCtxBase.identity.dataSourceRef);
+            }
+        } catch (_) {
+            // ignore – fallback unavailable
+        }
+
+        // If no explicit payload, try to derive from current selection – mirrors
+        // behaviour implemented for commitWindow so dialogs can simply return
+        // the selected row without extra wiring.
+        if (
+            (!payload || (Array.isArray(payload) ? payload.length === 0 : Object.keys(payload).length === 0)) &&
+            selectionCtx?.handlers?.dataSource?.getSelection
+        ) {
+            try {
+                const sel = selectionCtx.handlers.dataSource.getSelection();
+                if (sel && (sel.selected || sel.selection)) {
+                    payload = sel.selected ?? sel.selection ?? sel;
+                }
+            } catch (e) {
+                console.warn('commitDialog: failed to derive payload from selection', e);
+            }
+        }
         const dialogKey = getDialogId(dialogId);
         const entry = pendingDialogResolvers.get(dialogKey);
 
@@ -218,7 +246,27 @@ export function useWindowHandlers(windowId) {
     }
 
     const commitWindow = (props = {}) => {
-        const { payload = {} } = props;
+        let { payload = {} } = props;
+
+        // If caller did not supply an explicit payload, fall back to using
+        // the currently selected record of the active data source (when
+        // available).  This mirrors the behaviour of legacy Forge metadata
+        // where toolbar actions implicitly operate on the selected row.
+        if (
+            (!payload || (Array.isArray(payload) ? payload.length === 0 : Object.keys(payload).length === 0)) &&
+            props?.context?.handlers?.dataSource?.getSelection
+        ) {
+            try {
+                const sel = props.context.handlers.dataSource.getSelection();
+                if (sel && (sel.selected || sel.selection)) {
+                    // Normalise to object; multi-selection returns {selection: []}
+                    payload = sel.selected ?? sel.selection ?? sel;
+                }
+            } catch (e) {
+                // Non-fatal – fall back to empty payload when selection lookup fails
+                console.warn('commitWindow: failed to derive payload from selection', e);
+            }
+        }
         const entry = pendingWindowResolvers.get(windowId);
         if (entry) {
             const { resolve, outbound = [], caller } = entry;

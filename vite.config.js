@@ -19,4 +19,5 @@ export default defineConfig({
             },
         },
     },
+    // No custom aliases – relies on real packages (@phosphor-icons/react, etc.)
 });

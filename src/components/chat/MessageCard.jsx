@@ -1,6 +1,7 @@
 // MessageCard.jsx – chat message bubble with avatar
 import React from "react";
-import { Icon } from "@blueprintjs/core";
+// Use lightweight AvatarIcon (wrapping phosphor-react) instead of Blueprint icons
+import AvatarIcon from "../AvatarIcon.jsx";
 import { format as formatDate } from "date-fns";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +40,7 @@ function renderMarkdown(md = "") {
 
 // CSS classes are reused from chat.css already loaded by parent.
 
-export default function MessageCard({ msg, context }) {
+export default function MessageCard({ msg, context, resolveIcon }) {
     const avatarColour =
         msg.role === "user"
             ? "var(--blue4)"
@@ -47,8 +48,13 @@ export default function MessageCard({ msg, context }) {
                 ? "var(--light-gray4)"
                 : "var(--orange3)";
 
-    const iconName = msg.role === "assistant" ? "chat" : msg.role === "tool" ? "wrench" : "person";
-    const iconColour = msg.role === "assistant" ? "var(--black)" :  "var(--black)" ;
+    // Determine which icon to show for this message.
+    // 1. Explicit override on the message object
+    // 2. Fallback based on role
+    const iconName =
+        msg.iconName ||
+        (typeof resolveIcon === 'function' ? resolveIcon(msg) : undefined) ||
+        (msg.role === 'assistant' ? 'Smiley' : msg.role === 'tool' ? 'UserGear' : 'User');
 
     // Generic bubble – no execution specific UX in Forge default build.
     const bubbleClass =
@@ -61,8 +67,8 @@ export default function MessageCard({ msg, context }) {
     return (
         <div className={`chat-row ${msg.role}`}> {/* alignment flex row */}
             <div style={{ display: "flex", alignItems: "flex-start" }}>
-                <div className="avatar" style={{ background: avatarColour }}>
-                    <Icon icon={iconName} color={iconColour} size={12} />
+                <div className="avatar" style={{ background: avatarColour, display: 'flex', alignItems:'center', justifyContent:'center' }}>
+                    <AvatarIcon name={iconName} size={14} color={"var(--black)"} weight="fill" />
                 </div>
                 <div className={bubbleClass} data-ts={formatDate(new Date(msg.createdAt), "HH:mm")}>
                     <div className="prose max-w-full text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
