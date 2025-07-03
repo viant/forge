@@ -497,6 +497,8 @@ export const useToolbarControlEvents = (context, items = []) => {
                 handlers.onClick.push({id: "dataSource.fetchCollection"});
             } else if (item.id === "addNew") {
                     handlers.onClick.push({id: "dataSource.handleAddNew"});
+            } else if (item.id === "save") {
+                handlers.onClick.push({id: "dataSource.handleSave"});
             } else if (item.id === "settings") {
                 handlers.onClick.push({id: "table.openSetting"});
             }

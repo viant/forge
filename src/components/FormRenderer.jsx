@@ -32,7 +32,7 @@ export default function FormRenderer({ message, context }) {
             {prompt && <legend>{prompt}</legend>}
 
             <SchemaBasedForm
-                requestedSchema={requestedSchema}
+                schema={requestedSchema}
                 context={context}
                 onSubmit={handleSubmit}
             />

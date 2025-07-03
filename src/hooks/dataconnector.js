@@ -236,7 +236,7 @@ function useDataConnector(dataSource) {
             }
             return await resp.json();
         } catch (err) {
-            setError && setError(err);
+            console.error('PUT failed', err);
             throw err;
         }
     }
@@ -257,7 +257,7 @@ function useDataConnector(dataSource) {
             }
             return await resp.json();
         } catch (err) {
-            setError && setError(err);
+            console.error('DELETE failed', err);
             throw err;
         }
     }

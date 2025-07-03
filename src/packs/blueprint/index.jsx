@@ -22,10 +22,13 @@ import {
     FormGroup,
     AnchorButton,
 } from '@blueprintjs/core';
+import TextLookup from './TextLookup.jsx';
 import { Select } from '@blueprintjs/select';
 import { DateInput3 } from '@blueprintjs/datetime2';
 import { NumericInput } from '@blueprintjs/core';
 import { addStyles, EditableMathField } from 'react-mathquill';
+
+import PrettyJson from '../../components/PrettyJson.jsx';
 
 import { registerWidget } from '../../runtime/widgetRegistry.jsx';
 import { registerEventAdapter } from '../../runtime/binding.js';
@@ -50,8 +53,36 @@ function TextInput({ value = '', onChange, readOnly, ...rest }) {
 /* ------------------------------ Pack ---------------------------------- */
 
 export function registerPack() {
-    // Widget key mirrors legacy "text" type
-    registerWidget('text', TextInput, { framework: 'blueprint' });
+    // Widget key mirrors legacy "text" type – decide variant at runtime
+    registerWidget('text', (props) => {
+        if (props?.item?.lookup) {
+            return <TextLookup {...props} />;
+        }
+        return <TextInput {...props} />;
+    }, { framework: 'blueprint' });
+
+    /* -------------------- Password input --------------------------- */
+    registerWidget('password', (props) => <TextInput {...props} type="password" />, { framework: 'blueprint' });
+
+    registerEventAdapter('password', {
+        onChange: ({ adapter }) => (e) => {
+            const val = e?.target?.value ?? e;
+            adapter.set(val);
+        },
+    });
+
+    /* -------------------- Object / JSON viewer -------------------- */
+    registerWidget(
+        'object',
+        ({ readOnly, onChange, ...rest }) => (
+            <PrettyJson readOnly={readOnly} onChange={onChange} {...rest} />
+        ),
+        { framework: 'blueprint' }
+    );
+
+    registerEventAdapter('object', {
+        onChange: ({ adapter }) => (v) => adapter.set(v),
+    });
 
     // Basic onChange → adapter.set mapping
     registerEventAdapter('text', {
@@ -96,7 +127,10 @@ export function registerPack() {
     );
 
     registerEventAdapter('textarea', {
-        onChange: ({ adapter }) => (e) => adapter.set(e.target.value),
+        onChange: ({ adapter }) => (e) => {
+            const val = e?.target?.value ?? e;
+            adapter.set(val);
+        },
     });
 
     /* -------------------- Checkbox / Toggle ------------------------- */

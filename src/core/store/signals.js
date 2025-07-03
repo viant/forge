@@ -19,6 +19,26 @@ export const dialogSignals = signal({});
 export const viewSignals = signal({});
 export const messageSignals = signal({});
 
+// ---------------------------------------------------------------------------
+//  Global & window-level application status signals
+// ---------------------------------------------------------------------------
+
+// Shape suggestion: { busy:false, error:null, notice:null }
+export const appStatusSignal = signal({});
+
+const windowStatusSignals = signal({});
+
+export const getWindowStatusSignal = (windowId) => {
+    if (!windowStatusSignals.value[windowId]) {
+        // Initialise with current global snapshot so first focus is in sync
+        windowStatusSignals.value = {
+            ...windowStatusSignals.peek(),
+            [windowId]: signal(appStatusSignal.peek()),
+        };
+    }
+    return windowStatusSignals.value[windowId];
+};
+
 
 // ---------------------------------------------------------------------------
 //  Message-Bus signals (client-side, window-scoped)
@@ -296,6 +316,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
     // Update selectedTabId if the window is in tab
     if (inTab !== false) {
         selectedTabId.value = windowId;
+        selectedWindowId.value = windowId;
     } else {
         // For floating windows, bring them to front
         bringFloatingWindowToFront(windowId);
@@ -360,5 +381,7 @@ export const bringFloatingWindowToFront = (windowId) => {
             return win;
         }
     });
+
+    selectedWindowId.value = windowId;
 };
 

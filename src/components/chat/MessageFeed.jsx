@@ -8,8 +8,8 @@ import {range} from "lodash";
 // provide a custom mapping.
 // ---------------------------------------------------------------------------
 
-const DefaultBubbleRenderer = ({ message, context }) => (
-    <MessageCard msg={message} context={context} />
+const DefaultBubbleRenderer = ({ message, context, resolveIcon }) => (
+    <MessageCard msg={message} context={context} resolveIcon={resolveIcon} />
 );
 
 export const defaultClassifier = () => 'bubble';
@@ -22,6 +22,7 @@ export default function MessageFeed({
     classifyMessage = defaultClassifier,
     renderers = defaultRenderers,
     fallback = defaultRenderers.bubble,
+    resolveIcon,
 }) {
     const [visibleCount, setVisibleCount] = useState(batchSize);
 
@@ -58,7 +59,7 @@ export default function MessageFeed({
             {slice.map((m, i) => {
                 const kind = classifyMessage(m);
                 const Renderer = renderers[kind] || fallback;
-                return <Renderer key={i} message={m} context={context} />;
+                return <Renderer key={i} message={m} context={context} resolveIcon={resolveIcon} />;
             })}
             <div ref={bottomRef} />
         </div>

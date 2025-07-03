@@ -14,6 +14,7 @@ import Toolbar from "./basic/Toolbar.jsx";
 const defaultCellWidth = 30; // Adjust as needed
 
 export const resolveKey = (holder, name) => {
+    if (holder == null) return undefined;
     const keys = name.split(".");
     if (keys.length === 1) {
         return holder[name];

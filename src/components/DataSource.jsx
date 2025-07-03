@@ -27,6 +27,10 @@ function hasResolvedDependencies(parameters = [], values = {}, filter={}) {
             continue;
         }
         const isDefined = (paramDef.name in values) && values[paramDef.name] !== undefined;
+        console.log("hasResolvedDependencies", paramDef, isDefined, values, filter)
+        if (!isDefined) {
+            return false;
+        }
         if (!isDefined) {
             return false;
         }
@@ -39,6 +43,7 @@ function hasResolvedDependencies(parameters = [], values = {}, filter={}) {
  * Resolve a dot-separated ley
  */
 export const resolveKey = (holder, name) => {
+    if (holder == null) return undefined;
     const keys = name.split(".");
     if (keys.length === 1) {
         return holder[name]
@@ -67,7 +72,12 @@ function extractData(selectors, paging, data) {
     if (!dataSelector) {
         records = data;
     } else {
-        records = resolveKey(data, dataSelector) || [];
+        const respData = resolveKey(data, dataSelector)
+        if(respData && Array.isArray(respData)) {
+            records = respData
+        } else if (respData) {
+            records = [respData]
+        }
         const dataInfoSelector = selectors.dataInfo;
         if (dataInfoSelector && paging) {
             const {dataInfoSelectors} = paging
@@ -117,7 +127,16 @@ export default function DataSource({context}) {
     const {input, collection, selection, collectionInfo, metrics, form} = signals
     const {getUniqueKeyValue, setSelected, setLoading, setError, setInactive} = handlers.dataSource
     const events = dataSourceEvents(context, dataSource);
-    const upstream = dataSource.dataSourceRef ? getSelectionSignal(identity.getDataSourceId(dataSource.dataSourceRef)) : null;
+    const selectionMode = dataSource.selectionMode || 'single';
+    // Ensure the upstream selection signal is always initialised with an
+    // object so that downstream code can safely access `.selected` without
+    // additional null-checks.
+    const upstream = dataSource.dataSourceRef
+        ? getSelectionSignal(
+              identity.getDataSourceId(dataSource.dataSourceRef),
+              { selected: null, rowIndex: -1 },
+          )
+        : null;
 
 
     const handleUpstream = () => {
@@ -154,8 +173,6 @@ export default function DataSource({context}) {
     useSignalEffect(() => {
         const inputVal = input.value || {};
         const {fetch, refresh = false} = inputVal;
-
-
         if (!fetch && ! refresh) return;
 
         if (refresh) {
@@ -290,6 +307,7 @@ export default function DataSource({context}) {
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
         setError('');
         if (!hasDeps) {
+            console.log("no deps", hasDeps)
             setSelected({selected: null, rowIndex: -1});
             collection.value = [];
             flagReadDone();
@@ -303,15 +321,14 @@ export default function DataSource({context}) {
         // we optimistically clear.
         // ------------------------------------------------------------------
         const requestSig = JSON.stringify({filter, parameters, page});
-        const queryChanged = requestSig !== prevQuerySig.current;
-
-        if (queryChanged) {
-            setSelected({selected: null, rowIndex: -1});
-            collection.value = [];
-        } else {
-            // No meaningful change → skip network call
-            return Promise.resolve();
-        }
+        // const queryChanged = requestSig !== prevQuerySig.current;
+        // if (queryChanged) {
+        //     setSelected({selected: null, rowIndex: -1});
+        //     collection.value = [];
+        // } else {
+        //     // No meaningful change → skip network call
+        //     return Promise.resolve();
+        // }
 
         if (paging) {
             page = page || 1;
@@ -336,6 +353,7 @@ export default function DataSource({context}) {
                 page,
                 inputParameters: parameters,
             });
+
             let {records, info, stats} = extractData(selectors, paging, payload);
             if (events.onFetch.isDefined() && records.length > 0) {
                 records = events.onFetch.execute({collection: records})
@@ -362,6 +380,11 @@ export default function DataSource({context}) {
 
             }
             // 4) Post-Fetch Hook
+            else if (selectionMode !== 'multi' && dataSource.autoSelect !== false && records.length > 0) {
+                // Nothing was selected previously – auto-select first row
+                setSelected({ selected: records[0], rowIndex: 0 });
+                form.value = { ...records[0] };
+            }
         } catch (err) {
             console.warn('doFetchRecords error', err)
             setError(err);
