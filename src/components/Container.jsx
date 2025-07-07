@@ -4,7 +4,7 @@ import {useControlEvents} from "../hooks";
 import TablePanel from "./TablePanel.jsx";
 import FormPanel from "./FormPanel.jsx";
 import Chart from "./Chart.jsx";
-import {resolveParameterValue} from "../utils/selector.js";
+import {resolveParameterValue, resolveTemplate} from "../utils/selector.js";
 import Splitter from './Splitter';
 
 import {expandRepeatItems} from "../utils/repeat.js";
@@ -12,6 +12,7 @@ import FileBrowser from "./FileBrowser.jsx";
 import DataSourceFetcher from "./DataSourceFetcher.jsx";
 import Editor from "./Editor.jsx";
 import Chat from "./Chat.jsx";
+import SchemaBasedForm from "../widgets/SchemaBasedForm.jsx";
 import './Container.css';
 
 const Container = ({context, container, isActive}) => {
@@ -90,6 +91,52 @@ const Container = ({context, container, isActive}) => {
     }
 
 
+    // ---------------- SchemaBasedForm support ------------------
+    let schemaFormPanel = null;
+    if (container.schemaBasedForm) {
+        const formCfg = container.schemaBasedForm;
+
+        // Determine which data source the form should bind to – hierarchy:
+        // 1. formCfg.datasourceRef  2. container-level dataSourceRef 3. ctx identity
+        const dsRef = formCfg?.datasourceRef || formCfg?.dataSourceRef || dataSourceRef;
+
+        const subCtx = context.Context(dsRef);
+
+        // Resolve dynamic template strings in id / schema when provided
+        const dynId = typeof formCfg.id === 'string' ? resolveTemplate(formCfg.id, subCtx) : formCfg.id;
+
+        let dynSchema = formCfg.schema;
+        if (typeof formCfg.schema === 'string') {
+            try {
+                const raw = resolveTemplate(formCfg.schema, subCtx);
+                // If the resolved result is a JSON string – parse it, otherwise assume object ref
+                dynSchema = JSON.parse(raw);
+            } catch (_) {
+                // ignore parse errors – fallback to original string
+            }
+        }
+
+        // Default submit behaviour: push collected values to DataSource.setFormData
+        const defaultSubmit = (payload) => {
+            try {
+                subCtx?.handlers?.dataSource?.setFormData?.(payload);
+            } catch (e) {
+                console.error('SchemaBasedForm submit failed', e);
+            }
+        };
+
+        schemaFormPanel = (
+            <SchemaBasedForm
+                {...formCfg}
+                id={dynId}
+                schema={dynSchema}
+                context={subCtx}
+                onSubmit={defaultSubmit}
+            />
+        );
+    }
+
+
     const {style = {}} = container
 
     const gridStyle = {
@@ -132,7 +179,7 @@ const Container = ({context, container, isActive}) => {
     // ------------------------------------------------------------------
     const hasVisual =
         (visualItems?.length || 0) > 0 ||
-        tablePanel || chartPanel || chatPanel || fileBrowserPanel || editorPanel || formPanel || (containers && containers.length > 0);
+        tablePanel || chartPanel || chatPanel || fileBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
 
     if (!hasVisual) {
         return (
@@ -174,6 +221,7 @@ const Container = ({context, container, isActive}) => {
                 {tablePanel}
                 {fileBrowserPanel}
                 {editorPanel}
+                {schemaFormPanel}
                 {formPanel ? formPanel :
 
                     <Splitter key={'s' + identity.id}  orientation={orientation} divider={layout?.divider}>
