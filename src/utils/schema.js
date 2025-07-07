@@ -123,6 +123,9 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
                     case 'object':
                         widget = 'object';
                         break;
+                    case 'schema':
+                        widget = 'schema';
+                        break;
                     case 'password':
                         widget = 'password';
                         break;

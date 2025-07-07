@@ -1,6 +1,8 @@
 
 import React from 'react';
 import { Button } from '@blueprintjs/core';
+import QuickFilterInputs from './QuickFilterInputs.jsx';
+import QuickFilterToggle from './QuickFilterToggle.jsx';
 import "./Toolbar.css";
 import { useToolbarControlEvents } from '../../../hooks/event.js';
 
@@ -21,6 +23,20 @@ const Toolbar = ({
                 {toolbarItems
                     .filter((item) => item.align === 'left')
                     .map((item) => {
+                        if (item.id === 'quickFilter') {
+                            return (
+                                <>
+                                    <QuickFilterToggle key="qftoggle-left" context={context} />
+                                    <QuickFilterInputs key="qfinputs-left" context={context} align="left" />
+                                </>
+                            );
+                        }
+                        if (item.id === 'quickFilterInputs') {
+                            return <QuickFilterInputs key="qfinputs-left" context={context} align="left" />;
+                        }
+                        if (item.id === 'quickFilterToggle') {
+                            return <QuickFilterToggle key="qftoggle-left" context={context} />;
+                        }
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
                         const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
@@ -43,6 +59,20 @@ const Toolbar = ({
                 {toolbarItems
                     .filter((item) => item.align === 'center')
                     .map((item) => {
+                        if (item.id === 'quickFilter') {
+                            return (
+                                <>
+                                    <QuickFilterToggle key="qftoggle-center" context={context} />
+                                    <QuickFilterInputs key="qfinputs-center" context={context} align="center" />
+                                </>
+                            );
+                        }
+                        if (item.id === 'quickFilterInputs') {
+                            return <QuickFilterInputs key="qfinputs-center" context={context} align="center" />;
+                        }
+                        if (item.id === 'quickFilterToggle') {
+                            return <QuickFilterToggle key="qftoggle-center" context={context} />;
+                        }
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
 
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
@@ -66,6 +96,20 @@ const Toolbar = ({
                 {toolbarItems
                     .filter((item) => item.align !== 'left' && item.align !== 'center')
                     .map((item) => {
+                        if (item.id === 'quickFilter') {
+                            return (
+                                <>
+                                    <QuickFilterToggle key="qftoggle-right" context={context} />
+                                    <QuickFilterInputs key="qfinputs-right" context={context} align="right" />
+                                </>
+                            );
+                        }
+                        if (item.id === 'quickFilterInputs') {
+                            return <QuickFilterInputs key="qfinputs-right" context={context} align="right" />;
+                        }
+                        if (item.id === 'quickFilterToggle') {
+                            return <QuickFilterToggle key="qftoggle-right" context={context} />;
+                        }
                         const {events={}, stateEvents} = toolbarEvents[item.id] || {};
                         const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
                         const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;

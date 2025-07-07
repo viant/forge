@@ -437,6 +437,9 @@ type DataSource struct {
 	FilterSet     []Filter       `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
 	AutoSelect    *bool          `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
 	SelfReference string         `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
+	// QuickFilterSet selects which filterSet should be rendered in the toolbar as quick filters.
+	// Accepts either a string (filterSet.name) or an integer index (0-based).
+	QuickFilterSet interface{} `json:"quickFilterSet,omitempty" yaml:"quickFilterSet,omitempty"`
 }
 
 type SelectionMode string
@@ -565,9 +568,10 @@ type SchemaBasedForm struct {
 // FormField describes a single control in the form.
 type FormField struct {
 	// Core
-	Name     string      `json:"name"        yaml:"name"` // JSON key in the outgoing payload
-	Label    string      `json:"label"       yaml:"label"`
-	Type     string      `json:"type"        yaml:"type"` // string, integer, boolean …
+	Name  string `json:"name"        yaml:"name"` // JSON key in the outgoing payload
+	Label string `json:"label"       yaml:"label"`
+	// string, integer, boolean, object, array, schema …
+	Type     string      `json:"type"        yaml:"type"`
 	Required bool        `json:"required,omitempty" yaml:"required,omitempty"`
 	Enum     []string    `json:"enum,omitempty"     yaml:"enum,omitempty"`
 	Default  interface{} `json:"default,omitempty"  yaml:"default,omitempty"`

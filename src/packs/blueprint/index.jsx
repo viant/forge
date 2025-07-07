@@ -29,6 +29,7 @@ import { NumericInput } from '@blueprintjs/core';
 import { addStyles, EditableMathField } from 'react-mathquill';
 
 import PrettyJson from '../../components/PrettyJson.jsx';
+import SchemaExplorer from '../../widgets/SchemaExplorer.jsx';
 
 import { registerWidget } from '../../runtime/widgetRegistry.jsx';
 import { registerEventAdapter } from '../../runtime/binding.js';
@@ -132,6 +133,19 @@ export function registerPack() {
             adapter.set(val);
         },
     });
+
+    /* -------------------- JSON-Schema viewer ----------------------- */
+    // Usage: set `widget: schema` for a form field whose value is a JSON-Schema
+    // object.  The control renders SchemaExplorer in read-only mode.
+    registerWidget(
+        'schema',
+        ({ value }) => (
+            <div style={{ maxHeight: 300, overflow: 'auto' }}>
+                <SchemaExplorer value={value} />
+            </div>
+        ),
+        { framework: 'blueprint' }
+    );
 
     /* -------------------- Checkbox / Toggle ------------------------- */
     registerWidget(
