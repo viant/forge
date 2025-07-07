@@ -64,6 +64,7 @@ registerClassifier(
 
 registerClassifier((item) => {
     if (item?.type === 'object') return 'object';
+    if (item?.type === 'schema') return 'schema';
 }, { priority: 70 });
 
 /**
@@ -136,6 +137,8 @@ registerClassifier((item) => {
             return 'math';
         case 'object':
             return 'object';
+        case 'schema':
+            return 'schema';
         case 'button':
             return 'button';
         default:
