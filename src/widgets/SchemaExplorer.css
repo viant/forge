@@ -1,0 +1,8 @@
+.forge-schema-table {
+    border-collapse: collapse;
+}
+
+.forge-schema-table th,
+.forge-schema-table td {
+    border: 1px solid var(--bp4-divider-gray1, #CED9E0);
+}
