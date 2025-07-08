@@ -5,11 +5,13 @@ function useDataConnector(dataSource) {
     const {authStates, defaultAuthProvider} = useAuth();
     const {paging = {}, parameters = []} = dataSource;
 
+
     /**
      * Replaces path placeholders, adds query inputParameters, or sets headers
      */
     function applyParameters({url, headers, queryParams, body}, inputParameters) {
         let finalUrl = url;
+        console.log('applyParameters', url, inputParameters, parameters)
         if (!parameters || parameters.length === 0) {
             for(const k in inputParameters) {
                 const value = inputParameters[k];
@@ -17,6 +19,7 @@ function useDataConnector(dataSource) {
             }
             return finalUrl;
         }
+
         for (const paramDef of parameters) {
             const {name, kind} = paramDef;
             const value = inputParameters[name];

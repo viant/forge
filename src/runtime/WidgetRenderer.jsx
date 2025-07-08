@@ -64,7 +64,7 @@ export default function WidgetRenderer({
     });
     const adapterFactory = resolveStateAdapter(scope) || resolveStateAdapter('noop');
     const adapter = adapterFactory(context, item, state);
-
+    console.log('mapping --- ', widgetKey, item)
     // ------------------------------------------------------------------
     // 3. Events mapping
     // ------------------------------------------------------------------

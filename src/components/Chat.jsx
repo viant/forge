@@ -58,6 +58,12 @@ export default function Chat({
     renderers: renderersProp,
     fallback: fallbackProp,
     avatarIcons: avatarIconsProp,
+
+    /*
+     * Controls visibility of the prompt composer (user input area).
+     * When undefined, falls back to container.chat.showInput or defaults to true.
+     */
+    showInput: showInputProp,
 }) {
     // ---------------------------------------------------------------------
     // 📡  Resolve Forge runtime context
@@ -74,6 +80,10 @@ export default function Chat({
     // Determine effective toolbar / height (prop overrides metadata)
     const effectiveToolbar = toolbar !== null ? toolbar : chatCfg.toolbar;
     const effectiveHeight  = height !== undefined ? height : chatCfg.height;
+
+    // Determine whether the composer (user input) should be rendered.
+    const effectiveShowInput = showInputProp !== undefined ? showInputProp :
+        (chatCfg.showInput !== undefined ? chatCfg.showInput : true);
 
     // Resolve classifier / renderer strategy – props > service > defaults
     const chatService = context?.handlers?.chat || {};
@@ -144,6 +154,18 @@ export default function Chat({
 
     // Resolve any container-level event handlers declared in metadata
     const events = chatHandlers(context, container);
+
+    // ---------------------------------------------------------------------
+    // 🛑  Abort handler – invoked when the user clicks the "Abort" button in
+    //      the Composer (if rendered). Delegates to configured event handler
+    //      chain when provided.
+    // ---------------------------------------------------------------------
+
+    const handleAbort = () => {
+        if (events.onAbort?.isDefined?.()) {
+            events.onAbort.execute({ context });
+        }
+    };
 
     const handleSubmit = ({ content, toolNames = [] }) => {
         const userMessage = {
@@ -258,12 +280,16 @@ export default function Chat({
             />
 
             {/* Prompt composer */}
-            <Composer
-                showUpload={chatCfg.showUpload}
-                onSubmit={handleSubmit}
-                onUpload={handleUpload}
-                disabled={loading}
-            />
+            {effectiveShowInput && (
+                <Composer
+                    showUpload={chatCfg.showUpload}
+                    onSubmit={handleSubmit}
+                    onUpload={handleUpload}
+                    onAbort={handleAbort}
+                    showAbort={chatCfg.showAbort}
+                    disabled={loading}
+                />
+            )}
         </div>
     );
 }
