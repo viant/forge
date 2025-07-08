@@ -527,8 +527,10 @@ type JSONSchema struct {
 }
 
 type SchemaProperty struct {
-	Type        string      `json:"type,omitempty" yaml:"type,omitempty"` // string, integer, …
+	Type        string      `json:"type,omitempty" yaml:"type,omitempty"`   // string, integer, …
+	Title       string      `json:"title,omitempty" yaml:"title,omitempty"` // optional label override
 	Description string      `json:"description,omitempty" yaml:"description,omitempty"`
+	Format      string      `json:"format,omitempty" yaml:"format,omitempty"`
 	Enum        []string    `json:"enum,omitempty" yaml:"enum,omitempty"`
 	Default     interface{} `json:"default,omitempty" yaml:"default,omitempty"`
 

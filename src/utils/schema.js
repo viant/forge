@@ -32,7 +32,14 @@ export function registerSchemaFieldMapper(fn) {
 }
 
 export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
-    if (!schema || schema.type !== 'object') return [];
+    if (!schema) return [];
+
+    // Accept schemas that omit "type: object" but still define properties
+    const isObjectLike =
+        schema.type === 'object' ||
+        (schema.type === undefined && schema.properties && typeof schema.properties === 'object');
+
+    if (!isObjectLike) return [];
 
     const properties = schema.properties || {};
     // Stable iteration over property keys.
@@ -74,6 +81,10 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
 
         // -------- widget (default mapping) ------------------------
         let widget = p['x-ui-widget'];
+
+        // Normalize deprecated/alias widget keys
+        if (widget === 'text-area') widget = 'textarea';
+        if (widget === 'key-value-editor') widget = 'object';
 
         // ------------------------------------------------------------------
         // Default widget inference
@@ -121,6 +132,9 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
                         break;
                     }
                     case 'object':
+                        widget = 'object';
+                        break;
+                    case 'array':
                         widget = 'object';
                         break;
                     case 'schema':

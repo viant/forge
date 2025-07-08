@@ -170,11 +170,19 @@ export function registerPack() {
         />
     ), { framework: 'blueprint' });
 
+    const checkboxChangeHandler = ({ adapter }) => (arg) => {
+        if (arg && arg.target) {
+            adapter.set(arg.target.checked);
+        } else {
+            adapter.set(!!arg);
+        }
+    };
+
     registerEventAdapter('checkbox', {
-        onChange: ({ adapter }) => (e) => adapter.set(e.target.checked),
+        onChange: checkboxChangeHandler,
     });
     registerEventAdapter('toggle', {
-        onChange: ({ adapter }) => (e) => adapter.set(e.target.checked),
+        onChange: checkboxChangeHandler,
     });
 
     /* -------------------- Select / Dropdown ------------------------- */

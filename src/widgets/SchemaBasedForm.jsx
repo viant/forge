@@ -2,6 +2,8 @@
 // fields or a minimal JSON-schema (object with properties).
 
 import React, { useMemo, useState } from 'react';
+import { useSignalEffect } from '@preact/signals-react';
+import { resolveSelector } from '../utils/selector.js';
 import WidgetRenderer from '../runtime/WidgetRenderer.jsx';
 import { jsonSchemaToFields } from '../utils/schema.js';
 
@@ -10,7 +12,7 @@ Props:
   id?: string
   fields?: FormField[]          // explicit definition (preferred from backend)
   schema?: JSONSchema  // new alias for `schema` – mirrors chat backend
-  onSubmit?: (payload)=>void
+  onSubmit?: (payload, setFormState)=>void
   layout?, style?               // ignored in this first cut
 
 A **FormField** mirrors backend struct:
@@ -23,16 +25,56 @@ A **FormField** mirrors backend struct:
 const SchemaBasedForm = (props) => {
     const {
         fields,
-        schema,
+        schema: schemaProp,
         onSubmit,
         context,
         dataSourceRef,
+        dataBinding = 'schema', // optional path inside record for dynamic schema
         style,
     } = props;
+    // Determine rendering context & adapter (must be before hooks that use it)
+    let renderContext = context;
+    let stateArg = null;
+    let scope = 'local';
+
+    if (context && dataSourceRef) {
+        try {
+            renderContext = context.Context(dataSourceRef);
+            scope = 'form';
+        } catch (e) {
+            console.error('SchemaBasedForm: unable to resolve dataSourceRef', dataSourceRef, e);
+        }
+    }
+
+    const [tick, forceRender] = useState(0);
+
+    // Re-render whenever the underlying form data changes (selected record)
+    useSignalEffect(() => {
+        try {
+            renderContext?.signals?.form?.value; // establish dependency
+            forceRender((c) => c + 1);
+        } catch {}
+    });
+
+    // Resolve dynamic schema when not provided explicitly
+    const effectiveSchema = useMemo(() => {
+        if (schemaProp) return schemaProp;
+
+        // Attempt to pull from current record in DataSource via dataBinding path
+        try {
+            const record = renderContext?.handlers?.dataSource?.getFormData?.() || {};
+            const dyn = resolveSelector(record, dataBinding);
+            if (dyn && typeof dyn === 'object') return dyn;
+        } catch (e) {
+            console.error('SchemaBasedForm: unable to resolve dynamic schema', e);
+        }
+        return null;
+    }, [schemaProp, renderContext, tick]);
+
     const derivedFields = useMemo(() => {
         if (fields && fields.length) return fields;
-        return jsonSchemaToFields(schema);
-    }, [fields, schema, schema]);
+        return jsonSchemaToFields(effectiveSchema);
+    }, [fields, effectiveSchema]);
     // state object keyed by field.name
     const initialValues = useMemo(() => {
         const obj = {};
@@ -68,22 +110,22 @@ const SchemaBasedForm = (props) => {
         e?.preventDefault();
         if (!basicValidate()) return;
 
-        onSubmit?.(values);
+        // Provide helper setter to update form programmatically upon response.
+        const setFormState = (patch) => {
+            if (!patch || typeof patch !== 'object') return;
+            if (scope === 'form') {
+                try {
+                    renderContext?.handlers?.dataSource?.setFormData?.(patch);
+                } catch (e) {
+                    console.error('SchemaBasedForm: setFormData failed', e);
+                }
+            } else {
+                setValues((prev) => ({ ...prev, ...patch }));
+            }
+        };
+
+        onSubmit?.(values, setFormState);
     };
-
-    // Determine rendering context & adapter
-    let renderContext = context
-    let stateArg = null;
-    let scope = 'local';
-
-    if (context && dataSourceRef) {
-        try {
-            renderContext = context.Context(dataSourceRef);
-            scope = 'form';
-        } catch (e) {
-            console.error('SchemaBasedForm: unable to resolve dataSourceRef', dataSourceRef, e);
-        }
-    }
 
     if (scope === 'local') {
         stateArg = [values, setValues];

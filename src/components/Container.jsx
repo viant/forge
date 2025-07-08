@@ -116,10 +116,33 @@ const Container = ({context, container, isActive}) => {
             }
         }
 
-        // Default submit behaviour: push collected values to DataSource.setFormData
-        const defaultSubmit = (payload) => {
+        // Build submit handler: save form data, then trigger any additional
+        // Execute definitions attached to schemaBasedForm (event: "submit").
+        const customHandlers = (formCfg.on || [])
+            .filter((ex) => (ex.event || '').toLowerCase() === 'submit' && ex.handler)
+            .map((ex) => {
+                const fn = subCtx?.lookupHandler?.(ex.handler);
+                return { exec: ex, fn };
+            })
+            .filter(({ fn }) => typeof fn === 'function');
+
+
+        const submitHandler = (payload, setFormState) => {
+
+            console.log('SchemaBasedForm submitHandler submit', payload);
             try {
-                subCtx?.handlers?.dataSource?.setFormData?.(payload);
+                const dsHandlers = subCtx?.handlers?.dataSource;
+                if (customHandlers.length === 0) {
+                    throw new Error('No submit handlers found');
+                }
+                
+                customHandlers.forEach(({ exec, fn }) => {
+                    try {
+                        fn({ execution: exec, context: subCtx, data: payload, setFormState });
+                    } catch (e) {
+                        console.error('submit handler error', exec.handler, e);
+                    }
+                });
             } catch (e) {
                 console.error('SchemaBasedForm submit failed', e);
             }
@@ -131,7 +154,7 @@ const Container = ({context, container, isActive}) => {
                 id={dynId}
                 schema={dynSchema}
                 context={subCtx}
-                onSubmit={defaultSubmit}
+                onSubmit={submitHandler}
             />
         );
     }

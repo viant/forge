@@ -4,6 +4,7 @@ go 1.24.1
 
 require (
 	github.com/viant/afs v1.26.2
+	github.com/stretchr/testify v1.8.4
 	gopkg.in/yaml.v3 v3.0.1
 )
 

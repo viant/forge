@@ -1,17 +1,21 @@
-// PrettyJson.jsx – simple read-only viewer for JS objects/values.
+// PrettyJson.jsx – viewer/editor for JS objects/values.
 
 import React from 'react';
-import { Code, TextArea } from '@blueprintjs/core';
+import { Pre, TextArea } from '@blueprintjs/core';
 
 export default function PrettyJson({
     value,
     onChange,
-    readOnly = true,
+    readOnly, // undefined means decide based on presence of onChange
     maxHeight = 240,
     style = {},
     ...rest
 }) {
     if (value === undefined || value === null) value = {};
+
+    if (readOnly === undefined) {
+        readOnly = typeof onChange !== 'function';
+    }
 
     const initialText = () => {
         if (typeof value === 'string') return value;
@@ -34,8 +38,7 @@ export default function PrettyJson({
 
     if (readOnly || !onChange) {
         return (
-            <Code
-                tagName="pre"
+            <Pre
                 {...rest}
                 style={{
                     maxHeight,
@@ -45,15 +48,27 @@ export default function PrettyJson({
                 }}
             >
                 {text}
-            </Code>
+            </Pre>
         );
     }
+
+    const commitIfValid = (txt) => {
+        try {
+            const parsed = txt.trim() === '' ? {} : JSON.parse(txt);
+            onChange(parsed);
+        } catch {}
+    };
 
     const handleChange = (e) => {
         const txt = e.target.value;
         setText(txt);
+        if (error) setError(null);
+        commitIfValid(txt);
+    };
+
+    const handleBlur = () => {
         try {
-            const parsed = txt.trim() === '' ? {} : JSON.parse(txt);
+            const parsed = text.trim() === '' ? {} : JSON.parse(text);
             setError(null);
             onChange(parsed);
         } catch (err) {
@@ -69,6 +84,7 @@ export default function PrettyJson({
                 growVertically
                 value={text}
                 onChange={handleChange}
+                onBlur={handleBlur}
                 intent={error ? 'danger' : 'none'}
                 style={{ fontFamily: 'monospace', ...style, maxHeight }}
             />

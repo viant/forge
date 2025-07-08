@@ -25,10 +25,7 @@ const Toolbar = ({
                     .map((item) => {
                         if (item.id === 'quickFilter') {
                             return (
-                                <>
-                                    <QuickFilterToggle key="qftoggle-left" context={context} />
-                                    <QuickFilterInputs key="qfinputs-left" context={context} align="left" />
-                                </>
+                                <QuickFilterInputs key="qfinputs-left" context={context} align="left" />
                             );
                         }
                         if (item.id === 'quickFilterInputs') {
@@ -61,10 +58,7 @@ const Toolbar = ({
                     .map((item) => {
                         if (item.id === 'quickFilter') {
                             return (
-                                <>
-                                    <QuickFilterToggle key="qftoggle-center" context={context} />
-                                    <QuickFilterInputs key="qfinputs-center" context={context} align="center" />
-                                </>
+                                <QuickFilterInputs key="qfinputs-center" context={context} align="center" />
                             );
                         }
                         if (item.id === 'quickFilterInputs') {
@@ -98,10 +92,7 @@ const Toolbar = ({
                     .map((item) => {
                         if (item.id === 'quickFilter') {
                             return (
-                                <>
-                                    <QuickFilterToggle key="qftoggle-right" context={context} />
-                                    <QuickFilterInputs key="qfinputs-right" context={context} align="right" />
-                                </>
+                                <QuickFilterInputs key="qfinputs-right" context={context} align="right" />
                             );
                         }
                         if (item.id === 'quickFilterInputs') {

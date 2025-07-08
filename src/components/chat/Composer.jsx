@@ -7,8 +7,10 @@ export default function Composer({
     tools = [],
     onSubmit,
     onUpload,
+    onAbort,
     showTools = false,
     showUpload = false,
+    showAbort = false,
     disabled = false,
 }) {
     const [draft, setDraft] = useState("");
@@ -22,12 +24,17 @@ export default function Composer({
         setDraft("");
     };
 
+    const handleAbort = (e) => {
+        e.preventDefault();
+        onAbort?.();
+    };
+
     // Reflect global loading lock by disabling the action controls and showing a spinner
     const actionDisabled = disabled;
 
     return (
         <form className="flex flex-col gap-1 mt-2" onSubmit={handleSubmit}>
-            <div className="flex w-full">
+            <div className="flex w-full items-start">
                 <div className="composer-wrapper" style={{ flex: 1, minWidth: 0 }}>
                     <TextArea
                         fill
@@ -37,13 +44,23 @@ export default function Composer({
                         style={{ borderRadius: 14, resize: "vertical", minHeight: 40, paddingRight: 32 }}
                         disabled={disabled}
                     />
+
+                    {/* Single action button: send by default or abort when showAbort */}
                     <Button
-                        icon="send-message"
+                        icon={showAbort ? "cross" : "send-message"}
                         minimal
-                        type="submit"
+                        intent={showAbort ? "danger" : undefined}
                         className="composer-send"
-                        disabled={actionDisabled}
-                        loading={disabled}
+                        title={showAbort ? "Abort generation" : "Send"}
+                        {...(
+                            showAbort
+                                ? { onClick: handleAbort, disabled: false, type: "button" }
+                                : {
+                                      type: "submit",
+                                      disabled: actionDisabled,
+                                      loading: disabled,
+                                  }
+                        )}
                     />
                 </div>
             </div>
