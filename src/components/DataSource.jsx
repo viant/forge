@@ -18,21 +18,25 @@ import {useRef} from "react";
  * hasResolvedDependencies
  *  - Returns true if all defined parameters can be resolved from their locations.
  *  - If at least one parameter is missing, returns false.
+ *  - If a parameter is missing but has a default value, the default is assigned.
  */
-function hasResolvedDependencies(parameters = [], values = {}, filter={}) {
-    if (!parameters || parameters?.length === 0) return true; // no parameters => no dependencies
+function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
+    if (!parameters || parameters.length === 0) return true; // no parameters => no dependencies
+
     for (const paramDef of parameters) {
-        if(paramDef?.from === 'const') {
+        if (paramDef?.from === 'const') {
             filter[paramDef.name] = paramDef.location;
             continue;
         }
         const isDefined = (paramDef.name in values) && values[paramDef.name] !== undefined;
-        console.log("hasResolvedDependencies", paramDef, isDefined, values, filter)
+        console.log("hasResolvedDependencies", paramDef, isDefined, values, filter);
         if (!isDefined) {
-            return false;
-        }
-        if (!isDefined) {
-            return false;
+            if ('default' in paramDef) {
+                values[paramDef.name] = paramDef.default;
+            } else {
+                console.log("Missing required parameter:", paramDef);
+                return false;
+            }
         }
     }
     return true;
