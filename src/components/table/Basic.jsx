@@ -10,6 +10,7 @@ import FilterDialog from "./FilterDialog.jsx";
 import SettingsDialog from "./SettingsDialog.jsx";
 import "./Basic.css";
 import Toolbar from "./basic/Toolbar.jsx";
+import FullContentDialog from "./FullContentDialog";
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -338,15 +339,11 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             </HTMLTable>
 
             {/* Dialog for Full Cell Content */}
-            <Dialog
+            <FullContentDialog
                 isOpen={isDialogOpen}
                 onClose={() => setIsDialogOpen(false)}
-                title="Full Content"
-            >
-                <div style={{ padding: 20 }}>
-                    <p>{popupContent}</p>
-                </div>
-            </Dialog>
+                content={popupContent}
+            />
 
             {/* Filter Dialog */}
             <FilterDialog

@@ -508,6 +508,7 @@ type Parameter struct {
 	Name      string `json:"name" yaml:"name"`                             //dest selector
 	Direction string `json:"direction,omitempty" yaml:"direction,omitempty"`
 	Codec     *Codec `json:"codec,omitempty" yaml:"codec,omitempty"`
+	Default   string `json:"default,omitempty" yaml:"default,omitempty"`
 
 	//Deprecated
 	In string `json:"in,omitempty" yaml:"in,omitempty"`
