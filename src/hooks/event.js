@@ -418,17 +418,17 @@ export const useCellEvents = ({context, cellSelection, columnHandlers = {}, onRo
         const handler = columnHandlers[key];
         if (handler && handler.isDefined()) {
             if (isStateEvent(key)) {
-                stateEvents[key] = () => handler.execute({...cellSelection});
+                stateEvents[key] = () => handler.execute({...cellSelection, context});
                 continue;
             }
             events[key] = (event) => {
                 if (event && event.stopPropagation) {
                     event.stopPropagation();
                     if (!isSelected({...cellSelection})) {
-                        onRowClick({event, ...cellSelection});
+                        onRowClick({event, ...cellSelection, context});
                     }
                 }
-                return handler.execute({event, ...cellSelection});
+                return handler.execute({event, ...cellSelection, context});
             };
         }
     }
