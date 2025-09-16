@@ -28,6 +28,7 @@ import {injectActions} from '../actions';
 
 function WindowContentInner({window, metadata, services}) {
     const {windowKey, windowData, windowId, parameters = {}} = window;
+    const baseKey = (windowKey || '').split('?')[0];
 
     // Build Forge context (calls React hooks inside)
     const context = useMemo(() => {
@@ -85,9 +86,20 @@ function WindowContentInner({window, metadata, services}) {
      * ---------------------------------------------------------- */
 
     const renderDataSources = () => {
+        const keys = Object.keys(dataSources).filter((key) => {
+            try {
+                const ds = dataSources[key] || {};
+                // mount === false → do not mount DS container; allows lazy DS used only in dialogs
+                return ds.mount !== false;
+            } catch (_) { return true; }
+        });
+        // Special-case: chat/new window mounts only conversations + messages DS for faster first paint
+        const filteredKeys = (baseKey === 'chat/new')
+            ? keys.filter((k) => k === 'conversations' || k === 'messages')
+            : keys;
         return (
             <>
-                {Object.keys(dataSources).map((key) => (
+                {filteredKeys.map((key) => (
                     <DataSourceContainer
                         key={key}
                         windowContext={context}

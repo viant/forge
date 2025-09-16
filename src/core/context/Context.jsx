@@ -132,12 +132,6 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             if (!dataSourceRef) {
                 dataSourceRef = this.identity.dataSourceRef
             }
-
-            let result = dataSourceContextCache[dataSourceRef]
-            if (result) {
-                return result
-            }
-
             const identity = {
                 ...this.identity,
                 dataSourceRef,
@@ -147,6 +141,11 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const dataSource = metadata.dataSource[dataSourceRef]
             if (!dataSource) {
                 throw new Error(`DataSource not found: ${dataSourceRef}`, identity)
+            }
+
+            let result = dataSourceContextCache[dataSourceRef]
+            if (result) {
+                return result
             }
 
             const initialSelectionValue =
@@ -210,6 +209,78 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             }
             dataSourceContextCache[dataSourceRef] = result
             windowContextRegistry.set(windowId, this); // register top-level window context
+            this.dataSources[dataSourceRef] = dataSourceContextCache[dataSourceRef];
+            return dataSourceContextCache[dataSourceRef];
+        },
+
+        // Hook-safe variant for React components. Always call from inside a component.
+        useDsContext: function (dataSourceRef) {
+            if (!dataSourceRef) {
+                dataSourceRef = this.identity.dataSourceRef;
+            }
+
+            const identity = {
+                ...this.identity,
+                dataSourceRef,
+                ns,
+                dataSourceId: getDataSourceId(dataSourceRef)
+            };
+            const dataSource = metadata.dataSource[dataSourceRef];
+            if (!dataSource) {
+                throw new Error(`DataSource not found: ${dataSourceRef}`, identity);
+            }
+
+            // Always call the hook here; React requires consistent hook calls per render
+            const connector = useDataConnector(dataSource);
+
+            let cached = dataSourceContextCache[dataSourceRef];
+            if (cached) {
+                return cached;
+            }
+
+            const initialSelectionValue =
+                dataSource.selectionMode === 'multi' ? { selection: [] } : { selected: null, rowIndex: -1 };
+            const hasSelection = dataSource.selectionMode !== 'none';
+            const selectionSignals = hasSelection ? {
+                collection: getCollectionSignal(identity.dataSourceId),
+                collectionInfo: getCollectionInfoSignal(identity.dataSourceId),
+                selection: getSelectionSignal(identity.dataSourceId, initialSelectionValue),
+                metrics: getMetricsSignal(identity.dataSourceId),
+            } : {};
+
+            const standardSignals = {
+                input: getInputSignal(identity.dataSourceId),
+                form: getFormSignal(identity.dataSourceId),
+                control: getControlSignal(identity.dataSourceId),
+                message: getMessageSignal(identity.dataSourceId),
+                formStatus: getFormStatusSignal(identity.dataSourceId),
+                windowControl: windowControlSignal,
+            };
+
+            const signals = { ...standardSignals, ...selectionSignals };
+
+            const result = {
+                ...this,
+                handlers: { ...this._globalServices },
+                identity,
+                connector,
+                signals,
+                dataSource: metadata.dataSource[dataSourceRef],
+                itemId: (container, item) => `${windowId}DS${dataSourceRef}.(${container.id}||'').${item.id}`,
+                getSignalId: (key) => { this.signalIds[key] = true; return `${windowId}DS${dataSourceRef}Signal${key}`; },
+                tableSettingKey: (key) => `${windowId}DS${dataSourceRef}Table${key}`,
+            };
+
+            result.handlers = {
+                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector),
+                window: windowHandlers,
+                ...this._globalServices,
+            };
+            result.actions = metadata.actions.import(result) || {};
+            result.lookupHandler = (name) => resolveActionHandler(result.actions, result.handlers, name);
+
+            dataSourceContextCache[dataSourceRef] = result;
+            windowContextRegistry.set(windowId, this);
             this.dataSources[dataSourceRef] = dataSourceContextCache[dataSourceRef];
             return dataSourceContextCache[dataSourceRef];
         }
