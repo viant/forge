@@ -157,7 +157,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 collectionInfo: getCollectionInfoSignal(identity.dataSourceId),
                 selection: getSelectionSignal(identity.dataSourceId, initialSelectionValue),
                 metrics: getMetricsSignal(identity.dataSourceId),
-                formStatus: getFormStatusSignal(identity.dataSourceId),
+
             } : {}
 
             const standardSignals = {
@@ -165,6 +165,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 form: getFormSignal(identity.dataSourceId),
                 control: getControlSignal(identity.dataSourceId),
                 message: getMessageSignal(identity.dataSourceId),
+                formStatus: getFormStatusSignal(identity.dataSourceId),
                 windowControl: windowControlSignal
             }
 
