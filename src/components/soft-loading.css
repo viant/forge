@@ -1,0 +1,48 @@
+/* Soft loading skeleton styles */
+
+.soft-skeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.soft-skeleton-line {
+  position: relative;
+  overflow: hidden;
+  background: rgba(125, 125, 125, 0.12);
+  border-radius: 6px;
+}
+
+.soft-skeleton-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -150px;
+  height: 100%;
+  width: 150px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 100%);
+  animation: soft-shimmer 1.2s ease-in-out infinite;
+}
+
+.soft-skeleton-block {
+  position: relative;
+  overflow: hidden;
+  background: rgba(125, 125, 125, 0.12);
+  border-radius: 8px;
+}
+
+.soft-skeleton-block::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -200px;
+  height: 100%;
+  width: 200px;
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 100%);
+  animation: soft-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes soft-shimmer {
+  0% { left: -200px; }
+  100% { left: 120%; }
+}
+
