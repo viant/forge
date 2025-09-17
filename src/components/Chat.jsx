@@ -266,7 +266,18 @@ export default function Chat({
                 </div>
             )}
             {/* Error banner */}
-            {error && <div className="text-red-500 text-sm py-1">{error}</div>}
+            {(() => {
+                if (!error) return null;
+                try {
+                    const errText = String(error?.message || error);
+                    // Extra debug to troubleshoot Error objects reaching render
+                    // eslint-disable-next-line no-console
+                    console.log('[forge][chat] render error banner', { typeof: typeof error, message: error?.message, value: error });
+                    return <div className="text-red-500 text-sm py-1">{errText}</div>;
+                } catch (e) {
+                    return <div className="text-red-500 text-sm py-1">An error occurred</div>;
+                }
+            })()}
 
             {/* Message list */}
             <MessageFeed

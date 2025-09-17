@@ -52,7 +52,7 @@ export default function Composer({
                         intent={showAbort ? "danger" : undefined}
                         className="composer-send"
                         title={showAbort ? "Abort generation" : "Send"}
-                        {...(
+                        {...( 
                             showAbort
                                 ? { onClick: handleAbort, disabled: false, type: "button" }
                                 : {

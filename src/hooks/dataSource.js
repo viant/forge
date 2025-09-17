@@ -102,7 +102,18 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     }
 
     const setError = (error) => {
-        control.value = {...control.peek(), error, loading: false};
+        try {
+            // Debug: log error types and DS id for troubleshooting
+            console.error('[forge][ds] setError', {
+                ds: identity?.dataSourceRef,
+                type: typeof error,
+                message: error && error.message,
+                value: error,
+            });
+        } catch (_) { /* ignore */ }
+        // Coerce Error objects to string so React can render safely in Chat banner
+        const errorText = (error && (error.message || error.toString?.())) ? String(error.message || error.toString()) : String(error || '');
+        control.value = { ...control.peek(), error: errorText, loading: false };
     }
 
     const peekLoading = () => {

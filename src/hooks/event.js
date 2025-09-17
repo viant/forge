@@ -25,7 +25,8 @@ const Execution = (context, messageBus) => {
             }
 
             const handler = execution.handler;
-            result = handler({execution, ...args, parameters});
+            // Pass context through to service handlers so they can access DS state
+            result = handler({execution, ...args, parameters, context});
 
             if (execution.onSuccessHandler) {
                 return execution.onSuccessHandler({execution, ...args, result, parameters});
@@ -80,7 +81,16 @@ const Execution = (context, messageBus) => {
             }
 
             if (!execution.handler) {
-                execution.handler = context.lookupHandler(execution.id);
+                try {
+                    const h = context.lookupHandler(execution.id);
+                    // eslint-disable-next-line no-console
+                    console.log('[forge][event] lookup handler', execution.id, typeof h, h && (h.name || 'anon'));
+                    execution.handler = h;
+                } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error('[forge][event] lookup handler failed', execution.id, e);
+                    throw e;
+                }
             }
             // Prepare arguments and parameters
             execution.args = execution.args || [];

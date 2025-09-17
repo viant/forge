@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 
 import {Spinner} from '@blueprintjs/core';
+import SoftSkeleton, { SoftBlock } from './SoftSkeleton.jsx';
 
 import {
     getMetadataSignal,
@@ -199,7 +200,13 @@ export default function WindowContent({window, isInTab = false}) {
     const metadata = metadataSignal.peek();
 
     if (loading || !metadata) {
-        return <Spinner/>;
+        // Soft loading placeholder for window content
+        return (
+            <div style={{ padding: 16 }}>
+                <SoftSkeleton lines={1} height={18} style={{ marginBottom: 12 }} />
+                <SoftBlock height={180} />
+            </div>
+        );
     }
 
     return (
