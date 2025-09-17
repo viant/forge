@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from 'react';
-import {Tree, Spinner} from '@blueprintjs/core';
+import {Tree} from '@blueprintjs/core';
+import { SoftBlock } from './SoftSkeleton.jsx';
 import {useSignalEffect} from '@preact/signals-react';
 import { fileBrowserHandlers} from "../hooks";
 
@@ -233,8 +234,8 @@ const FileBrowser = (props) => {
     };
 
     if (loading && fileTreeData.length === 0) {
-        // Show spinner if we have no tree data at all
-        return <Spinner/>;
+        // Soft loading block while fetching tree
+        return <SoftBlock height={160} />;
     }
 
     const style = config.style || {}

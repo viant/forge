@@ -2,7 +2,8 @@
  * TableBackfill - Renders blank rows to fill space if needed
  * ------------------------------------------------------------------ */
 import React from "react";
-import {Spinner, Colors, Icon} from "@blueprintjs/core";
+import {Colors, Icon} from "@blueprintjs/core";
+import SoftSkeleton from '../../SoftSkeleton.jsx';
 
 const TableBackfill = ({context, rowCount, colSpan, collection}) => {
     if (rowCount <= 0) return null;
@@ -20,7 +21,7 @@ const TableBackfill = ({context, rowCount, colSpan, collection}) => {
             rows.push(<tr key={`backfill-${i}`}>
                 <td></td>
                 <td rowSpan={rowCount - 1} colSpan={colSpan - 1} className="empty-row">
-                    {loading && !error ? (<span className="table-pending"><Spinner></Spinner></span>) : null}
+                    {loading && !error ? (<SoftSkeleton lines={1} height={10} />) : null}
                     {noData && !disabled && !loading ? (
                         <span style={{color: Colors.BLUE3}}><Icon icon="info-sign"></Icon> No data. </span>) : null}
                     {error ?
