@@ -87,20 +87,9 @@ function WindowContentInner({window, metadata, services}) {
      * ---------------------------------------------------------- */
 
     const renderDataSources = () => {
-        const keys = Object.keys(dataSources).filter((key) => {
-            try {
-                const ds = dataSources[key] || {};
-                // mount === false → do not mount DS container; allows lazy DS used only in dialogs
-                return ds.mount !== false;
-            } catch (_) { return true; }
-        });
-        // Special-case: chat/new window mounts only conversations + messages DS for faster first paint
-        const filteredKeys = (baseKey === 'chat/new')
-            ? keys.filter((k) => k === 'conversations' || k === 'messages')
-            : keys;
         return (
             <>
-                {filteredKeys.map((key) => (
+                {Object.keys(dataSources).map((key) => (
                     <DataSourceContainer
                         key={key}
                         windowContext={context}

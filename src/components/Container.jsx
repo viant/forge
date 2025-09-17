@@ -204,6 +204,7 @@ const Container = ({context, container, isActive}) => {
         (visualItems?.length || 0) > 0 ||
         tablePanel || chartPanel || chatPanel || fileBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
 
+    console.log('hasVisual', container.dataSourceRef, hasVisual);
     if (!hasVisual) {
         return (
             <>

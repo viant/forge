@@ -19,7 +19,10 @@ export default function DataSourceFetcher({
     // 1. trigger collection fetch when component mounts (optional)
     useEffect(() => {
         if (fetchData) {
-            context?.handlers?.dataSource?.fetchCollection?.();
+
+           const collection =  context?.handlers?.dataSource?.fetchCollection?.();
+            console.log('fetchData', fetchData, collection, context?.handlers?.dataSource.fetchCollection());
+
         }
     }, [context,  fetchData]);
 
