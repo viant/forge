@@ -369,6 +369,7 @@ type Section struct {
 type Binding struct {
 	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	DataField     string `json:"dataField,omitempty" yaml:"dataField,omitempty"`
+	OptionsField  string `json:"optionsField,omitempty" yaml:"optionsField,omitempty"`
 	Path          string `json:"bindingPath,omitempty" yaml:"bindingPath,omitempty"`
 	Scope         string `json:"scope,omitempty" yaml:"scope,omitempty"`
 	MutationMode  string `json:"mutationMode,omitempty" yaml:"mutationMode,omitempty"`

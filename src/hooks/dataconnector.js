@@ -1,4 +1,29 @@
 import {useSetting} from "../core";
+import { getLogger } from "../utils/logger.js";
+
+
+// Toggle with env var or config if you don't always want noisy logs
+const STACK_DEBUG = process.env.STACK_DEBUG === '1';
+
+function logCallerStack(name , maxFrames = 5) {
+    const err = new Error();
+
+    // Normalize and trim the stack
+    const lines = (err.stack || '')
+        .split('\n')
+        // remove the first line: "Error"
+        .slice(1)
+        // remove this helper frame and the get() frame if present
+        .filter(l => !/logCallerStack|^\s*at\s*get\s*\(/.test(l))
+        .map(l => l.trim().replace(/^at\s+/, ''));
+
+    const callers = lines.slice(0, maxFrames);
+    if (callers.length) {
+        console.log(`[${name}] (up to ${maxFrames}):\n${callers.join('\n')}`);
+    } else {
+        console.log('[${name}] (no caller frames available)');
+    }
+}
 
 function useDataConnector(dataSource) {
     const {endpoints, useAuth} = useSetting();
@@ -10,8 +35,9 @@ function useDataConnector(dataSource) {
      * Replaces path placeholders, adds query inputParameters, or sets headers
      */
     function applyParameters({url, headers, queryParams, body}, inputParameters) {
+        const log = getLogger('connector');
         let finalUrl = url;
-        console.log('applyParameters', url, inputParameters, parameters)
+        try { log.debug('[applyParameters]', { url, inputParameters, parameters }); } catch(_) {}
         if (!parameters || parameters.length === 0) {
             for(const k in inputParameters) {
                 const value = inputParameters[k];
@@ -48,6 +74,7 @@ function useDataConnector(dataSource) {
                 finalUrl = finalUrl.replace(`{${k}}`, value);
             }
         }
+        try { log.debug('[resolvedUrl]', finalUrl); } catch(_) {}
         return finalUrl;
     }
 
@@ -129,6 +156,8 @@ function useDataConnector(dataSource) {
         }
     }
 
+
+
     /**
      * GET method
      */
@@ -150,16 +179,23 @@ function useDataConnector(dataSource) {
 
             const body = {};
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+
             const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            //logCallerStack('get:    ' + finalUrl);
+
             const request = {method, headers};
             if (Object.keys(body).length > 0) {
                 request["body"] = JSON.stringify(body);
             }
+            const log = getLogger('connector');
+            try { log.debug('[request]', { method, url: finalUrl, request }); } catch(_) {}
             const resp = await fetch(finalUrl, request);
             if (!resp.ok) {
                 throw new Error(`GET error: ${resp.statusText}`);
             }
-            return await resp.json();
+            const json = await resp.json();
+            try { log.debug('[response]', { url: finalUrl, status: resp.status }); } catch(_) {}
+            return json;
         } catch (err) {
             console.error("Failed to fetch data", err);
             throw err;
@@ -178,6 +214,8 @@ function useDataConnector(dataSource) {
 
             // apply path/query/header/body parameters
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            const log = getLogger('connector');
+            try { log.debug('[request][POST]', { url, body }); } catch(_) {}
             const resp = await fetch(url, {
                 method: "POST",
                 headers: {...headers, "Content-Type": "application/json"},
@@ -186,7 +224,9 @@ function useDataConnector(dataSource) {
             if (!resp.ok) {
                 throw new Error(`POST error: ${resp.statusText}`);
             }
-            return await resp.json();
+            const json = await resp.json();
+            try { log.debug('[response][POST]', { url, status: resp.status }); } catch(_) {}
+            return json;
         } catch (err) {
             console.error("Failed to fetch data", err);
             throw err;

@@ -5,6 +5,7 @@ import {
 import {resolveSelector, setSelector} from "../utils/selector.js";
 
 import {arrayEquals} from "../utils/equal.js";
+import { getLogger } from "../utils/logger.js";
 import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
 
@@ -98,22 +99,36 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     }
 
     const setLoading = (loading) => {
+        const log = getLogger('ds');
+        try { log.debug('[loading]', { ds: identity?.dataSourceRef, loading }); } catch(_) {}
         control.value = {...control.peek(), loading};
     }
 
     const setError = (error) => {
         try {
+            const log = getLogger('ds');
+            let caller = 'unknown';
+            try {
+                const stack = new Error().stack || '';
+                const lines = String(stack).split('\n').map((l) => l.trim());
+                // 0: Error, 1: this line, 2+: callers; find the first frame not containing handleSave
+                caller = lines.find((l, idx) => idx > 1 && !l.includes('handleSave')) || lines[2] || 'unknown';
+            } catch (_) {
+                // ignore
+            }
             // Debug: log error types and DS id for troubleshooting
-            console.error('[forge][ds] setError', {
+            log.error('setError', {
                 ds: identity?.dataSourceRef,
                 type: typeof error,
                 message: error && error.message,
                 value: error,
+                caller: caller,
             });
         } catch (_) { /* ignore */ }
         // Coerce Error objects to string so React can render safely in Chat banner
         const errorText = (error && (error.message || error.toString?.())) ? String(error.message || error.toString()) : String(error || '');
-        control.value = { ...control.peek(), error: errorText, loading: false };
+        // Preserve prior data and mark view as stale; leave clearing to user onError handlers
+        control.value = { ...control.peek(), error: errorText, loading: false, stale: true };
     }
 
     const peekLoading = () => {

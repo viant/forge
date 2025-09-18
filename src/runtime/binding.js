@@ -35,6 +35,9 @@ registerStateAdapter('local', (ctx, item, pair) => {
     const key = item.name || item.id;
     return {
         get: () => values[key],
+        getOptions: () => {
+            return []
+        },
         set: (v) => setValues((prev) => ({ ...prev, [key]: v })),
     };
 });
@@ -50,11 +53,15 @@ registerStateAdapter('form', (ctx, item) => {
     const dsHandlers = ctx?.handlers?.dataSource;
 
     const fieldKey = item.dataField || item.bindingPath || item.id;
-
+    const optionsFieldKey = item.optionsField  || fieldKey + 'Options'
     return {
         get: () => {
             const data = dsHandlers?.getFormData?.() || {};
             return resolveSelector(data, fieldKey);
+        },
+        getOptions: () => {
+            const data = dsHandlers?.getFormData?.() || {};
+            return   resolveSelector(data, optionsFieldKey) || [];
         },
         set: (v) => {
             dsHandlers?.setFormField?.({ item, value: v });
