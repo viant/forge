@@ -1,5 +1,6 @@
 // DataSource.jsx
 import React, {useState} from "react";
+import {getLogger} from "../utils/logger.js";
 import {useSignalEffect} from "@preact/signals-react";
 import {isMapEquals} from "../utils";
 import {
@@ -77,7 +78,7 @@ function extractData(selectors, paging, data) {
         records = data;
     } else {
         const respData = resolveKey(data, dataSelector)
-        if(respData && Array.isArray(respData)) {
+        if (respData && Array.isArray(respData)) {
             records = respData
         } else if (respData) {
             records = [respData]
@@ -117,12 +118,16 @@ function getNodeByPath(nodes, path, selfReference) {
 }
 
 
-
 /**
  * DataSource props:
  *  - context
  */
 export default function DataSource({context}) {
+    const log = getLogger('ds');
+    try {
+        log.debug('DataSource mount', context?.identity?.dataSourceRef || '(unknown)');
+    } catch (_) {
+    }
     let prevFilter = {};
     const prevQuerySig = useRef('');
 
@@ -137,11 +142,10 @@ export default function DataSource({context}) {
     // additional null-checks.
     const upstream = dataSource.dataSourceRef
         ? getSelectionSignal(
-              identity.getDataSourceId(dataSource.dataSourceRef),
-              { selected: null, rowIndex: -1 },
-          )
+            identity.getDataSourceId(dataSource.dataSourceRef),
+            {selected: null, rowIndex: -1},
+        )
         : null;
-
 
     const handleUpstream = () => {
         if (upstream.value.selected) {
@@ -177,7 +181,7 @@ export default function DataSource({context}) {
     useSignalEffect(() => {
         const inputVal = input.value || {};
         const {fetch, refresh = false} = inputVal;
-        if (!fetch && ! refresh) return;
+        if (!fetch && !refresh) return;
 
         if (refresh) {
             if (dataSource.dataSourceRef) {
@@ -225,7 +229,6 @@ export default function DataSource({context}) {
         }
 
 
-
         const finalFilter = {...refreshFilter};
         setLoading(true);
         try {
@@ -238,11 +241,9 @@ export default function DataSource({context}) {
 
             if (events.onFetch.isDefined() && records.length > 0) {
                 records = events.onFetch.execute({collection: records})
-            }
+            } 
 
             if (records.length > 0) {
-
-
                 const uid = getUniqueKeyValue(records[0]);
                 let selectedIndex = selection.peek()?.rowIndex || -1
                 const snapshot = collection.peek()
@@ -260,7 +261,7 @@ export default function DataSource({context}) {
 
                         if (getUniqueKeyValue(snapshot[i]) === uid) {
                             if (dataSource.selfReference) {
-                                snapshot[i] = { ...snapshot[i], ...newRecord };
+                                snapshot[i] = {...snapshot[i], ...newRecord};
                             } else {
                                 snapshot[i] = newRecord;
                             }
@@ -288,10 +289,27 @@ export default function DataSource({context}) {
                     }
                 }
             }
-        } catch(err) {
+
+            // Fire DS-level onSuccess if defined
+            try {
+                if (events.onSuccess && events.onSuccess.isDefined()) {
+                    log.debug('[refreshRecords] onSuccess:execute', {ds: context?.identity?.dataSourceRef});
+                    events.onSuccess.execute({
+                        collection: Array.isArray(collection.peek()) ? collection.peek() : [],
+                        payload
+                    });
+                }
+            } catch (_) {
+            }
+        } catch (err) {
             setError(err);
-            console.log("Error - reseting collection",  err);
-            collection.value = [];
+            try {
+                if (events.onError && events.onError.isDefined()) {
+                    log.debug('[refreshRecords] onError:execute', {ds: context?.identity?.dataSourceRef});
+                    events.onError.execute({error: err});
+                }
+            } catch (_) {
+            }
         } finally {
             setLoading(false);
         }
@@ -305,10 +323,13 @@ export default function DataSource({context}) {
      *  - Then calls postFetchHook
      */
     async function doFetchRecords() {
+        try {
+            log.debug('[doFetchRecords] start', {ds: context?.identity?.dataSourceRef, ts: Date.now()});
+        } catch (_) {
+        }
         const inputVal = input.value || {};
         let {page, filter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
-        setError('');
         if (!hasDeps) {
             console.log("no deps", hasDeps)
             setSelected({selected: null, rowIndex: -1});
@@ -356,12 +377,41 @@ export default function DataSource({context}) {
                 page,
                 inputParameters: parameters,
             });
+            try {
+                log.debug('[doFetchRecords] response', {
+                    ds: context?.identity?.dataSourceRef,
+                    keys: payload ? Object.keys(payload) : [],
+                    type: typeof payload
+                });
+            } catch (_) {
+            }
 
             let {records, info, stats} = extractData(selectors, paging, payload);
             if (events.onFetch.isDefined() && records.length > 0) {
+                try {
+                    log.debug('[doFetchRecords] onFetch:before', {
+                        ds: context?.identity?.dataSourceRef,
+                        size: records.length
+                    });
+                } catch (_) {
+                }
                 records = events.onFetch.execute({collection: records})
+                try {
+                    log.debug('[doFetchRecords] onFetch:after', {
+                        ds: context?.identity?.dataSourceRef,
+                        size: Array.isArray(records) ? records.length : 0
+                    });
+                } catch (_) {
+                }
             }
             collection.value = records;
+            try {
+                log.debug('[doFetchRecords] set collection', {
+                    ds: context?.identity?.dataSourceRef,
+                    size: Array.isArray(records) ? records.length : 0
+                });
+            } catch (_) {
+            }
             collectionInfo.value = info;
             metrics.value = stats;
 
@@ -385,14 +435,33 @@ export default function DataSource({context}) {
             // 4) Post-Fetch Hook
             else if (selectionMode !== 'multi' && dataSource.autoSelect !== false && records.length > 0) {
                 // Nothing was selected previously – auto-select first row
-                setSelected({ selected: records[0], rowIndex: 0 });
-                form.value = { ...records[0] };
+                setSelected({selected: records[0], rowIndex: 0});
+                form.value = {...records[0]};
+            }
+
+            // Fire DS-level onSuccess if defined
+            try {
+                if (events.onSuccess && events.onSuccess.isDefined()) {
+                    log.debug('[doFetchRecords] onSuccess:execute', {ds: context?.identity?.dataSourceRef});
+                    events.onSuccess.execute({
+                        collection: Array.isArray(collection.peek()) ? collection.peek() : [],
+                        payload
+                    });
+                }
+            } catch (_) {
             }
         } catch (err) {
-            console.warn('doFetchRecords error', err)
+            log.warn('doFetchRecords error', err)
             setError(err);
-            collection.value = [];
 
+            // Fire DS-level onError if defined
+            try {
+                if (events.onError && events.onError.isDefined()) {
+                    log.debug('[doFetchRecords] onError:execute', {ds: context?.identity?.dataSourceRef});
+                    events.onError.execute({error: err});
+                }
+            } catch (_) {
+            }
         } finally {
             setLoading(false);
         }

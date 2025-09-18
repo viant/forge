@@ -7,16 +7,12 @@
  * 4. Render within ControlWrapper for label / span.
  * ---------------------------------------------------------------------- */
 
-import React, { useState } from 'react';
-import { useSignalEffect } from '@preact/signals-react';
+import React, {useState} from 'react';
+import {useSignalEffect} from '@preact/signals-react';
 
-import { classify } from './widgetClassifier.js';
-import { getWidgetEntry } from './widgetRegistry.jsx';
-import {
-    resolveStateAdapter,
-    getEventAdapter,
-    runDynamicEvaluators,
-} from './binding.js';
+import {classify} from './widgetClassifier.js';
+import {getWidgetEntry} from './widgetRegistry.jsx';
+import {getEventAdapter, resolveStateAdapter, runDynamicEvaluators,} from './binding.js';
 
 import ControlWrapper from './ControlWrapper.jsx';
 
@@ -64,14 +60,17 @@ export default function WidgetRenderer({
     });
     const adapterFactory = resolveStateAdapter(scope) || resolveStateAdapter('noop');
     const adapter = adapterFactory(context, item, state);
+
     // ------------------------------------------------------------------
     // 3. Events mapping
     // ------------------------------------------------------------------
     const eventMap = getEventAdapter(widgetKey);
     const events = {};
     for (const [evtName, builder] of Object.entries(eventMap)) {
-        events[evtName] = builder({ adapter, item, context });
+        events[evtName] = builder({ adapter: adapter, item, context });
     }
+
+
 
     // ------------------------------------------------------------------
     // 4. Dynamic props (readonly, custom properties, value transformations)
@@ -113,9 +112,13 @@ export default function WidgetRenderer({
         }
     }
 
+
+    const options = item.options || adapter.getOptions()
+
+
     const widgetProps = {
         context,
-        adapter,
+        adapter: adapter,
         item,
         value: dynValue !== undefined ? dynValue : adapter.get(),
         readOnly:
@@ -126,11 +129,16 @@ export default function WidgetRenderer({
                 : item.readOnly,
         disabled: dynDisabledGlobal === undefined ? undefined : dynDisabledGlobal,
         onChange: events.onChange,
+        options,
         ...item.properties,
         ...combinedProps,
         ...mergedEvents,
     };
 
+
+    if(widgetProps.options) {
+        console.log('widgetProps', widgetProps);
+    }
     // Compatibility: when a widget supplies only `onChange` handler but the
     // event adapter produced `onItemSelect`, map it.
     if (!widgetProps.onChange && mergedEvents.onItemSelect) {
@@ -147,10 +155,8 @@ export default function WidgetRenderer({
     });
 
 
-    // pass static options array when present (used by select-like widgets)
-    if (item.options && !widgetProps.options) {
-        widgetProps.options = item.options;
-    }
+
+
 
     const itemWithError = validationMsg ? { ...item, validationError: validationMsg } : item;
 
