@@ -571,7 +571,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             return true;
         } catch (err) {
             setError(err);
-            console.error('handleSave error', err);
+            // Add caller info for easier debugging
+            console.error('handleSave error', { ds: identity?.dataSourceRef, caller, err });
             return false;
         } finally {
             setLoading(false);
