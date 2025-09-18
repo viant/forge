@@ -288,8 +288,7 @@ export default function DataSource({context}) {
                     }
                 }
             }
-        } catch
-            (err) {
+        } catch(err) {
             setError(err);
             console.log("Error - reseting collection",  err);
             collection.value = [];
