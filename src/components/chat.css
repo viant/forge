@@ -92,6 +92,23 @@
   z-index: 1;       /* make sure it sits above the textarea text */
 }
 
+.composer-attach {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.composer-attachments {
+  position: absolute;
+  left: 36px;  /* leave space for plus icon */
+  right: 40px; /* leave space for send button */
+  top: 6px;
+  z-index: 1;
+  font-size: 12px;
+}
+
 
 .composer-send2 {
   position: absolute;

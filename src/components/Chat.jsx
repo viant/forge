@@ -11,7 +11,7 @@ import FormRenderer from "./FormRenderer.jsx";
 import { useSetting } from "../core";
 
 import { chatHandlers } from "../hooks";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 
 // Shared chat styles (avatars, bubbles, etc.)
@@ -19,6 +19,8 @@ import "./chat.css";
 
 // Reuse the existing table toolbar for chat when descriptor provided
 import TableToolbar from "./table/basic/Toolbar.jsx";
+import AttachmentDialog from './chat/AttachmentDialog.jsx';
+import useUpload, { UploadStatus } from '../hooks/useUpload.js';
 
 
 // ---------------------------------------------------------------------------
@@ -138,6 +140,9 @@ export default function Chat({
     // 🛑  Local component state reflecting incoming signals
     // ---------------------------------------------------------------------
     const [messages, setMessages] = useState([]);
+    const [attachOpen, setAttachOpen] = useState(false);
+    const [pendingAttachments, setPendingAttachments] = useState([]);
+    const batchIdsRef = useRef(new Set());
 
 
     const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages
@@ -154,6 +159,11 @@ export default function Chat({
 
     // Resolve any container-level event handlers declared in metadata
     const events = chatHandlers(context, container);
+
+    // Resolve upload config from container metadata if provided
+    const uploadCfg = chatCfg.upload || {};
+    const uploader = useUpload(uploadCfg);
+    const announcedDone = useRef(new Set());
 
     // ---------------------------------------------------------------------
     // 🛑  Abort handler – invoked when the user clicks the "Abort" button in
@@ -173,6 +183,7 @@ export default function Chat({
             content,
             toolNames,
             createdAt: new Date().toISOString(),
+            attachments: pendingAttachments && pendingAttachments.length ? pendingAttachments : undefined,
         };
 
         // Immediately push the message to the DataSource (if available)
@@ -182,38 +193,65 @@ export default function Chat({
         if (events.onSubmit?.isDefined?.()) {
             events.onSubmit.execute({ message: userMessage, context });
         }
-    };
 
-    const handleUpload = (e) => {
-        const file = e?.target?.files?.[0];
-        if (!file) return;
-
-        const attachment = {
-            name: file.name,
-            url: URL.createObjectURL(file),
-            size: file.size,
-            mediaType: file.type,
-        };
-
-        const fileMessage = {
-            role: "user",
-            content: `Uploaded file: **${file.name}**`,
-            attachments: [attachment],
-            createdAt: new Date().toISOString(),
-        };
-
-        handlers?.dataSource?.setFormData?.(fileMessage);
-
-        // Delegate to custom upload handler when provided
-        if (events.onUpload?.isDefined?.()) {
-            events.onUpload.execute({ message: fileMessage, file, context });
-        }
-
-        // Reset the <input type="file"> element so the same file can be re-uploaded if needed
-        if (e?.target) {
-            e.target.value = "";
+        // Clear pending attachments after sending
+        if (pendingAttachments.length) {
+            setPendingAttachments([]);
         }
     };
+
+    const startUploads = (files) => {
+        if (!files || files.length === 0) return;
+        const ids = uploader.start(files, {});
+        if (Array.isArray(ids)) {
+            ids.forEach(id => batchIdsRef.current.add(id));
+        }
+    };
+
+    // When uploads complete, collect attachments for the next user prompt (no auto message)
+    useEffect(() => {
+        const newlyDone = uploader.items.filter(u => u.status === UploadStatus.DONE && !announcedDone.current.has(u.id));
+        if (newlyDone.length === 0) return;
+
+        newlyDone.forEach(u => announcedDone.current.add(u.id));
+
+        const newAttachments = newlyDone.map(u => {
+            const resp = u.response;
+            // Try to extract uri/url from server response; fallback to object URL
+            let url = resp?.uri || resp?.url || (resp?.item ? resp.item.uri : null);
+            if (!url) {
+                try { url = URL.createObjectURL(u.file); } catch (_) {}
+            }
+            return {
+                name: u.name,
+                url,
+                size: u.size,
+                mediaType: u.type,
+            };
+        });
+        if (newAttachments.length > 0) {
+            setPendingAttachments(prev => [...prev, ...newAttachments]);
+        }
+    }, [uploader.items]);
+
+    // Auto-close attachment dialog when current batch completes
+    useEffect(() => {
+        if (!attachOpen) return;
+        const ids = batchIdsRef.current;
+        if (ids.size === 0) return;
+        const statusById = new Map(uploader.items.map(u => [u.id, u.status]));
+        let allDone = true;
+        ids.forEach(id => {
+            const st = statusById.get(id);
+            if (st !== UploadStatus.DONE && st !== UploadStatus.ERROR && st !== UploadStatus.ABORTED) {
+                allDone = false;
+            }
+        });
+        if (allDone) {
+            setAttachOpen(false);
+            batchIdsRef.current = new Set();
+        }
+    }, [attachOpen, uploader.items]);
 
     // ---------------------------------------------------------------------
     // 🖼️  Render
@@ -295,12 +333,30 @@ export default function Chat({
                 <Composer
                     showUpload={chatCfg.showUpload}
                     onSubmit={handleSubmit}
-                    onUpload={handleUpload}
+                    onOpenAttach={() => {
+                        // Clear previous upload state so dialog starts fresh
+                        try { uploader.reset(); } catch (_) {}
+                        announcedDone.current = new Set();
+                        batchIdsRef.current = new Set();
+                        setAttachOpen(true);
+                    }}
                     onAbort={handleAbort}
                     showAbort={chatCfg.showAbort}
                     disabled={loading}
+                    attachments={pendingAttachments}
+                    onRemoveAttachment={(idx) => setPendingAttachments(prev => prev.filter((_, i) => i !== idx))}
                 />
             )}
+
+            {/* Attachment dialog */}
+            <AttachmentDialog
+                isOpen={attachOpen}
+                onClose={() => setAttachOpen(false)}
+                onSelect={(files) => { startUploads(files); }}
+                uploads={uploader.items}
+            />
+
+            {/* No external progress panel; attachments are shown in-input */}
         </div>
     );
 }
