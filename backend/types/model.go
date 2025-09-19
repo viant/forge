@@ -268,8 +268,22 @@ type Chat struct {
 	Height        string   `json:"height,omitempty" yaml:"height,omitempty"`
 	// ShowUpload controls whether file upload input should be displayed (default true).
 	ShowUpload bool `json:"showUpload,omitempty" yaml:"showUpload,omitempty"`
+	// Upload optional configuration for file uploads (endpoint/path/uri).
+	Upload *Upload `json:"upload,omitempty" yaml:"upload,omitempty"`
 	// On defines event handlers such as submit, upload
 	On []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
+}
+
+// Upload configures the chat upload flow.
+type Upload struct {
+	// Endpoint key from frontend settings (SettingProvider.endpoints)
+	Endpoint string `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	// Path relative to endpoint base (defaults to 'upload')
+	Path string `json:"path,omitempty" yaml:"path,omitempty"`
+	// Uri destination (prefix) relative to backend file service root
+	Uri string `json:"uri,omitempty" yaml:"uri,omitempty"`
+	// Absolute URL override. If set, takes precedence over endpoint/path.
+	URL string `json:"url,omitempty" yaml:"url,omitempty"`
 }
 
 type FileBrowser struct {

@@ -730,6 +730,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     
     const setCollection = (collection) => {
         collection.value  = collection;
+        console.log('setCollection', collection);
     };
 
 
