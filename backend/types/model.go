@@ -270,6 +270,8 @@ type Chat struct {
 	ShowUpload bool `json:"showUpload,omitempty" yaml:"showUpload,omitempty"`
 	// Upload optional configuration for file uploads (endpoint/path/uri).
 	Upload *Upload `json:"upload,omitempty" yaml:"upload,omitempty"`
+	// UploadField publishes uploaded files to this form field (default: "upload").
+	UploadField string `json:"uploadField,omitempty" yaml:"uploadField,omitempty"`
 	// On defines event handlers such as submit, upload
 	On []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
 }
