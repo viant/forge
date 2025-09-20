@@ -84,7 +84,6 @@ const Execution = (context, messageBus) => {
                 try {
                     const h = context.lookupHandler(execution.id);
                     // eslint-disable-next-line no-console
-                    console.log('[forge][event] lookup handler', execution.id, typeof h, h && (h.name || 'anon'));
                     execution.handler = h;
                 } catch (e) {
                     // eslint-disable-next-line no-console

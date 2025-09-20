@@ -19,7 +19,6 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
         if (appliedRef.current) return;
         appliedRef.current = true;
         if (!initialParams) return;
-        try { console.log('[forge][ds] apply initialParams', dsKey, Date.now(), initialParams); } catch(_) {}
         Object.entries(initialParams).forEach(([k, v]) => {
             if (k === 'filter' || k === 'parameters') {
                 const input = dsContext.signals.input;
@@ -33,7 +32,6 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
         });
     }, [dsContext, initialParams, dsKey]);
 
-    try { console.log('[forge][ds] mount', dsKey, Date.now()); } catch(_) {}
     return (
         <>
             <DataSource context={dsContext} />

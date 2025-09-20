@@ -39,7 +39,6 @@ const onMessage = async (context, message) => {
             if (execution.onError) {
                 const errorHandler = context.lookupHandler(execution.onError);
                 if (errorHandler) {
-                    console.log(`Running onError for event="${execution.event}"`);
                     await errorHandler(message, error);
                 }
             }

@@ -212,10 +212,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         Object.entries(dataSourceDependencies).forEach(([depRef, depParameters]) => {
 
             let depInput = dependencyInputs[depRef];
-
-            console.log('pushDependencies', depRef, depParameters, depInput)
-
-
             if (!depInput) {
                 const childDataSourceId = identity.getDataSourceId(depRef);
                 depInput = getInputSignal(childDataSourceId);
@@ -730,7 +726,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     
     const setCollection = (collection) => {
         collection.value  = collection;
-        console.log('setCollection', collection);
     };
 
 

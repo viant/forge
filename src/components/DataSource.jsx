@@ -30,12 +30,10 @@ function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
             continue;
         }
         const isDefined = (paramDef.name in values) && values[paramDef.name] !== undefined;
-        console.log("hasResolvedDependencies", paramDef, isDefined, values, filter);
         if (!isDefined) {
             if ('default' in paramDef) {
                 values[paramDef.name] = paramDef.default;
             } else {
-                console.log("Missing required parameter:", paramDef);
                 return false;
             }
         }
@@ -331,7 +329,6 @@ export default function DataSource({context}) {
         let {page, filter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
         if (!hasDeps) {
-            console.log("no deps", hasDeps)
             setSelected({selected: null, rowIndex: -1});
             collection.value = [];
             flagReadDone();

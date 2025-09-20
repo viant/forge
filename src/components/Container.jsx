@@ -128,8 +128,6 @@ const Container = ({context, container, isActive}) => {
 
 
         const submitHandler = (payload, setFormState) => {
-
-            console.log('SchemaBasedForm submitHandler submit', payload);
             try {
                 const dsHandlers = subCtx?.handlers?.dataSource;
                 if (customHandlers.length === 0) {
@@ -203,8 +201,6 @@ const Container = ({context, container, isActive}) => {
     const hasVisual =
         (visualItems?.length || 0) > 0 ||
         tablePanel || chartPanel || chatPanel || fileBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
-
-    console.log('hasVisual', container.dataSourceRef, hasVisual);
     if (!hasVisual) {
         return (
             <>
