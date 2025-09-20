@@ -20,7 +20,6 @@ export default function DataSourceFetcher({
     useEffect(() => {
         if (fetchData) {
             const collection = context?.handlers?.dataSource?.fetchCollection?.();
-            try { console.log('fetchData', fetchData, collection); } catch(_) {}
         }
     }, [context,  fetchData]);
 

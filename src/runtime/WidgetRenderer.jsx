@@ -136,9 +136,6 @@ export default function WidgetRenderer({
     };
 
 
-    if(widgetProps.options) {
-        console.log('widgetProps', widgetProps);
-    }
     // Compatibility: when a widget supplies only `onChange` handler but the
     // event adapter produced `onItemSelect`, map it.
     if (!widgetProps.onChange && mergedEvents.onItemSelect) {

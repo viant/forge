@@ -161,14 +161,12 @@ export default function WindowContent({window, isInTab = false}) {
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
-        try { console.log('[forge][window] fetch start', windowId, Date.now()); console.time(`[forge][window] ${windowId}`); } catch(_) {}
 
         connector.get({})
             .then((resp) => {
                 if (cancelled) return;
                 injectActions(resp.data);
                 metadataSignal.value = resp.data;
-                try { console.log('[forge][window] fetch success', windowId, Date.now()); } catch(_) {}
             })
             .catch((err) => {
                 if (!cancelled) {
@@ -178,7 +176,6 @@ export default function WindowContent({window, isInTab = false}) {
             .finally(() => {
                 if (!cancelled) {
                     setLoading(false);
-                    try { console.timeEnd(`[forge][window] ${windowId}`); } catch(_) {}
                 }
             });
 
