@@ -4,11 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/viant/forge/backend/service/file"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path"
+	"path/filepath"
+
+	"github.com/viant/forge/backend/service/file"
 )
 
 // newUUID generates a RFC4122-like UUID v4 string without external deps.
@@ -58,7 +61,7 @@ func UploadHandler(fs *file.Service) http.HandlerFunc {
 
 		name := fh.Filename
 		uuid := newUUID()
-		stagingFolder := path.Join(".tmp", "uploads", uuid)
+		stagingFolder := filepath.Join(os.TempDir(), "uploads", uuid)
 		target := path.Join(stagingFolder, name)
 
 		if err := fs.Upload(r.Context(), target, payload); err != nil {
