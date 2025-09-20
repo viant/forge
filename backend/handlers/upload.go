@@ -7,9 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path"
-	"path/filepath"
 
 	"github.com/viant/forge/backend/service/file"
 )
@@ -61,9 +59,8 @@ func UploadHandler(fs *file.Service) http.HandlerFunc {
 
 		name := fh.Filename
 		uuid := newUUID()
-		stagingFolder := filepath.Join(os.TempDir(), "uploads", uuid)
+		stagingFolder := "uploads/" + uuid
 		target := path.Join(stagingFolder, name)
-
 		if err := fs.Upload(r.Context(), target, payload); err != nil {
 			log.Printf("upload failed: %v", err)
 			http.Error(w, "unable to store file", http.StatusInternalServerError)

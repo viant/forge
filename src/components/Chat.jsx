@@ -162,6 +162,7 @@ export default function Chat({
 
     // Resolve upload config from container metadata if provided
     const uploadCfg = chatCfg.upload || {};
+    const uploadField = chatCfg.uploadField || 'upload';
     const uploader = useUpload(uploadCfg);
     const announcedDone = useRef(new Set());
 
@@ -194,9 +195,10 @@ export default function Chat({
             events.onSubmit.execute({ message: userMessage, context });
         }
 
-        // Clear pending attachments after sending
+        // Clear pending attachments after sending and reset form field
         if (pendingAttachments.length) {
             setPendingAttachments([]);
+            try { handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: [] }); } catch (_) {}
         }
     };
 
@@ -230,7 +232,13 @@ export default function Chat({
             };
         });
         if (newAttachments.length > 0) {
-            setPendingAttachments(prev => [...prev, ...newAttachments]);
+            setPendingAttachments(prev => {
+                const next = [...prev, ...newAttachments];
+                try {
+                    handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: next });
+                } catch (_) {}
+                return next;
+            });
         }
     }, [uploader.items]);
 
@@ -344,7 +352,11 @@ export default function Chat({
                     showAbort={chatCfg.showAbort}
                     disabled={loading}
                     attachments={pendingAttachments}
-                    onRemoveAttachment={(idx) => setPendingAttachments(prev => prev.filter((_, i) => i !== idx))}
+                    onRemoveAttachment={(idx) => setPendingAttachments(prev => {
+                        const next = prev.filter((_, i) => i !== idx);
+                        try { handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: next }); } catch (_) {}
+                        return next;
+                    })}
                 />
             )}
 
