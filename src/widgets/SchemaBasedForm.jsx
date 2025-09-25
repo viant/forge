@@ -31,6 +31,7 @@ const SchemaBasedForm = (props) => {
         dataSourceRef,
         dataBinding = 'schema', // optional path inside record for dynamic schema
         style,
+        showSubmit = true, // allow hiding the submit button
     } = props;
     // Determine rendering context & adapter (must be before hooks that use it)
     let renderContext = context;
@@ -192,14 +193,16 @@ const SchemaBasedForm = (props) => {
                     Please fix highlighted fields.
                 </div>
             )}
-            <button
-                type="submit"
-                className="bp4-button bp4-intent-primary"
-                style={{ gridColumn: 'span 2', justifySelf: 'start' }}
-                disabled={!isDirty}
-            >
-                {isLinkOnlyForm ? 'Accept' : 'Submit'}
-            </button>
+            {showSubmit && (
+                <button
+                    type="submit"
+                    className="bp4-button bp4-intent-primary"
+                    style={{ gridColumn: 'span 2', justifySelf: 'start' }}
+                    disabled={!isDirty}
+                >
+                    {isLinkOnlyForm ? 'Accept' : 'Submit'}
+                </button>
+            )}
         </form>
     );
 };
