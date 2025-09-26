@@ -181,8 +181,8 @@ can fully control which icon is shown.
 3. **App-wide default** – set once during bootstrap:
 
    ```js
-   context.handlers.chat.avatarIcons = { user: 'User', assistant: 'Student' };
-   ```
+  context.handlers.chat.avatarIcons = { user: 'User', assistant: 'Student' };
+  ```
 
 4. **YAML screen descriptor** – declare in the container metadata:
 
@@ -194,15 +194,51 @@ can fully control which icon is shown.
        tool: SealCheck
 
    # or dynamic
-   chat:
-     avatarIconsFn: |
-       (msg) => msg.role === 'assistant' && msg.meta?.admin ? 'Crown' : 'Smiley'
-   ```
+  chat:
+    avatarIconsFn: |
+      (msg) => msg.role === 'assistant' && msg.meta?.admin ? 'Crown' : 'Smiley'
+  ```
 
 Icons are provided by the
 [`@phosphor-icons/react`](https://www.npmjs.com/package/@phosphor-icons/react)
 package.  Browse the full catalogue at <https://phosphoricons.com/> and use
 the component name (e.g. `SmileyWink`, `UserGear`) as the icon string.
+
+#### Terminate Button Visibility
+
+`Chat` includes a circular action button that toggles between Send and Terminate. Visibility of the Terminate state can be controlled declaratively via `abortVisible` or statically via `showAbort`.
+
+- Precedence (highest → lowest):
+  - `showAbort` prop override
+  - `chat.abortVisible { selector, when }` (data-bound)
+  - `chat.showAbort` (static on/off)
+  - `loading` (auto fallback)
+
+- Data-bound visibility (recommended):
+
+  ```yaml
+  chat:
+    abortVisible:
+      selector: "job.status"           # resolved from form data
+      when: ["queued", "running"]     # show Terminate while async job is in these states
+    # Optional: read from another DataSource
+    # abortVisible:
+    #   dataSourceRef: otherDS
+    #   selector: "job.status"
+    #   when: ["queued", "running"]
+  ```
+
+  - Selector source: the chat’s bound DataSource form (`context.signals.form`) by default.
+    Use `abortVisible.dataSourceRef` to read from another DataSource.
+  - `when` semantics:
+    - omitted → Terminate shows when the selector value is truthy.
+    - scalar → Terminate shows when `selector === when`.
+    - array  → Terminate shows when `selector` is in `when`.
+
+- Typical flow:
+  - onSubmit handler starts async work and sets form data (e.g., `job.status = "running"`).
+  - A poller updates the form when done/failed (e.g., `job.status = "done"`), which hides Terminate.
+  - onAbort handler cancels and flips the form field to a non-matching value (e.g., `"aborted"`).
 
 ### Backend Services
 
