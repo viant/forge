@@ -1,6 +1,7 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useState } from "react";
 import { Button, TextArea } from "@blueprintjs/core";
+import { PaperPlaneRight, StopCircle } from '@phosphor-icons/react';
 
 
 export default function Composer({
@@ -33,6 +34,12 @@ export default function Composer({
 
     // Reflect global loading lock by disabling the action controls and showing a spinner
     const actionDisabled = disabled;
+    const isTerminate = !!showAbort;
+    const iconEl = isTerminate ? (
+        <StopCircle size={18} weight="fill" />
+    ) : (
+        <PaperPlaneRight size={18} weight="fill" />
+    );
 
     const topPad = (attachments && attachments.length) ? Math.min(12 + attachments.length * 22, 100) : 12;
 
@@ -92,13 +99,22 @@ export default function Composer({
 
                     {/* Single action button: send by default or abort when showAbort */}
                     <Button
-                        icon={showAbort ? "cross" : "send-message"}
+                        icon={iconEl}
                         minimal
-                        intent={showAbort ? "danger" : undefined}
+                        intent={isTerminate ? "danger" : "primary"}
                         className="composer-send"
-                        title={showAbort ? "Abort generation" : "Send"}
+                        style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 9999,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                        aria-label={isTerminate ? "Terminate" : "Send"}
+                        title={isTerminate ? "Terminate" : "Send"}
                         {...( 
-                            showAbort
+                            isTerminate
                                 ? { onClick: handleAbort, disabled: false, type: "button" }
                                 : {
                                       type: "submit",

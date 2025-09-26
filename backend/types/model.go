@@ -272,6 +272,15 @@ type Chat struct {
 	Upload *Upload `json:"upload,omitempty" yaml:"upload,omitempty"`
 	// UploadField publishes uploaded files to this form field (default: "upload").
 	UploadField string `json:"uploadField,omitempty" yaml:"uploadField,omitempty"`
+	ShowAbort   bool   `json:"showAbort,omitempty" yaml:"showAbort,omitempty"`
+	// AbortVisible allows declarative, data-bound control of the abort button
+	// visibility. When provided, the UI shows the abort button if the value
+	// resolved at `selector` matches `when` (or is truthy if `when` is omitted).
+	// Example:
+	//   abortVisible: { selector: "job.status", when: ["queued", "running"] }
+	AbortVisible          *SelectorCondition `json:"abortVisible,omitempty" yaml:"abortVisible,omitempty"`
+	DisableInputOnLoading bool               `json:"disableInputOnLoading,omitempty" yaml:"disableInputOnLoading,omitempty"`
+
 	// On defines event handlers such as submit, upload
 	On []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
 }
@@ -306,6 +315,16 @@ type EditorSelector struct {
 	Source    string `json:"source,omitempty" yaml:"source,omitempty"`
 	Location  string `json:"location,omitempty" yaml:"location,omitempty"`
 	Extension string `json:"extension,omitempty" yaml:"extension,omitempty"`
+}
+
+// SelectorCondition describes a condition based on a selector and a value
+// match. The `when` field can be a scalar (string/number/bool) or an array of
+// values to match against.
+type SelectorCondition struct {
+	// Optional override to read the selector from another DataSource.
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Selector      string `json:"selector,omitempty" yaml:"selector,omitempty"`
+	When          any    `json:"when,omitempty" yaml:"when,omitempty"`
 }
 
 type Repeat struct {

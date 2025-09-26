@@ -9,6 +9,8 @@ import MessageCard  from "./chat/MessageCard.jsx";
 import FormRenderer from "./FormRenderer.jsx";
 
 import { useSetting } from "../core";
+import { useSignalEffect } from '@preact/signals-react';
+import { resolveSelector } from '../utils/selector.js';
 
 import { chatHandlers } from "../hooks";
 import { useEffect, useRef } from "react";
@@ -55,6 +57,9 @@ export default function Chat({
 
     /* height of Chat component – CSS string (e.g. "60vh" or "50%") or fraction 0–1 */
     height,
+
+    /* Force visibility of the terminate button (overrides metadata/loading) */
+    showAbort: showAbortProp,
 
     classifyMessage: classifyMessageProp,
     renderers: renderersProp,
@@ -143,6 +148,7 @@ export default function Chat({
     const [attachOpen, setAttachOpen] = useState(false);
     const [pendingAttachments, setPendingAttachments] = useState([]);
     const batchIdsRef = useRef(new Set());
+    const [abortVisible, setAbortVisible] = useState(false);
 
 
     const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages
@@ -167,14 +173,57 @@ export default function Chat({
     const announcedDone = useRef(new Set());
 
     // ---------------------------------------------------------------------
+    // 🔎  Compute abort visibility via abortVisible { selector, when }
+    //      Precedence (highest → lowest): prop > abortVisible > showAbort > loading
+    // ---------------------------------------------------------------------
+    const computeAbortVisible = useCallback(() => {
+        const spec = chatCfg?.abortVisible;
+        if (!spec || !spec.selector) return false;
+        try {
+            const dsCtx = spec.dataSourceRef ? context.Context(spec.dataSourceRef) : context;
+            const formObj = dsCtx?.signals?.form?.value;
+            const val = resolveSelector(formObj, spec.selector);
+            const when = spec.when;
+            if (when === undefined || when === null) {
+                const out = !!val;
+                try { console.debug('[forge][chat] abortVisible selector', {dataSourceRef: spec.dataSourceRef, selector: spec.selector, val, out}); } catch(_) {}
+                return out;
+            }
+            if (Array.isArray(when)) {
+                const out = when.some((w) => w === val);
+                try { console.debug('[forge][chat] abortVisible selector(any)', {when, val, out}); } catch(_) {}
+                return out;
+            }
+            const out = (val === when);
+            try { console.debug('[forge][chat] abortVisible selector(eq)', {when, val, out}); } catch(_) {}
+            return out;
+        } catch (_) {
+            return false;
+        }
+    }, [context, chatCfg?.abortVisible?.dataSourceRef, chatCfg?.abortVisible?.selector, JSON.stringify(chatCfg?.abortVisible?.when || null)]);
+
+    // Subscribe to form changes so visibility updates with polling/async state
+    useSignalEffect(() => {
+        const spec = chatCfg?.abortVisible;
+        const dsCtx = spec?.dataSourceRef ? context.Context(spec.dataSourceRef) : context;
+        // Touch the correct form signal to subscribe
+        const _ = dsCtx?.signals?.form?.value;
+        setAbortVisible(computeAbortVisible());
+    });
+
+    // ---------------------------------------------------------------------
     // 🛑  Abort handler – invoked when the user clicks the "Abort" button in
     //      the Composer (if rendered). Delegates to configured event handler
     //      chain when provided.
     // ---------------------------------------------------------------------
 
     const handleAbort = () => {
+        try { console.debug('[forge][chat] abort click'); } catch(_) {}
         if (events.onAbort?.isDefined?.()) {
+            try { console.debug('[forge][chat] onAbort handler:', events.onAbort.handlerName?.()); } catch(_) {}
             events.onAbort.execute({ context });
+        } else {
+            try { console.warn('[forge][chat] onAbort not defined in container.on'); } catch(_) {}
         }
     };
 
@@ -295,6 +344,11 @@ export default function Chat({
         return null;
     };
 
+    // Resolve final showAbort with precedence
+    const effectiveShowAbort = (showAbortProp !== undefined)
+        ? showAbortProp
+        : (chatCfg.abortVisible ? abortVisible : (chatCfg.showAbort !== undefined ? chatCfg.showAbort : !!loading));
+
     return (
         <div
             className="w-full px-4 pt-4 gap-3"
@@ -348,7 +402,7 @@ export default function Chat({
                         setAttachOpen(true);
                     }}
                     onAbort={handleAbort}
-                    showAbort={chatCfg.showAbort}
+                    showAbort={effectiveShowAbort}
                     disabled={loading}
                     attachments={pendingAttachments}
                     onRemoveAttachment={(idx) => setPendingAttachments(prev => {
