@@ -1,23 +1,41 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useState } from "react";
-import { Button, TextArea } from "@blueprintjs/core";
-import { PaperPlaneRight, StopCircle } from '@phosphor-icons/react';
+import { Button, TextArea, Tooltip } from "@blueprintjs/core";
+import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash } from '@phosphor-icons/react';
 
 
 export default function Composer({
     tools = [],
     onSubmit,
     onOpenAttach,
+    onOpenSettings,
     onAbort,
     showTools = false,
     showUpload = false,
+    showSettings = false,
     showAbort = false,
+    uploadTooltip = 'upload',
+    settingsTooltip,
+    sendTooltip,
+    abortTooltip,
+    showMic = false,
+    micTooltip,
+    micOn: micOnProp,
+    defaultMicOn = false,
+    onToggleMic,
     disabled = false,
     attachments = [],
     onRemoveAttachment,
 }) {
     const [draft, setDraft] = useState("");
     const [selectedTools, setSelectedTools] = useState([]);
+    const [micOnInternal, setMicOnInternal] = useState(!!defaultMicOn);
+    const micOn = (micOnProp !== undefined) ? !!micOnProp : micOnInternal;
+    const toggleMic = () => {
+        const next = !micOn;
+        if (micOnProp === undefined) setMicOnInternal(next);
+        onToggleMic?.(next);
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -42,23 +60,54 @@ export default function Composer({
     );
 
     const topPad = (attachments && attachments.length) ? Math.min(12 + attachments.length * 22, 100) : 12;
+    const leftIcons = (showUpload ? 1 : 0) + (showSettings ? 1 : 0);
+    const rightIcons = 1 + (showMic ? 1 : 0); // send/abort + optional mic
+    const attachmentsLeft = 6 + 30 * leftIcons; // align with absolute left controls (6 + 30px per icon)
+    const textPadLeft = 12 + 32 * leftIcons;    // base 12 + 32px per icon for inner padding
+    const textPadRight = 32 + (rightIcons - 1) * 36; // allow room for mic + send
+    const attachmentsRight = 40 + (rightIcons - 1) * 36; // overlay space for right-side icons
+
+    const withTooltip = (node, content) => content ? (
+        <Tooltip content={content} hoverOpenDelay={250}>{node}</Tooltip>
+    ) : node;
 
     return (
         <form className="flex flex-col gap-1 mt-2" onSubmit={handleSubmit}>
             <div className="flex w-full items-start">
                 <div className="composer-wrapper" style={{ flex: 1, minWidth: 0 }}>
                     {showUpload && (
-                        <Button
-                            icon="plus"
-                            minimal
-                            small
-                            className="composer-attach"
-                            disabled={disabled}
-                            onClick={(e) => { e.preventDefault(); onOpenAttach?.(); }}
-                        />
+                        withTooltip(
+                            <Button
+                                icon="plus"
+                                minimal
+                                small
+                                className="composer-attach"
+                                disabled={disabled}
+                                title={uploadTooltip}
+                                aria-label={uploadTooltip}
+                                onClick={(e) => { e.preventDefault(); onOpenAttach?.(); }}
+                            />,
+                            uploadTooltip
+                        )
+                    )}
+                    {showSettings && (
+                        withTooltip(
+                            <Button
+                                icon="cog"
+                                minimal
+                                small
+                                className="composer-attach"
+                                style={{ left: showUpload ? 36 : 6 }}
+                                disabled={disabled}
+                                aria-label={settingsTooltip || "Settings"}
+                                title={settingsTooltip || "Settings"}
+                                onClick={(e) => { e.preventDefault(); onOpenSettings?.(); }}
+                            />,
+                            settingsTooltip
+                        )
                     )}
                     {attachments && attachments.length > 0 && (
-                        <div className="composer-attachments">
+                        <div className="composer-attachments" style={{ left: attachmentsLeft, right: attachmentsRight }}>
                             <table style={{ width: '100%', tableLayout: 'fixed' }}>
                                 <colgroup>
                                     <col style={{ width: '28px' }} />
@@ -93,36 +142,55 @@ export default function Composer({
                         placeholder="Type your message…"
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
-                        style={{ borderRadius: 14, resize: "vertical", minHeight: 40, paddingRight: 32, paddingLeft: showUpload ? 44 : 12, paddingTop: topPad }}
+                        style={{ borderRadius: 14, resize: "vertical", minHeight: 40, paddingRight: textPadRight, paddingLeft: textPadLeft, paddingTop: topPad }}
                         disabled={disabled}
                     />
 
+                    {showMic && withTooltip(
+                        <Button
+                            minimal
+                            className="composer-mic"
+                            style={{ width: 28, height: 28, right: 44 }}
+                            onClick={(e) => { e.preventDefault(); toggleMic(); }}
+                            disabled={disabled}
+                            aria-pressed={micOn}
+                            aria-label={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
+                            title={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
+                        >
+                            {micOn ? <Microphone size={18} weight="fill" /> : <MicrophoneSlash size={18} />}
+                        </Button>,
+                        micTooltip
+                    )}
+
                     {/* Single action button: send by default or abort when showAbort */}
-                    <Button
-                        icon={iconEl}
-                        minimal
-                        intent={isTerminate ? "danger" : "primary"}
-                        className="composer-send"
-                        style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 9999,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                        aria-label={isTerminate ? "Terminate" : "Send"}
-                        title={isTerminate ? "Terminate" : "Send"}
-                        {...( 
-                            isTerminate
-                                ? { onClick: handleAbort, disabled: false, type: "button" }
-                                : {
-                                      type: "submit",
-                                      disabled: actionDisabled,
-                                      loading: disabled,
-                                  }
-                        )}
-                    />
+                    {withTooltip(
+                        <Button
+                            icon={iconEl}
+                            minimal
+                            intent={isTerminate ? "danger" : "primary"}
+                            className="composer-send"
+                            style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 9999,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                            }}
+                            aria-label={isTerminate ? (abortTooltip || "Terminate") : (sendTooltip || "Send")}
+                            title={isTerminate ? (abortTooltip || "Terminate") : (sendTooltip || "Send")}
+                            {...( 
+                                isTerminate
+                                    ? { onClick: handleAbort, disabled: false, type: "button" }
+                                    : {
+                                          type: "submit",
+                                          disabled: actionDisabled,
+                                          loading: disabled,
+                                      }
+                            )}
+                        />,
+                        isTerminate ? abortTooltip : sendTooltip
+                    )}
                 </div>
             </div>
 

@@ -393,6 +393,13 @@ export default function Chat({
             {effectiveShowInput && (
                 <Composer
                     showUpload={chatCfg.showUpload}
+                    showSettings={!!chatCfg.showSettings}
+                    showMic={!!chatCfg.showMic}
+                    uploadTooltip={chatCfg?.tooltips?.upload}
+                    settingsTooltip={chatCfg?.tooltips?.settings}
+                    micTooltip={chatCfg?.tooltips?.mic}
+                    sendTooltip={chatCfg?.tooltips?.send}
+                    abortTooltip={chatCfg?.tooltips?.abort}
                     onSubmit={handleSubmit}
                     onOpenAttach={() => {
                         // Clear previous upload state so dialog starts fresh
@@ -400,6 +407,16 @@ export default function Chat({
                         announcedDone.current = new Set();
                         batchIdsRef.current = new Set();
                         setAttachOpen(true);
+                    }}
+                    onOpenSettings={() => {
+                        if (events.onSettings?.isDefined?.()) {
+                            events.onSettings.execute({ context });
+                        }
+                    }}
+                    onToggleMic={(active) => {
+                        if (events.onMicToggle?.isDefined?.()) {
+                            events.onMicToggle.execute({ context, active });
+                        }
                     }}
                     onAbort={handleAbort}
                     showAbort={effectiveShowAbort}

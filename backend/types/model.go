@@ -271,8 +271,11 @@ type Chat struct {
 	// Upload optional configuration for file uploads (endpoint/path/uri).
 	Upload *Upload `json:"upload,omitempty" yaml:"upload,omitempty"`
 	// UploadField publishes uploaded files to this form field (default: "upload").
-	UploadField string `json:"uploadField,omitempty" yaml:"uploadField,omitempty"`
-	ShowAbort   bool   `json:"showAbort,omitempty" yaml:"showAbort,omitempty"`
+	UploadField  string `json:"uploadField,omitempty" yaml:"uploadField,omitempty"`
+	ShowAbort    bool   `json:"showAbort,omitempty" yaml:"showAbort,omitempty"`
+	ShowSettings bool   `json:"showSettings,omitempty" yaml:"showSettings,omitempty"`
+	// ShowMic toggles the microphone icon in the composer (to the left of Send).
+	ShowMic bool `json:"showMic,omitempty" yaml:"showMic,omitempty"`
 	// AbortVisible allows declarative, data-bound control of the abort button
 	// visibility. When provided, the UI shows the abort button if the value
 	// resolved at `selector` matches `when` (or is truthy if `when` is omitted).
@@ -281,8 +284,20 @@ type Chat struct {
 	AbortVisible          *SelectorCondition `json:"abortVisible,omitempty" yaml:"abortVisible,omitempty"`
 	DisableInputOnLoading bool               `json:"disableInputOnLoading,omitempty" yaml:"disableInputOnLoading,omitempty"`
 
+	// Tooltips optional per-icon tooltip labels for the composer controls.
+	Tooltips *ChatTooltips `json:"tooltips,omitempty" yaml:"tooltips,omitempty"`
+
 	// On defines event handlers such as submit, upload
 	On []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
+}
+
+// ChatTooltips configures tooltip texts for chat composer icons.
+type ChatTooltips struct {
+	Upload   string `json:"upload,omitempty" yaml:"upload,omitempty"`
+	Settings string `json:"settings,omitempty" yaml:"settings,omitempty"`
+	Mic      string `json:"mic,omitempty" yaml:"mic,omitempty"`
+	Send     string `json:"send,omitempty" yaml:"send,omitempty"`
+	Abort    string `json:"abort,omitempty" yaml:"abort,omitempty"`
 }
 
 // Upload configures the chat upload flow.
