@@ -365,6 +365,8 @@ export const chatHandlers = (context, container) => {
     const handlers = {
         onSubmit: Execution(context, message),
         onUpload: Execution(context, message),
+        onSettings: Execution(context, message),
+        onMicToggle: Execution(context, message),
         // New handler allowing callers (e.g. Chat Composer) to signal that a
         // previously initiated submission should be aborted/cancelled.
         // Typical usage is to allow the UI to provide a "Stop" button that

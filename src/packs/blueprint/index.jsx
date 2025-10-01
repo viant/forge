@@ -170,6 +170,16 @@ export function registerPack() {
         />
     ), { framework: 'blueprint' });
 
+    // Alias: provide explicit 'switch' control using the same implementation
+    registerWidget('switch', ({ value = false, onChange, readOnly, ...rest }) => (
+        <Switch
+            {...rest}
+            checked={!!value}
+            onChange={(e) => onChange?.(e.target.checked)}
+            disabled={readOnly}
+        />
+    ), { framework: 'blueprint' });
+
     const checkboxChangeHandler = ({ adapter }) => (arg) => {
         if (arg && arg.target) {
             adapter.set(arg.target.checked);
@@ -182,6 +192,9 @@ export function registerPack() {
         onChange: checkboxChangeHandler,
     });
     registerEventAdapter('toggle', {
+        onChange: checkboxChangeHandler,
+    });
+    registerEventAdapter('switch', {
         onChange: checkboxChangeHandler,
     });
 

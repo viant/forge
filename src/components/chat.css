@@ -93,6 +93,14 @@
   z-index: 1;       /* make sure it sits above the textarea text */
 }
 
+/* optional mic button placed before send */
+.composer-mic {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
 .composer-attach {
   position: absolute;
   left: 6px;
