@@ -245,6 +245,7 @@ type Container struct {
 	Table           *Table           `json:"table,omitempty" yaml:"table,omitempty"`
 	FileBrowser     *FileBrowser     `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
 	Editor          *Editor          `json:"editor,omitempty" yaml:"editor,omitempty"`
+	Terminal        *Terminal        `json:"terminal,omitempty" yaml:"terminal,omitempty"`
 	Chart           *Chart           `json:"chart,omitempty" yaml:"chart,omitempty"`
 	Chat            *Chat            `json:"chat,omitempty" yaml:"chat,omitempty"`
 	Section         *Section         `json:"section,omitempty" yaml:"section,omitempty"`
@@ -259,6 +260,24 @@ type Container struct {
 	Repeat          *Repeat          `json:"repeat,omitempty" yaml:"repeat,omitempty"`
 	SelectFirst     bool             `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
 	FetchData       bool             `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
+}
+
+// Terminal declares a terminal-like, scrollable log/command view in a container.
+// It binds to a DataSource that provides entries shaped like:
+//
+//	{ input: string, output?: string, stderr?: string, code?: number }
+//
+// Frontend also accepts `stderro` and `status` as aliases.
+type Terminal struct {
+	// DataSourceRef points to the data source that supplies terminal entries.
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	// Optional toolbar to host actions (e.g., run, clear).
+	Toolbar *Toolbar `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	// Visual options
+	Height       string `json:"height,omitempty" yaml:"height,omitempty"`
+	Prompt       string `json:"prompt,omitempty" yaml:"prompt,omitempty"`
+	AutoScroll   *bool  `json:"autoScroll,omitempty" yaml:"autoScroll,omitempty"`
+	ShowDividers *bool  `json:"showDividers,omitempty" yaml:"showDividers,omitempty"`
 }
 
 type Chat struct {

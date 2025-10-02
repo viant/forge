@@ -12,6 +12,7 @@ import FileBrowser from "./FileBrowser.jsx";
 import DataSourceFetcher from "./DataSourceFetcher.jsx";
 import Editor from "./Editor.jsx";
 import Chat from "./Chat.jsx";
+import Terminal from "./Terminal.jsx";
 import SchemaBasedForm from "../widgets/SchemaBasedForm.jsx";
 import './Container.css';
 
@@ -60,6 +61,25 @@ const Container = ({context, container, isActive}) => {
                 context={context.Context(dsRef)}
                 container={container}
                 isActive={isActive}
+            />
+        );
+    }
+
+    // Terminal panel support
+    let terminalPanel = null;
+    if (container.terminal) {
+        const term = container.terminal;
+        const dsRef = term.dataSourceRef || dataSourceRef;
+        const autoScroll = term.autoScroll !== false; // default true
+        terminalPanel = (
+            <Terminal
+                context={context.Context(dsRef)}
+                height={term.height || '320px'}
+                prompt={term.prompt || '$'}
+                autoScroll={autoScroll}
+                showDividers={!!term.showDividers}
+                truncateLongOutput={term.truncateLongOutput}
+                truncateLength={term.truncateLength}
             />
         );
     }
@@ -200,7 +220,7 @@ const Container = ({context, container, isActive}) => {
     // ------------------------------------------------------------------
     const hasVisual =
         (visualItems?.length || 0) > 0 ||
-        tablePanel || chartPanel || chatPanel || fileBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
+        tablePanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual) {
         return (
             <>
@@ -238,6 +258,7 @@ const Container = ({context, container, isActive}) => {
                 </div>
                 {chartPanel}
                 {chatPanel}
+                {terminalPanel}
                 {tablePanel}
                 {fileBrowserPanel}
                 {editorPanel}

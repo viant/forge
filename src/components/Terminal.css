@@ -1,0 +1,94 @@
+/* Simple terminal-style scrollable container and entry styling */
+.terminal-container {
+  background-color: #0b0d10;
+  color: #e6edf3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  overflow-y: auto;
+}
+
+.terminal-inner {
+  padding: 12px 14px;
+}
+
+.term-entry {
+  margin-bottom: 10px;
+}
+
+.term-entry .term-command {
+  white-space: pre-wrap;
+  color: #e6edf3;
+  background: #0f1318;
+  border: 1px solid #1b2533;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.term-entry .term-output {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  color: #c9d1d9;
+  border-left: 3px solid #334155; /* slate */
+  padding-left: 8px;
+}
+
+.term-entry .term-stderr {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  color: #ffb4ab; /* soft red for stderr text */
+  border-left: 3px solid #ff6b6b;
+  padding-left: 8px;
+}
+
+.term-prompt {
+  color: #55d364; /* green prompt */
+  font-weight: 700;
+}
+
+.term-status {
+  display: inline-block;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.term-status.ok {
+  color: #0c3b2e;
+  background: #3fb67a; /* green */
+}
+
+.term-status.err {
+  color: #4a1313;
+  background: #ff6b6b; /* red */
+}
+
+.term-entry.error .term-command {
+  color: #ff8a8a;
+}
+
+.term-divider {
+  margin: 10px 0;
+  border: 0;
+  border-top: 1px solid #1f2937;
+}
+
+/* Truncated block container with an expand control */
+.term-block-with-expand {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.term-expand {
+  margin-top: 4px;
+  cursor: pointer;
+  color: #93c5fd; /* light blue link-like */
+}
+
+.term-expand:hover {
+  color: #bfdbfe;
+}
