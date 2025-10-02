@@ -81,6 +81,15 @@ const TableCell = ({
 
     let cellContent = null;
     switch (type) {
+        case "icon":
+            cellContent = <Icon
+                icon={value}
+                size={10}
+                small={true}
+                onClick={handleMoreClick}
+                style={{marginLeft: 4}}
+            />
+            break;
         case "button":
             cellContent = <Button {...cellProps} />;
             break;

@@ -13,3 +13,4 @@ export { default as SchemaBasedForm} from './../widgets/SchemaBasedForm.jsx';
 export { default as SchemaExplorer} from './../widgets/SchemaExplorer.jsx';
 export { default as BasicTable} from './table/Basic';
 export { default as AvatarIcon } from './AvatarIcon.jsx';
+export { default as Terminal } from './Terminal.jsx';
