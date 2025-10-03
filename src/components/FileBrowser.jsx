@@ -32,6 +32,30 @@ const FileBrowser = (props) => {
     const events = fileBrowserHandlers(context, config);
 
 
+    // Helpers to preserve expansion across refreshes
+    const collectExpanded = (nodes = [], acc = new Set()) => {
+        for (const n of nodes) {
+            const key = n?.nodeData?.uri || n?.id;
+            if (n?.isFolder && n?.isExpanded && key) acc.add(key);
+            if (n?.childNodes?.length) collectExpanded(n.childNodes, acc);
+        }
+        return acc;
+    };
+
+    const applyExpanded = (nodes = [], expanded = new Set()) => {
+        for (const n of nodes) {
+            if (n?.isFolder) {
+                const key = n?.nodeData?.uri || n?.id;
+                if (key && expanded.has(key)) {
+                    n.isExpanded = true;
+                    if (n.nodeData) n.nodeData.isExpanded = true;
+                    n.icon = 'folder-open';
+                }
+                if (n?.childNodes?.length) applyExpanded(n.childNodes, expanded);
+            }
+        }
+    };
+
     // Whenever the collection signal changes, rebuild tree data
     useSignalEffect(() => {
         const {loading, error} = control.value || {};
@@ -42,6 +66,7 @@ const FileBrowser = (props) => {
         if (data) {
             // Build tree data from the collection and prepend ".." when we
             // are inside a sub-folder so the user can navigate up.
+            const expanded = collectExpanded(fileTreeData);
             let input = data;
             try {
                 if (events.onPrepareTreeData && events.onPrepareTreeData.isDefined()) {
@@ -84,6 +109,7 @@ const FileBrowser = (props) => {
                 console.warn('FileBrowser – unable to compute parent folder', e);
             }
 
+            applyExpanded(treeData, expanded);
             setFileTreeData(treeData);
             setLoading(false);
         }
@@ -96,6 +122,7 @@ const FileBrowser = (props) => {
         setLoading(true);
         const data = handlers.dataSource.getCollection();
         if (data?.length > 0) {
+            const expanded = collectExpanded(fileTreeData);
             let input = data;
             try {
                 if (events.onPrepareTreeData && events.onPrepareTreeData.isDefined()) {
@@ -138,6 +165,7 @@ const FileBrowser = (props) => {
                 console.warn('FileBrowser – unable to compute parent folder (init)', e);
             }
 
+            applyExpanded(treeData, expanded);
             setFileTreeData(treeData);
             setLoading(false);
         } else if (data?.length === 0) {
@@ -162,9 +190,7 @@ const FileBrowser = (props) => {
                 node.isFolder = false;
             }
             const segments = (node.uri || "").split("/").filter(Boolean);
-            const name = node.name && node.name.trim() ? node.name : segments.pop() || "Unnamed";
-            const parent = segments.pop(); // one level up
-            const label = parent ? `${parent}/${name}` : name;
+            const label = node.name && node.name.trim() ? node.name : segments.pop() || "Unnamed";
             return {
                 id: node.uri, // Use uri as unique identifier
                 label: label,
@@ -202,7 +228,6 @@ const FileBrowser = (props) => {
         if (nodeToUpdate) {
             nodeToUpdate.isExpanded = true;
             nodeToUpdate.isSelected = handlers.dataSource.isSelected({nodePath});
-
             nodeToUpdate.nodeData['isExpanded'] = true;
             nodeToUpdate.icon = 'folder-open';
             // If childNodes are not loaded, fetch them
@@ -246,18 +271,23 @@ const FileBrowser = (props) => {
         }
 
         const args = { item: nodeToUpdate, node:nodeToUpdate, nodePath, ...node.nodeData, handleNodeCollapse, handleNodeExpand }
-        if(events.onNodeSelect && events.onNodeSelect.isDefined()) {
-             events.onNodeSelect.execute(args);
-        }
 
+        // Prefer specific handlers over the generic onNodeSelect.
         if (node.nodeData.isFolder) {
             if (events.onFolderSelect && events.onFolderSelect.isDefined()) {
+                e?.stopPropagation?.();
                 return events.onFolderSelect.execute(args);
             }
         } else {
             if (events.onFileSelect && events.onFileSelect.isDefined()) {
+                e?.stopPropagation?.();
                 return events.onFileSelect.execute(args);
             }
+        }
+
+        // Fallback to generic handler only when no specific handler was provided.
+        if (events.onNodeSelect && events.onNodeSelect.isDefined()) {
+            return events.onNodeSelect.execute(args);
         }
 
 
