@@ -15,6 +15,7 @@ import Chat from "./Chat.jsx";
 import Terminal from "./Terminal.jsx";
 import SchemaBasedForm from "../widgets/SchemaBasedForm.jsx";
 import './Container.css';
+import TableToolbar from "./table/basic/Toolbar.jsx";
 
 const Container = ({context, container, isActive}) => {
     const {items = [], containers = [], layout, table, chart} = container;
@@ -220,6 +221,7 @@ const Container = ({context, container, isActive}) => {
     // ------------------------------------------------------------------
     const hasVisual =
         (visualItems?.length || 0) > 0 ||
+        !!container.toolbar ||
         tablePanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual) {
         return (
@@ -238,8 +240,29 @@ const Container = ({context, container, isActive}) => {
 
     const handlers = (visualItems?.length || 0) > 0 ? useControlEvents(context, visualItems, state) : {}
 
+    // Optional container-level toolbar
+    const renderContainerToolbar = () => {
+        const tb = container.toolbar;
+        if (!tb) return null;
+        let tbContext = context;
+        if (tb.dataSourceRef) {
+            tbContext = context.Context(tb.dataSourceRef);
+        }
+        if (Array.isArray(tb.items)) {
+            const wrapperStyle = tb.style || {};
+            const wrapperClass = tb.className || '';
+            return (
+                <div className={`mb-2 ${wrapperClass}`} style={wrapperStyle}>
+                    <TableToolbar context={tbContext} toolbarItems={tb.items} />
+                </div>
+            );
+        }
+        return null;
+    };
+
     return (<>
             <div>
+                {container.toolbar ? renderContainerToolbar() : null}
                 <div style={gridStyle}>
                     {visualItems.map((item) => {
                         const subCtx = context.Context(item.dataSourceRef || dataSourceRef)

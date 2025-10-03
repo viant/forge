@@ -310,6 +310,8 @@ export const fileBrowserHandlers = (context, config) => {
         onNodeSelect: Execution(context, message),
         onFileSelect: Execution(context, message),
         onFolderSelect: Execution(context, message),
+        // Hook to transform the collection before tree build
+        onPrepareTreeData: Execution(context, message),
     };
     indexExecution(context, on, handlers, message);
 

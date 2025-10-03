@@ -242,6 +242,7 @@ type Container struct {
 	Title           string           `json:"title,omitempty" yaml:"title,omitempty"`
 	Layout          *Layout          `json:"layout,omitempty" yaml:"layout,omitempty"`
 	Style           *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	Toolbar         *Toolbar         `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
 	Table           *Table           `json:"table,omitempty" yaml:"table,omitempty"`
 	FileBrowser     *FileBrowser     `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
 	Editor          *Editor          `json:"editor,omitempty" yaml:"editor,omitempty"`
@@ -278,6 +279,9 @@ type Terminal struct {
 	Prompt       string `json:"prompt,omitempty" yaml:"prompt,omitempty"`
 	AutoScroll   *bool  `json:"autoScroll,omitempty" yaml:"autoScroll,omitempty"`
 	ShowDividers *bool  `json:"showDividers,omitempty" yaml:"showDividers,omitempty"`
+	// Truncation options for long outputs
+	TruncateLongOutput *bool `json:"truncateLongOutput,omitempty" yaml:"truncateLongOutput,omitempty"`
+	TruncateLength     int   `json:"truncateLength,omitempty" yaml:"truncateLength,omitempty"`
 }
 
 type Chat struct {
@@ -391,8 +395,10 @@ type Table struct {
 }
 
 type Toolbar struct {
-	Items         []Item `json:"items" yaml:"items"`
-	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Items         []Item           `json:"items" yaml:"items"`
+	DataSourceRef string           `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	ClassName     string           `json:"className,omitempty" yaml:"className,omitempty"`
 }
 
 type Column struct {
