@@ -38,11 +38,26 @@ const FileBrowser = (props) => {
         setLoading(loading);
         setError(error);
         const data = handlers.dataSource.getCollection();
+
         if (data) {
             // Build tree data from the collection and prepend ".." when we
             // are inside a sub-folder so the user can navigate up.
+            let input = data;
+            try {
+                if (events.onPrepareTreeData && events.onPrepareTreeData.isDefined()) {
+                    const transformed = events.onPrepareTreeData.execute({ collection: data, context });
+                    if (Array.isArray(transformed)) {
+                        input = transformed;
+                    } else if (Array.isArray(transformed?.collection)) {
+                        input = transformed.collection;
+                    }
+                }
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.warn('FileBrowser – onPrepareTreeData failed, using original collection', e);
+            }
 
-            let treeData = buildTree(data);
+            let treeData = buildTree(input);
 
             try {
                 const currentUri = handlers.dataSource.peekFilter()?.uri || '';
@@ -81,7 +96,22 @@ const FileBrowser = (props) => {
         setLoading(true);
         const data = handlers.dataSource.getCollection();
         if (data?.length > 0) {
-            let treeData = buildTree(data);
+            let input = data;
+            try {
+                if (events.onPrepareTreeData && events.onPrepareTreeData.isDefined()) {
+                    const transformed = events.onPrepareTreeData.execute({ collection: data, context });
+                    if (Array.isArray(transformed)) {
+                        input = transformed;
+                    } else if (Array.isArray(transformed?.collection)) {
+                        input = transformed.collection;
+                    }
+                }
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.warn('FileBrowser – onPrepareTreeData (init) failed, using original collection', e);
+            }
+
+            let treeData = buildTree(input);
 
             try {
                 const currentUri = handlers.dataSource.peekFilter()?.uri || '';
@@ -125,9 +155,19 @@ const FileBrowser = (props) => {
         return nodes.map((node, index) => {
             const currentNodePath = [...path, index];
             const isSelected = handlers.dataSource.isSelected({node, nodePath: currentNodePath});
+            if(!node.uri && node.url) {
+                node.uri = node.url
+            }
+            if (node.name === undefined && node.isFolder === undefined) {
+                node.isFolder = false;
+            }
+            const segments = (node.uri || "").split("/").filter(Boolean);
+            const name = node.name && node.name.trim() ? node.name : segments.pop() || "Unnamed";
+            const parent = segments.pop(); // one level up
+            const label = parent ? `${parent}/${name}` : name;
             return {
                 id: node.uri, // Use uri as unique identifier
-                label: node.name,
+                label: label,
                 icon: node.isFolder ? (node.isExpanded ? 'folder-open' : 'folder-close') : 'document',
                 isExpanded: node.isExpanded || false,
                 hasCaret: node.isFolder,
