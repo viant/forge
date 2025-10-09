@@ -122,10 +122,7 @@ function getNodeByPath(nodes, path, selfReference) {
  */
 export default function DataSource({context}) {
     const log = getLogger('ds');
-    try {
-        log.debug('DataSource mount', context?.identity?.dataSourceRef || '(unknown)');
-    } catch (_) {
-    }
+    try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
     let prevFilter = {};
     const prevQuerySig = useRef('');
 
@@ -175,32 +172,49 @@ export default function DataSource({context}) {
     }
 
 
-// Watch for input.fetch or input.refresh
+    // Log input signal changes to help diagnose missing fetch triggers
+    useSignalEffect(() => {
+        try {
+            const snap = input.value || {};
+            log.debug('[input changed]', { ds: context?.identity?.dataSourceRef, input: snap });
+        } catch (_) {}
+    });
+
+    // Watch for input.fetch or input.refresh
     useSignalEffect(() => {
         const inputVal = input.value || {};
         const {fetch, refresh = false} = inputVal;
-        if (!fetch && !refresh) return;
+        try { log.debug('[watch] flags', { ds: context?.identity?.dataSourceRef, fetch, refresh, input: inputVal }); } catch(_) {}
+        if (!fetch && !refresh) {
+            try { log.debug('[watch] skip (no flags)', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
+            return;
+        }
 
         if (refresh) {
             if (dataSource.dataSourceRef) {
+                try { log.debug('[watch] refresh: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
                 handleUpstream()
                 return
             }
+            try { log.debug('[watch] refresh: direct branch', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
             return refreshRecords().finally(() => {
                 flagReadDone();
             });
         }
         if (dataSource.dataSourceRef) {
+            try { log.debug('[watch] fetch: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
             handleUpstream()
             return
         }
 
+        try { log.debug('[watch] fetch: direct branch', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         return doFetchRecords().finally(() => {
             // Publish a new object so that the change propagates.
             input.value = {
                 ...input.peek(),
                 fetch: false,
             };
+            try { log.debug('[watch] fetch flag cleared', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         });
     });
 

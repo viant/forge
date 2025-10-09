@@ -143,7 +143,7 @@ function indexExecution(context, on, handlers, messageBus) {
 }
 
 const isStateEvent = (key) => {
-    return ["onValue", "onProperties", "onReadonly"].includes(key);
+    return ["onValue", "onProperties", "onReadonly", "onVisible"].includes(key);
 };
 
 export const useControlEvents = (context, items = [], state) => {
@@ -384,7 +384,10 @@ export const chatHandlers = (context, container) => {
 export const dialogHandlers = (context, container) => {
     const {signals} = context;
     const {message} = signals;
-    const {actions = [], items = [], on = []} = container;
+    const rawActions = container && container.actions;
+    const rawOn = container && container.on;
+    const actions = Array.isArray(rawActions) ? rawActions : [];
+    const on = Array.isArray(rawOn) ? rawOn : [];
     const handlers = {
         onInit: Execution(context, message),
         onOpen: Execution(context, message),
@@ -402,7 +405,7 @@ export const dialogHandlers = (context, container) => {
         indexExecution(context, action.on, actionHandler, message);
     });
 
-    if (on?.length > 0) {
+    if (on.length > 0) {
         indexExecution(context, on, handlers, message);
     }
     return handlers;

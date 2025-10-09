@@ -81,7 +81,6 @@ export default function PrettyJson({
             <TextArea
                 {...rest}
                 fill
-                growVertically
                 value={text}
                 onChange={handleChange}
                 onBlur={handleBlur}

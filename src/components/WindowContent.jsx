@@ -118,6 +118,69 @@ function WindowContentInner({window, metadata, services}) {
         );
     };
 
+    // Selection-aware default footer for floating windows.
+    // Supports caller overrides via openWindow options.footer = {
+    //   ok:     { handler?: 'ns.fn', label?: 'Select', requireSelection?: true }
+    //   cancel: { handler?: 'ns.fn', label?: 'Cancel' }
+    // }
+    const FloatingFooter = () => {
+        const dsCtx = context.Context(context.identity.dataSourceRef);
+        const [canSelect, setCanSelect] = useState(false);
+        useEffect(() => {
+            const update = () => {
+                try {
+                    const sel = dsCtx?.signals?.selection?.value;
+                    const has = !!(sel && (sel.selected || (Array.isArray(sel.selection) && sel.selection.length > 0)));
+                    setCanSelect(has);
+                } catch (_) {}
+            };
+            update();
+            return () => {};
+        }, [dsCtx]);
+
+        const footerCfg = window.footer || {};
+        const okCfg = footerCfg.ok || {};
+        const cancelCfg = footerCfg.cancel || {};
+
+        const onCancel = () => {
+            try {
+                if (cancelCfg.handler) {
+                    const fn = context.lookupHandler(cancelCfg.handler);
+                    return fn({ context: dsCtx, window, event: 'cancel' });
+                }
+            } catch (_) {}
+            removeWindow(windowId);
+        };
+
+        const onOk = () => {
+            try {
+                if (okCfg.handler) {
+                    const fn = context.lookupHandler(okCfg.handler);
+                    return fn({ context: dsCtx, window, event: 'ok' });
+                }
+            } catch (_) {}
+            context.handlers.window.commit?.({ context: dsCtx });
+        };
+
+        const requireSel = okCfg.requireSelection !== false; // default true
+        const okLabel = okCfg.label || 'OK';
+        const cancelLabel = cancelCfg.label || 'Cancel';
+
+        return (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 12px', borderTop: '1px solid #eee', position: 'sticky', bottom: 0, background: '#fff' }}>
+                <button className="bp4-button bp4-minimal" onClick={onCancel}>{cancelLabel}</button>
+                <button
+                    className={`bp4-button bp4-intent-primary ${(!canSelect && requireSel) ? 'bp4-disabled' : ''}`}
+                    disabled={!canSelect && requireSel}
+                    onClick={onOk}
+                    style={{ marginLeft: 8 }}
+                >
+                    {okLabel}
+                </button>
+            </div>
+        );
+    };
+
     return (
         <div>
             {renderDataSources()}
@@ -130,6 +193,7 @@ function WindowContentInner({window, metadata, services}) {
                 }}
                 isInTab={window.isInTab}
             />
+            {window.isInTab === false && !(window.footer && window.footer.hide === true) ? <FloatingFooter /> : null}
         </div>
     );
 }

@@ -41,11 +41,28 @@ const TableCell = ({
     const {cellProperties = {}} = col;
     const cellEvents = useCellEvents({context, cellSelection, columnHandlers, onRowClick});
     const {events, stateEvents} = cellEvents;
+    // Column-level visibility (per-row)
+    if (stateEvents.onVisible) {
+        try {
+            const vis = stateEvents.onVisible();
+            if (vis === false) {
+                return <td className="row"/>;
+            }
+        } catch (_) { /* ignore */ }
+    }
     // Filter out any custom expression props (e.g., disabledExpr) so they don't leak to DOM
     const filteredProps = Object.fromEntries(
         Object.entries(cellProperties || {}).filter(([k]) => !/Expr$/.test(k))
     );
     const cellProps = {...defaultCellProperties(col), ...filteredProps, ...events};
+    // Allow dynamic readonly/disabled
+    if (stateEvents.onReadonly) {
+        try {
+            if (stateEvents.onReadonly()) {
+                cellProps.disabled = true;
+            }
+        } catch (_) { /* ignore */ }
+    }
     const {type} = col;
     let tdClass = "row";
     if (isSelected({...cellSelection})) {

@@ -279,7 +279,7 @@ export const selectedTabId = signal(null);
 
 
 let floatingWindowZIndex = 10;
-export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab = true, parameters={}) => {
+export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab = true, parameters = {}, options = {}) => {
     if(windowData) {
         parameters['windowData'] = windowData;
     }
@@ -292,7 +292,19 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
     );
     let result = existingWindow
     if (!existingWindow) {
-        let newWindow = {windowTitle, windowId, parentKey, windowKey, windowData, inTab, parameters};
+        let newWindow = {windowTitle, windowId, parentKey, windowKey, windowData, inTab, parameters, isModal: !!options.modal};
+        if (options.size) {
+            newWindow.size = options.size;
+        }
+        if (options.x !== undefined) {
+            newWindow.x = options.x;
+        }
+        if (options.y !== undefined) {
+            newWindow.y = options.y;
+        }
+        if (options.footer) {
+            newWindow.footer = options.footer;
+        }
         if (inTab === false) {
             floatingWindowZIndex += 1;
             newWindow.zIndex = floatingWindowZIndex;
@@ -384,4 +396,3 @@ export const bringFloatingWindowToFront = (windowId) => {
 
     selectedWindowId.value = windowId;
 };
-

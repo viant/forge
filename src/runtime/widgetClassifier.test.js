@@ -22,6 +22,9 @@ const cases = [
     { item: { type: 'password' }, expected: 'password' },
     // Object type
     { item: { type: 'object' }, expected: 'object' },
+    // Markdown format/type
+    { item: { type: 'string', format: 'markdown' }, expected: 'markdown' },
+    { item: { type: 'markdown' }, expected: 'markdown' },
 ];
 
 for (const { item, expected } of cases) {

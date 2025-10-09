@@ -115,12 +115,14 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             if (dialogContextCache[key]) {
                 return dialogContextCache[key]
             }
-            const ctx = this.Context(dataSourceRef)
-            const result = {...ctx, handlers: {...ctx.handlers, dialog: useDialogHandlers(windowId, dialog.id)}}
-            result.lookupHandler = (name) => {
-                return resolveActionHandler(result.actions, result.handlers, name);
-            }
-            dialogContextCache[key] = result
+            // Build an isolated window context for the dialog and then create
+            // a data-source scoped context so signals are available to handlers
+            const base = Context(windowId, metadata, dataSourceRef, services)
+            base.init();
+            const dsCtx = base.Context(dataSourceRef);
+            dsCtx.handlers = { ...dsCtx.handlers, dialog: useDialogHandlers(windowId, dialog.id) };
+            dsCtx.lookupHandler = (name) => resolveActionHandler(dsCtx.actions, dsCtx.handlers, name);
+            dialogContextCache[key] = dsCtx
             return dialogContextCache[key]
         },
 
@@ -178,7 +180,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const connector = useDataConnector(dataSource);
             result = {
                 ...this,
+                // Preserve existing handlers (e.g., dialog) and merge DS/window + services
                 handlers: {
+                    ...this.handlers,
                     ...this._globalServices,
                 },
                 identity,
@@ -198,6 +202,8 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
             };
             result.handlers = {
+                // inherit parent handlers (including dialog for dialog contexts)
+                ...result.handlers,
                 dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector),
                 window: windowHandlers,
                 ...this._globalServices,
@@ -261,7 +267,8 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
             const result = {
                 ...this,
-                handlers: { ...this._globalServices },
+                // Preserve existing handlers (e.g., dialog) and merge DS/window + services
+                handlers: { ...this.handlers, ...this._globalServices },
                 identity,
                 connector,
                 signals,
@@ -272,6 +279,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             };
 
             result.handlers = {
+                ...result.handlers,
                 dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector),
                 window: windowHandlers,
                 ...this._globalServices,

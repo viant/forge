@@ -723,9 +723,9 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         return collection.value || [];
     };
 
-    
-    const setCollection = (collection) => {
-        collection.value  = collection;
+    // Update the collection signal with new records (avoid shadowing)
+    const setCollection = (records) => {
+        collection.value = records;
     };
 
 
@@ -805,6 +805,10 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             filter: {...inputFilter, ...filter},
             fetch: true,
         };
+        try {
+            const log = getLogger('ds');
+            log.debug('[fetchCollection]', { ds: identity?.dataSourceRef, filter: newValue.filter });
+        } catch (_) {}
         input.value =newValue
     };
 

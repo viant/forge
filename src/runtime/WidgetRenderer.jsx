@@ -116,11 +116,14 @@ export default function WidgetRenderer({
     const options = item.options || adapter.getOptions()
 
 
+    const baseValue = (dynValue !== undefined ? dynValue : adapter.get());
+    const safeValue = (baseValue === null || baseValue === undefined) ? '' : baseValue;
+
     const widgetProps = {
         context,
         adapter: adapter,
         item,
-        value: dynValue !== undefined ? dynValue : adapter.get(),
+        value: safeValue,
         readOnly:
             dynReadonlyLocal !== undefined
                 ? dynReadonlyLocal
@@ -154,6 +157,40 @@ export default function WidgetRenderer({
 
 
 
+
+    // Visibility: allow dynamic evaluator and simple visibleWhen rule on item
+    let visible = runDynamicEvaluators('onVisible', { item, context, value: currentVal });
+    // If not decided yet, check item-level handler mapping: onVisible → handler
+    if (visible === undefined && Array.isArray(item?.on)) {
+        try {
+            const h = item.on.find(e => e && e.event === 'onVisible');
+            if (h && typeof context?.lookupHandler === 'function') {
+                const fn = context.lookupHandler(h.handler);
+                if (typeof fn === 'function') {
+                    const res = fn({ item, context, value: currentVal });
+                    if (typeof res === 'boolean') {
+                        visible = res;
+                    }
+                }
+            }
+        } catch (e) { /* ignore */ }
+    }
+    if (visible === undefined) {
+        const vw = item?.visibleWhen;
+        if (vw && context?.handlers?.dataSource?.getFormData) {
+            try {
+                const data = context.handlers.dataSource.getFormData() || {};
+                const field = vw.field || vw.selector || vw.key;
+                const actual = field ? (data[field]) : undefined;
+                if (vw.equals !== undefined) {
+                    visible = (actual === vw.equals);
+                } else if (Array.isArray(vw.in)) {
+                    visible = vw.in.includes(actual);
+                }
+            } catch (e) { /* ignore */ }
+        }
+    }
+    if (visible === false) return null;
 
     const itemWithError = validationMsg ? { ...item, validationError: validationMsg } : item;
 

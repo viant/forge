@@ -37,6 +37,7 @@ import { registerClassifier } from '../../runtime/widgetClassifier.js';
 import { buildDateProps } from './dateUtils.js';
 import { registerWrapper } from '../../runtime/wrapperRegistry.js';
 import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
+import MarkdownView from '../../components/MarkdownView.jsx';
 
 /* ------------------------ Widget implementation ----------------------- */
 
@@ -211,6 +212,7 @@ export function registerPack() {
                     )}
                     filterable={false}
                     disabled={readOnly}
+                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start' }}
                     {...rest}
                     onItemSelect={(item) => onChange?.(item.value)}
                 >
@@ -413,6 +415,15 @@ export function registerPack() {
     registerEventAdapter('keyValuePairs', {
         onChange: ({ adapter }) => (v) => adapter.set(v),
     });
+
+    /* -------------------- Markdown (viewer) ------------------------ */
+    registerWidget(
+        'markdown',
+        ({ value = '', ...rest }) => (
+            <MarkdownView value={value ?? ''} {...rest} />
+        ),
+        { framework: 'blueprint' }
+    );
 }
 
 // Auto-register when the feature flag is active

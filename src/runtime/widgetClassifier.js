@@ -47,6 +47,8 @@ registerClassifier(
                 case 'date-time':
                 case 'datetime':
                     return 'datetime';
+                case 'markdown':
+                    return 'markdown';
                 default:
                     return undefined;
             }
@@ -65,6 +67,7 @@ registerClassifier(
 registerClassifier((item) => {
     if (item?.type === 'object') return 'object';
     if (item?.type === 'schema') return 'schema';
+    if (item?.type === 'markdown') return 'markdown';
 }, { priority: 70 });
 
 /**
