@@ -56,6 +56,20 @@ const WindowManager = () => {
         return removeResizeListener;
     }, []);
 
+    // Global ESC handler: closes the top-most floating window
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                const floats = activeWindows.value.filter(w => w.inTab === false && !w.isMinimized);
+                if (floats.length === 0) return;
+                const top = floats.reduce((a, b) => (a.zIndex || 0) >= (b.zIndex || 0) ? a : b);
+                if (top && top.windowId) removeWindow(top.windowId);
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [windows]);
+
     // Separate windows into tabbed and floating
     const tabWindows = windows.filter((win) => win.inTab !== false);
     const floatingWindows = windows.filter(
@@ -143,20 +157,103 @@ const WindowManager = () => {
             </Tabs>
 
             {/* Floating windows */}
+            {/* Modal backdrop: render under the top-most modal floating window */}
+            {(() => {
+                const modals = floatingWindows.filter(w => w.isModal);
+                if (modals.length === 0) return null;
+                const top = modals.reduce((a, b) => (a.zIndex || 0) >= (b.zIndex || 0) ? a : b);
+                const z = (top.zIndex || 10) - 1;
+                return (
+                    <div
+                        key={`backdrop-${top.windowId}`}
+                        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: z, pointerEvents: 'auto' }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                );
+            })()}
+
             {floatingWindows.map((win) => (
                 <Rnd
                     key={win.windowId}
+                    style={{ zIndex: win.zIndex || 10 }}
                     size={{
-                        width:
-                            win.width ||
-                            (containerSize.width || 600) - 2 * defaultSizePadding,
-                        height:
-                            win.height ||
-                            (containerSize.height || 400) - 2 * defaultSizePadding,
+                        width: (() => {
+                            if (typeof win.width === 'number') return win.width;
+                            const s = win.size && win.size.width;
+                            if (typeof s === 'string' && s.endsWith('%')) {
+                                const pct = Math.max(0, Math.min(100, parseFloat(s)));
+                                return Math.floor(((containerSize.width || 600) * pct) / 100);
+                            }
+                            if (typeof s === 'string' && s.endsWith('px')) return parseInt(s, 10);
+                            if (typeof s === 'number') return s;
+                            // default: half of container width
+                            return Math.floor(((containerSize.width || 600) * 0.5));
+                        })(),
+                        height: (() => {
+                            if (typeof win.height === 'number') return win.height;
+                            const s = win.size && win.size.height;
+                            if (typeof s === 'string' && s.endsWith('%')) {
+                                const pct = Math.max(0, Math.min(100, parseFloat(s)));
+                                return Math.floor(((containerSize.height || 400) * pct) / 100);
+                            }
+                            if (typeof s === 'string' && s.endsWith('px')) return parseInt(s, 10);
+                            if (typeof s === 'number') return s;
+                            // default: half of container height
+                            return Math.floor(((containerSize.height || 400) * 0.5));
+                        })(),
                     }}
                     position={{
-                        x: win.x !== undefined ? win.x : defaultSizePadding,
-                        y: win.y !== undefined ? win.y : defaultSizePadding,
+                        x: (() => {
+                            if (win.x !== undefined) {
+                                if (typeof win.x === 'string' && win.x.endsWith('%')) {
+                                    const pct = Math.max(0, Math.min(100, parseFloat(win.x)));
+                                    return Math.floor(((containerSize.width || 600) * pct) / 100);
+                                }
+                                return win.x;
+                            }
+                            // compute width same as above
+                            let w;
+                            const s = win.size && win.size.width;
+                            if (typeof win.width === 'number') w = win.width;
+                            else if (typeof s === 'string' && s.endsWith('%')) {
+                                const pct = Math.max(0, Math.min(100, parseFloat(s)));
+                                w = Math.floor(((containerSize.width || 600) * pct) / 100);
+                            } else if (typeof s === 'string' && s.endsWith('px')) {
+                                w = parseInt(s, 10);
+                            } else if (typeof s === 'number') {
+                                w = s;
+                            } else {
+                                w = Math.floor(((containerSize.width || 600) * 0.5));
+                            }
+                            const x = Math.max(0, Math.floor(((containerSize.width || 600) - w) / 2));
+                            return x;
+                        })(),
+                        y: (() => {
+                            if (win.y !== undefined) {
+                                if (typeof win.y === 'string' && win.y.endsWith('%')) {
+                                    const pct = Math.max(0, Math.min(100, parseFloat(win.y)));
+                                    return Math.floor(((containerSize.height || 400) * pct) / 100);
+                                }
+                                return win.y;
+                            }
+                            // compute height same as above
+                            let h;
+                            const s = win.size && win.size.height;
+                            if (typeof win.height === 'number') h = win.height;
+                            else if (typeof s === 'string' && s.endsWith('%')) {
+                                const pct = Math.max(0, Math.min(100, parseFloat(s)));
+                                h = Math.floor(((containerSize.height || 400) * pct) / 100);
+                            } else if (typeof s === 'string' && s.endsWith('px')) {
+                                h = parseInt(s, 10);
+                            } else if (typeof s === 'number') {
+                                h = s;
+                            } else {
+                                h = Math.floor(((containerSize.height || 400) * 0.5));
+                            }
+                            const y = Math.max(0, Math.floor(((containerSize.height || 400) - h) / 2));
+                            return y;
+                        })(),
                     }}
 
 
@@ -186,7 +283,9 @@ const WindowManager = () => {
                             flexDirection: 'column',
                             boxShadow: '0 0 10px rgba(0,0,0,0.3)',
                             height: '100%',
+                            outline: win.isModal ? '2px solid #2684FF33' : undefined,
                         }}
+                        data-window-id={win.windowId}
                     >
                         <div
                             className="window-header"
@@ -212,14 +311,34 @@ const WindowManager = () => {
                                     e.stopPropagation();
                                     dockWindow(win.windowId);
                                 }}
-                                showMinimize={true}  // Show minimize in floating mode
-                                showMaximize={true}  // Show maximize (dock) in floating mode
+                                showMinimize={!win.isModal}
+                                showMaximize={!win.isModal}
                             />
                             <span style={{marginLeft: 8}}>{win.windowTitle}</span>
                         </div>
                         <div
                             className="window-content"
                             style={{flexGrow: 1, overflow: 'auto'}}
+                            onKeyDown={(e) => {
+                                if (!win.isModal) return;
+                                if (e.key !== 'Tab') return;
+                                // Focus trap: keep focus within this floating window
+                                const root = e.currentTarget.closest('.floating-window');
+                                if (!root) return;
+                                const focusables = root.querySelectorAll('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
+                                const list = Array.prototype.slice.call(focusables).filter(el => el.offsetParent !== null);
+                                if (list.length === 0) { e.preventDefault(); return; }
+                                const idx = list.indexOf(document.activeElement);
+                                let nextIdx = idx;
+                                if (e.shiftKey) {
+                                    nextIdx = idx <= 0 ? list.length - 1 : idx - 1;
+                                } else {
+                                    nextIdx = idx === -1 || idx >= list.length - 1 ? 0 : idx + 1;
+                                }
+                                e.preventDefault();
+                                try { list[nextIdx].focus(); } catch(_) {}
+                            }}
+                            tabIndex={win.isModal ? 0 : undefined}
                         >
                             <WindowContent
                                 window={win}

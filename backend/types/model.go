@@ -477,10 +477,42 @@ type Item struct {
 // selected record fields back to the caller form.
 
 type Lookup struct {
-	WindowId string      `json:"windowId" yaml:"windowId"`
-	Title    string      `json:"title,omitempty" yaml:"title,omitempty"`
-	Inputs   []Parameter `json:"inputs,omitempty" yaml:"inputs,omitempty"`
-	Outputs  []Parameter `json:"outputs" yaml:"outputs"`
+	// Either DialogId (preferred) or WindowId can be provided. When DialogId
+	// is set, the UI opens a Forge dialog which renders a built-in
+	// Cancel/OK footer. WindowId uses a floating window instead.
+	DialogId string `json:"dialogId,omitempty" yaml:"dialogId,omitempty"`
+	WindowId string `json:"windowId,omitempty" yaml:"windowId,omitempty"`
+
+	Title string `json:"title,omitempty" yaml:"title,omitempty"`
+
+	// Optional size for dialog/window.
+	Size *LookupSize `json:"size,omitempty" yaml:"size,omitempty"`
+
+	// Optional footer customisation for modal flows: labels/handlers.
+	Footer *LookupFooter `json:"footer,omitempty" yaml:"footer,omitempty"`
+
+	Inputs  []Parameter `json:"inputs,omitempty" yaml:"inputs,omitempty"`
+	Outputs []Parameter `json:"outputs" yaml:"outputs"`
+}
+
+// LookupSize specifies optional width/height hints for the picker surface.
+type LookupSize struct {
+	Width  string `json:"width,omitempty" yaml:"width,omitempty"`
+	Height string `json:"height,omitempty" yaml:"height,omitempty"`
+}
+
+// LookupFooter allows callers to override default Cancel/OK behaviour.
+type LookupFooter struct {
+	Ok     *LookupFooterAction `json:"ok,omitempty" yaml:"ok,omitempty"`
+	Cancel *LookupFooterAction `json:"cancel,omitempty" yaml:"cancel,omitempty"`
+}
+
+type LookupFooterAction struct {
+	// Handler refers to a namespaced action exposed to the UI, e.g. "schedule.onPickOk".
+	Handler string `json:"handler,omitempty" yaml:"handler,omitempty"`
+	Label   string `json:"label,omitempty" yaml:"label,omitempty"`
+	// When false, OK remains enabled even with no current selection (default true).
+	RequireSelection *bool `json:"requireSelection,omitempty" yaml:"requireSelection,omitempty"`
 }
 
 type Execute struct {

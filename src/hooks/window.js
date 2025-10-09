@@ -5,6 +5,7 @@ import {
 } from "../core";
 import { getWindowContext } from "../core/context/Context.jsx";
 import { resolveSelector } from "../utils/selector.js";
+import { resolveParameters } from './parameters.js';
 
 const openViewDialog = (dialogSignal, props) => {
     dialogSignal.value = {...dialogSignal.peek(), open: true, props};
@@ -33,15 +34,18 @@ export function useDialogHandlers(windowId, dialogId) {
     const commit = (props = {}) => {
         let { payload } = props;
 
-        // Attempt to derive selection context once to use in fallback logic
-        let selectionCtx = null;
-        try {
-            const dialogCtxBase = getWindowContext(windowId);
-            if (dialogCtxBase) {
-                selectionCtx = dialogCtxBase.Context(dialogCtxBase.identity.dataSourceRef);
+        // Prefer an explicit context passed by the caller (dialog dataSource
+        // context). Fallback to the window's default DS context.
+        let selectionCtx = props && props.context ? props.context : null;
+        if (!selectionCtx) {
+            try {
+                const dialogCtxBase = getWindowContext(windowId);
+                if (dialogCtxBase) {
+                    selectionCtx = dialogCtxBase.Context(dialogCtxBase.identity.dataSourceRef);
+                }
+            } catch (_) {
+                // ignore – fallback unavailable
             }
-        } catch (_) {
-            // ignore – fallback unavailable
         }
 
         // If no explicit payload, try to derive from current selection – mirrors
@@ -60,11 +64,13 @@ export function useDialogHandlers(windowId, dialogId) {
                 console.warn('commitDialog: failed to derive payload from selection', e);
             }
         }
+        try { console.debug('[dialog.commit] incoming payload (pre-derive)', payload); } catch (_) {}
         const dialogKey = getDialogId(dialogId);
         const entry = pendingDialogResolvers.get(dialogKey);
 
         if (entry) {
             const { resolve, outbound = [], caller } = entry;
+            try { console.debug('[dialog.commit] entry', { outbound, caller }); } catch (_) {}
 
             if (caller && outbound.length > 0) {
                 try {
@@ -140,6 +146,7 @@ export function useDialogHandlers(windowId, dialogId) {
                 }
             }
 
+            try { console.debug('[dialog.commit] resolve(payload)', payload); } catch (_) {}
             if (resolve) resolve(payload);
             pendingDialogResolvers.delete(dialogKey);
         }
@@ -208,13 +215,41 @@ export function useWindowHandlers(windowId) {
             return false;
         });
 
+        // Resolve inbound parameters (seed initial DS inputs before mount)
+        let inboundParams = {};
+        try {
+            const callerBase = getWindowContext(windowId);
+            const callerRef = props.context?.identity?.dataSourceRef || (callerBase?.identity?.dataSourceRef);
+            const callerCtx = callerBase ? callerBase.Context(callerRef) : null;
+            if (callerCtx) {
+                const resolved = resolveParameters(paramDefs || [], callerCtx) || {};
+                inboundParams = resolved.inbound || resolved; // support both shapes
+            }
+        } catch (e) {
+            console.warn('[openWindow] resolveParameters error', e);
+        }
+
+        // Prefer explicit parameters passed by caller; otherwise use inbound
+        const initialParameters = (parameters && Object.keys(parameters).length > 0)
+            ? parameters
+            : inboundParams;
+
+        // If modal requested, force floating overlay
+        const modal = options && options.modal === true;
+        const sizeOpt = options && (options.size || {});
+        const widthOpt = options && options.width;
+        const heightOpt = options && options.height;
+        const size = sizeOpt || ((widthOpt || heightOpt) ? { width: widthOpt, height: heightOpt } : undefined);
+        const effectiveInTab = modal ? false : inTabOverride;
+
         const winObj = addWindow(
             windowTitle,
             windowId,
             windowKey,
             windowData,
-            inTabOverride,
-            parameters
+            effectiveInTab,
+            initialParameters,
+            { modal, size, footer: options.footer }
         );
 
         const entryBase = {
@@ -360,14 +395,13 @@ export function useWindowHandlers(windowId) {
         if (args.length === 0) throw new Error('args[0] (dialog id) required');
 
         const dialogId = args[0];
+        const dialogKey = getDialogId(dialogId);
 
         // Detect options object as last arg when typeof === 'object'
         let options = {};
         if (args.length > 1 && typeof args[args.length - 1] === 'object') {
             options = args[args.length - 1] || {};
         }
-
-        const dialogKey = getDialogId(dialogId);
         const dialogSignal = getDialogSignal(dialogKey);
 
         const parameterDefinitions = Array.isArray(execution.parameters) ? execution.parameters : [];
@@ -381,7 +415,34 @@ export function useWindowHandlers(windowId) {
             return false;
         });
 
-        openViewDialog(dialogSignal, { ...props, parameters });
+        // Resolve parameter definitions to a plain args object using caller context
+        let argsObj = {};
+        try {
+            const callerBase = getWindowContext(windowId);
+            const callerRef = props.context?.identity?.dataSourceRef || (callerBase?.identity?.dataSourceRef);
+            const callerCtx = callerBase ? callerBase.Context(callerRef) : null;
+            if (callerCtx) {
+                const defs = Array.isArray(options.parameters) ? options.parameters : parameterDefinitions;
+                argsObj = resolveParameters(defs || [], callerCtx) || {};
+            }
+        } catch (e) {
+            console.warn('[openDialog] resolveParameters error', e);
+        }
+
+        // Set dialog signal (open + props + args) in a single write to avoid reactive cycles
+        try {
+            const sig = getDialogSignal(dialogKey);
+            const prev = sig.peek();
+            sig.value = {
+                ...prev,
+                open: true,
+                props: { ...props, parameters },
+                args: argsObj,
+            };
+        } catch (_) {
+            // Fallback to legacy helper
+            openViewDialog(dialogSignal, { ...props, parameters });
+        }
 
         const entryBase = {
             resolve: null,
@@ -404,13 +465,15 @@ export function useWindowHandlers(windowId) {
     };
 
     const closeDialog = (props = {}) => {
-        const {dialogId} = args
-        const dialogSignal = getDialogSignal(getDialogId(dialogId))
-        closeViewDialog(dialogSignal)
+        const { dialogId } = props || {};
+        if (!dialogId) return;
+        const sig = getDialogSignal(getDialogId(dialogId));
+        closeViewDialog(sig);
     }
 
     const callerArgs = () => {
-        return dialogArgs(dialogArgs)
+        const sig = getDialogSignal(getDialogId(dialogId));
+        return dialogArgs(sig);
     }
 
     return {

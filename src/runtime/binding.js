@@ -89,6 +89,7 @@ const dynamicEvaluators = {
     onValue: [],
     onDisabled: [], // permission-based disabling
     onValidate: [], // return error string/null
+    onVisible: [],  // return boolean; undefined means no opinion
 };
 
 export function registerDynamicEvaluator(name, fn) {

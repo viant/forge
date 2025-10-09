@@ -3,6 +3,7 @@
 
 import { useEffect } from "react";
 import { useSignalEffect } from "@preact/signals-react";
+import { getLogger } from "../utils/logger.js";
 
 /**
  * Props:
@@ -16,10 +17,14 @@ export default function DataSourceFetcher({
     selectFirst = false,
     fetchData = true,
 }) {
+    const log = getLogger('ds');
     // 1. trigger collection fetch when component mounts (optional)
     useEffect(() => {
         if (fetchData) {
+            try { log.debug('[fetcher] fetch on mount', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
             const collection = context?.handlers?.dataSource?.fetchCollection?.();
+        } else {
+            try { log.debug('[fetcher] fetch disabled', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         }
     }, [context,  fetchData]);
 
@@ -35,6 +40,7 @@ export default function DataSourceFetcher({
         const currentRow = selSignal?.peek()?.rowIndex ?? -1;
         if (currentRow >= 0) return; // already selected
 
+        try { log.debug('[fetcher] auto-select first row', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         context.handlers?.dataSource?.setSelection?.({ args: { rowIndex: 0 } });
     });
 
