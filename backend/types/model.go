@@ -49,13 +49,20 @@ type NavigationItem struct {
 
 // Dialog represents a dialog with a title, content, actions, and on events.
 type Dialog struct {
-	Id            string           `json:"id" yaml:"id"`
-	Title         string           `json:"title" yaml:"title"`
-	DataSourceRef string           `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	Content       *Container       `json:"content" yaml:"content"`
-	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	Actions       []Item           `json:"actions" yaml:"actions"`
-	On            []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
+	Id            string            `json:"id" yaml:"id"`
+	Title         string            `json:"title" yaml:"title"`
+	DataSourceRef string            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Content       *Container        `json:"content" yaml:"content"`
+	Style         *StyleProperties  `json:"style,omitempty" yaml:"style,omitempty"`
+	Properties    *DialogProperties `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Actions       []Item            `json:"actions" yaml:"actions"`
+	On            []*Execute        `json:"on,omitempty" yaml:"on,omitempty"`
+}
+
+// DialogProperties holds optional flags that tweak dialog UI behavior.
+// Example: properties.searchable: false hides the quick-search input in the dialog header.
+type DialogProperties struct {
+	Searchable *bool `json:"searchable,omitempty" yaml:"searchable,omitempty"`
 }
 
 type Window struct {
@@ -85,16 +92,26 @@ type View struct {
 }
 
 type Layout struct {
+	Kind          string   `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Orientation   string   `json:"orientation" yaml:"orientation"`
 	Rows          int      `json:"rows" yaml:"rows"`
 	Columns       int      `json:"columns,omitempty" yaml:"columns,omitempty"`
 	LabelPosition string   `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
+	Labels        *Labels  `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Divider       *Divider `json:"divider,omitempty" yaml:"divider,omitempty"`
 }
 
 type Divider struct {
 	Visible bool  `json:"visible,omitempty" yaml:"visible,omitempty"`
 	Sizes   []int `json:"sizes,omitempty" yaml:"sizes,omitempty"`
+}
+
+// Labels config controls label rendering strategy for grid layouts.
+// When omitted, front-end defaults apply (currently "left" in grid mode).
+type Labels struct {
+	Mode   string `json:"mode,omitempty" yaml:"mode,omitempty"`     // "left" | "top" | "none"
+	Width  string `json:"width,omitempty" yaml:"width,omitempty"`   // only used for Mode "left"
+	Height string `json:"height,omitempty" yaml:"height,omitempty"` // only used for Mode "top"
 }
 
 type Progress struct {

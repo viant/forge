@@ -224,7 +224,8 @@ export function registerPack() {
     );
 
     registerEventAdapter('select', {
-        onItemSelect: ({ adapter }) => (val) => adapter.set(val.value ?? val),
+        onChange: ({ adapter }) => (val) => adapter.set(val?.value ?? val),
+        onItemSelect: ({ adapter }) => (val) => adapter.set(val?.value ?? val),
     });
 
     /* -------------------- Read-only Link ---------------------------- */

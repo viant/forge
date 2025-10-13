@@ -138,6 +138,11 @@ With both the frontend and backend servers running, you can access the applicati
 - **Chart (`Chart.jsx`)**: Visualizes data using chart components.
 - **Layout Renderer (`LayoutRenderer.jsx`)**: Builds complex nested page layouts declared in metadata.
 - **Splitter (`Splitter.jsx`)**: Adds resizable split-pane layouts.
+
+Grid layout (new)
+- Containers can opt into a coordinate-free grid with colspan/rowspan by setting `layout.kind: "grid"` and `layout.columns`.
+- Labels default to separate cells on the left; change via `layout.labels.mode`.
+- See `docs/grid-layout.md` for usage and examples.
 - **Form Renderer (`FormRenderer.jsx`)**: Auto-generates forms from JSON-Schema or UI metadata.
 - **Tree Multi-Select (`TreeMultiSelect.jsx`)**: Hierarchical multi-select control.
 - **Avatar Icon (`AvatarIcon.jsx`)**: Lightweight Phosphor-icon wrapper used by Chat.
