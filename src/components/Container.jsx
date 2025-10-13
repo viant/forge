@@ -16,6 +16,7 @@ import Terminal from "./Terminal.jsx";
 import SchemaBasedForm from "../widgets/SchemaBasedForm.jsx";
 import './Container.css';
 import TableToolbar from "./table/basic/Toolbar.jsx";
+import GridLayoutRenderer from './GridLayoutRenderer.jsx';
 
 const Container = ({context, container, isActive}) => {
     const {items = [], containers = [], layout, table, chart} = container;
@@ -263,22 +264,34 @@ const Container = ({context, container, isActive}) => {
     return (<>
             <div>
                 {container.toolbar ? renderContainerToolbar() : null}
-                <div style={gridStyle}>
-                    {visualItems.map((item) => {
-                        const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
-                        return (
-                            <ControlRenderer
-                                key={item.id}
-                                item={item}
-                                context={subCtx}
-                                events={handlers[item.id]?.events || {}}
-                                stateEvents={handlers[item.id]?.stateEvents || {}}
-                                container={container}
-                                state={state}
-                            />
-                        )
-                    })}
-                </div>
+                {container?.layout?.kind === 'grid' ? (
+                    <GridLayoutRenderer
+                        context={context}
+                        container={{ ...container, layout: { labels: { mode: (container?.layout?.labels?.mode || 'left') }, ...container.layout } }}
+                        items={visualItems}
+                        handlers={handlers}
+                        state={state}
+                        baseDataSourceRef={dataSourceRef}
+                        style={style}
+                    />
+                ) : (
+                    <div style={gridStyle}>
+                        {visualItems.map((item) => {
+                            const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
+                            return (
+                                <ControlRenderer
+                                    key={item.id}
+                                    item={item}
+                                    context={subCtx}
+                                    events={handlers[item.id]?.events || {}}
+                                    stateEvents={handlers[item.id]?.stateEvents || {}}
+                                    container={container}
+                                    state={state}
+                                />
+                            )
+                        })}
+                    </div>
+                )}
                 {chartPanel}
                 {chatPanel}
                 {terminalPanel}

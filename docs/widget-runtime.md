@@ -14,7 +14,7 @@ The design replaces the hard-coded switch–case in `ControlRenderer.jsx` with a
 | **Classifier chain** | `runtime/widgetClassifier.js` | Ordered functions that resolve an `item`/`field` descriptor to a widget key.  Default rule set mirrors today’s logic. |
 | **Binding helpers** | `runtime/binding.js` | Pluggable registries for: <br>• *State adapters* – read/write value to DataSource / local state / external store.<br>• *Event adapters* – translate Forge events to widget props.<br>• *Dynamic evaluators* – run `stateEvents` (`onReadonly`, `onProperties`, `onValue`). |
 | **WidgetRenderer** | `runtime/WidgetRenderer.jsx` | Glue component.<br>1. Classifies the item.<br>2. Pulls widget from registry.<br>3. Builds `props` via binding helpers.<br>4. Wraps in `ControlWrapper` for labels / grid. |
-| **ControlWrapper** | `runtime/ControlWrapper.jsx` | Handles label position, inline vs stacked layout, column span etc. |
+| **ControlWrapper** | `runtime/ControlWrapper.jsx` | Handles label position, inline vs stacked layout, column span etc. In grid mode with label-cells, wrappers suppress labels (labels render as separate cells). |
 | **Framework packs** | `packs/blueprint/`, `packs/mui/`, … | Each pack registers widgets, event adapters and optional classifiers in a single `registerPack()` call. |
 
 ### 1.1  Key APIs

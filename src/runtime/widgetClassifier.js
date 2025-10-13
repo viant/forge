@@ -115,8 +115,9 @@ registerClassifier((item) => {
         case 'integer':
             return 'number';
         case 'checkbox':
-        case 'toggle':
             return 'checkbox';
+        case 'toggle':
+            return 'toggle';
         case 'textarea':
             return 'textarea';
         case 'password':

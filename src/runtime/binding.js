@@ -22,7 +22,7 @@ export function resolveStateAdapter(scope) {
 }
 
 // Default no-op adapter – avoids crashes during early migration
-registerStateAdapter('noop', () => ({ get: () => undefined, set: () => {} }));
+registerStateAdapter('noop', () => ({ get: () => undefined, set: () => {}, getOptions: () => [] }));
 
 // Local state adapter used by SchemaBasedForm or any ad-hoc component that
 // wants to manage its own value object outside DataSource.

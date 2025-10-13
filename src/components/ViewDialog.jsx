@@ -71,11 +71,25 @@ const ViewDialog = ({context, dialog}) => {
         const dsExists = !!(context?.metadata?.dataSource && context.metadata.dataSource[dialog.dataSourceRef]);
         if (!dsExists) {
             const keys = Object.keys(context?.metadata?.dataSource || {});
-            console.error('[ViewDialog] dataSourceRef not found for dialog', dialog.dataSourceRef, 'available:', keys);
+            let callers = [];
+            try {
+                const stack = (new Error()).stack || '';
+                callers = String(stack).split('\n').slice(2, 6).map((s) => s.trim());
+            } catch (_) {}
+            console.error('[ViewDialog] dataSourceRef not found for dialog', dialog?.id || '(no id)', {
+                dataSourceRef: dialog?.dataSourceRef,
+                available: keys,
+                callers,
+            });
         }
         dsCtx = context.Context(dialog.dataSourceRef);
     } catch (e) {
-        console.error('[ViewDialog] failed to create DS context for', dialog.dataSourceRef, e);
+        let callers = [];
+        try {
+            const stack = (new Error()).stack || '';
+            callers = String(stack).split('\n').slice(2, 6).map((s) => s.trim());
+        } catch (_) {}
+        console.error('[ViewDialog] failed to create DS context for', dialog?.dataSourceRef, { error: String(e?.message || e), callers });
         dsCtx = null;
     }
 
@@ -110,6 +124,8 @@ const ViewDialog = ({context, dialog}) => {
 
     // Quick search is rendered via a child component to keep hook order stable
     const DialogQuickSearch = ({ dsCtx }) => {
+        const searchable = !(dialog?.properties && dialog.properties.searchable === false);
+        if (!searchable) return null;
         const [q, setQ] = React.useState('');
         const debounceRef = React.useRef(null);
         React.useEffect(() => {
@@ -192,7 +208,9 @@ const ViewDialog = ({context, dialog}) => {
                             onClick={(e) => {
                                 const handler = events.actions[action.id]
                                 if (handler.onClick) {
-                                    return handler.onClick.execute({event: e, action: action.id, context})
+                                    // Execute action handlers in the dialog's DS context so
+                                    // service functions do not need to call hooks (Context.Context)
+                                    return handler.onClick.execute({event: e, action: action.id, context: dsCtx})
                                 }
                             }}
                         >{action.label}</Button>

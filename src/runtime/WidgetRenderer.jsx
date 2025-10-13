@@ -66,6 +66,7 @@ export default function WidgetRenderer({
     // ------------------------------------------------------------------
     const eventMap = getEventAdapter(widgetKey);
     const events = {};
+    const allowedEventKeys = new Set(Object.keys(eventMap));
     for (const [evtName, builder] of Object.entries(eventMap)) {
         events[evtName] = builder({ adapter: adapter, item, context });
     }
@@ -101,15 +102,32 @@ export default function WidgetRenderer({
     // Merge events: if same key exists in both, chain them
     const mergedEvents = { ...events };
     for (const [k, extFn] of Object.entries(externalEvents)) {
-        if (mergedEvents[k]) {
-            const internalFn = mergedEvents[k];
-            mergedEvents[k] = (...args) => {
-                try { extFn?.(...args); } catch (e) { console.error(e); }
-                try { internalFn?.(...args); } catch (e) { console.error(e); }
-            };
-        } else {
-            mergedEvents[k] = extFn;
+        if (!extFn) continue;
+        if (allowedEventKeys.has(k)) {
+            if (mergedEvents[k]) {
+                const internalFn = mergedEvents[k];
+                mergedEvents[k] = (...args) => {
+                    try { extFn?.(...args); } catch (e) { console.error(e); }
+                    try { internalFn?.(...args); } catch (e) { console.error(e); }
+                };
+            } else {
+                mergedEvents[k] = extFn;
+            }
+            continue;
         }
+        // Compatibility: map stray onItemSelect into onChange when widget supports onChange.
+        if (k === 'onItemSelect' && allowedEventKeys.has('onChange')) {
+            const internalFn = mergedEvents.onChange;
+            if (internalFn) {
+                mergedEvents.onChange = (...args) => {
+                    try { extFn?.(...args); } catch (e) { console.error(e); }
+                    try { internalFn?.(...args); } catch (e) { console.error(e); }
+                };
+            } else {
+                mergedEvents.onChange = (...args) => { try { extFn?.(...args); } catch (e) { console.error(e); } };
+            }
+        }
+        // Ignore any other external event keys not supported by this widget.
     }
 
 
@@ -139,11 +157,7 @@ export default function WidgetRenderer({
     };
 
 
-    // Compatibility: when a widget supplies only `onChange` handler but the
-    // event adapter produced `onItemSelect`, map it.
-    if (!widgetProps.onChange && mergedEvents.onItemSelect) {
-        widgetProps.onChange = mergedEvents.onItemSelect;
-    }
+    // No need to expose unsupported event keys to the widget DOM.
 
     // ------------------------------------------------------------------
     // 5. Pass-through of common display properties present directly on item
