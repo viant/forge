@@ -693,10 +693,13 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     const setFormData = ({values = {}}) => {
         form.value = values;
         formSnapshot = values;
+        console.log('setting form data', values)
         formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
     }
 
     const setSilentFormData = ({values = {}}) => {
+        console.log('setting silent form data', values)
+
         form.value = {
             ...form.peek(),
             ...values,

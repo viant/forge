@@ -22,6 +22,7 @@ const windowContextRegistry = new Map();
 export function getWindowContext(windowId) {
     return windowContextRegistry.get(windowId);
 }
+
 import {useDialogHandlers, useWindowHandlers} from "../../hooks";
 import useDataConnector from "../../hooks/dataconnector";
 
@@ -42,7 +43,6 @@ function resolveActionHandler(actions, handlers, name) {
 }
 
 
-
 export const Context = (windowId, metadata, dataSourceRef, services) => {
     // ------------------------------------------------------------------
     // Inject default global services when not supplied
@@ -53,7 +53,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
     if (!services.form) services.form = {};
     if (typeof services.form.updateItemProperties !== 'function') {
         services.form.updateItemProperties = (props = {}) => {
-            const { args = [], context, item, value } = props;
+            const {args = [], context, item, value} = props;
             // bump control signal for the referenced control -> triggers re-eval of onProperties
             try {
                 const targetId = args[0];
@@ -61,7 +61,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                     const ctlSignal = context?.signals?.control;
                     if (ctlSignal) {
                         const snapshot = ctlSignal.peek();
-                        ctlSignal.value = { ...snapshot, [targetId]: Date.now() };
+                        ctlSignal.value = {...snapshot, [targetId]: Date.now()};
                     }
                 }
             } catch (e) {
@@ -120,14 +120,46 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const base = Context(windowId, metadata, dataSourceRef, services)
             base.init();
             const dsCtx = base.Context(dataSourceRef);
-            dsCtx.handlers = { ...dsCtx.handlers, dialog: useDialogHandlers(windowId, dialog.id) };
+            dsCtx.handlers = {...dsCtx.handlers, dialog: useDialogHandlers(windowId, dialog.id)};
             dsCtx.lookupHandler = (name) => resolveActionHandler(dsCtx.actions, dsCtx.handlers, name);
             dialogContextCache[key] = dsCtx
             return dialogContextCache[key]
         },
 
-        lookupHandler:function (name)  {
+        lookupHandler: function (name) {
             return resolveActionHandler(this.actions, this.handlers, name)
+        },
+
+        Signals: function (dataSourceRef, hasSelection = false) {
+
+            const identity = {
+                ...this.identity,
+                dataSourceRef,
+                ns,
+                dataSourceId: getDataSourceId(dataSourceRef)
+            }
+            const selectionSignals = hasSelection ? {
+                collection: getCollectionSignal(identity.dataSourceId),
+                collectionInfo: getCollectionInfoSignal(identity.dataSourceId),
+                selection: getSelectionSignal(identity.dataSourceId, []),
+                metrics: getMetricsSignal(identity.dataSourceId),
+            } : {}
+
+            const standardSignals = {
+                input: getInputSignal(identity.dataSourceId),
+                form: getFormSignal(identity.dataSourceId),
+                control: getControlSignal(identity.dataSourceId),
+                message: getMessageSignal(identity.dataSourceId),
+                formStatus: getFormStatusSignal(identity.dataSourceId),
+                windowControl: windowControlSignal
+            }
+
+
+            const signals = {
+                ...standardSignals,
+                ...selectionSignals
+            }
+            return signals
         },
 
         Context: function (dataSourceRef) {
@@ -196,7 +228,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                     this.signalIds[key] = true
                     return `${windowId}DS${dataSourceRef}Signal${key}`
                 },
-                tableSettingKey:(key) => {
+                tableSettingKey: (key) => {
                     return `${windowId}DS${dataSourceRef}Table${key}`
                 }
 
@@ -245,7 +277,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             }
 
             const initialSelectionValue =
-                dataSource.selectionMode === 'multi' ? { selection: [] } : { selected: null, rowIndex: -1 };
+                dataSource.selectionMode === 'multi' ? {selection: []} : {selected: null, rowIndex: -1};
             const hasSelection = dataSource.selectionMode !== 'none';
             const selectionSignals = hasSelection ? {
                 collection: getCollectionSignal(identity.dataSourceId),
@@ -263,18 +295,21 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 windowControl: windowControlSignal,
             };
 
-            const signals = { ...standardSignals, ...selectionSignals };
+            const signals = {...standardSignals, ...selectionSignals};
 
             const result = {
                 ...this,
                 // Preserve existing handlers (e.g., dialog) and merge DS/window + services
-                handlers: { ...this.handlers, ...this._globalServices },
+                handlers: {...this.handlers, ...this._globalServices},
                 identity,
                 connector,
                 signals,
                 dataSource: metadata.dataSource[dataSourceRef],
                 itemId: (container, item) => `${windowId}DS${dataSourceRef}.(${container.id}||'').${item.id}`,
-                getSignalId: (key) => { this.signalIds[key] = true; return `${windowId}DS${dataSourceRef}Signal${key}`; },
+                getSignalId: (key) => {
+                    this.signalIds[key] = true;
+                    return `${windowId}DS${dataSourceRef}Signal${key}`;
+                },
                 tableSettingKey: (key) => `${windowId}DS${dataSourceRef}Table${key}`,
             };
 
