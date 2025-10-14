@@ -186,16 +186,13 @@ export default function Chat({
             const when = spec.when;
             if (when === undefined || when === null) {
                 const out = !!val;
-                try { console.debug('[forge][chat] abortVisible selector', {dataSourceRef: spec.dataSourceRef, selector: spec.selector, val, out}); } catch(_) {}
                 return out;
             }
             if (Array.isArray(when)) {
                 const out = when.some((w) => w === val);
-                try { console.debug('[forge][chat] abortVisible selector(any)', {when, val, out}); } catch(_) {}
                 return out;
             }
             const out = (val === when);
-            try { console.debug('[forge][chat] abortVisible selector(eq)', {when, val, out}); } catch(_) {}
             return out;
         } catch (_) {
             return false;
