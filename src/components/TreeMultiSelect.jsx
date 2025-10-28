@@ -14,11 +14,18 @@ import { Tree, Switch, NonIdealState, Tooltip } from '@blueprintjs/core';
  * ------------------------------------------------------------------- */
 
 // Helper – build a tree structure from flat option list
+// Supports an optional per-option `groupKey` used solely for hierarchical grouping.
+// The actual selected value remains the option's `value`.
 function buildTree(options, separator) {
     const rootMap = new Map();
 
-    options.forEach(({ value, label, tooltip }) => {
-        const parts = value.split(separator);
+    options.forEach(({ value, label, tooltip, groupKey }) => {
+        // Prefer explicit groupKey; otherwise normalize value by replacing '/' with the separator
+        // so callers can switch grouping delimiter without changing upstream data.
+        const keyForGrouping = (typeof groupKey === 'string' && groupKey.length)
+            ? groupKey
+            : String(value ?? '').replaceAll('/', separator);
+        const parts = keyForGrouping.split(separator);
         let currentLevel = rootMap;
 
         parts.forEach((part, idx) => {
@@ -29,6 +36,7 @@ function buildTree(options, separator) {
                 currentLevel.set(part, {
                     id: key,
                     label: initialLabel,
+                    // Preserve the real selection value on leaves
                     fullValue: isLeaf ? value : null,
                     childrenMap: new Map(),
                     optionLabel: isLeaf ? initialLabel : part,
