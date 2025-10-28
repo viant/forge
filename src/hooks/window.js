@@ -193,7 +193,7 @@ export function useWindowHandlers(windowId) {
         let options = {};
         if (rawArgs.length > 0 && typeof rawArgs[rawArgs.length - 1] === 'object') {
             const maybe = rawArgs[rawArgs.length - 1];
-            if (maybe && (maybe.awaitResult !== undefined || maybe.parameters)) {
+            if (maybe && (maybe.awaitResult !== undefined || maybe.parameters || maybe.newInstance !== undefined || maybe.autoIndexTitle !== undefined)) {
                 options = rawArgs.pop();
             }
         }
@@ -249,7 +249,7 @@ export function useWindowHandlers(windowId) {
             windowData,
             effectiveInTab,
             initialParameters,
-            { modal, size, footer: options.footer }
+            { modal, size, footer: options.footer, newInstance: options.newInstance === true, autoIndexTitle: options.autoIndexTitle === true }
         );
 
         const entryBase = {

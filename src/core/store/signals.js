@@ -279,20 +279,53 @@ export const selectedTabId = signal(null);
 
 
 let floatingWindowZIndex = 10;
+
+// -----------------------------
+// Window helpers (ids, titles)
+// -----------------------------
+const nextInstanceIndex = (windows, windowKey) => {
+    try {
+        return windows.filter((w) => w.windowKey === windowKey).length;
+    } catch (_) {
+        return 0;
+    }
+};
+
+const computeWindowId = (baseId, forceNew, instanceIndex) => {
+    if (!forceNew) return baseId;
+    return `${baseId}__${Date.now()}_${(instanceIndex || 0) + 1}`;
+};
+
+const computeWindowTitle = (baseTitle, autoIndex, instanceIndex) => {
+    if (!autoIndex || typeof baseTitle !== 'string' || baseTitle.trim().length === 0) return baseTitle;
+    return `${baseTitle} <${(instanceIndex || 0) + 1}>`;
+};
+
 export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab = true, parameters = {}, options = {}) => {
     if(windowData) {
         parameters['windowData'] = windowData;
     }
     const hash = Object.keys(parameters).length > 0 ? generateIntHash(parameters) : ''
-    const windowId = hash ? `${windowKey}_${hash}`:windowKey;
+    const baseWindowId = hash ? `${windowKey}_${hash}` : windowKey;
+
+    // Support explicitly opening a new instance even if a window with the same
+    // key/parameters already exists. When requested, compute a unique ID and
+    // optionally auto-index the title (e.g., "chat <N+1>").
+    const forceNewInstance = options && options.newInstance === true;
+    const instanceIndex = nextInstanceIndex(activeWindows.peek(), windowKey);
+    const windowId = computeWindowId(baseWindowId, forceNewInstance, instanceIndex);
 
 
-    const existingWindow = activeWindows.value.find(
-        (win) => win.windowId === windowId
-    );
+    const existingWindow = forceNewInstance
+        ? undefined
+        : activeWindows.value.find((win) => win.windowId === windowId);
     let result = existingWindow
     if (!existingWindow) {
-        let newWindow = {windowTitle, windowId, parentKey, windowKey, windowData, inTab, parameters, isModal: !!options.modal};
+        // Optionally auto-index title for a nicer UX when multiple instances
+        // of the same windowKey are opened from navigation or actions.
+        const computedTitle = computeWindowTitle(windowTitle, options && options.autoIndexTitle === true, instanceIndex);
+
+        let newWindow = {windowTitle: computedTitle, windowId, parentKey, windowKey, windowData, inTab, parameters, isModal: !!options.modal};
         if (options.size) {
             newWindow.size = options.size;
         }

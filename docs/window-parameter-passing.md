@@ -159,6 +159,28 @@ The runtime merges the `parameters` array from the `options` object with
 those that might have been supplied on `execution.parameters`, so both
 styles inter-operate.
 
+Opening multiple instances and auto-indexing titles
+---------------------------------------------------------------
+When you want each invocation to open a brand new window instance (instead of
+focusing the existing one), pass `newInstance: true` in the options. To display
+an incrementing title like `chat <N+1>`, also include `autoIndexTitle: true`.
+
+```yaml
+on:
+  - event: onClick
+    handler: window.open
+    args:
+      - chat                     # window id / key
+      - chat                     # base title
+      - ''                       # optional data
+      - true                     # open in tab
+      - newInstance: true
+        autoIndexTitle: true
+```
+
+This results in titles `chat <1>`, `chat <2>`, ... as users open multiple
+instances from the navigation bar or actions.
+
 ---------------------------------------------------------------
 Compatibility with classic metadata
 ---------------------------------------------------------------

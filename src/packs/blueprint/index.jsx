@@ -314,15 +314,16 @@ export function registerPack() {
     registerWidget(
         'treeMultiSelect',
         (props) => {
-            const { value = [], onChange, readOnly, options = [], ...rest } = props
-            const {properties={}} = props
+            const { value = [], onChange, readOnly, options = [], separator, ...rest } = props
+            const { properties = {} } = props
+            const sep = (separator !== undefined && separator !== null) ? separator : (properties.separator || '_');
             return (<TreeMultiSelect
                 {...rest}
                 options={options}
                 value={value}
                 onChange={onChange}
                 readOnly={readOnly}
-                separator={properties.separator||'_'}
+                separator={sep}
             />)}
         ,
         { framework: 'blueprint' }
