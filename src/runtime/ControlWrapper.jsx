@@ -24,9 +24,13 @@ export default function ControlWrapper({ item, container, framework = 'core', ch
 
     const inline = (item.labelPosition || container?.layout?.labelPosition) === 'left';
 
+    const isLabelWidget =
+        (item?.type && String(item.type).toLowerCase() === 'label') ||
+        (item?.widget && String(item.widget).toLowerCase() === 'label');
+
     return (
         <div style={style} className="forge-control-wrapper">
-            {item?.label && !item.hideLabel && (
+            {item?.label && !item.hideLabel && !isLabelWidget && (
                 <label
                     style={{ display: inline ? 'inline-block' : 'block', marginRight: inline ? 8 : 0 }}
                     title={item.tooltip || undefined}
