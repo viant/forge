@@ -48,6 +48,48 @@ function defaultNormalizeMessages(rawMessages= []) {
     return rawMessages.map((m) => ({...m}));
 }
 
+function hasActiveSteps(steps = []) {
+    const list = Array.isArray(steps) ? steps : [];
+    return list.some((s) => {
+        const status = String(s?.status || s?.Status || '').toLowerCase();
+        return status === 'in_progress' || status === 'running' || status === 'processing' || status === 'pending';
+    });
+}
+
+function hasActiveExecutions(messages = []) {
+    const list = Array.isArray(messages) ? messages : [];
+    return list.some((m) => {
+        const executions = Array.isArray(m?.executions) ? m.executions : [];
+        return executions.some((ex) => hasActiveSteps(ex?.steps || []));
+    });
+}
+
+function lastIndexByRole(messages = [], role) {
+    const list = Array.isArray(messages) ? messages : [];
+    const target = String(role || '').toLowerCase();
+    for (let i = list.length - 1; i >= 0; i--) {
+        const r = String(list[i]?.role || list[i]?.Role || '').toLowerCase();
+        if (r === target) return i;
+    }
+    return -1;
+}
+
+function formatTokensCompact(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    if (n < 1000) return String(Math.round(n));
+    const k = n / 1000;
+    const roundedTenth = Math.round(k * 10) / 10;
+    const text = (roundedTenth % 1 === 0) ? String(Math.trunc(roundedTenth)) : String(roundedTenth);
+    return `${text}k`;
+}
+
+function formatCostCompact(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) return '';
+    return `$${n.toFixed(2)}`;
+}
+
 export default function Chat({
     context,
     container = {},
@@ -149,6 +191,9 @@ export default function Chat({
     const [pendingAttachments, setPendingAttachments] = useState([]);
     const batchIdsRef = useRef(new Set());
     const [abortVisible, setAbortVisible] = useState(false);
+    const [metaSnapshot, setMetaSnapshot] = useState({});
+    const [conversationSnapshot, setConversationSnapshot] = useState({});
+    const [usageSnapshot, setUsageSnapshot] = useState({});
 
 
     const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages
@@ -207,6 +252,198 @@ export default function Chat({
         const _ = dsCtx?.signals?.form?.value;
         setAbortVisible(computeAbortVisible());
     });
+
+    // Track conversation-level state (running/queued) for integrated queue UX.
+    useSignalEffect(() => {
+        try {
+            const convCtx = context.Context('conversations');
+            const formValue = convCtx?.signals?.form?.value;
+            setConversationSnapshot(formValue || {});
+        } catch (_) {
+            setConversationSnapshot({});
+        }
+    });
+
+    // Track usage data (tokens/cost) for compact display in the composer.
+    useSignalEffect(() => {
+        try {
+            const usageCtx = context.Context('usage');
+            const formValue = usageCtx?.signals?.form?.value;
+            setUsageSnapshot(formValue || {});
+        } catch (_) {
+            setUsageSnapshot({});
+        }
+    });
+
+    // ---------------------------------------------------------------------
+    // 🎛️  Command-center composer state (agent/model/tools/reasoning)
+    // ---------------------------------------------------------------------
+
+    const commandCenterCfg = chatCfg?.commandCenter;
+    const commandCenterEnabled = !!commandCenterCfg;
+    const metaCtx = commandCenterEnabled
+        ? context.Context((typeof commandCenterCfg === 'object' && commandCenterCfg.dataSourceRef) ? commandCenterCfg.dataSourceRef : 'meta')
+        : null;
+
+    useSignalEffect(() => {
+        if (!metaCtx) return;
+        const formValue = metaCtx?.signals?.form?.value;
+        setMetaSnapshot(formValue || {});
+    });
+
+    const metaDS = metaCtx?.handlers?.dataSource;
+
+    const normalizeString = (value) => String(value || '').trim();
+    const ensureStringArray = (value) => {
+        if (Array.isArray(value)) return value.map(v => String(v)).filter(Boolean);
+        if (value === undefined || value === null || value === '') return [];
+        return [String(value)];
+    };
+
+    const applyAgentSelection = (agentID) => {
+        if (!metaDS) return;
+        const key = normalizeString(agentID);
+        if (!key) return;
+        const form = metaDS.peekFormData?.() || metaSnapshot || {};
+        const agentInfo = form?.agentInfo || {};
+        const info = agentInfo?.[key] || {};
+
+        try { metaDS.setFormField?.({ item: { id: 'agent' }, value: key }); } catch (_) {}
+
+        const selectedTools = ensureStringArray(info?.tools);
+        const agentValues = { ...info, tool: selectedTools };
+        delete agentValues.tools;
+
+        try {
+            const prev = metaDS.peekFormData?.() || {};
+            metaDS.setFormData?.({ values: { ...prev, ...agentValues } });
+        } catch (_) {}
+    };
+
+    const setMetaField = (id, value) => {
+        if (!metaDS || !id) return;
+        try { metaDS.setFormField?.({ item: { id }, value }); } catch (_) {}
+    };
+
+    const handleAgentChange = (agentID) => {
+        if (events?.onAgentSelect?.isDefined?.()) {
+            events.onAgentSelect.execute({ context: metaCtx || context, selected: agentID, value: agentID });
+            return;
+        }
+        applyAgentSelection(agentID);
+    };
+
+    const handleModelChange = (modelID) => {
+        if (events?.onModelSelect?.isDefined?.()) {
+            events.onModelSelect.execute({ context: metaCtx || context, selected: modelID, value: modelID });
+            return;
+        }
+        setMetaField('model', normalizeString(modelID));
+    };
+
+    const handleReasoningChange = (effort) => {
+        if (events?.onReasoningSelect?.isDefined?.()) {
+            events.onReasoningSelect.execute({ context: metaCtx || context, selected: effort, value: effort });
+            return;
+        }
+        setMetaField('reasoningEffort', normalizeString(effort));
+    };
+
+    const handleToolsChange = (toolNames) => {
+        if (events?.onToolsChange?.isDefined?.()) {
+            events.onToolsChange.execute({ context: metaCtx || context, selected: toolNames, value: toolNames });
+            return;
+        }
+        setMetaField('tool', ensureStringArray(toolNames));
+    };
+
+    const defaultAgentTools = (agentID) => {
+        const id = normalizeString(agentID);
+        const info = metaSnapshot?.agentInfo?.[id] || {};
+        return ensureStringArray(info?.tools);
+    };
+
+    const defaultAgentModel = (agentID) => {
+        const id = normalizeString(agentID);
+        const info = metaSnapshot?.agentInfo?.[id] || {};
+        return normalizeString(info?.model);
+    };
+
+    const commandCenterDefaults = metaSnapshot?.defaults || {};
+    const currentAgent = normalizeString(metaSnapshot?.agent);
+    const currentModel = normalizeString(metaSnapshot?.model);
+    const currentReasoning = normalizeString(metaSnapshot?.reasoningEffort);
+    const currentTools = ensureStringArray(metaSnapshot?.tool);
+
+    const conversationID = normalizeString(conversationSnapshot?.id);
+    const isConversationRunning = !!conversationSnapshot?.running;
+    const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
+    const queuedCount = (() => {
+        const v = conversationSnapshot?.queuedCount;
+        if (typeof v === 'number' && !Number.isNaN(v)) return v;
+        const n = Number(v);
+        if (!Number.isNaN(n) && Number.isFinite(n)) return n;
+        return queuedTurns.length;
+    })();
+
+    const usageSummary = (() => {
+        const costText = formatCostCompact(usageSnapshot?.cost ?? usageSnapshot?.Cost);
+        const tokensText = formatTokensCompact(usageSnapshot?.totalTokens ?? usageSnapshot?.TotalTokens ?? usageSnapshot?.total);
+        const parts = [];
+        if (costText) parts.push(`Cost ${costText}`);
+        if (tokensText) parts.push(`Tokens ${tokensText}`);
+        return parts.join(' • ');
+    })();
+
+    const usageTooltip = (() => {
+        const tokensWithCache = normalizeString(usageSnapshot?.tokensWithCacheText);
+        const costText = normalizeString(usageSnapshot?.costText);
+        const pieces = [];
+        if (costText) pieces.push(`Cost: ${costText}`);
+        if (tokensWithCache) pieces.push(`Tokens: ${tokensWithCache}`);
+        return pieces.join('\n');
+    })();
+
+    const toolsLabel = () => {
+        if (!currentTools.length) return '';
+        if (currentTools.length <= 2) return currentTools.join(', ');
+        return `${currentTools.length} tools`;
+    };
+
+    // Command-center toolbar already exposes agent/model/tools/reasoning selectors; keep composer chips
+    // reserved for bundles + attachments to avoid duplicating controls.
+    const activeChips = [];
+
+    const handleChipClear = (chip) => {
+        const id = normalizeString(chip?.id);
+        if (!id) return;
+        const defAgent = normalizeString(commandCenterDefaults?.agent) || currentAgent;
+        const defModel = normalizeString(commandCenterDefaults?.model) || currentModel;
+
+        if (events?.onClearOverride?.isDefined?.()) {
+            events.onClearOverride.execute({ context: metaCtx || context, chip: id });
+            return true;
+        }
+
+        if (id === 'agent') {
+            handleAgentChange(defAgent);
+            return true;
+        }
+        if (id === 'model') {
+            const fallback = defaultAgentModel(currentAgent) || defModel;
+            handleModelChange(fallback);
+            return true;
+        }
+        if (id === 'tools') {
+            handleToolsChange(defaultAgentTools(currentAgent));
+            return true;
+        }
+        if (id === 'reasoningEffort') {
+            handleReasoningChange('');
+            return true;
+        }
+        return false;
+    };
 
     // ---------------------------------------------------------------------
     // 🛑  Abort handler – invoked when the user clicks the "Abort" button in
@@ -341,24 +578,69 @@ export default function Chat({
         return null;
     };
 
-    // Resolve final showAbort with precedence
+    // Backend `Post()` enqueues turns; treat "processing" as: the latest user message hasn't
+    // received an assistant response, or any execution steps are still active.
+    // Ignore stale `conversations.running` when we have no evidence of work in-flight.
+    const isProcessing = (() => {
+        const activeExec = hasActiveExecutions(messages);
+        const lastUser = lastIndexByRole(messages, 'user');
+        const lastAssistant = lastIndexByRole(messages, 'assistant');
+        const hasUnansweredUser = lastUser !== -1 && lastUser > lastAssistant;
+        if (activeExec || hasUnansweredUser) return true;
+        if (!isConversationRunning) return false;
+        // If we have evidence of a completed last turn, ignore stale running=true.
+        if (lastUser !== -1 && lastAssistant !== -1 && lastAssistant > lastUser) return false;
+        return true;
+    })();
+
+    // Abort should only be visible while the current turn is processing.
+    // The backend `conversations.running` signal can be stale, so do not rely on it for visibility.
     const effectiveShowAbort = (showAbortProp !== undefined)
         ? showAbortProp
-        : (chatCfg.abortVisible ? abortVisible : (chatCfg.showAbort !== undefined ? chatCfg.showAbort : !!loading));
+        : (chatCfg.showAbort !== undefined ? chatCfg.showAbort : true);
+
+    // Abort/Queue should only be visible while the current turn is being processed.
+    const effectiveShowAbortWhileRunning = effectiveShowAbort && isProcessing;
+
+    const composerDisabled = (chatCfg?.disableInputOnLoading)
+        ? (loading && !isProcessing)
+        : false;
+
+    const handleQueueCancel = (turn) => {
+        const turnID = normalizeString(turn?.id);
+        if (!turnID || !conversationID) return;
+        if (typeof chatService?.cancelQueuedTurnByID === 'function') {
+            chatService.cancelQueuedTurnByID({ context, conversationID, turnID });
+        }
+    };
+
+    const handleQueueMove = (turn, direction) => {
+        const turnID = normalizeString(turn?.id);
+        const dir = normalizeString(direction).toLowerCase();
+        if (!turnID || !conversationID || (dir !== 'up' && dir !== 'down')) return;
+        if (typeof chatService?.moveQueuedTurn === 'function') {
+            chatService.moveQueuedTurn({ context, conversationID, turnID, direction: dir });
+        }
+    };
 
     return (
         <div
             className="w-full px-4 pt-4 gap-3"
+            data-testid="chat-root"
             style={{
+                height: '100%',
                 ...heightStyle,
                 display: 'grid',
-                gridTemplateRows: 'auto 1fr auto',
+                gridTemplateRows: 'auto minmax(0, 1fr) auto',
+                minHeight: 0,
+                minWidth: 0,
+                overflow: 'hidden',
             }}
         >
 
             {/* Optional toolbar */}
             {effectiveToolbar && (
-                <div className="flex-none mb-1">
+                <div className="flex-none mb-1" data-testid="chat-toolbar">
                     {renderToolbar()}
                 </div>
             )}
@@ -369,9 +651,9 @@ export default function Chat({
                     const errText = String(error?.message || error);
                     // Extra debug to troubleshoot Error objects reaching render
                     // eslint-disable-next-line no-console
-                    return <div className="text-red-500 text-sm py-1">{errText}</div>;
+                    return <div className="text-red-500 text-sm py-1" data-testid="chat-error">{errText}</div>;
                 } catch (e) {
-                    return <div className="text-red-500 text-sm py-1">An error occurred</div>;
+                    return <div className="text-red-500 text-sm py-1" data-testid="chat-error">An error occurred</div>;
                 }
             })()}
 
@@ -392,6 +674,16 @@ export default function Chat({
                     showUpload={chatCfg.showUpload}
                     showSettings={!!chatCfg.showSettings}
                     showMic={!!chatCfg.showMic}
+                    showTools={!!chatCfg.showTools}
+                    commandCenter={commandCenterEnabled}
+                    submitMode={'send'}
+                    submitLabel={'Send'}
+                    queueCount={queuedCount}
+                    queuedTurns={queuedTurns}
+                    usageSummary={usageSummary}
+                    usageTooltip={usageTooltip}
+                    onQueueCancel={handleQueueCancel}
+                    onQueueMove={handleQueueMove}
                     uploadTooltip={chatCfg?.tooltips?.upload}
                     settingsTooltip={chatCfg?.tooltips?.settings}
                     micTooltip={chatCfg?.tooltips?.mic}
@@ -415,15 +707,37 @@ export default function Chat({
                             events.onMicToggle.execute({ context, active });
                         }
                     }}
+                    onCaptureAudio={(file) => {
+                        if (!file) return;
+                        startUploads([file]);
+                    }}
                     onAbort={handleAbort}
-                    showAbort={effectiveShowAbort}
-                    disabled={loading}
+                    showAbort={effectiveShowAbortWhileRunning}
+                    disabled={composerDisabled}
                     attachments={pendingAttachments}
                     onRemoveAttachment={(idx) => setPendingAttachments(prev => {
                         const next = prev.filter((_, i) => i !== idx);
                         try { handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: next }); } catch (_) {}
                         return next;
                     })}
+                    toolOptions={metaSnapshot?.toolOptions}
+                    selectedTools={currentTools}
+                    onToolsChange={handleToolsChange}
+                    agentOptions={metaSnapshot?.agentOptions}
+                    agentValue={currentAgent}
+                    onAgentChange={handleAgentChange}
+                    modelOptions={metaSnapshot?.modelOptions}
+                    modelValue={currentModel}
+                    onModelChange={handleModelChange}
+                    reasoningOptions={[
+                        { value: 'low', label: 'Low' },
+                        { value: 'medium', label: 'Medium' },
+                        { value: 'high', label: 'High' },
+                    ]}
+                    reasoningValue={currentReasoning}
+                    onReasoningChange={handleReasoningChange}
+                    activeChips={activeChips}
+                    onChipClear={(chip) => handleChipClear(chip)}
                 />
             )}
 

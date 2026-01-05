@@ -182,7 +182,7 @@ function WindowContentInner({window, metadata, services}) {
     };
 
     return (
-        <div>
+        <div style={{ height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             {renderDataSources()}
             {renderDialogs()}
             <WindowLayout
@@ -252,7 +252,7 @@ export default function WindowContent({window, isInTab = false}) {
     if (loading || !metadata) {
         // Soft loading placeholder for window content
         return (
-            <div style={{ padding: 16 }}>
+            <div style={{ padding: 16, height: '100%', minHeight: 0 }}>
                 <SoftSkeleton lines={1} height={18} style={{ marginBottom: 12 }} />
                 <SoftBlock height={180} />
             </div>

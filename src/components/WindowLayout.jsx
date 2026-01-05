@@ -17,7 +17,17 @@ const WindowLayout = ({
         return <div>No content defined in view.</div>;
     }
 
-    const style = {flex: 1, display: 'flex', flexDirection: 'column', padding: '4px', minHeight: '80vh', minWidth: '60vw'};
+    const style = {
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '4px',
+        height: '100%',
+        width: '100%',
+        minHeight: 0,
+        minWidth: 0,
+        overflow: 'hidden',
+    };
     return (
         <div
 

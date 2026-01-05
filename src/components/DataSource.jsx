@@ -218,6 +218,60 @@ export default function DataSource({context}) {
         });
     });
 
+    // Fire onSelection (alias onItemSelect) when DS selection changes
+    const prevSelectionKey = useRef('');
+    useSignalEffect(() => {
+        try {
+            const sel = selection.value || {};
+            let key = 'none';
+            if (dataSource.selfReference) {
+                if (selectionMode === 'multi') {
+                    const arr = (sel.selection || []).map(it => (it?.nodePath || []).join('/'));
+                    key = `m:${arr.join('|')}`;
+                } else {
+                    key = `s:${(sel.nodePath || []).join('/')}`;
+                }
+            } else {
+                if (selectionMode === 'multi') {
+                    const arr = (sel.selection || []).map(rec => {
+                        try { return String(getUniqueKeyValue(rec)); } catch(_) { return ''; }
+                    });
+                    key = `m:${arr.join('|')}`;
+                } else {
+                    const uid = sel && sel.selected ? (() => { try { return String(getUniqueKeyValue(sel.selected)); } catch(_) { return ''; } })() : '';
+                    key = `s:${uid}#${sel.rowIndex ?? -1}`;
+                }
+            }
+            if (key === prevSelectionKey.current) {
+                return;
+            }
+            prevSelectionKey.current = key;
+
+            // Only fire when there is a meaningful selection
+            const hasMeaningfulSelection = (() => {
+                if (selectionMode === 'multi') {
+                    return Array.isArray(sel.selection) && sel.selection.length > 0;
+                }
+                if (dataSource.selfReference) {
+                    return !!(sel && sel.selected && Array.isArray(sel.nodePath) && sel.nodePath.length > 0);
+                }
+                return !!(sel && sel.selected && (sel.rowIndex ?? -1) >= 0);
+            })();
+            if (!hasMeaningfulSelection) return;
+
+            // Execute custom selection handlers if present
+            if (events.onItemSelect && events.onItemSelect.isDefined()) {
+                if (selectionMode === 'multi') {
+                    events.onItemSelect.execute({ selection: sel.selection || [] });
+                } else if (dataSource.selfReference) {
+                    events.onItemSelect.execute({ selected: sel.selected || null, nodePath: sel.nodePath || null });
+                } else {
+                    events.onItemSelect.execute({ selected: sel.selected || null, rowIndex: sel.rowIndex ?? -1 });
+                }
+            }
+        } catch (_) { /* ignore */ }
+    });
+
 
     function flagReadDone() {
         input.value = {

@@ -9,8 +9,6 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
 
     const isVertical = orientation === 'vertical';
 
-
-
     const [sizes, setSizes] = useState(() => {
         if(divider.sizes) {
             return divider.sizes
@@ -18,19 +16,6 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
         const initialSize = (100 / React.Children.count(children));
         return Array(React.Children.count(children)).fill(initialSize);
     });
-
-
-    if (isVertical) {
-        return (<> {React.Children.map(children, (child, index) => {
-            return (
-                <div>
-                    {child}
-                </div>
-            )
-        })}
-        </>)
-    }
-
 
     const isVisible = divider.visible || false;
     const handleMouseDown = (index, event) => {
@@ -74,33 +59,36 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
 
     return (
         <div
-            className="splitter-container"
+            className={`splitter-container ${isVertical ? 'vertical' : ''}`}
             ref={containerRef}
             style={{
                 display: 'flex',
                 flexDirection: isVertical ? 'column' : 'row',
                 height: '100%',
                 width: '100%',
+                minHeight: 0,
+                minWidth: 0,
             }}
         >
             {React.Children.map(children, (child, index) => {
 
                 const style = {
-                    [isVertical ? 'height' : 'minWidth']: `${sizes[index]}%`,
+                    flexBasis: `${sizes[index]}%`,
+                    flexGrow: 0,
+                    flexShrink: 0,
                     marginRight: '5px',
                     marginLeft: '5px',
-
+                    overflow: 'auto',
+                    minHeight: 0,
+                    minWidth: 0,
                 }
                 if (index !== sizes.length - 1) {
                     if (isVertical) {
                         style['marginBottom'] = '5px'
                     }
                 }
-                if (!isVertical) {
-                    style['overflow'] = 'auto'
-                }
                 return (
-                    <>
+                    <React.Fragment key={'sf' + (child?.id || index)}>
                         <div
                             key={'kv' + (child.id|| index)}
                             className="splitter-panel"
@@ -114,7 +102,7 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
                                 onMouseDown={(e) => handleMouseDown(index, e)}
                             />
                         )}
-                    </>
+                    </React.Fragment>
                 )
             })}
         </div>

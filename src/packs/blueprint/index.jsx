@@ -38,6 +38,7 @@ import { buildDateProps } from './dateUtils.js';
 import { registerWrapper } from '../../runtime/wrapperRegistry.js';
 import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
 import MarkdownView from '../../components/MarkdownView.jsx';
+import MarkdownEditor from '../../components/MarkdownEditor.jsx';
 
 /* ------------------------ Widget implementation ----------------------- */
 
@@ -426,6 +427,26 @@ export function registerPack() {
         ),
         { framework: 'blueprint' }
     );
+
+    /* -------------------- Document (Markdown editor - EasyMDE) ---- */
+    registerWidget(
+        'document',
+        ({ value = '', onChange, readOnly, disabled, options = {}, ...rest }) => (
+            <MarkdownEditor
+                value={value ?? ''}
+                onChange={onChange}
+                readOnly={readOnly}
+                disabled={disabled}
+                options={options}
+                {...rest}
+            />
+        ),
+        { framework: 'blueprint' }
+    );
+
+    registerEventAdapter('document', {
+        onChange: ({ adapter }) => (v) => adapter.set(v),
+    });
 }
 
 // Auto-register when the feature flag is active

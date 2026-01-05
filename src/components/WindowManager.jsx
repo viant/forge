@@ -14,6 +14,7 @@ import {
 import {useSignalEffect} from '@preact/signals-react';
 import {Rnd} from 'react-rnd';
 import WindowControls from './WindowControls';
+import './WindowManager.css';
 
 const WindowManager = () => {
     const [windows, setWindows] = useState(() => activeWindows.value || []);
@@ -118,7 +119,7 @@ const WindowManager = () => {
     return (
         <div
             ref={containerRef}
-            style={{height: '100%', width: '100%', position: 'relative'}}
+            style={{flex: 1, minHeight: 0, width: '100%', position: 'relative', display: 'flex', flexDirection: 'column'}}
         >
             {/* Tabs for windows in tabbed mode */}
             <Tabs
@@ -127,6 +128,7 @@ const WindowManager = () => {
                 onChange={handleTabChange}
                 //renderActiveTabPanelOnly
                 large
+                className="forge-window-manager-tabs"
             >
                 {tabWindows.map((win) => (
                     <Tab

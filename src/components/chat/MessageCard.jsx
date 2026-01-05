@@ -40,7 +40,19 @@ function renderMarkdown(md = "") {
 
 // CSS classes are reused from chat.css already loaded by parent.
 
-export default function MessageCard({ msg, context, resolveIcon }) {
+function stableMessageID(msg) {
+    const candidate = msg?.id || msg?.Id || msg?.messageId || msg?.MessageId;
+    if (candidate === undefined || candidate === null) return '';
+    return String(candidate);
+}
+
+function messageTestID(msg, fallbackIndex, suffix) {
+    const id = stableMessageID(msg);
+    const base = id ? `chat-message-${id}` : `chat-message-idx-${fallbackIndex}`;
+    return suffix ? `${base}-${suffix}` : base;
+}
+
+export default function MessageCard({ msg, context, resolveIcon, messageIndex = 0 }) {
     const avatarColour =
         msg.role === "user"
             ? "var(--blue4)"
@@ -65,12 +77,23 @@ export default function MessageCard({ msg, context, resolveIcon }) {
                 : "chat-bubble chat-tool");
 
     return (
-        <div className={`chat-row ${msg.role}`}> {/* alignment flex row */}
+        <div
+            className={`chat-row ${msg.role}`}
+            data-testid={messageTestID(msg, messageIndex, 'row')}
+        >
             <div style={{ display: "flex", alignItems: "flex-start" }}>
-                <div className="avatar" style={{ background: avatarColour, display: 'flex', alignItems:'center', justifyContent:'center' }}>
+                <div
+                    className="avatar"
+                    style={{ background: avatarColour, display: 'flex', alignItems:'center', justifyContent:'center' }}
+                    data-testid={messageTestID(msg, messageIndex, 'avatar')}
+                >
                     <AvatarIcon name={iconName} size={14} color={"var(--black)"} weight="fill" />
                 </div>
-                <div className={bubbleClass} data-ts={formatDate(new Date(msg.createdAt), "HH:mm")}>
+                <div
+                    className={bubbleClass}
+                    data-ts={formatDate(new Date(msg.createdAt), "HH:mm")}
+                    data-testid={messageTestID(msg, messageIndex, 'bubble')}
+                >
                     <div className="prose max-w-full text-sm" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
 
                     {/* Execution details are rendered by application-specific bubble renderers. */}
