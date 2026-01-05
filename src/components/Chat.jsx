@@ -309,6 +309,15 @@ export default function Chat({
         const info = agentInfo?.[key] || {};
 
         try { metaDS.setFormField?.({ item: { id: 'agent' }, value: key }); } catch (_) {}
+        // Keep the conversation form in sync so any header/UI bound to the
+        // conversations data source reflects the selected agent immediately.
+        try {
+            const convCtx = context.Context('conversations');
+            const convDS = convCtx?.handlers?.dataSource;
+            convDS?.setFormField?.({ item: { id: 'agent' }, value: key });
+            const name = normalizeString(info?.name || info?.Name);
+            if (name) convDS?.setFormField?.({ item: { id: 'agentName' }, value: name });
+        } catch (_) {}
 
         const selectedTools = ensureStringArray(info?.tools);
         const agentValues = { ...info, tool: selectedTools };
@@ -338,7 +347,14 @@ export default function Chat({
             events.onModelSelect.execute({ context: metaCtx || context, selected: modelID, value: modelID });
             return;
         }
-        setMetaField('model', normalizeString(modelID));
+        const id = normalizeString(modelID);
+        setMetaField('model', id);
+        // Mirror selection into conversations form for header/UI consistency.
+        try {
+            const convCtx = context.Context('conversations');
+            const convDS = convCtx?.handlers?.dataSource;
+            convDS?.setFormField?.({ item: { id: 'model' }, value: id });
+        } catch (_) {}
     };
 
     const handleReasoningChange = (effort) => {

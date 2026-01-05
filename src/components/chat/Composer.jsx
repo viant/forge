@@ -1,7 +1,7 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Menu, MenuItem, Popover, Tag, TextArea, Tooltip } from "@blueprintjs/core";
-import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, Robot, Brain } from '@phosphor-icons/react';
+import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, UserCircle, Lightbulb } from '@phosphor-icons/react';
 import BundlesDialog from "./BundlesDialog.jsx";
 
 function composerMaxHeightPx(maxRows, paddingTopPx) {
@@ -751,6 +751,7 @@ export default function Composer({
                                 minimal
                                 small
                                 disabled={disabled}
+                                className="composer-icon-btn composer-icon-btn--attach"
                                 data-testid="chat-composer-attach"
                                 aria-label={uploadTooltip}
                                 title={uploadTooltip}
@@ -771,6 +772,7 @@ export default function Composer({
                                         minimal
                                         small
                                         disabled={disabled}
+                                        className="composer-icon-btn composer-icon-btn--tools"
                                         data-testid="chat-composer-tools"
                                         aria-label="Toolsets"
                                         title="Toolsets"
@@ -795,7 +797,8 @@ export default function Composer({
                                         data-testid="chat-composer-agent"
                                         aria-label="Agent"
                                         title="Agent"
-                                        icon={<Robot size={18} weight="fill" />}
+                                        className="composer-icon-btn composer-icon-btn--agent"
+                                        icon={<UserCircle size={20} weight="duotone" />}
                                         onClick={(e) => { e.preventDefault(); setAgentOpen((v) => !v); }}
                                     />,
                                     `Agent: ${optionLabel(normalizedAgentOptions, agentValue)}`
@@ -822,7 +825,8 @@ export default function Composer({
                                         data-testid="chat-composer-model"
                                         aria-label="Model"
                                         title="Model"
-                                        icon={<Brain size={18} weight="fill" />}
+                                        className="composer-icon-btn composer-icon-btn--model"
+                                        icon={<Lightbulb size={20} weight="duotone" />}
                                         onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
                                     />,
                                     `Model: ${optionLabel(normalizedModelOptions, modelValue)}`
@@ -888,6 +892,7 @@ export default function Composer({
                                 minimal
                                 small
                                 disabled={disabled}
+                                className="composer-icon-btn composer-icon-btn--settings"
                                 data-testid="chat-composer-settings"
                                 aria-label={settingsTooltip || "Settings"}
                                 title={settingsTooltip || "Settings"}
@@ -901,6 +906,7 @@ export default function Composer({
                                 minimal
                                 small
                                 disabled={disabled}
+                                className={`composer-icon-btn composer-icon-btn--mic ${micOn ? 'composer-icon-btn--micOn' : ''}`}
                                 data-testid="chat-composer-mic"
                                 aria-pressed={micOn}
                                 aria-label={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
@@ -1031,7 +1037,7 @@ export default function Composer({
                                 icon="plus"
                                 minimal
                                 small
-                                className="composer-attach"
+                                className="composer-attach composer-icon-btn composer-icon-btn--attach"
                                 data-testid="chat-composer-attach"
                                 disabled={disabled}
                                 title={uploadTooltip}
@@ -1047,7 +1053,7 @@ export default function Composer({
                                 icon="cog"
                                 minimal
                                 small
-                                className="composer-attach"
+                                className="composer-attach composer-icon-btn composer-icon-btn--settings"
                                 style={{ left: showUpload ? 36 : 6 }}
                                 data-testid="chat-composer-settings"
                                 disabled={disabled}
@@ -1117,7 +1123,7 @@ export default function Composer({
                     {showMic && withTooltip(
                         <Button
                             minimal
-                            className="composer-mic"
+                            className={`composer-mic composer-icon-btn composer-icon-btn--mic ${micOn ? 'composer-icon-btn--micOn' : ''}`}
                             style={{ width: 28, height: 28, right: 44 }}
                             onClick={(e) => { e.preventDefault(); toggleMic(); }}
                             disabled={disabled}
