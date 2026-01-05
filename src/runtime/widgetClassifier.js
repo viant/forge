@@ -68,6 +68,7 @@ registerClassifier((item) => {
     if (item?.type === 'object') return 'object';
     if (item?.type === 'schema') return 'schema';
     if (item?.type === 'markdown') return 'markdown';
+    if (item?.type === 'document') return 'document';
 }, { priority: 70 });
 
 /**

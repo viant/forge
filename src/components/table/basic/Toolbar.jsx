@@ -6,6 +6,25 @@ import QuickFilterToggle from './QuickFilterToggle.jsx';
 import "./Toolbar.css";
 import { useToolbarControlEvents } from '../../../hooks/event.js';
 
+function sanitizeTestID(value) {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+function toolbarItemTestID(item) {
+    const explicit =
+        item?.testID ??
+        item?.testId ??
+        item?.dataTestID ??
+        item?.dataTestId;
+    if (explicit) return String(explicit);
+    const itemID = sanitizeTestID(item?.id);
+    return itemID ? `toolbar-btn-${itemID}` : undefined;
+}
+
 const Toolbar = ({
                      context,
                      toolbarItems = [],
@@ -16,107 +35,58 @@ const Toolbar = ({
     const { control } = signals;
     const disabled = control.value?.inactive || false;
 
+    const renderToolbarItem = (item, align) => {
+        if (item.id === 'quickFilter' || item.id === 'quickFilterInputs') {
+            return <QuickFilterInputs key={`qfinputs-${align}`} context={context} align={align} />;
+        }
+        if (item.id === 'quickFilterToggle') {
+            return <QuickFilterToggle key={`qftoggle-${align}`} context={context} />;
+        }
+
+        const { events = {}, stateEvents } = toolbarEvents[item.id] || {};
+        const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
+        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
+        const testID = toolbarItemTestID(item);
+        const spanStyle = align === 'center'
+            ? { margin: "0 10px" }
+            : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" });
+
+        return (
+            <span key={item.id} style={spanStyle}>
+                <Button
+                    key={item.id}
+                    icon={item.icon}
+                    {...events}
+                    disabled={effectiveDisabled}
+                    data-testid={testID}
+                >
+                    {item.label || ""}
+                </Button>
+            </span>
+        );
+    };
+
+    const renderAlignedItems = (align) => {
+        return toolbarItems
+            .filter((item) => (align === 'right'
+                ? item.align !== 'left' && item.align !== 'center'
+                : item.align === align))
+            .map((item) => renderToolbarItem(item, align));
+    };
+
     return (
         <div className="toolbar-container">
             {/* Items aligned to the left */}
             <div className="toolbar-left">
-                {toolbarItems
-                    .filter((item) => item.align === 'left')
-                    .map((item) => {
-                        if (item.id === 'quickFilter') {
-                            return (
-                                <QuickFilterInputs key="qfinputs-left" context={context} align="left" />
-                            );
-                        }
-                        if (item.id === 'quickFilterInputs') {
-                            return <QuickFilterInputs key="qfinputs-left" context={context} align="left" />;
-                        }
-                        if (item.id === 'quickFilterToggle') {
-                            return <QuickFilterToggle key="qftoggle-left" context={context} />;
-                        }
-                        const {events={}, stateEvents} = toolbarEvents[item.id] || {};
-                        const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
-                        return (
-                            <span key={item.id} style={{ marginRight: "10px" }}>
-                                <Button
-                                    key={item.id}
-                                    icon={item.icon}
-                                    {...events}
-                                    disabled={effectiveDisabled}
-                                >
-                                    {item.label || ""}
-                                </Button>
-                            </span>
-                        );
-                    })}
+                {renderAlignedItems('left')}
             </div>
             {/* Items aligned to the center */}
             <div className="toolbar-center">
-                {toolbarItems
-                    .filter((item) => item.align === 'center')
-                    .map((item) => {
-                        if (item.id === 'quickFilter') {
-                            return (
-                                <QuickFilterInputs key="qfinputs-center" context={context} align="center" />
-                            );
-                        }
-                        if (item.id === 'quickFilterInputs') {
-                            return <QuickFilterInputs key="qfinputs-center" context={context} align="center" />;
-                        }
-                        if (item.id === 'quickFilterToggle') {
-                            return <QuickFilterToggle key="qftoggle-center" context={context} />;
-                        }
-                        const {events={}, stateEvents} = toolbarEvents[item.id] || {};
-
-                        const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
-                        return (
-                            <span key={item.id} style={{margin: "0 10px"}}>
-                                <Button
-                                    key={item.id}
-                                    icon={item.icon}
-                                    {...events}
-                                    disabled={effectiveDisabled}
-                                >
-                                    {item.label || ""}
-                                </Button>
-                            </span>
-                        );
-                    })}
+                {renderAlignedItems('center')}
             </div>
             {/* Items aligned to the right */}
             <div className="toolbar-right">
-                {toolbarItems
-                    .filter((item) => item.align !== 'left' && item.align !== 'center')
-                    .map((item) => {
-                        if (item.id === 'quickFilter') {
-                            return (
-                                <QuickFilterInputs key="qfinputs-right" context={context} align="right" />
-                            );
-                        }
-                        if (item.id === 'quickFilterInputs') {
-                            return <QuickFilterInputs key="qfinputs-right" context={context} align="right" />;
-                        }
-                        if (item.id === 'quickFilterToggle') {
-                            return <QuickFilterToggle key="qftoggle-right" context={context} />;
-                        }
-                        const {events={}, stateEvents} = toolbarEvents[item.id] || {};
-                        const isReadonly = stateEvents.onReadonly ? stateEvents.onReadonly() : false;
-                        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
-                        return (
-                            <span key={item.id} style={{ marginLeft: "10px" }}>
-                                <Button
-                                    key={item.id}
-                                    icon={item.icon}
-                                    {...events}
-                                    disabled={effectiveDisabled}
-                                >
-                                    {item.label || ""}
-                                </Button>
-                            </span>
-                        );
-                    })}
+                {renderAlignedItems('right')}
             </div>
         </div>
     );

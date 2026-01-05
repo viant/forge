@@ -1,15 +1,14 @@
 // MessageFeed.jsx – simple lazy loader list without virtualisation
 import React, { useState, useEffect, useRef } from "react";
 import MessageCard from "./MessageCard.jsx";
-import {range} from "lodash";
 
 // ---------------------------------------------------------------------------
 // Default rendering helpers used when the parent Chat component does not
 // provide a custom mapping.
 // ---------------------------------------------------------------------------
 
-const DefaultBubbleRenderer = ({ message, context, resolveIcon }) => (
-    <MessageCard msg={message} context={context} resolveIcon={resolveIcon} />
+const DefaultBubbleRenderer = ({ message, context, resolveIcon, messageIndex }) => (
+    <MessageCard msg={message} context={context} resolveIcon={resolveIcon} messageIndex={messageIndex} />
 );
 
 export const defaultClassifier = () => 'bubble';
@@ -45,11 +44,16 @@ export default function MessageFeed({
 
 
     return (
-        <div ref={containerRef} className="chat-feed space-y-2 pr-2">
+        <div
+            ref={containerRef}
+            className="chat-feed space-y-2 pr-2"
+            data-testid="chat-feed"
+        >
             {visibleCount < messages.length && (
                 <div className="flex justify-center py-1">
                     <button
                         className="bp4-button bp4-minimal bp4-small"
+                        data-testid="chat-feed-load-previous"
                         onClick={() => setVisibleCount((c) => Math.min(c + batchSize, messages.length))}
                     >
                         Load previous
@@ -59,7 +63,7 @@ export default function MessageFeed({
             {slice.map((m, i) => {
                 const kind = classifyMessage(m);
                 const Renderer = renderers[kind] || fallback;
-                return <Renderer key={i} message={m} context={context} resolveIcon={resolveIcon} />;
+                return <Renderer key={i} message={m} context={context} resolveIcon={resolveIcon} messageIndex={i} />;
             })}
             <div ref={bottomRef} />
         </div>

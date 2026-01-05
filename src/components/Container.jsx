@@ -262,7 +262,7 @@ const Container = ({context, container, isActive}) => {
     };
 
     return (<>
-            <div>
+            <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 {container.toolbar ? renderContainerToolbar() : null}
                 {container?.layout?.kind === 'grid' ? (
                     <GridLayoutRenderer
@@ -300,22 +300,67 @@ const Container = ({context, container, isActive}) => {
                 {editorPanel}
                 {schemaFormPanel}
                 {formPanel ? formPanel :
+                    (() => {
+                        if (!containers || containers.length === 0) {
+                            return null;
+                        }
 
-                    <Splitter key={'s' + identity.id}  orientation={orientation} divider={layout?.divider}>
-                        {containers.map((subContainer) => {
-                            const subId = 'Sc' + subContainer.id
+                        const useSplitter = layout?.kind === 'split' || layout?.divider?.visible === true;
+                        if (useSplitter) {
                             return (
-                                <div key={'d' + subId}>
-                                    <Container
-                                        key={subId}
-                                        context={context.Context(subContainer.dataSourceRef || dataSourceRef)}
-                                        container={subContainer}
-                                        isActive={isActive}
-                                    />
-                                </div>
-                            )
-                        })}
-                    </Splitter>
+                                <Splitter key={'s' + identity.id} orientation={orientation} divider={layout?.divider}>
+                                    {containers.map((subContainer) => {
+                                        const subId = 'Sc' + subContainer.id
+                                        return (
+                                            <div key={'d' + subId}>
+                                                <Container
+                                                    key={subId}
+                                                    context={context.Context(subContainer.dataSourceRef || dataSourceRef)}
+                                                    container={subContainer}
+                                                    isActive={isActive}
+                                                />
+                                            </div>
+                                        )
+                                    })}
+                                </Splitter>
+                            );
+                        }
+
+                        const isHorizontal = orientation === 'horizontal';
+                        return (
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    flexDirection: isHorizontal ? 'row' : 'column',
+                                    width: '100%',
+                                    height: '100%',
+                                    minHeight: 0,
+                                    minWidth: 0,
+                                }}
+                            >
+                                {containers.map((subContainer, index) => {
+                                    const subId = 'Sc' + subContainer.id;
+                                    const isLast = index === containers.length - 1;
+                                    const childStyle = {
+                                        flex: isLast ? '1 1 auto' : '0 0 auto',
+                                        minHeight: 0,
+                                        minWidth: 0,
+                                        overflow: 'hidden',
+                                    };
+                                    return (
+                                        <div key={'d' + subId} style={childStyle}>
+                                            <Container
+                                                key={subId}
+                                                context={context.Context(subContainer.dataSourceRef || dataSourceRef)}
+                                                container={subContainer}
+                                                isActive={isActive}
+                                            />
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        );
+                    })()
                 }
 
             </div>

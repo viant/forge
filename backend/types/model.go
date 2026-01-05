@@ -314,8 +314,12 @@ type Chat struct {
 	UploadField  string `json:"uploadField,omitempty" yaml:"uploadField,omitempty"`
 	ShowAbort    bool   `json:"showAbort,omitempty" yaml:"showAbort,omitempty"`
 	ShowSettings bool   `json:"showSettings,omitempty" yaml:"showSettings,omitempty"`
+	// ShowTools toggles the tools picker in the composer.
+	ShowTools bool `json:"showTools,omitempty" yaml:"showTools,omitempty"`
 	// ShowMic toggles the microphone icon in the composer (to the left of Send).
 	ShowMic bool `json:"showMic,omitempty" yaml:"showMic,omitempty"`
+	// CommandCenter enables the "composer-as-command-center" UI layout.
+	CommandCenter bool `json:"commandCenter,omitempty" yaml:"commandCenter,omitempty"`
 	// AbortVisible allows declarative, data-bound control of the abort button
 	// visibility. When provided, the UI shows the abort button if the value
 	// resolved at `selector` matches `when` (or is truthy if `when` is omitted).
