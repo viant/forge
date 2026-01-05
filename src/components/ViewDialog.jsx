@@ -19,18 +19,45 @@ const ViewDialog = ({context, dialog}) => {
         const isDialogOpen = handlers.dialog.isOpen();
         log.debug('open effect', { isDialogOpen, wasOpen: isOpen, dsRef: dialog?.dataSourceRef });
         if (isDialogOpen && !isOpen) {
+            const dialogContext = (() => {
+                try {
+                    return context?.Context?.(dialog?.dataSourceRef);
+                } catch (_) {
+                    return null;
+                }
+            })();
+            const dialogDataSourceHandlers = dialogContext?.handlers?.dataSource;
             try {
                 const args = handlers.dialog.callerArgs();
-                const current = handlers.dataSource.peekInput?.() || {};
+                const current = dialogDataSourceHandlers?.peekInput?.() || {};
                 const nextArgsStr = JSON.stringify(args || {});
                 const prevArgsStr = JSON.stringify((current.args || {}));
                 // Only set when changed to avoid signal cycles
                 if (nextArgsStr !== prevArgsStr) {
                     log.debug('setInputArgs', { nextArgs: args, prevArgs: current.args || {} });
-                    handlers.dataSource.setInputArgs(args);
+                    dialogDataSourceHandlers?.setInputArgs?.(args);
+                }
+
+                // Seed DS input parameters from dialog args so dataSource.parameters
+                // (path/query deps) resolve correctly on first fetch.
+                try {
+                    const dsRef = dialog?.dataSourceRef;
+                    let params = {};
+                    if (args && typeof args === 'object') {
+                        const scoped = (dsRef && args[dsRef]) ? args[dsRef] : args;
+                        const inputObj = (scoped && typeof scoped === 'object') ? (scoped.input || scoped) : {};
+                        params = (inputObj && typeof inputObj === 'object') ? (inputObj.parameters || inputObj) : {};
+                    }
+                    const prevParams = dialogDataSourceHandlers?.peekInput?.()?.parameters || {};
+                    if (JSON.stringify(prevParams) !== JSON.stringify(params)) {
+                        log.debug('setInputParameters', { ds: dsRef, params, prev: prevParams });
+                        dialogDataSourceHandlers?.setInputParameters?.(params);
+                    }
+                } catch (e) {
+                    log.warn('setInputParameters error', { error: String(e?.message || e) });
                 }
             } catch (e) {
-                console.warn('[ViewDialog] setInputArgs error', e);
+                log.warn('setInputArgs error', { error: String(e?.message || e) });
             }
             // Trigger initial fetch using DS helper (deferred to avoid reactive cycle)
             try {
@@ -45,11 +72,11 @@ const ViewDialog = ({context, dialog}) => {
                         log.debug('deferred fetchCollection', { filter, args });
                         dsHandlers?.fetchCollection?.({ filter });
                     } catch (err) {
-                        console.warn('[ViewDialog] deferred fetchCollection error', err);
+                        log.warn('deferred fetchCollection error', { error: String(err?.message || err) });
                     }
                 }, 0);
             } catch (e) {
-                console.warn('[ViewDialog] schedule fetch on open error', e);
+                log.warn('schedule fetch on open error', { error: String(e?.message || e) });
             }
             if (events.onOpen.isDefined()) {
                 events.onOpen.execute({ context, dialog });

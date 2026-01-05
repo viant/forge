@@ -182,7 +182,9 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     function getUniqueKeyValue(record) {
         const uniqueKey = dataSource.uniqueKey || [];
         if (!uniqueKey.length) {
-            throw new Error("No unique key found in dataSource");
+            // Some read-only / derived data sources (e.g. tool feeds) may omit unique keys.
+            // Do not crash the UI: fall back to a best-effort stable identifier.
+            return fallbackUniqueKeyValue(record);
         }
 
         // If only one unique key, return the corresponding value directly
@@ -195,6 +197,21 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         return uniqueKey
             .map(({field}) => resolveSelector(record, field) || '') // Extract each value, default to empty string if undefined
             .join('_'); // Concatenate with an underscore or any other delimiter
+    }
+
+    function fallbackUniqueKeyValue(record) {
+        if (record === null || record === undefined) {
+            return '';
+        }
+        const type = typeof record;
+        if (type === 'string' || type === 'number' || type === 'boolean') {
+            return String(record);
+        }
+        try {
+            return JSON.stringify(record);
+        } catch (_) {
+            return String(record);
+        }
     }
 
 
@@ -598,6 +615,14 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         };
     };
 
+    const setInputParameters = (parameters) => {
+        const next = (parameters && typeof parameters === 'object') ? parameters : {};
+        input.value = {
+            ...input.peek(),
+            parameters: next,
+        };
+    };
+
     const setPage = (page) => {
         input.value = {
             ...input.peek(),
@@ -909,6 +934,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         peekLoading,
         peekInput,
         setInputArgs,
+        setInputParameters,
         setActiveFilter,
         getActiveFilter,
         getFilterSet,

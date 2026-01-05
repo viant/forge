@@ -180,12 +180,13 @@ const Container = ({context, container, isActive}) => {
     }
 
 
-    const {style = {}} = container
+    const { style = {} } = container;
+    const display = (style && Object.prototype.hasOwnProperty.call(style, 'display')) ? style.display : 'grid';
 
     const gridStyle = {
         ...style,
         width: '100%',
-        display: 'grid',
+        display,
         gridTemplateColumns: `repeat(${columns}, 1fr)`,
         marginBottom: '4px',
         gap: '1rem',
