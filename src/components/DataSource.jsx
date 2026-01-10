@@ -47,18 +47,18 @@ function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
  */
 export const resolveKey = (holder, name) => {
     if (holder == null) return undefined;
+    if (!name) return holder;
     const keys = name.split(".");
     if (keys.length === 1) {
         return holder[name]
     }
     let result = holder;
     for (const key of keys) {
-        if (!key || typeof result[key] === "undefined") {
-            const reportAvailableKeys = []
-            for (const key in result) {
-                reportAvailableKeys.push(key)
-            }
-            throw new Error(`key "${key}" not found in holder, avails: "${reportAvailableKeys}".`, result);
+        if (!key) {
+            continue;
+        }
+        if (result == null || typeof result !== "object" || typeof result[key] === "undefined") {
+            return undefined;
         }
         result = result[key]
     }
@@ -75,7 +75,12 @@ function extractData(selectors, paging, data) {
     if (!dataSelector) {
         records = data;
     } else {
-        const respData = resolveKey(data, dataSelector)
+        let respData = resolveKey(data, dataSelector)
+        // Backward-compatible fallback: when selector cannot be resolved, treat the holder
+        // itself as the payload so upstream data sources do not crash on schema drift.
+        if (typeof respData === "undefined") {
+            respData = data
+        }
         if (respData && Array.isArray(respData)) {
             records = respData
         } else if (respData) {
@@ -143,32 +148,39 @@ export default function DataSource({context}) {
         : null;
 
     const handleUpstream = () => {
-        if (upstream.value.selected) {
-            let {records} = extractData(selectors, paging, upstream.value.selected);
+        try {
+            if (upstream.value.selected) {
+                let {records} = extractData(selectors, paging, upstream.value.selected);
 
-            if (events.onFetch.isDefined() && records.length > 0) {
-                records = events.onFetch.execute({collection: records})
-            }
-            collection.value = records;
+                if (events.onFetch.isDefined() && records.length > 0) {
+                    records = events.onFetch.execute({collection: records})
+                }
+                collection.value = records;
 
-            // ----------------------------------------------------------
-            // Auto-selection behaviour
-            // If dataSource.autoSelect === false we leave every row
-            // unselected; otherwise (default) keep the legacy behaviour
-            // of picking the first record.
-            // ----------------------------------------------------------
-            if (dataSource.autoSelect === false) {
-                setSelected({selected: null, rowIndex: -1});
+                // ----------------------------------------------------------
+                // Auto-selection behaviour
+                // If dataSource.autoSelect === false we leave every row
+                // unselected; otherwise (default) keep the legacy behaviour
+                // of picking the first record.
+                // ----------------------------------------------------------
+                if (dataSource.autoSelect === false) {
+                    setSelected({selected: null, rowIndex: -1});
+                } else {
+                    const selected = records?.length > 0 ? records[0] : null;
+                    const rowIndex = selected ? 0 : -1;
+                    setSelected({selected, rowIndex});
+                }
             } else {
-                const selected = records?.length > 0 ? records[0] : null;
-                const rowIndex = selected ? 0 : -1;
-                setSelected({selected, rowIndex});
+                collection.value = [];
+                setSelected({selected: null, rowIndex: -1})
             }
-        } else {
+        } catch (err) {
             collection.value = [];
             setSelected({selected: null, rowIndex: -1})
+            setError(err);
+        } finally {
+            flagReadDone();
         }
-        flagReadDone();
     }
 
 

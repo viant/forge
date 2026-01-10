@@ -64,6 +64,48 @@ function hasActiveExecutions(messages = []) {
     });
 }
 
+function isTerminalTurnStatus(value) {
+    const s = String(value || '').toLowerCase().trim();
+    return s === 'completed' || s === 'done' || s === 'succeeded' || s === 'success' || s === 'failed' || s === 'error' || s === 'canceled' || s === 'cancelled';
+}
+
+function resolveLastTurnStatus(messages = []) {
+    const list = Array.isArray(messages) ? messages : [];
+    // Prefer the last user turn id (newest user intent)
+    let lastTurnId = '';
+    for (let i = list.length - 1; i >= 0; i--) {
+        const m = list[i];
+        const role = String(m?.role || m?.Role || '').toLowerCase();
+        const tid = String(m?.turnId || m?.TurnId || m?.parentId || m?.ParentId || '').trim();
+        if (role === 'user' && tid) {
+            lastTurnId = tid;
+            break;
+        }
+    }
+    if (!lastTurnId) {
+        for (let i = list.length - 1; i >= 0; i--) {
+            const tid = String(list[i]?.turnId || list[i]?.TurnId || list[i]?.parentId || list[i]?.ParentId || '').trim();
+            if (tid) {
+                lastTurnId = tid;
+                break;
+            }
+        }
+    }
+    if (!lastTurnId) return '';
+
+    // Scan all rows belonging to the last turn for an explicit terminal status.
+    for (let i = list.length - 1; i >= 0; i--) {
+        const m = list[i];
+        const tid = String(m?.turnId || m?.TurnId || m?.parentId || m?.ParentId || '').trim();
+        if (tid !== lastTurnId) continue;
+        const turnStatus = String(m?.turnStatus || m?.TurnStatus || '').trim();
+        if (turnStatus) return turnStatus;
+        const status = String(m?.status || m?.Status || '').trim();
+        if (status && isTerminalTurnStatus(status)) return status;
+    }
+    return '';
+}
+
 function lastIndexByRole(messages = [], role) {
     const list = Array.isArray(messages) ? messages : [];
     const target = String(role || '').toLowerCase();
@@ -599,10 +641,16 @@ export default function Chat({
     // Ignore stale `conversations.running` when we have no evidence of work in-flight.
     const isProcessing = (() => {
         const activeExec = hasActiveExecutions(messages);
+        const lastTurnStatus = resolveLastTurnStatus(messages);
+        const lastTurnIsTerminal = isTerminalTurnStatus(lastTurnStatus);
         const lastUser = lastIndexByRole(messages, 'user');
         const lastAssistant = lastIndexByRole(messages, 'assistant');
         const hasUnansweredUser = lastUser !== -1 && lastUser > lastAssistant;
-        if (activeExec || hasUnansweredUser) return true;
+        if (activeExec) return true;
+        // If the newest user turn is terminal (e.g. canceled) but no assistant bubble was produced,
+        // do not keep the composer in a "processing" state.
+        if (lastTurnIsTerminal) return false;
+        if (hasUnansweredUser) return true;
         if (!isConversationRunning) return false;
         // If we have evidence of a completed last turn, ignore stale running=true.
         if (lastUser !== -1 && lastAssistant !== -1 && lastAssistant > lastUser) return false;

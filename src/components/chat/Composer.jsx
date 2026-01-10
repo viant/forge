@@ -759,29 +759,6 @@ export default function Composer({
                             />,
                             uploadTooltip
                         )}
-                        {hasToolsPicker && (showTools || commandCenter) && (
-                            <Popover
-                                content={bundlesMenu}
-                                isOpen={bundlesMenuOpen}
-                                onInteraction={(open) => setBundlesMenuOpen(open)}
-                                placement="top-start"
-                            >
-                                {withTooltip(
-                                    <Button
-                                        icon="wrench"
-                                        minimal
-                                        small
-                                        disabled={disabled}
-                                        className="composer-icon-btn composer-icon-btn--tools"
-                                        data-testid="chat-composer-tools"
-                                        aria-label="Toolsets"
-                                        title="Toolsets"
-                                        onClick={(e) => { e.preventDefault(); setBundlesMenuOpen((v) => !v); }}
-                                    />,
-                                    selectedBundleIDs.length ? `Toolsets: ${selectedBundlesSummary()}` : 'Toolsets'
-                                )}
-                            </Popover>
-                        )}
                         {Array.isArray(normalizedAgentOptions) && normalizedAgentOptions.length > 0 && (
                             <Popover
                                 content={optionMenu(normalizedAgentOptions, agentValue, onAgentChange, setAgentOpen)}
@@ -830,6 +807,29 @@ export default function Composer({
                                         onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
                                     />,
                                     `Model: ${optionLabel(normalizedModelOptions, modelValue)}`
+                                )}
+                            </Popover>
+                        )}
+                        {hasToolsPicker && (showTools || commandCenter) && (
+                            <Popover
+                                content={bundlesMenu}
+                                isOpen={bundlesMenuOpen}
+                                onInteraction={(open) => setBundlesMenuOpen(open)}
+                                placement="top-start"
+                            >
+                                {withTooltip(
+                                    <Button
+                                        icon="wrench"
+                                        minimal
+                                        small
+                                        disabled={disabled}
+                                        className="composer-icon-btn composer-icon-btn--tools"
+                                        data-testid="chat-composer-tools"
+                                        aria-label="Toolsets"
+                                        title="Toolsets"
+                                        onClick={(e) => { e.preventDefault(); setBundlesMenuOpen((v) => !v); }}
+                                    />,
+                                    selectedBundleIDs.length ? `Toolsets: ${selectedBundlesSummary()}` : 'Toolsets'
                                 )}
                             </Popover>
                         )}
