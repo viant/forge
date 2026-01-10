@@ -26,6 +26,16 @@ const Execution = (context, messageBus) => {
 
             const handler = execution.handler;
             // Pass context through to service handlers so they can access DS state
+            if (typeof handler !== 'function') {
+                // Don’t crash the UI when metadata references a missing handler.
+                // This commonly happens when a view is opened before a service
+                // is wired, or when metadata drifts across versions.
+                console.error('[forge][event] handler is not a function', {
+                    id: execution?.id,
+                    handler: execution?.handler,
+                });
+                return null;
+            }
             result = handler({execution, ...args, parameters, context});
 
             if (execution.onSuccessHandler) {
@@ -40,7 +50,9 @@ const Execution = (context, messageBus) => {
             if (onErrorHandler) {
                 onErrorHandler({execution, ...args, error: e});
             } else {
-                throw e;
+                // Avoid throwing from UI-driven events (especially state events like
+                // onValue/onVisible) because it breaks rendering.
+                return null;
             }
         } finally {
             if (execution.onDoneHandler) {
