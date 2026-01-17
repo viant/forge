@@ -1,6 +1,6 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Menu, MenuItem, Popover, Tag, TextArea, Tooltip } from "@blueprintjs/core";
+import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea, Tooltip } from "@blueprintjs/core";
 import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, UserCircle, Lightbulb } from '@phosphor-icons/react';
 import BundlesDialog from "./BundlesDialog.jsx";
 
@@ -15,11 +15,14 @@ export default function Composer({
     tools = [],
     toolOptions,
     selectedTools: selectedToolsProp,
-    onToolsChange,
-    agentOptions,
-    agentValue,
-    onAgentChange,
+	    onToolsChange,
+	    autoSelectTools = false,
+	    onAutoSelectToolsChange,
+	    agentOptions,
+	    agentValue,
+	    onAgentChange,
     modelOptions,
+    modelInfo,
     modelValue,
     onModelChange,
     reasoningOptions,
@@ -60,7 +63,7 @@ export default function Composer({
     onRemoveAttachment,
     autoResize = true,
 	maxRows = 10,
-}) {
+	}) {
 	const [draft, setDraft] = useState("");
 	const [selectedToolsInternal, setSelectedToolsInternal] = useState([]);
 	const selectedTools = (selectedToolsProp !== undefined) ? selectedToolsProp : selectedToolsInternal;
@@ -69,8 +72,8 @@ export default function Composer({
 	const [modelOpen, setModelOpen] = useState(false);
 	const [reasoningOpen, setReasoningOpen] = useState(false);
 	const [queueOpen, setQueueOpen] = useState(false);
-	const [bundlesOpen, setBundlesOpen] = useState(false);
-	const [bundlesMenuOpen, setBundlesMenuOpen] = useState(false);
+		const [bundlesOpen, setBundlesOpen] = useState(false);
+		const [bundlesMenuOpen, setBundlesMenuOpen] = useState(false);
 	const micOn = (micOnProp !== undefined) ? !!micOnProp : micOnInternal;
 	const recognitionRef = useRef(null);
 	const recognitionRestartRef = useRef(false);
@@ -80,6 +83,7 @@ export default function Composer({
 	const mediaStreamRef = useRef(null);
 	const mediaChunksRef = useRef([]);
 	const recordingStartTsRef = useRef(0);
+	const lastManualAgentRef = useRef('');
 
 	const setMicEnabled = (enabled) => {
 	    const next = !!enabled;
@@ -87,7 +91,12 @@ export default function Composer({
 	    onToggleMic?.(next);
 	};
 
-    const toggleMic = () => setMicEnabled(!micOn);
+		const toggleMic = () => setMicEnabled(!micOn);
+
+	    useEffect(() => {
+	        if (!autoSelectTools) return;
+	        setBundlesOpen(false);
+	    }, [autoSelectTools]);
 
 	const getSpeechRecognitionCtor = () => {
 	    try {
@@ -437,9 +446,26 @@ export default function Composer({
 	    const list = Array.isArray(modelOptions) ? modelOptions : [];
 	    return list.map((opt) => ({
 	        ...opt,
-	        label: String(opt?.value ?? opt?.id ?? opt?.label ?? ''),
+	        // Prefer explicit option labels; when options are auto-derived with label=value,
+	        // use workspace `modelInfo[modelId].name` if available.
+	        label: (() => {
+	            const value = String(opt?.value ?? opt?.id ?? '').trim();
+	            const rawLabel = String(opt?.label ?? opt?.name ?? opt?.title ?? '').trim();
+	            const infoLabel = (modelInfo && value && modelInfo?.[value]?.name)
+	                ? String(modelInfo[value].name).trim()
+	                : '';
+	            if (infoLabel && (!rawLabel || rawLabel === value)) return infoLabel;
+	            return rawLabel || value;
+	        })(),
 	    }));
-	}, [modelOptions]);
+	}, [
+	    // Some Forge contexts may mutate option arrays in-place; derive a stable signature
+	    // so the memo recomputes when option content changes.
+	    Array.isArray(modelOptions)
+	        ? modelOptions.map((o) => `${String(o?.value ?? o?.id ?? '').trim()}:${String(o?.label ?? o?.name ?? o?.title ?? '').trim()}`).join('|')
+	        : '',
+	    modelInfo,
+	]);
 
 	const normalizeString = (value) => String(value || '').trim();
 	const bundleIdFromTool = (toolOptionOrValue) => {
@@ -558,27 +584,84 @@ export default function Composer({
 	    onToolsChange?.(normalized);
 	};
 
-	const optionMenu = (options, currentValue, onChange, close) => (
-	    <Menu>
-	        {(Array.isArray(options) ? options : []).map((opt) => {
-                const val = String(opt?.value ?? opt?.id ?? '');
-                if (!val) return null;
-                const label = String(opt?.label ?? val);
-                const checked = String(currentValue || '') === val;
-                return (
-                    <MenuItem
-                        key={val}
-                        text={label}
-                        icon={checked ? "tick" : "blank"}
-                        onClick={() => {
-                            onChange?.(val);
-                            close(false);
-                        }}
-                    />
-                );
-            })}
-        </Menu>
-    );
+		const optionMenu = (options, currentValue, onChange, close) => (
+		    <Menu>
+		        {(Array.isArray(options) ? options : []).map((opt) => {
+	                const val = String(opt?.value ?? opt?.id ?? '');
+	                if (!val) return null;
+	                const label = String(opt?.label ?? val);
+	                const checked = String(currentValue || '') === val;
+	                return (
+	                    <MenuItem
+	                        key={val}
+	                        text={label}
+	                        icon={checked ? "tick" : "blank"}
+	                        onClick={() => {
+	                            onChange?.(val);
+	                            close(false);
+	                        }}
+	                    />
+	                );
+	            })}
+	        </Menu>
+	    );
+
+		const agentMenu = (options, currentValue, onChange, close) => {
+		    const list = Array.isArray(options) ? options : [];
+		    const filtered = list.filter((opt) => String(opt?.value ?? opt?.id ?? '') !== 'auto');
+		    const isAuto = String(currentValue || '') === 'auto';
+		    return (
+		        <Menu>
+		            <MenuItem
+		                text="Auto-select agent"
+		                intent={isAuto ? "success" : "primary"}
+		                active={isAuto}
+		                icon={isAuto ? "tick" : "automatic-updates"}
+		                labelElement={isAuto ? <Tag minimal intent="success">On</Tag> : null}
+		                data-testid="chat-composer-auto-agent"
+		                shouldDismissPopover={false}
+		                onClick={(e) => {
+		                    try { e?.preventDefault?.(); } catch (_) {}
+		                    try { e?.stopPropagation?.(); } catch (_) {}
+		                    if (!isAuto) {
+		                        onChange?.('auto');
+		                        return
+		                    }
+
+		                    // Turning auto off: revert to the last manual agent when available,
+		                    // otherwise fall back to the first listed agent.
+		                    const fallback = String(lastManualAgentRef.current || '').trim();
+		                    if (fallback) {
+		                        onChange?.(fallback);
+		                        return
+		                    }
+		                    const first = filtered.length ? String(filtered[0]?.value ?? filtered[0]?.id ?? '').trim() : '';
+		                    if (first) onChange?.(first);
+		                }}
+		            />
+		            <MenuDivider title="Manual agents" />
+		            {filtered.map((opt) => {
+		                const val = String(opt?.value ?? opt?.id ?? '');
+		                if (!val) return null;
+		                const label = String(opt?.label ?? val);
+		                const checked = String(currentValue || '') === val;
+		                return (
+		                    <MenuItem
+		                        key={val}
+		                        text={label}
+		                        icon={checked ? "tick" : (isAuto ? "lock" : "blank")}
+		                        disabled={isAuto}
+		                        shouldDismissPopover={false}
+		                        onClick={() => {
+		                            lastManualAgentRef.current = val;
+		                            onChange?.(val);
+		                        }}
+		                    />
+		                );
+		            })}
+		        </Menu>
+		    );
+		};
 
     const handleChipClick = (chip) => {
 	    const handled = onChipClick?.(chip);
@@ -626,36 +709,48 @@ export default function Composer({
 	    updateSelectedTools(Array.from(new Set([...tools, ...unknownSelectedTools])));
 	};
 
-	const openBundlesDialog = () => {
-	    setBundlesMenuOpen(false);
-	    setBundlesOpen(true);
-	};
+	    const openBundlesDialog = () => {
+		    setBundlesMenuOpen(false);
+		    setBundlesOpen(true);
+		};
 
-	const bundlesMenu = (
-	    <Menu>
-	        {selectedBundleIDs.length === 0 ? (
-	            <MenuItem disabled text="No toolsets selected" />
-	        ) : (
-	            selectedBundleIDs.map((bundleID) => {
-	                const bundle = bundleCatalog.byId.get(bundleID);
-	                if (!bundle) return null;
-	                return (
-	                    <MenuItem
-	                        key={bundle.id}
-	                        icon="tick"
-	                        text={bundle.label}
-	                        shouldDismissPopover={false}
-	                        onClick={() => {
-	                            const nextIDs = selectedBundleIDs.filter(id => id !== bundle.id);
-	                            updateSelectedBundles(nextIDs);
-	                        }}
-	                    />
-	                );
-	            }).filter(Boolean)
-	        )}
-	        <MenuItem icon="more" text="Add toolsets…" onClick={openBundlesDialog} />
-	    </Menu>
-	);
+		const bundlesMenu = (
+		    <Menu>
+		        <MenuItem
+		            text="Auto tools"
+		            intent={autoSelectTools ? "success" : "primary"}
+		            active={!!autoSelectTools}
+		            icon={autoSelectTools ? "tick" : "automatic-updates"}
+		            labelElement={autoSelectTools ? <Tag minimal intent="success">On</Tag> : null}
+		            data-testid="chat-composer-auto-tools"
+		            shouldDismissPopover={false}
+		            onClick={() => onAutoSelectToolsChange?.(!autoSelectTools)}
+		        />
+		        <MenuDivider title="Manual toolsets" />
+		        {selectedBundleIDs.length === 0 ? (
+		            <MenuItem disabled text={autoSelectTools ? "Toolsets disabled while Auto tools is on" : "No toolsets selected"} />
+		        ) : (
+		            selectedBundleIDs.map((bundleID) => {
+		                const bundle = bundleCatalog.byId.get(bundleID);
+		                if (!bundle) return null;
+		                return (
+		                    <MenuItem
+		                        key={bundle.id}
+		                        icon={autoSelectTools ? "lock" : "tick"}
+		                        text={bundle.label}
+		                        shouldDismissPopover={false}
+		                        disabled={!!autoSelectTools}
+		                        onClick={() => {
+		                            const nextIDs = selectedBundleIDs.filter(id => id !== bundle.id);
+		                            updateSelectedBundles(nextIDs);
+		                        }}
+		                    />
+		                );
+		            }).filter(Boolean)
+		        )}
+		        <MenuItem icon="more" text="Add toolsets…" onClick={openBundlesDialog} disabled={!!autoSelectTools} />
+		    </Menu>
+		);
 
 	const selectedBundlesSummary = () => {
 	    if (!selectedBundleIDs.length) return '';
@@ -739,12 +834,14 @@ export default function Composer({
     const textPadRight = 32 + (rightIcons - 1) * 36; // allow room for mic + send
     const attachmentsRight = 40 + (rightIcons - 1) * 36; // overlay space for right-side icons
 
-    if (commandCenter) {
-        return (
-            <form className="chat-composer flex flex-col gap-2" onSubmit={handleSubmit} data-testid="chat-composer">
-                <div className="composer-shell" data-testid="chat-composer-shell">
-                <div className="composer-bar" data-testid="chat-composer-bar">
-                    <div className="composer-bar-left">
+	    const currentModelLabel = optionLabel(normalizedModelOptions, modelValue) || 'Model';
+
+	    if (commandCenter) {
+	        return (
+	            <form className="chat-composer flex flex-col gap-2" onSubmit={handleSubmit} data-testid="chat-composer">
+	                <div className="composer-shell" data-testid="chat-composer-shell">
+	                <div className="composer-bar" data-testid="chat-composer-bar">
+	                    <div className="composer-bar-left">
                         {showUpload && withTooltip(
                             <Button
                                 icon="plus"
@@ -759,18 +856,20 @@ export default function Composer({
                             />,
                             uploadTooltip
                         )}
-                        {Array.isArray(normalizedAgentOptions) && normalizedAgentOptions.length > 0 && (
-                            <Popover
-                                content={optionMenu(normalizedAgentOptions, agentValue, onAgentChange, setAgentOpen)}
-                                isOpen={agentOpen}
-                                onInteraction={(open) => setAgentOpen(open)}
-                                placement="bottom-start"
-                            >
+	                        {Array.isArray(normalizedAgentOptions) && normalizedAgentOptions.length > 0 && (
+	                            <Popover
+	                                content={agentMenu(normalizedAgentOptions, agentValue, onAgentChange, setAgentOpen)}
+	                                isOpen={agentOpen}
+	                                onInteraction={(open) => setAgentOpen(open)}
+	                                closeOnContentClick={false}
+	                                placement="bottom-start"
+	                            >
                                 {withTooltip(
                                     <Button
                                         minimal
                                         small
                                         disabled={disabled}
+	                                    active={String(agentValue || '') === 'auto'}
                                         data-testid="chat-composer-agent"
                                         aria-label="Agent"
                                         title="Agent"
@@ -802,38 +901,42 @@ export default function Composer({
                                         data-testid="chat-composer-model"
                                         aria-label="Model"
                                         title="Model"
-                                        className="composer-icon-btn composer-icon-btn--model"
+                                        className="composer-icon-btn composer-icon-btn--model composer-icon-btn--modelText"
                                         icon={<Lightbulb size={20} weight="duotone" />}
+	                                    text={currentModelLabel === '—' ? 'Model' : currentModelLabel}
                                         onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
                                     />,
                                     `Model: ${optionLabel(normalizedModelOptions, modelValue)}`
                                 )}
                             </Popover>
                         )}
-                        {hasToolsPicker && (showTools || commandCenter) && (
-                            <Popover
-                                content={bundlesMenu}
-                                isOpen={bundlesMenuOpen}
-                                onInteraction={(open) => setBundlesMenuOpen(open)}
-                                placement="top-start"
-                            >
-                                {withTooltip(
-                                    <Button
-                                        icon="wrench"
-                                        minimal
-                                        small
-                                        disabled={disabled}
-                                        className="composer-icon-btn composer-icon-btn--tools"
-                                        data-testid="chat-composer-tools"
-                                        aria-label="Toolsets"
-                                        title="Toolsets"
-                                        onClick={(e) => { e.preventDefault(); setBundlesMenuOpen((v) => !v); }}
-                                    />,
-                                    selectedBundleIDs.length ? `Toolsets: ${selectedBundlesSummary()}` : 'Toolsets'
-                                )}
-                            </Popover>
-                        )}
-                    </div>
+	                        {hasToolsPicker && (showTools || commandCenter) && (
+	                            <Popover
+	                                content={bundlesMenu}
+	                                isOpen={bundlesMenuOpen}
+	                                onInteraction={(open) => setBundlesMenuOpen(open)}
+	                                placement="top-start"
+	                            >
+	                                {withTooltip(
+	                                    <Button
+	                                        icon="wrench"
+	                                        minimal
+	                                        small
+	                                        disabled={disabled}
+	                                        active={!!autoSelectTools}
+	                                        className="composer-icon-btn composer-icon-btn--tools"
+	                                        data-testid="chat-composer-tools"
+	                                        aria-label="Toolsets"
+	                                        title="Toolsets"
+	                                        onClick={(e) => { e.preventDefault(); setBundlesMenuOpen((v) => !v); }}
+	                                    />,
+	                                    autoSelectTools
+	                                        ? 'Auto tools is on'
+	                                        : (selectedBundleIDs.length ? `Toolsets: ${selectedBundlesSummary()}` : 'Toolsets')
+	                                )}
+	                            </Popover>
+	                        )}
+	                    </div>
 
                     <div className="composer-bar-center">
                         {usageSummary ? withTooltip(
@@ -954,16 +1057,16 @@ export default function Composer({
                     </div>
                 </div>
 
-                {hasToolsPicker && (showTools || commandCenter) && (
-                    <BundlesDialog
-                        isOpen={bundlesOpen}
-                        onClose={() => setBundlesOpen(false)}
-                        bundles={bundleCatalog.bundles}
-                        selectedBundleIDs={selectedBundleIDs}
-                        onChange={(ids) => updateSelectedBundles(ids)}
-                        disabled={disabled}
-                    />
-                )}
+	                {hasToolsPicker && (showTools || commandCenter) && (
+	                    <BundlesDialog
+	                        isOpen={bundlesOpen}
+	                        onClose={() => setBundlesOpen(false)}
+	                        bundles={bundleCatalog.bundles}
+	                        selectedBundleIDs={selectedBundleIDs}
+	                        onChange={(ids) => updateSelectedBundles(ids)}
+	                        disabled={disabled || !!autoSelectTools}
+	                    />
+	                )}
 
                 {Array.isArray(visibleChips) && visibleChips.length > 0 && (
                     <div className="composer-chips" data-testid="chat-composer-chips">
