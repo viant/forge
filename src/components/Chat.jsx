@@ -336,6 +336,15 @@ export default function Chat({
     const metaDS = metaCtx?.handlers?.dataSource;
 
     const normalizeString = (value) => String(value || '').trim();
+    const normalizeBool = (value) => {
+        if (value === true || value === false) return value;
+        if (value === undefined || value === null) return false;
+        if (typeof value === 'number') return value === 1;
+        const s = String(value).trim().toLowerCase();
+        if (s === 'true' || s === '1' || s === 'yes' || s === 'on') return true;
+        if (s === 'false' || s === '0' || s === 'no' || s === 'off') return false;
+        return false;
+    };
     const ensureStringArray = (value) => {
         if (Array.isArray(value)) return value.map(v => String(v)).filter(Boolean);
         if (value === undefined || value === null || value === '') return [];
@@ -415,6 +424,24 @@ export default function Chat({
         setMetaField('tool', ensureStringArray(toolNames));
     };
 
+    const handleAutoSelectToolsChange = (enabled) => {
+        const next = !!enabled;
+        // Ensure defaults do not override an explicit user selection.
+        try {
+            if (context?.resources) {
+                context.resources.autoSelectToolsTouched = true;
+            }
+        } catch (_) {}
+
+        setMetaField('autoSelectTools', next);
+        // Mirror into conversations form so conversation creation & header bindings stay consistent.
+        try {
+            const convCtx = context.Context('conversations');
+            const convDS = convCtx?.handlers?.dataSource;
+            convDS?.setFormField?.({ item: { id: 'autoSelectTools' }, value: next });
+        } catch (_) {}
+    };
+
     const defaultAgentTools = (agentID) => {
         const id = normalizeString(agentID);
         const info = metaSnapshot?.agentInfo?.[id] || {};
@@ -432,6 +459,9 @@ export default function Chat({
     const currentModel = normalizeString(metaSnapshot?.model);
     const currentReasoning = normalizeString(metaSnapshot?.reasoningEffort);
     const currentTools = ensureStringArray(metaSnapshot?.tool);
+    const currentAutoSelectTools = (metaSnapshot?.autoSelectTools !== undefined)
+        ? normalizeBool(metaSnapshot?.autoSelectTools)
+        : normalizeBool(commandCenterDefaults?.autoSelectTools);
 
     const conversationID = normalizeString(conversationSnapshot?.id);
     const isConversationRunning = !!conversationSnapshot?.running;
@@ -787,10 +817,13 @@ export default function Chat({
                     toolOptions={metaSnapshot?.toolOptions}
                     selectedTools={currentTools}
                     onToolsChange={handleToolsChange}
+                    autoSelectTools={currentAutoSelectTools}
+                    onAutoSelectToolsChange={handleAutoSelectToolsChange}
                     agentOptions={metaSnapshot?.agentOptions}
                     agentValue={currentAgent}
                     onAgentChange={handleAgentChange}
                     modelOptions={metaSnapshot?.modelOptions}
+                    modelInfo={metaSnapshot?.modelInfo}
                     modelValue={currentModel}
                     onModelChange={handleModelChange}
                     reasoningOptions={[
