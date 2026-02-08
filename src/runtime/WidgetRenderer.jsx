@@ -212,7 +212,7 @@ export default function WidgetRenderer({
         widgetProps.intent = 'danger';
     }
     return (
-        <ControlWrapper item={itemWithError} container={container} framework={framework} >
+        <ControlWrapper item={itemWithError} container={container} context={context} framework={framework} >
             <Widget { ...widgetProps} />
         </ControlWrapper>
     );

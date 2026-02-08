@@ -33,3 +33,15 @@ td .pagination-bar {
     justify-content: center;
     align-items: center;
 }
+
+.toolbar-container .pagination-bar {
+    display: flex;
+    align-items: center;
+}
+
+.toolbar-container .pagination-bar > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}

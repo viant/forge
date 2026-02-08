@@ -1,11 +1,12 @@
 .*/
 node_modules/
 dist/
+android/sample/
+android/app/
+android/mock-backend/
 
 # Logs and lock files
 *.log
 package-lock.json
 yarn.lock
 thtest_local.go
-
-

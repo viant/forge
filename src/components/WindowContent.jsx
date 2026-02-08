@@ -226,6 +226,19 @@ export default function WindowContent({window, isInTab = false}) {
         let cancelled = false;
         setLoading(true);
 
+        // Dynamic windows can supply inline metadata (skip remote fetch).
+        if (window && window.inlineMetadata) {
+            try {
+                injectActions(window.inlineMetadata);
+                metadataSignal.value = window.inlineMetadata;
+            } catch (e) {
+                console.error('Error applying inline metadata', e);
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+            return () => { cancelled = true; };
+        }
+
         connector.get({})
             .then((resp) => {
                 if (cancelled) return;

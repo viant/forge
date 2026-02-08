@@ -17,7 +17,7 @@
   },
   "scripts": {
     "build": "vite build",
-    "test": "node --no-warnings src/runtime/widgetClassifier.test.js && node --no-warnings src/utils/schema.test.js && node --no-warnings src/utils/schemaExplorer.test.js"
+    "test": "node --no-warnings src/runtime/widgetClassifier.test.js && node --no-warnings src/utils/schema.test.js && node --no-warnings src/utils/schemaExplorer.test.js && node --no-warnings src/core/ui/snapshot.test.js && node --no-warnings src/core/ui/registry.test.js && node --no-warnings src/core/ui/commands.test.js"
   },
   "dependencies": {
     "@blueprintjs/core": "^6.0.0-alpha.1",
