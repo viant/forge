@@ -561,6 +561,16 @@ export const useToolbarControlEvents = (context, items = []) => {
                         return handler.execute({context, event, item});
                     };
                 }
+                if (key === "onChange") {
+                    events["onChange"] = (event) => {
+                        return handler.execute({context, event, item});
+                    };
+                }
+                if (key === "onSelection") {
+                    events["onSelection"] = (event) => {
+                        return handler.execute({context, event, item});
+                    };
+                }
             }
         }
         result[item.id] = {events, stateEvents};

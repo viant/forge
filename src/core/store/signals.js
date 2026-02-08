@@ -325,7 +325,19 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         // of the same windowKey are opened from navigation or actions.
         const computedTitle = computeWindowTitle(windowTitle, options && options.autoIndexTitle === true, instanceIndex);
 
-        let newWindow = {windowTitle: computedTitle, windowId, parentKey, windowKey, windowData, inTab, parameters, isModal: !!options.modal};
+        let newWindow = {
+            windowTitle: computedTitle,
+            windowId,
+            parentKey,
+            windowKey,
+            windowData,
+            inTab,
+            parameters,
+            isModal: !!options.modal,
+        };
+        if (options.inlineMetadata) {
+            newWindow.inlineMetadata = options.inlineMetadata;
+        }
         if (options.size) {
             newWindow.size = options.size;
         }

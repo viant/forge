@@ -175,6 +175,10 @@ function useDataConnector(dataSource) {
                 const pageParameters = paging.parameters || {};
                 const pageParamName = pageParameters.page || "page";
                 queryParams.append(pageParamName, page);
+                const sizeParamName = pageParameters.size || "size";
+                if (paging.size && paging.size > 0) {
+                    queryParams.append(sizeParamName, paging.size);
+                }
             }
 
             const body = {};

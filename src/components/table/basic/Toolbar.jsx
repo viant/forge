@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { Button } from '@blueprintjs/core';
+import { Button, HTMLSelect } from '@blueprintjs/core';
 import QuickFilterInputs from './QuickFilterInputs.jsx';
 import QuickFilterToggle from './QuickFilterToggle.jsx';
+import PaginationBar from './PaginationBar.jsx';
 import "./Toolbar.css";
 import { useToolbarControlEvents } from '../../../hooks/event.js';
 
@@ -41,6 +42,35 @@ const Toolbar = ({
         }
         if (item.id === 'quickFilterToggle') {
             return <QuickFilterToggle key={`qftoggle-${align}`} context={context} />;
+        }
+        if (item.type === 'pagination' || item.id === 'pagination') {
+            return (
+                <span key={`pagination-${align}`} style={align === 'center' ? { margin: "0 10px" } : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" })}>
+                    <PaginationBar context={context} pagination={item.pagination || {}} />
+                </span>
+            );
+        }
+        const isSelect = item.type === 'select' || item.widget === 'select' || Array.isArray(item.options);
+        if (isSelect) {
+            const { events = {} } = toolbarEvents[item.id] || {};
+            const ctx = item.dataSourceRef ? context?.Context?.(item.dataSourceRef) || context : context;
+            const form = ctx?.handlers?.dataSource?.peekFormData?.() || {};
+            const field = item.field || item.bind || item.id;
+            const value = (form && field && form[field] !== undefined) ? form[field] : item.value;
+            const spanStyle = align === 'center'
+                ? { margin: "0 10px", display: 'inline-flex', alignItems: 'center', gap: 6 }
+                : (align === 'right' ? { marginLeft: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 } : { marginRight: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 });
+            return (
+                <span key={`select-${item.id}-${align}`} style={spanStyle}>
+                    {item.label ? <span>{item.label}</span> : null}
+                    <HTMLSelect
+                        options={item.options || []}
+                        value={value ?? ''}
+                        onChange={events.onChange}
+                        icon={item.icon}
+                    />
+                </span>
+            );
         }
 
         const { events = {}, stateEvents } = toolbarEvents[item.id] || {};
