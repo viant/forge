@@ -23,7 +23,7 @@ import {
     AnchorButton,
 } from '@blueprintjs/core';
 import TextLookup from './TextLookup.jsx';
-import { Select } from '@blueprintjs/select';
+import { Select, MultiSelect } from '@blueprintjs/select';
 import { DateInput3 } from '@blueprintjs/datetime2';
 import { NumericInput } from '@blueprintjs/core';
 import { addStyles, EditableMathField } from 'react-mathquill';
@@ -52,6 +52,19 @@ function TextInput({ value = '', onChange, readOnly, ...rest }) {
         />
     );
 }
+
+const normalizeMultiValues = (value) => {
+    if (Array.isArray(value)) return value.map((v) => `${v}`);
+    if (typeof value === 'string') {
+        return value.split(',').map((v) => v.trim()).filter(Boolean);
+    }
+    if (value && typeof value === 'object') {
+        return Object.entries(value)
+            .filter(([, selected]) => !!selected)
+            .map(([key]) => `${key}`);
+    }
+    return [];
+};
 
 /* ------------------------------ Pack ---------------------------------- */
 
@@ -227,6 +240,127 @@ export function registerPack() {
     registerEventAdapter('select', {
         onChange: ({ adapter }) => (val) => adapter.set(val?.value ?? val),
         onItemSelect: ({ adapter }) => (val) => adapter.set(val?.value ?? val),
+    });
+
+    /* -------------------- Multi-select ------------------------------ */
+    registerWidget(
+        'multiSelect',
+        function BPMultiSelect({
+            value = [],
+            onChange,
+            onItemSelect,
+            readOnly,
+            options = [],
+            appearance,
+            placeholder,
+            style,
+            ...rest
+        }) {
+            const selectedValues = normalizeMultiValues(value);
+            const selectedSet = new Set(selectedValues);
+            const normalizedOptions = Array.isArray(options) ? options : [];
+            const selectedItems = normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
+            const toggle = (option) => {
+                const optionValue = `${option?.value ?? ''}`;
+                if (!optionValue) return;
+                const next = selectedSet.has(optionValue)
+                    ? selectedValues.filter((v) => v !== optionValue)
+                    : [...selectedValues, optionValue];
+                onItemSelect?.(option);
+                onChange?.(next);
+            };
+
+            if (String(appearance || '').toLowerCase() === 'pills') {
+                const pillContainerStyle = {
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 6,
+                    alignItems: 'center',
+                    ...(style || {}),
+                };
+                return (
+                    <div style={pillContainerStyle}>
+                        {normalizedOptions.map((opt) => {
+                            const optionValue = `${opt?.value ?? ''}`;
+                            const selected = selectedSet.has(optionValue);
+                            return (
+                                <Button
+                                    key={optionValue}
+                                    small
+                                    disabled={readOnly}
+                                    outlined={false}
+                                    minimal={!selected}
+                                    intent="none"
+                                    style={{
+                                        borderRadius: 999,
+                                        minWidth: 34,
+                                        height: 30,
+                                        padding: '0 10px',
+                                        background: selected ? '#e2e8f0' : 'transparent',
+                                        boxShadow: selected ? 'inset 0 0 0 1px #cbd5e1' : 'none',
+                                    }}
+                                    onClick={() => toggle(opt)}
+                                >
+                                    {opt?.label || optionValue}
+                                </Button>
+                            );
+                        })}
+                    </div>
+                );
+            }
+
+            const remove = (tag, index) => {
+                const tagValue = `${tag?.value ?? tag ?? ''}`;
+                const next = Number.isInteger(index)
+                    ? selectedValues.filter((_, i) => i !== index)
+                    : selectedValues.filter((v) => v !== tagValue);
+                onChange?.(next);
+            };
+
+            return (
+                <MultiSelect
+                    {...rest}
+                    items={normalizedOptions}
+                    selectedItems={selectedItems}
+                    disabled={readOnly}
+                    fill
+                    resetOnSelect
+                    itemRenderer={(item, { handleClick, modifiers }) => (
+                        <MenuItem
+                            key={`${item?.value ?? ''}`}
+                            text={item?.label || item?.value}
+                            active={modifiers.active}
+                            icon={selectedSet.has(`${item?.value ?? ''}`) ? 'tick' : 'blank'}
+                            onClick={handleClick}
+                            shouldDismissPopover={false}
+                        />
+                    )}
+                    tagRenderer={(item) => item?.label || `${item?.value ?? ''}`}
+                    tagInputProps={{
+                        disabled: readOnly,
+                        style: style || undefined,
+                        inputProps: {
+                            placeholder: selectedItems.length ? '' : (placeholder || 'Select...'),
+                        },
+                    }}
+                    onItemSelect={toggle}
+                    onRemove={remove}
+                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start' }}
+                />
+            );
+        },
+        { framework: 'blueprint' },
+    );
+
+    registerEventAdapter('multiSelect', {
+        onChange: ({ adapter }) => (vals) => adapter.set(normalizeMultiValues(vals)),
+        onItemSelect: ({ adapter }) => (selected) => {
+            const optionValue = `${selected?.value ?? selected ?? ''}`;
+            if (!optionValue) return;
+            const current = normalizeMultiValues(adapter.get());
+            const hasValue = current.includes(optionValue);
+            adapter.set(hasValue ? current.filter((v) => v !== optionValue) : [...current, optionValue]);
+        },
     });
 
     /* -------------------- Read-only Link ---------------------------- */
