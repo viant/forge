@@ -3,11 +3,12 @@ import { maybeAutoStartUIBridge } from '../ui/autostart.js';
 
 
 const Setting = createContext({});
+const EmptyAuthContext = createContext({ authStates: {}, defaultAuthProvider: '' });
 
 
 export const SettingProvider = ({endpoints, connectorConfig, authContext, services={},  children}) => {
 
-    const useAuth = () => useContext(authContext);
+    const useAuth = () => useContext(authContext || EmptyAuthContext);
     const stopRef = useRef(null);
 
     // Opt-in UI bridge auto-connect (no-op unless URL is provided via env/settings).

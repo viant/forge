@@ -12,6 +12,7 @@ import {
     Checkbox,
     Switch,
     Button,
+    ButtonGroup,
     MenuItem,
     TextArea,
     RadioGroup,
@@ -245,7 +246,7 @@ export function registerPack() {
     /* -------------------- Multi-select ------------------------------ */
     registerWidget(
         'multiSelect',
-        function BPMultiSelect({
+        function BPMultiSelectWidget({
             value = [],
             onChange,
             onItemSelect,
@@ -428,21 +429,126 @@ export function registerPack() {
     registerDateKind('datetime');
 
     /* -------------------- Radio group ------------------------------- */
-    registerWidget('radio', ({ value, onChange, readOnly, options = [], ...rest }) => (
-        <RadioGroup
-            {...rest}
-            disabled={readOnly}
-            selectedValue={`${value}`}
-            onChange={(e) => onChange?.(e.target.value)}
-        >
-            {options.map((opt) => (
-                <Radio key={opt.value} label={opt.label} value={opt.value} />
-            ))}
-        </RadioGroup>
-    ), { framework: 'blueprint' });
+    registerWidget('radio', ({ value, onChange, readOnly, options = [], appearance, style, ...rest }) => {
+        if (appearance === 'segmented') {
+            return (
+                <ButtonGroup style={style} className="forge-segmented-control">
+                    {options.map((opt) => {
+                        const active = String(value) === String(opt.value);
+                        return (
+                            <Button
+                                key={opt.value}
+                                text={opt.label}
+                                active={active}
+                                disabled={readOnly}
+                                onClick={() => onChange?.(opt.value)}
+                                style={{
+                                    borderRadius: 999,
+                                    paddingLeft: 12,
+                                    paddingRight: 12,
+                                    fontWeight: 500,
+                                }}
+                            />
+                        );
+                    })}
+                </ButtonGroup>
+            );
+        }
+
+        return (
+            <RadioGroup
+                {...rest}
+                disabled={readOnly}
+                selectedValue={`${value}`}
+                onChange={(e) => onChange?.(e.target.value)}
+            >
+                {options.map((opt) => (
+                    <Radio key={opt.value} label={opt.label} value={opt.value} />
+                ))}
+            </RadioGroup>
+        );
+    }, { framework: 'blueprint' });
 
     registerEventAdapter('radio', {
-        onChange: ({ adapter }) => (e) => adapter.set(e.target.value),
+        onChange: ({ adapter }) => (e) => adapter.set(e?.target?.value ?? e),
+    });
+
+    /* -------------------- MultiSelect ------------------------------ */
+    const BP_MultiSelect = MultiSelect.ofType();
+    registerWidget(
+        'multiSelect',
+        ({ value = [], onChange, readOnly, options = [], appearance, placeholder, style, ...rest }) => {
+            const selected = Array.isArray(value) ? value.map((v) => String(v)) : [];
+
+            if (appearance === 'pills') {
+                return (
+                    <div
+                        style={{
+                            ...style,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            flexWrap: 'wrap',
+                        }}
+                    >
+                        {options.map((opt) => {
+                            const v = String(opt.value);
+                            const active = selected.includes(v);
+                            return (
+                                <Button
+                                    key={v}
+                                    text={opt.label}
+                                    disabled={readOnly}
+                                    small
+                                    onClick={() => {
+                                        const next = active
+                                            ? selected.filter((x) => x !== v)
+                                            : [...selected, v];
+                                        onChange?.(next);
+                                    }}
+                                    style={{
+                                        borderRadius: 999,
+                                        minWidth: 34,
+                                        paddingLeft: 10,
+                                        paddingRight: 10,
+                                        border: '1px solid #1f2937',
+                                        background: active ? '#111827' : '#ffffff',
+                                        color: active ? '#ffffff' : '#111827',
+                                        fontWeight: 600,
+                                    }}
+                                />
+                            );
+                        })}
+                    </div>
+                );
+            }
+
+            return (
+                <BP_MultiSelect
+                    items={options}
+                    selectedItems={options.filter((o) => selected.includes(String(o.value)))}
+                    itemRenderer={(item, { handleClick, modifiers }) => (
+                        <MenuItem key={item.value} text={item.label} active={modifiers.active} onClick={handleClick} />
+                    )}
+                    itemPredicate={(query, item) => String(item.label || '').toLowerCase().includes(String(query || '').toLowerCase())}
+                    onItemSelect={(item) => {
+                        const v = String(item?.value ?? '');
+                        if (!v) return;
+                        const next = selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v];
+                        onChange?.(next);
+                    }}
+                    tagRenderer={(item) => item.label}
+                    tagInputProps={{ placeholder: placeholder || 'Select…', disabled: readOnly }}
+                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start' }}
+                    {...rest}
+                />
+            );
+        },
+        { framework: 'blueprint' }
+    );
+
+    registerEventAdapter('multiSelect', {
+        onChange: ({ adapter }) => (vals) => adapter.set(Array.isArray(vals) ? vals : []),
     });
 
     /* -------------------- TreeMultiSelect --------------------------- */
