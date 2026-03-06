@@ -1,5 +1,5 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea, Tooltip } from "@blueprintjs/core";
 import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, UserCircle, Lightbulb } from '@phosphor-icons/react';
 import BundlesDialog from "./BundlesDialog.jsx";
@@ -63,8 +63,31 @@ export default function Composer({
     onRemoveAttachment,
     autoResize = true,
 	maxRows = 10,
+	getMessageHistory: getMessageHistoryProp,
 	}) {
+	// Fallback: read agently_composer_history from localStorage when chat service doesn't pass getComposerHistory (e.g. context path)
+	const getMessageHistory = useMemo(() => {
+		if (typeof getMessageHistoryProp === 'function') return getMessageHistoryProp;
+		const KEY = 'agently_composer_history';
+		const MAX = 10;
+		return (prefix) => {
+			try {
+				const raw = localStorage.getItem(KEY);
+				const list = raw ? JSON.parse(raw) : [];
+				if (!Array.isArray(list)) return [];
+				const p = String(prefix || '').trim().toLowerCase();
+				if (!p) return list.slice(-MAX);
+				return list.filter((item) => String(item || '').toLowerCase().includes(p)).slice(-MAX);
+			} catch (_) {
+				return [];
+			}
+		};
+	}, [getMessageHistoryProp]);
+
 	const [draft, setDraft] = useState("");
+	const [historyOpen, setHistoryOpen] = useState(false);
+	const [historySuggestions, setHistorySuggestions] = useState([]);
+	const historyCloseTimerRef = useRef(null);
 	const [selectedToolsInternal, setSelectedToolsInternal] = useState([]);
 	const selectedTools = (selectedToolsProp !== undefined) ? selectedToolsProp : selectedToolsInternal;
 	const [micOnInternal, setMicOnInternal] = useState(!!defaultMicOn);
@@ -84,6 +107,42 @@ export default function Composer({
 	const mediaChunksRef = useRef([]);
 	const recordingStartTsRef = useRef(0);
 	const lastManualAgentRef = useRef('');
+
+	const updateHistorySuggestions = useCallback((prefix) => {
+		if (typeof getMessageHistory !== 'function') return;
+		const p = prefix !== undefined ? String(prefix).trim() : draft.trim();
+		const list = getMessageHistory(p) || [];
+		setHistorySuggestions(Array.isArray(list) ? list.slice(0, 10) : []);
+		setHistoryOpen(true); // always show on focus so user sees the feature (empty = "No recent messages")
+	}, [getMessageHistory, draft]);
+
+	const openHistoryOnFocus = useCallback(() => {
+		if (typeof getMessageHistory !== 'function') return;
+		if (historyCloseTimerRef.current) {
+			clearTimeout(historyCloseTimerRef.current);
+			historyCloseTimerRef.current = null;
+		}
+		updateHistorySuggestions(undefined);
+	}, [getMessageHistory, updateHistorySuggestions]);
+
+	const closeHistory = useCallback(() => {
+		historyCloseTimerRef.current = setTimeout(() => setHistoryOpen(false), 150);
+	}, []);
+
+	const onSelectHistoryItem = useCallback((text) => {
+		setDraft(text);
+		setHistoryOpen(false);
+		if (historyCloseTimerRef.current) {
+			clearTimeout(historyCloseTimerRef.current);
+			historyCloseTimerRef.current = null;
+		}
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			if (historyCloseTimerRef.current) clearTimeout(historyCloseTimerRef.current);
+		};
+	}, []);
 
 	const setMicEnabled = (enabled) => {
 	    const next = !!enabled;
@@ -1108,23 +1167,67 @@ export default function Composer({
                     </div>
                 )}
 
-                <TextArea
-                    fill
-                    placeholder="Type your message…"
-                    value={draft}
-                    autoResize={autoResize}
-                    onChange={(e) => setDraft(e.target.value)}
-                    data-testid="chat-composer-input"
-                    className="composer-textarea"
-                    style={{
-                        borderRadius: 12,
-                        resize: "none",
-                        minHeight: 40,
-                        maxHeight: `${composerMaxHeightPx(maxRows, 12)}px`,
-                        overflowY: autoResize ? 'auto' : undefined,
-                    }}
-                    disabled={disabled}
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                    <TextArea
+                        fill
+                        placeholder="Type your message…"
+                        value={draft}
+                        autoResize={autoResize}
+                        onChange={(e) => { const v = e.target.value; setDraft(v); updateHistorySuggestions(v); }}
+                        onFocus={openHistoryOnFocus}
+                        onBlur={closeHistory}
+                        data-testid="chat-composer-input"
+                        className="composer-textarea"
+                        style={{
+                            borderRadius: 12,
+                            resize: "none",
+                            minHeight: 40,
+                            maxHeight: `${composerMaxHeightPx(maxRows, 12)}px`,
+                            overflowY: autoResize ? 'auto' : undefined,
+                        }}
+                        disabled={disabled}
+                    />
+                    {historyOpen && (
+                        <ul
+                            className="composer-history-dropdown"
+                            data-testid="chat-composer-history"
+                            style={{
+                                position: 'absolute',
+                                left: 0,
+                                right: 0,
+                                top: '100%',
+                                margin: 0,
+                                marginTop: 4,
+                                padding: '4px 0',
+                                listStyle: 'none',
+                                background: 'var(--bp4-background-color, #fff)',
+                                border: '1px solid var(--bp4-border-color, #ccc)',
+                                borderRadius: 8,
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                maxHeight: 240,
+                                overflowY: 'auto',
+                                zIndex: 100,
+                            }}
+                        >
+                            {historySuggestions.length === 0 ? (
+                                <li style={{ padding: '8px 12px', fontSize: 13, color: 'var(--bp4-text-muted-color, #666)' }}>
+                                    No recent messages
+                                </li>
+                            ) : (
+                                historySuggestions.map((text, i) => (
+                                    <li
+                                        key={`${i}-${(text || '').slice(0, 40)}`}
+                                        style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}
+                                        onMouseDown={(e) => { e.preventDefault(); onSelectHistoryItem(text); }}
+                                        role="option"
+                                    >
+                                        {(text || '').slice(0, 200)}{(text || '').length > 200 ? '…' : ''}
+                                    </li>
+                                ))
+                            )}
+                        </ul>
+                    )}
+                </div>
                 </div>
             </form>
         );
@@ -1203,25 +1306,69 @@ export default function Composer({
                         </div>
                     )}
 
-                    <TextArea
-                        fill
-                        placeholder="Type your message…"
-                        value={draft}
-                        autoResize={autoResize}
-                        onChange={(e) => setDraft(e.target.value)}
-                        data-testid="chat-composer-input"
-                        style={{
-                            borderRadius: 14,
-                            resize: "none",
-                            minHeight: 40,
-                            maxHeight: `${composerMaxHeightPx(maxRows, topPad)}px`,
-                            overflowY: autoResize ? 'auto' : undefined,
-                            paddingRight: textPadRight,
-                            paddingLeft: textPadLeft,
-                            paddingTop: topPad,
-                        }}
-                        disabled={disabled}
-                    />
+                    <div style={{ position: 'relative', width: '100%' }}>
+                        <TextArea
+                            fill
+                            placeholder="Type your message…"
+                            value={draft}
+                            autoResize={autoResize}
+                            onChange={(e) => { const v = e.target.value; setDraft(v); updateHistorySuggestions(v); }}
+                            onFocus={openHistoryOnFocus}
+                            onBlur={closeHistory}
+                            data-testid="chat-composer-input"
+                            style={{
+                                borderRadius: 14,
+                                resize: "none",
+                                minHeight: 40,
+                                maxHeight: `${composerMaxHeightPx(maxRows, topPad)}px`,
+                                overflowY: autoResize ? 'auto' : undefined,
+                                paddingRight: textPadRight,
+                                paddingLeft: textPadLeft,
+                                paddingTop: topPad,
+                            }}
+                            disabled={disabled}
+                        />
+                        {historyOpen && (
+                            <ul
+                                className="composer-history-dropdown"
+                                data-testid="chat-composer-history"
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    right: 0,
+                                    top: '100%',
+                                    margin: 0,
+                                    marginTop: 4,
+                                    padding: '4px 0',
+                                    listStyle: 'none',
+                                    background: 'var(--bp4-background-color, #fff)',
+                                    border: '1px solid var(--bp4-border-color, #ccc)',
+                                    borderRadius: 8,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                    maxHeight: 240,
+                                    overflowY: 'auto',
+                                    zIndex: 100,
+                                }}
+                            >
+                                {historySuggestions.length === 0 ? (
+                                    <li style={{ padding: '8px 12px', fontSize: 13, color: 'var(--bp4-text-muted-color, #666)' }}>
+                                        No recent messages
+                                    </li>
+                                ) : (
+                                    historySuggestions.map((text, i) => (
+                                        <li
+                                            key={`${i}-${(text || '').slice(0, 40)}`}
+                                            style={{ padding: '6px 12px', cursor: 'pointer', fontSize: 13 }}
+                                            onMouseDown={(e) => { e.preventDefault(); onSelectHistoryItem(text); }}
+                                            role="option"
+                                        >
+                                            {(text || '').slice(0, 200)}{(text || '').length > 200 ? '…' : ''}
+                                        </li>
+                                    ))
+                                )}
+                            </ul>
+                        )}
+                    </div>
 
                     {showMic && withTooltip(
                         <Button
