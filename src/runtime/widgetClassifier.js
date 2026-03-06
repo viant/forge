@@ -134,6 +134,8 @@ registerClassifier((item) => {
         case 'select':
         case 'dropdown':
             return 'select';
+        case 'multiSelect':
+            return 'multiSelect';
         case 'label':
             return 'label';
         case 'progressBar':

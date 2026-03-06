@@ -11,6 +11,58 @@ function composerMaxHeightPx(maxRows, paddingTopPx) {
     return (safeRows * estimatedLineHeightPx) + safePad + 16;
 }
 
+function titleCase(value) {
+    const text = String(value || '').trim().toLowerCase();
+    if (!text) return '';
+    return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function shortModelLabel(label, value) {
+    const rawValue = String(value || '').trim();
+    const rawLabel = String(label || rawValue || '').trim();
+    if (!rawLabel) return 'Model';
+    if (rawValue.toLowerCase() === 'auto' || rawLabel.toLowerCase() === 'auto-select model') return 'Auto';
+
+    let shortened = rawLabel;
+    if (shortened.includes('/')) {
+        shortened = shortened.split('/').pop() || shortened;
+    }
+    shortened = shortened.replace(/^\s*(openai|anthropic|google|meta|mistral|inceptionlabs)[\s:/-]+/i, '');
+    shortened = shortened.replace(/\s+/g, ' ').trim();
+    return shortened || rawLabel;
+}
+
+function resolveReasoningLevel(reasoningValue, modelValue, modelInfo, modelOptions) {
+    const normalized = String(reasoningValue || '').trim().toLowerCase();
+    if (normalized === 'low' || normalized === 'medium' || normalized === 'high') return normalized;
+
+    const modelID = String(modelValue || '').trim();
+    const modelName = String(
+        modelInfo?.[modelID]?.name
+        || modelInfo?.[modelID]?.Name
+        || (Array.isArray(modelOptions)
+            ? (modelOptions.find((opt) => String(opt?.value ?? opt?.id ?? '').trim() === modelID)?.label || '')
+            : '')
+        || modelID
+    ).toLowerCase();
+
+    if (!modelName || modelID.toLowerCase() === 'auto') return '';
+    if (/(mini|nano|flash|haiku)/.test(modelName)) return 'low';
+    if (/(gpt-5|o1|o3|reasoning|sonnet|opus|pro\b)/.test(modelName)) return 'high';
+    return 'medium';
+}
+
+function reasoningIconWeight(level) {
+    switch (String(level || '').toLowerCase()) {
+        case 'low':
+            return 'regular';
+        case 'high':
+            return 'fill';
+        default:
+            return 'duotone';
+    }
+}
+
 export default function Composer({
     tools = [],
     toolOptions,
@@ -832,9 +884,14 @@ export default function Composer({
     const attachmentsLeft = 6 + 30 * leftIcons; // align with absolute left controls (6 + 30px per icon)
     const textPadLeft = 12 + 32 * leftIcons;    // base 12 + 32px per icon for inner padding
     const textPadRight = 32 + (rightIcons - 1) * 36; // allow room for mic + send
-    const attachmentsRight = 40 + (rightIcons - 1) * 36; // overlay space for right-side icons
+	const attachmentsRight = 40 + (rightIcons - 1) * 36; // overlay space for right-side icons
 
-	    const currentModelLabel = optionLabel(normalizedModelOptions, modelValue) || 'Model';
+	    const currentAgentLabel = optionLabel(normalizedAgentOptions, agentValue);
+	    const currentModelFullLabel = optionLabel(normalizedModelOptions, modelValue);
+	    const currentModelLabel = shortModelLabel(currentModelFullLabel, modelValue);
+	    const effectiveReasoningLevel = resolveReasoningLevel(reasoningValue, modelValue, modelInfo, normalizedModelOptions);
+	    const reasoningLabel = effectiveReasoningLevel ? `Reasoning ${titleCase(effectiveReasoningLevel)}` : 'Reasoning';
+	    const reasoningIcon = <Lightbulb size={20} weight={reasoningIconWeight(effectiveReasoningLevel)} />;
 
 	    if (commandCenter) {
 	        return (
@@ -873,8 +930,11 @@ export default function Composer({
                                         data-testid="chat-composer-agent"
                                         aria-label="Agent"
                                         title="Agent"
-                                        className="composer-icon-btn composer-icon-btn--agent"
+                                        className="composer-icon-btn composer-icon-btn--agent composer-icon-btn--labelText"
                                         icon={<UserCircle size={20} weight="duotone" />}
+                                        text={currentAgentLabel === '—'
+                                            ? 'Agent'
+                                            : (String(agentValue || '').trim().toLowerCase() === 'auto' ? 'Auto' : currentAgentLabel)}
                                         onClick={(e) => { e.preventDefault(); setAgentOpen((v) => !v); }}
                                     />,
                                     `Agent: ${optionLabel(normalizedAgentOptions, agentValue)}`
@@ -901,7 +961,7 @@ export default function Composer({
                                         data-testid="chat-composer-model"
                                         aria-label="Model"
                                         title="Model"
-                                        className="composer-icon-btn composer-icon-btn--model composer-icon-btn--modelText"
+                                        className="composer-icon-btn composer-icon-btn--model composer-icon-btn--labelText"
                                         icon={<Lightbulb size={20} weight="duotone" />}
 	                                    text={currentModelLabel === '—' ? 'Model' : currentModelLabel}
                                         onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
@@ -982,9 +1042,11 @@ export default function Composer({
                                     data-testid="chat-composer-reasoning"
                                     aria-label="Reasoning"
                                     title="Reasoning"
+                                    className="composer-icon-btn composer-icon-btn--reasoning composer-icon-btn--labelText"
+                                    icon={reasoningIcon}
                                     onClick={(e) => { e.preventDefault(); setReasoningOpen((v) => !v); }}
                                 >
-                                    {String(reasoningValue || '').trim() ? `Reasoning: ${reasoningValue}` : 'Reasoning'}
+                                    {reasoningLabel}
                                 </Button>
                             </Popover>
                         )}

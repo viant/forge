@@ -6,8 +6,30 @@ import {resolveSelector, setSelector} from "../utils/selector.js";
 
 import {arrayEquals} from "../utils/equal.js";
 import { getLogger } from "../utils/logger.js";
-import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
+
+const equal = (a, b) => {
+    if (a === b) return true;
+    if (a == null || b == null) return a === b;
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== 'object') return a === b;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+        if (a.length !== b.length) return false;
+        for (let i = 0; i < a.length; i++) {
+            if (!equal(a[i], b[i])) return false;
+        }
+        return true;
+    }
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    for (const key of aKeys) {
+        if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+        if (!equal(a[key], b[key])) return false;
+    }
+    return true;
+};
 
 function findDataSourceDependencies(dataSourceRef, dataSources) {
     const dependencies = {};
