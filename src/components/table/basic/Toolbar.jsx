@@ -74,6 +74,14 @@ const Toolbar = ({
         }
 
         const { events = {}, stateEvents } = toolbarEvents[item.id] || {};
+        const isVisible = stateEvents?.onVisible ? !!stateEvents.onVisible() : true;
+        if (!isVisible) return null;
+        const dynamicProps = stateEvents?.onProperties ? (stateEvents.onProperties() || {}) : {};
+        const buttonProps = { ...(item.properties || {}), ...dynamicProps };
+        const buttonIcon = buttonProps.icon ?? item.icon;
+        const buttonLabel = (buttonProps.label !== undefined) ? buttonProps.label : (item.label || "");
+        delete buttonProps.icon;
+        delete buttonProps.label;
         const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
         const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
         const testID = toolbarItemTestID(item);
@@ -85,12 +93,13 @@ const Toolbar = ({
             <span key={item.id} style={spanStyle}>
                 <Button
                     key={item.id}
-                    icon={item.icon}
+                    icon={buttonIcon}
+                    {...buttonProps}
                     {...events}
                     disabled={effectiveDisabled}
                     data-testid={testID}
                 >
-                    {item.label || ""}
+                    {buttonLabel}
                 </Button>
             </span>
         );
