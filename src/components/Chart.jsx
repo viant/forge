@@ -1,11 +1,14 @@
 import React, {useState, useEffect} from "react";
 import {
     Button,
+    Dialog,
     MenuItem,
     RadioGroup,
     Radio,
+    Tooltip as BpTooltip,
 } from "@blueprintjs/core";
 import {MultiSelect} from "@blueprintjs/select";
+import { Table as BpTable, Column as BpColumn, Cell as BpCell, ColumnHeaderCell as BpColumnHeaderCell } from "@blueprintjs/table";
 import {
     LineChart,
     Line,
@@ -68,9 +71,14 @@ function formatLargeNumber(value) {
     }
 }
 
+function escapeCsvCell(value) {
+    const v = String(value ?? "");
+    if (/[",\n]/.test(v)) return `"${v.replace(/"/g, '""')}"`;
+    return v;
+}
+
 const Chart = ({container, context}) => {
     const {chart} = container;
-    const {handlers} = context;
 
     // Extract chart configuration
     const {
@@ -86,6 +94,10 @@ const Chart = ({container, context}) => {
     const [chartData, setChartData] = useState([]);
     const [selectedDataKeys, setSelectedDataKeys] = useState([]);
     const [availableDataKeys, setAvailableDataKeys] = useState([]);
+    const [viewMode, setViewMode] = useState("chart");
+    const [showColumnDialog, setShowColumnDialog] = useState(false);
+    const [columnWidths, setColumnWidths] = useState({});
+    const [expandedCell, setExpandedCell] = useState(null);
 
     const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || "");
     const [yAxisLabel, setYAxisLabel] = useState(yAxis.label || "");
@@ -123,6 +135,19 @@ const Chart = ({container, context}) => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableDataKeys]);
+
+    const allTableColumns = [xAxis.dataKey, ...availableDataKeys];
+    const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
+
+    useEffect(() => {
+        setVisibleColumns((prev) => {
+            const keep = prev.filter((k) => allTableColumns.includes(k));
+            const add = allTableColumns.filter((k) => !keep.includes(k));
+            const next = [...keep, ...add];
+            return next.length ? next : [...allTableColumns];
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [xAxis.dataKey, availableDataKeys.join("|")]);
 
 
 
@@ -215,6 +240,78 @@ const Chart = ({container, context}) => {
         </LineChart>
     );
 
+    const computedWidthByCol = React.useMemo(() => {
+        const out = {};
+        allTableColumns.forEach((key) => {
+            const headerLen = String(key || "").length;
+            let maxLen = headerLen;
+            chartData.forEach((row) => {
+                const len = String(row?.[key] ?? "").length;
+                if (len > maxLen) maxLen = len;
+            });
+            const w = Math.max(110, Math.min(420, maxLen * 8 + 28));
+            out[key] = w;
+        });
+        return out;
+    }, [allTableColumns, chartData]);
+
+    const tableColumnWidths = visibleColumns.map((key) => {
+        const persisted = Number(columnWidths[key]);
+        if (Number.isFinite(persisted) && persisted > 60) return persisted;
+        return computedWidthByCol[key] || 140;
+    });
+
+    const toggleColumnVisibility = (key) => {
+        setVisibleColumns((prev) => {
+            if (prev.includes(key)) return prev.filter((k) => k !== key);
+            return [...prev, key];
+        });
+    };
+
+    const downloadCsv = () => {
+        const cols = visibleColumns.length ? visibleColumns : allTableColumns;
+        const lines = [cols.map(escapeCsvCell).join(",")];
+        chartData.forEach((row) => {
+            lines.push(cols.map((c) => escapeCsvCell(row?.[c])).join(","));
+        });
+        const blob = new Blob(["\ufeff" + lines.join("\n")], {type: "text/csv;charset=utf-8"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        a.href = url;
+        a.download = `chart-table-${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const tableColumns = visibleColumns.map((columnKey) => (
+        <BpColumn
+            key={columnKey}
+            columnHeaderCellRenderer={() => <BpColumnHeaderCell name={columnKey}/>}
+            cellRenderer={(rowIndex) => {
+                const raw = chartData[rowIndex]?.[columnKey] ?? "";
+                const text = String(raw);
+                const isLong = text.length > 120;
+                const display = isLong ? `${text.slice(0, 120)}…` : text;
+                const content = <span>{display}</span>;
+                return (
+                    <BpCell
+                        style={{whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: isLong ? "pointer" : "default"}}
+                        onClick={() => isLong && setExpandedCell({title: columnKey, content: text})}
+                    >
+                        {isLong ? (
+                            <BpTooltip content={<div style={{maxWidth: 640, whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{text}</div>}>
+                                {content}
+                            </BpTooltip>
+                        ) : content}
+                    </BpCell>
+                );
+            }}
+        />
+    ));
+
     return (
         <div style={{width: width, height: height}}>
             {/* RadioGroup component for valueKey selection */}
@@ -253,6 +350,22 @@ const Chart = ({container, context}) => {
                     ),
                 }}
             />
+            <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8}}>
+                <div style={{display: "flex", gap: 6}}>
+                    <Button small minimal={viewMode !== "chart"} intent={viewMode === "chart" ? "primary" : "none"} onClick={() => setViewMode("chart")}>
+                        Chart
+                    </Button>
+                    <Button small minimal={viewMode !== "table"} intent={viewMode === "table" ? "primary" : "none"} onClick={() => setViewMode("table")}>
+                        Table
+                    </Button>
+                </div>
+                {viewMode === "table" ? (
+                    <div style={{display: "flex", gap: 6}}>
+                        <Button small icon="cog" onClick={() => setShowColumnDialog(true)}>Columns</Button>
+                        <Button small icon="download" onClick={downloadCsv}>CSV</Button>
+                    </div>
+                ) : null}
+            </div>
             {loading && (
                 <div style={{textAlign: 'center', padding: 4}}>Loading…</div>
             )}
@@ -260,9 +373,74 @@ const Chart = ({container, context}) => {
                 <div style={{color: 'red', padding: 4}}>{`${error}`}</div>
             )}
 
-            <ResponsiveContainer width="100%" height="100%">
-                {lineChart}
-            </ResponsiveContainer>
+            {viewMode === "chart" ? (
+                <ResponsiveContainer width="100%" height="100%">
+                    {lineChart}
+                </ResponsiveContainer>
+            ) : (
+                <div style={{width: "100%", marginTop: 8, overflowX: "auto"}}>
+                    <BpTable
+                        numRows={chartData.length}
+                        columnWidths={tableColumnWidths}
+                        onColumnWidthChanged={(indexOrSize, sizeOrIndex) => {
+                            let idx = indexOrSize;
+                            let size = sizeOrIndex;
+                            if (idx > 2000 && size < 200) {
+                                const t = idx;
+                                idx = size;
+                                size = t;
+                            }
+                            const key = visibleColumns[idx];
+                            if (key && Number.isFinite(size) && size > 60) {
+                                setColumnWidths((prev) => ({...prev, [key]: size}));
+                            }
+                        }}
+                        enableGhostCells={false}
+                        enableRowHeader={false}
+                        defaultRowHeight={28}
+                    >
+                        {tableColumns}
+                    </BpTable>
+                </div>
+            )}
+
+            <Dialog isOpen={showColumnDialog} onClose={() => setShowColumnDialog(false)} title="Column customization">
+                <div style={{padding: 12, display: "flex", flexDirection: "column", gap: 10}}>
+                    {allTableColumns.map((key) => (
+                        <div key={key} style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12}}>
+                            <label className="bp4-control bp4-checkbox" style={{marginBottom: 0}}>
+                                <input
+                                    type="checkbox"
+                                    checked={visibleColumns.includes(key)}
+                                    onChange={() => toggleColumnVisibility(key)}
+                                />
+                                <span className="bp4-control-indicator"/>
+                                {key}
+                            </label>
+                            <input
+                                className="bp4-input bp4-small"
+                                type="number"
+                                min={80}
+                                max={640}
+                                value={Number(columnWidths[key] || computedWidthByCol[key] || 140)}
+                                onChange={(e) => {
+                                    const v = Number(e.target.value || 0);
+                                    if (Number.isFinite(v) && v >= 80) {
+                                        setColumnWidths((prev) => ({...prev, [key]: Math.min(640, v)}));
+                                    }
+                                }}
+                                style={{width: 90}}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </Dialog>
+
+            <Dialog isOpen={!!expandedCell} onClose={() => setExpandedCell(null)} title={expandedCell?.title || "Cell content"}>
+                <div style={{padding: 12, whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
+                    {expandedCell?.content || ""}
+                </div>
+            </Dialog>
         </div>
     );
 };
