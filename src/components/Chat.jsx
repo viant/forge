@@ -809,6 +809,7 @@ export default function Chat({
                     showAbort={effectiveShowAbortWhileRunning}
                     disabled={composerDisabled}
                     attachments={pendingAttachments}
+                    getMessageHistory={context?.handlers?.chat?.getComposerHistory}
                     onRemoveAttachment={(idx) => setPendingAttachments(prev => {
                         const next = prev.filter((_, i) => i !== idx);
                         try { handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: next }); } catch (_) {}
