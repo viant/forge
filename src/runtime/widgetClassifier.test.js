@@ -25,6 +25,8 @@ const cases = [
     // Markdown format/type
     { item: { type: 'string', format: 'markdown' }, expected: 'markdown' },
     { item: { type: 'markdown' }, expected: 'markdown' },
+    // Multi-select type
+    { item: { type: 'multiSelect' }, expected: 'multiSelect' },
 ];
 
 for (const { item, expected } of cases) {

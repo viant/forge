@@ -178,6 +178,10 @@ export const useControlEvents = (context, items = [], state) => {
             case "dropdown":
                 handlers.onItemSelect = Execution(context, message);
                 break;
+            case "multiSelect":
+                handlers.onChange = Execution(context, message);
+                handlers.onItemSelect = Execution(context, message);
+                break;
             case "number":
             case "numeric": // fallthrough
             case "currency":
@@ -268,7 +272,9 @@ export const useControlEvents = (context, items = [], state) => {
                         switch (item.type) {
                             case "keyValuePairs": // fallthrough
                             case "date": // fallthrough
-                            case "datetime":
+                            case "datetime": // fallthrough
+                            case "multiSelect": // fallthrough
+                            case "treeMultiSelect":
                                 events["onChange"] = (value) => {
                                     return handlers[key].execute({item, value, state, context});
                                 };
