@@ -209,6 +209,7 @@ export default function WindowContent({window, isInTab = false}) {
 
     const metadataSignal = getMetadataSignal(windowId);
     const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
 
     // Settings & connector
     const {connectorConfig = {}, services = {}} = useSetting();
@@ -248,6 +249,7 @@ export default function WindowContent({window, isInTab = false}) {
             .catch((err) => {
                 if (!cancelled) {
                     console.error('Error fetching metadata', err);
+                    setFetchError(err);
                 }
             })
             .finally(() => {
@@ -262,12 +264,22 @@ export default function WindowContent({window, isInTab = false}) {
 
     const metadata = metadataSignal.peek();
 
-    if (loading || !metadata) {
+    if (loading) {
         // Soft loading placeholder for window content
         return (
             <div style={{ padding: 16, height: '100%', minHeight: 0 }}>
                 <SoftSkeleton lines={1} height={18} style={{ marginBottom: 12 }} />
                 <SoftBlock height={180} />
+            </div>
+        );
+    }
+
+    if (!metadata) {
+        return (
+            <div style={{ padding: 16, height: '100%', minHeight: 0, color: '#888' }}>
+                {fetchError
+                    ? <span>Failed to load window: {fetchError.message}</span>
+                    : <span>No metadata available for window "{windowKey}"</span>}
             </div>
         );
     }
