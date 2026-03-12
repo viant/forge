@@ -106,7 +106,7 @@ function useDataConnector(dataSource) {
         // Get auth provider from dataSource or use default
         const authProvider = dataSource.authProvider || defaultAuthProvider;
 
-        const providerState = authStates[authProvider];
+        const providerState = authStates?.[authProvider];
         if (providerState && providerState.jwtToken?.id_token) {
             headers["Authorization"] = `Bearer ${providerState.jwtToken.id_token}`;
         }

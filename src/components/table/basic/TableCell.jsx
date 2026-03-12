@@ -73,7 +73,11 @@ const TableCell = ({
     const enforceCellSize = col.enforceColumnSize !== undefined ? col.enforceColumnSize : enforceColumnSize;
 
     if (stateEvents.onValue) {
-        value = stateEvents.onValue();
+        const computed = stateEvents.onValue();
+        if (computed !== undefined) {
+            value = computed;
+            displayedText = computed;
+        }
     }
 
     // Initialize refs and state for text truncation detection
@@ -156,8 +160,16 @@ const TableCell = ({
         ...(cell.maxWidth && {maxWidth: cell.maxWidth, minWidth: cell.minWidth}),
     };
 
+    // Expose the raw value as a data attribute so CSS can style cells by content
+    const dataAttrs = {};
+    if (value != null && (type === undefined || type === 'text' || type === '')) {
+        const raw = String(value).trim().toLowerCase().replace(/\s+/g, '-');
+        if (raw) dataAttrs['data-value'] = raw;
+    }
+    if (col.id) dataAttrs['data-col'] = col.id;
+
     return (
-        <td style={tdStyle} className={tdClass}>
+        <td style={tdStyle} className={tdClass} {...dataAttrs}>
             {cellContent}
         </td>
     );

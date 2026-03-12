@@ -409,10 +409,11 @@ type Card struct {
 }
 
 type Table struct {
-	Columns           []Column   `json:"columns" yaml:"columns"`
-	Toolbar           *Toolbar   `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	EnforceColumnSize *bool      `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
-	On                []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
+	Columns           []Column    `json:"columns" yaml:"columns"`
+	Toolbar           *Toolbar    `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	EnforceColumnSize *bool       `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
+	Pagination        interface{} `json:"pagination,omitempty" yaml:"pagination,omitempty"`
+	On                []*Execute  `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type Toolbar struct {
@@ -423,20 +424,21 @@ type Toolbar struct {
 }
 
 type Column struct {
-	ID             string                 `json:"id" yaml:"id"`
-	Name           string                 `json:"name" yaml:"name"`
-	Width          int                    `json:"width,omitempty" yaml:"width,omitempty"`
-	Align          string                 `json:"align,omitempty" yaml:"align,omitempty"`
-	NumericFormat  string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	Sortable       bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
-	Icon           string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
-	Type           string                 `json:"type,omitempty" yaml:"type,omitempty"`
-	MultiSelect    bool                   `json:"multiSelect,omitempty" yaml:"multiSelect,omitempty"`
-	CellProperties map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
-	HeadProperties map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
-	Progress       *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`
-	On             []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
-	ToolTip        string                 `json:"tooltip" yaml:"tooltip"`
+	ID                string                 `json:"id" yaml:"id"`
+	Name              string                 `json:"name" yaml:"name"`
+	Width             int                    `json:"width,omitempty" yaml:"width,omitempty"`
+	Align             string                 `json:"align,omitempty" yaml:"align,omitempty"`
+	NumericFormat     string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	Sortable          bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
+	Icon              string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Type              string                 `json:"type,omitempty" yaml:"type,omitempty"`
+	MultiSelect       bool                   `json:"multiSelect,omitempty" yaml:"multiSelect,omitempty"`
+	EnforceColumnSize bool                   `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
+	CellProperties    map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
+	HeadProperties    map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
+	Progress          *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`
+	On                []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
+	ToolTip           string                 `json:"tooltip" yaml:"tooltip"`
 }
 
 // TemplateItem represents a single template item with an ID and an operator.
