@@ -40,6 +40,8 @@ export default function Composer({
     usageTooltip,
     onQueueCancel,
     onQueueMove,
+    onQueueEdit,
+    onQueueSteer,
     onSubmit,
     onOpenAttach,
     onOpenSettings,
@@ -61,9 +63,10 @@ export default function Composer({
     disabled = false,
     attachments = [],
     onRemoveAttachment,
-    autoResize = true,
+	autoResize = true,
 	maxRows = 10,
 	getMessageHistory: getMessageHistoryProp,
+	historyOnFocus = false,
 	}) {
 	// Fallback: read agently_composer_history from localStorage when chat service doesn't pass getComposerHistory (e.g. context path)
 	const getMessageHistory = useMemo(() => {
@@ -112,8 +115,9 @@ export default function Composer({
 		if (typeof getMessageHistory !== 'function') return;
 		const p = prefix !== undefined ? String(prefix).trim() : draft.trim();
 		const list = getMessageHistory(p) || [];
-		setHistorySuggestions(Array.isArray(list) ? list.slice(0, 10) : []);
-		setHistoryOpen(true); // always show on focus so user sees the feature (empty = "No recent messages")
+		const next = Array.isArray(list) ? list.slice(0, 10) : [];
+		setHistorySuggestions(next);
+		setHistoryOpen(p.length > 0 && next.length > 0);
 	}, [getMessageHistory, draft]);
 
 	const openHistoryOnFocus = useCallback(() => {
@@ -122,8 +126,15 @@ export default function Composer({
 			clearTimeout(historyCloseTimerRef.current);
 			historyCloseTimerRef.current = null;
 		}
-		updateHistorySuggestions(undefined);
-	}, [getMessageHistory, updateHistorySuggestions]);
+		if (historyOnFocus) {
+			updateHistorySuggestions(undefined);
+		} else if (draft.trim()) {
+			updateHistorySuggestions(draft);
+		} else {
+			setHistorySuggestions([]);
+			setHistoryOpen(false);
+		}
+	}, [getMessageHistory, updateHistorySuggestions, draft, historyOnFocus]);
 
 	const closeHistory = useCallback(() => {
 		historyCloseTimerRef.current = setTimeout(() => setHistoryOpen(false), 150);
@@ -461,6 +472,7 @@ export default function Composer({
         e.preventDefault();
         if (disabled) return; // Block submission while disabled
         if (!draft.trim()) return;
+        setHistoryOpen(false);
         onSubmit?.({ content: draft, toolNames: selectedTools });
         setDraft("");
     };
@@ -853,6 +865,24 @@ export default function Composer({
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                     <Button
+                                        minimal
+                                        small
+                                        intent="primary"
+                                        disabled={disabled}
+                                        data-testid={`chat-queue-steer-${id}`}
+                                        onClick={(e) => { e.preventDefault(); onQueueSteer?.(t); }}
+                                    >
+                                        Steer
+                                    </Button>
+                                    <Button
+                                        icon="edit"
+                                        minimal
+                                        small
+                                        disabled={disabled}
+                                        data-testid={`chat-queue-edit-${id}`}
+                                        onClick={(e) => { e.preventDefault(); onQueueEdit?.(t); }}
+                                    />
+                                    <Button
                                         icon="chevron-up"
                                         minimal
                                         small
@@ -1207,6 +1237,7 @@ export default function Composer({
                                 maxHeight: 240,
                                 overflowY: 'auto',
                                 zIndex: 100,
+                                pointerEvents: historySuggestions.length === 0 ? 'none' : 'auto',
                             }}
                         >
                             {historySuggestions.length === 0 ? (
@@ -1348,6 +1379,7 @@ export default function Composer({
                                     maxHeight: 240,
                                     overflowY: 'auto',
                                     zIndex: 100,
+                                    pointerEvents: historySuggestions.length === 0 ? 'none' : 'auto',
                                 }}
                             >
                                 {historySuggestions.length === 0 ? (

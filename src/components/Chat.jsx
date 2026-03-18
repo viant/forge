@@ -60,7 +60,25 @@ function hasActiveExecutions(messages = []) {
     const list = Array.isArray(messages) ? messages : [];
     return list.some((m) => {
         const executions = Array.isArray(m?.executions) ? m.executions : [];
-        return executions.some((ex) => hasActiveSteps(ex?.steps || []));
+        if (executions.some((ex) => hasActiveSteps(ex?.steps || []))) return true;
+        const executionGroups = Array.isArray(m?.executionGroups) ? m.executionGroups : [];
+        if (executionGroups.some((group) => {
+            const status = String(group?.status || group?.Status || '').toLowerCase();
+            if (status === 'in_progress' || status === 'running' || status === 'processing' || status === 'pending' || status === 'thinking' || status === 'streaming') {
+                return true;
+            }
+            const modelSteps = Array.isArray(group?.modelSteps) ? group.modelSteps : (group?.modelCall ? [group.modelCall] : []);
+            const toolSteps = Array.isArray(group?.toolSteps) ? group.toolSteps : [];
+            return hasActiveSteps(modelSteps) || hasActiveSteps(toolSteps);
+        })) return true;
+        const iterationData = m?._iterationData;
+        const iterationStatus = String(iterationData?.status || m?.turnStatus || m?.status || '').toLowerCase();
+        return iterationStatus === 'in_progress'
+            || iterationStatus === 'running'
+            || iterationStatus === 'processing'
+            || iterationStatus === 'pending'
+            || iterationStatus === 'thinking'
+            || iterationStatus === 'streaming';
     });
 }
 
@@ -717,6 +735,35 @@ export default function Chat({
         }
     };
 
+    const handleQueueEdit = (turn) => {
+        const turnID = normalizeString(turn?.id);
+        if (!turnID || !conversationID) return;
+        const initial = normalizeString(turn?.content) || normalizeString(turn?.preview);
+        const next = window.prompt('Edit queued request', initial);
+        if (next == null) return;
+        const content = normalizeString(next);
+        if (!content || content === initial) return;
+        if (typeof chatService?.editQueuedTurn === 'function') {
+            chatService.editQueuedTurn({ context, conversationID, turnID, content });
+        }
+    };
+
+    const handleQueueSteer = (turn) => {
+        const turnID = normalizeString(turn?.id);
+        if (!turnID || !conversationID) return;
+        if (typeof chatService?.forceSteerQueuedTurn === 'function') {
+            chatService.forceSteerQueuedTurn({ context, conversationID, turnID });
+            return;
+        }
+        const content = normalizeString(turn?.content) || normalizeString(turn?.preview);
+        if (!content) return;
+        const runningTurnId = normalizeString(context?.resources?.chat?.runningTurnId);
+        if (!runningTurnId) return;
+        if (typeof chatService?.steerTurn === 'function') {
+            chatService.steerTurn({ context, conversationID, turnID: runningTurnId, content });
+        }
+    };
+
     return (
         <div
             className="w-full px-4 pt-4 gap-3"
@@ -778,6 +825,8 @@ export default function Chat({
                     usageTooltip={usageTooltip}
                     onQueueCancel={handleQueueCancel}
                     onQueueMove={handleQueueMove}
+                    onQueueEdit={handleQueueEdit}
+                    onQueueSteer={handleQueueSteer}
                     uploadTooltip={chatCfg?.tooltips?.upload}
                     settingsTooltip={chatCfg?.tooltips?.settings}
                     micTooltip={chatCfg?.tooltips?.mic}
