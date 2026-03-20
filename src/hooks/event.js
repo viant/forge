@@ -548,11 +548,6 @@ export const useToolbarControlEvents = (context, items = []) => {
             }
         }
 
-        // Handle onReadonly event
-        if (on.length > 0) {
-            indexExecution(context, on, handlers, message);
-        }
-
         const events = {};
         const stateEvents = {};
         for (const key in handlers) {
