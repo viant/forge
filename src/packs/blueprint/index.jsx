@@ -433,7 +433,7 @@ export function registerPack() {
             {...rest}
             disabled={readOnly}
             selectedValue={`${value}`}
-            onChange={(e) => onChange?.(e.target.value)}
+            onChange={(e) => onChange?.(e)}
         >
             {options.map((opt) => (
                 <Radio key={opt.value} label={opt.label} value={opt.value} />
@@ -442,7 +442,7 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     registerEventAdapter('radio', {
-        onChange: ({ adapter }) => (e) => adapter.set(e.target.value),
+        onChange: ({ adapter }) => (e) => adapter.set(e?.target?.value ?? e),
     });
 
     /* -------------------- TreeMultiSelect --------------------------- */
