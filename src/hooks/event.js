@@ -288,7 +288,7 @@ export const useControlEvents = (context, items = [], state) => {
                                 break;
                             default:
                                 events["onChange"] = (event) => {
-                                    const value = event.target?.value;
+                                    const value = event?.target?.value ?? event;
                                     return handlers[key].execute({event, item, value, state, context});
                                 };
                         }

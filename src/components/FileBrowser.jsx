@@ -314,6 +314,7 @@ const FileBrowser = (props) => {
 
     return (
         <div
+            className={config.className || ''}
             style={{
                 padding: '10px',
                 border: '1px solid #ccc',

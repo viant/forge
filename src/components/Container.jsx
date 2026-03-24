@@ -82,6 +82,8 @@ const Container = ({context, container, isActive}) => {
                 showDividers={!!term.showDividers}
                 truncateLongOutput={term.truncateLongOutput}
                 truncateLength={term.truncateLength}
+                className={term.className || ''}
+                style={term.style || {}}
             />
         );
     }
@@ -265,34 +267,36 @@ const Container = ({context, container, isActive}) => {
     return (<>
             <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 {container.toolbar ? renderContainerToolbar() : null}
-                {container?.layout?.kind === 'grid' ? (
-                    <GridLayoutRenderer
-                        context={context}
-                        container={{ ...container, layout: { labels: { mode: (container?.layout?.labels?.mode || 'left') }, ...container.layout } }}
-                        items={visualItems}
-                        handlers={handlers}
-                        state={state}
-                        baseDataSourceRef={dataSourceRef}
-                        style={style}
-                    />
-                ) : (
-                    <div style={gridStyle}>
-                        {visualItems.map((item) => {
-                            const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
-                            return (
-                                <ControlRenderer
-                                    key={item.id}
-                                    item={item}
-                                    context={subCtx}
-                                    events={handlers[item.id]?.events || {}}
-                                    stateEvents={handlers[item.id]?.stateEvents || {}}
-                                    container={container}
-                                    state={state}
-                                />
-                            )
-                        })}
-                    </div>
-                )}
+                {(visualItems?.length || 0) > 0 ? (
+                    container?.layout?.kind === 'grid' ? (
+                        <GridLayoutRenderer
+                            context={context}
+                            container={{ ...container, layout: { labels: { mode: (container?.layout?.labels?.mode || 'left') }, ...container.layout } }}
+                            items={visualItems}
+                            handlers={handlers}
+                            state={state}
+                            baseDataSourceRef={dataSourceRef}
+                            style={style}
+                        />
+                    ) : (
+                        <div style={gridStyle}>
+                            {visualItems.map((item) => {
+                                const subCtx = context.Context(item.dataSourceRef || dataSourceRef)
+                                return (
+                                    <ControlRenderer
+                                        key={item.id}
+                                        item={item}
+                                        context={subCtx}
+                                        events={handlers[item.id]?.events || {}}
+                                        stateEvents={handlers[item.id]?.stateEvents || {}}
+                                        container={container}
+                                        state={state}
+                                    />
+                                )
+                            })}
+                        </div>
+                    )
+                ) : null}
                 {chartPanel}
                 {chatPanel}
                 {terminalPanel}

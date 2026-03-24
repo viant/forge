@@ -20,10 +20,12 @@ const TableRow = ({
         return onRowClick({ event, ...rowSelection });
     };
 
-    const { handlers } = context;
-    const { isSelected } = handlers.dataSource;
+    const dataSource = context?.handlers?.dataSource || {};
+    const isSelected = typeof dataSource.isSelected === "function"
+        ? dataSource.isSelected
+        : () => false;
 
-    const selected = isSelected({ ...rowSelection });
+    const selected = !!isSelected({ ...rowSelection });
 
     const cells = [];
     for (let colIndex = 0; colIndex < columns.length; colIndex++) {

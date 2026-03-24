@@ -35,8 +35,10 @@ const TableCell = ({
                        onShowFullContent,
                    }) => {
     let {displayedText, value, align} = cell;
-    const {handlers} = context;
-    const {isSelected} = handlers.dataSource;
+    const dataSource = context?.handlers?.dataSource || {};
+    const isSelected = typeof dataSource.isSelected === "function"
+        ? dataSource.isSelected
+        : () => false;
     const {col, row} = cellSelection;
     const {cellProperties = {}} = col;
     const cellEvents = useCellEvents({context, cellSelection, columnHandlers, onRowClick});

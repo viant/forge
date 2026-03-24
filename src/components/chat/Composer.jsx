@@ -924,6 +924,13 @@ export default function Composer({
     const attachmentsRight = 40 + (rightIcons - 1) * 36; // overlay space for right-side icons
 
 	    const currentModelLabel = optionLabel(normalizedModelOptions, modelValue) || 'Model';
+	    const currentAgentLabel = (() => {
+	        const raw = optionLabel(normalizedAgentOptions, agentValue);
+	        if (raw && raw !== '—') return raw;
+	        const defaultOption = normalizedAgentOptions.find((opt) => !!opt?.default)
+	            || normalizedAgentOptions.find((opt) => normalizeString(opt?.value ?? opt?.id).toLowerCase() !== 'auto');
+	        return normalizeString(defaultOption?.label) || 'Agent';
+	    })();
 
 	    if (commandCenter) {
 	        return (
@@ -962,8 +969,9 @@ export default function Composer({
                                         data-testid="chat-composer-agent"
                                         aria-label="Agent"
                                         title="Agent"
-                                        className="composer-icon-btn composer-icon-btn--agent"
+                                        className="composer-icon-btn composer-icon-btn--agent composer-icon-btn--labelText"
                                         icon={<UserCircle size={20} weight="duotone" />}
+	                                    text={currentAgentLabel}
                                         onClick={(e) => { e.preventDefault(); setAgentOpen((v) => !v); }}
                                     />,
                                     `Agent: ${optionLabel(normalizedAgentOptions, agentValue)}`
@@ -990,7 +998,7 @@ export default function Composer({
                                         data-testid="chat-composer-model"
                                         aria-label="Model"
                                         title="Model"
-                                        className="composer-icon-btn composer-icon-btn--model composer-icon-btn--modelText"
+                                        className="composer-icon-btn composer-icon-btn--model composer-icon-btn--labelText"
                                         icon={<Lightbulb size={20} weight="duotone" />}
 	                                    text={currentModelLabel === '—' ? 'Model' : currentModelLabel}
                                         onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
