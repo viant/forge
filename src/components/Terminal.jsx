@@ -25,6 +25,7 @@ const Terminal = ({
   prompt = '$',
   showDividers = false,
   className = '',
+  style = {},
   truncateLongOutput = true,
   truncateLength = 150,
 }) => {
@@ -98,7 +99,7 @@ const Terminal = ({
     <div
       ref={scrollRef}
       className={`terminal-container ${className}`}
-      style={{ height }}
+      style={{ height, ...style }}
       data-testid="terminal"
     >
       <div className="terminal-inner">

@@ -3,14 +3,22 @@ import { Checkbox, Icon, Tooltip, Position } from "@blueprintjs/core";
 
 const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
     const { onSort, sortColumnId, sortDirection } = sortConfig;
-    const { handlers, dataSource } = context;
-    const {
-        setAllSelection,
-        resetSelection,
-        getSelection,
-        peekCollection,
-    } = handlers.dataSource;
-    const selectionMode = dataSource.selectionMode || "single";
+    const handlers = context?.handlers || {};
+    const dataSourceConfig = context?.dataSource || {};
+    const dataSourceHandlers = handlers.dataSource || {};
+    const setAllSelection = typeof dataSourceHandlers.setAllSelection === "function"
+        ? dataSourceHandlers.setAllSelection
+        : () => {};
+    const resetSelection = typeof dataSourceHandlers.resetSelection === "function"
+        ? dataSourceHandlers.resetSelection
+        : () => {};
+    const getSelection = typeof dataSourceHandlers.getSelection === "function"
+        ? dataSourceHandlers.getSelection
+        : () => ({ selected: null, selection: [] });
+    const peekCollection = typeof dataSourceHandlers.peekCollection === "function"
+        ? dataSourceHandlers.peekCollection
+        : () => [];
+    const selectionMode = dataSourceConfig.selectionMode || "single";
 
     const selection = getSelection();
     const collection = peekCollection();
