@@ -11,6 +11,72 @@ function composerMaxHeightPx(maxRows, paddingTopPx) {
     return (safeRows * estimatedLineHeightPx) + safePad + 16;
 }
 
+const COMPOSER_DRAFTS_KEY = 'agently.composerDrafts.v1';
+
+function currentConversationIdFromLocation() {
+    if (typeof window === 'undefined') return '';
+    const match = String(window.location?.pathname || '').match(/\/conversation\/([^/?#]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+}
+
+function readStoredDraftMap() {
+    if (typeof window === 'undefined') return {};
+    try {
+        const raw = window.sessionStorage?.getItem(COMPOSER_DRAFTS_KEY) || '{}';
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_) {
+        return {};
+    }
+}
+
+function writeStoredDraftMap(value = {}) {
+    if (typeof window === 'undefined') return;
+    try {
+        window.sessionStorage?.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(value || {}));
+    } catch (_) {}
+}
+
+function readStoredDraft(conversationId = '') {
+    const map = readStoredDraftMap();
+    const key = String(conversationId || '').trim() || '__pending__';
+    return String(map[key] || '').trim();
+}
+
+function consumeStoredDraft(conversationId = '') {
+    const map = readStoredDraftMap();
+    const key = String(conversationId || '').trim() || '__pending__';
+    const value = String(map[key] || '').trim();
+    if (!value) return '';
+    delete map[key];
+    writeStoredDraftMap(map);
+    return value;
+}
+
+function movePendingDraftToConversation(conversationId = '') {
+    const id = String(conversationId || '').trim();
+    if (!id) return '';
+    const map = readStoredDraftMap();
+    const pending = String(map.__pending__ || '').trim();
+    if (!pending || String(map[id] || '').trim()) return '';
+    delete map.__pending__;
+    map[id] = pending;
+    writeStoredDraftMap(map);
+    return pending;
+}
+
+function storeDraftForConversation(conversationId = '', draft = '') {
+    const id = String(conversationId || '').trim() || '__pending__';
+    const text = String(draft || '');
+    const map = readStoredDraftMap();
+    if (text.trim()) {
+        map[id] = text;
+    } else {
+        delete map[id];
+    }
+    writeStoredDraftMap(map);
+}
+
 export default function Composer({
     tools = [],
     toolOptions,
@@ -110,6 +176,50 @@ export default function Composer({
 	const mediaChunksRef = useRef([]);
 	const recordingStartTsRef = useRef(0);
 	const lastManualAgentRef = useRef('');
+
+	useEffect(() => {
+	    const applyPrefill = (prompt, conversationId = '') => {
+	        const targetId = String(conversationId || '').trim();
+	        const currentId = currentConversationIdFromLocation();
+	        if (targetId && currentId && targetId !== currentId) return;
+	        setDraft((prev) => prev && prev.trim() ? prev : String(prompt || ''));
+	    };
+
+	    const restoreCurrentDraft = (conversationId = '') => {
+	        const currentId = String(conversationId || currentConversationIdFromLocation()).trim();
+	        const moved = movePendingDraftToConversation(currentId);
+	        const restored = moved || consumeStoredDraft(currentId) || (!currentId ? consumeStoredDraft('__pending__') : '');
+	        if (restored) {
+	            setDraft((prev) => prev && prev.trim() ? prev : restored);
+	        }
+	    };
+
+	    const handlePrefill = (event) => {
+	        const prompt = String(event?.detail?.prompt || '').trim();
+	        const conversationId = String(event?.detail?.conversationId || '').trim();
+	        if (!prompt) return;
+	        applyPrefill(prompt, conversationId);
+	    };
+
+	    const handleConversationActive = (event) => {
+	        const conversationId = String(event?.detail?.id || '').trim();
+	        restoreCurrentDraft(conversationId);
+	    };
+
+	    restoreCurrentDraft();
+	    window.addEventListener('agently:composer-prefill', handlePrefill);
+	    window.addEventListener('agently:conversation-active', handleConversationActive);
+	    window.addEventListener('popstate', handleConversationActive);
+	    return () => {
+	        window.removeEventListener('agently:composer-prefill', handlePrefill);
+	        window.removeEventListener('agently:conversation-active', handleConversationActive);
+	        window.removeEventListener('popstate', handleConversationActive);
+	    };
+	}, []);
+
+	useEffect(() => {
+	    storeDraftForConversation(currentConversationIdFromLocation(), draft);
+	}, [draft]);
 
 	const updateHistorySuggestions = useCallback((prefix) => {
 		if (typeof getMessageHistory !== 'function') return;
@@ -473,6 +583,7 @@ export default function Composer({
         if (disabled) return; // Block submission while disabled
         if (!draft.trim()) return;
         setHistoryOpen(false);
+        storeDraftForConversation(currentConversationIdFromLocation(), '');
         onSubmit?.({ content: draft, toolNames: selectedTools });
         setDraft("");
     };

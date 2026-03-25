@@ -226,6 +226,7 @@ export default function WindowContent({window, isInTab = false}) {
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
+        setFetchError(null);
 
         // Dynamic windows can supply inline metadata (skip remote fetch).
         if (window && window.inlineMetadata) {
@@ -243,6 +244,7 @@ export default function WindowContent({window, isInTab = false}) {
         connector.get({})
             .then((resp) => {
                 if (cancelled) return;
+                setFetchError(null);
                 injectActions(resp.data);
                 metadataSignal.value = resp.data;
             })
@@ -275,10 +277,13 @@ export default function WindowContent({window, isInTab = false}) {
     }
 
     if (!metadata) {
+        const isAuthError = fetchError && (fetchError.status === 401 || fetchError.status === 403 || fetchError.isUnauthorized);
         return (
             <div style={{ padding: 16, height: '100%', minHeight: 0, color: '#888' }}>
                 {fetchError
-                    ? <span>Failed to load window: {fetchError.message}</span>
+                    ? isAuthError
+                        ? <span>Authentication required. Please sign in to continue.</span>
+                        : <span>Failed to load window: {fetchError.message}</span>
                     : <span>No metadata available for window "{windowKey}"</span>}
             </div>
         );

@@ -22,6 +22,31 @@ import {
 import {format} from "date-fns";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 
+function useMeasuredContainer() {
+    const ref = React.useRef(null);
+    const [size, setSize] = useState({width: 0, height: 0});
+
+    useEffect(() => {
+        const node = ref.current;
+        if (!node || typeof ResizeObserver === "undefined") return undefined;
+        const update = () => {
+            const nextWidth = Number(node.clientWidth || 0);
+            const nextHeight = Number(node.clientHeight || 0);
+            setSize((prev) => (
+                prev.width === nextWidth && prev.height === nextHeight
+                    ? prev
+                    : {width: nextWidth, height: nextHeight}
+            ));
+        };
+        update();
+        const observer = new ResizeObserver(() => update());
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, []);
+
+    return [ref, size];
+}
+
 // Function to transform rawData into chartData
 export function transformData(rawData, chart, valueKey) {
     const {xAxis, series} = chart;
@@ -77,8 +102,10 @@ function escapeCsvCell(value) {
     return v;
 }
 
-const Chart = ({container, context}) => {
+const Chart = ({container, context, isActive = true}) => {
     const {chart} = container;
+    const [chartRef, chartSize] = useMeasuredContainer();
+    const [chartReady, setChartReady] = useState(false);
 
     // Extract chart configuration
     const {
@@ -135,6 +162,15 @@ const Chart = ({container, context}) => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [availableDataKeys]);
+
+    useEffect(() => {
+        if (!isActive || viewMode !== "chart" || chartSize.width <= 0 || chartSize.height <= 0) {
+            setChartReady(false);
+            return undefined;
+        }
+        const raf = window.requestAnimationFrame(() => setChartReady(true));
+        return () => window.cancelAnimationFrame(raf);
+    }, [isActive, viewMode, chartSize.width, chartSize.height]);
 
     const allTableColumns = [xAxis.dataKey, ...availableDataKeys];
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
@@ -313,7 +349,7 @@ const Chart = ({container, context}) => {
     ));
 
     return (
-        <div style={{width: width, height: height}}>
+        <div style={{width: width, height: height}} ref={chartRef}>
             {/* RadioGroup component for valueKey selection */}
             <RadioGroup
                 inline={true}
@@ -374,9 +410,11 @@ const Chart = ({container, context}) => {
             )}
 
             {viewMode === "chart" ? (
-                <ResponsiveContainer width="100%" height="100%">
-                    {lineChart}
-                </ResponsiveContainer>
+                chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        {lineChart}
+                    </ResponsiveContainer>
+                ) : null
             ) : (
                 <div style={{width: "100%", marginTop: 8, overflowX: "auto"}}>
                     <BpTable
