@@ -27,8 +27,34 @@ function logCallerStack(name , maxFrames = 5) {
 
 function useDataConnector(dataSource) {
     const {endpoints, useAuth} = useSetting();
-    const {authStates, defaultAuthProvider} = useAuth();
+    const auth = useAuth();
+    const {authStates, defaultAuthProvider} = auth;
     const {paging = {}, parameters = []} = dataSource;
+
+    function notifyUnauthorized(error) {
+        if (!error || (error.status !== 401 && error.status !== 403)) {
+            return;
+        }
+        for (const handlerName of ['handleUnauthorized', 'onUnauthorized', 'promptLogin', 'beginLogin']) {
+            const fn = auth?.[handlerName];
+            if (typeof fn === 'function') {
+                try {
+                    fn(error);
+                    return;
+                } catch (e) {
+                    console.error(`Unauthorized handler ${handlerName} failed`, e);
+                }
+            }
+        }
+    }
+
+    function makeRequestError(resp, prefix = 'Request error') {
+        const error = new Error(`${prefix}: ${resp.status} ${resp.statusText}`);
+        error.status = resp.status;
+        error.statusText = resp.statusText;
+        error.isUnauthorized = resp.status === 401 || resp.status === 403;
+        return error;
+    }
 
 
     /**
@@ -145,7 +171,9 @@ function useDataConnector(dataSource) {
             // Execute fetch request
             const resp = await fetch(finalUrl, request);
             if (!resp.ok) {
-                throw new Error(`GET request failed: ${resp.status} ${resp.statusText}`);
+                const err = makeRequestError(resp, 'GET request failed');
+                notifyUnauthorized(err);
+                throw err;
             }
             const data = await resp.text();
             // Return parsed JSON response
@@ -195,7 +223,9 @@ function useDataConnector(dataSource) {
             try { log.debug('[request]', { method, url: finalUrl, request }); } catch(_) {}
             const resp = await fetch(finalUrl, request);
             if (!resp.ok) {
-                throw new Error(`GET error: ${resp.statusText}`);
+                const err = makeRequestError(resp, 'GET error');
+                notifyUnauthorized(err);
+                throw err;
             }
             const json = await resp.json();
             try { log.debug('[response]', { url: finalUrl, status: resp.status }); } catch(_) {}
@@ -226,7 +256,9 @@ function useDataConnector(dataSource) {
                 body: JSON.stringify(body),
             });
             if (!resp.ok) {
-                throw new Error(`POST error: ${resp.statusText}`);
+                const err = makeRequestError(resp, 'POST error');
+                notifyUnauthorized(err);
+                throw err;
             }
             const json = await resp.json();
             try { log.debug('[response][POST]', { url, status: resp.status }); } catch(_) {}
@@ -253,7 +285,9 @@ function useDataConnector(dataSource) {
                 body: JSON.stringify(body),
             });
             if (!resp.ok) {
-                throw new Error(`POST error: ${resp.statusText}`);
+                const err = makeRequestError(resp, 'PATCH error');
+                notifyUnauthorized(err);
+                throw err;
             }
             return await resp.json();
         } catch (err) {
