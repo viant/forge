@@ -279,7 +279,7 @@ export function registerPack() {
                     ...(style || {}),
                 };
                 return (
-                    <div style={pillContainerStyle}>
+                    <div style={pillContainerStyle} className="forge-pills-container">
                         {normalizedOptions.map((opt) => {
                             const optionValue = `${opt?.value ?? ''}`;
                             const selected = selectedSet.has(optionValue);
@@ -428,18 +428,65 @@ export function registerPack() {
     registerDateKind('datetime');
 
     /* -------------------- Radio group ------------------------------- */
-    registerWidget('radio', ({ value, onChange, readOnly, options = [], ...rest }) => (
-        <RadioGroup
-            {...rest}
-            disabled={readOnly}
-            selectedValue={`${value}`}
-            onChange={(e) => onChange?.(e)}
-        >
-            {options.map((opt) => (
-                <Radio key={opt.value} label={opt.label} value={opt.value} />
-            ))}
-        </RadioGroup>
-    ), { framework: 'blueprint' });
+    registerWidget('radio', ({ value, onChange, readOnly, options = [], appearance, ...rest }) => {
+        if (String(appearance || '').toLowerCase() === 'segmented') {
+            return (
+                <div
+                    role="group"
+                    className="forge-segmented-control"
+                    style={{
+                        display: 'inline-flex',
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                        border: '1px solid #d0d9ea',
+                        background: '#eef2f8',
+                        padding: 3,
+                        gap: 2,
+                    }}
+                >
+                    {options.map((opt) => {
+                        const isActive = String(value) === String(opt.value);
+                        return (
+                            <Button
+                                key={opt.value}
+                                small
+                                disabled={readOnly}
+                                minimal={!isActive}
+                                style={{
+                                    borderRadius: 7,
+                                    fontWeight: isActive ? 700 : 500,
+                                    fontSize: 13,
+                                    padding: '4px 16px',
+                                    background: isActive ? '#ffffff' : 'transparent',
+                                    color: isActive ? '#1e3f8a' : '#607089',
+                                    boxShadow: isActive ? '0 1px 5px rgba(30,63,138,0.14), 0 0 0 1px rgba(200,216,240,0.6)' : 'none',
+                                    border: 'none',
+                                    transition: 'all 0.15s ease',
+                                    cursor: readOnly ? 'not-allowed' : 'pointer',
+                                    whiteSpace: 'nowrap',
+                                }}
+                                onClick={() => !readOnly && onChange?.(opt.value)}
+                            >
+                                {opt.label || opt.value}
+                            </Button>
+                        );
+                    })}
+                </div>
+            );
+        }
+        return (
+            <RadioGroup
+                {...rest}
+                disabled={readOnly}
+                selectedValue={`${value}`}
+                onChange={(e) => onChange?.(e)}
+            >
+                {options.map((opt) => (
+                    <Radio key={opt.value} label={opt.label} value={opt.value} />
+                ))}
+            </RadioGroup>
+        );
+    }, { framework: 'blueprint' });
 
     registerEventAdapter('radio', {
         onChange: ({ adapter }) => (e) => adapter.set(e?.target?.value ?? e),
