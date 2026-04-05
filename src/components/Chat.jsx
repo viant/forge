@@ -630,6 +630,18 @@ export default function Chat({
         if (!Number.isNaN(n) && Number.isFinite(n)) return n;
         return queuedTurns.length;
     })();
+    const effectiveQueuedTurns = (() => {
+        const seen = new Set();
+        const merged = [];
+        for (const entry of [...localQueuedTurns, ...queuedTurns]) {
+            if (!entry || typeof entry !== 'object') continue;
+            const key = normalizeString(entry?.id) || normalizeString(entry?.preview);
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            merged.push(entry);
+        }
+        return merged;
+    })();
 
     const usageSummary = (() => {
         const costText = formatCostCompact(usageSnapshot?.cost ?? usageSnapshot?.Cost);
@@ -895,6 +907,11 @@ export default function Chat({
         if (lastUser !== -1 && lastAssistant !== -1 && lastAssistant > lastUser) return false;
         return true;
     })();
+
+    const showStarterTasks = starterTasks.length > 0
+        && messages.length === 0
+        && !conversationID
+        && !isProcessing;
 
     useEffect(() => {
         if (backendConversationRunning || hasActiveExecutions(messages) || resolveLastTurnStatus(messages)) {
