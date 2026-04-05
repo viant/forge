@@ -14,6 +14,15 @@ import { resolveSelector } from '../utils/selector.js';
 
 import { chatHandlers } from "../hooks";
 import { useEffect, useRef } from "react";
+import {
+    BugBeetle,
+    Flask,
+    GameController,
+    PencilSimple,
+    RocketLaunch,
+    ShieldWarning,
+    TreeStructure
+} from '@phosphor-icons/react';
 
 
 // Shared chat styles (avatars, bubbles, etc.)
@@ -42,6 +51,53 @@ export const defaultRenderers = {
     bubble: BubbleRenderer,
     form:   FormRenderer,
 };
+
+const STARTER_TASK_ICON_MAP = {
+    'bug': BugBeetle,
+    'flask': Flask,
+    'gamepad': GameController,
+    'pencil': PencilSimple,
+    'rocket': RocketLaunch,
+    'shield-warning': ShieldWarning,
+    'tree-structure': TreeStructure,
+};
+
+function StarterTaskIcon({ icon }) {
+    const Icon = STARTER_TASK_ICON_MAP[String(icon || '').trim().toLowerCase()] || PencilSimple;
+    return <Icon size={20} weight="duotone" />;
+}
+
+function StarterTaskGrid({ tasks = [], onSelect }) {
+    const list = Array.isArray(tasks) ? tasks.filter(Boolean) : [];
+    if (list.length === 0) return null;
+    return (
+        <section className="chat-starter-tasks" data-testid="chat-starter-tasks">
+            <div className="chat-starter-tasks-head">
+                <h2 className="chat-starter-tasks-title">Start with a task</h2>
+            </div>
+            <div className="chat-starter-tasks-subtitle">Get started</div>
+            <div className="chat-starter-tasks-grid">
+                {list.map((task, index) => (
+                    <button
+                        key={String(task?.id || `starter-task-${index}`)}
+                        type="button"
+                        className="chat-starter-task-card"
+                        data-testid={`chat-starter-task-${index}`}
+                        onClick={() => onSelect?.(task)}
+                    >
+                        <span className="chat-starter-task-icon">
+                            <StarterTaskIcon icon={task?.icon} />
+                        </span>
+                        <span className="chat-starter-task-title">{task?.title}</span>
+                        {String(task?.description || '').trim() ? (
+                            <span className="chat-starter-task-description">{task.description}</span>
+                        ) : null}
+                    </button>
+                ))}
+            </div>
+        </section>
+    );
+}
 
 
 function defaultNormalizeMessages(rawMessages= []) {
@@ -150,6 +206,28 @@ function formatCostCompact(value) {
     return `$${n.toFixed(2)}`;
 }
 
+function hasHandledTranscriptTurn(messages = [], preview = '') {
+    const target = String(preview || '').trim();
+    if (!target) return false;
+    const list = Array.isArray(messages) ? messages : [];
+    let userIndex = -1;
+    for (let i = list.length - 1; i >= 0; i--) {
+        const role = String(list[i]?.role || list[i]?.Role || '').toLowerCase();
+        const content = String(list[i]?.content || list[i]?.Content || '').trim();
+        if (role === 'user' && content === target) {
+            userIndex = i;
+            break;
+        }
+    }
+    if (userIndex === -1) return false;
+    for (let i = userIndex + 1; i < list.length; i++) {
+        const role = String(list[i]?.role || list[i]?.Role || '').toLowerCase();
+        if (role === 'assistant') return true;
+    }
+    const status = String(list[userIndex]?.turnStatus || list[userIndex]?.TurnStatus || '').toLowerCase();
+    return isTerminalTurnStatus(status);
+}
+
 export default function Chat({
     context,
     container = {},
@@ -254,6 +332,11 @@ export default function Chat({
     const [metaSnapshot, setMetaSnapshot] = useState({});
     const [conversationSnapshot, setConversationSnapshot] = useState({});
     const [usageSnapshot, setUsageSnapshot] = useState({});
+    const [localQueuedTurns, setLocalQueuedTurns] = useState([]);
+    const [optimisticRunning, setOptimisticRunning] = useState(false);
+    const [composerDraft, setComposerDraft] = useState('');
+    const submitLatchRef = useRef(false);
+    const submitLatchTimerRef = useRef(null);
 
 
     const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages
@@ -372,12 +455,33 @@ export default function Chat({
     const applyAgentSelection = (agentID) => {
         if (!metaDS) return;
         const key = normalizeString(agentID);
-        if (!key) return;
         const form = metaDS.peekFormData?.() || metaSnapshot || {};
-        const agentInfo = form?.agentInfo || {};
-        const info = agentInfo?.[key] || {};
+        const agentInfo = form?.agentInfo || metaSnapshot?.agentInfo || {};
+        const optionInfo = (Array.isArray(form?.agentOptions) ? form.agentOptions : Array.isArray(metaSnapshot?.agentOptions) ? metaSnapshot.agentOptions : [])
+            .find((entry) => normalizeString(entry?.value ?? entry?.id) === key) || {};
+        const info = { ...optionInfo, ...(agentInfo?.[key] || {}) };
+        const preferredModel = normalizeString(info?.modelRef || info?.model || '');
+
+        if (!key) {
+            const next = {
+                ...(metaDS.peekFormData?.() || {}),
+                agent: '',
+                model: normalizeString(form?.defaults?.model || ''),
+            };
+            metaDS.setFormData?.({ values: next });
+            try {
+                const convCtx = context.Context('conversations');
+                const convDS = convCtx?.handlers?.dataSource;
+                convDS?.setFormField?.({ item: { id: 'agent' }, value: '' });
+                convDS?.setFormField?.({ item: { id: 'model' }, value: next.model || '' });
+            } catch (_) {}
+            return;
+        }
 
         try { metaDS.setFormField?.({ item: { id: 'agent' }, value: key }); } catch (_) {}
+        if (preferredModel) {
+            try { metaDS.setFormField?.({ item: { id: 'model' }, value: preferredModel }); } catch (_) {}
+        }
         // Keep the conversation form in sync so any header/UI bound to the
         // conversations data source reflects the selected agent immediately.
         try {
@@ -386,10 +490,12 @@ export default function Chat({
             convDS?.setFormField?.({ item: { id: 'agent' }, value: key });
             const name = normalizeString(info?.name || info?.Name);
             if (name) convDS?.setFormField?.({ item: { id: 'agentName' }, value: name });
+            if (preferredModel) convDS?.setFormField?.({ item: { id: 'model' }, value: preferredModel });
         } catch (_) {}
 
         const selectedTools = ensureStringArray(info?.tools);
         const agentValues = { ...info, tool: selectedTools };
+        if (preferredModel) agentValues.model = preferredModel;
         delete agentValues.tools;
 
         try {
@@ -406,7 +512,6 @@ export default function Chat({
     const handleAgentChange = (agentID) => {
         if (events?.onAgentSelect?.isDefined?.()) {
             events.onAgentSelect.execute({ context: metaCtx || context, selected: agentID, value: agentID });
-            return;
         }
         applyAgentSelection(agentID);
     };
@@ -460,29 +565,63 @@ export default function Chat({
         } catch (_) {}
     };
 
-    const defaultAgentTools = (agentID) => {
+    const findAgentOption = (agentID) => {
         const id = normalizeString(agentID);
-        const info = metaSnapshot?.agentInfo?.[id] || {};
+        if (!id) return {};
+        return (Array.isArray(metaSnapshot?.agentOptions) ? metaSnapshot.agentOptions : [])
+            .find((entry) => {
+                const value = normalizeString(entry?.value ?? entry?.id);
+                const label = normalizeString(entry?.label ?? entry?.name ?? entry?.title);
+                return value === id || label === id;
+            }) || {};
+    };
+
+    const findAgentInfo = (agentID) => {
+        const id = normalizeString(agentID);
+        if (!id) return {};
+        const mapped = metaSnapshot?.agentInfo?.[id];
+        if (mapped) return mapped;
+        return (Array.isArray(metaSnapshot?.agentInfos) ? metaSnapshot.agentInfos : [])
+            .find((entry) => {
+                const value = normalizeString(entry?.id ?? entry?.value);
+                const label = normalizeString(entry?.label ?? entry?.name ?? entry?.title);
+                return value === id || label === id;
+            }) || {};
+    };
+
+    const defaultAgentTools = (agentID) => {
+        const optionInfo = findAgentOption(agentID);
+        const info = { ...optionInfo, ...findAgentInfo(agentID) };
         return ensureStringArray(info?.tools);
     };
 
     const defaultAgentModel = (agentID) => {
-        const id = normalizeString(agentID);
-        const info = metaSnapshot?.agentInfo?.[id] || {};
-        return normalizeString(info?.model);
+        const optionInfo = findAgentOption(agentID);
+        const info = { ...optionInfo, ...findAgentInfo(agentID) };
+        return normalizeString(info?.modelRef || info?.model);
     };
 
     const commandCenterDefaults = metaSnapshot?.defaults || {};
     const currentAgent = normalizeString(metaSnapshot?.agent);
-    const currentModel = normalizeString(metaSnapshot?.model);
+    const selectedAgentPreferredModel = defaultAgentModel(currentAgent);
+    const rawCurrentModel = normalizeString(metaSnapshot?.model);
+    const defaultModel = normalizeString(commandCenterDefaults?.model);
+    const currentModel = (() => {
+        if (!currentAgent || !selectedAgentPreferredModel) return rawCurrentModel;
+        if (!rawCurrentModel || rawCurrentModel === defaultModel) {
+            return selectedAgentPreferredModel;
+        }
+        return rawCurrentModel;
+    })();
     const currentReasoning = normalizeString(metaSnapshot?.reasoningEffort);
     const currentTools = ensureStringArray(metaSnapshot?.tool);
     const currentAutoSelectTools = (metaSnapshot?.autoSelectTools !== undefined)
         ? normalizeBool(metaSnapshot?.autoSelectTools)
         : normalizeBool(commandCenterDefaults?.autoSelectTools);
+    const starterTasks = Array.isArray(metaSnapshot?.starterTasks) ? metaSnapshot.starterTasks : [];
 
     const conversationID = normalizeString(conversationSnapshot?.id);
-    const isConversationRunning = !!conversationSnapshot?.running;
+    const backendConversationRunning = !!conversationSnapshot?.running;
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
     const queuedCount = (() => {
         const v = conversationSnapshot?.queuedCount;
@@ -509,6 +648,22 @@ export default function Chat({
         if (tokensWithCache) pieces.push(`Tokens: ${tokensWithCache}`);
         return pieces.join('\n');
     })();
+
+    useEffect(() => {
+        if (!localQueuedTurns.length) return;
+        const backendQueuedContent = new Set(
+            (Array.isArray(queuedTurns) ? queuedTurns : [])
+                .map((entry) => String(entry?.preview || '').trim())
+                .filter(Boolean)
+        );
+        setLocalQueuedTurns((current) => current.filter((entry) => {
+            const preview = String(entry?.preview || '').trim();
+            if (!preview) return false;
+            if (backendQueuedContent.has(preview)) return false;
+            if (backendConversationRunning || optimisticRunning) return true;
+            return !hasHandledTranscriptTurn(messages, preview);
+        }));
+    }, [messages, queuedTurns, localQueuedTurns.length, backendConversationRunning, optimisticRunning]);
 
     const toolsLabel = () => {
         if (!currentTools.length) return '';
@@ -568,6 +723,13 @@ export default function Chat({
     };
 
     const handleSubmit = ({ content, toolNames = [] }) => {
+        const submitModel = (() => {
+            const preferred = defaultAgentModel(currentAgent);
+            if (preferred && (!currentModel || currentModel === defaultModel || currentModel === rawCurrentModel)) {
+                return preferred;
+            }
+            return currentModel || preferred || rawCurrentModel || defaultModel;
+        })();
         const userMessage = {
             role: "user",
             content,
@@ -576,12 +738,41 @@ export default function Chat({
             attachments: pendingAttachments && pendingAttachments.length ? pendingAttachments : undefined,
         };
 
-        // Immediately push the message to the DataSource (if available)
-        handlers?.dataSource?.setFormData?.(userMessage);
+        const submittingWhileProcessing = isProcessing || backendConversationRunning || optimisticRunning || submitLatchRef.current;
+        if (!submittingWhileProcessing) {
+            setOptimisticRunning(true);
+            submitLatchRef.current = true;
+            if (submitLatchTimerRef.current) {
+                clearTimeout(submitLatchTimerRef.current);
+            }
+            submitLatchTimerRef.current = setTimeout(() => {
+                if (!isProcessing && !backendConversationRunning) {
+                    submitLatchRef.current = false;
+                }
+                submitLatchTimerRef.current = null;
+            }, 2000);
+            handlers?.dataSource?.setFormData?.(userMessage);
+        } else {
+            setLocalQueuedTurns((current) => [
+                ...current,
+                {
+                    id: `local:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+                    preview: String(content || '').trim(),
+                    local: true,
+                },
+            ]);
+        }
 
         // Execute custom event callback defined in configuration (if any)
         if (events.onSubmit?.isDefined?.()) {
-            events.onSubmit.execute({ message: userMessage, context });
+            events.onSubmit.execute({
+                message: userMessage,
+                context,
+                agent: currentAgent,
+                model: submitModel,
+                reasoningEffort: currentReasoning,
+                tools: currentTools,
+            });
         }
 
         // Clear pending attachments after sending and reset form field
@@ -699,11 +890,36 @@ export default function Chat({
         // do not keep the composer in a "processing" state.
         if (lastTurnIsTerminal) return false;
         if (hasUnansweredUser) return true;
-        if (!isConversationRunning) return false;
+        if (!(backendConversationRunning || optimisticRunning)) return false;
         // If we have evidence of a completed last turn, ignore stale running=true.
         if (lastUser !== -1 && lastAssistant !== -1 && lastAssistant > lastUser) return false;
         return true;
     })();
+
+    useEffect(() => {
+        if (backendConversationRunning || hasActiveExecutions(messages) || resolveLastTurnStatus(messages)) {
+            setOptimisticRunning(false);
+        }
+    }, [backendConversationRunning, messages]);
+
+    useEffect(() => {
+        if (isProcessing || backendConversationRunning || optimisticRunning) {
+            submitLatchRef.current = true;
+            return;
+        }
+        if (submitLatchTimerRef.current) {
+            clearTimeout(submitLatchTimerRef.current);
+            submitLatchTimerRef.current = null;
+        }
+        submitLatchRef.current = false;
+    }, [isProcessing, backendConversationRunning, optimisticRunning]);
+
+    useEffect(() => () => {
+        if (submitLatchTimerRef.current) {
+            clearTimeout(submitLatchTimerRef.current);
+            submitLatchTimerRef.current = null;
+        }
+    }, []);
 
     // Abort should only be visible while the current turn is processing.
     // The backend `conversations.running` signal can be stale, so do not rely on it for visibility.
@@ -798,20 +1014,34 @@ export default function Chat({
                 }
             })()}
 
-            {/* Message list */}
-            <MessageFeed
-                messages={messages}
-                batchSize={chatCfg.batchSize || 50}
-                context={context}
-                classifyMessage={classifyMessage}
-                renderers={renderers}
-                fallback={fallback}
-                resolveIcon={resolveAvatarIcon}
-            />
+            {showStarterTasks ? (
+                <div className="chat-starter-stage" data-testid="chat-starter-stage">
+                    <StarterTaskGrid
+                        tasks={starterTasks}
+                        onSelect={(task) => {
+                            const prompt = String(task?.prompt || '').trim();
+                            if (!prompt) return;
+                            setComposerDraft(prompt);
+                        }}
+                    />
+                </div>
+            ) : (
+                <MessageFeed
+                    messages={messages}
+                    batchSize={chatCfg.batchSize || 50}
+                    context={context}
+                    classifyMessage={classifyMessage}
+                    renderers={renderers}
+                    fallback={fallback}
+                    resolveIcon={resolveAvatarIcon}
+                />
+            )}
 
             {/* Prompt composer */}
             {effectiveShowInput && (
                 <Composer
+                    draftValue={composerDraft}
+                    onDraftChange={setComposerDraft}
                     showUpload={chatCfg.showUpload}
                     showSettings={!!chatCfg.showSettings}
                     showMic={!!chatCfg.showMic}
@@ -819,10 +1049,11 @@ export default function Chat({
                     commandCenter={commandCenterEnabled}
                     submitMode={'send'}
                     submitLabel={'Send'}
-                    queueCount={queuedCount}
-                    queuedTurns={queuedTurns}
+                    queueCount={effectiveQueuedTurns.length || queuedCount}
+                    queuedTurns={effectiveQueuedTurns}
                     usageSummary={usageSummary}
                     usageTooltip={usageTooltip}
+                    queueRunning={backendConversationRunning || optimisticRunning}
                     onQueueCancel={handleQueueCancel}
                     onQueueMove={handleQueueMove}
                     onQueueEdit={handleQueueEdit}
@@ -874,7 +1105,7 @@ export default function Chat({
                     onAgentChange={handleAgentChange}
                     modelOptions={metaSnapshot?.modelOptions}
                     modelInfo={metaSnapshot?.modelInfo}
-                    modelValue={currentModel}
+                    modelValue={currentModel || defaultAgentModel(currentAgent) || rawCurrentModel || defaultModel}
                     onModelChange={handleModelChange}
                     reasoningOptions={[
                         { value: 'low', label: 'Low' },

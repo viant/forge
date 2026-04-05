@@ -3,12 +3,14 @@ package com.viant.forgeandroid.runtime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 
 class ForgeRuntime(
     endpoints: Map<String, EndpointConfig>,
-    val scope: CoroutineScope
+    val scope: CoroutineScope,
+    private val targetContext: ForgeTargetContext = ForgeTargetContext(platform = "android")
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val endpointRegistry = EndpointRegistry(endpoints)
@@ -21,8 +23,15 @@ class ForgeRuntime(
     private val handlers = HandlerRegistry()
     private val execEngine = ExecutionEngine(this, handlers, parameterResolver, scope)
     private val pendingDialogs = mutableMapOf<String, PendingDialog>()
+    private val pendingWindows = mutableMapOf<String, PendingWindow>()
 
     val windows = windowRuntime.windows()
+
+    init {
+        dataSourceRuntime.setExecutor { execution, context, args ->
+            execEngine.execute(execution, context, args)
+        }
+    }
 
     fun registerHandler(name: String, handler: Handler) {
         handlers.register(name, handler)
@@ -36,11 +45,12 @@ class ForgeRuntime(
 
     fun openWindowInline(windowKey: String, title: String = windowKey, inTab: Boolean = true, metadata: WindowMetadata): WindowState {
         val state = windowRuntime.openWindow(windowKey, title, inTab, emptyMap(), inline = metadata)
-        signals.metadata(state.windowId).set(metadata)
+        signals.metadata(state.windowId).set(resolveMetadata(metadata))
         return state
     }
 
     fun closeWindow(windowId: String) {
+        clearPendingWindow(windowId)
         windowRuntime.closeWindow(windowId)
     }
 
@@ -63,7 +73,9 @@ class ForgeRuntime(
             }
             try {
                 val meta = restClient.get("appAPI", "forge/window/${window.windowKey}") { body ->
-                    json.decodeFromString<WindowMetadata>(body)
+                    val parsed = json.parseToJsonElement(body)
+                    val resolved = MetadataResolver.resolve(parsed, targetContext) ?: parsed
+                    json.decodeFromJsonElement<WindowMetadata>(resolved)
                 }
                 signals.metadata(window.windowId).set(meta)
             } catch (e: Exception) {
@@ -71,6 +83,12 @@ class ForgeRuntime(
                 signals.metadata(window.windowId).set(null)
             }
         }
+    }
+
+    private fun resolveMetadata(metadata: WindowMetadata): WindowMetadata {
+        val parsed = json.parseToJsonElement(json.encodeToString(metadata))
+        val resolved = MetadataResolver.resolve(parsed, targetContext) ?: parsed
+        return json.decodeFromJsonElement(resolved)
     }
 
     internal fun openDialog(windowId: String, dialogId: String, args: Map<String, Any?>) {
@@ -97,9 +115,29 @@ class ForgeRuntime(
     }
 
     internal fun pendingDialog(dialogKey: String): PendingDialog? = pendingDialogs[dialogKey]
+
+    internal fun registerPendingWindow(windowId: String, pending: PendingWindow) {
+        pendingWindows[windowId] = pending
+    }
+
+    internal fun pendingWindow(windowId: String): PendingWindow? = pendingWindows[windowId]
+
+    internal fun clearPendingWindow(windowId: String) {
+        pendingWindows.remove(windowId)
+    }
+
+    fun isReadOnly(execution: ExecutionDef, context: DataSourceContext?): Boolean {
+        return execEngine.evaluateReadOnly(execution, context)
+    }
 }
 
 data class PendingDialog(
+    val callerWindowId: String,
+    val callerDataSourceRef: String,
+    val outbound: List<ParameterDef>
+)
+
+data class PendingWindow(
     val callerWindowId: String,
     val callerDataSourceRef: String,
     val outbound: List<ParameterDef>
@@ -141,6 +179,14 @@ class ExecutionEngine(
         }
     }
 
+    fun evaluateReadOnly(execution: ExecutionDef, context: DataSourceContext?): Boolean {
+        return when (execution.handler) {
+            "dataSource.noSelection" -> !(context?.hasSelection() ?: false)
+            "dataSource.isFormNotDirty" -> !(context?.isFormDirty() ?: false)
+            else -> false
+        }
+    }
+
     private fun builtIn(name: String): Handler? = when (name) {
         "window.openDialog" -> handler@{ args ->
             val dialogId = args.execution.args.getOrNull(0) ?: return@handler null
@@ -157,6 +203,8 @@ class ExecutionEngine(
                         outbound = resolution.outbound
                     )
                 )
+                runtime.openDialog(windowId, dialogId, resolution.inbound)
+                return@handler null
             }
             runtime.openDialog(windowId, dialogId, emptyMap())
             null
@@ -164,19 +212,55 @@ class ExecutionEngine(
         "window.openWindow" -> handler@{ args ->
             val windowKey = args.execution.args.getOrNull(0) ?: return@handler null
             val title = args.execution.args.getOrNull(1) ?: windowKey
-            runtime.openWindow(windowKey, title, inTab = true, parameters = emptyMap())
+            val callerCtx = args.context
+            val resolution = if (callerCtx != null) parameterResolver.resolve(args.execution.parameters, callerCtx) else ParameterResolution(emptyMap(), emptyList())
+            val state = runtime.openWindow(windowKey, title, inTab = true, parameters = resolution.inbound)
+            if (callerCtx != null) {
+                if (resolution.outbound.isNotEmpty()) {
+                    runtime.registerPendingWindow(
+                        state.windowId,
+                        PendingWindow(
+                            callerWindowId = callerCtx.window.windowId,
+                            callerDataSourceRef = callerCtx.dataSourceRef,
+                            outbound = resolution.outbound
+                        )
+                    )
+                }
+            }
+            null
+        }
+        "window.closeWindow" -> handler@{ args ->
+            val windowId = (args.args["windowId"] as? String) ?: args.context?.window?.windowId ?: return@handler null
+            runtime.clearPendingWindow(windowId)
+            runtime.closeWindow(windowId)
+            null
+        }
+        "window.commit", "window.commitWindow" -> handler@{ args ->
+            val windowId = (args.args["windowId"] as? String) ?: args.context?.window?.windowId ?: return@handler null
+            val payload = JsonUtil.asStringMap(args.args["payload"]).takeIf { it.isNotEmpty() }
+                ?: args.context?.peekSelection()?.selected
+                ?: emptyMap()
+            val pending = runtime.pendingWindow(windowId)
+            if (pending != null) {
+                val callerCtx = runtime.dataSourceContext(pending.callerWindowId, pending.callerDataSourceRef)
+                outboundApply(pending.outbound, payload, callerCtx)
+                runtime.clearPendingWindow(windowId)
+            }
+            runtime.closeWindow(windowId)
             null
         }
         "dialog.commit" -> handler@{ args ->
             val dialogId = (args.args["dialogId"] as? String) ?: args.execution.args.getOrNull(0) ?: return@handler null
             val windowId = (args.args["windowId"] as? String) ?: args.context?.window?.windowId ?: return@handler null
             val dialogKey = "${windowId}Dialog$dialogId"
-            val pending = runtime.pendingDialog(dialogKey) ?: return@handler null
-            val callerCtx = runtime.dataSourceContext(pending.callerWindowId, pending.callerDataSourceRef)
-            val payload = (args.args["payload"] as? Map<String, Any?>)
+            val payload = JsonUtil.asStringMap(args.args["payload"]).takeIf { it.isNotEmpty() }
                 ?: args.context?.peekSelection()?.selected
                 ?: emptyMap()
-            outboundApply(pending.outbound, payload, callerCtx)
+            val pending = runtime.pendingDialog(dialogKey)
+            if (pending != null) {
+                val callerCtx = runtime.dataSourceContext(pending.callerWindowId, pending.callerDataSourceRef)
+                outboundApply(pending.outbound, payload, callerCtx)
+            }
             runtime.closeDialog(windowId, dialogId)
             null
         }
@@ -190,8 +274,38 @@ class ExecutionEngine(
             args.context?.fetchCollection()
             null
         }
+        "dataSource.handleAddNew" -> handler@{ args ->
+            val context = args.context ?: return@handler null
+            context.resetSelection()
+            context.setForm(emptyMap())
+            null
+        }
+        "dataSource.noSelection" -> handler@{ args ->
+            val context = args.context ?: return@handler true
+            !context.hasSelection()
+        }
+        "dataSource.isFormNotDirty" -> handler@{ args ->
+            val context = args.context ?: return@handler true
+            !context.isFormDirty()
+        }
+        "dataSource.setFilter" -> handler@{ args ->
+            val context = args.context ?: return@handler null
+            val directFilter = JsonUtil.asStringMap(args.args["filter"]).takeIf { it.isNotEmpty() }
+            if (directFilter != null) {
+                context.setFilter(directFilter)
+                return@handler null
+            }
+            val next = context.peekFilter().toMutableMap()
+            args.args.forEach { (key, value) ->
+                if (key != "row" && key != "rowIndex" && key != "windowId" && value != null) {
+                    next[key] = value
+                }
+            }
+            context.setFilter(next)
+            null
+        }
         "dataSource.toggleSelection" -> handler@{ args ->
-            val row = args.args["row"] as? Map<String, Any?> ?: return@handler null
+            val row = JsonUtil.asStringMap(args.args["row"]).takeIf { it.isNotEmpty() } ?: return@handler null
             val rowIndex = (args.args["rowIndex"] as? Int) ?: -1
             args.context?.toggleSelection(row, rowIndex)
             null
@@ -211,7 +325,7 @@ class ExecutionEngine(
             when (store) {
                 "form" -> target.setFormField(p.name ?: srcPath, value)
                 "filter" -> target.setFilterValue(p.name ?: srcPath, value)
-                "selection" -> target.setSelection(SelectionState(selected = value as? Map<String, Any?>))
+                "selection" -> target.setSelection(SelectionState(selected = JsonUtil.asStringMap(value).takeIf { it.isNotEmpty() }))
                 "metrics" -> target.setMetrics(p.name ?: srcPath, value)
                 "input.query", "query" -> target.setFilterValue(p.name ?: srcPath, value)
                 else -> target.setFormField(p.name ?: srcPath, value)

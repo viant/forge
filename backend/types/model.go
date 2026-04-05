@@ -1,5 +1,67 @@
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
+// TargetSpec declares where a metadata node applies.
+// It supports short forms during unmarshal:
+//
+//	target: web
+//	target: [web, android]
+//
+// as well as the expanded object form.
+type TargetSpec struct {
+	Platforms        []string `json:"platforms,omitempty" yaml:"platforms,omitempty"`
+	ExcludePlatforms []string `json:"excludePlatforms,omitempty" yaml:"excludePlatforms,omitempty"`
+	FormFactors      []string `json:"formFactors,omitempty" yaml:"formFactors,omitempty"`
+	Capabilities     []string `json:"capabilities,omitempty" yaml:"capabilities,omitempty"`
+}
+
+func (t *TargetSpec) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 || string(data) == "null" {
+		return nil
+	}
+	var text string
+	if err := json.Unmarshal(data, &text); err == nil {
+		t.Platforms = []string{text}
+		return nil
+	}
+	var list []string
+	if err := json.Unmarshal(data, &list); err == nil {
+		t.Platforms = append([]string(nil), list...)
+		return nil
+	}
+	type alias TargetSpec
+	var expanded alias
+	if err := json.Unmarshal(data, &expanded); err != nil {
+		return fmt.Errorf("invalid target spec: %w", err)
+	}
+	*t = TargetSpec(expanded)
+	return nil
+}
+
+func (t *TargetSpec) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var text string
+	if err := unmarshal(&text); err == nil {
+		t.Platforms = []string{text}
+		return nil
+	}
+	var list []string
+	if err := unmarshal(&list); err == nil {
+		t.Platforms = append([]string(nil), list...)
+		return nil
+	}
+	type alias TargetSpec
+	var expanded alias
+	if err := unmarshal(&expanded); err != nil {
+		return fmt.Errorf("invalid target spec: %w", err)
+	}
+	*t = TargetSpec(expanded)
+	return nil
+}
+
 type Chart struct {
 	Type          string        `json:"type" yaml:"type"`
 	XAxis         ChartXAxis    `json:"xAxis" yaml:"xAxis"`
@@ -38,25 +100,29 @@ type ChartSeriesValue struct {
 }
 
 type NavigationItem struct {
-	ID            string           `json:"id" yaml:"id"`
-	Label         string           `json:"label" yaml:"label"`
-	Icon          string           `json:"icon" yaml:"icon"`
-	WindowKey     string           `json:"windowKey" yaml:"windowKey"`
-	WindowTitle   string           `json:"windowTitle" yaml:"windowTitle"`
-	MultiInstance bool             `json:"multiInstance,omitempty" yaml:"multiInstance,omitempty"`
-	ChildNodes    []NavigationItem `json:"childNodes,omitempty" yaml:"childNodes,omitempty"`
+	ID              string                            `json:"id" yaml:"id"`
+	Label           string                            `json:"label" yaml:"label"`
+	Icon            string                            `json:"icon" yaml:"icon"`
+	WindowKey       string                            `json:"windowKey" yaml:"windowKey"`
+	WindowTitle     string                            `json:"windowTitle" yaml:"windowTitle"`
+	MultiInstance   bool                              `json:"multiInstance,omitempty" yaml:"multiInstance,omitempty"`
+	ChildNodes      []NavigationItem                  `json:"childNodes,omitempty" yaml:"childNodes,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
 // Dialog represents a dialog with a title, content, actions, and on events.
 type Dialog struct {
-	Id            string            `json:"id" yaml:"id"`
-	Title         string            `json:"title" yaml:"title"`
-	DataSourceRef string            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	Content       *Container        `json:"content" yaml:"content"`
-	Style         *StyleProperties  `json:"style,omitempty" yaml:"style,omitempty"`
-	Properties    *DialogProperties `json:"properties,omitempty" yaml:"properties,omitempty"`
-	Actions       []Item            `json:"actions" yaml:"actions"`
-	On            []*Execute        `json:"on,omitempty" yaml:"on,omitempty"`
+	Id              string                            `json:"id" yaml:"id"`
+	Title           string                            `json:"title" yaml:"title"`
+	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Content         *Container                        `json:"content" yaml:"content"`
+	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	Properties      *DialogProperties                 `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Actions         []Item                            `json:"actions" yaml:"actions"`
+	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
 // DialogProperties holds optional flags that tweak dialog UI behavior.
@@ -66,13 +132,15 @@ type DialogProperties struct {
 }
 
 type Window struct {
-	Ns         []string              `json:"ns,omitempty" yaml:"ns,omitempty"`
-	Namespace  string                `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	DataSource map[string]DataSource `json:"dataSource" yaml:"dataSource"`
-	View       View                  `json:"view" yaml:"view"`
-	Dialogs    []Dialog              `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
-	Actions    *Actions              `json:"actions,omitempty" yaml:"actions,omitempty"`
-	On         []*Execute            `json:"on,omitempty" yaml:"on,omitempty"`
+	Ns              []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
+	Namespace       string                            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	DataSource      map[string]DataSource             `json:"dataSource" yaml:"dataSource"`
+	View            View                              `json:"view" yaml:"view"`
+	Dialogs         []Dialog                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
+	Actions         *Actions                          `json:"actions,omitempty" yaml:"actions,omitempty"`
+	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
 func (w *Window) SetCode(code []byte) {
@@ -86,9 +154,11 @@ type Actions struct {
 }
 
 type View struct {
-	Layout  Layout     `json:"layout,omitempty" yaml:"layout,omitempty"`
-	Content *Container `json:"content" yaml:"content"`
-	On      []*Execute `json:"on,omitempty" yaml:"on,omitempty"`
+	Layout          Layout                            `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Content         *Container                        `json:"content" yaml:"content"`
+	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
 type Layout struct {
@@ -255,29 +325,31 @@ type UnitedSize struct {
 type Container struct {
 	ID              string `json:"id" yaml:"id"`
 	Binding         `yaml:",inline"`
-	State           *Parameter       `json:"state,omitempty" yaml:"state,omitempty"`
-	Title           string           `json:"title,omitempty" yaml:"title,omitempty"`
-	Layout          *Layout          `json:"layout,omitempty" yaml:"layout,omitempty"`
-	Style           *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	Toolbar         *Toolbar         `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	Table           *Table           `json:"table,omitempty" yaml:"table,omitempty"`
-	FileBrowser     *FileBrowser     `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
-	Editor          *Editor          `json:"editor,omitempty" yaml:"editor,omitempty"`
-	Terminal        *Terminal        `json:"terminal,omitempty" yaml:"terminal,omitempty"`
-	Chart           *Chart           `json:"chart,omitempty" yaml:"chart,omitempty"`
-	Chat            *Chat            `json:"chat,omitempty" yaml:"chat,omitempty"`
-	Section         *Section         `json:"section,omitempty" yaml:"section,omitempty"`
-	Items           []Item           `json:"items,omitempty" yaml:"items,omitempty"`
-	Card            *Card            `json:"card,omitempty" yaml:"card,omitempty"`
-	Footer          *Container       `json:"footer,omitempty" yaml:"footer,omitempty"`
-	Containers      []Container      `json:"containers,omitempty" yaml:"containers,omitempty"`
-	SchemaBasedForm *SchemaBasedForm `json:"schemaBasedForm,omitempty" yaml:"schemaBasedForm,omitempty"`
-	On              []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
-	Tabs            *Tabs            `json:"tabs,omitempty" yaml:"tabs,omitempty"`
-	Dialogs         []string         `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
-	Repeat          *Repeat          `json:"repeat,omitempty" yaml:"repeat,omitempty"`
-	SelectFirst     bool             `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
-	FetchData       bool             `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	State           *Parameter                        `json:"state,omitempty" yaml:"state,omitempty"`
+	Title           string                            `json:"title,omitempty" yaml:"title,omitempty"`
+	Layout          *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	Toolbar         *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	Table           *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
+	FileBrowser     *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
+	Editor          *Editor                           `json:"editor,omitempty" yaml:"editor,omitempty"`
+	Terminal        *Terminal                         `json:"terminal,omitempty" yaml:"terminal,omitempty"`
+	Chart           *Chart                            `json:"chart,omitempty" yaml:"chart,omitempty"`
+	Chat            *Chat                             `json:"chat,omitempty" yaml:"chat,omitempty"`
+	Section         *Section                          `json:"section,omitempty" yaml:"section,omitempty"`
+	Items           []Item                            `json:"items,omitempty" yaml:"items,omitempty"`
+	Card            *Card                             `json:"card,omitempty" yaml:"card,omitempty"`
+	Footer          *Container                        `json:"footer,omitempty" yaml:"footer,omitempty"`
+	Containers      []Container                       `json:"containers,omitempty" yaml:"containers,omitempty"`
+	SchemaBasedForm *SchemaBasedForm                  `json:"schemaBasedForm,omitempty" yaml:"schemaBasedForm,omitempty"`
+	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Tabs            *Tabs                             `json:"tabs,omitempty" yaml:"tabs,omitempty"`
+	Dialogs         []string                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
+	Repeat          *Repeat                           `json:"repeat,omitempty" yaml:"repeat,omitempty"`
+	SelectFirst     bool                              `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
+	FetchData       bool                              `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
 }
 
 // Terminal declares a terminal-like, scrollable log/command view in a container.
@@ -303,9 +375,11 @@ type Terminal struct {
 
 type Chat struct {
 	// DataSourceRef points to the data source that supplies messages.
-	DataSourceRef string   `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	Toolbar       *Toolbar `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	Height        string   `json:"height,omitempty" yaml:"height,omitempty"`
+	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	Toolbar         *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	Height          string                            `json:"height,omitempty" yaml:"height,omitempty"`
 	// ShowUpload controls whether file upload input should be displayed (default true).
 	ShowUpload bool `json:"showUpload,omitempty" yaml:"showUpload,omitempty"`
 	// Upload optional configuration for file uploads (endpoint/path/uri).
@@ -417,10 +491,12 @@ type Table struct {
 }
 
 type Toolbar struct {
-	Items         []Item           `json:"items" yaml:"items"`
-	DataSourceRef string           `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	ClassName     string           `json:"className,omitempty" yaml:"className,omitempty"`
+	Items           []Item                            `json:"items" yaml:"items"`
+	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
 type Column struct {
@@ -475,17 +551,19 @@ type Binding struct {
 type Item struct {
 	ID                   string `json:"id" yaml:"id"`
 	Binding              `yaml:",inline"`
-	OptionDataSourceRets []string         `json:"optionDataSourceRets,omitempty" yaml:"optionDataSourceRets,omitempty"`
-	Value                interface{}      `json:"value,omitempty" yaml:"value,omitempty"`
-	Style                *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	Label                string           `json:"label" yaml:"label"`
-	LabelPosition        string           `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
-	Align                string           `json:"align,omitempty" yaml:"align,omitempty"`
-	Options              []Option         `json:"options,omitempty" yaml:"options,omitempty"`
-	DateFnsFormat        string           `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
-	NumericFormat        string           `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	Icon                 string           `json:"icon,omitempty" yaml:"icon,omitempty"`
-	Type                 string           `json:"type,omitempty" yaml:"type,omitempty"`
+	Target               *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides      map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	OptionDataSourceRets []string                          `json:"optionDataSourceRets,omitempty" yaml:"optionDataSourceRets,omitempty"`
+	Value                interface{}                       `json:"value,omitempty" yaml:"value,omitempty"`
+	Style                *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	Label                string                            `json:"label" yaml:"label"`
+	LabelPosition        string                            `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
+	Align                string                            `json:"align,omitempty" yaml:"align,omitempty"`
+	Options              []Option                          `json:"options,omitempty" yaml:"options,omitempty"`
+	DateFnsFormat        string                            `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
+	NumericFormat        string                            `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	Icon                 string                            `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Type                 string                            `json:"type,omitempty" yaml:"type,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
 	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
 	ColumnSpan int                    `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
@@ -539,15 +617,17 @@ type LookupFooterAction struct {
 }
 
 type Execute struct {
-	Event      string       `json:"event" yaml:"event"`
-	Async      bool         `json:"async,omitempty" yaml:"async,omitempty"`
-	Arguments  []string     `json:"args,omitempty" yaml:"args,omitempty"`
-	Parameters []*Parameter `json:"parameters,omitempty" yaml:"parameters,omitempty"`
-	Init       string       `json:"init,omitempty" yaml:"init,omitempty"`
-	Handler    string       `json:"handler,omitempty" yaml:"handler,omitempty"`
-	OnError    string       `json:"onError,omitempty" yaml:"onError,omitempty"`
-	OnDone     string       `json:"onDone,omitempty" yaml:"onDone,omitempty"`
-	OnSuccess  string       `json:"onSuccess,omitempty" yaml:"onSuccess,omitempty"`
+	Event           string                            `json:"event" yaml:"event"`
+	Async           bool                              `json:"async,omitempty" yaml:"async,omitempty"`
+	Arguments       []string                          `json:"args,omitempty" yaml:"args,omitempty"`
+	Parameters      []*Parameter                      `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	Init            string                            `json:"init,omitempty" yaml:"init,omitempty"`
+	Handler         string                            `json:"handler,omitempty" yaml:"handler,omitempty"`
+	OnError         string                            `json:"onError,omitempty" yaml:"onError,omitempty"`
+	OnDone          string                            `json:"onDone,omitempty" yaml:"onDone,omitempty"`
+	OnSuccess       string                            `json:"onSuccess,omitempty" yaml:"onSuccess,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
 type Option struct {
@@ -557,18 +637,20 @@ type Option struct {
 }
 
 type DataSource struct {
-	Service       *Service       `json:"service,omitempty" yaml:"service,omitempty"`
-	DataSourceRef string         `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	UniqueKey     []*UniqueKey   `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
-	Parameters    []Parameter    `json:"parameters" yaml:"parameters"`
-	On            []*Execute     `json:"on,omitempty" yaml:"on,omitempty"`
-	Cardinality   string         `json:"cardinality" yaml:"cardinality"`
-	Selectors     *Selectors     `json:"selectors,omitempty" yaml:"selectors,omitempty"`
-	SelectionMode *SelectionMode `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
-	Paging        *PagingConfig  `json:"paging,omitempty" yaml:"paging,omitempty"`
-	FilterSet     []Filter       `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
-	AutoSelect    *bool          `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
-	SelfReference string         `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
+	Service         *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
+	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	UniqueKey       []*UniqueKey                      `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
+	Parameters      []Parameter                       `json:"parameters" yaml:"parameters"`
+	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Cardinality     string                            `json:"cardinality" yaml:"cardinality"`
+	Selectors       *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
+	SelectionMode   *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
+	Paging          *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
+	FilterSet       []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
+	AutoSelect      *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
+	SelfReference   string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
 	// QuickFilterSet selects which filterSet should be rendered in the toolbar as quick filters.
 	// Accepts either a string (filterSet.name) or an integer index (0-based).
 	QuickFilterSet interface{} `json:"quickFilterSet,omitempty" yaml:"quickFilterSet,omitempty"`

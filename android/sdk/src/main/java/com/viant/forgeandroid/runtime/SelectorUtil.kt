@@ -21,7 +21,7 @@ object SelectorUtil {
             if (i == parts.lastIndex) {
                 cur[key] = value
             } else {
-                val next = (cur[key] as? Map<String, Any?>)?.toMutableMap() ?: mutableMapOf()
+                val next = JsonUtil.asStringMap(cur[key]).toMutableMap()
                 cur[key] = next
                 cur = next
             }

@@ -78,6 +78,8 @@ function storeDraftForConversation(conversationId = '', draft = '') {
 }
 
 export default function Composer({
+    draftValue,
+    onDraftChange,
     tools = [],
     toolOptions,
     selectedTools: selectedToolsProp,
@@ -102,6 +104,7 @@ export default function Composer({
     submitLabel,
     queueCount,
     queuedTurns,
+    queueRunning = false,
     usageSummary,
     usageTooltip,
     onQueueCancel,
@@ -153,7 +156,7 @@ export default function Composer({
 		};
 	}, [getMessageHistoryProp]);
 
-	const [draft, setDraft] = useState("");
+	const [draft, setDraft] = useState(String(draftValue || ""));
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [historySuggestions, setHistorySuggestions] = useState([]);
 	const historyCloseTimerRef = useRef(null);
@@ -164,8 +167,8 @@ export default function Composer({
 	const [modelOpen, setModelOpen] = useState(false);
 	const [reasoningOpen, setReasoningOpen] = useState(false);
 	const [queueOpen, setQueueOpen] = useState(false);
-		const [bundlesOpen, setBundlesOpen] = useState(false);
-		const [bundlesMenuOpen, setBundlesMenuOpen] = useState(false);
+	const [bundlesOpen, setBundlesOpen] = useState(false);
+	const [bundlesMenuOpen, setBundlesMenuOpen] = useState(false);
 	const micOn = (micOnProp !== undefined) ? !!micOnProp : micOnInternal;
 	const recognitionRef = useRef(null);
 	const recognitionRestartRef = useRef(false);
@@ -251,7 +254,7 @@ export default function Composer({
 	}, []);
 
 	const onSelectHistoryItem = useCallback((text) => {
-		setDraft(text);
+		updateDraft(text);
 		setHistoryOpen(false);
 		if (historyCloseTimerRef.current) {
 			clearTimeout(historyCloseTimerRef.current);
@@ -431,7 +434,7 @@ export default function Composer({
 	            (async () => {
 	                const transcript = await transcribeAudioFile(file);
 	                if (transcript) {
-	                    setDraft((prev) => {
+	                    updateDraft((prev) => {
 	                        const base = String(prev || '').trim();
 	                        const sep = base ? ' ' : '';
 	                        return `${base}${sep}${transcript}`.trim();
@@ -507,7 +510,7 @@ export default function Composer({
 	            const base = String(dictationBaseRef.current || '').trim();
 	            const finalText = String(dictationFinalRef.current || '').trim();
 	            const parts = [base, finalText, interim].filter(Boolean);
-	            setDraft(parts.join(' ').trim());
+	            updateDraft(parts.join(' ').trim());
 	        } catch (_) {}
 	    };
 
@@ -585,7 +588,7 @@ export default function Composer({
         setHistoryOpen(false);
         storeDraftForConversation(currentConversationIdFromLocation(), '');
         onSubmit?.({ content: draft, toolNames: selectedTools });
-        setDraft("");
+        updateDraft("");
     };
 
     const handleAbort = (e) => {
@@ -943,6 +946,103 @@ export default function Composer({
 	    return `${labels.length} toolsets`;
 	};
 
+    const visibleQueuedTurns = queueOpen ? effectiveQueuedTurns : effectiveQueuedTurns.slice(0, 2);
+    const queueHasMore = effectiveQueuedTurns.length > 2;
+
+    const queueTray = effectiveQueueCount > 0 ? (
+        <div className="composer-queue-tray" data-testid="chat-composer-queue-tray">
+            {visibleQueuedTurns.map((t, idx) => {
+                const id = String(t?.id || '');
+                if (!id) return null;
+                const preview = String(t?.preview || '').trim() || id;
+                const stateLabel = queueRunning && idx === 0 ? 'Next' : 'Queued';
+                const canUp = idx > 0;
+                const canDown = idx < (effectiveQueuedTurns.length - 1);
+                return (
+                    <div className="composer-queue-item" key={id} data-testid={`chat-composer-queue-item-${id}`}>
+                        <div className={`composer-queue-item-state${queueRunning && idx === 0 ? ' is-next' : ''}`}>
+                            <span className="composer-queue-item-state-dot" aria-hidden="true" />
+                            <span className="composer-queue-item-state-label">{stateLabel}</span>
+                        </div>
+                        <div className="composer-queue-item-main">
+                            <div className="composer-queue-item-icon" aria-hidden="true">↳</div>
+                            <div className="composer-queue-item-preview" title={preview}>{preview}</div>
+                        </div>
+                        <div className="composer-queue-item-actions">
+                            <Button
+                                small
+                                minimal
+                                className="composer-queue-action composer-queue-action-primary"
+                                disabled={!queueRunning}
+                                onClick={(e) => { e.preventDefault(); onQueueForceSteer?.(t); }}
+                            >
+                                Steer
+                            </Button>
+                            <Button
+                                small
+                                minimal
+                                icon="trash"
+                                className="composer-queue-action"
+                                onClick={(e) => { e.preventDefault(); onQueueCancel?.(t); }}
+                            />
+                            <Popover
+                                content={(
+                                    <Menu>
+                                        <MenuItem
+                                            text="Move up"
+                                            icon="arrow-up"
+                                            disabled={!canUp}
+                                            onClick={() => onQueueMove?.(t, 'up')}
+                                        />
+                                        <MenuItem
+                                            text="Move down"
+                                            icon="arrow-down"
+                                            disabled={!canDown}
+                                            onClick={() => onQueueMove?.(t, 'down')}
+                                        />
+                                        <MenuItem
+                                            text="Edit"
+                                            icon="edit"
+                                            onClick={() => {
+                                                const next = window.prompt('Edit queued request', preview);
+                                                if (next == null) return;
+                                                onQueueEdit?.(t, String(next || ''));
+                                            }}
+                                        />
+                                    </Menu>
+                                )}
+                                placement="top-end"
+                            >
+                                <Button
+                                    small
+                                    minimal
+                                    icon="more"
+                                    className="composer-queue-action"
+                                    onClick={(e) => e.preventDefault()}
+                                />
+                            </Popover>
+                        </div>
+                    </div>
+                );
+            })}
+            {queueHasMore ? (
+                <div className="composer-queue-footer">
+                    <Button
+                        small
+                        minimal
+                        className="composer-queue-toggle"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            setQueueOpen((value) => !value);
+                        }}
+                    >
+                        {queueOpen ? 'Show less' : `${effectiveQueueCount - visibleQueuedTurns.length} more`}
+                    </Button>
+                </div>
+            ) : null}
+        </div>
+    ) : null;
+
     const queuePopover = (
         <div style={{ padding: 8, minWidth: 380, maxWidth: 520 }} data-testid="chat-queue-popover">
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Queued turns</div>
@@ -1046,6 +1146,7 @@ export default function Composer({
 	    if (commandCenter) {
 	        return (
 	            <form className="chat-composer flex flex-col gap-2" onSubmit={handleSubmit} data-testid="chat-composer">
+                    {queueTray}
 	                <div className="composer-shell" data-testid="chat-composer-shell">
 	                <div className="composer-bar" data-testid="chat-composer-bar">
 	                    <div className="composer-bar-left">
@@ -1322,7 +1423,7 @@ export default function Composer({
                         placeholder="Type your message…"
                         value={draft}
                         autoResize={autoResize}
-                        onChange={(e) => { const v = e.target.value; setDraft(v); updateHistorySuggestions(v); }}
+                        onChange={(e) => { const v = e.target.value; updateDraft(v); updateHistorySuggestions(v); }}
                         onFocus={openHistoryOnFocus}
                         onBlur={closeHistory}
                         data-testid="chat-composer-input"
@@ -1462,7 +1563,7 @@ export default function Composer({
                             placeholder="Type your message…"
                             value={draft}
                             autoResize={autoResize}
-                            onChange={(e) => { const v = e.target.value; setDraft(v); updateHistorySuggestions(v); }}
+                            onChange={(e) => { const v = e.target.value; updateDraft(v); updateHistorySuggestions(v); }}
                             onFocus={openHistoryOnFocus}
                             onBlur={closeHistory}
                             data-testid="chat-composer-input"

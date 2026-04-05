@@ -13,7 +13,9 @@ data class WindowMetadata(
     val dialogs: List<DialogDef> = emptyList(),
     val window: WindowDef? = null,
     val actions: ActionsDef? = null,
-    val on: List<ExecutionDef> = emptyList()
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -24,7 +26,9 @@ data class ActionsDef(
 @Serializable
 data class WindowDef(
     val on: List<ExecutionDef> = emptyList(),
-    val footer: FooterDef? = null
+    val footer: FooterDef? = null,
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -34,12 +38,16 @@ data class FooterDef(
 
 @Serializable
 data class ViewDef(
-    val content: ContentDef? = null
+    val content: ContentDef? = null,
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
 data class ContentDef(
-    val containers: List<ContainerDef> = emptyList()
+    val containers: List<ContainerDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -48,11 +56,19 @@ data class ContainerDef(
     val title: String? = null,
     val dataSourceRef: String? = null,
     val table: TableDef? = null,
+    val fileBrowser: FileBrowserDef? = null,
+    val chart: ChartDef? = null,
+    val editor: EditorDef? = null,
     val items: List<ItemDef> = emptyList(),
     val containers: List<ContainerDef> = emptyList(),
     val tabs: TabsDef? = null,
     val layout: LayoutDef? = null,
-    val chat: ChatDef? = null
+    val chat: ChatDef? = null,
+    val on: List<ExecutionDef> = emptyList(),
+    val selectFirst: Boolean? = null,
+    val fetchData: Boolean? = null,
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -69,12 +85,73 @@ data class LayoutDef(
 data class TableDef(
     val columns: List<ColumnDef> = emptyList(),
     val toolbar: ToolbarDef? = null,
-    val on: List<ExecutionDef> = emptyList()
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class ChartDef(
+    val xAxis: ChartAxisDef? = null,
+    val yAxis: ChartAxisDef? = null,
+    val series: ChartSeriesDef? = null,
+    val width: Int? = null,
+    val height: Int? = null,
+    val type: String? = null,
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class ChartAxisDef(
+    val dataKey: String? = null,
+    val label: String? = null,
+    val tickFormat: String? = null
+)
+
+@Serializable
+data class ChartSeriesDef(
+    val nameKey: String? = null,
+    val valueKey: String? = null,
+    val palette: List<String> = emptyList(),
+    val values: List<ChartValueOption> = emptyList()
+)
+
+@Serializable
+data class ChartValueOption(
+    val name: String? = null,
+    val value: String? = null
+)
+
+@Serializable
+data class FileBrowserDef(
+    val title: String? = null,
+    val folderOnly: Boolean? = null,
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class EditorDef(
+    val selector: EditorSelectorDef? = null,
+    val style: Map<String, String> = emptyMap(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class EditorSelectorDef(
+    val source: String? = null,
+    val location: String? = null,
+    val extension: String? = null
 )
 
 @Serializable
 data class ToolbarDef(
-    val items: List<ToolbarItemDef> = emptyList()
+    val items: List<ToolbarItemDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -82,7 +159,9 @@ data class ToolbarItemDef(
     val id: String? = null,
     val icon: String? = null,
     val align: String? = null,
-    val on: List<ExecutionDef> = emptyList()
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -93,7 +172,9 @@ data class ColumnDef(
     val type: String? = null,
     val width: Int? = null,
     val icon: String? = null,
-    val on: List<ExecutionDef> = emptyList()
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -106,7 +187,9 @@ data class ItemDef(
     val scope: String? = null,
     val options: List<OptionDef> = emptyList(),
     val properties: Map<String, JsonElement> = emptyMap(),
-    val on: List<ExecutionDef> = emptyList()
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -122,7 +205,9 @@ data class DialogDef(
     val content: ContainerDef? = null,
     val on: List<ExecutionDef> = emptyList(),
     val actions: List<ActionDef> = emptyList(),
-    val style: Map<String, String> = emptyMap()
+    val style: Map<String, String> = emptyMap(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -130,17 +215,24 @@ data class ActionDef(
     val id: String? = null,
     val label: String? = null,
     val icon: String? = null,
-    val on: List<ExecutionDef> = emptyList()
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
 data class DataSourceDef(
     val service: ServiceDef? = null,
     val selectionMode: String? = null,
+    val autoSelect: Boolean? = null,
     val uniqueKey: List<UniqueKeyDef> = emptyList(),
     val selectors: SelectorDef? = null,
     val paging: PagingDef? = null,
-    val parameters: List<ParameterDef> = emptyList()
+    val params: Map<String, String> = emptyMap(),
+    val parameters: List<ParameterDef> = emptyList(),
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -181,7 +273,9 @@ data class ExecutionDef(
     val onError: String? = null,
     val onDone: String? = null,
     val onSuccess: String? = null,
-    val async: Boolean? = null
+    val async: Boolean? = null,
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -199,7 +293,17 @@ data class ParameterDef(
 @Serializable
 data class ChatDef(
     val on: List<ExecutionDef> = emptyList(),
-    val header: ChatHeaderDef? = null
+    val header: ChatHeaderDef? = null,
+    val showUpload: Boolean? = null,
+    val uploadField: String? = null,
+    val showMic: Boolean? = null,
+    val showSettings: Boolean? = null,
+    val showAbort: Boolean? = null,
+    val showTools: Boolean? = null,
+    val commandCenter: Boolean? = null,
+    val abortVisible: JsonElement? = null,
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -213,7 +317,9 @@ data class ChatHeaderDef(
 data class ChatHeaderButtonDef(
     val icon: String? = null,
     val label: String? = null,
-    val on: List<ExecutionDef> = emptyList()
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 // Runtime state containers
