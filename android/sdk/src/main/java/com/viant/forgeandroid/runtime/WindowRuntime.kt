@@ -31,7 +31,8 @@ class WindowRuntime(
 
     fun context(windowId: String, metadata: Signal<WindowMetadata?>): WindowContext {
         return windowContexts.getOrPut(windowId) {
-            WindowContext(windowId, metadata, signals, dataSourceRuntime)
+            val parameters = windowList.peek().find { it.windowId == windowId }?.parameters ?: emptyMap()
+            WindowContext(windowId, metadata, signals, dataSourceRuntime, parameters)
         }
     }
 }
@@ -40,7 +41,8 @@ class WindowContext(
     val windowId: String,
     val metadata: Signal<WindowMetadata?>,
     private val signals: SignalRegistry,
-    private val dataSourceRuntime: DataSourceRuntime
+    private val dataSourceRuntime: DataSourceRuntime,
+    val parameters: Map<String, Any?> = emptyMap()
 ) {
     val identity = WindowIdentity(windowId)
 

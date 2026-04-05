@@ -19,6 +19,7 @@ import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
 import useDataConnector from '../hooks/dataconnector.js';
 import {injectActions} from '../actions';
+import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 
 
 /* ------------------------------------------------------------------
@@ -212,7 +213,7 @@ export default function WindowContent({window, isInTab = false}) {
     const [fetchError, setFetchError] = useState(null);
 
     // Settings & connector
-    const {connectorConfig = {}, services = {}} = useSetting();
+    const {connectorConfig = {}, services = {}, targetContext = {}} = useSetting();
     if (!connectorConfig.window) {
         throw new Error('No connectorConfig.window found');
     }

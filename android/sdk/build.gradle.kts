@@ -10,7 +10,6 @@ android {
 
     defaultConfig {
         minSdk = 26
-        targetSdk = 35
     }
 
     buildFeatures {
@@ -56,4 +55,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    testImplementation(kotlin("test"))
 }

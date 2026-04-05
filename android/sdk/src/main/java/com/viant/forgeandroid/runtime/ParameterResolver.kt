@@ -66,16 +66,26 @@ class ParameterResolver {
         val key = name ?: return
         when (store) {
             "input", "input.query", "input.path", "input.headers", "input.body" -> {
-                val sub = dst.getOrPut("input") { mutableMapOf<String, Any?>() } as MutableMap<String, Any?>
+                val sub = mutableMapStore(dst, "input")
                 val subKey = store.removePrefix("input.")
                 if (subKey.isNotEmpty()) {
-                    val child = sub.getOrPut(subKey) { mutableMapOf<String, Any?>() } as MutableMap<String, Any?>
+                    val child = mutableMapStore(sub, subKey)
                     child[key] = value
                 } else {
                     sub[key] = value
                 }
             }
             else -> dst[key] = value
+        }
+    }
+
+    private fun mutableMapStore(dst: MutableMap<String, Any?>, key: String): MutableMap<String, Any?> {
+        val existing = dst[key]
+        return if (existing is MutableMap<*, *>) {
+            @Suppress("UNCHECKED_CAST")
+            existing as MutableMap<String, Any?>
+        } else {
+            JsonUtil.asStringMap(existing).toMutableMap().also { dst[key] = it }
         }
     }
 

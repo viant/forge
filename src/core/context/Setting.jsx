@@ -5,7 +5,7 @@ import { maybeAutoStartUIBridge } from '../ui/autostart.js';
 const Setting = createContext({});
 const NoopAuthContext = createContext({});
 
-export const SettingProvider = ({endpoints, connectorConfig, authContext, services={},  children}) => {
+export const SettingProvider = ({endpoints, connectorConfig, authContext, services={}, targetContext = {}, children}) => {
 
     const safeAuthContext = authContext || NoopAuthContext;
     const useAuth = () => useContext(safeAuthContext);
@@ -22,7 +22,7 @@ export const SettingProvider = ({endpoints, connectorConfig, authContext, servic
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
      return (
-        <Setting.Provider value={{endpoints, connectorConfig, useAuth, services}}>
+        <Setting.Provider value={{endpoints, connectorConfig, useAuth, services, targetContext}}>
             {children}
         </Setting.Provider>
     );

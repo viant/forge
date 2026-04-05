@@ -11,7 +11,14 @@ object JsonUtil {
 
     fun parseObject(text: String): Map<String, Any?> {
         val el = json.parseToJsonElement(text)
-        return elementToAny(el) as? Map<String, Any?> ?: emptyMap()
+        return asStringMap(elementToAny(el))
+    }
+
+    fun asStringMap(value: Any?): Map<String, Any?> {
+        return when (value) {
+            is Map<*, *> -> value.entries.associate { it.key.toString() to it.value }
+            else -> emptyMap()
+        }
     }
 
     fun elementToAny(el: JsonElement): Any? = when (el) {

@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -100,7 +100,7 @@ fun MenuListRenderer(runtime: ForgeRuntime, window: WindowContext, items: List<I
                 }
             }
             if (idx < items.size - 1) {
-                Divider(color = Color(0xFFE6E6E6))
+                HorizontalDivider(color = Color(0xFFE6E6E6))
             }
         }
     }
