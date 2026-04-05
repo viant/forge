@@ -180,6 +180,21 @@ export default function Composer({
 	const recordingStartTsRef = useRef(0);
 	const lastManualAgentRef = useRef('');
 
+	const updateDraft = useCallback((nextValue) => {
+		setDraft((prev) => {
+			const resolved = typeof nextValue === 'function' ? nextValue(prev) : nextValue;
+			const next = String(resolved || "");
+			onDraftChange?.(next);
+			return next;
+		});
+	}, [onDraftChange]);
+
+	useEffect(() => {
+		if (draftValue === undefined) return;
+		const next = String(draftValue || "");
+		setDraft((prev) => prev === next ? prev : next);
+	}, [draftValue]);
+
 	useEffect(() => {
 	    const applyPrefill = (prompt, conversationId = '') => {
 	        const targetId = String(conversationId || '').trim();
