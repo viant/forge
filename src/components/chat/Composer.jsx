@@ -172,6 +172,7 @@ export default function Composer({
 	const [bundlesOpen, setBundlesOpen] = useState(false);
 	const [bundlesMenuOpen, setBundlesMenuOpen] = useState(false);
 	const micOn = (micOnProp !== undefined) ? !!micOnProp : micOnInternal;
+	const draftRef = useRef(String(draftValue || ""));
 	const recognitionRef = useRef(null);
 	const recognitionRestartRef = useRef(false);
 	const dictationBaseRef = useRef('');
@@ -183,19 +184,24 @@ export default function Composer({
 	const lastManualAgentRef = useRef('');
 
 	const updateDraft = useCallback((nextValue) => {
-		setDraft((prev) => {
-			const resolved = typeof nextValue === 'function' ? nextValue(prev) : nextValue;
-			const next = String(resolved || "");
-			onDraftChange?.(next);
-			return next;
-		});
+		const prev = String(draftRef.current || "");
+		const resolved = typeof nextValue === 'function' ? nextValue(prev) : nextValue;
+		const next = String(resolved || "");
+		draftRef.current = next;
+		setDraft((current) => current === next ? current : next);
+		onDraftChange?.(next);
 	}, [onDraftChange]);
 
 	useEffect(() => {
 		if (draftValue === undefined) return;
 		const next = String(draftValue || "");
+		draftRef.current = next;
 		setDraft((prev) => prev === next ? prev : next);
 	}, [draftValue]);
+
+	useEffect(() => {
+		draftRef.current = String(draft || "");
+	}, [draft]);
 
 	useEffect(() => {
 	    const applyPrefill = (prompt, conversationId = '') => {
