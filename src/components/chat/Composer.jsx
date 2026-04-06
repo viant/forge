@@ -11,7 +11,10 @@ function composerMaxHeightPx(maxRows, paddingTopPx) {
     return (safeRows * estimatedLineHeightPx) + safePad + 16;
 }
 
-const COMPOSER_DRAFTS_KEY = 'agently.composerDrafts.v1';
+const COMPOSER_DRAFTS_KEY = 'forge.composerDrafts.v1';
+const COMPOSER_HISTORY_KEY = 'forge_composer_history';
+const COMPOSER_PREFILL_EVENT = 'forge:composer-prefill';
+const CONVERSATION_ACTIVE_EVENT = 'forge:conversation-active';
 
 function currentConversationIdFromLocation() {
     if (typeof window === 'undefined') return '';
@@ -137,14 +140,13 @@ export default function Composer({
 	getMessageHistory: getMessageHistoryProp,
 	historyOnFocus = false,
 	}) {
-	// Fallback: read agently_composer_history from localStorage when chat service doesn't pass getComposerHistory (e.g. context path)
+	// Fallback: read forge_composer_history from localStorage when chat service doesn't pass getComposerHistory.
 	const getMessageHistory = useMemo(() => {
 		if (typeof getMessageHistoryProp === 'function') return getMessageHistoryProp;
-		const KEY = 'agently_composer_history';
 		const MAX = 10;
 		return (prefix) => {
 			try {
-				const raw = localStorage.getItem(KEY);
+				const raw = localStorage.getItem(COMPOSER_HISTORY_KEY);
 				const list = raw ? JSON.parse(raw) : [];
 				if (!Array.isArray(list)) return [];
 				const p = String(prefix || '').trim().toLowerCase();
@@ -225,12 +227,12 @@ export default function Composer({
 	    };
 
 	    restoreCurrentDraft();
-	    window.addEventListener('agently:composer-prefill', handlePrefill);
-	    window.addEventListener('agently:conversation-active', handleConversationActive);
+	    window.addEventListener(COMPOSER_PREFILL_EVENT, handlePrefill);
+	    window.addEventListener(CONVERSATION_ACTIVE_EVENT, handleConversationActive);
 	    window.addEventListener('popstate', handleConversationActive);
 	    return () => {
-	        window.removeEventListener('agently:composer-prefill', handlePrefill);
-	        window.removeEventListener('agently:conversation-active', handleConversationActive);
+	        window.removeEventListener(COMPOSER_PREFILL_EVENT, handlePrefill);
+	        window.removeEventListener(CONVERSATION_ACTIVE_EVENT, handleConversationActive);
 	        window.removeEventListener('popstate', handleConversationActive);
 	    };
 	}, []);
