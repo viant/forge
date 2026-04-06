@@ -13,15 +13,16 @@ const ViewDialog = ({context, dialog}) => {
     const [isOpen, setIsOpen] = useState(false);
     const log = getLogger('dialog');
     const {handlers} = context
+    const resolvedDataSourceRef = dialog?.dataSourceRef || context?.identity?.dataSourceRef || '';
 
     const events = dialogHandlers(context, dialog)
     useSignalEffect(() => {
         const isDialogOpen = handlers.dialog.isOpen();
-        log.debug('open effect', { isDialogOpen, wasOpen: isOpen, dsRef: dialog?.dataSourceRef });
+        log.debug('open effect', { isDialogOpen, wasOpen: isOpen, dsRef: resolvedDataSourceRef });
         if (isDialogOpen && !isOpen) {
             const dialogContext = (() => {
                 try {
-                    return context?.Context?.(dialog?.dataSourceRef);
+                    return resolvedDataSourceRef ? context?.Context?.(resolvedDataSourceRef) : null;
                 } catch (_) {
                     return null;
                 }
@@ -41,7 +42,7 @@ const ViewDialog = ({context, dialog}) => {
                 // Seed DS input parameters from dialog args so dataSource.parameters
                 // (path/query deps) resolve correctly on first fetch.
                 try {
-                    const dsRef = dialog?.dataSourceRef;
+                    const dsRef = resolvedDataSourceRef;
                     let params = {};
                     if (args && typeof args === 'object') {
                         const scoped = (dsRef && args[dsRef]) ? args[dsRef] : args;
@@ -63,7 +64,7 @@ const ViewDialog = ({context, dialog}) => {
             try {
                 setTimeout(() => {
                     try {
-                        const dsC = context?.Context?.(dialog.dataSourceRef);
+                        const dsC = resolvedDataSourceRef ? context?.Context?.(resolvedDataSourceRef) : null;
                         const dsHandlers = dsC?.handlers?.dataSource;
                         const inSig = dsC?.signals?.input;
                         const args = (inSig?.peek?.() || {}).args || {};
@@ -95,7 +96,7 @@ const ViewDialog = ({context, dialog}) => {
     // can subscribe to its signals regardless of visibility.
     let dsCtx;
     try {
-        const dsExists = !!(context?.metadata?.dataSource && context.metadata.dataSource[dialog.dataSourceRef]);
+        const dsExists = !!(resolvedDataSourceRef && context?.metadata?.dataSource && context.metadata.dataSource[resolvedDataSourceRef]);
         if (!dsExists) {
             const keys = Object.keys(context?.metadata?.dataSource || {});
             let callers = [];
@@ -104,19 +105,19 @@ const ViewDialog = ({context, dialog}) => {
                 callers = String(stack).split('\n').slice(2, 6).map((s) => s.trim());
             } catch (_) {}
             console.error('[ViewDialog] dataSourceRef not found for dialog', dialog?.id || '(no id)', {
-                dataSourceRef: dialog?.dataSourceRef,
+                dataSourceRef: resolvedDataSourceRef,
                 available: keys,
                 callers,
             });
         }
-        dsCtx = context.Context(dialog.dataSourceRef);
+        dsCtx = resolvedDataSourceRef ? context.Context(resolvedDataSourceRef) : null;
     } catch (e) {
         let callers = [];
         try {
             const stack = (new Error()).stack || '';
             callers = String(stack).split('\n').slice(2, 6).map((s) => s.trim());
         } catch (_) {}
-        console.error('[ViewDialog] failed to create DS context for', dialog?.dataSourceRef, { error: String(e?.message || e), callers });
+        console.error('[ViewDialog] failed to create DS context for', resolvedDataSourceRef, { error: String(e?.message || e), callers });
         dsCtx = null;
     }
 
@@ -217,13 +218,13 @@ const ViewDialog = ({context, dialog}) => {
                     <DataSource context={dsCtx} />
                     <MessageBus context={dsCtx} />
                 </>) : (
-                    <div style={{ color: '#a82a2a', padding: 8 }}>Dialog misconfigured: missing data source “{String(dialog.dataSourceRef)}”.</div>
+                    <div style={{ color: '#a82a2a', padding: 8 }}>Dialog misconfigured: missing data source “{String(resolvedDataSourceRef)}”.</div>
                 )}
                 {/* Inline quick-search input above the content for a friendlier UX */}
                 <DialogQuickSearch dsCtx={dsCtx} />
                 <LayoutRenderer
                     context={dsCtx}
-                    container={{dataSourceRef: dialog.dataSourceRef, ...dialog.content}}
+                    container={{dataSourceRef: resolvedDataSourceRef, ...dialog.content}}
                 />
             </DialogBody>
             <DialogFooter actions={
