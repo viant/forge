@@ -24,7 +24,7 @@ export function useDataSourceState(context) {
         const { loading = false, error = null } = control.peek() || {};
         return { loading, error };
     });
-    const [sel, setSel]             = useState(selection.peek());
+    const [sel, setSel]             = useState(selection?.peek?.());
 
     // keep data in sync
     useSignalEffect(() => {
@@ -39,7 +39,7 @@ export function useDataSourceState(context) {
 
     // keep selection in sync (optional)
     useSignalEffect(() => {
-        setSel(selection.value);
+        setSel(selection?.value);
     });
 
     return { collection: data, ...flags, selection: sel };

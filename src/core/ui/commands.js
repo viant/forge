@@ -12,6 +12,11 @@ import {
   getFormSignal,
   getSelectionSignal,
   getCollectionSignal,
+  getMetricsSignal,
+  getControlSignal,
+  getBusSignal,
+  getDashboardFilterSignal,
+  getDashboardSelectionSignal,
   getFormStatusSignal,
   getDialogSignal,
 } from '../store/signals.js';
@@ -19,6 +24,11 @@ import {
 import { focusControl, listControlTargets, getFocusedControlMeta, enableFocusTracking } from './registry.js';
 import { setSelector } from '../../utils/selector.js';
 import { resolveSelector } from '../../utils/selector.js';
+import { buildStandaloneDashboardDocument, buildStandaloneDashboardHtml, downloadDashboardHtml } from './dashboardExport.js';
+import { createDashboardDemoBundle, createDashboardDemoMetadata, createDashboardDemoSeed, listDashboardDemoVariants } from './dashboardDemo.js';
+import { buildDashboardDemoStandaloneHtml, getDashboardDemoExportFilename, listDashboardDemoArtifacts } from './dashboardDemoArtifacts.js';
+import { getWindowContext } from '../context/registry.js';
+import { buildDashboardDefaultFilters, setDashboardSelectionState } from '../../components/dashboard/dashboardUtils.js';
 
 function requireString(name, v) {
   if (typeof v !== 'string' || v.trim() === '') {
@@ -74,6 +84,73 @@ function getDataSourceId(windowId, dataSourceRef) {
   const dsRef = dataSourceRef || getDefaultDsRef(windowId);
   if (!dsRef) throw new Error(`dataSourceRef not found for window: ${windowId}`);
   return { dataSourceRef: dsRef, dataSourceId: `${windowId}DS${dsRef}` };
+}
+
+function getDashboardKey(windowId, dashboardId) {
+  if (dashboardId) {
+    return `${windowId}:${dashboardId}`;
+  }
+  const metadata = getMetadataSignal(windowId).peek();
+  const containerId = metadata?.view?.content?.id || 'dashboard';
+  return `${windowId}:${containerId}`;
+}
+
+function seedDataSource(windowId, dataSourceRef, seed = {}) {
+  const dataSourceId = `${windowId}DS${dataSourceRef}`;
+  if (seed.collection) {
+    getCollectionSignal(dataSourceId).value = seed.collection;
+  }
+  if (seed.metrics) {
+    getMetricsSignal(dataSourceId).value = seed.metrics;
+  }
+  getControlSignal(dataSourceId).value = { loading: false, error: null };
+}
+
+function createDashboardExportContext(windowId, metadata, dataSourceRef, dashboardKey) {
+  const defaultDsRef = dataSourceRef || metadata?.view?.dataSourceRef || Object.keys(metadata?.dataSource || {})[0];
+  const makeContext = (dsRef) => {
+    const actualDsRef = dsRef || defaultDsRef;
+    const dataSourceId = `${windowId}DS${actualDsRef}`;
+    const nextDashboardKey = dashboardKey || `${windowId}:${metadata?.view?.content?.id || 'dashboard'}`;
+    const ctx = {
+      identity: {
+        windowId,
+        dataSourceRef: actualDsRef,
+        dataSourceId,
+        dashboardKey: nextDashboardKey,
+      },
+      dashboardKey: nextDashboardKey,
+      locale: metadata?.view?.content?.locale || 'en-US',
+      metadata,
+      signals: {
+        metrics: getMetricsSignal(dataSourceId),
+        collection: getCollectionSignal(dataSourceId),
+        control: getControlSignal(dataSourceId),
+      },
+      Context(nextDsRef) {
+        return makeContext(nextDsRef);
+      },
+    };
+
+    Object.defineProperties(ctx, {
+      dashboardSelection: {
+        enumerable: true,
+        get() {
+          return getDashboardSelectionSignal(nextDashboardKey).peek();
+        },
+      },
+      dashboardFilters: {
+        enumerable: true,
+        get() {
+          return getDashboardFilterSignal(nextDashboardKey).peek();
+        },
+      },
+    });
+
+    return ctx;
+  };
+
+  return makeContext(defaultDsRef);
 }
 
 function computeUniqueKeyValue(record, uniqueKey = []) {
@@ -149,6 +226,267 @@ export async function runUICommand(cmd = {}) {
 
       const controls = candidates.filter(hit).slice(0, limit);
       return { controls };
+    }
+
+    case 'ui.dashboard.exportHtml': {
+      const model = params.model || {};
+      const filename = params.filename || 'dashboard.html';
+      const html = buildStandaloneDashboardHtml(model);
+      if (params.download !== false) {
+        downloadDashboardHtml({ html, filename });
+      }
+      return { ok: true, filename, html };
+    }
+
+    case 'ui.dashboard.exportFromContainer': {
+      const filename = params.filename || 'dashboard.html';
+      const { model, html } = buildStandaloneDashboardDocument({
+        container: params.container,
+        context: params.context,
+        chartSvgs: params.chartSvgs,
+        rootElement: params.rootElement || (typeof document !== 'undefined' && params.rootSelector ? document.querySelector(params.rootSelector) : null),
+        title: params.title,
+        subtitle: params.subtitle,
+        generatedAt: params.generatedAt,
+      });
+      if (params.download !== false) {
+        downloadDashboardHtml({ html, filename });
+      }
+      return { ok: true, filename, model, html };
+    }
+
+    case 'ui.dashboard.openDemo': {
+      const variant = params.variant || 'performance';
+      const { metadata, seed } = createDashboardDemoBundle(variant);
+      const windowKey = params.windowKey || `dashboard-demo-${randomSuffix()}`;
+      const windowTitle = params.windowTitle || params.title || 'Dashboard Demo';
+      const parentKey = params.parentKey || selectedWindowId.peek() || 'root';
+      const inTab = params.inTab !== false;
+      const options = {
+        ...(params.options || {}),
+        inlineMetadata: metadata,
+        newInstance: true,
+      };
+      const win = addWindow(windowTitle, parentKey, windowKey, params.windowData || '', inTab, params.parameters || {}, options);
+      Object.entries(seed).forEach(([dataSourceRef, value]) => seedDataSource(win.windowId, dataSourceRef, value));
+      return { ok: true, windowId: win?.windowId || null, windowKey, variant };
+    }
+
+    case 'ui.dashboard.listDemos': {
+      return {
+        ok: true,
+        demos: listDashboardDemoVariants(),
+      };
+    }
+
+    case 'ui.dashboard.getDemo': {
+      const variant = params.variant || 'performance';
+      const bundle = createDashboardDemoBundle(variant);
+      return {
+        ok: true,
+        variant,
+        metadata: bundle.metadata,
+        seed: bundle.seed,
+      };
+    }
+
+    case 'ui.dashboard.capabilities': {
+      return {
+        ok: true,
+        blockKinds: [
+          'dashboard.summary',
+          'dashboard.compare',
+          'dashboard.kpiTable',
+          'dashboard.filters',
+          'dashboard.timeline',
+          'dashboard.dimensions',
+          'dashboard.messages',
+          'dashboard.status',
+          'dashboard.feed',
+          'dashboard.report',
+          'dashboard.detail',
+        ],
+        chartTypes: ['line', 'bar', 'area'],
+        commands: [
+          'ui.dashboard.listDemos',
+          'ui.dashboard.getDemo',
+          'ui.dashboard.openDemo',
+          'ui.dashboard.listDemoArtifacts',
+          'ui.dashboard.generateDemoArtifacts',
+          'ui.dashboard.exportHtml',
+          'ui.dashboard.exportFromContainer',
+          'ui.dashboard.exportWindow',
+          'ui.dashboard.filter.set',
+          'ui.dashboard.filter.clear',
+          'ui.dashboard.selection.set',
+          'ui.dashboard.selection.clear',
+          'ui.dashboard.state.get',
+          'ui.dashboard.state.reset',
+        ],
+        demos: listDashboardDemoVariants(),
+      };
+    }
+
+    case 'ui.dashboard.listDemoArtifacts': {
+      return {
+        ok: true,
+        artifacts: listDashboardDemoArtifacts(),
+      };
+    }
+
+    case 'ui.dashboard.generateDemoArtifacts': {
+      const variants = Array.isArray(params.variants) && params.variants.length > 0
+        ? params.variants
+        : listDashboardDemoArtifacts().map((artifact) => artifact.id);
+
+      const artifacts = variants.map((variant) => {
+        const { model, html } = buildDashboardDemoStandaloneHtml(variant, {
+          generatedAt: params.generatedAt,
+        });
+        return {
+          id: variant,
+          filename: getDashboardDemoExportFilename(variant),
+          title: model?.title || variant,
+          html,
+          model,
+        };
+      });
+
+      return {
+        ok: true,
+        artifacts,
+      };
+    }
+
+    case 'ui.dashboard.exportWindow': {
+      const windowId = requireString('windowId', params.windowId);
+      const metadata = params.metadata || getMetadataSignal(windowId).peek() || getWindowById(windowId)?.inlineMetadata;
+      const container = metadata?.view?.content;
+      if (!container) {
+        throw new Error(`window view content not found: ${windowId}`);
+      }
+      const dsRef = params.dataSourceRef || metadata?.view?.dataSourceRef || getDefaultDsRef(windowId);
+      const context = params.context || createDashboardExportContext(windowId, metadata, dsRef, `${windowId}:${container.id || 'dashboard'}`);
+      const rootElement = params.rootElement
+        || (typeof document !== 'undefined' ? document.querySelector(`[data-window-id="${windowId}"]`) : null);
+      const filename = params.filename || `${windowId}-dashboard.html`;
+      const { model, html } = buildStandaloneDashboardDocument({
+        container,
+        context,
+        rootElement,
+        title: params.title || container?.title,
+        subtitle: params.subtitle || container?.subtitle,
+        generatedAt: params.generatedAt,
+      });
+      if (params.download !== false) {
+        downloadDashboardHtml({ html, filename });
+      }
+      return { ok: true, filename, model, html };
+    }
+
+    case 'ui.dashboard.filter.set': {
+      const windowId = requireString('windowId', params.windowId);
+      const dashboardKey = params.dashboardKey || getDashboardKey(windowId, params.dashboardId);
+      const filterSignal = getDashboardFilterSignal(dashboardKey);
+      const prev = filterSignal.peek() || {};
+      const patch = params.patch || {};
+      filterSignal.value = {
+        ...prev,
+        ...patch,
+      };
+      return { ok: true, dashboardKey, filters: filterSignal.value };
+    }
+
+    case 'ui.dashboard.filter.clear': {
+      const windowId = requireString('windowId', params.windowId);
+      const dashboardKey = params.dashboardKey || getDashboardKey(windowId, params.dashboardId);
+      const filterSignal = getDashboardFilterSignal(dashboardKey);
+      if (Array.isArray(params.fields) && params.fields.length > 0) {
+        const next = { ...(filterSignal.peek() || {}) };
+        params.fields.forEach((field) => {
+          delete next[field];
+        });
+        filterSignal.value = next;
+      } else {
+        filterSignal.value = {};
+      }
+      return { ok: true, dashboardKey, filters: filterSignal.value };
+    }
+
+    case 'ui.dashboard.selection.set': {
+      const windowId = requireString('windowId', params.windowId);
+      const dashboardKey = params.dashboardKey || getDashboardKey(windowId, params.dashboardId);
+      const payload = setDashboardSelectionState({
+        windowId,
+        dashboardKey,
+        dimension: params.dimension || null,
+        entityKey: params.entityKey ?? null,
+        pointKey: params.pointKey ?? null,
+        selected: params.selected ?? null,
+        sourceBlockId: params.sourceBlockId || null,
+      });
+      return { ok: true, dashboardKey, selection: payload };
+    }
+
+    case 'ui.dashboard.selection.clear': {
+      const windowId = requireString('windowId', params.windowId);
+      const dashboardKey = params.dashboardKey || getDashboardKey(windowId, params.dashboardId);
+      const payload = setDashboardSelectionState({
+        windowId,
+        dashboardKey,
+        dimension: null,
+        entityKey: null,
+        pointKey: null,
+        selected: null,
+        sourceBlockId: params.sourceBlockId || null,
+      });
+      return { ok: true, dashboardKey, selection: payload };
+    }
+
+    case 'ui.dashboard.state.get': {
+      const windowId = requireString('windowId', params.windowId);
+      const metadata = params.metadata || getMetadataSignal(windowId).peek() || getWindowById(windowId)?.inlineMetadata || {};
+      const dashboardId = params.dashboardId || metadata?.view?.content?.id || 'dashboard';
+      const dashboardKey = params.dashboardKey || getDashboardKey(windowId, dashboardId);
+      const container = metadata?.view?.content || null;
+      return {
+        ok: true,
+        windowId,
+        dashboardId,
+        dashboardKey,
+        filters: getDashboardFilterSignal(dashboardKey).peek() || {},
+        selection: getDashboardSelectionSignal(dashboardKey).peek() || {},
+        title: container?.title || '',
+        blockIds: Array.isArray(container?.containers) ? container.containers.map((block) => block?.id).filter(Boolean) : [],
+      };
+    }
+
+    case 'ui.dashboard.state.reset': {
+      const windowId = requireString('windowId', params.windowId);
+      const metadata = params.metadata || getMetadataSignal(windowId).peek() || getWindowById(windowId)?.inlineMetadata || {};
+      const container = metadata?.view?.content || null;
+      const dashboardId = params.dashboardId || container?.id || 'dashboard';
+      const dashboardKey = params.dashboardKey || getDashboardKey(windowId, dashboardId);
+      const defaultFilters = buildDashboardDefaultFilters(container);
+      const filterSignal = getDashboardFilterSignal(dashboardKey);
+      filterSignal.value = defaultFilters;
+      const payload = setDashboardSelectionState({
+        windowId,
+        dashboardKey,
+        dimension: null,
+        entityKey: null,
+        pointKey: null,
+        selected: null,
+        sourceBlockId: params.sourceBlockId || 'ui.dashboard.state.reset',
+      });
+
+      return {
+        ok: true,
+        dashboardId,
+        dashboardKey,
+        filters: filterSignal.value,
+        selection: payload,
+      };
     }
 
     // ------------------------------------------------------------------
@@ -433,8 +771,7 @@ export async function runUICommand(cmd = {}) {
       const windowId = requireString('windowId', params.windowId);
       const dialogId = requireString('dialogId', params.dialogId);
       try {
-        const mod = await import('../context/Context.jsx');
-        const base = mod.getWindowContext?.(windowId);
+        const base = getWindowContext(windowId);
         const dsRef = params.dataSourceRef || base?.identity?.dataSourceRef || getDefaultDsRef(windowId);
         const ctx = base?.Context?.(dsRef);
         const opts = params.options || {};
@@ -462,8 +799,7 @@ export async function runUICommand(cmd = {}) {
       const windowId = requireString('windowId', params.windowId);
       const dialogId = requireString('dialogId', params.dialogId);
       try {
-        const mod = await import('../context/Context.jsx');
-        const base = mod.getWindowContext?.(windowId);
+        const base = getWindowContext(windowId);
         const dsRef = params.dataSourceRef || base?.identity?.dataSourceRef || getDefaultDsRef(windowId);
         const ctx = base?.Context?.(dsRef);
         ctx?.handlers?.window?.closeDialog?.({ dialogId, context: ctx });
@@ -479,8 +815,7 @@ export async function runUICommand(cmd = {}) {
       const windowId = requireString('windowId', params.windowId);
       const dialogId = requireString('dialogId', params.dialogId);
       const payload = params.payload;
-      const mod = await import('../context/Context.jsx');
-      const base = mod.getWindowContext?.(windowId);
+      const base = getWindowContext(windowId);
       if (!base) throw new Error(`window context not found: ${windowId}`);
       const meta = getMetadataSignal(windowId).peek();
       const dialog = (meta?.dialogs || []).find((d) => d?.id === dialogId);

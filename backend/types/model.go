@@ -166,6 +166,9 @@ type Layout struct {
 	Orientation   string   `json:"orientation" yaml:"orientation"`
 	Rows          int      `json:"rows" yaml:"rows"`
 	Columns       int      `json:"columns,omitempty" yaml:"columns,omitempty"`
+	Gap           string   `json:"gap,omitempty" yaml:"gap,omitempty"`
+	RowGap        string   `json:"rowGap,omitempty" yaml:"rowGap,omitempty"`
+	ColumnGap     string   `json:"columnGap,omitempty" yaml:"columnGap,omitempty"`
 	LabelPosition string   `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
 	Labels        *Labels  `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Divider       *Divider `json:"divider,omitempty" yaml:"divider,omitempty"`
@@ -329,6 +332,12 @@ type Container struct {
 	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 	State           *Parameter                        `json:"state,omitempty" yaml:"state,omitempty"`
 	Title           string                            `json:"title,omitempty" yaml:"title,omitempty"`
+	Kind            string                            `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Role            string                            `json:"role,omitempty" yaml:"role,omitempty"`
+	FilterBindings  map[string]string                 `json:"filterBindings,omitempty" yaml:"filterBindings,omitempty"`
+	ColumnSpan      int                               `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
+	RowSpan         int                               `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
+	VisibleWhen     *DashboardCondition               `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 	Layout          *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
 	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	Toolbar         *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
@@ -350,6 +359,7 @@ type Container struct {
 	Repeat          *Repeat                           `json:"repeat,omitempty" yaml:"repeat,omitempty"`
 	SelectFirst     bool                              `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
 	FetchData       bool                              `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
+	Dashboard       *Dashboard                        `json:"dashboard,omitempty" yaml:"dashboard,omitempty"`
 }
 
 // Terminal declares a terminal-like, scrollable log/command view in a container.
@@ -459,6 +469,172 @@ type SelectorCondition struct {
 	Selector      string `json:"selector,omitempty" yaml:"selector,omitempty"`
 	When          any    `json:"when,omitempty" yaml:"when,omitempty"`
 }
+
+// DashboardCondition extends SelectorCondition with threshold and emptiness
+// operators used by dashboard blocks.
+type DashboardCondition struct {
+	DataSourceRef string   `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Selector      string   `json:"selector,omitempty" yaml:"selector,omitempty"`
+	Field         string   `json:"field,omitempty" yaml:"field,omitempty"`
+	Key           string   `json:"key,omitempty" yaml:"key,omitempty"`
+	When          any      `json:"when,omitempty" yaml:"when,omitempty"`
+	Gt            *float64 `json:"gt,omitempty" yaml:"gt,omitempty"`
+	Gte           *float64 `json:"gte,omitempty" yaml:"gte,omitempty"`
+	Lt            *float64 `json:"lt,omitempty" yaml:"lt,omitempty"`
+	Lte           *float64 `json:"lte,omitempty" yaml:"lte,omitempty"`
+	NotEmpty      *bool    `json:"notEmpty,omitempty" yaml:"notEmpty,omitempty"`
+}
+
+type Dashboard struct {
+	Summary    *DashboardSummary    `json:"summary,omitempty" yaml:"summary,omitempty"`
+	Compare    *DashboardCompare    `json:"compare,omitempty" yaml:"compare,omitempty"`
+	KPITable   *DashboardKPITable   `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
+	Filters    *DashboardFilters    `json:"filters,omitempty" yaml:"filters,omitempty"`
+	Timeline   *DashboardTimeline   `json:"timeline,omitempty" yaml:"timeline,omitempty"`
+	Dimensions *DashboardDimensions `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
+	Messages   *DashboardMessages   `json:"messages,omitempty" yaml:"messages,omitempty"`
+	Status     *DashboardStatus     `json:"status,omitempty" yaml:"status,omitempty"`
+	Feed       *DashboardFeed       `json:"feed,omitempty" yaml:"feed,omitempty"`
+	Report     *DashboardReport     `json:"report,omitempty" yaml:"report,omitempty"`
+	Detail     *DashboardDetail     `json:"detail,omitempty" yaml:"detail,omitempty"`
+}
+
+type DashboardSummary struct {
+	Metrics []DashboardMetric `json:"metrics,omitempty" yaml:"metrics,omitempty"`
+}
+
+type DashboardCompare struct {
+	Items []DashboardCompareItem `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
+type DashboardCompareItem struct {
+	ID           string `json:"id,omitempty" yaml:"id,omitempty"`
+	Label        string `json:"label,omitempty" yaml:"label,omitempty"`
+	Current      string `json:"current,omitempty" yaml:"current,omitempty"`
+	Previous     string `json:"previous,omitempty" yaml:"previous,omitempty"`
+	Format       string `json:"format,omitempty" yaml:"format,omitempty"`
+	DeltaFormat  string `json:"deltaFormat,omitempty" yaml:"deltaFormat,omitempty"`
+	PositiveIsUp *bool  `json:"positiveIsUp,omitempty" yaml:"positiveIsUp,omitempty"`
+	DeltaLabel   string `json:"deltaLabel,omitempty" yaml:"deltaLabel,omitempty"`
+}
+
+type DashboardKPITable struct {
+	Rows []DashboardKPIRow `json:"rows,omitempty" yaml:"rows,omitempty"`
+}
+
+type DashboardKPIRow struct {
+	ID          string `json:"id,omitempty" yaml:"id,omitempty"`
+	Label       string `json:"label,omitempty" yaml:"label,omitempty"`
+	Value       string `json:"value,omitempty" yaml:"value,omitempty"`
+	Format      string `json:"format,omitempty" yaml:"format,omitempty"`
+	Context     string `json:"context,omitempty" yaml:"context,omitempty"`
+	ContextTone string `json:"contextTone,omitempty" yaml:"contextTone,omitempty"`
+}
+
+type DashboardFilters struct {
+	Items []DashboardFilterItem `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
+type DashboardFilterItem struct {
+	ID       string                  `json:"id,omitempty" yaml:"id,omitempty"`
+	Label    string                  `json:"label,omitempty" yaml:"label,omitempty"`
+	Field    string                  `json:"field,omitempty" yaml:"field,omitempty"`
+	Multiple bool                    `json:"multiple,omitempty" yaml:"multiple,omitempty"`
+	Options  []DashboardFilterOption `json:"options,omitempty" yaml:"options,omitempty"`
+}
+
+type DashboardFilterOption struct {
+	Label   string `json:"label,omitempty" yaml:"label,omitempty"`
+	Value   string `json:"value,omitempty" yaml:"value,omitempty"`
+	Default bool   `json:"default,omitempty" yaml:"default,omitempty"`
+}
+
+type DashboardMetric struct {
+	ID       string `json:"id,omitempty" yaml:"id,omitempty"`
+	Label    string `json:"label,omitempty" yaml:"label,omitempty"`
+	Selector string `json:"selector,omitempty" yaml:"selector,omitempty"`
+	Format   string `json:"format,omitempty" yaml:"format,omitempty"`
+}
+
+type DashboardTimeline struct {
+	ViewModes []string `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
+	// Annotations are reserved for future timeline overlays; the current JS
+	// runtime ignores this field in v1.
+	Annotations *DashboardAnnotation `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+}
+
+type DashboardAnnotation struct {
+	Selector string `json:"selector,omitempty" yaml:"selector,omitempty"`
+}
+
+type DashboardDimensions struct {
+	Dimension *DashboardField `json:"dimension,omitempty" yaml:"dimension,omitempty"`
+	Metric    *DashboardField `json:"metric,omitempty" yaml:"metric,omitempty"`
+	ViewModes []string        `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
+	Limit     int             `json:"limit,omitempty" yaml:"limit,omitempty"`
+	OrderBy   string          `json:"orderBy,omitempty" yaml:"orderBy,omitempty"`
+}
+
+type DashboardField struct {
+	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
+	Label  string `json:"label,omitempty" yaml:"label,omitempty"`
+	Format string `json:"format,omitempty" yaml:"format,omitempty"`
+}
+
+type DashboardMessages struct {
+	Items []DashboardMessage `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
+type DashboardMessage struct {
+	Severity    string              `json:"severity,omitempty" yaml:"severity,omitempty"`
+	Title       string              `json:"title,omitempty" yaml:"title,omitempty"`
+	Body        string              `json:"body,omitempty" yaml:"body,omitempty"`
+	VisibleWhen *DashboardCondition `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+}
+
+type DashboardStatus struct {
+	Checks []DashboardStatusCheck `json:"checks,omitempty" yaml:"checks,omitempty"`
+}
+
+type DashboardStatusCheck struct {
+	ID       string         `json:"id,omitempty" yaml:"id,omitempty"`
+	Label    string         `json:"label,omitempty" yaml:"label,omitempty"`
+	Selector string         `json:"selector,omitempty" yaml:"selector,omitempty"`
+	Format   string         `json:"format,omitempty" yaml:"format,omitempty"`
+	Tone     *DashboardTone `json:"tone,omitempty" yaml:"tone,omitempty"`
+}
+
+type DashboardTone struct {
+	WarningAbove float64 `json:"warningAbove,omitempty" yaml:"warningAbove,omitempty"`
+	DangerAbove  float64 `json:"dangerAbove,omitempty" yaml:"dangerAbove,omitempty"`
+}
+
+type DashboardFeed struct {
+	Fields *DashboardFeedFields `json:"fields,omitempty" yaml:"fields,omitempty"`
+}
+
+type DashboardFeedFields struct {
+	Title     string `json:"title,omitempty" yaml:"title,omitempty"`
+	Body      string `json:"body,omitempty" yaml:"body,omitempty"`
+	Timestamp string `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
+	Severity  string `json:"severity,omitempty" yaml:"severity,omitempty"`
+}
+
+type DashboardReport struct {
+	Sections []DashboardReportSection `json:"sections,omitempty" yaml:"sections,omitempty"`
+}
+
+type DashboardReportSection struct {
+	ID          string              `json:"id,omitempty" yaml:"id,omitempty"`
+	Title       string              `json:"title,omitempty" yaml:"title,omitempty"`
+	Body        []string            `json:"body,omitempty" yaml:"body,omitempty"`
+	Tone        string              `json:"tone,omitempty" yaml:"tone,omitempty"`
+	VisibleWhen *DashboardCondition `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+}
+
+// DashboardDetail is a marker block. Nested detail content is described by the
+// parent Container.Containers slice rather than fields on this struct.
+type DashboardDetail struct{}
 
 type Repeat struct {
 	Iterator *Parameter `json:"iterator,omitempty" yaml:"iterator,omitempty"`
