@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Quality Dashboard Demo</title>
+  <style>
+:root {
+  --bg: #f5f8fa;
+  --panel-bg: #ffffff;
+  --panel-border: #d8e1e8;
+  --text: #182026;
+  --muted: #5f6b7c;
+  --primary: #137cbd;
+  --track: #ebf1f5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.dashboard-export {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.dashboard-export__header {
+  margin-bottom: 20px;
+}
+.dashboard-export__title {
+  margin: 0 0 6px;
+  font-size: 28px;
+}
+.dashboard-export__subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.dashboard-export__state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dashboard-export__state-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: #ffffff;
+  font-size: 12px;
+  color: var(--text);
+}
+.dashboard-export__state-chip strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+.dashboard-export__grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+.dashboard-export__block {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(16, 22, 26, 0.08);
+}
+.dashboard-export__block h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.dashboard-export__block p.block-subtitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.metric-card {
+  border: 1px solid var(--panel-border);
+  background: #f8fafb;
+  border-radius: 8px;
+  padding: 12px;
+}
+.metric-card__label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.metric-card__value {
+  font-size: 24px;
+  font-weight: 700;
+}
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.compare-card {
+  border: 1px solid var(--panel-border);
+  background: #f8fafb;
+  border-radius: 8px;
+  padding: 12px;
+}
+.compare-card__label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.compare-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.compare-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.compare-card__delta {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 700;
+  border: 1px solid var(--panel-border);
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.filter-group__label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filter-chip {
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  background: #fff;
+  font-size: 12px;
+}
+.message-list,
+.status-list,
+.feed-list,
+.dimension-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.message-card,
+.status-card,
+.feed-item {
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+}
+.tone-info { background: #ebf1f5; border-color: #ced9e0; color: #30404d; }
+.tone-warning { background: #fff5d6; border-color: #f5c542; color: #8a5d00; }
+.tone-danger { background: #fdecea; border-color: #db3737; color: #a82a2a; }
+.tone-success { background: #eef8f0; border-color: #0f9960; color: #0a6640; }
+.dimension-item__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.dimension-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+.dimension-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+.plain-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.plain-table th,
+.plain-table td {
+  padding: 8px;
+  border-bottom: 1px solid #ebf1f5;
+  text-align: left;
+}
+.plain-table th:last-child,
+.plain-table td:last-child {
+  text-align: right;
+}
+.plain-table td.metric-label {
+  font-weight: 600;
+}
+.chart-shell svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.feed-item {
+  border-left: 3px solid var(--primary);
+}
+.feed-item__meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+@media (max-width: 900px) {
+  .dashboard-export__grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-export__block {
+    grid-column: span 1 !important;
+  }
+}
+</style>
+</head>
+<body>
+  <main class="dashboard-export">
+    <header class="dashboard-export__header">
+      <h1 class="dashboard-export__title">Data Quality Dashboard Demo</h1>
+      <p class="dashboard-export__subtitle">A quality-first dashboard variant with checks, summaries, and remediation guidance</p>
+      <p class="dashboard-export__subtitle">Generated 2026-04-07T22:20:22.121Z</p>
+      <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>domain=customer, billing</span></div>
+    </header>
+    <div class="dashboard-export__grid">
+      
+    <section class="dashboard-export__block" style="grid-column: span 12;">
+      <h2>Filters</h2>
+      
+      <div class="message-list">
+    <div class="filter-group">
+      <div class="filter-group__label">Domain</div>
+      <div class="filter-chip-row">
+        <span class="filter-chip tone-info">Customer</span><span class="filter-chip tone-info">Billing</span>
+      </div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Quality Summary</h2>
+      
+      <div class="metric-grid">
+    <div class="metric-card">
+      <div class="metric-card__label">Rows Checked</div>
+      <div class="metric-card__value">2.8M</div>
+    </div>
+  
+    <div class="metric-card">
+      <div class="metric-card__label">Failed Rows</div>
+      <div class="metric-card__value">126K</div>
+    </div>
+  
+    <div class="metric-card">
+      <div class="metric-card__label">Score</div>
+      <div class="metric-card__value">95.5%</div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Quality Checks</h2>
+      
+      <div class="status-list">
+    <div class="status-card tone-warning">
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <strong>Null Rate</strong>
+        <span>4.5%</span>
+      </div>
+    </div>
+  
+    <div class="status-card tone-warning">
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <strong>Duplicate Rate</strong>
+        <span>1.6%</span>
+      </div>
+    </div>
+  
+    <div class="status-card tone-warning">
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <strong>Freshness Delay (hrs)</strong>
+        <span>3</span>
+      </div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 8;">
+      <h2>Null Trend</h2>
+      
+      
+      <table class="plain-table">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>null_rate_pct</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td>2026-04-01</td>
+              <td>2.1</td>
+            </tr>
+          
+            <tr>
+              <td>2026-04-02</td>
+              <td>2.4</td>
+            </tr>
+          
+            <tr>
+              <td>2026-04-03</td>
+              <td>4.9</td>
+            </tr>
+          
+            <tr>
+              <td>2026-04-04</td>
+              <td>5.2</td>
+            </tr>
+          
+        </tbody>
+      </table>
+    
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Quality Notes</h2>
+      
+      <div class="message-list">
+    <div class="message-card tone-warning">
+      <div style="font-weight:700; margin-bottom:4px;">Null rate elevated</div>
+      <div>Current null rate is 4.5%.</div>
+    </div>
+  
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:4px;">Filtered domains</div>
+      <div>Active domains: customer,billing.</div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Issues by Dataset</h2>
+      
+      <div class="dimension-list">
+    <div class="message-card">
+      <div class="dimension-item__row">
+        <span>invoice_fact</span>
+        <span>68,000</span>
+      </div>
+      <div class="dimension-bar"><span style="width:100%"></span></div>
+    </div>
+  
+    <div class="message-card">
+      <div class="dimension-item__row">
+        <span>customer_profile</span>
+        <span>42,000</span>
+      </div>
+      <div class="dimension-bar"><span style="width:61.76470588235294%"></span></div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Quality Metrics</h2>
+      
+      
+    <table class="plain-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td class="metric-label">Pass Rate</td>
+            <td>95.5%</td>
+            <td><span class="compare-card__delta tone-success">Score</span></td>
+          </tr>
+        
+          <tr>
+            <td class="metric-label">Failed Rows</td>
+            <td>126K</td>
+            <td><span class="compare-card__delta tone-warning">Volume</span></td>
+          </tr>
+        
+          <tr>
+            <td class="metric-label">Delay (hrs)</td>
+            <td>3</td>
+            <td><span class="compare-card__delta tone-danger">Freshness</span></td>
+          </tr>
+        
+      </tbody>
+    </table>
+  
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 8;">
+      <h2>Remediation Report</h2>
+      
+      <div class="message-list">
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:6px;">Quality Summary</div>
+      <p style="margin:0 0 8px; line-height:1.5;">Quality score is 95.5% across 2800000 checked rows.</p><p style="margin:0 0 8px; line-height:1.5;">Failed rows currently total 126000.</p>
+    </div>
+  
+    <div class="message-card tone-warning">
+      <div style="font-weight:700; margin-bottom:6px;">Recommended Action</div>
+      <p style="margin:0 0 8px; line-height:1.5;">Prioritize null remediation in the billing and customer domains before the next downstream sync.</p>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Quality Trail</h2>
+      
+      <div class="feed-list">
+    <div class="feed-item">
+      <div class="feed-item__meta">2026-04-07 07:30</div>
+      <div style="font-weight:600; margin-bottom:4px;">Null spike detected</div>
+      <div>invoice_fact null rate exceeded 5%.</div>
+    </div>
+  
+    <div class="feed-item">
+      <div class="feed-item__meta">2026-04-07 08:05</div>
+      <div style="font-weight:600; margin-bottom:4px;">Validation rerun</div>
+      <div>customer_profile checks completed after remediation.</div>
+    </div>
+  </div>
+    </section>
+  
+    </div>
+  </main>
+</body>
+</html>

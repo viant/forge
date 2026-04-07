@@ -50,6 +50,9 @@ export const getWindowStatusSignal = (windowId) => {
 
 export const busSignals = signal({});
 
+export const dashboardFilterSignals = signal({});
+export const dashboardSelectionSignals = signal({});
+
 export const getBusSignal = (windowId) => {
     if (!busSignals.value[windowId]) {
         const newSignal = signal([]);
@@ -59,6 +62,29 @@ export const getBusSignal = (windowId) => {
         };
     }
     return busSignals.value[windowId];
+};
+
+export const getDashboardFilterSignal = (dashboardKey, initialValue = {}) => {
+    if (!dashboardFilterSignals.value[dashboardKey]) {
+        dashboardFilterSignals.value = {
+            ...dashboardFilterSignals.peek(),
+            [dashboardKey]: signal(initialValue),
+        };
+    }
+    return dashboardFilterSignals.value[dashboardKey];
+};
+
+export const getDashboardSelectionSignal = (
+    dashboardKey,
+    initialValue = {dimension: null, entityKey: null, pointKey: null},
+) => {
+    if (!dashboardSelectionSignals.value[dashboardKey]) {
+        dashboardSelectionSignals.value = {
+            ...dashboardSelectionSignals.peek(),
+            [dashboardKey]: signal(initialValue),
+        };
+    }
+    return dashboardSelectionSignals.value[dashboardKey];
 };
 
 
@@ -245,27 +271,64 @@ export const removeSignalsForKey = (windowId) => {
     const newDataSignals = {...dataSignals.value};
     const newDataControlSignals = {...controlSignals.value};
     const newDataInputSignals = {...inputSignals.value};
+    const newViewSignals = {...viewSignals.value};
+    const newSelectionSignals = {...selectionSignals.value};
+    const newCollectionInfoSignals = {...collectionInfoSignals.value};
+    const newMetricsSignals = {...metricsSignals.value};
+    const newFormSignals = {...formSignals.value};
+    const newMessageSignals = {...messageSignals.value};
+    const newDialogSignals = {...dialogSignals.value};
+    const newFormStatusSignals = {...formStatusSignals.value};
 
     const newBusSignals = {...busSignals.value};
+    const newDashboardFilterSignals = {...dashboardFilterSignals.value};
+    const newDashboardSelectionSignals = {...dashboardSelectionSignals.value};
 
 
     for (const key in newDataSignals) {
         if (key.startsWith(windowId)) {
             delete newDataSignals[key];
-            delete controlSignals[key];
-            delete inputSignals[key];
-            delete viewSignals[key];
+            delete newDataControlSignals[key];
+            delete newDataInputSignals[key];
+            delete newViewSignals[key];
+            delete newSelectionSignals[key];
+            delete newCollectionInfoSignals[key];
+            delete newMetricsSignals[key];
+            delete newFormSignals[key];
+            delete newMessageSignals[key];
+            delete newDialogSignals[key];
+            delete newFormStatusSignals[key];
         }
     }
 
     // Remove bus signal for this window (exact match, not startsWith)
     delete newBusSignals[windowId];
+    for (const key in newDashboardFilterSignals) {
+        if (key.startsWith(`${windowId}:`)) {
+            delete newDashboardFilterSignals[key];
+        }
+    }
+    for (const key in newDashboardSelectionSignals) {
+        if (key.startsWith(`${windowId}:`)) {
+            delete newDashboardSelectionSignals[key];
+        }
+    }
 
 
     dataSignals.value = newDataSignals;
     controlSignals.value = newDataControlSignals;
     inputSignals.value = newDataInputSignals;
+    viewSignals.value = newViewSignals;
+    selectionSignals.value = newSelectionSignals;
+    collectionInfoSignals.value = newCollectionInfoSignals;
+    metricsSignals.value = newMetricsSignals;
+    formSignals.value = newFormSignals;
+    messageSignals.value = newMessageSignals;
+    dialogSignals.value = newDialogSignals;
+    formStatusSignals.value = newFormStatusSignals;
     busSignals.value = newBusSignals;
+    dashboardFilterSignals.value = newDashboardFilterSignals;
+    dashboardSelectionSignals.value = newDashboardSelectionSignals;
 };
 
 

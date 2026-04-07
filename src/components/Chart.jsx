@@ -12,6 +12,10 @@ import { Table as BpTable, Column as BpColumn, Cell as BpCell, ColumnHeaderCell 
 import {
     LineChart,
     Line,
+    BarChart,
+    Bar,
+    AreaChart,
+    Area,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -102,13 +106,14 @@ function escapeCsvCell(value) {
     return v;
 }
 
-const Chart = ({container, context, isActive = true}) => {
+const Chart = ({container, context, isActive = true, embedded = false}) => {
     const {chart} = container;
     const [chartRef, chartSize] = useMeasuredContainer();
     const [chartReady, setChartReady] = useState(false);
 
     // Extract chart configuration
     const {
+        type = "line",
         xAxis,
         yAxis,
         cartesianGrid,
@@ -171,6 +176,12 @@ const Chart = ({container, context, isActive = true}) => {
         const raf = window.requestAnimationFrame(() => setChartReady(true));
         return () => window.cancelAnimationFrame(raf);
     }, [isActive, viewMode, chartSize.width, chartSize.height]);
+
+    useEffect(() => {
+        if (embedded && viewMode !== "chart") {
+            setViewMode("chart");
+        }
+    }, [embedded, viewMode]);
 
     const allTableColumns = [xAxis.dataKey, ...availableDataKeys];
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
@@ -276,6 +287,89 @@ const Chart = ({container, context, isActive = true}) => {
         </LineChart>
     );
 
+    const barChart = (
+        <BarChart
+            data={chartData}
+            margin={{top: 10, right: 60, left: 10, bottom: 10}}
+        >
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray}/>
+            <XAxis
+                dataKey={xAxis.dataKey}
+                tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
+                label={{
+                    value: xAxis.label,
+                    position: "insideBottomRight",
+                    offset: 0,
+                }}
+            />
+            <YAxis
+                width={100}
+                tickFormatter={formatLargeNumber}
+                label={{
+                    value: yAxisLabel,
+                    angle: -90,
+                    position: "insideLeft",
+                }}
+            />
+            <Tooltip
+                labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
+                formatter={(value) => formatLargeNumber(value)}
+            />
+            <Legend/>
+            {selectedDataKeys.map((dataKey, index) => (
+                <Bar
+                    key={dataKey}
+                    dataKey={dataKey}
+                    name={dataKey}
+                    fill={palette[index % palette.length]}
+                />
+            ))}
+        </BarChart>
+    );
+
+    const areaChart = (
+        <AreaChart
+            data={chartData}
+            margin={{top: 10, right: 60, left: 10, bottom: 10}}
+        >
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray}/>
+            <XAxis
+                dataKey={xAxis.dataKey}
+                tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
+                label={{
+                    value: xAxis.label,
+                    position: "insideBottomRight",
+                    offset: 0,
+                }}
+            />
+            <YAxis
+                width={100}
+                tickFormatter={formatLargeNumber}
+                label={{
+                    value: yAxisLabel,
+                    angle: -90,
+                    position: "insideLeft",
+                }}
+            />
+            <Tooltip
+                labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
+                formatter={(value) => formatLargeNumber(value)}
+            />
+            <Legend/>
+            {selectedDataKeys.map((dataKey, index) => (
+                <Area
+                    key={dataKey}
+                    type="monotone"
+                    dataKey={dataKey}
+                    name={dataKey}
+                    stroke={palette[index % palette.length]}
+                    fill={palette[index % palette.length]}
+                    fillOpacity={0.22}
+                />
+            ))}
+        </AreaChart>
+    );
+
     const computedWidthByCol = React.useMemo(() => {
         const out = {};
         allTableColumns.forEach((key) => {
@@ -348,60 +442,70 @@ const Chart = ({container, context, isActive = true}) => {
         />
     ));
 
-    return (
-        <div style={{width: width, height: height}} ref={chartRef}>
-            {/* RadioGroup component for valueKey selection */}
-            <RadioGroup
-                inline={true}
-                name={container.id}
-                onChange={handleValueKeyChange}
-                selectedValue={selectedValueKey}
-            >
-                {series.values.map((option, index) => (
-                    <Radio key={option.value + index} label={option.label} value={option.value}/>
-                ))}
-            </RadioGroup>
+    const chartExportId = container?.id && String(container?.kind || '').startsWith('dashboard.')
+        ? container.id
+        : undefined;
 
-            {/* MultiSelect component for dataKey selection */}
-            <MultiSelect
-                items={availableDataKeys} // Use availableDataKeys instead of selectedDataKeys
-                itemRenderer={renderDataKeyItem}
-                onItemSelect={handleDataKeySelect}
-                tagRenderer={(dataKey) => dataKey}
-                selectedItems={selectedDataKeys}
-                fill={true}
-                placeholder="Select data keys..."
-                popoverProps={{minimal: true}}
-                resetOnSelect={false}
-                tagInputProps={{
-                    onRemove: (dataKey) => {
-                        handleDataKeySelect(dataKey);
-                    },
-                    rightElement: (
-                        <Button
-                            icon="cross"
-                            minimal={true}
-                            onClick={handleClearSelection}
-                        />
-                    ),
-                }}
-            />
-            <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8}}>
-                <div style={{display: "flex", gap: 6}}>
-                    <Button small minimal={viewMode !== "chart"} intent={viewMode === "chart" ? "primary" : "none"} onClick={() => setViewMode("chart")}>
-                        Chart
-                    </Button>
-                    <Button small minimal={viewMode !== "table"} intent={viewMode === "table" ? "primary" : "none"} onClick={() => setViewMode("table")}>
-                        Table
-                    </Button>
-                </div>
-                {viewMode === "table" ? (
-                    <div style={{display: "flex", gap: 6}}>
-                        <Button small icon="cog" onClick={() => setShowColumnDialog(true)}>Columns</Button>
-                        <Button small icon="download" onClick={downloadCsv}>CSV</Button>
+    return (
+        <div
+            style={{width: width, height: height}}
+            ref={chartRef}
+            data-dashboard-chart-id={chartExportId}
+        >
+            {!embedded ? (
+                <>
+                    <RadioGroup
+                        inline={true}
+                        name={container.id}
+                        onChange={handleValueKeyChange}
+                        selectedValue={selectedValueKey}
+                    >
+                        {series.values.map((option, index) => (
+                            <Radio key={option.value + index} label={option.label} value={option.value}/>
+                        ))}
+                    </RadioGroup>
+
+                    <MultiSelect
+                        items={availableDataKeys}
+                        itemRenderer={renderDataKeyItem}
+                        onItemSelect={handleDataKeySelect}
+                        tagRenderer={(dataKey) => dataKey}
+                        selectedItems={selectedDataKeys}
+                        fill={true}
+                        placeholder="Select data keys..."
+                        popoverProps={{minimal: true}}
+                        resetOnSelect={false}
+                        tagInputProps={{
+                            onRemove: (dataKey) => {
+                                handleDataKeySelect(dataKey);
+                            },
+                            rightElement: (
+                                <Button
+                                    icon="cross"
+                                    minimal={true}
+                                    onClick={handleClearSelection}
+                                />
+                            ),
+                        }}
+                    />
+                    <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8}}>
+                        <div style={{display: "flex", gap: 6}}>
+                            <Button small minimal={viewMode !== "chart"} intent={viewMode === "chart" ? "primary" : "none"} onClick={() => setViewMode("chart")}>
+                                Chart
+                            </Button>
+                            <Button small minimal={viewMode !== "table"} intent={viewMode === "table" ? "primary" : "none"} onClick={() => setViewMode("table")}>
+                                Table
+                            </Button>
+                        </div>
+                        {viewMode === "table" ? (
+                            <div style={{display: "flex", gap: 6}}>
+                                <Button small icon="cog" onClick={() => setShowColumnDialog(true)}>Columns</Button>
+                                <Button small icon="download" onClick={downloadCsv}>CSV</Button>
+                            </div>
+                        ) : null}
                     </div>
-                ) : null}
-            </div>
+                </>
+            ) : null}
             {loading && (
                 <div style={{textAlign: 'center', padding: 4}}>Loading…</div>
             )}
@@ -412,7 +516,7 @@ const Chart = ({container, context, isActive = true}) => {
             {viewMode === "chart" ? (
                 chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                        {lineChart}
+                        {type === "bar" ? barChart : type === "area" ? areaChart : lineChart}
                     </ResponsiveContainer>
                 ) : null
             ) : (
@@ -442,7 +546,7 @@ const Chart = ({container, context, isActive = true}) => {
                 </div>
             )}
 
-            <Dialog isOpen={showColumnDialog} onClose={() => setShowColumnDialog(false)} title="Column customization">
+            <Dialog isOpen={!embedded && showColumnDialog} onClose={() => setShowColumnDialog(false)} title="Column customization">
                 <div style={{padding: 12, display: "flex", flexDirection: "column", gap: 10}}>
                     {allTableColumns.map((key) => (
                         <div key={key} style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12}}>
@@ -474,7 +578,7 @@ const Chart = ({container, context, isActive = true}) => {
                 </div>
             </Dialog>
 
-            <Dialog isOpen={!!expandedCell} onClose={() => setExpandedCell(null)} title={expandedCell?.title || "Cell content"}>
+            <Dialog isOpen={!embedded && !!expandedCell} onClose={() => setExpandedCell(null)} title={expandedCell?.title || "Cell content"}>
                 <div style={{padding: 12, whiteSpace: "pre-wrap", wordBreak: "break-word"}}>
                     {expandedCell?.content || ""}
                 </div>

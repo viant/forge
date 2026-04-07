@@ -133,14 +133,25 @@ function mapToCss(pos, labelMode, hasLabel) {
     return { ctrl, label: null };
 }
 
-export default function GridLayoutRenderer({ context, container, items, handlers = {}, state, baseDataSourceRef, style: styleOverride = {} }) {
+export default function GridLayoutRenderer({
+    context,
+    container,
+    items,
+    entries,
+    renderEntry,
+    handlers = {},
+    state,
+    baseDataSourceRef,
+    style: styleOverride = {},
+}) {
     const layout = container?.layout || {};
     const columns = layout?.columns || 1;
     const labels = layout?.labels || {};
     const labelMode = (labels.mode || 'left');
     const controlGap = labels?.controlGap !== undefined ? Number(labels.controlGap) : 8;
+    const sourceEntries = entries || items || [];
 
-    const { placements, rowCount } = useMemo(() => placeItems(items, columns), [items, columns]);
+    const { placements, rowCount } = useMemo(() => placeItems(sourceEntries, columns), [sourceEntries, columns]);
 
     const containerStyle = useMemo(() => ({ ...styleOverride, ...buildContainerStyle(layout, rowCount) }), [layout, rowCount, styleOverride]);
 
@@ -152,6 +163,23 @@ export default function GridLayoutRenderer({ context, container, items, handlers
                 const hasLabel = !!item.label && !item.hideLabel && !item.isStandalone && labelMode !== 'none';
                 const pos = { r, c, w, h };
                 const css = mapToCss(pos, labelMode, hasLabel);
+
+                if (typeof renderEntry === 'function') {
+                    return (
+                        <React.Fragment key={`${item.id || item.name || `${r}-${c}`}-frag`}>
+                            {renderEntry({
+                                entry: item,
+                                context: subCtx,
+                                css,
+                                hasLabel,
+                                labelMode,
+                                handlers,
+                                state,
+                                container,
+                            })}
+                        </React.Fragment>
+                    );
+                }
 
                 // Label cell (if applicable)
                 const labelNode = hasLabel ? (

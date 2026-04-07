@@ -183,7 +183,7 @@ function WindowContentInner({window, metadata, services}) {
     };
 
     return (
-        <div style={{ height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div data-window-id={windowId} style={{ height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
             {renderDataSources()}
             {renderDialogs()}
             <WindowLayout

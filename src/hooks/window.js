@@ -2,10 +2,13 @@
 import {
     addWindow,
     getDialogSignal, removeSignalsForKey,
-} from "../core";
-import { getWindowContext } from "../core/context/Context.jsx";
+} from "../core/store/signals.js";
+import { getWindowContext } from "../core/context/registry.js";
 import { resolveSelector } from "../utils/selector.js";
 import { resolveParameters } from './parameters.js';
+import {buildStandaloneDashboardDocument, downloadDashboardHtml} from "../core/ui/dashboardExport.js";
+import {getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal} from "../core/store/signals.js";
+import {buildDashboardDefaultFilters, setDashboardSelectionState} from "../components/dashboard/dashboardUtils.js";
 
 const openViewDialog = (dialogSignal, props) => {
     dialogSignal.value = {...dialogSignal.peek(), open: true, props};
@@ -83,8 +86,6 @@ export function useDialogHandlers(windowId, dialogId) {
                             let store = storeRaw;
                             if (store === 'query') store = 'input.query';
                             if (store === 'path') store = 'input.path';
-                            if (store === 'headers') store = 'input.headers';
-                            if (store === 'body') store = 'input.body';
                             if (store === 'headers') store = 'input.headers';
                             if (store === 'body') store = 'input.body';
                             const ds = dsRaw || caller.dataSourceRef;
@@ -278,6 +279,136 @@ export function useWindowHandlers(windowId) {
 
     const closeWindow = (props = {}) => {
         removeSignalsForKey(windowId);
+    }
+
+    const exportDashboard = (props = {}) => {
+        const base = getWindowContext(windowId);
+        const ctx = props.context || base?.Context?.(base?.identity?.dataSourceRef);
+        const metadata = ctx?.metadata;
+        const container = metadata?.view?.content;
+        if (!container) {
+            throw new Error(`dashboard view content not found for window: ${windowId}`);
+        }
+
+        const rootElement = typeof document !== 'undefined'
+            ? document.querySelector(`[data-window-id="${windowId}"]`)
+            : null;
+        const filename = props?.execution?.args?.[0] || props?.parameters?.filename || `${windowId}-dashboard.html`;
+        const {html} = buildStandaloneDashboardDocument({
+            container,
+            context: ctx,
+            rootElement,
+            title: container?.title,
+            subtitle: container?.subtitle,
+        });
+        downloadDashboardHtml({html, filename});
+        return true;
+    }
+
+    const setDashboardFilter = (props = {}) => {
+        const base = getWindowContext(windowId);
+        const ctx = props.context || base?.Context?.(base?.identity?.dataSourceRef);
+        const dashboardId = props?.execution?.args?.[0] || props?.parameters?.dashboardId || ctx?.metadata?.view?.content?.id || 'dashboard';
+        const patch = props?.execution?.args?.[1] || props?.parameters?.patch || {};
+        const dashboardKey = `${windowId}:${dashboardId}`;
+        const filterSignal = getDashboardFilterSignal(dashboardKey);
+        filterSignal.value = {
+            ...(filterSignal.peek() || {}),
+            ...(patch || {}),
+        };
+        return true;
+    }
+
+    const clearDashboardFilters = (props = {}) => {
+        const base = getWindowContext(windowId);
+        const ctx = props.context || base?.Context?.(base?.identity?.dataSourceRef);
+        const dashboardId = props?.execution?.args?.[0] || props?.parameters?.dashboardId || ctx?.metadata?.view?.content?.id || 'dashboard';
+        const fields = props?.execution?.args?.[1] || props?.parameters?.fields || null;
+        const dashboardKey = `${windowId}:${dashboardId}`;
+        const filterSignal = getDashboardFilterSignal(dashboardKey);
+        if (Array.isArray(fields) && fields.length > 0) {
+            const next = {...(filterSignal.peek() || {})};
+            fields.forEach((field) => delete next[field]);
+            filterSignal.value = next;
+        } else {
+            filterSignal.value = {};
+        }
+        return true;
+    }
+
+    const setDashboardSelection = (props = {}) => {
+        const base = getWindowContext(windowId);
+        const ctx = props.context || base?.Context?.(base?.identity?.dataSourceRef);
+        const dashboardId = props?.execution?.args?.[0] || props?.parameters?.dashboardId || ctx?.metadata?.view?.content?.id || 'dashboard';
+        const selectionPatch = props?.execution?.args?.[1] || props?.parameters || {};
+        const dashboardKey = `${windowId}:${dashboardId}`;
+        setDashboardSelectionState({
+            windowId,
+            dashboardKey,
+            dimension: selectionPatch.dimension || null,
+            entityKey: selectionPatch.entityKey ?? null,
+            pointKey: selectionPatch.pointKey ?? null,
+            selected: selectionPatch.selected ?? null,
+            sourceBlockId: selectionPatch.sourceBlockId || null,
+        });
+        return true;
+    }
+
+    const clearDashboardSelection = (props = {}) => {
+        const base = getWindowContext(windowId);
+        const ctx = props.context || base?.Context?.(base?.identity?.dataSourceRef);
+        const dashboardId = props?.execution?.args?.[0] || props?.parameters?.dashboardId || ctx?.metadata?.view?.content?.id || 'dashboard';
+        const sourceBlockId = props?.execution?.args?.[1]?.sourceBlockId || props?.parameters?.sourceBlockId || null;
+        const dashboardKey = `${windowId}:${dashboardId}`;
+        setDashboardSelectionState({
+            windowId,
+            dashboardKey,
+            dimension: null,
+            entityKey: null,
+            pointKey: null,
+            selected: null,
+            sourceBlockId,
+        });
+        return true;
+    }
+
+    const resetDashboardState = (props = {}) => {
+        const base = getWindowContext(windowId);
+        const ctx = props.context || base?.Context?.(base?.identity?.dataSourceRef);
+        const container = ctx?.metadata?.view?.content || null;
+        const dashboardId = props?.execution?.args?.[0] || props?.parameters?.dashboardId || container?.id || 'dashboard';
+        const dashboardKey = `${windowId}:${dashboardId}`;
+        const defaults = buildDashboardDefaultFilters(container);
+
+        getDashboardFilterSignal(dashboardKey).value = defaults;
+        setDashboardSelectionState({
+            windowId,
+            dashboardKey,
+            dimension: null,
+            entityKey: null,
+            pointKey: null,
+            selected: null,
+            sourceBlockId: 'window.resetDashboardState',
+        });
+        return true;
+    }
+
+    const getDashboardState = (props = {}) => {
+        const base = getWindowContext(windowId);
+        const ctx = props.context || base?.Context?.(base?.identity?.dataSourceRef);
+        const container = ctx?.metadata?.view?.content || null;
+        const dashboardId = props?.execution?.args?.[0] || props?.parameters?.dashboardId || container?.id || 'dashboard';
+        const dashboardKey = `${windowId}:${dashboardId}`;
+        return {
+            ok: true,
+            windowId,
+            dashboardId,
+            dashboardKey,
+            title: container?.title || '',
+            filters: getDashboardFilterSignal(dashboardKey).peek() || {},
+            selection: getDashboardSelectionSignal(dashboardKey).peek() || {},
+            blockIds: Array.isArray(container?.containers) ? container.containers.map((block) => block?.id).filter(Boolean) : [],
+        };
     }
 
     const commitWindow = (props = {}) => {
@@ -479,6 +610,13 @@ export function useWindowHandlers(windowId) {
     return {
         openWindow,
         closeWindow,
+        exportDashboard,
+        setDashboardFilter,
+        clearDashboardFilters,
+        setDashboardSelection,
+        clearDashboardSelection,
+        resetDashboardState,
+        getDashboardState,
         openDialog,
         closeDialog,
         callerArgs,

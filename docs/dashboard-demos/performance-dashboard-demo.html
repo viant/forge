@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Performance Dashboard Demo</title>
+  <style>
+:root {
+  --bg: #f5f8fa;
+  --panel-bg: #ffffff;
+  --panel-border: #d8e1e8;
+  --text: #182026;
+  --muted: #5f6b7c;
+  --primary: #137cbd;
+  --track: #ebf1f5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+.dashboard-export {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.dashboard-export__header {
+  margin-bottom: 20px;
+}
+.dashboard-export__title {
+  margin: 0 0 6px;
+  font-size: 28px;
+}
+.dashboard-export__subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.dashboard-export__state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.dashboard-export__state-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: #ffffff;
+  font-size: 12px;
+  color: var(--text);
+}
+.dashboard-export__state-chip strong {
+  color: var(--muted);
+  font-weight: 600;
+}
+.dashboard-export__grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+.dashboard-export__block {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(16, 22, 26, 0.08);
+}
+.dashboard-export__block h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+.dashboard-export__block p.block-subtitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+.metric-card {
+  border: 1px solid var(--panel-border);
+  background: #f8fafb;
+  border-radius: 8px;
+  padding: 12px;
+}
+.metric-card__label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.metric-card__value {
+  font-size: 24px;
+  font-weight: 700;
+}
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.compare-card {
+  border: 1px solid var(--panel-border);
+  background: #f8fafb;
+  border-radius: 8px;
+  padding: 12px;
+}
+.compare-card__label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.compare-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.compare-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.compare-card__delta {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 700;
+  border: 1px solid var(--panel-border);
+}
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.filter-group__label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.filter-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filter-chip {
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  background: #fff;
+  font-size: 12px;
+}
+.message-list,
+.status-list,
+.feed-list,
+.dimension-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.message-card,
+.status-card,
+.feed-item {
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--panel-border);
+}
+.tone-info { background: #ebf1f5; border-color: #ced9e0; color: #30404d; }
+.tone-warning { background: #fff5d6; border-color: #f5c542; color: #8a5d00; }
+.tone-danger { background: #fdecea; border-color: #db3737; color: #a82a2a; }
+.tone-success { background: #eef8f0; border-color: #0f9960; color: #0a6640; }
+.dimension-item__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.dimension-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: hidden;
+}
+.dimension-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+}
+.plain-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.plain-table th,
+.plain-table td {
+  padding: 8px;
+  border-bottom: 1px solid #ebf1f5;
+  text-align: left;
+}
+.plain-table th:last-child,
+.plain-table td:last-child {
+  text-align: right;
+}
+.plain-table td.metric-label {
+  font-weight: 600;
+}
+.chart-shell svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.feed-item {
+  border-left: 3px solid var(--primary);
+}
+.feed-item__meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+@media (max-width: 900px) {
+  .dashboard-export__grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-export__block {
+    grid-column: span 1 !important;
+  }
+}
+</style>
+</head>
+<body>
+  <main class="dashboard-export">
+    <header class="dashboard-export__header">
+      <h1 class="dashboard-export__title">Performance Dashboard Demo</h1>
+      <p class="dashboard-export__subtitle">Generic Forge dashboard blocks with seeded in-memory data</p>
+      <p class="dashboard-export__subtitle">Generated 2026-04-07T22:20:22.110Z</p>
+      <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>dateRange=90d</span><span class="dashboard-export__state-chip"><strong>Filter</strong>region=NA</span></div>
+    </header>
+    <div class="dashboard-export__grid">
+      
+    <section class="dashboard-export__block" style="grid-column: span 12;">
+      <h2>Filters</h2>
+      
+      <div class="message-list">
+    <div class="filter-group">
+      <div class="filter-group__label">Date Range</div>
+      <div class="filter-chip-row">
+        <span class="filter-chip tone-info">90D</span>
+      </div>
+    </div>
+  
+    <div class="filter-group">
+      <div class="filter-group__label">Region</div>
+      <div class="filter-chip-row">
+        <span class="filter-chip tone-info">NA</span>
+      </div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 7;">
+      <h2>Overview</h2>
+      
+      <div class="metric-grid">
+    <div class="metric-card">
+      <div class="metric-card__label">Spend</div>
+      <div class="metric-card__value">$123,000</div>
+    </div>
+  
+    <div class="metric-card">
+      <div class="metric-card__label">Impressions</div>
+      <div class="metric-card__value">5.4M</div>
+    </div>
+  
+    <div class="metric-card">
+      <div class="metric-card__label">CTR</div>
+      <div class="metric-card__value">2.3%</div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 5;">
+      <h2>Period Compare</h2>
+      
+      <div class="compare-grid">
+    <div class="compare-card">
+      <div class="compare-card__label">Spend</div>
+      <div class="compare-card__value">$123,000</div>
+      <div class="compare-card__footer">
+        <span>vs prior period: $118,000</span>
+        <span class="compare-card__delta tone-success">+$5,000</span>
+      </div>
+    </div>
+  
+    <div class="compare-card">
+      <div class="compare-card__label">CTR</div>
+      <div class="compare-card__value">2.3%</div>
+      <div class="compare-card__footer">
+        <span>vs prior period: 2.0%</span>
+        <span class="compare-card__delta tone-success">+0.3%</span>
+      </div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 8;">
+      <h2>Weekly Trend</h2>
+      
+      
+      <table class="plain-table">
+        <thead>
+          <tr>
+            <th>Week</th>
+            <th>spend</th>
+          </tr>
+        </thead>
+        <tbody>
+          
+            <tr>
+              <td>2026-02-01</td>
+              <td>30000</td>
+            </tr>
+          
+            <tr>
+              <td>2026-02-08</td>
+              <td>28000</td>
+            </tr>
+          
+            <tr>
+              <td>2026-02-15</td>
+              <td>32000</td>
+            </tr>
+          
+            <tr>
+              <td>2026-02-01</td>
+              <td>8000</td>
+            </tr>
+          
+            <tr>
+              <td>2026-02-08</td>
+              <td>7000</td>
+            </tr>
+          
+            <tr>
+              <td>2026-02-15</td>
+              <td>9000</td>
+            </tr>
+          
+        </tbody>
+      </table>
+    
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Messages</h2>
+      
+      <div class="message-list">
+    <div class="message-card tone-warning">
+      <div style="font-weight:700; margin-bottom:4px;">High zero-spend rate</div>
+      <div>47.2% of rows currently have zero spend.</div>
+    </div>
+  
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:4px;">US concentration</div>
+      <div>US continues to dominate spend in the 90d window.</div>
+    </div>
+  
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:4px;">Active Region Filter</div>
+      <div>Regions: NA.</div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Spend by Country</h2>
+      
+      <div class="dimension-list">
+    <div class="message-card">
+      <div class="dimension-item__row">
+        <span>US</span>
+        <span>$100,000</span>
+      </div>
+      <div class="dimension-bar"><span style="width:100%"></span></div>
+    </div>
+  
+    <div class="message-card">
+      <div class="dimension-item__row">
+        <span>CA</span>
+        <span>$12,000</span>
+      </div>
+      <div class="dimension-bar"><span style="width:12%"></span></div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Data Health</h2>
+      
+      <div class="status-list">
+    <div class="status-card tone-danger">
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <strong>Zero spend rows</strong>
+        <span>47.2%</span>
+      </div>
+    </div>
+  
+    <div class="status-card tone-warning">
+      <div style="display:flex; justify-content:space-between; gap:12px;">
+        <strong>Null country rows</strong>
+        <span>1.1%</span>
+      </div>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 8;">
+      <h2>Metric Table</h2>
+      
+      
+    <table class="plain-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td class="metric-label">Total Spend</td>
+            <td>$123,000</td>
+            <td><span class="compare-card__delta tone-info">Financial</span></td>
+          </tr>
+        
+          <tr>
+            <td class="metric-label">Impressions</td>
+            <td>5.4M</td>
+            <td><span class="compare-card__delta tone-success">Reach</span></td>
+          </tr>
+        
+          <tr>
+            <td class="metric-label">CTR</td>
+            <td>2.3%</td>
+            <td><span class="compare-card__delta tone-warning">Engagement</span></td>
+          </tr>
+        
+      </tbody>
+    </table>
+  
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Report</h2>
+      
+      <div class="message-list">
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:6px;">Executive Summary</div>
+      <p style="margin:0 0 8px; line-height:1.5;">Total spend is 123000 with overall CTR at 2.3.</p><p style="margin:0 0 8px; line-height:1.5;">Zero-spend rows remain at 47.2% and should be reviewed before the next reporting cycle.</p>
+    </div>
+  
+    <div class="message-card tone-warning">
+      <div style="font-weight:700; margin-bottom:6px;">Recommended Action</div>
+      <p style="margin:0 0 8px; line-height:1.5;">Prioritize cleanup of zero-spend rows and review country attribution for smaller markets.</p>
+    </div>
+  </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Audit Trail</h2>
+      
+      <div class="feed-list">
+    <div class="feed-item">
+      <div class="feed-item__meta">2026-04-07 09:00</div>
+      <div style="font-weight:600; margin-bottom:4px;">Loaded metrics</div>
+      <div>Summary and quality metrics seeded into the demo context.</div>
+    </div>
+  
+    <div class="feed-item">
+      <div class="feed-item__meta">2026-04-07 09:01</div>
+      <div style="font-weight:600; margin-bottom:4px;">Loaded trend data</div>
+      <div>Weekly trend collection prepared for timeline rendering.</div>
+    </div>
+  </div>
+    </section>
+  
+    </div>
+  </main>
+</body>
+</html>
