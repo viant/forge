@@ -1,24 +1,6 @@
 import {getCollectionSignal} from '../store/signals.js';
 
-export function listDashboardDemoVariants() {
-  return [
-    {
-      id: 'performance',
-      title: 'Performance Dashboard Demo',
-      description: 'Marketing/performance dashboard with country drilldown and export.',
-    },
-    {
-      id: 'operations',
-      title: 'Operations Dashboard Demo',
-      description: 'Service health and incident dashboard with severity filtering.',
-    },
-    {
-      id: 'quality',
-      title: 'Data Quality Dashboard Demo',
-      description: 'Quality-focused dashboard with checks, distributions, and remediation notes.',
-    },
-  ];
-}
+export const DEFAULT_DASHBOARD_DEMO_VARIANT = 'performance';
 
 export function createDashboardDemoMetadata() {
   return {
@@ -938,21 +920,51 @@ export function createQualityDashboardDemoSeed() {
   };
 }
 
-export function createDashboardDemoBundle(variant = 'performance') {
-  if (variant === 'operations') {
-    return {
-      metadata: createOperationsDashboardDemoMetadata(),
-      seed: createOperationsDashboardDemoSeed(),
-    };
-  }
-  if (variant === 'quality') {
-    return {
-      metadata: createQualityDashboardDemoMetadata(),
-      seed: createQualityDashboardDemoSeed(),
-    };
-  }
+const DASHBOARD_DEMO_DEFINITIONS = [
+  {
+    id: 'performance',
+    title: 'Performance Dashboard Demo',
+    description: 'Marketing/performance dashboard with country drilldown and export.',
+    filename: 'performance-dashboard-demo.html',
+    createMetadata: createDashboardDemoMetadata,
+    createSeed: createDashboardDemoSeed,
+  },
+  {
+    id: 'operations',
+    title: 'Operations Dashboard Demo',
+    description: 'Service health and incident dashboard with severity filtering.',
+    filename: 'operations-dashboard-demo.html',
+    createMetadata: createOperationsDashboardDemoMetadata,
+    createSeed: createOperationsDashboardDemoSeed,
+  },
+  {
+    id: 'quality',
+    title: 'Data Quality Dashboard Demo',
+    description: 'Quality-focused dashboard with checks, distributions, and remediation notes.',
+    filename: 'quality-dashboard-demo.html',
+    createMetadata: createQualityDashboardDemoMetadata,
+    createSeed: createQualityDashboardDemoSeed,
+  },
+];
+
+export function listDashboardDemoVariants() {
+  return DASHBOARD_DEMO_DEFINITIONS.map(({id, title, description, filename}) => ({
+    id,
+    title,
+    description,
+    filename,
+  }));
+}
+
+export function getDashboardDemoDefinition(variant = DEFAULT_DASHBOARD_DEMO_VARIANT) {
+  return DASHBOARD_DEMO_DEFINITIONS.find((entry) => entry.id === variant)
+    || DASHBOARD_DEMO_DEFINITIONS.find((entry) => entry.id === DEFAULT_DASHBOARD_DEMO_VARIANT);
+}
+
+export function createDashboardDemoBundle(variant = DEFAULT_DASHBOARD_DEMO_VARIANT) {
+  const definition = getDashboardDemoDefinition(variant);
   return {
-    metadata: createDashboardDemoMetadata(),
-    seed: createDashboardDemoSeed(),
+    metadata: definition.createMetadata(),
+    seed: definition.createSeed(),
   };
 }
