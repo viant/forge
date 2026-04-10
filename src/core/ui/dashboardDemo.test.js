@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import {
+  DEFAULT_DASHBOARD_DEMO_VARIANT,
   createDashboardDemoBundle,
   createDashboardDemoMetadata,
   createDashboardDemoSeed,
@@ -8,6 +9,7 @@ import {
   createOperationsDashboardDemoSeed,
   createQualityDashboardDemoMetadata,
   createQualityDashboardDemoSeed,
+  getDashboardDemoDefinition,
   listDashboardDemoVariants,
 } from './dashboardDemo.js';
 
@@ -20,8 +22,11 @@ const qualitySeed = createQualityDashboardDemoSeed();
 const opsBundle = createDashboardDemoBundle('operations');
 const qualityBundle = createDashboardDemoBundle('quality');
 const variants = listDashboardDemoVariants();
+const fallbackBundle = createDashboardDemoBundle('unknown');
+const qualityDefinition = getDashboardDemoDefinition('quality');
 
 assert.equal(metadata.view.content.kind, 'dashboard');
+assert.equal(DEFAULT_DASHBOARD_DEMO_VARIANT, 'performance');
 assert.equal(metadata.view.content.toolbar.items.some((item) => item.label === 'Reset Dashboard'), true);
 assert.equal(metadata.view.content.toolbar.items.some((item) => item.on?.[0]?.handler === 'window.resetDashboardState'), true);
 assert.equal(metadata.view.content.toolbar.items.some((item) => item.on?.[0]?.handler === 'window.exportDashboard'), true);
@@ -49,6 +54,9 @@ assert.equal(qualityMetadata.view.content.title, 'Data Quality Dashboard Demo');
 assert.equal(qualityMetadata.view.content.containers.some((c) => c.kind === 'dashboard.status'), true);
 assert.equal(qualitySeed.quality.metrics.summary.failed_rows, 126000);
 assert.equal(qualityBundle.metadata.view.content.id, 'qualityDashboard');
+assert.equal(fallbackBundle.metadata.view.content.id, 'demoDashboard');
+assert.equal(qualityDefinition.filename, 'quality-dashboard-demo.html');
 assert.equal(variants.some((item) => item.id === 'performance'), true);
 assert.equal(variants.some((item) => item.id === 'operations'), true);
 assert.equal(variants.some((item) => item.id === 'quality'), true);
+assert.equal(variants.find((item) => item.id === 'quality').filename, 'quality-dashboard-demo.html');

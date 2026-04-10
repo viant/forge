@@ -25,8 +25,9 @@ import { focusControl, listControlTargets, getFocusedControlMeta, enableFocusTra
 import { setSelector } from '../../utils/selector.js';
 import { resolveSelector } from '../../utils/selector.js';
 import { buildStandaloneDashboardDocument, buildStandaloneDashboardHtml, downloadDashboardHtml } from './dashboardExport.js';
-import { createDashboardDemoBundle, createDashboardDemoMetadata, createDashboardDemoSeed, listDashboardDemoVariants } from './dashboardDemo.js';
+import { createDashboardDemoBundle, createDashboardDemoMetadata, createDashboardDemoSeed, DEFAULT_DASHBOARD_DEMO_VARIANT, listDashboardDemoVariants } from './dashboardDemo.js';
 import { buildDashboardDemoStandaloneHtml, getDashboardDemoExportFilename, listDashboardDemoArtifacts } from './dashboardDemoArtifacts.js';
+import { DASHBOARD_BLOCK_KINDS, DASHBOARD_CHART_TYPES, DASHBOARD_COMMANDS } from './dashboardCapabilities.js';
 import { getWindowContext } from '../context/registry.js';
 import { buildDashboardDefaultFilters, setDashboardSelectionState } from '../../components/dashboard/dashboardUtils.js';
 
@@ -256,7 +257,7 @@ export async function runUICommand(cmd = {}) {
     }
 
     case 'ui.dashboard.openDemo': {
-      const variant = params.variant || 'performance';
+      const variant = params.variant || DEFAULT_DASHBOARD_DEMO_VARIANT;
       const { metadata, seed } = createDashboardDemoBundle(variant);
       const windowKey = params.windowKey || `dashboard-demo-${randomSuffix()}`;
       const windowTitle = params.windowTitle || params.title || 'Dashboard Demo';
@@ -280,7 +281,7 @@ export async function runUICommand(cmd = {}) {
     }
 
     case 'ui.dashboard.getDemo': {
-      const variant = params.variant || 'performance';
+      const variant = params.variant || DEFAULT_DASHBOARD_DEMO_VARIANT;
       const bundle = createDashboardDemoBundle(variant);
       return {
         ok: true,
@@ -293,36 +294,9 @@ export async function runUICommand(cmd = {}) {
     case 'ui.dashboard.capabilities': {
       return {
         ok: true,
-        blockKinds: [
-          'dashboard.summary',
-          'dashboard.compare',
-          'dashboard.kpiTable',
-          'dashboard.filters',
-          'dashboard.timeline',
-          'dashboard.dimensions',
-          'dashboard.messages',
-          'dashboard.status',
-          'dashboard.feed',
-          'dashboard.report',
-          'dashboard.detail',
-        ],
-        chartTypes: ['line', 'bar', 'area'],
-        commands: [
-          'ui.dashboard.listDemos',
-          'ui.dashboard.getDemo',
-          'ui.dashboard.openDemo',
-          'ui.dashboard.listDemoArtifacts',
-          'ui.dashboard.generateDemoArtifacts',
-          'ui.dashboard.exportHtml',
-          'ui.dashboard.exportFromContainer',
-          'ui.dashboard.exportWindow',
-          'ui.dashboard.filter.set',
-          'ui.dashboard.filter.clear',
-          'ui.dashboard.selection.set',
-          'ui.dashboard.selection.clear',
-          'ui.dashboard.state.get',
-          'ui.dashboard.state.reset',
-        ],
+        blockKinds: DASHBOARD_BLOCK_KINDS,
+        chartTypes: DASHBOARD_CHART_TYPES,
+        commands: DASHBOARD_COMMANDS,
         demos: listDashboardDemoVariants(),
       };
     }
@@ -342,6 +316,7 @@ export async function runUICommand(cmd = {}) {
       const artifacts = variants.map((variant) => {
         const { model, html } = buildDashboardDemoStandaloneHtml(variant, {
           generatedAt: params.generatedAt,
+          locale: params.locale,
         });
         return {
           id: variant,

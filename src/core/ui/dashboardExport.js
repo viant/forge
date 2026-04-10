@@ -1,5 +1,5 @@
 import {resolveKey} from '../../utils/selector.js';
-import {applyDashboardFiltersToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
+import {applyDashboardFiltersToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -517,25 +517,6 @@ function buildSummaryBlock(container, blockContext) {
   };
 }
 
-function formatDeltaValue(value, format = 'numberDelta') {
-  if (value == null) return '-';
-  const numeric = Number(value) || 0;
-  const absolute = Math.abs(numeric);
-
-  switch (format) {
-    case 'percentDelta':
-      return `${numeric >= 0 ? '+' : '-'}${absolute.toFixed(1)}%`;
-    case 'compactNumberDelta':
-      return `${numeric >= 0 ? '+' : '-'}${new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(absolute)}`;
-    case 'currencyDelta':
-      return `${numeric >= 0 ? '+' : '-'}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(absolute)}`;
-    case 'numberDelta':
-    case 'number':
-    default:
-      return `${numeric >= 0 ? '+' : '-'}${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(absolute)}`;
-  }
-}
-
 function severityForDelta(delta, positiveIsUp = true) {
   const numeric = Number(delta);
   if (!Number.isFinite(numeric) || numeric === 0) return 'info';
@@ -565,7 +546,7 @@ function buildCompareBlock(container, blockContext) {
         currentValue: formatDashboardValue(currentRaw, baseFormat, blockContext.locale || 'en-US'),
         previousValue: formatDashboardValue(previousRaw, baseFormat, blockContext.locale || 'en-US'),
         deltaLabel: item.deltaLabel || 'vs previous',
-        deltaValue: formatDeltaValue(deltaRaw, deltaFormat),
+        deltaValue: formatDashboardDelta(deltaRaw, deltaFormat, blockContext.locale || 'en-US'),
         severity: severityForDelta(deltaRaw, positiveIsUp),
       };
     }),
