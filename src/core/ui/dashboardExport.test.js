@@ -97,6 +97,23 @@ assert.match(html, /High zero-spend rate/);
 assert.match(html, /US dominates spend/);
 assert.match(html, /grid-column: span 8/);
 
+const localizedHtml = buildStandaloneDashboardHtml({
+  title: 'Localized Dashboard',
+  locale: 'de-DE',
+  generatedAt: '2026-04-07T10:00:00Z',
+  blocks: [
+    {
+      kind: 'dashboard.summary',
+      title: 'KPIs',
+      metrics: [
+        { label: 'Spend', value: '1.234,5' },
+      ],
+    },
+  ],
+});
+
+assert.match(localizedHtml, /<html lang="de-DE">/);
+
 const fakeRoot = {
   querySelector(selector) {
     if (selector !== 'svg') return null;
@@ -258,6 +275,7 @@ const model = buildDashboardExportModel({
   },
   context: {
     ...context,
+    locale: 'de-DE',
     dashboardFilters: {dateRange: '90d', region: ['NA']},
     dashboardSelection: { entityKey: 'US' },
   },
@@ -268,9 +286,10 @@ assert.equal(model.blocks.length, 7);
 assert.equal(model.dashboardFilters.dateRange, '90d');
 assert.deepEqual(model.dashboardFilters.region, ['NA']);
 assert.equal(model.dashboardSelection.entityKey, 'US');
-assert.equal(model.blocks[0].metrics[0].value, '$123,000');
-assert.equal(model.blocks[1].items[0].deltaValue, '+$5,000');
-assert.equal(model.blocks[2].rows[0].value, '5.4M');
+assert.equal(model.locale, 'de-DE');
+assert.equal(model.blocks[0].metrics[0].value, '123.000 $');
+assert.equal(model.blocks[1].items[0].deltaValue, '+5.000 $');
+assert.equal(model.blocks[2].rows[0].value, '5,4 Mio.');
 assert.equal(model.blocks[3].items[0].activeOptions[0], '90D');
 assert.equal(model.blocks[4].items.length, 1);
 assert.equal(model.blocks[4].items[0].title, 'Zero-spend 47.2');

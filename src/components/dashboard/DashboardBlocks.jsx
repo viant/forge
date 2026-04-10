@@ -3,7 +3,7 @@ import {useSignalEffect} from '@preact/signals-react';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
-import {applyDashboardFiltersToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
+import {applyDashboardFiltersToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 
 const panelStyle = {
@@ -74,27 +74,6 @@ function deltaTone(delta, positiveIsUp = true) {
     const isPositive = Number(delta) > 0;
     const isGood = positiveIsUp ? isPositive : !isPositive;
     return isGood ? toneColors.success : toneColors.danger;
-}
-
-function formatDelta(value, format = 'number') {
-    if (value == null) {
-        return '-';
-    }
-    const numeric = Number(value) || 0;
-    const absolute = Math.abs(numeric);
-
-    switch (format) {
-        case 'percentDelta':
-            return `${numeric >= 0 ? '+' : '-'}${absolute.toFixed(1)}%`;
-        case 'compactNumberDelta':
-            return `${numeric >= 0 ? '+' : '-'}${new Intl.NumberFormat('en-US', {notation: 'compact', maximumFractionDigits: 1}).format(absolute)}`;
-        case 'currencyDelta':
-            return `${numeric >= 0 ? '+' : '-'}${new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(absolute)}`;
-        case 'numberDelta':
-        case 'number':
-        default:
-            return `${numeric >= 0 ? '+' : '-'}${new Intl.NumberFormat('en-US', {maximumFractionDigits: 2}).format(absolute)}`;
-    }
 }
 
 function Panel({container, children, actions = null}) {
@@ -180,7 +159,7 @@ export function DashboardCompare({container, context}) {
                                         padding: '2px 8px',
                                     }}
                                 >
-                                    {formatDelta(delta, item.deltaFormat || `${item.format || 'number'}Delta`)}
+                                    {formatDashboardDelta(delta, item.deltaFormat || `${item.format || 'number'}Delta`, locale)}
                                 </span>
                             </div>
                         </div>
@@ -717,30 +696,44 @@ class DashboardErrorBoundary extends React.Component {
 }
 
 export function DashboardBlock({container, context, isActive, children}) {
+    let content = null;
     switch (container.kind) {
         case 'dashboard.summary':
-            return <DashboardSummary container={container} context={context}/>;
+            content = <DashboardSummary container={container} context={context}/>;
+            break;
         case 'dashboard.compare':
-            return <DashboardCompare container={container} context={context}/>;
+            content = <DashboardCompare container={container} context={context}/>;
+            break;
         case 'dashboard.kpiTable':
-            return <DashboardKPITable container={container} context={context}/>;
+            content = <DashboardKPITable container={container} context={context}/>;
+            break;
         case 'dashboard.filters':
-            return <DashboardFilters container={container} context={context}/>;
+            content = <DashboardFilters container={container} context={context}/>;
+            break;
         case 'dashboard.timeline':
-            return <DashboardTimeline container={container} context={context} isActive={isActive}/>;
+            content = <DashboardTimeline container={container} context={context} isActive={isActive}/>;
+            break;
         case 'dashboard.dimensions':
-            return <DashboardDimensions container={container} context={context}/>;
+            content = <DashboardDimensions container={container} context={context}/>;
+            break;
         case 'dashboard.messages':
-            return <DashboardMessages container={container} context={context}/>;
+            content = <DashboardMessages container={container} context={context}/>;
+            break;
         case 'dashboard.status':
-            return <DashboardStatus container={container} context={context}/>;
+            content = <DashboardStatus container={container} context={context}/>;
+            break;
         case 'dashboard.feed':
-            return <DashboardFeed container={container} context={context}/>;
+            content = <DashboardFeed container={container} context={context}/>;
+            break;
         case 'dashboard.report':
-            return <DashboardReport container={container} context={context}/>;
+            content = <DashboardReport container={container} context={context}/>;
+            break;
         case 'dashboard.detail':
-            return <DashboardErrorBoundary container={container}><DashboardDetail container={container} context={context}>{children}</DashboardDetail></DashboardErrorBoundary>;
+            content = <DashboardDetail container={container} context={context}>{children}</DashboardDetail>;
+            break;
         default:
-            return null;
+            content = null;
+            break;
     }
+    return <DashboardErrorBoundary container={container}>{content}</DashboardErrorBoundary>;
 }
