@@ -104,6 +104,28 @@ function defaultNormalizeMessages(rawMessages= []) {
     return rawMessages.map((m) => ({...m}));
 }
 
+function hasSyntheticChatRows(rawMessages = []) {
+    const list = Array.isArray(rawMessages) ? rawMessages : [];
+    return list.some((message) => {
+        const kind = String(message?._type || '').trim().toLowerCase();
+        return kind === 'iteration'
+            || kind === 'queue'
+            || kind === 'starter'
+            || kind === 'paginator'
+            || !!message?._iterationData;
+    });
+}
+
+function isChatDebugEnabled() {
+    if (typeof window === 'undefined') return false;
+    try {
+        const raw = String(window.localStorage?.getItem('agently.debugStream') || '').trim().toLowerCase();
+        return ['1', 'true', 'on', 'yes'].includes(raw);
+    } catch (_) {
+        return false;
+    }
+}
+
 function hasActiveSteps(steps = []) {
     const list = Array.isArray(steps) ? steps : [];
     return list.some((s) => {
@@ -342,7 +364,30 @@ export default function Chat({
     const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages
     
     useEffect(() => {
-        const norm = normalizeMessages(rawMessages);
+        const synthetic = hasSyntheticChatRows(rawMessages);
+        const norm = synthetic
+            ? rawMessages
+            : normalizeMessages(rawMessages);
+        if (isChatDebugEnabled()) {
+            // eslint-disable-next-line no-console
+            console.log('[forge-chat]', {
+                rawCount: Array.isArray(rawMessages) ? rawMessages.length : 0,
+                rawTypes: (Array.isArray(rawMessages) ? rawMessages : []).map((m) => ({
+                    id: m?.id,
+                    type: m?._type || m?.role,
+                    mode: m?.mode || '',
+                    head: String(m?.content || '').slice(0, 60)
+                })),
+                synthetic,
+                normCount: Array.isArray(norm) ? norm.length : 0,
+                normTypes: (Array.isArray(norm) ? norm : []).map((m) => ({
+                    id: m?.id,
+                    type: m?._type || m?.role,
+                    mode: m?.mode || '',
+                    head: String(m?.content || '').slice(0, 60)
+                }))
+            });
+        }
         setMessages(norm);
     }, [rawMessages]);
 
