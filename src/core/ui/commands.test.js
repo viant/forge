@@ -81,6 +81,7 @@ const exportedFromContainer = await runUICommand({
     },
     context: {
       dashboardKey: 'W1:perf',
+      locale: 'de-DE',
       signals: {
         metrics: {
           peek: () => ({ summary: { total_spend: 10 } }),
@@ -93,8 +94,10 @@ const exportedFromContainer = await runUICommand({
   },
 });
 assert.equal(exportedFromContainer.ok, true);
-assert.match(exportedFromContainer.html, /\$10/);
+assert.match(exportedFromContainer.html, /<html lang="de-DE">/);
+assert.match(exportedFromContainer.html, /10\s?\$/);
 assert.equal(exportedFromContainer.model.blocks.length, 1);
+assert.equal(exportedFromContainer.model.locale, 'de-DE');
 
 const exportedWithDomSvg = await runUICommand({
   method: 'ui.dashboard.exportFromContainer',
@@ -179,9 +182,18 @@ const dashboardCapabilities = await runUICommand({
 assert.equal(dashboardCapabilities.ok, true);
 assert.equal(dashboardCapabilities.blockKinds.includes('dashboard.filters'), true);
 assert.equal(dashboardCapabilities.chartTypes.includes('area'), true);
+assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.capabilities'), true);
 assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.state.reset'), true);
 assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.generateDemoArtifacts'), true);
 assert.equal(dashboardCapabilities.demos.some((item) => item.id === 'operations'), true);
+
+const defaultDemoBundle = await runUICommand({
+  method: 'ui.dashboard.getDemo',
+  params: {},
+});
+assert.equal(defaultDemoBundle.ok, true);
+assert.equal(defaultDemoBundle.variant, 'performance');
+assert.equal(defaultDemoBundle.metadata.view.content.id, 'demoDashboard');
 
 const demoArtifacts = await runUICommand({
   method: 'ui.dashboard.listDemoArtifacts',
@@ -202,6 +214,18 @@ assert.equal(generatedArtifacts.artifacts.length, 1);
 assert.equal(generatedArtifacts.artifacts[0].id, 'quality');
 assert.match(generatedArtifacts.artifacts[0].html, /Data Quality Dashboard Demo/);
 assert.equal(generatedArtifacts.artifacts[0].model.generatedAt, '2026-04-07T12:00:00.000Z');
+
+const localizedArtifacts = await runUICommand({
+  method: 'ui.dashboard.generateDemoArtifacts',
+  params: {
+    variants: ['performance'],
+    generatedAt: '2026-04-07T12:00:00.000Z',
+    locale: 'de-DE',
+  },
+});
+assert.equal(localizedArtifacts.ok, true);
+assert.equal(localizedArtifacts.artifacts[0].model.locale, 'de-DE');
+assert.match(localizedArtifacts.artifacts[0].html, /<html lang="de-DE">/);
 
 const openedDemo = await runUICommand({
   method: 'ui.dashboard.openDemo',

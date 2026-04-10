@@ -133,30 +133,67 @@ export const interpolateDashboardTemplate = (template, scope = {}) => {
     });
 };
 
-export const formatDashboardValue = (value, format) => {
+export const formatDashboardValue = (value, format, locale = 'en-US') => {
     if (value == null) return '-';
 
     switch (format) {
         case 'currency':
-            return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(Number(value) || 0);
+            return new Intl.NumberFormat(locale, {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(Number(value) || 0);
         case 'compactNumber':
-            return new Intl.NumberFormat('en-US', {notation: 'compact', maximumFractionDigits: 1}).format(Number(value) || 0);
+            return new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(Number(value) || 0);
         case 'percent':
             return `${Number(value).toFixed(1)}%`;
         case 'number':
         default:
-            return new Intl.NumberFormat('en-US', {maximumFractionDigits: 2}).format(Number(value));
+            return new Intl.NumberFormat(locale, {maximumFractionDigits: 2}).format(Number(value));
+    }
+};
+
+export const formatDashboardDelta = (value, format = 'numberDelta', locale = 'en-US') => {
+    if (value == null) {
+        return '-';
+    }
+
+    const numeric = Number(value) || 0;
+    const absolute = Math.abs(numeric);
+    const prefix = numeric >= 0 ? '+' : '-';
+
+    switch (format) {
+        case 'percentDelta':
+            return `${prefix}${absolute.toFixed(1)}%`;
+        case 'compactNumberDelta':
+            return `${prefix}${new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(absolute)}`;
+        case 'currencyDelta':
+            return `${prefix}${new Intl.NumberFormat(locale, {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(absolute)}`;
+        case 'numberDelta':
+        case 'number':
+        default:
+            return `${prefix}${new Intl.NumberFormat(locale, {maximumFractionDigits: 2}).format(absolute)}`;
     }
 };
 
 export const getDashboardToneName = (value, tone = {}) => {
+    const normalizedTone = {...(tone || {})};
+    if (normalizedTone.warningAbove !== undefined && normalizedTone.dangerAbove !== undefined) {
+        const warningAbove = Number(normalizedTone.warningAbove);
+        const dangerAbove = Number(normalizedTone.dangerAbove);
+        normalizedTone.warningAbove = Math.min(warningAbove, dangerAbove);
+        normalizedTone.dangerAbove = Math.max(warningAbove, dangerAbove);
+    }
+    if (normalizedTone.warningBelow !== undefined && normalizedTone.dangerBelow !== undefined) {
+        const warningBelow = Number(normalizedTone.warningBelow);
+        const dangerBelow = Number(normalizedTone.dangerBelow);
+        normalizedTone.warningBelow = Math.max(warningBelow, dangerBelow);
+        normalizedTone.dangerBelow = Math.min(warningBelow, dangerBelow);
+    }
+
     const numeric = Number(value);
-    if (tone.dangerAbove !== undefined && numeric >= Number(tone.dangerAbove)) return 'danger';
-    if (tone.warningAbove !== undefined && numeric >= Number(tone.warningAbove)) return 'warning';
-    if (tone.successAbove !== undefined && numeric >= Number(tone.successAbove)) return 'success';
-    if (tone.dangerBelow !== undefined && numeric <= Number(tone.dangerBelow)) return 'danger';
-    if (tone.warningBelow !== undefined && numeric <= Number(tone.warningBelow)) return 'warning';
-    if (tone.successBelow !== undefined && numeric <= Number(tone.successBelow)) return 'success';
+    if (normalizedTone.dangerAbove !== undefined && numeric >= Number(normalizedTone.dangerAbove)) return 'danger';
+    if (normalizedTone.warningAbove !== undefined && numeric >= Number(normalizedTone.warningAbove)) return 'warning';
+    if (normalizedTone.successAbove !== undefined && numeric >= Number(normalizedTone.successAbove)) return 'success';
+    if (normalizedTone.dangerBelow !== undefined && numeric <= Number(normalizedTone.dangerBelow)) return 'danger';
+    if (normalizedTone.warningBelow !== undefined && numeric <= Number(normalizedTone.warningBelow)) return 'warning';
+    if (normalizedTone.successBelow !== undefined && numeric <= Number(normalizedTone.successBelow)) return 'success';
     return 'info';
 };
 

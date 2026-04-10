@@ -1,12 +1,6 @@
 import { buildDashboardDefaultFilters } from '../../components/dashboard/dashboardUtils.js';
 import { buildDashboardExportModel, buildStandaloneDashboardDocument } from './dashboardExport.js';
-import { createDashboardDemoBundle, listDashboardDemoVariants } from './dashboardDemo.js';
-
-const demoFilenameByVariant = {
-  performance: 'performance-dashboard-demo.html',
-  operations: 'operations-dashboard-demo.html',
-  quality: 'quality-dashboard-demo.html',
-};
+import { createDashboardDemoBundle, DEFAULT_DASHBOARD_DEMO_VARIANT, getDashboardDemoDefinition, listDashboardDemoVariants } from './dashboardDemo.js';
 
 function createSignalValue(value) {
   return {
@@ -23,13 +17,14 @@ function getDashboardId(metadata = {}) {
   return getDashboardContainer(metadata)?.id || 'dashboard';
 }
 
-export function getDashboardDemoExportFilename(variant = 'performance') {
-  return demoFilenameByVariant[variant] || `${variant}-dashboard-demo.html`;
+export function getDashboardDemoExportFilename(variant = DEFAULT_DASHBOARD_DEMO_VARIANT) {
+  return getDashboardDemoDefinition(variant)?.filename || `${variant}-dashboard-demo.html`;
 }
 
-export function buildDashboardDemoContext(variant = 'performance', options = {}) {
+export function buildDashboardDemoContext(variant = DEFAULT_DASHBOARD_DEMO_VARIANT, options = {}) {
   const { metadata, seed } = createDashboardDemoBundle(variant);
   const rootContainer = getDashboardContainer(metadata);
+  const locale = options.locale || rootContainer?.locale || 'en-US';
   const dashboardFilters = options.dashboardFilters || buildDashboardDefaultFilters(rootContainer);
   const dashboardSelection = options.dashboardSelection || {};
   const byDataSource = {};
@@ -43,6 +38,7 @@ export function buildDashboardDemoContext(variant = 'performance', options = {})
       dashboardFilters,
       dashboardSelection,
       dashboardKey: `${variant}:${getDashboardId(metadata)}`,
+      locale,
     };
   });
 
@@ -55,6 +51,7 @@ export function buildDashboardDemoContext(variant = 'performance', options = {})
     dashboardKey: `${variant}:${getDashboardId(metadata)}`,
     dashboardFilters,
     dashboardSelection,
+    locale,
     signals: {
       metrics: byDataSource[defaultRef]?.signals?.metrics || createSignalValue({}),
       collection: byDataSource[defaultRef]?.signals?.collection || createSignalValue([]),
@@ -68,12 +65,13 @@ export function buildDashboardDemoContext(variant = 'performance', options = {})
         dashboardFilters,
         dashboardSelection,
         dashboardKey: `${variant}:${getDashboardId(metadata)}`,
+        locale,
       };
     },
   };
 }
 
-export function buildDashboardDemoExportModel(variant = 'performance', options = {}) {
+export function buildDashboardDemoExportModel(variant = DEFAULT_DASHBOARD_DEMO_VARIANT, options = {}) {
   const context = buildDashboardDemoContext(variant, options);
   return buildDashboardExportModel({
     container: context.rootContainer,
@@ -84,7 +82,7 @@ export function buildDashboardDemoExportModel(variant = 'performance', options =
   });
 }
 
-export function buildDashboardDemoStandaloneHtml(variant = 'performance', options = {}) {
+export function buildDashboardDemoStandaloneHtml(variant = DEFAULT_DASHBOARD_DEMO_VARIANT, options = {}) {
   const context = buildDashboardDemoContext(variant, options);
   return buildStandaloneDashboardDocument({
     container: context.rootContainer,
