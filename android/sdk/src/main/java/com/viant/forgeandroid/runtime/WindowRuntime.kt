@@ -40,7 +40,7 @@ class WindowRuntime(
 class WindowContext(
     val windowId: String,
     val metadata: Signal<WindowMetadata?>,
-    private val signals: SignalRegistry,
+    internal val signals: SignalRegistry,
     private val dataSourceRuntime: DataSourceRuntime,
     val parameters: Map<String, Any?> = emptyMap()
 ) {

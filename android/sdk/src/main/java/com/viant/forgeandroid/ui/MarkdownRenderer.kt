@@ -341,6 +341,44 @@ private fun MermaidRenderer(source: String) {
                     MermaidRelationLine(transition.from, transition.to, transition.label)
                 }
             }
+
+            is MermaidDiagram.EntityRelationshipDiagram -> {
+                diagram.entities.forEach { entity ->
+                    MermaidNode(entity)
+                }
+                diagram.relations.forEach { relation ->
+                    MermaidRelationLine(relation.from, relation.to, relation.label)
+                }
+            }
+
+            is MermaidDiagram.PieChart -> {
+                diagram.slices.forEach { slice ->
+                    MermaidMetricRow(
+                        label = slice.label,
+                        value = slice.value
+                    )
+                }
+            }
+
+            is MermaidDiagram.Timeline -> {
+                diagram.events.forEach { event ->
+                    MermaidMetricRow(
+                        label = event.time,
+                        value = event.label
+                    )
+                }
+            }
+
+            is MermaidDiagram.Gantt -> {
+                diagram.tasks.forEach { task ->
+                    MermaidMetricRow(
+                        label = task.section?.let { "$it / ${task.name}" } ?: task.name,
+                        value = listOfNotNull(task.start, task.end).joinToString(" → ").ifBlank {
+                            task.tags.joinToString(", ")
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -448,6 +486,29 @@ private fun MermaidRelationLine(from: String, to: String, label: String?) {
     }
 }
 
+@Composable
+private fun MermaidMetricRow(label: String, value: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color(0xFF475467),
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF101828)
+        )
+    }
+}
+
 internal sealed interface MermaidDiagram {
     data class Flowchart(val nodes: List<String>) : MermaidDiagram
     data class Sequence(
@@ -462,6 +523,13 @@ internal sealed interface MermaidDiagram {
         val states: List<String>,
         val transitions: List<MermaidRelation>
     ) : MermaidDiagram
+    data class EntityRelationshipDiagram(
+        val entities: List<String>,
+        val relations: List<MermaidRelation>
+    ) : MermaidDiagram
+    data class PieChart(val slices: List<MermaidPieSlice>) : MermaidDiagram
+    data class Timeline(val events: List<MermaidTimelineEvent>) : MermaidDiagram
+    data class Gantt(val tasks: List<MermaidGanttTask>) : MermaidDiagram
 }
 
 internal data class MermaidSequenceMessage(
@@ -481,11 +549,33 @@ internal data class MermaidRelation(
     val label: String? = null
 )
 
+internal data class MermaidPieSlice(
+    val label: String,
+    val value: String
+)
+
+internal data class MermaidTimelineEvent(
+    val time: String,
+    val label: String
+)
+
+internal data class MermaidGanttTask(
+    val section: String?,
+    val name: String,
+    val start: String?,
+    val end: String?,
+    val tags: List<String>
+)
+
 internal fun parseMermaidDiagram(source: String): MermaidDiagram? {
     return parseMermaidFlowchart(source)
         ?: parseMermaidSequence(source)
         ?: parseMermaidClassDiagram(source)
         ?: parseMermaidStateDiagram(source)
+        ?: parseMermaidEntityRelationship(source)
+        ?: parseMermaidPie(source)
+        ?: parseMermaidTimeline(source)
+        ?: parseMermaidGantt(source)
 }
 
 private fun parseMermaidFlowchart(source: String): MermaidDiagram.Flowchart? {
@@ -630,6 +720,116 @@ private fun normalizeStateName(value: String): String {
         "[*]" -> "Start/End"
         else -> value.trim().removePrefix("[").removeSuffix("]")
     }
+}
+
+private fun parseMermaidEntityRelationship(source: String): MermaidDiagram.EntityRelationshipDiagram? {
+    val lines = source.lines().map { it.trim() }.filter { it.isNotBlank() }
+    if (lines.isEmpty()) return null
+    if (!lines.first().lowercase().startsWith("erdiagram")) return null
+    val relationDecl = Regex("""^([A-Za-z0-9_]+)\s+[\|\}o\{\-\.]+?\s+([A-Za-z0-9_]+)(?:\s*:\s*(.+))?$""")
+    val entities = linkedSetOf<String>()
+    val relations = mutableListOf<MermaidRelation>()
+    lines.drop(1).forEach { line ->
+        relationDecl.matchEntire(line)?.let { match ->
+            val from = match.groupValues[1]
+            val to = match.groupValues[2]
+            entities += from
+            entities += to
+            relations += MermaidRelation(
+                from = from,
+                to = to,
+                label = match.groupValues.getOrNull(3)?.trim().orEmpty().ifBlank { null }
+            )
+        }
+    }
+    if (entities.isEmpty()) return null
+    return MermaidDiagram.EntityRelationshipDiagram(
+        entities = entities.toList(),
+        relations = relations
+    )
+}
+
+private fun parseMermaidPie(source: String): MermaidDiagram.PieChart? {
+    val lines = source.lines().map { it.trim() }.filter { it.isNotBlank() }
+    if (lines.isEmpty()) return null
+    if (!lines.first().lowercase().startsWith("pie")) return null
+    val sliceDecl = Regex("""^"?([^":]+)"?\s*:\s*(.+)$""")
+    val slices = lines.drop(1)
+        .filterNot { it.equals("showdata", ignoreCase = true) || it.startsWith("title ", ignoreCase = true) }
+        .mapNotNull { line ->
+            sliceDecl.matchEntire(line)?.let { match ->
+                MermaidPieSlice(
+                    label = match.groupValues[1].trim(),
+                    value = match.groupValues[2].trim()
+                )
+            }
+        }
+    if (slices.isEmpty()) return null
+    return MermaidDiagram.PieChart(slices)
+}
+
+private fun parseMermaidTimeline(source: String): MermaidDiagram.Timeline? {
+    val lines = source.lines().map { it.trim() }.filter { it.isNotBlank() }
+    if (lines.isEmpty()) return null
+    if (!lines.first().lowercase().startsWith("timeline")) return null
+    val events = mutableListOf<MermaidTimelineEvent>()
+    var currentTime: String? = null
+    lines.drop(1).forEach { line ->
+        if (line.startsWith("title ", ignoreCase = true)) {
+            return@forEach
+        }
+        if (":" !in line) {
+            currentTime = line
+            return@forEach
+        }
+        val parts = line.split(":", limit = 2)
+        val time = parts[0].trim().ifBlank { currentTime.orEmpty() }
+        val label = parts.getOrNull(1)?.trim().orEmpty()
+        if (time.isNotBlank() && label.isNotBlank()) {
+            events += MermaidTimelineEvent(time = time, label = label)
+            currentTime = time
+        }
+    }
+    if (events.isEmpty()) return null
+    return MermaidDiagram.Timeline(events)
+}
+
+private fun parseMermaidGantt(source: String): MermaidDiagram.Gantt? {
+    val lines = source.lines().map { it.trim() }.filter { it.isNotBlank() }
+    if (lines.isEmpty()) return null
+    if (!lines.first().lowercase().startsWith("gantt")) return null
+    val tasks = mutableListOf<MermaidGanttTask>()
+    var currentSection: String? = null
+    lines.drop(1).forEach { line ->
+        when {
+            line.startsWith("title ", ignoreCase = true) -> return@forEach
+            line.startsWith("dateformat ", ignoreCase = true) -> return@forEach
+            line.startsWith("axisformat ", ignoreCase = true) -> return@forEach
+            line.startsWith("section ", ignoreCase = true) -> {
+                currentSection = line.removePrefix("section").trim()
+                return@forEach
+            }
+        }
+        val parts = line.split(":", limit = 2)
+        if (parts.size < 2) return@forEach
+        val name = parts[0].trim()
+        val fields = parts[1].split(",").map { it.trim() }.filter { it.isNotBlank() }
+        if (name.isBlank() || fields.isEmpty()) return@forEach
+        val scheduleFields = fields.filter { field ->
+            field.any(Char::isDigit) || field.equals("after", ignoreCase = true)
+        }
+        val start = scheduleFields.getOrNull(0)
+        val end = scheduleFields.getOrNull(1)
+        tasks += MermaidGanttTask(
+            section = currentSection,
+            name = name,
+            start = start,
+            end = end,
+            tags = fields - scheduleFields.toSet()
+        )
+    }
+    if (tasks.isEmpty()) return null
+    return MermaidDiagram.Gantt(tasks)
 }
 
 private fun isTableRow(line: String): Boolean {

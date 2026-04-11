@@ -1,8 +1,12 @@
 package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -46,6 +50,42 @@ fun FormRenderer(_runtime: com.viant.forgeandroid.runtime.ForgeRuntime, context:
                             val optVal = option.value ?: ""
                             RowRadio(option.label ?: optVal, value == optVal) {
                                 context.setFormField(key, optVal)
+                            }
+                        }
+                    }
+                }
+                "multiSelect" -> {
+                    val selectedValues = when (val raw = context.peekForm()[key]) {
+                        is List<*> -> raw.mapNotNull { it?.toString() }
+                        is String -> listOf(raw)
+                        else -> emptyList()
+                    }
+                    Column(modifier = Modifier.padding(4.dp)) {
+                        Text(item.label ?: key)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(top = 6.dp)
+                        ) {
+                            item.options.forEach { option ->
+                                val optVal = option.value ?: ""
+                                val selected = selectedValues.contains(optVal)
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = {
+                                        val next = selectedValues.toMutableList().apply {
+                                            if (selected) {
+                                                removeAll { it == optVal }
+                                            } else {
+                                                add(optVal)
+                                            }
+                                        }
+                                        context.setFormField(key, next)
+                                    },
+                                    label = { Text(option.label ?: optVal) },
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
                             }
                         }
                     }

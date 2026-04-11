@@ -36,7 +36,7 @@ fun FileBrowserRenderer(runtime: ForgeRuntime, context: DataSourceContext, confi
     val control by context.control.flow.collectAsState(initial = com.viant.forgeandroid.runtime.ControlState())
     val selection by context.selection.flow.collectAsState(initial = com.viant.forgeandroid.runtime.SelectionState())
     val input by context.input.flow.collectAsState(initial = com.viant.forgeandroid.runtime.InputState())
-    val selectedUri = selection.selected?.get("uri")?.toString()
+    val selectedUri = rowLocation(selection.selected)
     val currentUri = input.filter["uri"]?.toString().orEmpty()
 
     LaunchedEffect(Unit) {
@@ -69,14 +69,14 @@ fun FileBrowserRenderer(runtime: ForgeRuntime, context: DataSourceContext, confi
             )
         }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            itemsIndexed(rows, key = { _, row -> row["uri"]?.toString() ?: row.hashCode().toString() }) { index, row ->
+            itemsIndexed(rows, key = { _, row -> rowLocation(row) ?: row.hashCode().toString() }) { index, row ->
                 FileBrowserRow(
                     row = row,
-                    selected = selectedUri == row["uri"]?.toString(),
+                    selected = selectedUri == rowLocation(row),
                     folderOnly = config.folderOnly == true,
                     onClick = {
                         val isFolder = row["isFolder"] as? Boolean == true
-                        val uri = row["uri"]?.toString().orEmpty()
+                        val uri = rowLocation(row).orEmpty()
                         val actionable = isFolder || config.folderOnly != true
                         if (!actionable) {
                             return@FileBrowserRow
@@ -125,9 +125,9 @@ private fun FileBrowserRow(
     val isFolder = row["isFolder"] as? Boolean == true
     val name = row["name"]?.toString()
         ?.takeIf { it.isNotBlank() }
-        ?: row["uri"]?.toString()?.substringAfterLast('/')?.ifBlank { "/" }
+        ?: rowLocation(row)?.substringAfterLast('/')?.ifBlank { "/" }
         ?: "Unnamed"
-    val subtitle = row["uri"]?.toString().orEmpty()
+    val subtitle = rowLocation(row).orEmpty()
 
     Box(
         modifier = Modifier
@@ -159,4 +159,14 @@ private fun FileBrowserRow(
             }
         }
     }
+}
+
+private fun rowLocation(row: Map<String, Any?>?): String? {
+    if (row == null) {
+        return null
+    }
+    return listOf("uri", "URI", "url", "path", "Path")
+        .asSequence()
+        .mapNotNull { key -> row[key]?.toString()?.trim() }
+        .firstOrNull { it.isNotBlank() }
 }

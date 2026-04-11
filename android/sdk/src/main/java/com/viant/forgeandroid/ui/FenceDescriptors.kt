@@ -57,7 +57,7 @@ internal fun describeFence(rawLang: String, body: String): FenceDescriptor {
             table = parseFenceTable(body)
         )
     }
-    if (lang == "mermaid" || Regex("^\\s*(sequenceDiagram|flowchart|graph|classDiagram|stateDiagram)").containsMatchIn(body)) {
+    if (lang == "mermaid" || Regex("^\\s*(sequenceDiagram|flowchart|graph|classDiagram|stateDiagram|erDiagram|pie|timeline|gantt)").containsMatchIn(body)) {
         return FenceDescriptor(FenceRendererType.Mermaid, lang, body)
     }
     if (lang == "markdown" || lang == "md") {

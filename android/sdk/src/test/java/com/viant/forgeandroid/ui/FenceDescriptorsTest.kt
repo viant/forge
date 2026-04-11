@@ -81,7 +81,7 @@ class FenceDescriptorsTest {
     }
 
     @Test
-    fun `parseMermaidDiagram returns null for unsupported mermaid grammar`() {
+    fun `parseMermaidDiagram parses entity relationship diagrams`() {
         val diagram = parseMermaidDiagram(
             """
                 erDiagram
@@ -89,7 +89,9 @@ class FenceDescriptorsTest {
             """.trimIndent()
         )
 
-        assertEquals(null, diagram)
+        val er = assertIs<MermaidDiagram.EntityRelationshipDiagram>(diagram)
+        assertEquals(listOf("USER", "ORDER"), er.entities)
+        assertEquals("places", er.relations.first().label)
     }
 
     @Test
@@ -143,5 +145,56 @@ class FenceDescriptorsTest {
         assertEquals(listOf("Start/End", "Idle", "Running"), stateDiagram.states)
         assertEquals(3, stateDiagram.transitions.size)
         assertEquals("query", stateDiagram.transitions[1].label)
+    }
+
+    @Test
+    fun `parseMermaidDiagram parses pie diagrams`() {
+        val diagram = parseMermaidDiagram(
+            """
+                pie showData
+                    "API" : 42
+                    "UI" : 18
+            """.trimIndent()
+        )
+
+        val pie = assertIs<MermaidDiagram.PieChart>(diagram)
+        assertEquals(2, pie.slices.size)
+        assertEquals("API", pie.slices.first().label)
+        assertEquals("42", pie.slices.first().value)
+    }
+
+    @Test
+    fun `parseMermaidDiagram parses timeline diagrams`() {
+        val diagram = parseMermaidDiagram(
+            """
+                timeline
+                    2024 : Service launched
+                    2025 : Android renderer added
+            """.trimIndent()
+        )
+
+        val timeline = assertIs<MermaidDiagram.Timeline>(diagram)
+        assertEquals(2, timeline.events.size)
+        assertEquals("2024", timeline.events.first().time)
+        assertEquals("Service launched", timeline.events.first().label)
+    }
+
+    @Test
+    fun `parseMermaidDiagram parses gantt diagrams`() {
+        val diagram = parseMermaidDiagram(
+            """
+                gantt
+                    title Release plan
+                    section Core
+                    Approval migration :done, 2026-04-01, 2026-04-05
+            """.trimIndent()
+        )
+
+        val gantt = assertIs<MermaidDiagram.Gantt>(diagram)
+        assertEquals(1, gantt.tasks.size)
+        assertEquals("Core", gantt.tasks.first().section)
+        assertEquals("Approval migration", gantt.tasks.first().name)
+        assertEquals("2026-04-01", gantt.tasks.first().start)
+        assertEquals("2026-04-05", gantt.tasks.first().end)
     }
 }
