@@ -54,21 +54,67 @@ data class ContentDef(
 data class ContainerDef(
     val id: String? = null,
     val title: String? = null,
+    val subtitle: String? = null,
+    val kind: String? = null,
+    val role: String? = null,
     val dataSourceRef: String? = null,
+    val toolbar: ToolbarDef? = null,
+    val filterBindings: Map<String, String> = emptyMap(),
+    val columnSpan: Int? = null,
+    val rowSpan: Int? = null,
+    val visibleWhen: DashboardConditionDef? = null,
+    val metrics: List<DashboardMetricDef> = emptyList(),
+    val checks: List<DashboardStatusCheckDef> = emptyList(),
+    val rows: List<DashboardKPIRowDef> = emptyList(),
+    val sections: List<DashboardReportSectionDef> = emptyList(),
+    val fields: DashboardFeedFieldsDef? = null,
+    val dimension: DashboardFieldDef? = null,
+    val metric: DashboardFieldDef? = null,
+    val viewModes: List<String> = emptyList(),
+    val limit: Int? = null,
+    val orderBy: String? = null,
     val table: TableDef? = null,
     val fileBrowser: FileBrowserDef? = null,
     val chart: ChartDef? = null,
     val editor: EditorDef? = null,
+    val terminal: TerminalDef? = null,
     val items: List<ItemDef> = emptyList(),
     val containers: List<ContainerDef> = emptyList(),
     val tabs: TabsDef? = null,
     val layout: LayoutDef? = null,
     val chat: ChatDef? = null,
+    val schemaBasedForm: SchemaBasedFormDef? = null,
+    val dashboard: DashboardDef? = null,
+    val actions: List<ActionDef> = emptyList(),
     val on: List<ExecutionDef> = emptyList(),
     val selectFirst: Boolean? = null,
     val fetchData: Boolean? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class SchemaBasedFormDef(
+    val id: String? = null,
+    val dataBinding: String? = null,
+    @SerialName("datasourceRef")
+    val datasourceRef: String? = null,
+    val dataSourceRef: String? = null,
+    val fields: List<FormFieldDef> = emptyList(),
+    val schema: JsonElement? = null,
+    val showSubmit: Boolean? = null
+)
+
+@Serializable
+data class FormFieldDef(
+    val name: String? = null,
+    val label: String? = null,
+    val type: String? = null,
+    val required: Boolean? = null,
+    val enum: List<String> = emptyList(),
+    val default: JsonElement? = null,
+    val widget: String? = null,
+    val placeholder: String? = null
 )
 
 @Serializable
@@ -78,7 +124,210 @@ data class TabsDef(
 
 @Serializable
 data class LayoutDef(
+    val kind: String? = null,
+    val orientation: String? = null,
+    val rows: Int? = null,
+    val columns: Int? = null,
     val labelPosition: String? = null
+)
+
+@Serializable
+data class DashboardConditionDef(
+    val source: String? = null,
+    val dataSourceRef: String? = null,
+    val selector: String? = null,
+    val field: String? = null,
+    val key: String? = null,
+    @SerialName("when")
+    val whenValue: JsonElement? = null,
+    val equals: JsonElement? = null,
+    val notEquals: JsonElement? = null,
+    @SerialName("in")
+    val inValues: List<JsonElement> = emptyList(),
+    val gt: Double? = null,
+    val gte: Double? = null,
+    val lt: Double? = null,
+    val lte: Double? = null,
+    val empty: Boolean? = null,
+    val notEmpty: Boolean? = null
+)
+
+@Serializable
+data class DashboardDef(
+    val key: String? = null,
+    val summary: DashboardSummaryDef? = null,
+    val compare: DashboardCompareDef? = null,
+    val kpiTable: DashboardKPITableDef? = null,
+    val filters: DashboardFiltersDef? = null,
+    val timeline: DashboardTimelineDef? = null,
+    val dimensions: DashboardDimensionsDef? = null,
+    val messages: DashboardMessagesDef? = null,
+    val status: DashboardStatusDef? = null,
+    val feed: DashboardFeedDef? = null,
+    val report: DashboardReportDef? = null,
+    val detail: DashboardDetailDef? = null
+)
+
+@Serializable
+data class DashboardSummaryDef(
+    val metrics: List<DashboardMetricDef> = emptyList()
+)
+
+@Serializable
+data class DashboardMetricDef(
+    val id: String? = null,
+    val label: String? = null,
+    val selector: String? = null,
+    val format: String? = null
+)
+
+@Serializable
+data class DashboardCompareDef(
+    val items: List<DashboardCompareItemDef> = emptyList()
+)
+
+@Serializable
+data class DashboardCompareItemDef(
+    val id: String? = null,
+    val label: String? = null,
+    val current: String? = null,
+    val previous: String? = null,
+    val format: String? = null,
+    val deltaFormat: String? = null,
+    val positiveIsUp: Boolean? = null,
+    val deltaLabel: String? = null
+)
+
+@Serializable
+data class DashboardKPITableDef(
+    val rows: List<DashboardKPIRowDef> = emptyList()
+)
+
+@Serializable
+data class DashboardKPIRowDef(
+    val id: String? = null,
+    val label: String? = null,
+    val value: String? = null,
+    val format: String? = null,
+    val context: String? = null,
+    val contextTone: String? = null
+)
+
+@Serializable
+data class DashboardFiltersDef(
+    val items: List<DashboardFilterItemDef> = emptyList()
+)
+
+@Serializable
+data class DashboardFilterItemDef(
+    val id: String? = null,
+    val label: String? = null,
+    val field: String? = null,
+    val multiple: Boolean? = null,
+    val options: List<DashboardFilterOptionDef> = emptyList()
+)
+
+@Serializable
+data class DashboardFilterOptionDef(
+    val label: String? = null,
+    val value: String? = null,
+    val default: Boolean? = null
+)
+
+@Serializable
+data class DashboardTimelineDef(
+    val viewModes: List<String> = emptyList(),
+    val annotations: DashboardAnnotationDef? = null
+)
+
+@Serializable
+data class DashboardAnnotationDef(
+    val selector: String? = null
+)
+
+@Serializable
+data class DashboardDimensionsDef(
+    val dimension: DashboardFieldDef? = null,
+    val metric: DashboardFieldDef? = null,
+    val viewModes: List<String> = emptyList(),
+    val limit: Int? = null,
+    val orderBy: String? = null
+)
+
+@Serializable
+data class DashboardFieldDef(
+    val key: String? = null,
+    val label: String? = null,
+    val format: String? = null
+)
+
+@Serializable
+data class DashboardMessagesDef(
+    val items: List<DashboardMessageDef> = emptyList()
+)
+
+@Serializable
+data class DashboardMessageDef(
+    val severity: String? = null,
+    val title: String? = null,
+    val body: String? = null,
+    val visibleWhen: DashboardConditionDef? = null
+)
+
+@Serializable
+data class DashboardStatusDef(
+    val checks: List<DashboardStatusCheckDef> = emptyList()
+)
+
+@Serializable
+data class DashboardStatusCheckDef(
+    val id: String? = null,
+    val label: String? = null,
+    val selector: String? = null,
+    val format: String? = null,
+    val tone: DashboardToneDef? = null
+)
+
+@Serializable
+data class DashboardToneDef(
+    val warningAbove: Double? = null,
+    val dangerAbove: Double? = null,
+    val successAbove: Double? = null,
+    val warningBelow: Double? = null,
+    val dangerBelow: Double? = null,
+    val successBelow: Double? = null
+)
+
+@Serializable
+data class DashboardFeedDef(
+    val fields: DashboardFeedFieldsDef? = null
+)
+
+@Serializable
+data class DashboardFeedFieldsDef(
+    val title: String? = null,
+    val body: String? = null,
+    val timestamp: String? = null,
+    val severity: String? = null
+)
+
+@Serializable
+data class DashboardReportDef(
+    val sections: List<DashboardReportSectionDef> = emptyList()
+)
+
+@Serializable
+data class DashboardReportSectionDef(
+    val id: String? = null,
+    val title: String? = null,
+    val body: List<String> = emptyList(),
+    val tone: String? = null,
+    val visibleWhen: DashboardConditionDef? = null
+)
+
+@Serializable
+data class DashboardDetailDef(
+    val reserved: String? = null
 )
 
 @Serializable
@@ -141,6 +390,20 @@ data class EditorDef(
 )
 
 @Serializable
+data class TerminalDef(
+    val dataSourceRef: String? = null,
+    val toolbar: ToolbarDef? = null,
+    val height: String? = null,
+    val prompt: String? = null,
+    val autoScroll: Boolean? = null,
+    val showDividers: Boolean? = null,
+    val truncateLongOutput: Boolean? = null,
+    val truncateLength: Int? = null,
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
 data class EditorSelectorDef(
     val source: String? = null,
     val location: String? = null,
@@ -157,6 +420,7 @@ data class ToolbarDef(
 @Serializable
 data class ToolbarItemDef(
     val id: String? = null,
+    val label: String? = null,
     val icon: String? = null,
     val align: String? = null,
     val on: List<ExecutionDef> = emptyList(),
@@ -181,10 +445,22 @@ data class ColumnDef(
 data class ItemDef(
     val id: String? = null,
     val label: String? = null,
+    val title: String? = null,
+    val body: String? = null,
+    val severity: String? = null,
+    val current: String? = null,
+    val previous: String? = null,
+    val format: String? = null,
+    val deltaFormat: String? = null,
+    val positiveIsUp: Boolean? = null,
+    val deltaLabel: String? = null,
     val type: String? = null,
+    val field: String? = null,
+    val multiple: Boolean? = null,
     val dataField: String? = null,
     val bindingPath: String? = null,
     val scope: String? = null,
+    val visibleWhen: DashboardConditionDef? = null,
     val options: List<OptionDef> = emptyList(),
     val properties: Map<String, JsonElement> = emptyMap(),
     val on: List<ExecutionDef> = emptyList(),
@@ -195,7 +471,8 @@ data class ItemDef(
 @Serializable
 data class OptionDef(
     val value: String? = null,
-    val label: String? = null
+    val label: String? = null,
+    val default: Boolean? = null
 )
 
 @Serializable

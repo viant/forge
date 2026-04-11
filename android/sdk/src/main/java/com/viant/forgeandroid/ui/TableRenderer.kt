@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.runtime.Composable
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.TableDef
@@ -95,7 +97,7 @@ private fun MobileTableCard(
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 3.dp else 1.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            table.columns.filter { it.type != "button" }.forEachIndexed { fieldIndex, col ->
+            displayColumns(table).forEachIndexed { fieldIndex, col ->
                 val key = col.id ?: col.name ?: return@forEachIndexed
                 val value = row[key]?.toString().orEmpty()
                 if (fieldIndex == 0) {
@@ -118,7 +120,8 @@ private fun MobileTableCard(
                     }
                 }
             }
-            val actions = table.columns.filter { it.type == "button" && it.on.isNotEmpty() }
+            val actions = buttonColumns(table)
+            val iconActions = iconColumns(table)
             if (actions.isNotEmpty()) {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -126,12 +129,25 @@ private fun MobileTableCard(
                 ) {
                     actions.forEach { col ->
                         AssistChip(
-                            onClick = {
-                                col.on.firstOrNull()?.let { exec ->
-                                    runtime.execute(exec, context, mapOf("row" to row, "rowIndex" to index))
-                                }
-                            },
+                            onClick = { executeRowAction(runtime, context, col, row, index) },
                             label = { Text(col.label ?: col.icon ?: col.id ?: "Action") },
+                            colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFE9EEF9))
+                        )
+                    }
+                }
+            }
+            if (iconActions.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    iconActions.forEach { col ->
+                        AssistChip(
+                            onClick = { executeRowAction(runtime, context, col, row, index, event = "onClick") },
+                            label = { Text(col.label ?: "Open") },
+                            leadingIcon = {
+                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = col.label ?: "Open")
+                            },
                             colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFE9EEF9))
                         )
                     }
@@ -164,14 +180,20 @@ private fun DesktopTableRow(
             when (col.type) {
                 "button" -> {
                     Button(
-                        onClick = {
-                            col.on.firstOrNull()?.let { exec ->
-                                runtime.execute(exec, context, mapOf("row" to row, "rowIndex" to index))
-                            }
-                        },
+                        onClick = { executeRowAction(runtime, context, col, row, index) },
                         modifier = Modifier.padding(end = 8.dp)
                     ) {
                         Text(col.label ?: col.icon ?: col.id ?: "...")
+                    }
+                }
+                "icon" -> {
+                    IconButton(
+                        onClick = { executeRowAction(runtime, context, col, row, index, event = "onClick") }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = col.label ?: col.icon ?: col.id ?: "Open"
+                        )
                     }
                 }
                 else -> {
@@ -193,6 +215,34 @@ private fun DesktopTableRow(
             }
         }
     }
+}
+
+private fun displayColumns(table: TableDef): List<ColumnDef> {
+    return table.columns.filter { col -> col.type != "button" && col.type != "icon" }
+}
+
+private fun buttonColumns(table: TableDef): List<ColumnDef> {
+    return table.columns.filter { it.type == "button" && it.on.isNotEmpty() }
+}
+
+private fun iconColumns(table: TableDef): List<ColumnDef> {
+    return table.columns.filter { it.type == "icon" && it.on.any { exec -> exec.event == "onClick" } }
+}
+
+private fun executeRowAction(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    column: ColumnDef,
+    row: Map<String, Any?>,
+    rowIndex: Int,
+    event: String? = null
+) {
+    val execution = if (event == null) {
+        column.on.firstOrNull()
+    } else {
+        column.on.firstOrNull { it.event == event }
+    } ?: return
+    runtime.execute(execution, context, mapOf("row" to row, "rowIndex" to rowIndex))
 }
 
 @Composable

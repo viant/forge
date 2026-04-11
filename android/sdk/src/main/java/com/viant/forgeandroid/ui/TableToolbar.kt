@@ -30,7 +30,7 @@ fun TableToolbar(runtime: ForgeRuntime, context: DataSourceContext, toolbar: Too
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         toolbar.items.forEach { item ->
-            val label = item.icon ?: item.id ?: ""
+            val label = item.label ?: item.icon ?: item.id ?: ""
             val readonly = remember(item.on, selection, form) {
                 item.on
                     .filter { it.event == "onReadonly" }

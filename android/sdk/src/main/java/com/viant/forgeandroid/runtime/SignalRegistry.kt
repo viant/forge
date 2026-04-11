@@ -9,6 +9,8 @@ class SignalRegistry {
     private val controlSignals = mutableMapOf<String, Signal<ControlState>>()
     private val metricsSignals = mutableMapOf<String, Signal<Map<String, Any?>>>()
     private val dialogSignals = mutableMapOf<String, Signal<DialogState>>()
+    private val dashboardFilterSignals = mutableMapOf<String, Signal<Map<String, Any?>>>()
+    private val dashboardSelectionSignals = mutableMapOf<String, Signal<DashboardSelectionState>>()
 
     fun metadata(windowId: String): Signal<WindowMetadata?> =
         metadataSignals.getOrPut(windowId) { Signal(null) }
@@ -34,6 +36,12 @@ class SignalRegistry {
     fun dialog(dialogId: String): Signal<DialogState> =
         dialogSignals.getOrPut(dialogId) { Signal(DialogState()) }
 
+    fun dashboardFilters(key: String): Signal<Map<String, Any?>> =
+        dashboardFilterSignals.getOrPut(key) { Signal(emptyMap()) }
+
+    fun dashboardSelection(key: String): Signal<DashboardSelectionState> =
+        dashboardSelectionSignals.getOrPut(key) { Signal(DashboardSelectionState()) }
+
     fun removeWindow(windowId: String) {
         metadataSignals.remove(windowId)
         val keys = collectionSignals.keys.filter { it.startsWith(windowId) }
@@ -46,5 +54,7 @@ class SignalRegistry {
             metricsSignals.remove(it)
         }
         dialogSignals.keys.filter { it.startsWith(windowId) }.forEach { dialogSignals.remove(it) }
+        dashboardFilterSignals.keys.filter { it.startsWith("$windowId:") }.forEach { dashboardFilterSignals.remove(it) }
+        dashboardSelectionSignals.keys.filter { it.startsWith("$windowId:") }.forEach { dashboardSelectionSignals.remove(it) }
     }
 }

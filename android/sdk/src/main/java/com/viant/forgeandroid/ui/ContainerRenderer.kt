@@ -13,11 +13,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.font.FontWeight
 import com.viant.forgeandroid.runtime.ContainerDef
+import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.WindowContext
 
 @Composable
 fun ContainerRenderer(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef) {
+    val kind = container.kind?.trim().orEmpty()
+    if (kind == "dashboard" || kind.startsWith("dashboard.")) {
+        DashboardRenderer(runtime, window, container)
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -31,80 +38,98 @@ fun ContainerRenderer(runtime: ForgeRuntime, window: WindowContext, container: C
                 modifier = Modifier.padding(bottom = 8.dp)
             )
         }
+        container.subtitle?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+
+        if (container.toolbar != null && container.dataSourceRef != null) {
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = container.dataSourceRef
+            ) { toolbarContext ->
+                TableToolbar(runtime, toolbarContext, container.toolbar)
+            }
+        }
 
         if (container.tabs != null && container.containers.isNotEmpty()) {
             TabsRenderer(runtime, window, container.containers)
             return@Column
         }
 
-        if (container.table != null && container.dataSourceRef != null) {
-            val dsContext = window.contextOrNull(container.dataSourceRef)
+        if (container.schemaBasedForm != null) {
+            val dsRef = container.schemaBasedForm.dataSourceRef
+                ?: container.schemaBasedForm.datasourceRef
+                ?: container.dataSourceRef
+            val dsContext = dsRef?.let(window::contextOrNull)
             if (dsContext != null) {
-                val rows by dsContext.collection.flow.collectAsState(initial = emptyList())
-                LaunchedEffect(container.fetchData, dsContext) {
-                    if (container.fetchData == true) {
-                        dsContext.fetchCollection()
-                    }
-                }
-                LaunchedEffect(container.selectFirst, rows) {
-                    if (container.selectFirst == true && rows.isNotEmpty() && dsContext.peekSelection().selected == null) {
-                        dsContext.toggleSelection(rows.first(), 0)
-                    }
-                }
+                SchemaBasedFormRenderer(runtime, dsContext, container)
+                return@Column
+            }
+        }
+
+        if (container.table != null && container.dataSourceRef != null) {
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = container.dataSourceRef,
+                fetchData = container.fetchData,
+                selectFirst = container.selectFirst
+            ) { dsContext ->
                 TableRenderer(runtime, dsContext, container.table)
             }
         }
 
         if (container.fileBrowser != null && container.dataSourceRef != null) {
-            val dsContext = window.contextOrNull(container.dataSourceRef)
-            if (dsContext != null) {
-                LaunchedEffect(container.fetchData, dsContext) {
-                    if (container.fetchData == true) {
-                        dsContext.fetchCollection()
-                    }
-                }
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = container.dataSourceRef,
+                fetchData = container.fetchData
+            ) { dsContext ->
                 FileBrowserRenderer(runtime, dsContext, container.fileBrowser)
             }
         }
 
         if (container.chart != null && container.dataSourceRef != null) {
-            val dsContext = window.contextOrNull(container.dataSourceRef)
-            if (dsContext != null) {
-                LaunchedEffect(container.fetchData, dsContext) {
-                    if (container.fetchData == true) {
-                        dsContext.fetchCollection()
-                    }
-                }
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = container.dataSourceRef,
+                fetchData = container.fetchData
+            ) { dsContext ->
                 ChartRenderer(dsContext, container.chart)
             }
         }
 
         if (container.editor != null && container.dataSourceRef != null) {
-            val dsContext = window.contextOrNull(container.dataSourceRef)
-            if (dsContext != null) {
-                LaunchedEffect(container.fetchData, dsContext) {
-                    if (container.fetchData == true) {
-                        dsContext.fetchCollection()
-                    }
-                }
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = container.dataSourceRef,
+                fetchData = container.fetchData
+            ) { dsContext ->
                 EditorRenderer(dsContext, container.editor)
             }
         }
 
+        if (container.terminal != null) {
+            val dsRef = container.terminal.dataSourceRef ?: container.dataSourceRef
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = dsRef,
+                fetchData = container.fetchData
+            ) { dsContext ->
+                TerminalRenderer(runtime, dsContext, container.terminal)
+            }
+        }
+
         if (container.items.isNotEmpty() && container.dataSourceRef != null) {
-            val dsContext = window.contextOrNull(container.dataSourceRef)
-            if (dsContext != null) {
-                val rows by dsContext.collection.flow.collectAsState(initial = emptyList())
-                LaunchedEffect(container.fetchData, dsContext) {
-                    if (container.fetchData == true) {
-                        dsContext.fetchCollection()
-                    }
-                }
-                LaunchedEffect(container.selectFirst, rows) {
-                    if (container.selectFirst == true && rows.isNotEmpty() && dsContext.peekSelection().selected == null) {
-                        dsContext.toggleSelection(rows.first(), 0)
-                    }
-                }
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = container.dataSourceRef,
+                fetchData = container.fetchData,
+                selectFirst = container.selectFirst
+            ) { dsContext ->
                 FormRenderer(runtime, dsContext, container.items)
             }
         }
@@ -114,13 +139,11 @@ fun ContainerRenderer(runtime: ForgeRuntime, window: WindowContext, container: C
         }
 
         if (container.chat != null && container.dataSourceRef != null) {
-            val dsContext = window.contextOrNull(container.dataSourceRef)
-            if (dsContext != null) {
-                LaunchedEffect(container.fetchData, dsContext) {
-                    if (container.fetchData == true) {
-                        dsContext.fetchCollection()
-                    }
-                }
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = container.dataSourceRef,
+                fetchData = container.fetchData
+            ) { dsContext ->
                 ChatRenderer(runtime, dsContext, container.chat)
             }
         }
@@ -129,4 +152,28 @@ fun ContainerRenderer(runtime: ForgeRuntime, window: WindowContext, container: C
             ContainerRenderer(runtime, window, nested)
         }
     }
+}
+
+@Composable
+private fun WithContainerDataSource(
+    window: WindowContext,
+    dataSourceRef: String?,
+    fetchData: Boolean? = null,
+    selectFirst: Boolean? = null,
+    content: @Composable (DataSourceContext) -> Unit
+) {
+    val dsContext = dataSourceRef?.let(window::contextOrNull) ?: return
+    val rows by dsContext.collection.flow.collectAsState(initial = emptyList())
+
+    LaunchedEffect(fetchData, dsContext) {
+        if (fetchData == true) {
+            dsContext.fetchCollection()
+        }
+    }
+    LaunchedEffect(selectFirst, rows, dsContext) {
+        if (selectFirst == true && rows.isNotEmpty() && dsContext.peekSelection().selected == null) {
+            dsContext.toggleSelection(rows.first(), 0)
+        }
+    }
+    content(dsContext)
 }

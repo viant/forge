@@ -10,7 +10,8 @@ import kotlinx.serialization.json.decodeFromJsonElement
 class ForgeRuntime(
     endpoints: Map<String, EndpointConfig>,
     val scope: CoroutineScope,
-    private val targetContext: ForgeTargetContext = ForgeTargetContext(platform = "android")
+    private val targetContext: ForgeTargetContext = ForgeTargetContext(platform = "android"),
+    private val windowMetadataBaseUri: String = "forge/window"
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val endpointRegistry = EndpointRegistry(endpoints)
@@ -72,7 +73,7 @@ class ForgeRuntime(
                 return@launch
             }
             try {
-                val meta = restClient.get("appAPI", "forge/window/${window.windowKey}") { body ->
+                val meta = restClient.get("appAPI", "${windowMetadataBaseUri.trimEnd('/')}/${window.windowKey}") { body ->
                     val parsed = json.parseToJsonElement(body)
                     val resolved = MetadataResolver.resolve(parsed, targetContext) ?: parsed
                     json.decodeFromJsonElement<WindowMetadata>(resolved)
