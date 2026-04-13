@@ -2,9 +2,13 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct ContainerRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let container: ContainerDef
 
-    public init(container: ContainerDef) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
+        self.runtime = runtime
+        self.window = window
         self.container = container
     }
 
@@ -29,24 +33,26 @@ public struct ContainerRenderer: View {
     @ViewBuilder
     private var renderedBody: some View {
         if container.kind == "dashboard" || container.kind?.starts(with: "dashboard.") == true {
-            DashboardRenderer(container: container)
+            DashboardRenderer(runtime: runtime, window: window, container: container)
         } else if container.schemaBasedForm != nil {
             SchemaBasedFormRenderer(container: container)
         } else if let table = container.table {
-            TableRenderer(table: table)
+            TableRenderer(runtime: runtime, window: window, table: table)
         } else if let chart = container.chart {
-            ChartRenderer(chart: chart)
+            ChartRenderer(runtime: runtime, window: window, chart: chart)
         } else if container.tabs != nil, !container.containers.isEmpty {
-            TabsRenderer(container: container)
+            TabsRenderer(runtime: runtime, window: window, container: container)
         } else if let editor = container.editor {
-            EditorRenderer(editor: editor)
+            EditorRenderer(runtime: runtime, window: window, editor: editor)
+        } else if container.kind == "chat" {
+            ChatRenderer(runtime: runtime, window: window, container: container)
         } else if !container.items.isEmpty {
-            MenuListRenderer(items: container.items)
+            MenuListRenderer(runtime: runtime, window: window, items: container.items)
         } else if !container.containers.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
                 ForEach(container.containers) { child in
-                    ContainerRenderer(container: child)
+                    ContainerRenderer(runtime: runtime, window: window, container: child)
                 }
             }
         } else {

@@ -2,9 +2,13 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct MenuListRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let items: [ItemDef]
 
-    public init(items: [ItemDef]) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, items: [ItemDef]) {
+        self.runtime = runtime
+        self.window = window
         self.items = items
     }
 

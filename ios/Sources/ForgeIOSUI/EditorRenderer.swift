@@ -2,9 +2,13 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct EditorRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let editor: EditorDef
 
-    public init(editor: EditorDef) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, editor: EditorDef) {
+        self.runtime = runtime
+        self.window = window
         self.editor = editor
     }
 

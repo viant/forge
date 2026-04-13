@@ -2,9 +2,13 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct ChartRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let chart: ChartDef
 
-    public init(chart: ChartDef) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, chart: ChartDef) {
+        self.runtime = runtime
+        self.window = window
         self.chart = chart
     }
 

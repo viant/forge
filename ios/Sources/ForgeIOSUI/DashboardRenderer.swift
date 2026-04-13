@@ -2,9 +2,13 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct DashboardRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let container: ContainerDef
 
-    public init(container: ContainerDef) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
+        self.runtime = runtime
+        self.window = window
         self.container = container
     }
 

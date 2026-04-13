@@ -774,4 +774,80 @@ public indirect enum JSONValue: Codable, Sendable, Equatable {
         if case .array(let value) = self { return value }
         return nil
     }
+
+    public var intValue: Int? {
+        if case .number(let n) = self { return Int(exactly: n) }
+        return nil
+    }
+
+    public var boolValue: Bool? {
+        if case .bool(let b) = self { return b }
+        return nil
+    }
+}
+
+// MARK: - Execution model
+
+public struct ExecutionDef: Codable, Sendable {
+    public let action: String
+    public let args: [String]
+    public let parameters: [ParameterDef]
+
+    public init(action: String, args: [String] = [], parameters: [ParameterDef] = []) {
+        self.action = action
+        self.args = args
+        self.parameters = parameters
+    }
+}
+
+public struct ParameterDef: Codable, Sendable {
+    public let name: String
+    public let direction: String?   // "in", "out", "inout"
+    public let value: JSONValue?
+    public let selector: String?
+
+    public init(name: String, direction: String? = nil,
+                value: JSONValue? = nil, selector: String? = nil) {
+        self.name = name
+        self.direction = direction
+        self.value = value
+        self.selector = selector
+    }
+}
+
+public struct ExecutionContext: Sendable {
+    public let windowID: String
+    public let dataSourceRef: String
+
+    public init(windowID: String, dataSourceRef: String = "") {
+        self.windowID = windowID
+        self.dataSourceRef = dataSourceRef
+    }
+}
+
+public struct ExecutionArgs: Sendable {
+    public let execution: ExecutionDef
+    public let context: ExecutionContext?
+    public let args: [String: JSONValue]
+
+    public init(execution: ExecutionDef, context: ExecutionContext? = nil,
+                args: [String: JSONValue] = [:]) {
+        self.execution = execution
+        self.context = context
+        self.args = args
+    }
+}
+
+public typealias ForgeHandler = @Sendable (ExecutionArgs) async -> JSONValue?
+
+struct PendingDialog: Sendable {
+    let callerWindowID: String
+    let callerDataSourceRef: String
+    let outbound: [ParameterDef]
+}
+
+struct PendingWindow: Sendable {
+    let callerWindowID: String
+    let callerDataSourceRef: String
+    let outbound: [ParameterDef]
 }
