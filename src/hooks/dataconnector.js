@@ -1,5 +1,6 @@
 import {useSetting} from "../core";
 import { getLogger } from "../utils/logger.js";
+import { appendTargetContextQuery } from "../runtime/targetContext.js";
 
 
 // Toggle with env var or config if you don't always want noisy logs
@@ -30,6 +31,7 @@ function useDataConnector(dataSource) {
     const auth = useAuth();
     const {authStates, defaultAuthProvider} = auth;
     const {paging = {}, parameters = []} = dataSource;
+    const {targetContext = {}} = useSetting();
 
     function notifyUnauthorized(error) {
         if (!error || (error.status !== 401 && error.status !== 403)) {
@@ -161,6 +163,9 @@ function useDataConnector(dataSource) {
             // Prepare the request body
             let body = {};
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            if (dataSource?.service?.includeTargetContext) {
+                appendTargetContextQuery(queryParams, targetContext);
+            }
             const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
 
             const request = {method, headers};
@@ -211,6 +216,9 @@ function useDataConnector(dataSource) {
 
             const body = {};
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            if (dataSource?.service?.includeTargetContext) {
+                appendTargetContextQuery(queryParams, targetContext);
+            }
 
             const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
             //logCallerStack('get:    ' + finalUrl);

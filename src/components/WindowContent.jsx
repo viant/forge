@@ -220,7 +220,7 @@ export default function WindowContent({window, isInTab = false}) {
 
     const {service} = connectorConfig.window;
     const baseKey = windowKey.split('?')[0];
-    const config  = {service: {...service, uri: `${service.uri}/${baseKey}`}};
+    const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
     const connector = useDataConnector(config);
 
     // Fetch metadata once per windowId

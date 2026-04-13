@@ -126,7 +126,7 @@ const WindowManager = () => {
                 id="window-manager-tabs"
                 selectedTabId={tabId}
                 onChange={handleTabChange}
-                //renderActiveTabPanelOnly
+                renderActiveTabPanelOnly
                 large
                 className="forge-window-manager-tabs"
             >
@@ -150,9 +150,11 @@ const WindowManager = () => {
                             </div>
                         }
                         panel={
-                            <WindowContent window={win}
-                                isInTab={true}
-                            />
+                            win.windowId === tabId ? (
+                                <WindowContent window={win}
+                                    isInTab={true}
+                                />
+                            ) : null
                         }
                     />
                 ))}

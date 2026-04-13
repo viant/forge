@@ -8,7 +8,6 @@ import (
 	"github.com/viant/forge/backend/service/meta"
 	"github.com/viant/forge/backend/types"
 	"net/http"
-
 	"strings"
 )
 
@@ -28,7 +27,7 @@ func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.Ha
 		}
 		path := pathParts[0]
 		subPath := strings.Join(pathParts[1:], "/")
-		aWindow, err := LoadWindow(r.Context(), loader, baseURL, path, subPath)
+		aWindow, err := LoadWindow(r.Context(), loader, baseURL, path, subPath, targetContextFromRequest(r))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -44,19 +43,22 @@ func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.Ha
 }
 
 // LoadWindow loads window data using the file.Service.
-func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey string) (*types.Window, error) {
+func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey string, target *meta.TargetContext) (*types.Window, error) {
 	subPath := "main"
 	if subKey != "" {
 		subPath = subKey + "/main"
 	}
 	filePath := url.Join(baseURL, key, subPath)
-	result := &types.Window{}
-	err := loader.Load(ctx, filePath+".yaml", result)
+	resolvedBase, err := loader.ResolveWindowBase(ctx, filePath, target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load window for key %s: %w", key, err)
 	}
-	if ok, _ := loader.Exists(context.Background(), filePath+".js"); ok {
-		code, err := loader.Download(context.Background(), filePath+".js")
+	result := &types.Window{}
+	if err := loader.LoadWithTarget(ctx, resolvedBase+".yaml", result, target); err != nil {
+		return nil, fmt.Errorf("failed to load window for key %s: %w", key, err)
+	}
+	if ok, _ := loader.Exists(context.Background(), resolvedBase+".js"); ok {
+		code, err := loader.Download(context.Background(), resolvedBase+".js")
 		if err != nil {
 			return nil, err
 		}
