@@ -2,9 +2,13 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct TabsRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let container: ContainerDef
 
-    public init(container: ContainerDef) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
+        self.runtime = runtime
+        self.window = window
         self.container = container
     }
 
@@ -15,7 +19,7 @@ public struct TabsRenderer: View {
             }
             TabView {
                 ForEach(container.containers) { child in
-                    ContainerRenderer(container: child)
+                    ContainerRenderer(runtime: runtime, window: window, container: child)
                         .tabItem {
                             Text(child.title ?? child.id ?? "Tab")
                         }

@@ -2,9 +2,13 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct TableRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let table: TableDef
 
-    public init(table: TableDef) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, table: TableDef) {
+        self.runtime = runtime
+        self.window = window
         self.table = table
     }
 
