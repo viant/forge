@@ -46,6 +46,96 @@ Forge is divided into two main parts:
 - **Frontend**: Built with React and utilizes modern JavaScript features along with libraries like Blueprint.js for UI components.
 - **Backend**: Built with Go (Golang), providing APIs and services to the frontend. It uses the `viant/afs` library for abstract file system interactions.
 
+### Multi-Platform Metadata
+
+Forge should be treated as the canonical owner of the target-aware metadata
+contract used by its generic metadata-driven UI/runtime. Forge is not an
+agentic dependency; applications such as Agently can reuse the same target
+shape outside Forge when they need consistent client identity elsewhere.
+
+#### Shared target context
+
+Use one shared target-context shape across:
+
+- metadata/window requests
+- runtime metadata resolution
+- any application-level context that intentionally chooses to mirror the same
+  client identity contract
+
+Recommended shape:
+
+```json
+{
+  "platform": "web|android|ios",
+  "formFactor": "desktop|tablet|phone",
+  "surface": "browser|app",
+  "capabilities": ["markdown", "chart", "upload", "code", "diff"]
+}
+```
+
+Rules:
+
+- do not create different shapes for metadata calls vs any app-level reuse of
+  the same client identity contract
+- Forge owns the field names and matching semantics
+- apps and SDKs should reuse the same structure
+
+Current vocabulary in use:
+
+- `markdown`: rich markdown rendering
+- `chart`: chart/data visualization rendering
+- `upload`: browser file upload support
+- `code`: code-oriented rendering/edit affordances on web
+- `diff`: diff rendering on web
+- `attachments`: attachment-aware mobile composer/runtime support
+- `camera`: camera capture support on mobile
+- `voice`: voice input/capture support on mobile
+
+These are additive platform capabilities, not a replacement for the primary
+branching axes of `platform` and `formFactor`.
+
+#### Metadata branching
+
+Platform-specific UI should use explicit metadata branches instead of deleting or
+overriding shared web windows.
+
+Recommended structure:
+
+```text
+metadata/window/<window-key>/
+  shared/
+  web/
+  android/
+    phone/
+    tablet/
+  ios/
+    phone/
+    tablet/
+```
+
+Resolution order:
+
+1. exact platform + form factor
+2. platform
+3. shared
+4. legacy fallback during migration only
+
+#### Backend responsibility
+
+Forge backend window loading should resolve the target branch before loading
+`main.yaml`.
+
+Forge backend `$import(...)` should also become target-aware so relative imports
+search in this order:
+
+1. current target branch
+2. platform branch
+3. shared branch
+4. legacy relative path fallback
+
+Without this, platform folder branches are brittle because target-specific
+`main.yaml` files can still import the wrong child metadata.
+
 ## Installation
 
 ### Prerequisites

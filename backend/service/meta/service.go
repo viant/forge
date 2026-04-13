@@ -3,6 +3,7 @@ package meta
 import (
 	"context"
 	"fmt"
+	"path"
 	"github.com/viant/afs"
 	"github.com/viant/afs/file"
 	"github.com/viant/afs/storage"
@@ -19,14 +20,29 @@ type Service struct {
 	options []storage.Option
 }
 
+type TargetContext struct {
+	Platform     string
+	FormFactor   string
+	Surface      string
+	Capabilities []string
+}
+
 // Load reads the YAML file at the given path, resolves $import directives,
 // and decodes the result into the provided Go variable v.
 func (l *Service) Load(ctx context.Context, path string, v interface{}) error {
+	return l.LoadWithTarget(ctx, path, v, nil)
+}
+
+func (l *Service) LoadWithTarget(ctx context.Context, path string, v interface{}, target *TargetContext) error {
 	URL := l.getURL(path)
-	return l.LoadWithURL(ctx, URL, v)
+	return l.LoadWithURLAndTarget(ctx, URL, v, target)
 }
 
 func (l *Service) LoadWithURL(ctx context.Context, URL string, v interface{}) error {
+	return l.LoadWithURLAndTarget(ctx, URL, v, nil)
+}
+
+func (l *Service) LoadWithURLAndTarget(ctx context.Context, URL string, v interface{}, target *TargetContext) error {
 	// Read the file content using the filesystem service.
 	data, err := l.fs.DownloadWithURL(ctx, URL, l.options...)
 	if err != nil {
@@ -43,7 +59,7 @@ func (l *Service) LoadWithURL(ctx context.Context, URL string, v interface{}) er
 	// Resolve $import directives recursively.
 	baseDir, _ := url.Split(object.URL(), file.Scheme)
 
-	if err := l.resolveImports(ctx, &node, baseDir); err != nil {
+	if err := l.resolveImports(ctx, &node, baseDir, target); err != nil {
 		return err
 	}
 
@@ -81,12 +97,12 @@ func (l *Service) Download(ctx context.Context, path string) ([]byte, error) {
 }
 
 // resolveImports recursively resolves $import directives within a YAML node.
-func (l *Service) resolveImports(ctx context.Context, node *yaml.Node, baseDir string) error {
+func (l *Service) resolveImports(ctx context.Context, node *yaml.Node, baseDir string, target *TargetContext) error {
 	switch node.Kind {
 	case yaml.DocumentNode:
 		// Recursively resolve imports in document content.
 		for _, contentNode := range node.Content {
-			if err := l.resolveImports(ctx, contentNode, baseDir); err != nil {
+			if err := l.resolveImports(ctx, contentNode, baseDir, target); err != nil {
 				return err
 			}
 		}
@@ -97,10 +113,10 @@ func (l *Service) resolveImports(ctx context.Context, node *yaml.Node, baseDir s
 			valueNode := node.Content[i+1]
 
 			// Resolve imports in the key and value nodes.
-			if err := l.processNode(ctx, keyNode, baseDir); err != nil {
+			if err := l.processNode(ctx, keyNode, baseDir, target); err != nil {
 				return err
 			}
-			if err := l.processNode(ctx, valueNode, baseDir); err != nil {
+			if err := l.processNode(ctx, valueNode, baseDir, target); err != nil {
 				return err
 			}
 		}
@@ -108,14 +124,14 @@ func (l *Service) resolveImports(ctx context.Context, node *yaml.Node, baseDir s
 		// Resolve imports in each item of the sequence.
 		for i := 0; i < len(node.Content); i++ {
 			itemNode := node.Content[i]
-			if err := l.processNode(ctx, itemNode, baseDir); err != nil {
+			if err := l.processNode(ctx, itemNode, baseDir, target); err != nil {
 				return err
 			}
 		}
 	case yaml.AliasNode:
 		// Resolve imports in the referenced node.
 		if node.Alias != nil {
-			if err := l.resolveImports(ctx, node.Alias, baseDir); err != nil {
+			if err := l.resolveImports(ctx, node.Alias, baseDir, target); err != nil {
 				return err
 			}
 		}
@@ -126,16 +142,17 @@ func (l *Service) resolveImports(ctx context.Context, node *yaml.Node, baseDir s
 }
 
 // processNode checks if the node contains an $import directive and processes it.
-func (l *Service) processNode(ctx context.Context, node *yaml.Node, baseDir string) error {
+func (l *Service) processNode(ctx context.Context, node *yaml.Node, baseDir string, target *TargetContext) error {
 	if node.Kind == yaml.ScalarNode && node.Tag == "!!str" {
 		if isImportDirective(node.Value) {
 			importPath, key, err := getImportPathAndKey(node.Value)
 			if err != nil {
 				return err
 			}
-			// Resolve the full path of the imported file.
-			fullPath := url.Join(baseDir, importPath)
-			// Read and parse the imported file.
+			fullPath, err := l.resolveImportURL(ctx, baseDir, importPath, target)
+			if err != nil {
+				return err
+			}
 			data, err := l.fs.DownloadWithURL(ctx, fullPath, l.options...)
 			if err != nil {
 				return err
@@ -146,7 +163,7 @@ func (l *Service) processNode(ctx context.Context, node *yaml.Node, baseDir stri
 			}
 			parent, _ := url.Split(fullPath, file.Scheme)
 			// Resolve imports in the imported node recursively.
-			if err := l.resolveImports(ctx, &importedNode, parent); err != nil {
+			if err := l.resolveImports(ctx, &importedNode, parent, target); err != nil {
 				return err
 			}
 
@@ -168,11 +185,139 @@ func (l *Service) processNode(ctx context.Context, node *yaml.Node, baseDir stri
 		}
 	} else {
 		// Recursively resolve imports in this node.
-		if err := l.resolveImports(ctx, node, baseDir); err != nil {
+		if err := l.resolveImports(ctx, node, baseDir, target); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (l *Service) ResolveWindowBase(ctx context.Context, basePath string, target *TargetContext) (string, error) {
+	candidates := branchCandidates(basePath, target)
+	for _, candidate := range candidates {
+		ok, err := l.Exists(ctx, candidate+".yaml")
+		if err != nil {
+			continue
+		}
+		if ok {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("open %s.yaml: file does not exist", basePath)
+}
+
+func (l *Service) resolveImportURL(ctx context.Context, baseDir, importPath string, target *TargetContext) (string, error) {
+	candidates := importCandidates(baseDir, importPath, target)
+	for _, candidate := range candidates {
+		ok, err := l.fs.Exists(ctx, candidate, l.options...)
+		if err != nil {
+			continue
+		}
+		if ok {
+			return candidate, nil
+		}
+	}
+	return "", fmt.Errorf("open %s: file does not exist", url.Join(baseDir, importPath))
+}
+
+func branchCandidates(basePath string, target *TargetContext) []string {
+	baseDir, leaf := splitMetaBase(basePath)
+	if target == nil {
+		return []string{basePath}
+	}
+	var result []string
+	platform := strings.TrimSpace(target.Platform)
+	formFactor := strings.TrimSpace(target.FormFactor)
+	if platform != "" && formFactor != "" {
+		result = append(result, url.Join(baseDir, platform, formFactor, leaf))
+	}
+	if platform != "" {
+		result = append(result, url.Join(baseDir, platform, leaf))
+	}
+	result = append(result, url.Join(baseDir, "shared", leaf))
+	result = append(result, basePath)
+	return uniqueStrings(result)
+}
+
+func importCandidates(baseDir, importPath string, target *TargetContext) []string {
+	if target == nil {
+		return []string{joinMetaPath(baseDir, importPath)}
+	}
+	rootDir, branchLevel := branchRoot(baseDir, target)
+	logicalBase := baseDir
+	if branchLevel > 0 {
+		logicalBase = rootDir
+	}
+	logicalPath := joinMetaPath(logicalBase, importPath)
+	candidates := []string{logicalPath}
+	relativeImport := strings.TrimPrefix(logicalPath, strings.TrimSuffix(rootDir, "/"))
+	relativeImport = strings.TrimPrefix(relativeImport, "/")
+	switch branchLevel {
+	case 2:
+		if platform := strings.TrimSpace(target.Platform); platform != "" {
+			if formFactor := strings.TrimSpace(target.FormFactor); formFactor != "" {
+				candidates = append(candidates, joinMetaPath(rootDir, path.Join(platform, formFactor, relativeImport)))
+			}
+			candidates = append(candidates, joinMetaPath(rootDir, path.Join(platform, relativeImport)))
+		}
+		candidates = append(candidates, joinMetaPath(rootDir, path.Join("shared", relativeImport)))
+	case 1:
+		if platform := strings.TrimSpace(target.Platform); platform != "" {
+			candidates = append(candidates, joinMetaPath(rootDir, path.Join(platform, relativeImport)))
+		}
+		candidates = append(candidates, joinMetaPath(rootDir, path.Join("shared", relativeImport)))
+	}
+	return uniqueStrings(candidates)
+}
+
+func branchRoot(baseDir string, target *TargetContext) (string, int) {
+	platform := strings.TrimSpace(target.Platform)
+	formFactor := strings.TrimSpace(target.FormFactor)
+	if platform != "" && formFactor != "" {
+		suffix := "/" + platform + "/" + formFactor
+		if strings.HasSuffix(baseDir, suffix) {
+			return strings.TrimSuffix(baseDir, suffix), 2
+		}
+	}
+	if platform != "" {
+		suffix := "/" + platform
+		if strings.HasSuffix(baseDir, suffix) {
+			return strings.TrimSuffix(baseDir, suffix), 1
+		}
+	}
+	if strings.HasSuffix(baseDir, "/shared") {
+		return strings.TrimSuffix(baseDir, "/shared"), 1
+	}
+	return baseDir, 0
+}
+
+func uniqueStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
+func splitMetaBase(basePath string) (string, string) {
+	trimmed := strings.TrimSuffix(basePath, "/")
+	index := strings.LastIndex(trimmed, "/")
+	if index == -1 {
+		return "", trimmed
+	}
+	return trimmed[:index], trimmed[index+1:]
+}
+
+func joinMetaPath(base, rel string) string {
+	if url.Scheme(base, "") != "" {
+		return url.Join(base, rel)
+	}
+	return path.Clean(path.Join(base, rel))
 }
 
 // getImportPathAndKey extracts the path and key from an $import directive.

@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/viant/afs/url"
-	"github.com/viant/forge/backend/service/file"
+	"github.com/viant/forge/backend/service/meta"
 	"github.com/viant/forge/backend/types"
-	"gopkg.in/yaml.v3"
 	"net/http"
 )
 
@@ -16,10 +14,10 @@ type NavigationResponse struct {
 	Data   []types.NavigationItem `json:"data"`
 }
 
-// NavigationHandler fetches navigation data using the file.Service.
-func NavigationHandler(fs *file.Service, baseURL string) http.HandlerFunc {
+// NavigationHandler fetches navigation data using the metadata service.
+func NavigationHandler(loader *meta.Service, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		navigation, err := FetchNavigationData(r.Context(), fs, baseURL)
+		navigation, err := FetchNavigationData(r.Context(), loader, baseURL, targetContextFromRequest(r))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -33,16 +31,15 @@ func NavigationHandler(fs *file.Service, baseURL string) http.HandlerFunc {
 	}
 }
 
-// FetchNavigationData navigation data using the file.Service.
-func FetchNavigationData(ctx context.Context, fs *file.Service, baseURL string) ([]types.NavigationItem, error) {
-	URL := url.Join(baseURL, "navigation.yaml")
-	data, err := fs.Download(ctx, URL) // Fetch as a file
+// FetchNavigationData loads navigation metadata using the same target-aware
+// branch selection as window metadata.
+func FetchNavigationData(ctx context.Context, loader *meta.Service, baseURL string, target *meta.TargetContext) ([]types.NavigationItem, error) {
+	base, err := loader.ResolveWindowBase(ctx, "navigation", target)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load navigation data: %w", err)
 	}
-
 	var navigation []types.NavigationItem
-	if err := yaml.Unmarshal(data, &navigation); err != nil {
+	if err := loader.LoadWithTarget(ctx, base+".yaml", &navigation, target); err != nil {
 		return nil, fmt.Errorf("failed to parse navigation data: %w", err)
 	}
 	return navigation, nil
