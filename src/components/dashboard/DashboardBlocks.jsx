@@ -8,25 +8,28 @@ import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/
 
 const panelStyle = {
     width: '100%',
-    height: '100%',
+    height: 'auto',
     minHeight: 0,
     minWidth: 0,
-    padding: '16px',
-    border: '1px solid #d8e1e8',
-    borderRadius: '10px',
-    background: '#ffffff',
-    boxShadow: '0 1px 2px rgba(16, 22, 26, 0.08)',
+    padding: '14px',
+    border: '1px solid #dbe5ec',
+    borderRadius: '14px',
+    background: 'linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)',
+    boxShadow: '0 8px 18px rgba(16, 22, 26, 0.035), 0 1px 2px rgba(16, 22, 26, 0.05)',
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
     boxSizing: 'border-box',
+    overflow: 'hidden',
 };
 
 const titleStyle = {
-    fontSize: '16px',
-    fontWeight: 600,
+    fontSize: '12px',
+    fontWeight: 800,
     color: '#182026',
     margin: 0,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
 };
 
 const subtitleStyle = {
@@ -34,6 +37,14 @@ const subtitleStyle = {
     color: '#5f6b7c',
     margin: 0,
 };
+
+const sectionRuleStyle = {
+    height: '1px',
+    width: '100%',
+    background: 'linear-gradient(90deg, rgba(19,124,189,0.24) 0%, rgba(15,153,96,0.1) 50%, rgba(219,225,232,0.18) 100%)',
+};
+
+const metricCardAccent = ['#137cbd', '#0f9960', '#d9822b', '#8f3985', '#c23030'];
 
 const toneColors = {
     info: {background: '#ebf1f5', border: '#ced9e0', text: '#30404d'},
@@ -67,6 +78,15 @@ function getDashboardLocale(context) {
     return context?.locale || context?.metadata?.view?.content?.locale || 'en-US';
 }
 
+function titleizeDashboardKey(value = '') {
+    return String(value || '')
+        .replace(/[_-]+/g, ' ')
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
 function deltaTone(delta, positiveIsUp = true) {
     if (delta == null || Number.isNaN(Number(delta)) || Number(delta) === 0) {
         return toneColors.info;
@@ -74,6 +94,50 @@ function deltaTone(delta, positiveIsUp = true) {
     const isPositive = Number(delta) > 0;
     const isGood = positiveIsUp ? isPositive : !isPositive;
     return isGood ? toneColors.success : toneColors.danger;
+}
+
+function isDashboardStatusValue(value = '') {
+    const normalized = String(value || '').trim().toLowerCase();
+    return [
+        'behind',
+        'ahead',
+        'on_track',
+        'on track',
+        'underpacing',
+        'overpacing',
+        'healthy',
+        'warning',
+        'critical',
+        'active',
+        'inactive',
+    ].includes(normalized);
+}
+
+function dashboardStatusTone(value = '') {
+    const normalized = String(value || '').trim().toLowerCase();
+    if (normalized === 'ahead' || normalized === 'on_track' || normalized === 'on track' || normalized === 'healthy' || normalized === 'active') {
+        return toneColors.success;
+    }
+    if (normalized === 'behind' || normalized === 'underpacing' || normalized === 'critical' || normalized === 'inactive') {
+        return toneColors.danger;
+    }
+    return toneColors.warning;
+}
+
+function renderDashboardTableCell(cell, column, locale) {
+    if (typeof cell === 'number') {
+        return formatDashboardValue(cell, column?.format, locale);
+    }
+    const text = String(cell ?? '-');
+    if (isDashboardStatusValue(text)) {
+        const tone = dashboardStatusTone(text);
+        return (
+            <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
+                {text.replace(/_/g, ' ')}
+            </span>
+        );
+    }
+    return text;
 }
 
 function Panel({container, children, actions = null}) {
@@ -88,6 +152,7 @@ function Panel({container, children, actions = null}) {
                     {actions}
                 </div>
             ) : null}
+            {(container.title || actions) ? <div style={sectionRuleStyle} /> : null}
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px', flex: '1 1 auto', minHeight: 0}}>
                 {children}
             </div>
@@ -99,19 +164,50 @@ export function DashboardSummary({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
     const metrics = container.metrics || container.dashboard?.summary?.metrics || [];
+    const metricCards = Array.isArray(metrics)
+        ? metrics.map((metric) => ({
+            key: metric.id || metric.selector,
+            label: metric.label,
+            value: resolveKey(metricsData, metric.selector),
+            format: metric.format,
+        }))
+        : metrics && typeof metrics === 'object'
+            ? Object.entries(metrics).map(([key, value]) => ({
+                key,
+                label: titleizeDashboardKey(key),
+                value,
+                format: typeof value === 'number' && value > 0 && value < 1 ? 'percent' : undefined,
+            }))
+            : [];
 
     return (
         <Panel container={container}>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px'}}>
-                {metrics.map((metric) => {
-                    const value = resolveKey(metricsData, metric.selector);
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px'}}>
+                {metricCards.map((metric) => {
+                    const isStatus = isDashboardStatusValue(metric.value);
+                    const tone = isStatus ? dashboardStatusTone(metric.value) : null;
                     return (
                         <div
-                            key={metric.id || metric.selector}
-                            style={{border: '1px solid #d8e1e8', borderRadius: '8px', padding: '12px', background: '#f8fafb'}}
+                            key={metric.key}
+                            style={{
+                                border: '1px solid #d8e1e8',
+                                borderTop: `3px solid ${metricCardAccent[Math.abs(String(metric.key || '').length) % metricCardAccent.length]}`,
+                                borderRadius: '10px',
+                                padding: '12px',
+                                background: 'linear-gradient(180deg, #fbfdff 0%, #f5f8fa 100%)',
+                                boxShadow: '0 1px 2px rgba(16, 22, 26, 0.06)',
+                            }}
                         >
-                            <div style={{fontSize: '12px', color: '#5f6b7c', marginBottom: '6px'}}>{metric.label}</div>
-                            <div style={{fontSize: '24px', fontWeight: 700, color: '#182026'}}>{formatDashboardValue(value, metric.format, locale)}</div>
+                            <div style={{fontSize: '11px', letterSpacing: '0.02em', textTransform: 'uppercase', color: '#5f6b7c', marginBottom: '6px'}}>{metric.label}</div>
+                            {isStatus ? (
+                                <div>
+                                    <span style={{display: 'inline-flex', alignItems: 'center', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '5px 10px'}}>
+                                        {String(metric.value || '').replace(/_/g, ' ')}
+                                    </span>
+                                </div>
+                            ) : (
+                                <div style={{fontSize: '24px', fontWeight: 700, color: '#182026'}}>{formatDashboardValue(metric.value, metric.format, locale)}</div>
+                            )}
                         </div>
                     );
                 })}
@@ -124,6 +220,7 @@ export function DashboardCompare({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
     const items = container.items || container.dashboard?.compare?.items || [];
+    const compareAccent = ['#137cbd', '#0f9960', '#d9822b', '#8f3985', '#c23030'];
 
     return (
         <Panel container={container}>
@@ -140,11 +237,37 @@ export function DashboardCompare({container, context}) {
                     return (
                         <div
                             key={item.id || item.label || item.current}
-                            style={{border: '1px solid #d8e1e8', borderRadius: '8px', padding: '12px', background: '#f8fafb', display: 'flex', flexDirection: 'column', gap: '8px'}}
+                            style={{
+                                border: '1px solid #d8e1e8',
+                                borderTop: `3px solid ${compareAccent[Math.abs(String(item.id || item.label || '').length) % compareAccent.length]}`,
+                                borderRadius: '10px',
+                                padding: '12px',
+                                background: 'linear-gradient(180deg, #ffffff 0%, #f8fbfe 100%)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px',
+                                boxShadow: '0 1px 2px rgba(16, 22, 26, 0.05)',
+                            }}
                         >
-                            <div style={{fontSize: '12px', color: '#5f6b7c'}}>{item.label}</div>
+                            <div style={{fontSize: '11px', letterSpacing: '0.02em', textTransform: 'uppercase', color: '#5f6b7c'}}>{item.label}</div>
                             <div style={{fontSize: '24px', fontWeight: 700, color: '#182026'}}>{formatDashboardValue(currentValue, item.format, locale)}</div>
-                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'}}>
+                            {(item.currentLabel || item.previousLabel) ? (
+                                <div style={{display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '2px'}}>
+                                    {item.currentLabel ? (
+                                        <span style={{display: 'inline-flex', alignItems: 'center', width: 'fit-content', fontSize: '11px', fontWeight: 700, color: '#30404d', background: '#edf4fa', border: '1px solid #d5e3ef', borderRadius: '999px', padding: '4px 9px'}}>
+                                            {item.currentLabel}
+                                        </span>
+                                    ) : null}
+                                    {item.previousLabel ? (
+                                        <div style={{fontSize: '11px', color: '#5f6b7c', lineHeight: 1.35}}>
+                                            <span style={{fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', fontSize: '10px'}}>Baseline</span>
+                                            {' '}
+                                            {item.previousLabel}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', paddingTop: '2px'}}>
                                 <span style={{fontSize: '12px', color: '#5f6b7c'}}>
                                     {item.deltaLabel || 'vs previous'}: {formatDashboardValue(previousValue, item.format, locale)}
                                 </span>
@@ -174,37 +297,86 @@ export function DashboardKPITable({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
     const rows = container.rows || container.dashboard?.kpiTable?.rows || [];
+    const columns = Array.isArray(container.columns) ? container.columns : null;
+    const usesDirectTable = Array.isArray(columns) && columns.length > 0;
+    const normalizedColumns = usesDirectTable
+        ? columns.map((column) => {
+            if (typeof column === 'string') {
+                const lower = column.toLowerCase();
+                const format = lower === 'ctr' || lower === 'vtr' ? 'percent' : undefined;
+                return {key: column, label: titleizeDashboardKey(column), format};
+            }
+            const key = String(column?.key || column?.id || '').trim();
+            const lower = key.toLowerCase();
+            const inferredFormat = lower === 'ctr' || lower === 'vtr' ? 'percent' : undefined;
+            return {
+                key,
+                label: column?.label || titleizeDashboardKey(key),
+                format: column?.format || inferredFormat,
+            };
+        }).filter((column) => !!column.key)
+        : [];
 
     return (
         <Panel container={container}>
             <div style={{overflow: 'auto'}}>
-                <table style={{width: '100%', borderCollapse: 'collapse'}}>
-                    <thead>
-                    <tr>
-                        <th style={{textAlign: 'left', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Metric</th>
-                        <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Value</th>
-                        <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Context</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {rows.map((row, index) => {
-                        const tone = toneColors[row.contextTone] || toneColors.info;
-                        const value = resolveKey(metricsData, row.value);
-                        return (
-                            <tr key={row.id || row.label || index}>
-                                <td style={{padding: '8px', borderBottom: '1px solid #ebf1f5', fontWeight: 600}}>{row.label}</td>
-                                <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>{formatDashboardValue(value, row.format, locale)}</td>
-                                <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>
-                                    {row.context ? (
-                                        <span style={{fontSize: '12px', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
-                                            {row.context}
-                                        </span>
-                                    ) : '-'}
-                                </td>
+                <table style={{width: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
+                    {usesDirectTable ? (
+                        <>
+                            <thead>
+                            <tr>
+                                {normalizedColumns.map((column) => (
+                                    <th key={column.key} style={{textAlign: 'left', borderBottom: '1px solid #d8e1e8', padding: '10px 8px', background: '#f7fafc', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.02em', color: '#5f6b7c', position: 'sticky', top: 0}}>
+                                        {column.label}
+                                    </th>
+                                ))}
                             </tr>
-                        );
-                    })}
-                    </tbody>
+                            </thead>
+                            <tbody>
+                            {rows.map((row, index) => {
+                                const cells = Array.isArray(row) ? row : normalizedColumns.map((column) => row?.[column.key]);
+                                return (
+                                    <tr key={index} style={{background: index % 2 === 0 ? '#ffffff' : '#fbfdff'}}>
+                                        {cells.map((cell, cellIndex) => (
+                                            <td key={`${index}-${cellIndex}`} style={{padding: '10px 8px', borderBottom: '1px solid #ebf1f5', color: cellIndex === 0 ? '#182026' : '#30404d', fontWeight: cellIndex === 0 ? 600 : 400, fontSize: '12px', lineHeight: 1.45, verticalAlign: 'top', maxWidth: cellIndex >= normalizedColumns.length - 1 ? '320px' : undefined, whiteSpace: cellIndex >= normalizedColumns.length - 2 ? 'normal' : 'nowrap'}}>
+                                                {renderDashboardTableCell(cell, normalizedColumns[cellIndex], locale)}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                );
+                            })}
+                            </tbody>
+                        </>
+                    ) : (
+                        <>
+                            <thead>
+                            <tr>
+                                <th style={{textAlign: 'left', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Metric</th>
+                                <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Value</th>
+                                <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Context</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {rows.map((row, index) => {
+                                const tone = toneColors[row.contextTone] || toneColors.info;
+                                const value = resolveKey(metricsData, row.value);
+                                return (
+                                    <tr key={row.id || row.label || index}>
+                                        <td style={{padding: '8px', borderBottom: '1px solid #ebf1f5', fontWeight: 600}}>{row.label}</td>
+                                        <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>{formatDashboardValue(value, row.format, locale)}</td>
+                                        <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>
+                                            {row.context ? (
+                                                <span style={{fontSize: '12px', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
+                                                    {row.context}
+                                                </span>
+                                            ) : '-'}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            </tbody>
+                        </>
+                    )}
                 </table>
             </div>
         </Panel>
@@ -298,7 +470,32 @@ export function DashboardFilters({container, context}) {
 }
 
 export function DashboardTimeline({container, context, isActive}) {
-    if (!container.chart) {
+    const normalizedContainer = !container.chart && (container.dataSource || container.mapping)
+        ? {
+            ...container,
+            dataSourceRef: container.dataSourceRef || container.dataSource,
+            chart: {
+                type: 'line',
+                xAxis: {
+                    dataKey: container.mapping?.dateColumn || 'date',
+                    label: titleizeDashboardKey(container.mapping?.dateColumn || 'date'),
+                },
+                series: {
+                    nameKey: Array.isArray(container.mapping?.seriesColumns) && container.mapping.seriesColumns.length > 0
+                        ? container.mapping.seriesColumns[0]
+                        : 'series',
+                    valueKey: Array.isArray(container.mapping?.seriesColumns) && container.mapping.seriesColumns.length > 1
+                        ? container.mapping.seriesColumns[1]
+                        : 'value',
+                    values: Array.isArray(container.mapping?.seriesColumns)
+                        ? container.mapping.seriesColumns.slice(1).map((entry) => ({label: titleizeDashboardKey(entry), value: entry}))
+                        : [{label: 'Value', value: 'value'}],
+                },
+            },
+        }
+        : container;
+
+    if (!normalizedContainer.chart) {
         return (
             <Panel container={container}>
                 <div style={subtitleStyle}>Timeline blocks require `container.chart`.</div>
@@ -311,8 +508,8 @@ export function DashboardTimeline({container, context, isActive}) {
     const {collection = [], control, selection} = context?.signals || {};
     const collectionValue = useSignalSnapshot(collection, []);
     const filteredCollection = useMemo(
-        () => applyDashboardFiltersToCollection(collectionValue || [], container.filterBindings, dashboardFilters),
-        [collectionValue, container.filterBindings, dashboardFilters],
+        () => applyDashboardFiltersToCollection(collectionValue || [], normalizedContainer.filterBindings, dashboardFilters),
+        [collectionValue, normalizedContainer.filterBindings, dashboardFilters],
     );
     const filteredContext = useMemo(() => ({
         ...context,
@@ -328,9 +525,9 @@ export function DashboardTimeline({container, context, isActive}) {
     }), [context, filteredCollection, control, selection]);
 
     return (
-            <Panel container={container}>
-            <div style={{flex: '1 1 auto', minHeight: '320px'}}>
-                <Chart container={container} context={filteredContext} isActive={isActive} embedded={true}/>
+        <Panel container={container}>
+            <div style={{flex: '1 1 auto', minHeight: '500px', overflow: 'hidden', border: '1px solid #dbe6ef', borderRadius: '14px', background: 'linear-gradient(180deg, #fdfefe 0%, #f4f8fb 100%)', padding: '12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)'}}>
+                <Chart container={normalizedContainer} context={filteredContext} isActive={isActive} embedded={true}/>
             </div>
         </Panel>
     );
@@ -493,6 +690,15 @@ export function DashboardDimensions({container, context}) {
 export function DashboardMessages({container, context}) {
     const metricsData = useMetrics(context);
     const items = container.items || container.dashboard?.messages?.items || [];
+    const normalizedItems = Array.isArray(items) && items.length > 0
+        ? items
+        : Array.isArray(container.messages)
+            ? container.messages.map((message, index) => ({
+                severity: 'info',
+                title: `Note ${index + 1}`,
+                body: String(message ?? ''),
+            }))
+            : [];
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
     const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
@@ -516,7 +722,7 @@ export function DashboardMessages({container, context}) {
         dashboardFilters,
         dashboardSelection,
     });
-    const visibleItems = items.filter((item) => evaluateDashboardCondition(item.visibleWhen, {
+    const visibleItems = normalizedItems.filter((item) => evaluateDashboardCondition(item.visibleWhen, {
         ...conditionSnapshot,
     }));
 
@@ -528,10 +734,15 @@ export function DashboardMessages({container, context}) {
                 return (
                     <div
                         key={`${item.title || item.body || index}`}
-                        style={{padding: '12px', borderRadius: '8px', border: `1px solid ${tone.border}`, background: tone.background, color: tone.text}}
+                        style={{padding: '16px', borderRadius: '12px', border: `1px solid ${tone.border}`, borderLeft: `4px solid ${tone.border}`, background: tone.background, color: tone.text, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 1px 2px rgba(16, 22, 26, 0.04)'}}
                     >
-                        {item.title ? <div style={{fontWeight: 700, marginBottom: '4px'}}>{interpolateDashboardTemplate(item.title, interpolationScope)}</div> : null}
-                        <div style={{fontSize: '13px', lineHeight: 1.5}}>{interpolateDashboardTemplate(item.body, interpolationScope)}</div>
+                        <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'}}>
+                            {item.title ? <div style={{fontWeight: 700}}>{interpolateDashboardTemplate(item.title, interpolationScope)}</div> : <div />}
+                            <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px', background: '#ffffffaa', color: tone.text}}>
+                                {String(item.severity || 'info')}
+                            </span>
+                        </div>
+                        <div style={{fontSize: '13px', lineHeight: 1.7, maxWidth: '92ch'}}>{interpolateDashboardTemplate(item.body, interpolationScope)}</div>
                     </div>
                 );
             })}
