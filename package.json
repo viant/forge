@@ -46,6 +46,7 @@
     "@tanstack/react-virtual": "^3.13.10",
     "@uiw/react-codemirror": "^4.23.8",
     "@vitejs/plugin-react": "^4.3.4",
+    "d3-dsv": "^3.0.1",
     "immutability-helper": "^3.1.1",
     "isbot": "^5.1.17",
     "lodash": "^4.17.21",

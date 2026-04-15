@@ -136,16 +136,26 @@ export const interpolateDashboardTemplate = (template, scope = {}) => {
 export const formatDashboardValue = (value, format, locale = 'en-US') => {
     if (value == null) return '-';
 
+    const numeric = Number(value);
+    const isNumeric = Number.isFinite(numeric);
+
+    if (!isNumeric) {
+        if (typeof value === 'string' && value.trim() !== '') {
+            return value;
+        }
+        return '-';
+    }
+
     switch (format) {
         case 'currency':
-            return new Intl.NumberFormat(locale, {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(Number(value) || 0);
+            return new Intl.NumberFormat(locale, {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(numeric);
         case 'compactNumber':
-            return new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(Number(value) || 0);
+            return new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(numeric);
         case 'percent':
-            return `${Number(value).toFixed(1)}%`;
+            return `${(numeric * 100).toFixed(1)}%`;
         case 'number':
         default:
-            return new Intl.NumberFormat(locale, {maximumFractionDigits: 2}).format(Number(value));
+            return new Intl.NumberFormat(locale, {maximumFractionDigits: 2}).format(numeric);
     }
 };
 
@@ -160,7 +170,7 @@ export const formatDashboardDelta = (value, format = 'numberDelta', locale = 'en
 
     switch (format) {
         case 'percentDelta':
-            return `${prefix}${absolute.toFixed(1)}%`;
+            return `${prefix}${(absolute * 100).toFixed(1)}%`;
         case 'compactNumberDelta':
             return `${prefix}${new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(absolute)}`;
         case 'currencyDelta':

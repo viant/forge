@@ -233,21 +233,30 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         setSelectedValueKey(newValueKey); // Just update the state
     };
 
+    const chartMargin = embedded
+        ? {top: 24, right: 12, left: 4, bottom: 8}
+        : {top: 10, right: 60, left: 10, bottom: 10};
+    const legendProps = embedded
+        ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
+        : {};
+
     // Prepare lineChart component
     const lineChart = (
         <LineChart
             data={chartData}
-            margin={{top: 10, right: 60, left: 10, bottom: 10}}
+            margin={chartMargin}
         >
             {/* CARTESIAN GRID */}
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray}/>
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
 
             {/* X-AXIS */}
             <XAxis
                 dataKey={xAxis.dataKey}
                 tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
+                tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                minTickGap={embedded ? 24 : 5}
                 label={{
-                    value: xAxis.label,
+                    value: embedded ? "" : xAxis.label,
                     position: "insideBottomRight",
                     offset: 0,
                 }}
@@ -255,10 +264,11 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
 
             {/* Y-AXIS */}
             <YAxis
-                width={100} // Added width to prevent label truncation
+                width={embedded ? 56 : 100} // Added width to prevent label truncation
                 tickFormatter={formatLargeNumber} // Format large numbers
+                tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
                 label={{
-                    value: yAxisLabel, // Use dynamic yAxis label
+                    value: embedded ? "" : yAxisLabel, // Use dynamic yAxis label
                     angle: -90,
                     position: "insideLeft",
                 }}
@@ -268,10 +278,11 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             <Tooltip
                 labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
                 formatter={(value) => formatLargeNumber(value)}
+                contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
             />
 
             {/* LEGEND */}
-            <Legend/>
+            <Legend {...legendProps}/>
 
             {/* Dynamically create <Line> components for each selected dataKey */}
             {selectedDataKeys.map((dataKey, index) => (
@@ -281,7 +292,11 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     dataKey={dataKey}
                     name={dataKey}
                     stroke={palette[index % palette.length]}
-                    dot={false}
+                    strokeWidth={embedded ? 4 : 2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false}
+                    activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }}
                 />
             ))}
         </LineChart>
@@ -290,9 +305,9 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const barChart = (
         <BarChart
             data={chartData}
-            margin={{top: 10, right: 60, left: 10, bottom: 10}}
+            margin={chartMargin}
         >
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray}/>
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
             <XAxis
                 dataKey={xAxis.dataKey}
                 tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
@@ -315,7 +330,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
                 formatter={(value) => formatLargeNumber(value)}
             />
-            <Legend/>
+            <Legend {...legendProps}/>
             {selectedDataKeys.map((dataKey, index) => (
                 <Bar
                     key={dataKey}
@@ -330,9 +345,9 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const areaChart = (
         <AreaChart
             data={chartData}
-            margin={{top: 10, right: 60, left: 10, bottom: 10}}
+            margin={chartMargin}
         >
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray}/>
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
             <XAxis
                 dataKey={xAxis.dataKey}
                 tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
@@ -355,7 +370,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
                 formatter={(value) => formatLargeNumber(value)}
             />
-            <Legend/>
+            <Legend {...legendProps}/>
             {selectedDataKeys.map((dataKey, index) => (
                 <Area
                     key={dataKey}
@@ -446,9 +461,12 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         ? container.id
         : undefined;
 
+    const resolvedWidth = width || "100%";
+    const resolvedHeight = height || (embedded ? 460 : "100%");
+
     return (
         <div
-            style={{width: width, height: height}}
+            style={{width: resolvedWidth, height: resolvedHeight}}
             ref={chartRef}
             data-dashboard-chart-id={chartExportId}
         >
