@@ -296,7 +296,9 @@ export function DashboardCompare({container, context}) {
 export function DashboardKPITable({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
-    const rows = container.rows || container.dashboard?.kpiTable?.rows || [];
+    const {collection = []} = useDataSourceState(context);
+    const directRows = container.rows || container.dashboard?.kpiTable?.rows || [];
+    const rows = Array.isArray(directRows) && directRows.length > 0 ? directRows : (Array.isArray(collection) ? collection : []);
     const columns = Array.isArray(container.columns) ? container.columns : null;
     const usesDirectTable = Array.isArray(columns) && columns.length > 0;
     const normalizedColumns = usesDirectTable
