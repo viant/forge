@@ -8,6 +8,7 @@ export const DASHBOARD_BLOCK_KINDS = [
   'dashboard.messages',
   'dashboard.status',
   'dashboard.feed',
+  'dashboard.badges',
   'dashboard.report',
   'dashboard.detail',
 ];

@@ -181,6 +181,7 @@ const dashboardCapabilities = await runUICommand({
 });
 assert.equal(dashboardCapabilities.ok, true);
 assert.equal(dashboardCapabilities.blockKinds.includes('dashboard.filters'), true);
+assert.equal(dashboardCapabilities.blockKinds.includes('dashboard.badges'), true);
 assert.equal(dashboardCapabilities.chartTypes.includes('area'), true);
 assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.capabilities'), true);
 assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.state.reset'), true);

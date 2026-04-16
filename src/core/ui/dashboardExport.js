@@ -172,7 +172,8 @@ body {
 .message-list,
 .status-list,
 .feed-list,
-.dimension-list {
+.dimension-list,
+.badge-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -235,6 +236,21 @@ body {
   font-size: 11px;
   color: var(--muted);
   margin-bottom: 4px;
+}
+.badge-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  font-size: 12px;
+  font-weight: 600;
 }
 @media (max-width: 900px) {
   .dashboard-export__grid {
@@ -334,6 +350,14 @@ function renderFeedBlock(block) {
   `).join('')}</div>`;
 }
 
+function renderBadgesBlock(block) {
+  return `<div class="badge-list">${(block.items || []).map((item) => `
+    <span class="badge-pill ${toneClassBySeverity[item.tone] || toneClassBySeverity.info}">
+      ${escapeHtml(item.value ? `${item.label}: ${item.value}` : item.label)}
+    </span>
+  `).join('')}</div>`;
+}
+
 function renderReportBlock(block) {
   return `<div class="message-list">${(block.sections || []).map((section) => `
     <div class="message-card ${toneClassBySeverity[section.tone] || toneClassBySeverity.info}">
@@ -412,6 +436,8 @@ function renderBlockBody(block) {
       return renderStatusBlock(block);
     case 'dashboard.feed':
       return renderFeedBlock(block);
+    case 'dashboard.badges':
+      return renderBadgesBlock(block);
     case 'dashboard.report':
       return renderReportBlock(block);
     case 'dashboard.detail':
@@ -694,6 +720,26 @@ function buildFeedBlock(container, blockContext) {
   };
 }
 
+function buildBadgesBlock(container, blockContext) {
+  const interpolationScope = {
+    ...(blockContext.metrics || {}),
+    metrics: blockContext.metrics || {},
+    filters: blockContext.dashboardFilters || {},
+    selection: blockContext.dashboardSelection || {},
+  };
+  return {
+    kind: container.kind,
+    title: container.title,
+    subtitle: container.subtitle,
+    columnSpan: container.columnSpan,
+    items: (container.items || []).map((item) => ({
+      label: interpolateDashboardTemplate(item.label, interpolationScope),
+      value: interpolateDashboardTemplate(item.value, interpolationScope),
+      tone: item.tone || item.severity || 'info',
+    })),
+  };
+}
+
 function buildReportBlock(container, blockContext = {}) {
   const interpolationScope = {
     ...(blockContext.metrics || {}),
@@ -751,6 +797,8 @@ function buildExportBlock(container, context, chartSvgs) {
       return buildStatusBlock(container, blockContext);
     case 'dashboard.feed':
       return buildFeedBlock(container, blockContext);
+    case 'dashboard.badges':
+      return buildBadgesBlock(container, blockContext);
     case 'dashboard.report':
       return buildReportBlock(container, blockContext);
     case 'dashboard.detail':

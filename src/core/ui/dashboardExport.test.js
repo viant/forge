@@ -72,6 +72,14 @@ const html = buildStandaloneDashboardHtml({
       ],
     },
     {
+      kind: 'dashboard.badges',
+      title: 'Flags',
+      columnSpan: 6,
+      items: [
+        { tone: 'success', label: 'td_budget_status', value: 'has_budget' },
+      ],
+    },
+    {
       kind: 'dashboard.report',
       title: 'Report',
       columnSpan: 6,
@@ -94,6 +102,7 @@ assert.match(html, /dateRange=90d/);
 assert.match(html, /Selection/);
 assert.match(html, /country=US/);
 assert.match(html, /High zero-spend rate/);
+assert.match(html, /td_budget_status: has_budget/);
 assert.match(html, /US dominates spend/);
 assert.match(html, /grid-column: span 8/);
 
@@ -249,6 +258,18 @@ const model = buildDashboardExportModel({
         ],
       },
       {
+        id: 'flags',
+        kind: 'dashboard.badges',
+        title: 'Flags',
+        items: [
+          {
+            tone: 'success',
+            label: 'Status',
+            value: '${selection.entityKey}',
+          },
+        ],
+      },
+      {
         id: 'dimensions',
         kind: 'dashboard.dimensions',
         title: 'By Country',
@@ -282,7 +303,7 @@ const model = buildDashboardExportModel({
   chartSvgs: {},
 });
 
-assert.equal(model.blocks.length, 7);
+assert.equal(model.blocks.length, 8);
 assert.equal(model.dashboardFilters.dateRange, '90d');
 assert.deepEqual(model.dashboardFilters.region, ['NA']);
 assert.equal(model.dashboardSelection.entityKey, 'US');
@@ -294,10 +315,11 @@ assert.equal(model.blocks[3].items[0].activeOptions[0], '90D');
 assert.equal(model.blocks[4].items.length, 1);
 assert.equal(model.blocks[4].items[0].title, 'Zero-spend 47.2');
 assert.equal(model.blocks[4].items[0].body, 'Selected US for 90d');
-assert.equal(model.blocks[5].rows[0].label, 'US');
-assert.equal(model.blocks[5].rows.length, 2);
-assert.equal(model.blocks[6].sections[0].title, 'Spend 123000');
-assert.equal(model.blocks[6].sections[0].body[0], 'Selected US');
+assert.equal(model.blocks[5].items[0].value, 'US');
+assert.equal(model.blocks[6].rows[0].label, 'US');
+assert.equal(model.blocks[6].rows.length, 2);
+assert.equal(model.blocks[7].sections[0].title, 'Spend 123000');
+assert.equal(model.blocks[7].sections[0].body[0], 'Selected US');
 
 const nestedModel = buildDashboardExportModel({
   container: {
