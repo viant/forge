@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-US">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -159,7 +159,8 @@ body {
 .message-list,
 .status-list,
 .feed-list,
-.dimension-list {
+.dimension-list,
+.badge-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -223,6 +224,21 @@ body {
   color: var(--muted);
   margin-bottom: 4px;
 }
+.badge-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  font-size: 12px;
+  font-weight: 600;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
@@ -238,7 +254,7 @@ body {
     <header class="dashboard-export__header">
       <h1 class="dashboard-export__title">Operations Dashboard Demo</h1>
       <p class="dashboard-export__subtitle">A second dashboard variant showing service health and incident flow</p>
-      <p class="dashboard-export__subtitle">Generated 2026-04-07T22:20:22.120Z</p>
+      <p class="dashboard-export__subtitle">Generated 2026-04-16T17:49:18.117Z</p>
       <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>severity=critical, warning</span></div>
     </header>
     <div class="dashboard-export__grid">
@@ -298,34 +314,16 @@ body {
     <section class="dashboard-export__block" style="grid-column: span 8;">
       <h2>Incident Trend</h2>
       
-      
-      <table class="plain-table">
-        <thead>
-          <tr>
-            <th>Day</th>
-            <th>count</th>
-          </tr>
-        </thead>
-        <tbody>
-          
-            <tr>
-              <td>2026-04-01</td>
-              <td>2</td>
-            </tr>
-          
-            <tr>
-              <td>2026-04-02</td>
-              <td>3</td>
-            </tr>
-          
-            <tr>
-              <td>2026-04-03</td>
-              <td>2</td>
-            </tr>
-          
-        </tbody>
-      </table>
-    
+      <div class="chart-shell"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 216 200" width="216" height="200" style="display:block;margin:0 auto;">
+    <line x1="50" y1="170" x2="206" y2="170" stroke="#d8e1e8" />
+    <line x1="50" y1="10" x2="50" y2="170" stroke="#d8e1e8" />
+    <rect x="50" y="63.33333333333334" width="40" height="106.66666666666666" fill="#c23030" rx="2" />
+    <text x="70" y="184" text-anchor="middle" font-size="9" fill="#5f6b7c">2026-04-01</text>
+    <rect x="102" y="10" width="40" height="160" fill="#d9822b" rx="2" />
+    <text x="122" y="184" text-anchor="middle" font-size="9" fill="#5f6b7c">2026-04-02</text>
+    <rect x="154" y="63.33333333333334" width="40" height="106.66666666666666" fill="#137cbd" rx="2" />
+    <text x="174" y="184" text-anchor="middle" font-size="9" fill="#5f6b7c">2026-04-03</text>
+  </svg></div>
     </section>
   
 

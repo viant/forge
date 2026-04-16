@@ -477,12 +477,17 @@ type DashboardCondition struct {
 	Selector      string   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	Field         string   `json:"field,omitempty" yaml:"field,omitempty"`
 	Key           string   `json:"key,omitempty" yaml:"key,omitempty"`
-	When          any      `json:"when,omitempty" yaml:"when,omitempty"`
-	Gt            *float64 `json:"gt,omitempty" yaml:"gt,omitempty"`
-	Gte           *float64 `json:"gte,omitempty" yaml:"gte,omitempty"`
-	Lt            *float64 `json:"lt,omitempty" yaml:"lt,omitempty"`
-	Lte           *float64 `json:"lte,omitempty" yaml:"lte,omitempty"`
-	NotEmpty      *bool    `json:"notEmpty,omitempty" yaml:"notEmpty,omitempty"`
+	Source    string `json:"source,omitempty" yaml:"source,omitempty"`
+	When     any    `json:"when,omitempty" yaml:"when,omitempty"`
+	Equals   any    `json:"equals,omitempty" yaml:"equals,omitempty"`
+	NotEquals any   `json:"notEquals,omitempty" yaml:"notEquals,omitempty"`
+	In       []any  `json:"in,omitempty" yaml:"in,omitempty"`
+	Gt       *float64 `json:"gt,omitempty" yaml:"gt,omitempty"`
+	Gte      *float64 `json:"gte,omitempty" yaml:"gte,omitempty"`
+	Lt       *float64 `json:"lt,omitempty" yaml:"lt,omitempty"`
+	Lte      *float64 `json:"lte,omitempty" yaml:"lte,omitempty"`
+	Empty    *bool    `json:"empty,omitempty" yaml:"empty,omitempty"`
+	NotEmpty *bool    `json:"notEmpty,omitempty" yaml:"notEmpty,omitempty"`
 }
 
 type Dashboard struct {
@@ -497,6 +502,8 @@ type Dashboard struct {
 	Feed       *DashboardFeed       `json:"feed,omitempty" yaml:"feed,omitempty"`
 	Report     *DashboardReport     `json:"report,omitempty" yaml:"report,omitempty"`
 	Detail     *DashboardDetail     `json:"detail,omitempty" yaml:"detail,omitempty"`
+	Badges     *DashboardBadges     `json:"badges,omitempty" yaml:"badges,omitempty"`
+	Table      *DashboardTable      `json:"table,omitempty" yaml:"table,omitempty"`
 }
 
 type DashboardSummary struct {
@@ -537,6 +544,7 @@ type DashboardFilters struct {
 
 type DashboardFilterItem struct {
 	ID       string                  `json:"id,omitempty" yaml:"id,omitempty"`
+	Type     string                  `json:"type,omitempty" yaml:"type,omitempty"`
 	Label    string                  `json:"label,omitempty" yaml:"label,omitempty"`
 	Field    string                  `json:"field,omitempty" yaml:"field,omitempty"`
 	Multiple bool                    `json:"multiple,omitempty" yaml:"multiple,omitempty"`
@@ -607,6 +615,10 @@ type DashboardStatusCheck struct {
 type DashboardTone struct {
 	WarningAbove float64 `json:"warningAbove,omitempty" yaml:"warningAbove,omitempty"`
 	DangerAbove  float64 `json:"dangerAbove,omitempty" yaml:"dangerAbove,omitempty"`
+	WarningBelow float64 `json:"warningBelow,omitempty" yaml:"warningBelow,omitempty"`
+	DangerBelow  float64 `json:"dangerBelow,omitempty" yaml:"dangerBelow,omitempty"`
+	SuccessAbove float64 `json:"successAbove,omitempty" yaml:"successAbove,omitempty"`
+	SuccessBelow float64 `json:"successBelow,omitempty" yaml:"successBelow,omitempty"`
 }
 
 type DashboardFeed struct {
@@ -630,6 +642,29 @@ type DashboardReportSection struct {
 	Body        []string            `json:"body,omitempty" yaml:"body,omitempty"`
 	Tone        string              `json:"tone,omitempty" yaml:"tone,omitempty"`
 	VisibleWhen *DashboardCondition `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+}
+
+type DashboardBadges struct {
+	Items []DashboardBadgeItem `json:"items,omitempty" yaml:"items,omitempty"`
+}
+
+type DashboardBadgeItem struct {
+	ID    string `json:"id,omitempty" yaml:"id,omitempty"`
+	Label string `json:"label,omitempty" yaml:"label,omitempty"`
+	Value string `json:"value,omitempty" yaml:"value,omitempty"`
+	Tone  string `json:"tone,omitempty" yaml:"tone,omitempty"`
+}
+
+type DashboardTable struct {
+	Columns []DashboardTableColumn `json:"columns,omitempty" yaml:"columns,omitempty"`
+	Limit   int                    `json:"limit,omitempty" yaml:"limit,omitempty"`
+}
+
+type DashboardTableColumn struct {
+	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
+	Label  string `json:"label,omitempty" yaml:"label,omitempty"`
+	Format string `json:"format,omitempty" yaml:"format,omitempty"`
+	Align  string `json:"align,omitempty" yaml:"align,omitempty"`
 }
 
 // DashboardDetail is a marker block. Nested detail content is described by the

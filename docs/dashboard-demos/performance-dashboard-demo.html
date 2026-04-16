@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-US">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -159,7 +159,8 @@ body {
 .message-list,
 .status-list,
 .feed-list,
-.dimension-list {
+.dimension-list,
+.badge-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -223,6 +224,21 @@ body {
   color: var(--muted);
   margin-bottom: 4px;
 }
+.badge-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  font-size: 12px;
+  font-weight: 600;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
@@ -238,7 +254,7 @@ body {
     <header class="dashboard-export__header">
       <h1 class="dashboard-export__title">Performance Dashboard Demo</h1>
       <p class="dashboard-export__subtitle">Generic Forge dashboard blocks with seeded in-memory data</p>
-      <p class="dashboard-export__subtitle">Generated 2026-04-07T22:20:22.110Z</p>
+      <p class="dashboard-export__subtitle">Generated 2026-04-16T17:49:18.102Z</p>
       <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>dateRange=90d</span><span class="dashboard-export__state-chip"><strong>Filter</strong>region=NA</span></div>
     </header>
     <div class="dashboard-export__grid">
@@ -258,6 +274,13 @@ body {
       <div class="filter-group__label">Region</div>
       <div class="filter-chip-row">
         <span class="filter-chip tone-info">NA</span>
+      </div>
+    </div>
+  
+    <div class="filter-group">
+      <div class="filter-group__label">Date Range</div>
+      <div class="filter-chip-row">
+        
       </div>
     </div>
   </div>
@@ -497,6 +520,50 @@ body {
       <div>Weekly trend collection prepared for timeline rendering.</div>
     </div>
   </div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Spend Distribution</h2>
+      
+      <div class="chart-shell"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 400" width="280" height="400" style="display:block;margin:0 auto;">
+    <path d="M140,140 L140,33.599999999999994 A106.4,106.4 0 1,1 41.82971633614939,98.96884835446238 Z" fill="#137cbd" />
+    <path d="M140,140 L41.82971633614939,98.96884835446238 A106.4,106.4 0 0,1 83.30962982847711,49.96022029227464 Z" fill="#0f9960" />
+    <path d="M140,140 L83.30962982847711,49.96022029227464 A106.4,106.4 0 0,1 113.11846184500575,37.05174646249898 Z" fill="#d9822b" />
+    <path d="M140,140 L113.11846184500575,37.05174646249898 A106.4,106.4 0 0,1 129.14847929439745,34.15480880844949 Z" fill="#8f398f" />
+    <path d="M140,140 L129.14847929439745,34.15480880844949 A106.4,106.4 0 0,1 140.00000000000009,33.599999999999994 Z" fill="#c23030" />
+    <rect x="10" y="292" width="12" height="12" rx="2" fill="#137cbd" /><text x="28" y="303" font-size="12" fill="#30404d">US — 81%</text>
+    <rect x="10" y="312" width="12" height="12" rx="2" fill="#0f9960" /><text x="28" y="323" font-size="12" fill="#30404d">CA — 10%</text>
+    <rect x="10" y="332" width="12" height="12" rx="2" fill="#d9822b" /><text x="28" y="343" font-size="12" fill="#30404d">GB — 5%</text>
+    <rect x="10" y="352" width="12" height="12" rx="2" fill="#8f398f" /><text x="28" y="363" font-size="12" fill="#30404d">AU — 2%</text>
+    <rect x="10" y="372" width="12" height="12" rx="2" fill="#c23030" /><text x="28" y="383" font-size="12" fill="#30404d">DE — 2%</text>
+  </svg></div>
+    </section>
+  
+
+    <section class="dashboard-export__block" style="grid-column: span 8;">
+      <h2>Country Detail Table</h2>
+      
+      
+    <table class="plain-table">
+      <thead>
+        <tr>
+          <th>Country</th><th>Region</th><th>Spend</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td>US</td><td>NA</td><td>$100,000</td>
+          </tr>
+        
+          <tr>
+            <td>CA</td><td>NA</td><td>$12,000</td>
+          </tr>
+        
+      </tbody>
+    </table>
+  
     </section>
   
     </div>

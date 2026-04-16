@@ -100,6 +100,15 @@ export const applyDashboardFiltersToCollection = (collection = [], filterBinding
             }
 
             const rowValue = resolveKey(row, rowField);
+
+            // Date range filter: { start, end }
+            if (activeValue && typeof activeValue === 'object' && !Array.isArray(activeValue) && (activeValue.start || activeValue.end)) {
+                const rv = String(rowValue ?? '');
+                if (activeValue.start && rv < activeValue.start) return false;
+                if (activeValue.end && rv > activeValue.end) return false;
+                return true;
+            }
+
             if (Array.isArray(activeValue)) {
                 return activeValue.some((entry) => equalsFilterValue(entry, rowValue));
             }

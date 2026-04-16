@@ -17,6 +17,9 @@ import {
     AreaChart,
     Area,
     ComposedChart,
+    PieChart,
+    Pie,
+    Cell,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -187,10 +190,26 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
 
     const { collection, loading, error } = useDataSourceState(context);
 
+    const isPieChart = type === "pie" || type === "donut";
+
     function prepareData() {
+        if (isPieChart) {
+            const nameKey = series.nameKey || "name";
+            const valueKey = series.valueKey || selectedValueKey || "value";
+            const rows = (collection || []).map((row) => ({
+                name: row[nameKey] ?? "unknown",
+                value: Number(row[valueKey]) || 0,
+                _raw: row,
+            })).filter((row) => row.value > 0);
+            setChartData(rows);
+            setAvailableDataKeys(rows.map((row) => row.name));
+            setYAxisLabel("");
+            return;
+        }
+
         if (directSeriesChart) {
             const sorted = [...(collection || [])].sort(
-                (a, b) => new Date(a?.[xAxis.dataKey]) - new Date(b?.[xAxis.dataKey])
+                (a, b) => new Date(a?.[xAxis?.dataKey]) - new Date(b?.[xAxis?.dataKey])
             );
             const keys = seriesDefinitions.map((entry) => entry.value);
             setChartData(sorted);
@@ -204,7 +223,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         setAvailableDataKeys(keys); // Update available data keys
 
         // Update yAxis label based on selectedValueKey
-        const selectedValue = series.values.find((val) => val.value === selectedValueKey);
+        const selectedValue = (series.values || []).find((val) => val.value === selectedValueKey);
         if (selectedValue) {
             setYAxisLabel(selectedValue.name);
         }
@@ -419,6 +438,39 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         </AreaChart>
     );
 
+    const pieFilteredData = isPieChart
+        ? chartData.filter((row) => selectedDataKeys.includes(row.name))
+        : [];
+    const piePalette = palette.length > 0 ? palette : ['#137cbd', '#0f9960', '#d9822b', '#8f398f', '#c23030', '#5c7080', '#2965cc', '#29a634'];
+    const pieInnerRadius = type === "donut" ? "45%" : 0;
+    const pieChart = (
+        <PieChart margin={embedded ? {top: 8, right: 8, bottom: 8, left: 8} : {top: 10, right: 10, bottom: 10, left: 10}}>
+            <Pie
+                data={pieFilteredData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={pieInnerRadius}
+                outerRadius="78%"
+                paddingAngle={pieFilteredData.length > 1 ? 2 : 0}
+                label={embedded ? false : ({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                labelLine={!embedded}
+            >
+                {pieFilteredData.map((entry, index) => (
+                    <Cell key={entry.name || index} fill={piePalette[index % piePalette.length]} />
+                ))}
+            </Pie>
+            <Tooltip
+                formatter={(value) => formatLargeNumber(value)}
+                contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
+            />
+            <Legend
+                {...(embedded ? {wrapperStyle: {fontSize: "11px"}, iconSize: 10} : {})}
+            />
+        </PieChart>
+    );
+
     const computedWidthByCol = React.useMemo(() => {
         const out = {};
         allTableColumns.forEach((key) => {
@@ -506,7 +558,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         >
             {!embedded ? (
                 <>
-                    {!directSeriesChart ? (
+                    {!directSeriesChart && !isPieChart ? (
                         <RadioGroup
                             inline={true}
                             name={container.id}
@@ -570,13 +622,15 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             {viewMode === "chart" ? (
                 chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                        {type === "composed" || directSeriesChart || hasRightAxis
-                            ? composedChart
-                            : type === "bar"
-                                ? barChart
-                                : type === "area"
-                                    ? areaChart
-                                    : lineChart}
+                        {isPieChart
+                            ? pieChart
+                            : type === "composed" || directSeriesChart || hasRightAxis
+                                ? composedChart
+                                : type === "bar"
+                                    ? barChart
+                                    : type === "area"
+                                        ? areaChart
+                                        : lineChart}
                     </ResponsiveContainer>
                 ) : null
             ) : (
