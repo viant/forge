@@ -16,6 +16,7 @@ import {
     Bar,
     AreaChart,
     Area,
+    ComposedChart,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -78,6 +79,50 @@ export function transformData(rawData, chart, valueKey) {
     return {data, keys};
 }
 
+function isDirectSeriesChart(chart = {}) {
+    return !chart?.series?.nameKey && Array.isArray(chart?.series?.values) && chart.series.values.length > 0;
+}
+
+function getSeriesDefinitions(chart = {}) {
+    const palette = chart?.series?.palette || [];
+    return (chart?.series?.values || []).map((entry, index) => ({
+        ...entry,
+        value: entry?.value,
+        label: entry?.label || entry?.name || entry?.value || `Series ${index + 1}`,
+        name: entry?.name || entry?.label || entry?.value || `Series ${index + 1}`,
+        type: entry?.type || chart?.type || "line",
+        axis: entry?.axis || "left",
+        color: entry?.color || palette[index % Math.max(palette.length, 1)] || "#137cbd",
+    })).filter((entry) => !!entry.value);
+}
+
+function formatValueByFormat(value, formatType) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+        return value;
+    }
+    switch (formatType) {
+        case "currency":
+            return `$${numeric.toFixed(2)}`;
+        case "compactNumber":
+            return formatLargeNumber(numeric);
+        case "percent":
+            return `${numeric.toFixed(1)}%`;
+        case "percentFraction":
+            return `${(numeric * 100).toFixed(1)}%`;
+        default:
+            return formatLargeNumber(numeric);
+    }
+}
+
+function createAxisTickFormatter(formatType) {
+    return (value) => formatValueByFormat(value, formatType);
+}
+
+function tooltipFormatterForFormat(formatType) {
+    return (value) => formatValueByFormat(value, formatType);
+}
+
 function formatTimestamp(timestamp, fmt = "MM/dd") {
     try {
         return format(new Date(timestamp), fmt);
@@ -115,13 +160,19 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const {
         type = "line",
         xAxis,
-        yAxis,
-        cartesianGrid,
+        yAxis = {},
+        axes = {},
+        cartesianGrid = {strokeDasharray: "3 3"},
         width,
         height,
         series,
     } = chart;
-    const {palette} = series;
+    const {palette = []} = series;
+    const directSeriesChart = isDirectSeriesChart(chart);
+    const seriesDefinitions = getSeriesDefinitions(chart);
+    const leftAxis = {...yAxis, ...(axes.left || {})};
+    const rightAxis = axes.right || null;
+    const hasRightAxis = !!rightAxis || seriesDefinitions.some((entry) => entry.axis === "right");
 
     const [chartData, setChartData] = useState([]);
     const [selectedDataKeys, setSelectedDataKeys] = useState([]);
@@ -131,12 +182,23 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const [columnWidths, setColumnWidths] = useState({});
     const [expandedCell, setExpandedCell] = useState(null);
 
-    const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || "");
-    const [yAxisLabel, setYAxisLabel] = useState(yAxis.label || "");
+    const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || seriesDefinitions[0]?.value || "");
+    const [yAxisLabel, setYAxisLabel] = useState(leftAxis.label || "");
 
     const { collection, loading, error } = useDataSourceState(context);
 
     function prepareData() {
+        if (directSeriesChart) {
+            const sorted = [...(collection || [])].sort(
+                (a, b) => new Date(a?.[xAxis.dataKey]) - new Date(b?.[xAxis.dataKey])
+            );
+            const keys = seriesDefinitions.map((entry) => entry.value);
+            setChartData(sorted);
+            setAvailableDataKeys(keys);
+            setYAxisLabel(leftAxis.label || "");
+            return;
+        }
+
         const {data, keys} = transformData(collection, chart, selectedValueKey);
         setChartData(data);
         setAvailableDataKeys(keys); // Update available data keys
@@ -151,7 +213,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     useEffect(() => {
         prepareData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collection, selectedValueKey]);
+    }, [collection, selectedValueKey, directSeriesChart, xAxis.dataKey, leftAxis.label, seriesDefinitions]);
 
     useEffect(() => {
         // Keep selectedDataKeys in sync with availableDataKeys
@@ -215,10 +277,11 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     };
 
     const renderDataKeyItem = (dataKey, {modifiers, handleClick}) => {
+        const seriesDef = seriesDefinitions.find((entry) => entry.value === dataKey);
         return (
             <MenuItem
                 key={dataKey}
-                text={dataKey}
+                text={seriesDef?.label || dataKey}
                 active={modifiers.active}
                 icon={selectedDataKeys.includes(dataKey) ? "tick" : "blank"}
                 onClick={handleClick}
@@ -240,16 +303,20 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
         : {};
 
-    // Prepare lineChart component
-    const lineChart = (
-        <LineChart
-            data={chartData}
-            margin={chartMargin}
-        >
-            {/* CARTESIAN GRID */}
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
+    const selectedSeriesDefinitions = directSeriesChart
+        ? seriesDefinitions.filter((entry) => selectedDataKeys.includes(entry.value))
+        : selectedDataKeys.map((dataKey, index) => ({
+            value: dataKey,
+            label: dataKey,
+            name: dataKey,
+            type,
+            axis: "left",
+            color: palette[index % Math.max(palette.length, 1)] || "#137cbd",
+        }));
 
-            {/* X-AXIS */}
+    const sharedChartChildren = (
+        <>
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
             <XAxis
                 dataKey={xAxis.dataKey}
                 tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
@@ -261,127 +328,94 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     offset: 0,
                 }}
             />
-
-            {/* Y-AXIS */}
             <YAxis
-                width={embedded ? 56 : 100} // Added width to prevent label truncation
-                tickFormatter={formatLargeNumber} // Format large numbers
+                yAxisId="left"
+                width={embedded ? 56 : 100}
+                tickFormatter={createAxisTickFormatter(leftAxis.format)}
                 tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
                 label={{
-                    value: embedded ? "" : yAxisLabel, // Use dynamic yAxis label
+                    value: embedded ? "" : (leftAxis.label || yAxisLabel),
                     angle: -90,
                     position: "insideLeft",
                 }}
+                domain={leftAxis.domain}
             />
-
-            {/* TOOLTIP */}
+            {hasRightAxis ? (
+                <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    width={embedded ? 56 : 80}
+                    tickFormatter={createAxisTickFormatter(rightAxis?.format)}
+                    tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                    label={rightAxis?.label ? {
+                        value: embedded ? "" : rightAxis.label,
+                        angle: 90,
+                        position: "insideRight",
+                    } : undefined}
+                    domain={rightAxis?.domain}
+                />
+            ) : null}
             <Tooltip
                 labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
-                formatter={(value) => formatLargeNumber(value)}
+                formatter={(value, name, item) => {
+                    const formatType = item?.payload?.__seriesFormats?.[item?.dataKey] || item?.payload?.__seriesAxes?.[item?.dataKey];
+                    return [tooltipFormatterForFormat(formatType)(value), name];
+                }}
                 contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
             />
-
-            {/* LEGEND */}
             <Legend {...legendProps}/>
+            {selectedSeriesDefinitions.map((entry, index) => {
+                const commonProps = {
+                    key: entry.value,
+                    dataKey: entry.value,
+                    name: entry.name || entry.label,
+                    yAxisId: entry.axis || "left",
+                    stroke: entry.color,
+                    fill: entry.color,
+                    strokeWidth: entry.strokeWidth || (embedded ? 3 : 2),
+                    strokeDasharray: entry.strokeDasharray,
+                    fillOpacity: entry.fillOpacity ?? (entry.type === "area" ? 0.22 : 1),
+                    opacity: entry.opacity,
+                };
 
-            {/* Dynamically create <Line> components for each selected dataKey */}
-            {selectedDataKeys.map((dataKey, index) => (
-                <Line
-                    key={dataKey}
-                    type="monotone"
-                    dataKey={dataKey}
-                    name={dataKey}
-                    stroke={palette[index % palette.length]}
-                    strokeWidth={embedded ? 4 : 2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false}
-                    activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }}
-                />
-            ))}
+                if (entry.type === "bar") {
+                    return <Bar {...commonProps} stackId={entry.stackId} />;
+                }
+                if (entry.type === "area") {
+                    return <Area {...commonProps} type="monotone" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+                }
+                return <Line {...commonProps} type="monotone" strokeLinecap="round" strokeLinejoin="round" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+            })}
+        </>
+    );
+
+    const normalizedChartData = chartData.map((row) => ({
+        ...row,
+        __seriesFormats: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
+        __seriesAxes: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
+    }));
+
+    const composedChart = (
+        <ComposedChart data={normalizedChartData} margin={chartMargin}>
+            {sharedChartChildren}
+        </ComposedChart>
+    );
+
+    const lineChart = (
+        <LineChart data={normalizedChartData} margin={chartMargin}>
+            {sharedChartChildren}
         </LineChart>
     );
 
     const barChart = (
-        <BarChart
-            data={chartData}
-            margin={chartMargin}
-        >
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
-            <XAxis
-                dataKey={xAxis.dataKey}
-                tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
-                label={{
-                    value: xAxis.label,
-                    position: "insideBottomRight",
-                    offset: 0,
-                }}
-            />
-            <YAxis
-                width={100}
-                tickFormatter={formatLargeNumber}
-                label={{
-                    value: yAxisLabel,
-                    angle: -90,
-                    position: "insideLeft",
-                }}
-            />
-            <Tooltip
-                labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
-                formatter={(value) => formatLargeNumber(value)}
-            />
-            <Legend {...legendProps}/>
-            {selectedDataKeys.map((dataKey, index) => (
-                <Bar
-                    key={dataKey}
-                    dataKey={dataKey}
-                    name={dataKey}
-                    fill={palette[index % palette.length]}
-                />
-            ))}
+        <BarChart data={normalizedChartData} margin={chartMargin}>
+            {sharedChartChildren}
         </BarChart>
     );
 
     const areaChart = (
-        <AreaChart
-            data={chartData}
-            margin={chartMargin}
-        >
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
-            <XAxis
-                dataKey={xAxis.dataKey}
-                tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
-                label={{
-                    value: xAxis.label,
-                    position: "insideBottomRight",
-                    offset: 0,
-                }}
-            />
-            <YAxis
-                width={100}
-                tickFormatter={formatLargeNumber}
-                label={{
-                    value: yAxisLabel,
-                    angle: -90,
-                    position: "insideLeft",
-                }}
-            />
-            <Tooltip
-                labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
-                formatter={(value) => formatLargeNumber(value)}
-            />
-            <Legend {...legendProps}/>
-            {selectedDataKeys.map((dataKey, index) => (
-                <Area
-                    key={dataKey}
-                    type="monotone"
-                    dataKey={dataKey}
-                    name={dataKey}
-                    stroke={palette[index % palette.length]}
-                    fill={palette[index % palette.length]}
-                    fillOpacity={0.22}
-                />
-            ))}
+        <AreaChart data={normalizedChartData} margin={chartMargin}>
+            {sharedChartChildren}
         </AreaChart>
     );
 
@@ -472,22 +506,24 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         >
             {!embedded ? (
                 <>
-                    <RadioGroup
-                        inline={true}
-                        name={container.id}
-                        onChange={handleValueKeyChange}
-                        selectedValue={selectedValueKey}
-                    >
-                        {series.values.map((option, index) => (
-                            <Radio key={option.value + index} label={option.label} value={option.value}/>
-                        ))}
-                    </RadioGroup>
+                    {!directSeriesChart ? (
+                        <RadioGroup
+                            inline={true}
+                            name={container.id}
+                            onChange={handleValueKeyChange}
+                            selectedValue={selectedValueKey}
+                        >
+                            {series.values.map((option, index) => (
+                                <Radio key={option.value + index} label={option.label} value={option.value}/>
+                            ))}
+                        </RadioGroup>
+                    ) : null}
 
                     <MultiSelect
                         items={availableDataKeys}
                         itemRenderer={renderDataKeyItem}
                         onItemSelect={handleDataKeySelect}
-                        tagRenderer={(dataKey) => dataKey}
+                        tagRenderer={(dataKey) => seriesDefinitions.find((entry) => entry.value === dataKey)?.label || dataKey}
                         selectedItems={selectedDataKeys}
                         fill={true}
                         placeholder="Select data keys..."
@@ -534,7 +570,13 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             {viewMode === "chart" ? (
                 chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                        {type === "bar" ? barChart : type === "area" ? areaChart : lineChart}
+                        {type === "composed" || directSeriesChart || hasRightAxis
+                            ? composedChart
+                            : type === "bar"
+                                ? barChart
+                                : type === "area"
+                                    ? areaChart
+                                    : lineChart}
                     </ResponsiveContainer>
                 ) : null
             ) : (

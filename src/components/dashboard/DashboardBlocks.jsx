@@ -807,6 +807,53 @@ export function DashboardFeed({container, context}) {
     );
 }
 
+export function DashboardBadges({container, context}) {
+    const metricsData = useMetrics(context);
+    const items = container.items || container.dashboard?.badges?.items || [];
+    const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
+    const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
+    const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
+    const interpolationScope = {
+        ...(metricsData || {}),
+        metrics: metricsData || {},
+        filters: dashboardFilters || {},
+        selection: dashboardSelection || {},
+    };
+
+    return (
+        <Panel container={container}>
+            <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
+                {items.map((item, index) => {
+                    const tone = toneColors[item.tone || item.severity] || toneColors.info;
+                    const label = interpolateDashboardTemplate(item.label, interpolationScope);
+                    const value = interpolateDashboardTemplate(item.value, interpolationScope);
+                    const text = value ? `${label}: ${value}` : label;
+                    return (
+                        <span
+                            key={item.id || text || index}
+                            style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                color: tone.text,
+                                background: tone.background,
+                                border: `1px solid ${tone.border}`,
+                                borderRadius: '999px',
+                                padding: '4px 10px',
+                            }}
+                        >
+                            {text}
+                        </span>
+                    );
+                })}
+            </div>
+        </Panel>
+    );
+}
+
 export function DashboardReport({container, context}) {
     const metricsData = useMetrics(context);
     const sections = container.sections || container.dashboard?.report?.sections || [];
@@ -937,6 +984,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.feed':
             content = <DashboardFeed container={container} context={context}/>;
+            break;
+        case 'dashboard.badges':
+            content = <DashboardBadges container={container} context={context}/>;
             break;
         case 'dashboard.report':
             content = <DashboardReport container={container} context={context}/>;

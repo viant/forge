@@ -173,8 +173,11 @@ assert.deepEqual(
 
 assert.equal(formatDashboardValue(1234.5, 'number', 'de-DE'), '1.234,5');
 assert.equal(formatDashboardValue(1234, 'currency', 'de-DE').includes('1.234'), true);
+assert.equal(formatDashboardValue(19.37, 'percent', 'en-US'), '19.4%');
+assert.equal(formatDashboardValue(0.1937, 'percentFraction', 'en-US'), '19.4%');
 assert.equal(formatDashboardDelta(5000, 'currencyDelta', 'de-DE'), '+5.000 $');
 assert.equal(formatDashboardDelta(-12.5, 'percentDelta', 'en-US'), '-12.5%');
+assert.equal(formatDashboardDelta(-0.125, 'percentFractionDelta', 'en-US'), '-12.5%');
 assert.equal(getDashboardToneName(50, { warningAbove: 40, dangerAbove: 25 }), 'danger');
 assert.equal(getDashboardToneName(30, { warningAbove: 40, dangerAbove: 25 }), 'warning');
 assert.equal(getDashboardToneName(90, { warningBelow: 80, dangerBelow: 95 }), 'warning');

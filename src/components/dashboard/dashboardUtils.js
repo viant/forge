@@ -152,6 +152,8 @@ export const formatDashboardValue = (value, format, locale = 'en-US') => {
         case 'compactNumber':
             return new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(numeric);
         case 'percent':
+            return `${numeric.toFixed(1)}%`;
+        case 'percentFraction':
             return `${(numeric * 100).toFixed(1)}%`;
         case 'number':
         default:
@@ -170,6 +172,8 @@ export const formatDashboardDelta = (value, format = 'numberDelta', locale = 'en
 
     switch (format) {
         case 'percentDelta':
+            return `${prefix}${absolute.toFixed(1)}%`;
+        case 'percentFractionDelta':
             return `${prefix}${(absolute * 100).toFixed(1)}%`;
         case 'compactNumberDelta':
             return `${prefix}${new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(absolute)}`;
