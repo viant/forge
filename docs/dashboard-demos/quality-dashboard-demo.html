@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-US">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -159,7 +159,8 @@ body {
 .message-list,
 .status-list,
 .feed-list,
-.dimension-list {
+.dimension-list,
+.badge-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -223,6 +224,21 @@ body {
   color: var(--muted);
   margin-bottom: 4px;
 }
+.badge-list {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  font-size: 12px;
+  font-weight: 600;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
@@ -238,7 +254,7 @@ body {
     <header class="dashboard-export__header">
       <h1 class="dashboard-export__title">Data Quality Dashboard Demo</h1>
       <p class="dashboard-export__subtitle">A quality-first dashboard variant with checks, summaries, and remediation guidance</p>
-      <p class="dashboard-export__subtitle">Generated 2026-04-07T22:20:22.121Z</p>
+      <p class="dashboard-export__subtitle">Generated 2026-04-16T17:49:18.118Z</p>
       <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>domain=customer, billing</span></div>
     </header>
     <div class="dashboard-export__grid">

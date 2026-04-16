@@ -429,12 +429,44 @@ export function DashboardFilters({container, context}) {
         filterSignal.value = {...current, [field]: optionValue};
     };
 
+    const setDateRange = (item, edge, value) => {
+        if (!dashboardKey) return;
+        const field = item.field || item.id;
+        const filterSignal = getDashboardFilterSignal(dashboardKey);
+        const current = filterSignal.peek() || {};
+        const prev = current[field] && typeof current[field] === 'object' ? current[field] : {};
+        filterSignal.value = {...current, [field]: {...prev, [edge]: value || undefined}};
+    };
+
     return (
         <Panel container={container}>
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                 {items.map((item) => {
                     const field = item.field || item.id;
                     const current = filters?.[field];
+                    if (item.type === 'dateRange') {
+                        const range = current && typeof current === 'object' ? current : {};
+                        return (
+                            <div key={field} style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
+                                <div style={{fontSize: '12px', fontWeight: 600, color: '#5f6b7c'}}>{item.label}</div>
+                                <div style={{display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center'}}>
+                                    <input
+                                        type="date"
+                                        value={range.start || ''}
+                                        onChange={(e) => setDateRange(item, 'start', e.target.value)}
+                                        style={{border: '1px solid #ced9e0', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: '#30404d'}}
+                                    />
+                                    <span style={{fontSize: '12px', color: '#5f6b7c'}}>to</span>
+                                    <input
+                                        type="date"
+                                        value={range.end || ''}
+                                        onChange={(e) => setDateRange(item, 'end', e.target.value)}
+                                        style={{border: '1px solid #ced9e0', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', color: '#30404d'}}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    }
                     return (
                         <div key={field} style={{display: 'flex', flexDirection: 'column', gap: '6px'}}>
                             <div style={{fontSize: '12px', fontWeight: 600, color: '#5f6b7c'}}>{item.label}</div>
@@ -955,6 +987,121 @@ class DashboardErrorBoundary extends React.Component {
     }
 }
 
+export function DashboardTable({container, context}) {
+    const locale = getDashboardLocale(context);
+    const {collection, loading, error} = useDataSourceState(context);
+    const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
+    const limit = container.limit || container.dashboard?.table?.limit || 200;
+
+    const rawColumns = container.columns || container.dashboard?.table?.columns || [];
+    const normalizedColumns = useMemo(() => rawColumns.map((col) => {
+        if (typeof col === 'string') {
+            return {key: col, label: titleizeDashboardKey(col)};
+        }
+        const key = String(col?.key || col?.id || '').trim();
+        return {key, label: col?.label || titleizeDashboardKey(key), format: col?.format, align: col?.align};
+    }).filter((col) => !!col.key), [rawColumns]);
+
+    const filteredCollection = useMemo(
+        () => applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters),
+        [collection, container.filterBindings, dashboardFilters],
+    );
+
+    const [sortKey, setSortKey] = useState(null);
+    const [sortDir, setSortDir] = useState('asc');
+
+    const sortedRows = useMemo(() => {
+        const rows = filteredCollection.slice(0, limit);
+        if (!sortKey) return rows;
+        return [...rows].sort((a, b) => {
+            const av = a?.[sortKey];
+            const bv = b?.[sortKey];
+            const an = Number(av);
+            const bn = Number(bv);
+            const numeric = Number.isFinite(an) && Number.isFinite(bn);
+            const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
+            return sortDir === 'desc' ? -cmp : cmp;
+        });
+    }, [filteredCollection, limit, sortKey, sortDir]);
+
+    const handleSort = (key) => {
+        if (sortKey === key) {
+            setSortDir((prev) => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortKey(key);
+            setSortDir('asc');
+        }
+    };
+
+    return (
+        <Panel container={container}>
+            {loading ? <div style={subtitleStyle}>Loading…</div> : null}
+            {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
+            {!loading && sortedRows.length === 0 ? <div style={subtitleStyle}>No data.</div> : null}
+            {sortedRows.length > 0 ? (
+                <div style={{overflow: 'auto'}}>
+                    <table style={{width: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
+                        <thead>
+                        <tr>
+                            {normalizedColumns.map((col) => {
+                                const active = sortKey === col.key;
+                                const arrow = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+                                return (
+                                    <th
+                                        key={col.key}
+                                        onClick={() => handleSort(col.key)}
+                                        style={{
+                                            textAlign: col.align || 'left',
+                                            borderBottom: '1px solid #d8e1e8',
+                                            padding: '10px 8px',
+                                            background: '#f7fafc',
+                                            fontSize: '11px',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '0.02em',
+                                            color: active ? '#137cbd' : '#5f6b7c',
+                                            cursor: 'pointer',
+                                            userSelect: 'none',
+                                            position: 'sticky',
+                                            top: 0,
+                                        }}
+                                    >
+                                        {col.label}{arrow}
+                                    </th>
+                                );
+                            })}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {sortedRows.map((row, index) => (
+                            <tr key={index} style={{background: index % 2 === 0 ? '#ffffff' : '#fbfdff'}}>
+                                {normalizedColumns.map((col, ci) => (
+                                    <td
+                                        key={`${index}-${ci}`}
+                                        style={{
+                                            padding: '10px 8px',
+                                            borderBottom: '1px solid #ebf1f5',
+                                            color: ci === 0 ? '#182026' : '#30404d',
+                                            fontWeight: ci === 0 ? 600 : 400,
+                                            fontSize: '12px',
+                                            lineHeight: 1.45,
+                                            textAlign: col.align || 'left',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        {renderDashboardTableCell(row?.[col.key], col, locale)}
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                        </tbody>
+                    </table>
+                </div>
+            ) : null}
+        </Panel>
+    );
+}
+
 export function DashboardBlock({container, context, isActive, children}) {
     let content = null;
     switch (container.kind) {
@@ -990,6 +1137,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.report':
             content = <DashboardReport container={container} context={context}/>;
+            break;
+        case 'dashboard.table':
+            content = <DashboardTable container={container} context={context}/>;
             break;
         case 'dashboard.detail':
             content = <DashboardDetail container={container} context={context}>{children}</DashboardDetail>;

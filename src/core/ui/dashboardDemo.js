@@ -107,6 +107,12 @@ export function createDashboardDemoMetadata() {
                   { label: 'APAC', value: 'APAC' },
                 ],
               },
+              {
+                id: 'dateRange',
+                type: 'dateRange',
+                label: 'Date Range',
+                field: 'dateRange',
+              },
             ],
           },
           {
@@ -338,6 +344,39 @@ export function createDashboardDemoMetadata() {
               title: 'title',
               body: 'body',
             },
+          },
+          {
+            id: 'spendPie',
+            kind: 'dashboard.timeline',
+            title: 'Spend Distribution',
+            columnSpan: 4,
+            dataSourceRef: 'byCountry',
+            chart: {
+              type: 'pie',
+              width: '100%',
+              height: '340px',
+              series: {
+                nameKey: 'country',
+                valueKey: 'spend',
+                palette: ['#137cbd', '#0f9960', '#d9822b', '#8f398f', '#c23030'],
+              },
+            },
+          },
+          {
+            id: 'countryTable',
+            kind: 'dashboard.table',
+            title: 'Country Detail Table',
+            columnSpan: 8,
+            dataSourceRef: 'byCountry',
+            filterBindings: {
+              region: 'region',
+            },
+            columns: [
+              { key: 'country', label: 'Country' },
+              { key: 'region', label: 'Region' },
+              { key: 'spend', label: 'Spend', format: 'currency' },
+            ],
+            limit: 20,
           },
         ],
       },

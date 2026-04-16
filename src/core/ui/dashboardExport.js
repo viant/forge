@@ -402,9 +402,83 @@ function renderDimensionsBlock(block) {
   `).join('')}</div>`;
 }
 
+function generatePieSvg(slices, palette, size = 280) {
+  if (!slices || !slices.length) return '';
+  const total = slices.reduce((sum, s) => sum + (Number(s.value) || 0), 0);
+  if (total <= 0) return '';
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size * 0.38;
+  const colors = palette && palette.length ? palette : ['#137cbd', '#0f9960', '#d9822b', '#8f398f', '#c23030', '#5c7080', '#2965cc', '#29a634'];
+  let startAngle = -Math.PI / 2;
+  const paths = slices.map((s, i) => {
+    const fraction = (Number(s.value) || 0) / total;
+    const angle = fraction * 2 * Math.PI;
+    const endAngle = startAngle + angle;
+    const largeArc = angle > Math.PI ? 1 : 0;
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const fill = colors[i % colors.length];
+    const path = slices.length === 1
+      ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" />`
+      : `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z" fill="${fill}" />`;
+    startAngle = endAngle;
+    return path;
+  }).join('\n    ');
+  const legendY = size + 12;
+  const legend = slices.map((s, i) => {
+    const pct = total > 0 ? ((Number(s.value) || 0) / total * 100).toFixed(0) : '0';
+    const fill = colors[i % colors.length];
+    const y = legendY + i * 20;
+    return `<rect x="10" y="${y}" width="12" height="12" rx="2" fill="${fill}" /><text x="28" y="${y + 11}" font-size="12" fill="#30404d">${escapeHtml(s.name || s.label || '')} — ${pct}%</text>`;
+  }).join('\n    ');
+  const totalHeight = legendY + slices.length * 20 + 8;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${totalHeight}" width="${size}" height="${totalHeight}" style="display:block;margin:0 auto;">
+    ${paths}
+    ${legend}
+  </svg>`;
+}
+
+function generateBarSvg(rows, {xLabel = 'X', yLabel = 'Value', palette} = {}) {
+  if (!rows || !rows.length) return '';
+  const colors = palette && palette.length ? palette : ['#137cbd'];
+  const maxVal = rows.reduce((m, r) => Math.max(m, Number(r.value) || 0), 0) || 1;
+  const barW = Math.min(40, Math.max(12, Math.floor(320 / rows.length)));
+  const gap = Math.max(4, Math.floor(barW * 0.3));
+  const chartW = rows.length * (barW + gap) + 60;
+  const chartH = 200;
+  const originX = 50;
+  const originY = chartH - 30;
+  const plotH = originY - 10;
+  const bars = rows.map((r, i) => {
+    const val = Number(r.value) || 0;
+    const h = Math.max(1, (val / maxVal) * plotH);
+    const x = originX + i * (barW + gap);
+    const y = originY - h;
+    const fill = colors[i % colors.length];
+    const labelY = originY + 14;
+    const lbl = String(r.label ?? '').slice(0, 10);
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${fill}" rx="2" />
+    <text x="${x + barW / 2}" y="${labelY}" text-anchor="middle" font-size="9" fill="#5f6b7c">${escapeHtml(lbl)}</text>`;
+  }).join('\n    ');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${chartW} ${chartH}" width="${chartW}" height="${chartH}" style="display:block;margin:0 auto;">
+    <line x1="${originX}" y1="${originY}" x2="${chartW - 10}" y2="${originY}" stroke="#d8e1e8" />
+    <line x1="${originX}" y1="10" x2="${originX}" y2="${originY}" stroke="#d8e1e8" />
+    ${bars}
+  </svg>`;
+}
+
 function renderTimelineBlock(block) {
   if (block.svg) {
     return `<div class="chart-shell">${block.svg}</div>`;
+  }
+  if (block.pieSvg) {
+    return `<div class="chart-shell">${block.pieSvg}</div>`;
+  }
+  if (block.barSvg) {
+    return `<div class="chart-shell">${block.barSvg}</div>`;
   }
   if (block.table) {
     return renderDimensionsBlock({viewMode: 'table', rows: block.table.rows, dimensionLabel: block.table.dimensionLabel, metricLabel: block.table.metricLabel});
@@ -414,6 +488,28 @@ function renderTimelineBlock(block) {
 
 function renderDetailBlock(block) {
   return (block.children || []).map(renderBlockBody).join('');
+}
+
+function renderTableBlock(block) {
+  const columns = block.columns || [];
+  const rows = block.rows || [];
+  if (!columns.length) return '';
+  return `
+    <table class="plain-table">
+      <thead>
+        <tr>
+          ${columns.map((col) => `<th>${escapeHtml(col.label || col.key)}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((row) => `
+          <tr>
+            ${columns.map((col) => `<td>${escapeHtml(row?.[col.key] ?? '-')}</td>`).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 function renderBlockBody(block) {
@@ -440,6 +536,8 @@ function renderBlockBody(block) {
       return renderBadgesBlock(block);
     case 'dashboard.report':
       return renderReportBlock(block);
+    case 'dashboard.table':
+      return renderTableBlock(block);
     case 'dashboard.detail':
       return renderDetailBlock(block);
     default:
@@ -625,18 +723,38 @@ function buildFiltersBlock(container, blockContext) {
 function buildTimelineBlock(container, blockContext, chartSvgs) {
   const rows = applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters)
     .map((row) => ({ ...row }));
+  const chartType = container.chart?.type || 'line';
+  const isPie = chartType === 'pie' || chartType === 'donut';
+  const isBar = chartType === 'bar';
+  const nameKey = container.chart?.series?.nameKey;
+  const valueKey = container.chart?.series?.valueKey || 'value';
+  const chartPalette = container.chart?.series?.palette;
+
+  let pieSvg = '';
+  let barSvg = '';
+  if (isPie && rows.length > 0 && nameKey) {
+    const slices = rows.map((row) => ({name: row[nameKey], value: Number(row[valueKey]) || 0})).filter((s) => s.value > 0);
+    pieSvg = generatePieSvg(slices, chartPalette);
+  } else if (isBar && rows.length > 0) {
+    const xKey = container.chart?.xAxis?.dataKey;
+    const barRows = rows.slice(0, 30).map((row) => ({label: row[xKey] ?? '', value: Number(row[valueKey]) || 0}));
+    barSvg = generateBarSvg(barRows, {xLabel: container.chart?.xAxis?.label, yLabel: container.chart?.yAxis?.label, palette: chartPalette});
+  }
+
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
     svg: chartSvgs?.[container.id] || '',
+    pieSvg,
+    barSvg,
     table: rows.length ? {
       dimensionLabel: container.chart?.xAxis?.label || container.chart?.xAxis?.dataKey || 'X',
       metricLabel: container.chart?.series?.valueKey || 'Value',
       rows: rows.slice(0, 25).map((row) => ({
-        label: row?.[container.chart?.xAxis?.dataKey],
-        value: row?.[container.chart?.series?.valueKey],
+        label: row?.[container.chart?.xAxis?.dataKey || nameKey],
+        value: row?.[valueKey],
       })),
     } : null,
   };
@@ -763,6 +881,33 @@ function buildReportBlock(container, blockContext = {}) {
   };
 }
 
+function buildTableBlock(container, blockContext) {
+  const rawColumns = container.columns || container.dashboard?.table?.columns || [];
+  const columns = rawColumns.map((col) => {
+    if (typeof col === 'string') return {key: col, label: col};
+    return {key: col?.key || '', label: col?.label || col?.key || '', format: col?.format};
+  }).filter((col) => !!col.key);
+  const limit = container.limit || container.dashboard?.table?.limit || 200;
+  const rows = applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters)
+    .slice(0, limit)
+    .map((row) => {
+      const out = {};
+      for (const col of columns) {
+        const raw = resolveKey(row, col.key);
+        out[col.key] = col.format ? formatDashboardValue(raw, col.format, blockContext.locale || 'en-US') : (raw ?? '-');
+      }
+      return out;
+    });
+  return {
+    kind: container.kind,
+    title: container.title,
+    subtitle: container.subtitle,
+    columnSpan: container.columnSpan,
+    columns,
+    rows,
+  };
+}
+
 function buildDetailBlock(container, context, chartSvgs) {
   return {
     kind: container.kind,
@@ -801,6 +946,8 @@ function buildExportBlock(container, context, chartSvgs) {
       return buildBadgesBlock(container, blockContext);
     case 'dashboard.report':
       return buildReportBlock(container, blockContext);
+    case 'dashboard.table':
+      return buildTableBlock(container, blockContext);
     case 'dashboard.detail':
       return buildDetailBlock(container, context, chartSvgs);
     default:

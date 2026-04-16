@@ -9,11 +9,12 @@ export const DASHBOARD_BLOCK_KINDS = [
   'dashboard.status',
   'dashboard.feed',
   'dashboard.badges',
+  'dashboard.table',
   'dashboard.report',
   'dashboard.detail',
 ];
 
-export const DASHBOARD_CHART_TYPES = ['line', 'bar', 'area'];
+export const DASHBOARD_CHART_TYPES = ['line', 'bar', 'area', 'pie', 'donut'];
 
 export const DASHBOARD_COMMANDS = [
   'ui.dashboard.capabilities',
