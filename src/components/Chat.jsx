@@ -134,12 +134,31 @@ function hasActiveSteps(steps = []) {
     });
 }
 
+function effectiveChatRow(message = {}) {
+    const iterationData = message?._iterationData;
+    if (iterationData && typeof iterationData === 'object') {
+        return {
+            ...iterationData,
+            role: message?.role || iterationData?.role || '',
+            turnStatus: iterationData?.status || message?.turnStatus || message?.status || '',
+            status: iterationData?.status || message?.status || message?.turnStatus || '',
+        };
+    }
+    return message || {};
+}
+
+function hasActiveTurnLifecycle(context = null) {
+    const chatState = context?.resources?.chat;
+    return !!String(chatState?.runningTurnId || chatState?.activeStreamTurnId || '').trim();
+}
+
 function hasActiveExecutions(messages = []) {
     const list = Array.isArray(messages) ? messages : [];
     return list.some((m) => {
-        const executions = Array.isArray(m?.executions) ? m.executions : [];
+        const row = effectiveChatRow(m);
+        const executions = Array.isArray(row?.executions) ? row.executions : [];
         if (executions.some((ex) => hasActiveSteps(ex?.steps || []))) return true;
-        const executionGroups = Array.isArray(m?.executionGroups) ? m.executionGroups : [];
+        const executionGroups = Array.isArray(row?.executionGroups) ? row.executionGroups : [];
         if (executionGroups.some((group) => {
             const status = String(group?.status || group?.Status || '').toLowerCase();
             if (status === 'in_progress' || status === 'running' || status === 'processing' || status === 'pending' || status === 'thinking' || status === 'streaming') {
@@ -149,8 +168,7 @@ function hasActiveExecutions(messages = []) {
             const toolSteps = Array.isArray(group?.toolSteps) ? group.toolSteps : [];
             return hasActiveSteps(modelSteps) || hasActiveSteps(toolSteps);
         })) return true;
-        const iterationData = m?._iterationData;
-        const iterationStatus = String(iterationData?.status || m?.turnStatus || m?.status || '').toLowerCase();
+        const iterationStatus = String(row?.turnStatus || row?.status || '').toLowerCase();
         return iterationStatus === 'in_progress'
             || iterationStatus === 'running'
             || iterationStatus === 'processing'
@@ -170,7 +188,7 @@ function resolveLastTurnStatus(messages = []) {
     // Prefer the last user turn id (newest user intent)
     let lastTurnId = '';
     for (let i = list.length - 1; i >= 0; i--) {
-        const m = list[i];
+        const m = effectiveChatRow(list[i]);
         const role = String(m?.role || m?.Role || '').toLowerCase();
         const tid = String(m?.turnId || m?.TurnId || m?.parentId || m?.ParentId || '').trim();
         if (role === 'user' && tid) {
@@ -180,7 +198,8 @@ function resolveLastTurnStatus(messages = []) {
     }
     if (!lastTurnId) {
         for (let i = list.length - 1; i >= 0; i--) {
-            const tid = String(list[i]?.turnId || list[i]?.TurnId || list[i]?.parentId || list[i]?.ParentId || '').trim();
+            const row = effectiveChatRow(list[i]);
+            const tid = String(row?.turnId || row?.TurnId || row?.parentId || row?.ParentId || '').trim();
             if (tid) {
                 lastTurnId = tid;
                 break;
@@ -191,7 +210,7 @@ function resolveLastTurnStatus(messages = []) {
 
     // Scan all rows belonging to the last turn for an explicit terminal status.
     for (let i = list.length - 1; i >= 0; i--) {
-        const m = list[i];
+        const m = effectiveChatRow(list[i]);
         const tid = String(m?.turnId || m?.TurnId || m?.parentId || m?.ParentId || '').trim();
         if (tid !== lastTurnId) continue;
         const turnStatus = String(m?.turnStatus || m?.TurnStatus || '').trim();
@@ -246,8 +265,23 @@ function hasHandledTranscriptTurn(messages = [], preview = '') {
         const role = String(list[i]?.role || list[i]?.Role || '').toLowerCase();
         if (role === 'assistant') return true;
     }
-    const status = String(list[userIndex]?.turnStatus || list[userIndex]?.TurnStatus || '').toLowerCase();
-    return isTerminalTurnStatus(status);
+  const status = String(list[userIndex]?.turnStatus || list[userIndex]?.TurnStatus || '').toLowerCase();
+  return isTerminalTurnStatus(status);
+}
+
+function previewMatchesActiveTurn(messages = [], preview = '', runningTurnId = '') {
+    const target = String(preview || '').trim();
+    const activeTurnId = String(runningTurnId || '').trim();
+    if (!target || !activeTurnId) return false;
+    const list = Array.isArray(messages) ? messages : [];
+    return list.some((message) => {
+        const row = effectiveChatRow(message);
+        const role = String(row?.role || row?.Role || '').toLowerCase();
+        if (role !== 'user') return false;
+        const turnId = String(row?.turnId || row?.TurnId || row?.parentId || row?.ParentId || '').trim();
+        if (turnId !== activeTurnId) return false;
+        return String(row?.content || row?.Content || '').trim() === target;
+    });
 }
 
 export default function Chat({
@@ -717,10 +751,11 @@ export default function Chat({
             const preview = String(entry?.preview || '').trim();
             if (!preview) return false;
             if (backendQueuedContent.has(preview)) return false;
+            if (previewMatchesActiveTurn(messages, preview, context?.resources?.chat?.runningTurnId)) return false;
             if (backendConversationRunning || optimisticRunning) return true;
             return !hasHandledTranscriptTurn(messages, preview);
         }));
-    }, [messages, queuedTurns, localQueuedTurns.length, backendConversationRunning, optimisticRunning]);
+    }, [messages, queuedTurns, localQueuedTurns.length, backendConversationRunning, optimisticRunning, context?.resources?.chat?.runningTurnId]);
 
     const toolsLabel = () => {
         if (!currentTools.length) return '';
@@ -935,6 +970,7 @@ export default function Chat({
     // Backend `Post()` enqueues turns; treat "processing" as: the latest user message hasn't
     // received an assistant response, or any execution steps are still active.
     // Ignore stale `conversations.running` when we have no evidence of work in-flight.
+    const turnLifecycleRunning = backendConversationRunning || hasActiveTurnLifecycle(context) || optimisticRunning;
     const isProcessing = (() => {
         const activeExec = hasActiveExecutions(messages);
         const lastTurnStatus = resolveLastTurnStatus(messages);
@@ -942,14 +978,12 @@ export default function Chat({
         const lastUser = lastIndexByRole(messages, 'user');
         const lastAssistant = lastIndexByRole(messages, 'assistant');
         const hasUnansweredUser = lastUser !== -1 && lastUser > lastAssistant;
+        if (turnLifecycleRunning) return true;
         if (activeExec) return true;
         // If the newest user turn is terminal (e.g. canceled) but no assistant bubble was produced,
         // do not keep the composer in a "processing" state.
         if (lastTurnIsTerminal) return false;
         if (hasUnansweredUser) return true;
-        if (!(backendConversationRunning || optimisticRunning)) return false;
-        // If we have evidence of a completed last turn, ignore stale running=true.
-        if (lastUser !== -1 && lastAssistant !== -1 && lastAssistant > lastUser) return false;
         return true;
     })();
 
@@ -990,7 +1024,33 @@ export default function Chat({
         : (chatCfg.showAbort !== undefined ? chatCfg.showAbort : true);
 
     // Abort/Queue should only be visible while the current turn is being processed.
-    const effectiveShowAbortWhileRunning = effectiveShowAbort && isProcessing;
+    const effectiveShowAbortWhileRunning = effectiveShowAbort && (turnLifecycleRunning || abortVisible);
+
+    useEffect(() => {
+        if (!isChatDebugEnabled()) return;
+        try {
+            console.log('[forge-chat:processing]', {
+                conversationID,
+                messageCount: Array.isArray(messages) ? messages.length : 0,
+                turnLifecycleRunning,
+                abortVisible,
+                backendConversationRunning,
+                optimisticRunning,
+                isProcessing,
+                effectiveShowAbortWhileRunning,
+                lastTurnStatus: resolveLastTurnStatus(messages),
+                hasActiveExecutions: hasActiveExecutions(messages),
+                messageKinds: (Array.isArray(messages) ? messages : []).map((message) => ({
+                    id: String(message?.id || '').trim(),
+                    type: String(message?._type || message?.role || '').trim(),
+                    topLevelStatus: String(message?.status || message?.turnStatus || '').trim(),
+                    iterationStatus: String(message?._iterationData?.status || '').trim(),
+                    executionGroupCount: Array.isArray(message?.executionGroups) ? message.executionGroups.length : 0,
+                    iterationExecutionGroupCount: Array.isArray(message?._iterationData?.executionGroups) ? message._iterationData.executionGroups.length : 0,
+                })),
+            });
+        } catch (_) {}
+    }, [conversationID, messages, turnLifecycleRunning, abortVisible, backendConversationRunning, optimisticRunning, isProcessing, effectiveShowAbortWhileRunning]);
 
     const composerDisabled = (chatCfg?.disableInputOnLoading)
         ? (loading && !isProcessing)
