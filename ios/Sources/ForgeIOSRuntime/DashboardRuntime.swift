@@ -146,7 +146,7 @@ public enum DashboardRuntime {
     }
 
     public static func formatDashboardValue(_ value: Any?, format: String?) -> String {
-        guard let value else { return "n/a" }
+        guard let value = unwrapOptional(value) else { return "n/a" }
         let normalized = format?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let locale = Locale(identifier: "en_US")
         switch normalized {

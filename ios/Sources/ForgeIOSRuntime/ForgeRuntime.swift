@@ -105,6 +105,26 @@ public actor ForgeRuntime {
         return await dataSourceRuntime.form(dataSourceID: dataSourceID)
     }
 
+    public func setDataSourceCollection(windowID: String, dataSourceRef: String, rows: [[String: JSONValue]]) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: rows)
+    }
+
+    public func dataSourceCollection(windowID: String, dataSourceRef: String) async -> [[String: JSONValue]] {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        return await dataSourceRuntime.collection(dataSourceID: dataSourceID)
+    }
+
+    public func setDataSourceMetrics(windowID: String, dataSourceRef: String, values: [String: JSONValue]) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: values)
+    }
+
+    public func dataSourceMetrics(windowID: String, dataSourceRef: String) async -> [String: JSONValue] {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        return await dataSourceRuntime.metrics(dataSourceID: dataSourceID)
+    }
+
     // MARK: - Handler registry
 
     public func registerHandler(_ name: String, _ handler: @escaping ForgeHandler) {

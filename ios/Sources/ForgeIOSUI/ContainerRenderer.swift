@@ -37,9 +37,9 @@ public struct ContainerRenderer: View {
         } else if container.schemaBasedForm != nil {
             SchemaBasedFormRenderer(container: container)
         } else if let table = container.table {
-            TableRenderer(runtime: runtime, window: window, table: table)
+            TableRenderer(runtime: runtime, window: window, container: container, table: table)
         } else if let chart = container.chart {
-            ChartRenderer(runtime: runtime, window: window, chart: chart)
+            ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
         } else if container.tabs != nil, !container.containers.isEmpty {
             TabsRenderer(runtime: runtime, window: window, container: container)
         } else if let editor = container.editor {

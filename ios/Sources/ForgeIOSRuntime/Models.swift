@@ -423,6 +423,18 @@ public struct DashboardMetricDef: Codable, Sendable {
     public let label: String?
     public let selector: String?
     public let format: String?
+
+    public init(
+        id: String? = nil,
+        label: String? = nil,
+        selector: String? = nil,
+        format: String? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.selector = selector
+        self.format = format
+    }
 }
 
 public struct DashboardCompareDef: Codable, Sendable {
@@ -455,6 +467,10 @@ public struct DashboardKPIRowDef: Codable, Sendable, Identifiable {
 
 public struct DashboardFiltersDef: Codable, Sendable {
     public let items: [DashboardFilterItemDef]
+
+    public init(items: [DashboardFilterItemDef] = []) {
+        self.items = items
+    }
 }
 
 public struct DashboardFilterItemDef: Codable, Sendable, Identifiable {
@@ -463,6 +479,20 @@ public struct DashboardFilterItemDef: Codable, Sendable, Identifiable {
     public let field: String?
     public let multiple: Bool?
     public let options: [DashboardFilterOptionDef]
+
+    public init(
+        id: String? = nil,
+        label: String? = nil,
+        field: String? = nil,
+        multiple: Bool? = nil,
+        options: [DashboardFilterOptionDef] = []
+    ) {
+        self.id = id
+        self.label = label
+        self.field = field
+        self.multiple = multiple
+        self.options = options
+    }
 }
 
 public struct DashboardFilterOptionDef: Codable, Sendable, Identifiable {
@@ -476,12 +506,27 @@ public struct DashboardFilterOptionDef: Codable, Sendable, Identifiable {
         case defaultValue = "default"
     }
 
+    public init(
+        label: String? = nil,
+        value: String? = nil,
+        defaultValue: Bool? = nil
+    ) {
+        self.label = label
+        self.value = value
+        self.defaultValue = defaultValue
+    }
+
     public var id: String { value ?? label ?? UUID().uuidString }
 }
 
 public struct DashboardTimelineDef: Codable, Sendable {
     public let viewModes: [String]
     public let annotations: DashboardAnnotationDef?
+
+    public init(viewModes: [String] = [], annotations: DashboardAnnotationDef? = nil) {
+        self.viewModes = viewModes
+        self.annotations = annotations
+    }
 }
 
 public struct DashboardAnnotationDef: Codable, Sendable {
@@ -652,10 +697,28 @@ public struct ItemDef: Codable, Sendable, Identifiable {
 public struct ChartDef: Codable, Sendable {
     public let kind: String?
     public let title: String?
+    public let type: String?
+    public let xKey: String?
+    public let valueKey: String?
+    public let nameKey: String?
+    public let series: [String]
 
-    public init(kind: String? = nil, title: String? = nil) {
+    public init(
+        kind: String? = nil,
+        title: String? = nil,
+        type: String? = nil,
+        xKey: String? = nil,
+        valueKey: String? = nil,
+        nameKey: String? = nil,
+        series: [String] = []
+    ) {
         self.kind = kind
         self.title = title
+        self.type = type
+        self.xKey = xKey
+        self.valueKey = valueKey
+        self.nameKey = nameKey
+        self.series = series
     }
 }
 

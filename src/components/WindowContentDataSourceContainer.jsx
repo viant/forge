@@ -15,17 +15,19 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
     const dsContext = (typeof windowContext.useDsContext === 'function')
         ? windowContext.useDsContext(dsKey)
         : windowContext.Context(dsKey);
-    const appliedRef = useRef(false);
+    const appliedSignatureRef = useRef('');
 
     useEffect(() => {
-        if (appliedRef.current) return;
-        appliedRef.current = true;
         if (!initialParams) return;
+        const signature = JSON.stringify(initialParams);
+        if (appliedSignatureRef.current === signature) return;
+        appliedSignatureRef.current = signature;
         try { log.debug('[ds-mount] initialParams', { ds: dsKey, initial: initialParams }); } catch(_) {}
         Object.entries(initialParams).forEach(([k, v]) => {
             if (k === 'filter' || k === 'parameters') {
                 const input = dsContext.signals.input;
-                input.value = { ...input.peek(), [k]: v };
+                const prev = input.peek();
+                input.value = { ...prev, [k]: v, fetch: true };
                 return;
             }
             const signal = dsContext.signals[k];
