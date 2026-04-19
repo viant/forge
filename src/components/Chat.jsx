@@ -10,7 +10,6 @@ import FormRenderer from "./FormRenderer.jsx";
 
 import { useSetting } from "../core";
 import { useSignalEffect } from '@preact/signals-react';
-import { resolveSelector } from '../utils/selector.js';
 
 import { chatHandlers } from "../hooks";
 import { useEffect, useRef } from "react";
@@ -28,10 +27,54 @@ import {
 // Shared chat styles (avatars, bubbles, etc.)
 import "./chat.css";
 
-// Reuse the existing table toolbar for chat when descriptor provided
-import TableToolbar from "./table/basic/Toolbar.jsx";
 import AttachmentDialog from './chat/AttachmentDialog.jsx';
 import useUpload, { UploadStatus } from '../hooks/useUpload.js';
+import {
+    defaultNormalizeMessages,
+    normalizeLegacyMessages,
+    hasActiveExecutions,
+    isTerminalTurnStatus,
+    resolveLastTurnStatus,
+    lastIndexByRole,
+    shouldKeepLocalQueuedPreview,
+} from './chatLegacyHelpers.js';
+import {
+    normalizeString,
+    normalizeBool,
+    ensureStringArray,
+    defaultAgentTools,
+    defaultAgentModel,
+    resolveCurrentModel,
+} from './chatCommandCenterHelpers.js';
+import {
+    applyAgentSelection,
+    applyModelSelection,
+    applyReasoningSelection,
+    applyToolsSelection,
+    applyAutoSelectToolsSelection,
+} from './chatCommandCenterActions.js';
+import {
+    cancelQueuedTurn,
+    moveQueuedTurn,
+    editQueuedTurn,
+    steerQueuedTurn,
+} from './chatQueueActions.js';
+import {
+    computeSubmittingWhileProcessing,
+    shouldHoldLegacySubmitLatch,
+    shouldClearLegacyOptimisticRunning,
+    makeLocalQueuedPreview,
+} from './chatLegacySubmitState.js';
+import useChatLegacyState from './useChatLegacyState.js';
+import useChatLegacyLifecycle from './useChatLegacyLifecycle.js';
+import { computeChatDerivedState } from './chatDerivedState.js';
+import { computeAbortVisibility, renderChatToolbar } from './chatViewHelpers.js';
+import {
+    buildUsageSummary,
+    buildUsageTooltip,
+    buildToolsLabel,
+    clearCommandCenterChip,
+} from './chatCommandCenterViewState.js';
 
 
 // ---------------------------------------------------------------------------
@@ -99,23 +142,6 @@ function StarterTaskGrid({ tasks = [], onSelect }) {
     );
 }
 
-
-function defaultNormalizeMessages(rawMessages= []) {
-    return rawMessages.map((m) => ({...m}));
-}
-
-function hasSyntheticChatRows(rawMessages = []) {
-    const list = Array.isArray(rawMessages) ? rawMessages : [];
-    return list.some((message) => {
-        const kind = String(message?._type || '').trim().toLowerCase();
-        return kind === 'iteration'
-            || kind === 'queue'
-            || kind === 'starter'
-            || kind === 'paginator'
-            || !!message?._iterationData;
-    });
-}
-
 function isChatDebugEnabled() {
     if (typeof window === 'undefined') return false;
     try {
@@ -126,162 +152,13 @@ function isChatDebugEnabled() {
     }
 }
 
-function hasActiveSteps(steps = []) {
-    const list = Array.isArray(steps) ? steps : [];
-    return list.some((s) => {
-        const status = String(s?.status || s?.Status || '').toLowerCase();
-        return status === 'in_progress' || status === 'running' || status === 'processing' || status === 'pending';
-    });
-}
-
-function effectiveChatRow(message = {}) {
-    const iterationData = message?._iterationData;
-    if (iterationData && typeof iterationData === 'object') {
-        return {
-            ...iterationData,
-            role: message?.role || iterationData?.role || '',
-            turnStatus: iterationData?.status || message?.turnStatus || message?.status || '',
-            status: iterationData?.status || message?.status || message?.turnStatus || '',
-        };
-    }
-    return message || {};
+function logFeedDebugEnabled() {
+    return isChatDebugEnabled();
 }
 
 function hasActiveTurnLifecycle(context = null) {
     const chatState = context?.resources?.chat;
     return !!String(chatState?.runningTurnId || chatState?.activeStreamTurnId || '').trim();
-}
-
-function hasActiveExecutions(messages = []) {
-    const list = Array.isArray(messages) ? messages : [];
-    return list.some((m) => {
-        const row = effectiveChatRow(m);
-        const executions = Array.isArray(row?.executions) ? row.executions : [];
-        if (executions.some((ex) => hasActiveSteps(ex?.steps || []))) return true;
-        const executionGroups = Array.isArray(row?.executionGroups) ? row.executionGroups : [];
-        if (executionGroups.some((group) => {
-            const status = String(group?.status || group?.Status || '').toLowerCase();
-            if (status === 'in_progress' || status === 'running' || status === 'processing' || status === 'pending' || status === 'thinking' || status === 'streaming') {
-                return true;
-            }
-            const modelSteps = Array.isArray(group?.modelSteps) ? group.modelSteps : (group?.modelCall ? [group.modelCall] : []);
-            const toolSteps = Array.isArray(group?.toolSteps) ? group.toolSteps : [];
-            return hasActiveSteps(modelSteps) || hasActiveSteps(toolSteps);
-        })) return true;
-        const iterationStatus = String(row?.turnStatus || row?.status || '').toLowerCase();
-        return iterationStatus === 'in_progress'
-            || iterationStatus === 'running'
-            || iterationStatus === 'processing'
-            || iterationStatus === 'pending'
-            || iterationStatus === 'thinking'
-            || iterationStatus === 'streaming';
-    });
-}
-
-function isTerminalTurnStatus(value) {
-    const s = String(value || '').toLowerCase().trim();
-    return s === 'completed' || s === 'done' || s === 'succeeded' || s === 'success' || s === 'failed' || s === 'error' || s === 'canceled' || s === 'cancelled';
-}
-
-function resolveLastTurnStatus(messages = []) {
-    const list = Array.isArray(messages) ? messages : [];
-    // Prefer the last user turn id (newest user intent)
-    let lastTurnId = '';
-    for (let i = list.length - 1; i >= 0; i--) {
-        const m = effectiveChatRow(list[i]);
-        const role = String(m?.role || m?.Role || '').toLowerCase();
-        const tid = String(m?.turnId || m?.TurnId || m?.parentId || m?.ParentId || '').trim();
-        if (role === 'user' && tid) {
-            lastTurnId = tid;
-            break;
-        }
-    }
-    if (!lastTurnId) {
-        for (let i = list.length - 1; i >= 0; i--) {
-            const row = effectiveChatRow(list[i]);
-            const tid = String(row?.turnId || row?.TurnId || row?.parentId || row?.ParentId || '').trim();
-            if (tid) {
-                lastTurnId = tid;
-                break;
-            }
-        }
-    }
-    if (!lastTurnId) return '';
-
-    // Scan all rows belonging to the last turn for an explicit terminal status.
-    for (let i = list.length - 1; i >= 0; i--) {
-        const m = effectiveChatRow(list[i]);
-        const tid = String(m?.turnId || m?.TurnId || m?.parentId || m?.ParentId || '').trim();
-        if (tid !== lastTurnId) continue;
-        const turnStatus = String(m?.turnStatus || m?.TurnStatus || '').trim();
-        if (turnStatus) return turnStatus;
-        const status = String(m?.status || m?.Status || '').trim();
-        if (status && isTerminalTurnStatus(status)) return status;
-    }
-    return '';
-}
-
-function lastIndexByRole(messages = [], role) {
-    const list = Array.isArray(messages) ? messages : [];
-    const target = String(role || '').toLowerCase();
-    for (let i = list.length - 1; i >= 0; i--) {
-        const r = String(list[i]?.role || list[i]?.Role || '').toLowerCase();
-        if (r === target) return i;
-    }
-    return -1;
-}
-
-function formatTokensCompact(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) return '';
-    if (n < 1000) return String(Math.round(n));
-    const k = n / 1000;
-    const roundedTenth = Math.round(k * 10) / 10;
-    const text = (roundedTenth % 1 === 0) ? String(Math.trunc(roundedTenth)) : String(roundedTenth);
-    return `${text}k`;
-}
-
-function formatCostCompact(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n) || n < 0) return '';
-    return `$${n.toFixed(2)}`;
-}
-
-function hasHandledTranscriptTurn(messages = [], preview = '') {
-    const target = String(preview || '').trim();
-    if (!target) return false;
-    const list = Array.isArray(messages) ? messages : [];
-    let userIndex = -1;
-    for (let i = list.length - 1; i >= 0; i--) {
-        const role = String(list[i]?.role || list[i]?.Role || '').toLowerCase();
-        const content = String(list[i]?.content || list[i]?.Content || '').trim();
-        if (role === 'user' && content === target) {
-            userIndex = i;
-            break;
-        }
-    }
-    if (userIndex === -1) return false;
-    for (let i = userIndex + 1; i < list.length; i++) {
-        const role = String(list[i]?.role || list[i]?.Role || '').toLowerCase();
-        if (role === 'assistant') return true;
-    }
-  const status = String(list[userIndex]?.turnStatus || list[userIndex]?.TurnStatus || '').toLowerCase();
-  return isTerminalTurnStatus(status);
-}
-
-function previewMatchesActiveTurn(messages = [], preview = '', runningTurnId = '') {
-    const target = String(preview || '').trim();
-    const activeTurnId = String(runningTurnId || '').trim();
-    if (!target || !activeTurnId) return false;
-    const list = Array.isArray(messages) ? messages : [];
-    return list.some((message) => {
-        const row = effectiveChatRow(message);
-        const role = String(row?.role || row?.Role || '').toLowerCase();
-        if (role !== 'user') return false;
-        const turnId = String(row?.turnId || row?.TurnId || row?.parentId || row?.ParentId || '').trim();
-        if (turnId !== activeTurnId) return false;
-        return String(row?.content || row?.Content || '').trim() === target;
-    });
 }
 
 export default function Chat({
@@ -307,6 +184,7 @@ export default function Chat({
      * When undefined, falls back to container.chat.showInput or defaults to true.
      */
     showInput: showInputProp,
+
 }) {
     // ---------------------------------------------------------------------
     // 📡  Resolve Forge runtime context
@@ -330,6 +208,19 @@ export default function Chat({
 
     // Resolve classifier / renderer strategy – props > service > defaults
     const chatService = context?.handlers?.chat || {};
+    const renderFeed = context?.lookupHandler?.('chat.renderFeed');
+    const usesExternalFeedState = typeof renderFeed === 'function';
+    const usesLegacyFeedState = !usesExternalFeedState;
+    useEffect(() => {
+        if (!logFeedDebugEnabled()) return;
+        try {
+            console.log('[forge-chat:feed]', {
+                hasLookupHandler: typeof context?.lookupHandler === 'function',
+                renderFeedType: typeof renderFeed,
+                chatServiceKeys: Object.keys(chatService || {}).sort(),
+            });
+        } catch (_) {}
+    }, [context, renderFeed, chatService]);
 
 
     const classifyMessage = classifyMessageProp || chatService.classifyMessage || defaultClassifier;
@@ -380,7 +271,6 @@ export default function Chat({
     // ---------------------------------------------------------------------
     // 🛑  Local component state reflecting incoming signals
     // ---------------------------------------------------------------------
-    const [messages, setMessages] = useState([]);
     const [attachOpen, setAttachOpen] = useState(false);
     const [pendingAttachments, setPendingAttachments] = useState([]);
     const batchIdsRef = useRef(new Set());
@@ -388,42 +278,25 @@ export default function Chat({
     const [metaSnapshot, setMetaSnapshot] = useState({});
     const [conversationSnapshot, setConversationSnapshot] = useState({});
     const [usageSnapshot, setUsageSnapshot] = useState({});
-    const [localQueuedTurns, setLocalQueuedTurns] = useState([]);
-    const [optimisticRunning, setOptimisticRunning] = useState(false);
     const [composerDraft, setComposerDraft] = useState('');
-    const submitLatchRef = useRef(false);
-    const submitLatchTimerRef = useRef(null);
-
-
-    const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages
-    
-    useEffect(() => {
-        const synthetic = hasSyntheticChatRows(rawMessages);
-        const norm = synthetic
-            ? rawMessages
-            : normalizeMessages(rawMessages);
-        if (isChatDebugEnabled()) {
-            // eslint-disable-next-line no-console
-            console.log('[forge-chat]', {
-                rawCount: Array.isArray(rawMessages) ? rawMessages.length : 0,
-                rawTypes: (Array.isArray(rawMessages) ? rawMessages : []).map((m) => ({
-                    id: m?.id,
-                    type: m?._type || m?.role,
-                    mode: m?.mode || '',
-                    head: String(m?.content || '').slice(0, 60)
-                })),
-                synthetic,
-                normCount: Array.isArray(norm) ? norm.length : 0,
-                normTypes: (Array.isArray(norm) ? norm : []).map((m) => ({
-                    id: m?.id,
-                    type: m?._type || m?.role,
-                    mode: m?.mode || '',
-                    head: String(m?.content || '').slice(0, 60)
-                }))
-            });
-        }
-        setMessages(norm);
-    }, [rawMessages]);
+    const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages;
+    const {
+        messages,
+        localQueuedTurns,
+        setLocalQueuedTurns,
+        optimisticRunning,
+        setOptimisticRunning,
+        submitLatchRef,
+        submitLatchTimerRef,
+        clearSubmitLatchTimer,
+        resetSubmitLatch,
+    } = useChatLegacyState({
+        rawMessages,
+        usesLegacyFeedState,
+        normalizeMessages,
+        normalizeLegacyMessages,
+        debugEnabled: isChatDebugEnabled(),
+    });
 
 
     // ---------------------------------------------------------------------
@@ -443,28 +316,9 @@ export default function Chat({
     // 🔎  Compute abort visibility via abortVisible { selector, when }
     //      Precedence (highest → lowest): prop > abortVisible > showAbort > loading
     // ---------------------------------------------------------------------
-    const computeAbortVisible = useCallback(() => {
-        const spec = chatCfg?.abortVisible;
-        if (!spec || !spec.selector) return false;
-        try {
-            const dsCtx = spec.dataSourceRef ? context.Context(spec.dataSourceRef) : context;
-            const formObj = dsCtx?.signals?.form?.value;
-            const val = resolveSelector(formObj, spec.selector);
-            const when = spec.when;
-            if (when === undefined || when === null) {
-                const out = !!val;
-                return out;
-            }
-            if (Array.isArray(when)) {
-                const out = when.some((w) => w === val);
-                return out;
-            }
-            const out = (val === when);
-            return out;
-        } catch (_) {
-            return false;
-        }
-    }, [context, chatCfg?.abortVisible?.dataSourceRef, chatCfg?.abortVisible?.selector, JSON.stringify(chatCfg?.abortVisible?.when || null)]);
+    const computeAbortVisible = useCallback(() => (
+        computeAbortVisibility({ chatCfg, context })
+    ), [chatCfg, context]);
 
     // Subscribe to form changes so visibility updates with polling/async state
     useSignalEffect(() => {
@@ -499,11 +353,18 @@ export default function Chat({
 
     // ---------------------------------------------------------------------
     // 🎛️  Command-center composer state (agent/model/tools/reasoning)
+    //      Prefer an external resolver when the caller wants to own these
+    //      semantics (for example Agently's chatStore/runtime path).
     // ---------------------------------------------------------------------
 
+    const resolveComposerProps = context?.lookupHandler?.('chat.resolveComposerProps');
+    const externalComposerProps = (typeof resolveComposerProps === 'function')
+        ? (resolveComposerProps({ context, container }) || {})
+        : null;
+    const usesExternalComposerProps = !!externalComposerProps;
     const commandCenterCfg = chatCfg?.commandCenter;
-    const commandCenterEnabled = !!commandCenterCfg;
-    const metaCtx = commandCenterEnabled
+    const commandCenterEnabled = !!(externalComposerProps?.commandCenter ?? commandCenterCfg);
+    const metaCtx = (!usesExternalComposerProps && commandCenterEnabled)
         ? context.Context((typeof commandCenterCfg === 'object' && commandCenterCfg.dataSourceRef) ? commandCenterCfg.dataSourceRef : 'meta')
         : null;
 
@@ -515,288 +376,166 @@ export default function Chat({
 
     const metaDS = metaCtx?.handlers?.dataSource;
 
-    const normalizeString = (value) => String(value || '').trim();
-    const normalizeBool = (value) => {
-        if (value === true || value === false) return value;
-        if (value === undefined || value === null) return false;
-        if (typeof value === 'number') return value === 1;
-        const s = String(value).trim().toLowerCase();
-        if (s === 'true' || s === '1' || s === 'yes' || s === 'on') return true;
-        if (s === 'false' || s === '0' || s === 'no' || s === 'off') return false;
-        return false;
-    };
-    const ensureStringArray = (value) => {
-        if (Array.isArray(value)) return value.map(v => String(v)).filter(Boolean);
-        if (value === undefined || value === null || value === '') return [];
-        return [String(value)];
-    };
-
-    const applyAgentSelection = (agentID) => {
-        if (!metaDS) return;
-        const key = normalizeString(agentID);
-        const form = metaDS.peekFormData?.() || metaSnapshot || {};
-        const agentInfo = form?.agentInfo || metaSnapshot?.agentInfo || {};
-        const optionInfo = (Array.isArray(form?.agentOptions) ? form.agentOptions : Array.isArray(metaSnapshot?.agentOptions) ? metaSnapshot.agentOptions : [])
-            .find((entry) => normalizeString(entry?.value ?? entry?.id) === key) || {};
-        const info = { ...optionInfo, ...(agentInfo?.[key] || {}) };
-        const preferredModel = normalizeString(info?.modelRef || info?.model || '');
-
-        if (!key) {
-            const next = {
-                ...(metaDS.peekFormData?.() || {}),
-                agent: '',
-                model: normalizeString(form?.defaults?.model || ''),
-            };
-            metaDS.setFormData?.({ values: next });
-            try {
-                const convCtx = context.Context('conversations');
-                const convDS = convCtx?.handlers?.dataSource;
-                convDS?.setFormField?.({ item: { id: 'agent' }, value: '' });
-                convDS?.setFormField?.({ item: { id: 'model' }, value: next.model || '' });
-            } catch (_) {}
-            return;
-        }
-
-        try { metaDS.setFormField?.({ item: { id: 'agent' }, value: key }); } catch (_) {}
-        if (preferredModel) {
-            try { metaDS.setFormField?.({ item: { id: 'model' }, value: preferredModel }); } catch (_) {}
-        }
-        // Keep the conversation form in sync so any header/UI bound to the
-        // conversations data source reflects the selected agent immediately.
-        try {
-            const convCtx = context.Context('conversations');
-            const convDS = convCtx?.handlers?.dataSource;
-            convDS?.setFormField?.({ item: { id: 'agent' }, value: key });
-            const name = normalizeString(info?.name || info?.Name);
-            if (name) convDS?.setFormField?.({ item: { id: 'agentName' }, value: name });
-            if (preferredModel) convDS?.setFormField?.({ item: { id: 'model' }, value: preferredModel });
-        } catch (_) {}
-
-        const selectedTools = ensureStringArray(info?.tools);
-        const agentValues = { ...info, tool: selectedTools };
-        if (preferredModel) agentValues.model = preferredModel;
-        delete agentValues.tools;
-
-        try {
-            const prev = metaDS.peekFormData?.() || {};
-            metaDS.setFormData?.({ values: { ...prev, ...agentValues } });
-        } catch (_) {}
-    };
-
-    const setMetaField = (id, value) => {
-        if (!metaDS || !id) return;
-        try { metaDS.setFormField?.({ item: { id }, value }); } catch (_) {}
-    };
-
-    const handleAgentChange = (agentID) => {
+    const internalHandleAgentChange = (agentID) => {
         if (events?.onAgentSelect?.isDefined?.()) {
             events.onAgentSelect.execute({ context: metaCtx || context, selected: agentID, value: agentID });
         }
-        applyAgentSelection(agentID);
+        applyAgentSelection({ agentID, metaDS, metaSnapshot, context });
     };
 
-    const handleModelChange = (modelID) => {
+    const internalHandleModelChange = (modelID) => {
         if (events?.onModelSelect?.isDefined?.()) {
             events.onModelSelect.execute({ context: metaCtx || context, selected: modelID, value: modelID });
             return;
         }
-        const id = normalizeString(modelID);
-        setMetaField('model', id);
-        // Mirror selection into conversations form for header/UI consistency.
-        try {
-            const convCtx = context.Context('conversations');
-            const convDS = convCtx?.handlers?.dataSource;
-            convDS?.setFormField?.({ item: { id: 'model' }, value: id });
-        } catch (_) {}
+        applyModelSelection({ modelID, metaDS, context });
     };
 
-    const handleReasoningChange = (effort) => {
+    const internalHandleReasoningChange = (effort) => {
         if (events?.onReasoningSelect?.isDefined?.()) {
             events.onReasoningSelect.execute({ context: metaCtx || context, selected: effort, value: effort });
             return;
         }
-        setMetaField('reasoningEffort', normalizeString(effort));
+        applyReasoningSelection({ effort, metaDS });
     };
 
-    const handleToolsChange = (toolNames) => {
+    const internalHandleToolsChange = (toolNames) => {
         if (events?.onToolsChange?.isDefined?.()) {
             events.onToolsChange.execute({ context: metaCtx || context, selected: toolNames, value: toolNames });
             return;
         }
-        setMetaField('tool', ensureStringArray(toolNames));
+        applyToolsSelection({ toolNames, metaDS });
     };
 
-    const handleAutoSelectToolsChange = (enabled) => {
-        const next = !!enabled;
-        // Ensure defaults do not override an explicit user selection.
-        try {
-            if (context?.resources) {
-                context.resources.autoSelectToolsTouched = true;
-            }
-        } catch (_) {}
-
-        setMetaField('autoSelectTools', next);
-        // Mirror into conversations form so conversation creation & header bindings stay consistent.
-        try {
-            const convCtx = context.Context('conversations');
-            const convDS = convCtx?.handlers?.dataSource;
-            convDS?.setFormField?.({ item: { id: 'autoSelectTools' }, value: next });
-        } catch (_) {}
+    const internalHandleAutoSelectToolsChange = (enabled) => {
+        applyAutoSelectToolsSelection({ enabled, metaDS, context });
     };
 
-    const findAgentOption = (agentID) => {
-        const id = normalizeString(agentID);
-        if (!id) return {};
-        return (Array.isArray(metaSnapshot?.agentOptions) ? metaSnapshot.agentOptions : [])
-            .find((entry) => {
-                const value = normalizeString(entry?.value ?? entry?.id);
-                const label = normalizeString(entry?.label ?? entry?.name ?? entry?.title);
-                return value === id || label === id;
-            }) || {};
-    };
-
-    const findAgentInfo = (agentID) => {
-        const id = normalizeString(agentID);
-        if (!id) return {};
-        const mapped = metaSnapshot?.agentInfo?.[id];
-        if (mapped) return mapped;
-        return (Array.isArray(metaSnapshot?.agentInfos) ? metaSnapshot.agentInfos : [])
-            .find((entry) => {
-                const value = normalizeString(entry?.id ?? entry?.value);
-                const label = normalizeString(entry?.label ?? entry?.name ?? entry?.title);
-                return value === id || label === id;
-            }) || {};
-    };
-
-    const defaultAgentTools = (agentID) => {
-        const optionInfo = findAgentOption(agentID);
-        const info = { ...optionInfo, ...findAgentInfo(agentID) };
-        return ensureStringArray(info?.tools);
-    };
-
-    const defaultAgentModel = (agentID) => {
-        const optionInfo = findAgentOption(agentID);
-        const info = { ...optionInfo, ...findAgentInfo(agentID) };
-        return normalizeString(info?.modelRef || info?.model);
-    };
-
-    const commandCenterDefaults = metaSnapshot?.defaults || {};
-    const currentAgent = normalizeString(metaSnapshot?.agent);
-    const selectedAgentPreferredModel = defaultAgentModel(currentAgent);
-    const rawCurrentModel = normalizeString(metaSnapshot?.model);
-    const defaultModel = normalizeString(commandCenterDefaults?.model);
-    const currentModel = (() => {
-        if (!currentAgent || !selectedAgentPreferredModel) return rawCurrentModel;
-        if (!rawCurrentModel || rawCurrentModel === defaultModel) {
-            return selectedAgentPreferredModel;
-        }
-        return rawCurrentModel;
-    })();
-    const currentReasoning = normalizeString(metaSnapshot?.reasoningEffort);
-    const currentTools = ensureStringArray(metaSnapshot?.tool);
-    const currentAutoSelectTools = (metaSnapshot?.autoSelectTools !== undefined)
-        ? normalizeBool(metaSnapshot?.autoSelectTools)
-        : normalizeBool(commandCenterDefaults?.autoSelectTools);
-    const starterTasks = Array.isArray(metaSnapshot?.starterTasks) ? metaSnapshot.starterTasks : [];
+    const commandCenterDefaults = usesExternalComposerProps
+        ? (externalComposerProps?.defaults || {})
+        : (metaSnapshot?.defaults || {});
+    const currentAgent = usesExternalComposerProps
+        ? normalizeString(externalComposerProps?.agentValue)
+        : normalizeString(metaSnapshot?.agent);
+    const rawCurrentModel = usesExternalComposerProps
+        ? normalizeString(externalComposerProps?.modelValue)
+        : normalizeString(metaSnapshot?.model);
+    const defaultModel = usesExternalComposerProps
+        ? normalizeString(externalComposerProps?.defaultModel)
+        : normalizeString(commandCenterDefaults?.model);
+    const currentModel = usesExternalComposerProps
+        ? normalizeString(externalComposerProps?.modelValue)
+        : resolveCurrentModel(metaSnapshot);
+    const currentReasoning = usesExternalComposerProps
+        ? normalizeString(externalComposerProps?.reasoningValue)
+        : normalizeString(metaSnapshot?.reasoningEffort);
+    const currentTools = usesExternalComposerProps
+        ? ensureStringArray(externalComposerProps?.selectedTools)
+        : ensureStringArray(metaSnapshot?.tool);
+    const currentAutoSelectTools = usesExternalComposerProps
+        ? normalizeBool(externalComposerProps?.autoSelectTools)
+        : ((metaSnapshot?.autoSelectTools !== undefined)
+            ? normalizeBool(metaSnapshot?.autoSelectTools)
+            : normalizeBool(commandCenterDefaults?.autoSelectTools));
+    const starterTasks = usesExternalComposerProps
+        ? (Array.isArray(externalComposerProps?.starterTasks) ? externalComposerProps.starterTasks : [])
+        : (Array.isArray(metaSnapshot?.starterTasks) ? metaSnapshot.starterTasks : []);
+    const composerAgentOptions = usesExternalComposerProps
+        ? (externalComposerProps?.agentOptions || [])
+        : metaSnapshot?.agentOptions;
+    const composerModelOptions = usesExternalComposerProps
+        ? (externalComposerProps?.modelOptions || [])
+        : metaSnapshot?.modelOptions;
+    const composerModelInfo = usesExternalComposerProps
+        ? (externalComposerProps?.modelInfo || {})
+        : metaSnapshot?.modelInfo;
+    const composerReasoningOptions = usesExternalComposerProps
+        ? (externalComposerProps?.reasoningOptions || [])
+        : [
+            { value: 'low', label: 'Low' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'high', label: 'High' },
+        ];
+    const handleAgentChange = usesExternalComposerProps
+        ? (externalComposerProps?.onAgentChange || (() => {}))
+        : internalHandleAgentChange;
+    const handleModelChange = usesExternalComposerProps
+        ? (externalComposerProps?.onModelChange || (() => {}))
+        : internalHandleModelChange;
+    const handleReasoningChange = usesExternalComposerProps
+        ? (externalComposerProps?.onReasoningChange || (() => {}))
+        : internalHandleReasoningChange;
+    const handleToolsChange = usesExternalComposerProps
+        ? (externalComposerProps?.onToolsChange || (() => {}))
+        : internalHandleToolsChange;
+    const handleAutoSelectToolsChange = usesExternalComposerProps
+        ? (externalComposerProps?.onAutoSelectToolsChange || (() => {}))
+        : internalHandleAutoSelectToolsChange;
 
     const conversationID = normalizeString(conversationSnapshot?.id);
     const backendConversationRunning = !!conversationSnapshot?.running;
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
-    const queuedCount = (() => {
-        const v = conversationSnapshot?.queuedCount;
-        if (typeof v === 'number' && !Number.isNaN(v)) return v;
-        const n = Number(v);
-        if (!Number.isNaN(n) && Number.isFinite(n)) return n;
-        return queuedTurns.length;
-    })();
-    const effectiveQueuedTurns = (() => {
-        const seen = new Set();
-        const merged = [];
-        for (const entry of [...localQueuedTurns, ...queuedTurns]) {
-            if (!entry || typeof entry !== 'object') continue;
-            const key = normalizeString(entry?.id) || normalizeString(entry?.preview);
-            if (!key || seen.has(key)) continue;
-            seen.add(key);
-            merged.push(entry);
-        }
-        return merged;
-    })();
+    const queuedCountValue = conversationSnapshot?.queuedCount;
 
-    const usageSummary = (() => {
-        const costText = formatCostCompact(usageSnapshot?.cost ?? usageSnapshot?.Cost);
-        const tokensText = formatTokensCompact(usageSnapshot?.totalTokens ?? usageSnapshot?.TotalTokens ?? usageSnapshot?.total);
-        const parts = [];
-        if (costText) parts.push(`Cost ${costText}`);
-        if (tokensText) parts.push(`Tokens ${tokensText}`);
-        return parts.join(' • ');
-    })();
+    const usageSummary = buildUsageSummary(usageSnapshot);
+    const usageTooltip = buildUsageTooltip(usageSnapshot);
+    const legacyActiveExecutions = usesExternalFeedState ? false : hasActiveExecutions(messages);
+    const legacyLastTurnStatus = usesExternalFeedState ? '' : resolveLastTurnStatus(messages);
+    const {
+        localOptimisticRunning,
+        turnLifecycleRunning,
+        isProcessing,
+        showStarterTasks,
+        effectiveShowAbortWhileRunning,
+        effectiveQueuedTurns,
+        queuedCount,
+    } = computeChatDerivedState({
+        usesExternalFeedState,
+        usesLegacyFeedState,
+        backendConversationRunning,
+        hasActiveTurnLifecycle: hasActiveTurnLifecycle(context),
+        optimisticRunning,
+        messages,
+        legacyActiveExecutions,
+        legacyLastTurnStatus,
+        lastUserIndex: lastIndexByRole(messages, 'user'),
+        lastAssistantIndex: lastIndexByRole(messages, 'assistant'),
+        isTerminalTurnStatus,
+        starterTaskCount: starterTasks.length,
+        conversationID,
+        effectiveShowAbort: (showAbortProp !== undefined)
+            ? showAbortProp
+            : (chatCfg.showAbort !== undefined ? chatCfg.showAbort : true),
+        abortVisible,
+        queuedTurns,
+        localQueuedTurns,
+        queuedCountValue,
+    });
 
-    const usageTooltip = (() => {
-        const tokensWithCache = normalizeString(usageSnapshot?.tokensWithCacheText);
-        const costText = normalizeString(usageSnapshot?.costText);
-        const pieces = [];
-        if (costText) pieces.push(`Cost: ${costText}`);
-        if (tokensWithCache) pieces.push(`Tokens: ${tokensWithCache}`);
-        return pieces.join('\n');
-    })();
-
-    useEffect(() => {
-        if (!localQueuedTurns.length) return;
-        const backendQueuedContent = new Set(
-            (Array.isArray(queuedTurns) ? queuedTurns : [])
-                .map((entry) => String(entry?.preview || '').trim())
-                .filter(Boolean)
-        );
-        setLocalQueuedTurns((current) => current.filter((entry) => {
-            const preview = String(entry?.preview || '').trim();
-            if (!preview) return false;
-            if (backendQueuedContent.has(preview)) return false;
-            if (previewMatchesActiveTurn(messages, preview, context?.resources?.chat?.runningTurnId)) return false;
-            if (backendConversationRunning || optimisticRunning) return true;
-            return !hasHandledTranscriptTurn(messages, preview);
-        }));
-    }, [messages, queuedTurns, localQueuedTurns.length, backendConversationRunning, optimisticRunning, context?.resources?.chat?.runningTurnId]);
-
-    const toolsLabel = () => {
-        if (!currentTools.length) return '';
-        if (currentTools.length <= 2) return currentTools.join(', ');
-        return `${currentTools.length} tools`;
-    };
+    const toolsLabel = () => buildToolsLabel(currentTools);
 
     // Command-center toolbar already exposes agent/model/tools/reasoning selectors; keep composer chips
     // reserved for bundles + attachments to avoid duplicating controls.
-    const activeChips = [];
+    const activeChips = usesExternalComposerProps
+        ? (Array.isArray(externalComposerProps?.activeChips) ? externalComposerProps.activeChips : [])
+        : [];
 
-    const handleChipClear = (chip) => {
-        const id = normalizeString(chip?.id);
-        if (!id) return;
-        const defAgent = normalizeString(commandCenterDefaults?.agent) || currentAgent;
-        const defModel = normalizeString(commandCenterDefaults?.model) || currentModel;
-
-        if (events?.onClearOverride?.isDefined?.()) {
-            events.onClearOverride.execute({ context: metaCtx || context, chip: id });
-            return true;
-        }
-
-        if (id === 'agent') {
-            handleAgentChange(defAgent);
-            return true;
-        }
-        if (id === 'model') {
-            const fallback = defaultAgentModel(currentAgent) || defModel;
-            handleModelChange(fallback);
-            return true;
-        }
-        if (id === 'tools') {
-            handleToolsChange(defaultAgentTools(currentAgent));
-            return true;
-        }
-        if (id === 'reasoningEffort') {
-            handleReasoningChange('');
-            return true;
-        }
-        return false;
-    };
+    const handleChipClear = usesExternalComposerProps
+        ? (externalComposerProps?.onChipClear || (() => false))
+        : ((chip) => clearCommandCenterChip({
+            chip,
+            commandCenterDefaults,
+            currentAgent,
+            currentModel,
+            metaSnapshot,
+            events,
+            metaCtx,
+            context,
+            handleAgentChange,
+            handleModelChange,
+            handleToolsChange,
+            handleReasoningChange,
+        }));
 
     // ---------------------------------------------------------------------
     // 🛑  Abort handler – invoked when the user clicks the "Abort" button in
@@ -816,7 +555,13 @@ export default function Chat({
 
     const handleSubmit = ({ content, toolNames = [] }) => {
         const submitModel = (() => {
-            const preferred = defaultAgentModel(currentAgent);
+            if (usesExternalComposerProps) {
+                return normalizeString(externalComposerProps?.submitModel)
+                    || currentModel
+                    || rawCurrentModel
+                    || defaultModel;
+            }
+            const preferred = defaultAgentModel(metaSnapshot, currentAgent);
             if (preferred && (!currentModel || currentModel === defaultModel || currentModel === rawCurrentModel)) {
                 return preferred;
             }
@@ -830,28 +575,41 @@ export default function Chat({
             attachments: pendingAttachments && pendingAttachments.length ? pendingAttachments : undefined,
         };
 
-        const submittingWhileProcessing = isProcessing || backendConversationRunning || optimisticRunning || submitLatchRef.current;
-        if (!submittingWhileProcessing) {
+        const serviceOwnsSubmit = !!events.onSubmit?.isDefined?.();
+        // When the caller drives its own chat state (chatStore via onSubmit),
+        // the four internal bookkeeping pieces below are redundant: the
+        // caller's reducer handles identity + dedup + running + queued. Skip
+        // them in that case and let the canonical chatStore stay authoritative.
+        const externalStateOwns = usesExternalFeedState && serviceOwnsSubmit;
+
+        const submittingWhileProcessing = computeSubmittingWhileProcessing({
+            externalStateOwns,
+            isProcessing,
+            backendConversationRunning,
+            localOptimisticRunning,
+            submitLatch: submitLatchRef.current,
+        });
+        if (externalStateOwns) {
+            // External store path: no optimisticRunning, no submitLatch, no
+            // local queue, no dataSource write. Submit fires through the
+            // caller's onSubmit handler below.
+        } else if (!submittingWhileProcessing) {
             setOptimisticRunning(true);
             submitLatchRef.current = true;
-            if (submitLatchTimerRef.current) {
-                clearTimeout(submitLatchTimerRef.current);
-            }
+            clearSubmitLatchTimer();
             submitLatchTimerRef.current = setTimeout(() => {
                 if (!isProcessing && !backendConversationRunning) {
                     submitLatchRef.current = false;
                 }
                 submitLatchTimerRef.current = null;
             }, 2000);
-            handlers?.dataSource?.setFormData?.(userMessage);
+            if (!serviceOwnsSubmit) {
+                handlers?.dataSource?.setFormData?.(userMessage);
+            }
         } else {
             setLocalQueuedTurns((current) => [
                 ...current,
-                {
-                    id: `local:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
-                    preview: String(content || '').trim(),
-                    local: true,
-                },
+                makeLocalQueuedPreview(content, Date.now(), Math.random()),
             ]);
         }
 
@@ -940,91 +698,28 @@ export default function Chat({
     const heightStyle = effectiveHeight !== undefined ?
         { height: typeof effectiveHeight === 'number' ? `${effectiveHeight * 100}%` : String(effectiveHeight) } : {};
 
-    // Helper to render toolbar depending on kind
-    const renderToolbar = () => {
-        if (!effectiveToolbar) return null;
+    const debugLastTurnStatus = legacyLastTurnStatus;
+    const debugHasActiveExecutions = legacyActiveExecutions;
 
-        if (React.isValidElement(effectiveToolbar)) {
-            return effectiveToolbar;
-        }
-
-        if (typeof effectiveToolbar === 'function') {
-            return effectiveToolbar();
-        }
-
-        // Descriptor object from YAML (expects { items:[...] })
-        if (typeof effectiveToolbar === 'object' && Array.isArray(effectiveToolbar.items)) {
-            let toolbarContext = context
-            if(effectiveToolbar.dataSourceRef) {
-                toolbarContext = context.Context(effectiveToolbar.dataSourceRef)
-            }
-            return (
-                <TableToolbar context={toolbarContext} toolbarItems={effectiveToolbar.items} />
-            );
-        }
-
-        // Fallback: render nothing
-        return null;
-    };
-
-    // Backend `Post()` enqueues turns; treat "processing" as: the latest user message hasn't
-    // received an assistant response, or any execution steps are still active.
-    // Ignore stale `conversations.running` when we have no evidence of work in-flight.
-    const turnLifecycleRunning = backendConversationRunning || hasActiveTurnLifecycle(context) || optimisticRunning;
-    const isProcessing = (() => {
-        const activeExec = hasActiveExecutions(messages);
-        const lastTurnStatus = resolveLastTurnStatus(messages);
-        const lastTurnIsTerminal = isTerminalTurnStatus(lastTurnStatus);
-        const lastUser = lastIndexByRole(messages, 'user');
-        const lastAssistant = lastIndexByRole(messages, 'assistant');
-        const hasUnansweredUser = lastUser !== -1 && lastUser > lastAssistant;
-        if (turnLifecycleRunning) return true;
-        if (activeExec) return true;
-        // If the newest user turn is terminal (e.g. canceled) but no assistant bubble was produced,
-        // do not keep the composer in a "processing" state.
-        if (lastTurnIsTerminal) return false;
-        if (hasUnansweredUser) return true;
-        return true;
-    })();
-
-    const showStarterTasks = starterTasks.length > 0
-        && messages.length === 0
-        && !conversationID
-        && !isProcessing;
-
-    useEffect(() => {
-        if (backendConversationRunning || hasActiveExecutions(messages) || resolveLastTurnStatus(messages)) {
-            setOptimisticRunning(false);
-        }
-    }, [backendConversationRunning, messages]);
-
-    useEffect(() => {
-        if (isProcessing || backendConversationRunning || optimisticRunning) {
-            submitLatchRef.current = true;
-            return;
-        }
-        if (submitLatchTimerRef.current) {
-            clearTimeout(submitLatchTimerRef.current);
-            submitLatchTimerRef.current = null;
-        }
-        submitLatchRef.current = false;
-    }, [isProcessing, backendConversationRunning, optimisticRunning]);
-
-    useEffect(() => () => {
-        if (submitLatchTimerRef.current) {
-            clearTimeout(submitLatchTimerRef.current);
-            submitLatchTimerRef.current = null;
-        }
-    }, []);
-
-    // Abort should only be visible while the current turn is processing.
-    // The backend `conversations.running` signal can be stale, so do not rely on it for visibility.
-    const effectiveShowAbort = (showAbortProp !== undefined)
-        ? showAbortProp
-        : (chatCfg.showAbort !== undefined ? chatCfg.showAbort : true);
-
-    // Abort/Queue should only be visible while the current turn is being processed.
-    const effectiveShowAbortWhileRunning = effectiveShowAbort && (turnLifecycleRunning || abortVisible);
+    useChatLegacyLifecycle({
+        usesLegacyFeedState,
+        localQueuedTurns,
+        queuedTurns,
+        messages,
+        runningTurnId: context?.resources?.chat?.runningTurnId,
+        backendConversationRunning,
+        localOptimisticRunning,
+        turnLifecycleRunning,
+        legacyActiveExecutions,
+        legacyLastTurnStatus,
+        isProcessing,
+        setLocalQueuedTurns,
+        setOptimisticRunning,
+        resetSubmitLatch,
+        submitLatchRef,
+        clearSubmitLatchTimer,
+        shouldKeepLocalQueuedPreview,
+    });
 
     useEffect(() => {
         if (!isChatDebugEnabled()) return;
@@ -1035,11 +730,11 @@ export default function Chat({
                 turnLifecycleRunning,
                 abortVisible,
                 backendConversationRunning,
-                optimisticRunning,
+                optimisticRunning: localOptimisticRunning,
                 isProcessing,
                 effectiveShowAbortWhileRunning,
-                lastTurnStatus: resolveLastTurnStatus(messages),
-                hasActiveExecutions: hasActiveExecutions(messages),
+                lastTurnStatus: debugLastTurnStatus,
+                hasActiveExecutions: debugHasActiveExecutions,
                 messageKinds: (Array.isArray(messages) ? messages : []).map((message) => ({
                     id: String(message?.id || '').trim(),
                     type: String(message?._type || message?.role || '').trim(),
@@ -1050,56 +745,32 @@ export default function Chat({
                 })),
             });
         } catch (_) {}
-    }, [conversationID, messages, turnLifecycleRunning, abortVisible, backendConversationRunning, optimisticRunning, isProcessing, effectiveShowAbortWhileRunning]);
+    }, [conversationID, messages, turnLifecycleRunning, abortVisible, backendConversationRunning, localOptimisticRunning, isProcessing, effectiveShowAbortWhileRunning, debugLastTurnStatus, debugHasActiveExecutions]);
 
     const composerDisabled = (chatCfg?.disableInputOnLoading)
         ? (loading && !isProcessing)
         : false;
 
     const handleQueueCancel = (turn) => {
-        const turnID = normalizeString(turn?.id);
-        if (!turnID || !conversationID) return;
-        if (typeof chatService?.cancelQueuedTurnByID === 'function') {
-            chatService.cancelQueuedTurnByID({ context, conversationID, turnID });
-        }
+        cancelQueuedTurn({ chatService, context, conversationID, turn });
     };
 
     const handleQueueMove = (turn, direction) => {
-        const turnID = normalizeString(turn?.id);
-        const dir = normalizeString(direction).toLowerCase();
-        if (!turnID || !conversationID || (dir !== 'up' && dir !== 'down')) return;
-        if (typeof chatService?.moveQueuedTurn === 'function') {
-            chatService.moveQueuedTurn({ context, conversationID, turnID, direction: dir });
-        }
+        moveQueuedTurn({ chatService, context, conversationID, turn, direction });
     };
 
     const handleQueueEdit = (turn) => {
-        const turnID = normalizeString(turn?.id);
-        if (!turnID || !conversationID) return;
-        const initial = normalizeString(turn?.content) || normalizeString(turn?.preview);
-        const next = window.prompt('Edit queued request', initial);
-        if (next == null) return;
-        const content = normalizeString(next);
-        if (!content || content === initial) return;
-        if (typeof chatService?.editQueuedTurn === 'function') {
-            chatService.editQueuedTurn({ context, conversationID, turnID, content });
-        }
+        editQueuedTurn({ chatService, context, conversationID, turn });
     };
 
     const handleQueueSteer = (turn) => {
-        const turnID = normalizeString(turn?.id);
-        if (!turnID || !conversationID) return;
-        if (typeof chatService?.forceSteerQueuedTurn === 'function') {
-            chatService.forceSteerQueuedTurn({ context, conversationID, turnID });
-            return;
-        }
-        const content = normalizeString(turn?.content) || normalizeString(turn?.preview);
-        if (!content) return;
-        const runningTurnId = normalizeString(context?.resources?.chat?.runningTurnId);
-        if (!runningTurnId) return;
-        if (typeof chatService?.steerTurn === 'function') {
-            chatService.steerTurn({ context, conversationID, turnID: runningTurnId, content });
-        }
+        steerQueuedTurn({
+            chatService,
+            context,
+            conversationID,
+            turn,
+            runningTurnId: context?.resources?.chat?.runningTurnId,
+        });
     };
 
     return (
@@ -1109,8 +780,8 @@ export default function Chat({
             style={{
                 height: '100%',
                 ...heightStyle,
-                display: 'grid',
-                gridTemplateRows: 'auto minmax(0, 1fr) auto',
+                display: 'flex',
+                flexDirection: 'column',
                 minHeight: 0,
                 minWidth: 0,
                 overflow: 'hidden',
@@ -1120,7 +791,7 @@ export default function Chat({
             {/* Optional toolbar */}
             {effectiveToolbar && (
                 <div className="flex-none mb-1" data-testid="chat-toolbar">
-                    {renderToolbar()}
+                    {renderChatToolbar({ effectiveToolbar, context })}
                 </div>
             )}
             {/* Error banner */}
@@ -1136,28 +807,48 @@ export default function Chat({
                 }
             })()}
 
-            {showStarterTasks ? (
-                <div className="chat-starter-stage" data-testid="chat-starter-stage">
-                    <StarterTaskGrid
-                        tasks={starterTasks}
-                        onSelect={(task) => {
-                            const prompt = String(task?.prompt || '').trim();
-                            if (!prompt) return;
-                            setComposerDraft(prompt);
-                        }}
+            <div
+                className="chat-feed-stage"
+                data-testid="chat-feed-stage"
+                style={{
+                    flexGrow: 1,
+                    flexShrink: 1,
+                    flexBasis: '0px',
+                    minHeight: 0,
+                    minWidth: 0,
+                    overflow: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
+                {showStarterTasks ? (
+                    <div className="chat-starter-stage" data-testid="chat-starter-stage">
+                        <StarterTaskGrid
+                            tasks={starterTasks}
+                            onSelect={(task) => {
+                                const prompt = String(task?.prompt || '').trim();
+                                if (!prompt) return;
+                                setComposerDraft(prompt);
+                            }}
+                        />
+                    </div>
+                ) : usesExternalFeedState ? (
+                    renderFeed({
+                        conversationId: conversationID,
+                        context,
+                    })
+                ) : (
+                    <MessageFeed
+                        messages={messages}
+                        batchSize={chatCfg.batchSize || 50}
+                        context={context}
+                        classifyMessage={classifyMessage}
+                        renderers={renderers}
+                        fallback={fallback}
+                        resolveIcon={resolveAvatarIcon}
                     />
-                </div>
-            ) : (
-                <MessageFeed
-                    messages={messages}
-                    batchSize={chatCfg.batchSize || 50}
-                    context={context}
-                    classifyMessage={classifyMessage}
-                    renderers={renderers}
-                    fallback={fallback}
-                    resolveIcon={resolveAvatarIcon}
-                />
-            )}
+                )}
+            </div>
 
             {/* Prompt composer */}
             {effectiveShowInput && (
@@ -1175,7 +866,7 @@ export default function Chat({
                     queuedTurns={effectiveQueuedTurns}
                     usageSummary={usageSummary}
                     usageTooltip={usageTooltip}
-                    queueRunning={backendConversationRunning || optimisticRunning}
+                    queueRunning={turnLifecycleRunning}
                     onQueueCancel={handleQueueCancel}
                     onQueueMove={handleQueueMove}
                     onQueueEdit={handleQueueEdit}
@@ -1222,18 +913,14 @@ export default function Chat({
                     onToolsChange={handleToolsChange}
                     autoSelectTools={currentAutoSelectTools}
                     onAutoSelectToolsChange={handleAutoSelectToolsChange}
-                    agentOptions={metaSnapshot?.agentOptions}
+                    agentOptions={composerAgentOptions}
                     agentValue={currentAgent}
                     onAgentChange={handleAgentChange}
-                    modelOptions={metaSnapshot?.modelOptions}
-                    modelInfo={metaSnapshot?.modelInfo}
-                    modelValue={currentModel || defaultAgentModel(currentAgent) || rawCurrentModel || defaultModel}
+                    modelOptions={composerModelOptions}
+                    modelInfo={composerModelInfo}
+                    modelValue={currentModel || (usesExternalComposerProps ? '' : defaultAgentModel(metaSnapshot, currentAgent)) || rawCurrentModel || defaultModel}
                     onModelChange={handleModelChange}
-                    reasoningOptions={[
-                        { value: 'low', label: 'Low' },
-                        { value: 'medium', label: 'Medium' },
-                        { value: 'high', label: 'High' },
-                    ]}
+                    reasoningOptions={composerReasoningOptions}
                     reasoningValue={currentReasoning}
                     onReasoningChange={handleReasoningChange}
                     activeChips={activeChips}

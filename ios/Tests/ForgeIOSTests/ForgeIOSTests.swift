@@ -1,5 +1,6 @@
 import XCTest
 @testable import ForgeIOSRuntime
+@testable import ForgeIOSUI
 
 final class ForgeIOSTests: XCTestCase {
     func testSchemaBasedFormDecodesSchemaAndAliasDataSourceRef() throws {
@@ -149,6 +150,59 @@ final class ForgeIOSTests: XCTestCase {
             metadata: WindowMetadata()
         )
         XCTAssertEqual(state.key, "test")
+    }
+
+    func testParseMarkdownBlocksDetectsMermaidFence() {
+        let source = """
+        Intro
+        ```mermaid
+        flowchart TD
+          A[Start] --> B[Done]
+        ```
+        """
+
+        let blocks = parseMarkdownBlocks(source)
+
+        XCTAssertEqual(blocks.count, 2)
+        XCTAssertEqual(blocks[0], .markdown("Intro"))
+        XCTAssertEqual(blocks[1], .mermaid("flowchart TD\n  A[Start] --> B[Done]"))
+    }
+
+    func testParseMermaidDiagramParsesFlowchartNodes() {
+        let source = """
+        flowchart TD
+          A[Order 2639076] --> B[Spend summary]
+          B --> C[Alpha]
+          B --> D[Beta]
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .flowchart(
+                MermaidFlowchart(nodes: ["Order 2639076", "Spend summary", "Alpha", "Beta"])
+            )
+        )
+    }
+
+    func testParseMermaidDiagramParsesPieSlices() {
+        let source = """
+        pie showData
+          title Spend share
+          "Alpha" : 1316.86
+          "Beta" : 842.10
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .pie([
+                MermaidPieSlice(label: "Alpha", value: 1316.86),
+                MermaidPieSlice(label: "Beta", value: 842.10)
+            ])
+        )
     }
 
     func testDataSourceRuntimeStoresTypedFormAndSelectionState() async {

@@ -197,21 +197,33 @@ private fun DashboardSummaryBlock(container: ContainerDef, metrics: Map<String, 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         summaryMetrics.forEach { metric ->
             val value = SelectorUtil.resolve(metrics, metric.selector)
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFF7F9FC), RoundedCornerShape(12.dp))
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = metric.label ?: metric.selector ?: "Metric",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = metric.label ?: metric.selector ?: "Metric",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    metric.selector?.takeIf { it.isNotBlank() }?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Text(
                     text = formatDashboardValue(value, metric.format),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold
                 )
             }

@@ -15,3 +15,18 @@ export { default as BasicTable} from './table/Basic';
 export { default as AvatarIcon } from './AvatarIcon.jsx';
 export { default as Terminal } from './Terminal.jsx';
 export { DashboardBlock } from './dashboard/DashboardBlocks.jsx';
+export {
+    normalizeString,
+    normalizeBool,
+    ensureStringArray,
+    defaultAgentTools,
+    defaultAgentModel,
+    resolveCurrentModel,
+} from './chatCommandCenterHelpers.js';
+export {
+    applyAgentSelection,
+    applyModelSelection,
+    applyReasoningSelection,
+    applyToolsSelection,
+    applyAutoSelectToolsSelection,
+} from './chatCommandCenterActions.js';

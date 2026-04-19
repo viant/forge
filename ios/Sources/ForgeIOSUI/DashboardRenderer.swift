@@ -5,6 +5,7 @@ public struct DashboardRenderer: View {
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
+    @State private var runtimeMetrics: [String: Any] = [:]
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
         self.runtime = runtime
@@ -14,6 +15,9 @@ public struct DashboardRenderer: View {
 
     public var body: some View {
         dashboardBody(container)
+            .task(id: runtimeMetricsTaskKey) {
+                await loadRuntimeMetrics()
+            }
     }
 
     private func dashboardBody(_ container: ContainerDef) -> AnyView {
@@ -131,7 +135,11 @@ public struct DashboardRenderer: View {
         if summaryMetrics.isEmpty {
             unsupportedBlock("dashboard summary has no metrics")
         } else {
-            VStack(alignment: .leading, spacing: 10) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 160), spacing: 10, alignment: .top)],
+                alignment: .leading,
+                spacing: 10
+            ) {
                 ForEach(Array(summaryMetrics.enumerated()), id: \.offset) { _, metric in
                     let value = DashboardRuntime.resolveDashboardValue(
                         source: nil,
@@ -143,10 +151,13 @@ public struct DashboardRenderer: View {
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                         Text(DashboardRuntime.formatDashboardValue(value, format: metric.format))
-                            .font(.title3.weight(.semibold))
+                            .font(.headline.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.secondary.opacity(0.08))
@@ -475,7 +486,7 @@ public struct DashboardRenderer: View {
     }
 
     private func dashboardMetrics(_ container: ContainerDef) -> [String: Any] {
-        var metrics: [String: Any] = [:]
+        var metrics = runtimeMetrics
         for item in container.items {
             if let id = item.id {
                 metrics[id] = [
@@ -485,6 +496,32 @@ public struct DashboardRenderer: View {
             }
         }
         return metrics
+    }
+
+    private var runtimeMetricsTaskKey: String {
+        [
+            window?.windowID ?? "",
+            container.id ?? "",
+            container.dataSourceRef ?? ""
+        ].joined(separator: ":")
+    }
+
+    private func loadRuntimeMetrics() async {
+        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+            runtimeMetrics = [:]
+            return
+        }
+        let rawMetrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        if !rawMetrics.isEmpty {
+            runtimeMetrics = rawMetrics.mapValues { $0.anyValueValue as Any }
+            return
+        }
+        let rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        if let first = rows.first {
+            runtimeMetrics = first.mapValues { $0.anyValueValue as Any }
+        } else {
+            runtimeMetrics = [:]
+        }
     }
 
     private func tone(for value: Double, config: DashboardToneDef?) -> String {
@@ -539,5 +576,24 @@ public struct DashboardRenderer: View {
 
     private func isBlank(_ value: String?) -> Bool {
         value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+    }
+}
+
+private extension JSONValue {
+    var anyValueValue: Any? {
+        switch self {
+        case .string(let value):
+            return value
+        case .number(let value):
+            return value
+        case .bool(let value):
+            return value
+        case .array(let value):
+            return value.map(\.anyValueValue)
+        case .object(let value):
+            return value.mapValues(\.anyValueValue)
+        case .null:
+            return nil
+        }
     }
 }
