@@ -451,6 +451,18 @@ export function createDashboardDemoSeed() {
         { country: 'DE', region: 'EMEA', spend: 2000 },
       ],
     },
+    eligibilityFunnel: {
+      collection: [
+        { feature_label: '1. profile.agg', reduction_pct: 14.4 },
+        { feature_label: '2. ad.pmp.deal.id', reduction_pct: 12.8 },
+        { feature_label: '3. location.postalcode.list', reduction_pct: 9.6 },
+        { feature_label: '4. media.format', reduction_pct: 7.1 },
+        { feature_label: '5. adsize', reduction_pct: 6.9 },
+        { feature_label: '6. external.pmp.deal', reduction_pct: 5.5 },
+        { feature_label: '7. media.api.protocol', reduction_pct: 4.7 },
+        { feature_label: '8. sitelet.agg', reduction_pct: 2.6 },
+      ],
+    },
     detailTrend: {
       collection: [
         { week: '2026-02-01', series: 'US', spend: 30000 },
