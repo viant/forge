@@ -449,13 +449,13 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         if (!categoryKey || !primarySeries) return null;
 
         const categoryWidth = Math.min(
-            280,
+            220,
             Math.max(
-                120,
-                ...normalizedChartData.map((row) => String(row?.[categoryKey] ?? "").length * 7 + 28)
+                110,
+                ...normalizedChartData.map((row) => String(row?.[categoryKey] ?? "").length * 6 + 20)
             )
         );
-        const barSize = embedded ? 12 : 14;
+        const barSize = embedded ? 10 : 12;
 
         return (
             <BarChart data={normalizedChartData} margin={chartMargin} layout="vertical">
@@ -481,7 +481,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
                     contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
                 />
-                <Legend {...legendProps} />
+                {selectedSeriesDefinitions.length > 1 ? <Legend {...legendProps} /> : null}
                 {selectedSeriesDefinitions.length === 1 ? (
                     <Bar dataKey={primarySeries.value} name={primarySeries.name || primarySeries.label} fill={primarySeries.color} barSize={barSize}>
                         {normalizedChartData.map((_, index) => (
@@ -619,12 +619,16 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         ? container.id
         : undefined;
 
-    const resolvedWidth = width || "100%";
-    const resolvedHeight = height || (embedded ? 460 : "100%");
+    const resolvedWidth = isHorizontalBar
+        ? (width || (embedded ? "82%" : "85%"))
+        : (width || "100%");
+    const resolvedHeight = isHorizontalBar
+        ? (height || (embedded ? 320 : "100%"))
+        : (height || (embedded ? 460 : "100%"));
 
     return (
         <div
-            style={{width: resolvedWidth, height: resolvedHeight}}
+            style={{width: resolvedWidth, height: resolvedHeight, margin: isHorizontalBar ? "0 auto" : undefined}}
             ref={chartRef}
             data-dashboard-chart-id={chartExportId}
         >
