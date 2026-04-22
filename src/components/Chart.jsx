@@ -86,6 +86,10 @@ function isDirectSeriesChart(chart = {}) {
     return !chart?.series?.nameKey && Array.isArray(chart?.series?.values) && chart.series.values.length > 0;
 }
 
+function isHorizontalBarType(type = "") {
+    return type === "horizontal_bar" || type === "funnel_bar";
+}
+
 function getSeriesDefinitions(chart = {}) {
     const palette = chart?.series?.palette || [];
     return (chart?.series?.values || []).map((entry, index) => ({
@@ -191,6 +195,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const { collection, loading, error } = useDataSourceState(context);
 
     const isPieChart = type === "pie" || type === "donut";
+    const isHorizontalBar = isHorizontalBarType(type);
 
     function prepareData() {
         if (isPieChart) {
@@ -432,6 +437,65 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         </BarChart>
     );
 
+    const horizontalBarChart = (() => {
+        const categoryKey = xAxis?.dataKey;
+        const primarySeries = selectedSeriesDefinitions[0];
+        if (!categoryKey || !primarySeries) return null;
+
+        const categoryWidth = Math.min(
+            280,
+            Math.max(
+                120,
+                ...normalizedChartData.map((row) => String(row?.[categoryKey] ?? "").length * 7 + 28)
+            )
+        );
+
+        return (
+            <BarChart data={normalizedChartData} margin={chartMargin} layout="vertical">
+                <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
+                <XAxis
+                    type="number"
+                    tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format)}
+                    tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                    label={{
+                        value: embedded ? "" : (leftAxis.label || primarySeries.label || ""),
+                        position: "insideBottomRight",
+                        offset: 0,
+                    }}
+                    domain={leftAxis.domain}
+                />
+                <YAxis
+                    type="category"
+                    dataKey={categoryKey}
+                    width={categoryWidth}
+                    tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                />
+                <Tooltip
+                    formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
+                    contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
+                />
+                <Legend {...legendProps} />
+                {selectedSeriesDefinitions.length === 1 ? (
+                    <Bar dataKey={primarySeries.value} name={primarySeries.name || primarySeries.label} fill={primarySeries.color}>
+                        {normalizedChartData.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={palette[index % Math.max(palette.length, 1)] || primarySeries.color || "#137cbd"} />
+                        ))}
+                    </Bar>
+                ) : (
+                    selectedSeriesDefinitions.map((entry) => (
+                        <Bar
+                            key={entry.value}
+                            dataKey={entry.value}
+                            name={entry.name || entry.label}
+                            fill={entry.color}
+                            stackId={type === "funnel_bar" ? undefined : entry.stackId}
+                        />
+                    ))
+                )}
+            </BarChart>
+        );
+    })();
+
     const areaChart = (
         <AreaChart data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
@@ -624,6 +688,8 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     <ResponsiveContainer width="100%" height="100%">
                         {isPieChart
                             ? pieChart
+                            : isHorizontalBar
+                                ? horizontalBarChart
                             : type === "composed" || directSeriesChart || hasRightAxis
                                 ? composedChart
                                 : type === "bar"
