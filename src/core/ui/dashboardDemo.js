@@ -9,6 +9,7 @@ export function createDashboardDemoMetadata() {
       perf: { selectionMode: 'none', service: { endpoint: 'demo', uri: 'perf' } },
       weeklyTrend: { selectionMode: 'single', service: { endpoint: 'demo', uri: 'weeklyTrend' } },
       byCountry: { selectionMode: 'single', service: { endpoint: 'demo', uri: 'byCountry' } },
+      eligibilityFunnel: { selectionMode: 'none', service: { endpoint: 'demo', uri: 'eligibilityFunnel' } },
       audit: { selectionMode: 'none', service: { endpoint: 'demo', uri: 'audit' } },
       detailTrend: { selectionMode: 'none', service: { endpoint: 'demo', uri: 'detailTrend' } },
     },
@@ -34,6 +35,16 @@ export function createDashboardDemoMetadata() {
 
         return {
           dashboardDemo: {
+            eligibilityFunnel: [
+              { feature_label: '1. profile.agg', reduction_pct: 14.4 },
+              { feature_label: '2. ad.pmp.deal.id', reduction_pct: 12.8 },
+              { feature_label: '3. location.postalcode.list', reduction_pct: 9.6 },
+              { feature_label: '4. media.format', reduction_pct: 7.1 },
+              { feature_label: '5. adsize', reduction_pct: 6.9 },
+              { feature_label: '6. external.pmp.deal', reduction_pct: 5.5 },
+              { feature_label: '7. media.api.protocol', reduction_pct: 4.7 },
+              { feature_label: '8. sitelet.agg', reduction_pct: 2.6 },
+            ],
             updateDetailTrend: ({context: handlerContext, item}) => {
               const windowId = handlerContext?.identity?.windowId;
               const country = item?.country || 'US';
@@ -179,6 +190,23 @@ export function createDashboardDemoMetadata() {
                 ],
                 palette: ['#137cbd', '#0f9960', '#d9822b'],
               },
+            },
+          },
+          {
+            id: 'eligibilityFunnel',
+            kind: 'dashboard.timeline',
+            title: 'Eligibility funnel',
+            columnSpan: 6,
+            dataSourceRef: 'eligibilityFunnel',
+            chart: {
+              type: 'funnel_bar',
+              width: '100%',
+              height: '360px',
+              categoryField: 'feature_label',
+              valueField: 'reduction_pct',
+              valueLabel: 'Reduction %',
+              format: 'percent',
+              palette: ['#2f6de1', '#7a46d8', '#db2f7d', '#f55d1f', '#d79619', '#2aa84a', '#24a0c7', '#5a5ce6'],
             },
           },
           {
