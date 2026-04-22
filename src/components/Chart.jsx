@@ -413,7 +413,13 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         </>
     );
 
-    const normalizedChartData = chartData.map((row) => ({
+    const normalizedChartData = (isHorizontalBar
+        ? [...chartData].sort((a, b) => {
+            const primaryKey = selectedSeriesDefinitions[0]?.value;
+            return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
+        })
+        : chartData
+    ).map((row) => ({
         ...row,
         __seriesFormats: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
         __seriesAxes: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
@@ -449,6 +455,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 ...normalizedChartData.map((row) => String(row?.[categoryKey] ?? "").length * 7 + 28)
             )
         );
+        const barSize = embedded ? 12 : 14;
 
         return (
             <BarChart data={normalizedChartData} margin={chartMargin} layout="vertical">
@@ -476,7 +483,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 />
                 <Legend {...legendProps} />
                 {selectedSeriesDefinitions.length === 1 ? (
-                    <Bar dataKey={primarySeries.value} name={primarySeries.name || primarySeries.label} fill={primarySeries.color}>
+                    <Bar dataKey={primarySeries.value} name={primarySeries.name || primarySeries.label} fill={primarySeries.color} barSize={barSize}>
                         {normalizedChartData.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={palette[index % Math.max(palette.length, 1)] || primarySeries.color || "#137cbd"} />
                         ))}
@@ -488,6 +495,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                             dataKey={entry.value}
                             name={entry.name || entry.label}
                             fill={entry.color}
+                            barSize={barSize}
                             stackId={type === "funnel_bar" ? undefined : entry.stackId}
                         />
                     ))
