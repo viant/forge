@@ -309,27 +309,30 @@ const FileBrowser = (props) => {
     }
 
     const style = config.style || {}
-    const {width= '100%', height = '70vh'} = style
+    const {width= '100%', height = '70vh', overflow, ...restStyle} = style
+    const className = ['app-file-browser', config.className || ''].filter(Boolean).join(' ')
 
 
     return (
         <div
-            className={config.className || ''}
+            className={className}
             style={{
-                padding: '10px',
-                border: '1px solid #ccc',
-                overflow: 'auto',
-                ...style,
                 width: width,
                 height:height,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                ...restStyle,
             }}
         >
-            <Tree
-                contents={fileTreeData}
-                onNodeClick={handleNodeClick}
-                onNodeExpand={handleNodeExpand}
-                onNodeCollapse={handleNodeCollapse}
-            />
+            <div className="app-file-browser-scroll" style={{ flex: 1, minHeight: 0, overflow: overflow || 'auto' }}>
+                <Tree
+                    contents={fileTreeData}
+                    onNodeClick={handleNodeClick}
+                    onNodeExpand={handleNodeExpand}
+                    onNodeCollapse={handleNodeCollapse}
+                />
+            </div>
         </div>
     );
 };
