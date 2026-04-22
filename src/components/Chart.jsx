@@ -90,6 +90,21 @@ function isHorizontalBarType(type = "") {
     return type === "horizontal_bar" || type === "funnel_bar";
 }
 
+function defaultCategoricalPalette() {
+    return [
+        '#2f6de1', '#7a46d8', '#db2f7d', '#f55d1f', '#d79619',
+        '#2aa84a', '#24a0c7', '#5a5ce6', '#d13b5c', '#8a6b0f',
+        '#0f8f6b', '#4d7cff', '#9b51e0', '#ff5c8a', '#ff7a1a',
+        '#c89b14', '#27ae60', '#1f9ac0', '#6c63ff', '#e74c3c',
+        '#b9770e', '#16a085', '#3498db', '#8e44ad', '#e91e63',
+        '#ff7043', '#f4b400', '#43a047', '#00acc1', '#3f51b5',
+        '#ef5350', '#ffa726', '#9ccc65', '#26c6da', '#7e57c2',
+        '#ec407a', '#ffca28', '#66bb6a', '#29b6f6', '#5c6bc0',
+        '#ab47bc', '#ff704d', '#d4e157', '#26a69a', '#42a5f5',
+        '#7e57c2', '#f06292', '#ffb300', '#4db6ac', '#7986cb'
+    ];
+}
+
 function getSeriesDefinitions(chart = {}) {
     const palette = chart?.series?.palette || [];
     return (chart?.series?.values || []).map((entry, index) => ({
@@ -448,6 +463,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         const primarySeries = selectedSeriesDefinitions[0];
         if (!categoryKey || !primarySeries) return null;
 
+        const activePalette = (palette && palette.length > 0) ? palette : defaultCategoricalPalette();
         const categoryWidth = Math.min(
             220,
             Math.max(
@@ -485,7 +501,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 {selectedSeriesDefinitions.length === 1 ? (
                     <Bar dataKey={primarySeries.value} name={primarySeries.name || primarySeries.label} fill={primarySeries.color} barSize={barSize}>
                         {normalizedChartData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={palette[index % Math.max(palette.length, 1)] || primarySeries.color || "#137cbd"} />
+                            <Cell key={`cell-${index}`} fill={activePalette[index % activePalette.length]} />
                         ))}
                     </Bar>
                 ) : (
