@@ -470,6 +470,40 @@ function generateBarSvg(rows, {xLabel = 'X', yLabel = 'Value', palette} = {}) {
   </svg>`;
 }
 
+function generateHorizontalBarSvg(rows, {xLabel = 'Value', palette} = {}) {
+  if (!rows || !rows.length) return '';
+  const colors = palette && palette.length ? palette : ['#137cbd', '#7a46d8', '#db2f7d', '#f55d1f', '#d79619', '#2aa84a', '#24a0c7'];
+  const maxVal = rows.reduce((m, r) => Math.max(m, Number(r.value) || 0), 0) || 1;
+  const rowHeight = 30;
+  const topPad = 16;
+  const leftPad = 230;
+  const rightPad = 36;
+  const chartW = 900;
+  const plotW = chartW - leftPad - rightPad;
+  const chartH = topPad + rows.length * rowHeight + 30;
+
+  const bars = rows.map((r, i) => {
+    const val = Number(r.value) || 0;
+    const width = Math.max(1, (val / maxVal) * plotW);
+    const y = topPad + i * rowHeight;
+    const fill = colors[i % colors.length];
+    const label = String(r.label ?? '');
+    const valueLabel = Number.isFinite(val) ? `${val.toFixed(1)}%` : String(r.value ?? '');
+    return `
+      <text x="${leftPad - 10}" y="${y + 15}" text-anchor="end" font-size="12" fill="#30404d">${escapeHtml(label)}</text>
+      <rect x="${leftPad}" y="${y}" width="${width}" height="18" fill="${fill}" rx="4" />
+      <text x="${leftPad + width + 8}" y="${y + 14}" font-size="11" fill="#5f6b7c">${escapeHtml(valueLabel)}</text>
+    `;
+  }).join('\n');
+
+  const axisY = topPad + rows.length * rowHeight + 8;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${chartW} ${chartH}" width="${chartW}" height="${chartH}" style="display:block;margin:0 auto;">
+    <line x1="${leftPad}" y1="${axisY}" x2="${chartW - rightPad}" y2="${axisY}" stroke="#d8e1e8" />
+    <text x="${chartW / 2}" y="${chartH - 6}" text-anchor="middle" font-size="12" fill="#5f6b7c">${escapeHtml(xLabel)}</text>
+    ${bars}
+  </svg>`;
+}
+
 function renderTimelineBlock(block) {
   if (block.svg) {
     return `<div class="chart-shell">${block.svg}</div>`;
@@ -479,6 +513,9 @@ function renderTimelineBlock(block) {
   }
   if (block.barSvg) {
     return `<div class="chart-shell">${block.barSvg}</div>`;
+  }
+  if (block.horizontalBarSvg) {
+    return `<div class="chart-shell">${block.horizontalBarSvg}</div>`;
   }
   if (block.table) {
     return renderDimensionsBlock({viewMode: 'table', rows: block.table.rows, dimensionLabel: block.table.dimensionLabel, metricLabel: block.table.metricLabel});
@@ -726,12 +763,14 @@ function buildTimelineBlock(container, blockContext, chartSvgs) {
   const chartType = container.chart?.type || 'line';
   const isPie = chartType === 'pie' || chartType === 'donut';
   const isBar = chartType === 'bar';
+  const isHorizontalBar = chartType === 'horizontal_bar' || chartType === 'funnel_bar';
   const nameKey = container.chart?.series?.nameKey;
-  const valueKey = container.chart?.series?.valueKey || 'value';
+  const valueKey = container.chart?.series?.valueKey || container.chart?.valueField || 'value';
   const chartPalette = container.chart?.series?.palette;
 
   let pieSvg = '';
   let barSvg = '';
+  let horizontalBarSvg = '';
   if (isPie && rows.length > 0 && nameKey) {
     const slices = rows.map((row) => ({name: row[nameKey], value: Number(row[valueKey]) || 0})).filter((s) => s.value > 0);
     pieSvg = generatePieSvg(slices, chartPalette);
@@ -739,6 +778,10 @@ function buildTimelineBlock(container, blockContext, chartSvgs) {
     const xKey = container.chart?.xAxis?.dataKey;
     const barRows = rows.slice(0, 30).map((row) => ({label: row[xKey] ?? '', value: Number(row[valueKey]) || 0}));
     barSvg = generateBarSvg(barRows, {xLabel: container.chart?.xAxis?.label, yLabel: container.chart?.yAxis?.label, palette: chartPalette});
+  } else if (isHorizontalBar && rows.length > 0) {
+    const categoryKey = container.chart?.categoryField || container.chart?.xAxis?.dataKey;
+    const barRows = rows.slice(0, 30).map((row) => ({label: row[categoryKey] ?? '', value: Number(row[valueKey]) || 0}));
+    horizontalBarSvg = generateHorizontalBarSvg(barRows, {xLabel: container.chart?.yAxis?.label || container.chart?.valueLabel || 'Value', palette: container.chart?.series?.palette || container.chart?.palette});
   }
 
   return {
@@ -749,11 +792,12 @@ function buildTimelineBlock(container, blockContext, chartSvgs) {
     svg: chartSvgs?.[container.id] || '',
     pieSvg,
     barSvg,
+    horizontalBarSvg,
     table: rows.length ? {
-      dimensionLabel: container.chart?.xAxis?.label || container.chart?.xAxis?.dataKey || 'X',
+      dimensionLabel: container.chart?.xAxis?.label || container.chart?.categoryField || container.chart?.xAxis?.dataKey || 'X',
       metricLabel: container.chart?.series?.valueKey || 'Value',
       rows: rows.slice(0, 25).map((row) => ({
-        label: row?.[container.chart?.xAxis?.dataKey || nameKey],
+        label: row?.[container.chart?.xAxis?.dataKey || container.chart?.categoryField || nameKey],
         value: row?.[valueKey],
       })),
     } : null,
