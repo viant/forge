@@ -474,7 +474,7 @@ function generateHorizontalBarSvg(rows, {xLabel = 'Value', palette} = {}) {
   if (!rows || !rows.length) return '';
   const colors = palette && palette.length ? palette : ['#137cbd', '#7a46d8', '#db2f7d', '#f55d1f', '#d79619', '#2aa84a', '#24a0c7'];
   const maxVal = rows.reduce((m, r) => Math.max(m, Number(r.value) || 0), 0) || 1;
-  const rowHeight = 30;
+  const rowHeight = 24;
   const topPad = 16;
   const leftPad = 230;
   const rightPad = 36;
@@ -491,8 +491,8 @@ function generateHorizontalBarSvg(rows, {xLabel = 'Value', palette} = {}) {
     const valueLabel = Number.isFinite(val) ? `${val.toFixed(1)}%` : String(r.value ?? '');
     return `
       <text x="${leftPad - 10}" y="${y + 15}" text-anchor="end" font-size="12" fill="#30404d">${escapeHtml(label)}</text>
-      <rect x="${leftPad}" y="${y}" width="${width}" height="18" fill="${fill}" rx="4" />
-      <text x="${leftPad + width + 8}" y="${y + 14}" font-size="11" fill="#5f6b7c">${escapeHtml(valueLabel)}</text>
+      <rect x="${leftPad}" y="${y}" width="${width}" height="12" fill="${fill}" rx="4" />
+      <text x="${leftPad + width + 8}" y="${y + 11}" font-size="11" fill="#5f6b7c">${escapeHtml(valueLabel)}</text>
     `;
   }).join('\n');
 
@@ -771,16 +771,20 @@ function buildTimelineBlock(container, blockContext, chartSvgs) {
   let pieSvg = '';
   let barSvg = '';
   let horizontalBarSvg = '';
-  if (isPie && rows.length > 0 && nameKey) {
-    const slices = rows.map((row) => ({name: row[nameKey], value: Number(row[valueKey]) || 0})).filter((s) => s.value > 0);
+  const orderedRows = isHorizontalBar
+    ? [...rows].sort((a, b) => Number(b?.[valueKey] || 0) - Number(a?.[valueKey] || 0))
+    : rows;
+
+  if (isPie && orderedRows.length > 0 && nameKey) {
+    const slices = orderedRows.map((row) => ({name: row[nameKey], value: Number(row[valueKey]) || 0})).filter((s) => s.value > 0);
     pieSvg = generatePieSvg(slices, chartPalette);
-  } else if (isBar && rows.length > 0) {
+  } else if (isBar && orderedRows.length > 0) {
     const xKey = container.chart?.xAxis?.dataKey;
-    const barRows = rows.slice(0, 30).map((row) => ({label: row[xKey] ?? '', value: Number(row[valueKey]) || 0}));
+    const barRows = orderedRows.slice(0, 30).map((row) => ({label: row[xKey] ?? '', value: Number(row[valueKey]) || 0}));
     barSvg = generateBarSvg(barRows, {xLabel: container.chart?.xAxis?.label, yLabel: container.chart?.yAxis?.label, palette: chartPalette});
-  } else if (isHorizontalBar && rows.length > 0) {
+  } else if (isHorizontalBar && orderedRows.length > 0) {
     const categoryKey = container.chart?.categoryField || container.chart?.xAxis?.dataKey;
-    const barRows = rows.slice(0, 30).map((row) => ({label: row[categoryKey] ?? '', value: Number(row[valueKey]) || 0}));
+    const barRows = orderedRows.slice(0, 30).map((row) => ({label: row[categoryKey] ?? '', value: Number(row[valueKey]) || 0}));
     horizontalBarSvg = generateHorizontalBarSvg(barRows, {xLabel: container.chart?.yAxis?.label || container.chart?.valueLabel || 'Value', palette: container.chart?.series?.palette || container.chart?.palette});
   }
 
@@ -793,10 +797,10 @@ function buildTimelineBlock(container, blockContext, chartSvgs) {
     pieSvg,
     barSvg,
     horizontalBarSvg,
-    table: rows.length ? {
+    table: orderedRows.length ? {
       dimensionLabel: container.chart?.xAxis?.label || container.chart?.categoryField || container.chart?.xAxis?.dataKey || 'X',
       metricLabel: container.chart?.series?.valueKey || 'Value',
-      rows: rows.slice(0, 25).map((row) => ({
+      rows: orderedRows.slice(0, 25).map((row) => ({
         label: row?.[container.chart?.xAxis?.dataKey || container.chart?.categoryField || nameKey],
         value: row?.[valueKey],
       })),
