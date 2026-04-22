@@ -474,11 +474,11 @@ function generateHorizontalBarSvg(rows, {xLabel = 'Value', palette} = {}) {
   if (!rows || !rows.length) return '';
   const colors = palette && palette.length ? palette : ['#137cbd', '#7a46d8', '#db2f7d', '#f55d1f', '#d79619', '#2aa84a', '#24a0c7'];
   const maxVal = rows.reduce((m, r) => Math.max(m, Number(r.value) || 0), 0) || 1;
-  const rowHeight = 24;
+  const rowHeight = 22;
   const topPad = 16;
-  const leftPad = 230;
-  const rightPad = 36;
-  const chartW = 900;
+  const leftPad = 190;
+  const rightPad = 28;
+  const chartW = 760;
   const plotW = chartW - leftPad - rightPad;
   const chartH = topPad + rows.length * rowHeight + 30;
 
@@ -491,8 +491,8 @@ function generateHorizontalBarSvg(rows, {xLabel = 'Value', palette} = {}) {
     const valueLabel = Number.isFinite(val) ? `${val.toFixed(1)}%` : String(r.value ?? '');
     return `
       <text x="${leftPad - 10}" y="${y + 15}" text-anchor="end" font-size="12" fill="#30404d">${escapeHtml(label)}</text>
-      <rect x="${leftPad}" y="${y}" width="${width}" height="12" fill="${fill}" rx="4" />
-      <text x="${leftPad + width + 8}" y="${y + 11}" font-size="11" fill="#5f6b7c">${escapeHtml(valueLabel)}</text>
+      <rect x="${leftPad}" y="${y}" width="${width}" height="10" fill="${fill}" rx="4" />
+      <text x="${leftPad + width + 6}" y="${y + 10}" font-size="10" fill="#5f6b7c">${escapeHtml(valueLabel)}</text>
     `;
   }).join('\n');
 
