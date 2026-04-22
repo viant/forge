@@ -195,7 +195,7 @@ export function createDashboardDemoMetadata() {
           {
             id: 'eligibilityFunnel',
             kind: 'dashboard.timeline',
-            title: 'Eligibility funnel',
+            title: 'Restrictive funnel',
             columnSpan: 6,
             dataSourceRef: 'eligibilityFunnel',
             chart: {
