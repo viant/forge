@@ -176,6 +176,10 @@ body {
 .tone-warning { background: #fff5d6; border-color: #f5c542; color: #8a5d00; }
 .tone-danger { background: #fdecea; border-color: #db3737; color: #a82a2a; }
 .tone-success { background: #eef8f0; border-color: #0f9960; color: #0a6640; }
+.forge-table-tone-info { background-color: #edf4ff; color: #1757bc; }
+.forge-table-tone-success { background-color: #ecfdf4; color: #087044; }
+.forge-table-tone-warning { background-color: #fff7e8; color: #8a4b00; }
+.forge-table-tone-danger { background-color: #fff1f0; color: #b42318; }
 .dimension-item__row {
   display: flex;
   justify-content: space-between;
@@ -239,12 +243,122 @@ body {
   font-size: 12px;
   font-weight: 600;
 }
+.dashboard-report {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.dashboard-report__shell {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+}
+.dashboard-report__nav,
+.dashboard-report__page {
+  background: #fff;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(16, 22, 26, 0.04);
+}
+.dashboard-report__nav {
+  padding: 16px;
+  align-self: start;
+}
+.dashboard-report__nav h2,
+.dashboard-report__nav h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.dashboard-report__toc {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+.dashboard-report__toc span {
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #30404d;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.dashboard-report__nav-section {
+  border-top: 1px solid var(--track);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.dashboard-report__nav-section ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  color: #30404d;
+  font-size: 12px;
+}
+.dashboard-report__page {
+  padding: 22px;
+}
+.dashboard-report__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+.dashboard-report__header h1 {
+  margin: 0;
+  font-size: 26px;
+}
+.dashboard-report__header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.dashboard-report__meta {
+  min-width: 220px;
+  color: #30404d;
+  font-size: 12px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.dashboard-report__section {
+  border: 1px solid var(--panel-border);
+  background: #fbfdff;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.dashboard-report__section h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+.dashboard-report__section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.dashboard-report__block .dashboard-export__block {
+  grid-column: auto !important;
+  box-shadow: none;
+  height: 100%;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
   }
   .dashboard-export__block {
     grid-column: span 1 !important;
+  }
+  .dashboard-report__shell,
+  .dashboard-report__section-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-report__header {
+    flex-direction: column;
   }
 }
 </style>
@@ -254,7 +368,7 @@ body {
     <header class="dashboard-export__header">
       <h1 class="dashboard-export__title">Data Quality Dashboard Demo</h1>
       <p class="dashboard-export__subtitle">A quality-first dashboard variant with checks, summaries, and remediation guidance</p>
-      <p class="dashboard-export__subtitle">Generated 2026-04-16T17:49:18.118Z</p>
+      <p class="dashboard-export__subtitle">Generated 2026-04-24T21:10:44.621Z</p>
       <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>domain=customer, billing</span></div>
     </header>
     <div class="dashboard-export__grid">

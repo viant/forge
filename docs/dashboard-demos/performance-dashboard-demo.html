@@ -176,6 +176,10 @@ body {
 .tone-warning { background: #fff5d6; border-color: #f5c542; color: #8a5d00; }
 .tone-danger { background: #fdecea; border-color: #db3737; color: #a82a2a; }
 .tone-success { background: #eef8f0; border-color: #0f9960; color: #0a6640; }
+.forge-table-tone-info { background-color: #edf4ff; color: #1757bc; }
+.forge-table-tone-success { background-color: #ecfdf4; color: #087044; }
+.forge-table-tone-warning { background-color: #fff7e8; color: #8a4b00; }
+.forge-table-tone-danger { background-color: #fff1f0; color: #b42318; }
 .dimension-item__row {
   display: flex;
   justify-content: space-between;
@@ -239,6 +243,109 @@ body {
   font-size: 12px;
   font-weight: 600;
 }
+.dashboard-report {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.dashboard-report__shell {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+}
+.dashboard-report__nav,
+.dashboard-report__page {
+  background: #fff;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(16, 22, 26, 0.04);
+}
+.dashboard-report__nav {
+  padding: 16px;
+  align-self: start;
+}
+.dashboard-report__nav h2,
+.dashboard-report__nav h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.dashboard-report__toc {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+.dashboard-report__toc span {
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #30404d;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.dashboard-report__nav-section {
+  border-top: 1px solid var(--track);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.dashboard-report__nav-section ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  color: #30404d;
+  font-size: 12px;
+}
+.dashboard-report__page {
+  padding: 22px;
+}
+.dashboard-report__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+.dashboard-report__header h1 {
+  margin: 0;
+  font-size: 26px;
+}
+.dashboard-report__header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.dashboard-report__meta {
+  min-width: 220px;
+  color: #30404d;
+  font-size: 12px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.dashboard-report__section {
+  border: 1px solid var(--panel-border);
+  background: #fbfdff;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.dashboard-report__section h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+.dashboard-report__section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.dashboard-report__block .dashboard-export__block {
+  grid-column: auto !important;
+  box-shadow: none;
+  height: 100%;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
@@ -246,47 +353,86 @@ body {
   .dashboard-export__block {
     grid-column: span 1 !important;
   }
+  .dashboard-report__shell,
+  .dashboard-report__section-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-report__header {
+    flex-direction: column;
+  }
 }
 </style>
 </head>
 <body>
-  <main class="dashboard-export">
-    <header class="dashboard-export__header">
-      <h1 class="dashboard-export__title">Performance Dashboard Demo</h1>
-      <p class="dashboard-export__subtitle">Generic Forge dashboard blocks with seeded in-memory data</p>
-      <p class="dashboard-export__subtitle">Generated 2026-04-16T17:49:18.102Z</p>
-      <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>dateRange=90d</span><span class="dashboard-export__state-chip"><strong>Filter</strong>region=NA</span></div>
-    </header>
-    <div class="dashboard-export__grid">
-      
-    <section class="dashboard-export__block" style="grid-column: span 12;">
-      <h2>Filters</h2>
+  
+  <main class="dashboard-report">
+    <div class="dashboard-report__shell">
+      <aside class="dashboard-report__nav">
+        <h2>Report Options</h2>
+        <div class="dashboard-report__toc">
+          <span>1 Executive Summary</span>
+          <span>2 Key Metrics</span>
+          <span>3 Charts</span>
+          <span>4 Tables</span>
+          <span>5 Compatibility</span>
+        </div>
+        <div class="dashboard-report__nav-section">
+          <h3>Included content</h3>
+          <ul>
+            <li>Narrative summary</li>
+            <li>KPI snapshot</li>
+            <li>Charts</li>
+            <li>Tables</li>
+          </ul>
+        </div>
+        <div class="dashboard-report__nav-section">
+          <h3>Output</h3>
+          <ul>
+            <li>HTML ready</li>
+            <li>PDF future</li>
+            <li>Markdown future</li>
+          </ul>
+        </div>
+      </aside>
+      <article class="dashboard-report__page">
+        <header class="dashboard-report__header">
+          <div>
+            <h1>Performance and Data Quality Report</h1>
+            <p>Generated from the same dashboard blocks used in the interactive A+D dashboard view.</p>
+          </div>
+          <div class="dashboard-report__meta">
+            <span><strong>Generated:</strong> 2026-04-24T21:10:44.604Z</span>
+            <span><strong>Mode:</strong> document</span>
+            <span><strong>Locale:</strong> en-US</span>
+          </div>
+        </header>
+        <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>dateRange=90d</span><span class="dashboard-export__state-chip"><strong>Filter</strong>region=NA</span></div>
+        
+        <section class="dashboard-report__section">
+          <h2>Executive Summary</h2>
+          <div class="dashboard-report__block">
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Report</h2>
       
       <div class="message-list">
-    <div class="filter-group">
-      <div class="filter-group__label">Date Range</div>
-      <div class="filter-chip-row">
-        <span class="filter-chip tone-info">90D</span>
-      </div>
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:6px;">Executive Summary</div>
+      <p style="margin:0 0 8px; line-height:1.5;">Total spend is 123000 with overall CTR at 2.3.</p><p style="margin:0 0 8px; line-height:1.5;">Zero-spend rows remain at 47.2% and should be reviewed before the next reporting cycle.</p>
     </div>
   
-    <div class="filter-group">
-      <div class="filter-group__label">Region</div>
-      <div class="filter-chip-row">
-        <span class="filter-chip tone-info">NA</span>
-      </div>
-    </div>
-  
-    <div class="filter-group">
-      <div class="filter-group__label">Date Range</div>
-      <div class="filter-chip-row">
-        
-      </div>
+    <div class="message-card tone-warning">
+      <div style="font-weight:700; margin-bottom:6px;">Recommended Action</div>
+      <p style="margin:0 0 8px; line-height:1.5;">Prioritize cleanup of zero-spend rows and review country attribution for smaller markets.</p>
     </div>
   </div>
     </section>
-  
-
+  </div>
+        </section>
+        
+        <section class="dashboard-report__section">
+          <h2>Key Metrics</h2>
+          <div class="dashboard-report__section-grid">
+            <div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 7;">
       <h2>Overview</h2>
       
@@ -307,8 +453,8 @@ body {
     </div>
   </div>
     </section>
-  
-
+  </div>
+<div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 5;">
       <h2>Period Compare</h2>
       
@@ -332,8 +478,52 @@ body {
     </div>
   </div>
     </section>
+  </div>
+<div class="dashboard-report__block">
+    <section class="dashboard-export__block" style="grid-column: span 8;">
+      <h2>Metric Table</h2>
+      
+      
+    <table class="plain-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td class="metric-label">Total Spend</td>
+            <td>$123,000</td>
+            <td><span class="compare-card__delta tone-info">Financial</span></td>
+          </tr>
+        
+          <tr>
+            <td class="metric-label">Impressions</td>
+            <td>5.4M</td>
+            <td><span class="compare-card__delta tone-success">Reach</span></td>
+          </tr>
+        
+          <tr>
+            <td class="metric-label">CTR</td>
+            <td>2.3%</td>
+            <td><span class="compare-card__delta tone-warning">Engagement</span></td>
+          </tr>
+        
+      </tbody>
+    </table>
   
-
+    </section>
+  </div>
+          </div>
+        </section>
+        
+        <section class="dashboard-report__section">
+          <h2>Chart Evidence</h2>
+          <div class="dashboard-report__section-grid">
+            <div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 8;">
       <h2>Weekly Trend</h2>
       
@@ -381,30 +571,58 @@ body {
       </table>
     
     </section>
-  
-
-    <section class="dashboard-export__block" style="grid-column: span 4;">
-      <h2>Messages</h2>
-      
-      <div class="message-list">
-    <div class="message-card tone-warning">
-      <div style="font-weight:700; margin-bottom:4px;">High zero-spend rate</div>
-      <div>47.2% of rows currently have zero spend.</div>
-    </div>
-  
-    <div class="message-card tone-info">
-      <div style="font-weight:700; margin-bottom:4px;">US concentration</div>
-      <div>US continues to dominate spend in the 90d window.</div>
-    </div>
-  
-    <div class="message-card tone-info">
-      <div style="font-weight:700; margin-bottom:4px;">Active Region Filter</div>
-      <div>Regions: NA.</div>
-    </div>
   </div>
-    </section>
-  
+<div class="dashboard-report__block">
+    <section class="dashboard-export__block" style="grid-column: span 6;">
+      <h2>Restrictive funnel</h2>
+      
+      <div class="chart-shell"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 222" width="760" height="222" style="display:block;margin:0 auto;">
+    <line x1="190" y1="200" x2="732" y2="200" stroke="#d8e1e8" />
+    <text x="380" y="216" text-anchor="middle" font-size="12" fill="#5f6b7c">Reduction %</text>
+    
+      <text x="180" y="31" text-anchor="end" font-size="12" fill="#30404d">1. profile.agg</text>
+      <rect x="190" y="16" width="542" height="10" fill="#2f6de1" rx="4" />
+      <text x="738" y="26" font-size="10" fill="#5f6b7c">14.4%</text>
+    
 
+      <text x="180" y="53" text-anchor="end" font-size="12" fill="#30404d">2. ad.pmp.deal.id</text>
+      <rect x="190" y="38" width="481.7777777777778" height="10" fill="#7a46d8" rx="4" />
+      <text x="677.7777777777778" y="48" font-size="10" fill="#5f6b7c">12.8%</text>
+    
+
+      <text x="180" y="75" text-anchor="end" font-size="12" fill="#30404d">3. location.postalcode.list</text>
+      <rect x="190" y="60" width="361.3333333333333" height="10" fill="#db2f7d" rx="4" />
+      <text x="557.3333333333333" y="70" font-size="10" fill="#5f6b7c">9.6%</text>
+    
+
+      <text x="180" y="97" text-anchor="end" font-size="12" fill="#30404d">4. media.format</text>
+      <rect x="190" y="82" width="267.2361111111111" height="10" fill="#f55d1f" rx="4" />
+      <text x="463.2361111111111" y="92" font-size="10" fill="#5f6b7c">7.1%</text>
+    
+
+      <text x="180" y="119" text-anchor="end" font-size="12" fill="#30404d">5. adsize</text>
+      <rect x="190" y="104" width="259.70833333333337" height="10" fill="#d79619" rx="4" />
+      <text x="455.70833333333337" y="114" font-size="10" fill="#5f6b7c">6.9%</text>
+    
+
+      <text x="180" y="141" text-anchor="end" font-size="12" fill="#30404d">6. external.pmp.deal</text>
+      <rect x="190" y="126" width="207.01388888888889" height="10" fill="#2aa84a" rx="4" />
+      <text x="403.0138888888889" y="136" font-size="10" fill="#5f6b7c">5.5%</text>
+    
+
+      <text x="180" y="163" text-anchor="end" font-size="12" fill="#30404d">7. media.api.protocol</text>
+      <rect x="190" y="148" width="176.90277777777777" height="10" fill="#24a0c7" rx="4" />
+      <text x="372.90277777777777" y="158" font-size="10" fill="#5f6b7c">4.7%</text>
+    
+
+      <text x="180" y="185" text-anchor="end" font-size="12" fill="#30404d">8. sitelet.agg</text>
+      <rect x="190" y="170" width="97.86111111111111" height="10" fill="#5a5ce6" rx="4" />
+      <text x="293.8611111111111" y="180" font-size="10" fill="#5f6b7c">2.6%</text>
+    
+  </svg></div>
+    </section>
+  </div>
+<div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 6;">
       <h2>Spend by Country</h2>
       
@@ -426,8 +644,54 @@ body {
     </div>
   </div>
     </section>
+  </div>
+<div class="dashboard-report__block">
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Spend Distribution</h2>
+      
+      <div class="chart-shell"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 400" width="280" height="400" style="display:block;margin:0 auto;">
+    <path d="M140,140 L140,33.599999999999994 A106.4,106.4 0 1,1 41.82971633614939,98.96884835446238 Z" fill="#2367d1" />
+    <path d="M140,140 L41.82971633614939,98.96884835446238 A106.4,106.4 0 0,1 83.30962982847711,49.96022029227464 Z" fill="#16865a" />
+    <path d="M140,140 L83.30962982847711,49.96022029227464 A106.4,106.4 0 0,1 113.11846184500575,37.05174646249898 Z" fill="#b76b00" />
+    <path d="M140,140 L113.11846184500575,37.05174646249898 A106.4,106.4 0 0,1 129.14847929439745,34.15480880844949 Z" fill="#7a4cc2" />
+    <path d="M140,140 L129.14847929439745,34.15480880844949 A106.4,106.4 0 0,1 140.00000000000009,33.599999999999994 Z" fill="#c43c36" />
+    <rect x="10" y="292" width="12" height="12" rx="2" fill="#2367d1" /><text x="28" y="303" font-size="12" fill="#30404d">US — 81%</text>
+    <rect x="10" y="312" width="12" height="12" rx="2" fill="#16865a" /><text x="28" y="323" font-size="12" fill="#30404d">CA — 10%</text>
+    <rect x="10" y="332" width="12" height="12" rx="2" fill="#b76b00" /><text x="28" y="343" font-size="12" fill="#30404d">GB — 5%</text>
+    <rect x="10" y="352" width="12" height="12" rx="2" fill="#7a4cc2" /><text x="28" y="363" font-size="12" fill="#30404d">AU — 2%</text>
+    <rect x="10" y="372" width="12" height="12" rx="2" fill="#c43c36" /><text x="28" y="383" font-size="12" fill="#30404d">DE — 2%</text>
+  </svg></div>
+    </section>
+  </div>
+          </div>
+        </section>
+        
+        <section class="dashboard-report__section">
+          <h2>Tables and Actions</h2>
+          <div class="dashboard-report__section-grid">
+            <div class="dashboard-report__block">
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>Messages</h2>
+      
+      <div class="message-list">
+    <div class="message-card tone-warning">
+      <div style="font-weight:700; margin-bottom:4px;">High zero-spend rate</div>
+      <div>47.2% of rows currently have zero spend.</div>
+    </div>
   
-
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:4px;">US concentration</div>
+      <div>US continues to dominate spend in the 90d window.</div>
+    </div>
+  
+    <div class="message-card tone-info">
+      <div style="font-weight:700; margin-bottom:4px;">Active Region Filter</div>
+      <div>Regions: NA.</div>
+    </div>
+  </div>
+    </section>
+  </div>
+<div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 4;">
       <h2>Data Health</h2>
       
@@ -447,125 +711,41 @@ body {
     </div>
   </div>
     </section>
-  
-
+  </div>
+<div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 8;">
-      <h2>Metric Table</h2>
+      <h2>Country Performance Table</h2>
       
       
     <table class="plain-table">
       <thead>
         <tr>
-          <th>Metric</th>
-          <th>Value</th>
-          <th>Context</th>
+          <th>Country</th><th>Region</th><th>Spend</th><th>Impressions</th><th>CTR</th><th>Zero Spend</th><th>Status</th>
         </tr>
       </thead>
       <tbody>
         
           <tr>
-            <td class="metric-label">Total Spend</td>
-            <td>$123,000</td>
-            <td><span class="compare-card__delta tone-info">Financial</span></td>
+            <td>US</td><td>NA</td><td>$100,000</td><td>4.2M</td><td>2.4%</td><td>39.1%</td><td class="forge-table-tone-warning">watch</td>
           </tr>
         
           <tr>
-            <td class="metric-label">Impressions</td>
-            <td>5.4M</td>
-            <td><span class="compare-card__delta tone-success">Reach</span></td>
-          </tr>
-        
-          <tr>
-            <td class="metric-label">CTR</td>
-            <td>2.3%</td>
-            <td><span class="compare-card__delta tone-warning">Engagement</span></td>
+            <td>CA</td><td>NA</td><td>$12,000</td><td>620K</td><td>2.1%</td><td>51.0%</td><td class="forge-table-tone-danger">critical</td>
           </tr>
         
       </tbody>
     </table>
   
     </section>
-  
-
-    <section class="dashboard-export__block" style="grid-column: span 6;">
-      <h2>Report</h2>
-      
-      <div class="message-list">
-    <div class="message-card tone-info">
-      <div style="font-weight:700; margin-bottom:6px;">Executive Summary</div>
-      <p style="margin:0 0 8px; line-height:1.5;">Total spend is 123000 with overall CTR at 2.3.</p><p style="margin:0 0 8px; line-height:1.5;">Zero-spend rows remain at 47.2% and should be reviewed before the next reporting cycle.</p>
-    </div>
-  
-    <div class="message-card tone-warning">
-      <div style="font-weight:700; margin-bottom:6px;">Recommended Action</div>
-      <p style="margin:0 0 8px; line-height:1.5;">Prioritize cleanup of zero-spend rows and review country attribution for smaller markets.</p>
-    </div>
   </div>
-    </section>
-  
-
-    <section class="dashboard-export__block" style="grid-column: span 4;">
-      <h2>Audit Trail</h2>
-      
-      <div class="feed-list">
-    <div class="feed-item">
-      <div class="feed-item__meta">2026-04-07 09:00</div>
-      <div style="font-weight:600; margin-bottom:4px;">Loaded metrics</div>
-      <div>Summary and quality metrics seeded into the demo context.</div>
-    </div>
-  
-    <div class="feed-item">
-      <div class="feed-item__meta">2026-04-07 09:01</div>
-      <div style="font-weight:600; margin-bottom:4px;">Loaded trend data</div>
-      <div>Weekly trend collection prepared for timeline rendering.</div>
-    </div>
-  </div>
-    </section>
-  
-
-    <section class="dashboard-export__block" style="grid-column: span 4;">
-      <h2>Spend Distribution</h2>
-      
-      <div class="chart-shell"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 400" width="280" height="400" style="display:block;margin:0 auto;">
-    <path d="M140,140 L140,33.599999999999994 A106.4,106.4 0 1,1 41.82971633614939,98.96884835446238 Z" fill="#137cbd" />
-    <path d="M140,140 L41.82971633614939,98.96884835446238 A106.4,106.4 0 0,1 83.30962982847711,49.96022029227464 Z" fill="#0f9960" />
-    <path d="M140,140 L83.30962982847711,49.96022029227464 A106.4,106.4 0 0,1 113.11846184500575,37.05174646249898 Z" fill="#d9822b" />
-    <path d="M140,140 L113.11846184500575,37.05174646249898 A106.4,106.4 0 0,1 129.14847929439745,34.15480880844949 Z" fill="#8f398f" />
-    <path d="M140,140 L129.14847929439745,34.15480880844949 A106.4,106.4 0 0,1 140.00000000000009,33.599999999999994 Z" fill="#c23030" />
-    <rect x="10" y="292" width="12" height="12" rx="2" fill="#137cbd" /><text x="28" y="303" font-size="12" fill="#30404d">US — 81%</text>
-    <rect x="10" y="312" width="12" height="12" rx="2" fill="#0f9960" /><text x="28" y="323" font-size="12" fill="#30404d">CA — 10%</text>
-    <rect x="10" y="332" width="12" height="12" rx="2" fill="#d9822b" /><text x="28" y="343" font-size="12" fill="#30404d">GB — 5%</text>
-    <rect x="10" y="352" width="12" height="12" rx="2" fill="#8f398f" /><text x="28" y="363" font-size="12" fill="#30404d">AU — 2%</text>
-    <rect x="10" y="372" width="12" height="12" rx="2" fill="#c23030" /><text x="28" y="383" font-size="12" fill="#30404d">DE — 2%</text>
-  </svg></div>
-    </section>
-  
-
-    <section class="dashboard-export__block" style="grid-column: span 8;">
-      <h2>Country Detail Table</h2>
-      
-      
-    <table class="plain-table">
-      <thead>
-        <tr>
-          <th>Country</th><th>Region</th><th>Spend</th>
-        </tr>
-      </thead>
-      <tbody>
+          </div>
+        </section>
         
-          <tr>
-            <td>US</td><td>NA</td><td>$100,000</td>
-          </tr>
-        
-          <tr>
-            <td>CA</td><td>NA</td><td>$12,000</td>
-          </tr>
-        
-      </tbody>
-    </table>
-  
-    </section>
-  
+        <section class="dashboard-report__section">
+          <h2>Compatibility Contract</h2>
+          <p class="block-subtitle">Existing dashboards continue to render as interactive dashboards. Report mode changes presentation and export composition only when report configuration is present.</p>
+        </section>
+      </article>
     </div>
   </main>
 </body>
