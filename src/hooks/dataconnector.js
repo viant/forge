@@ -26,11 +26,37 @@ function logCallerStack(name , maxFrames = 5) {
     }
 }
 
+function pagingConfig(paging) {
+    if (!paging || paging.enabled === false) {
+        return null;
+    }
+    return paging;
+}
+
+function resolvePagingValues(page, paging) {
+    const config = pagingConfig(paging);
+    if (page == null || !config) {
+        return null;
+    }
+
+    const pageParameters = config.parameters || {};
+    const pageParamName = pageParameters.page || "page";
+    const sizeParamName = pageParameters.size || "size";
+    const sizeValue = config.size && config.size > 0 ? config.size : undefined;
+    let pageValue = page;
+    if (pageParamName === 'offset') {
+        const pageNumber = Number(page) || 1;
+        const pageSize = Number(sizeValue) || 0;
+        pageValue = Math.max(0, pageNumber - 1) * pageSize;
+    }
+    return { pageParamName, sizeParamName, pageValue, sizeValue };
+}
+
 function useDataConnector(dataSource) {
     const {endpoints, useAuth} = useSetting();
     const auth = useAuth();
     const {authStates, defaultAuthProvider} = auth;
-    const {paging = {}, parameters = []} = dataSource;
+    const {paging, parameters = []} = dataSource;
     const {targetContext = {}} = useSetting();
 
     function notifyUnauthorized(error) {
@@ -198,19 +224,22 @@ function useDataConnector(dataSource) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             const queryParams = new URLSearchParams();
+            const requestMethod = String(method || 'GET').toUpperCase();
+            const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
             // Merge filter into query string
-            Object.entries(filter).forEach(([key, val]) => {
-                if (val != null) queryParams.append(key, val);
-            });
+            if (requestMethod === 'GET') {
+                Object.entries(filter).forEach(([key, val]) => {
+                    if (val != null) queryParams.append(key, val);
+                });
+            }
 
             // Handle paging
-            if (page != null && paging) {
-                const pageParameters = paging.parameters || {};
-                const pageParamName = pageParameters.page || "page";
-                queryParams.append(pageParamName, page);
-                const sizeParamName = pageParameters.size || "size";
-                if (paging.size && paging.size > 0) {
-                    queryParams.append(sizeParamName, paging.size);
+            const pagingValues = resolvePagingValues(page, paging);
+            if (requestMethod === 'GET' && pagingValues) {
+                const { pageParamName, sizeParamName, pageValue, sizeValue } = pagingValues;
+                queryParams.append(pageParamName, pageValue);
+                if (sizeValue != null) {
+                    queryParams.append(sizeParamName, sizeValue);
                 }
             }
 
@@ -221,10 +250,27 @@ function useDataConnector(dataSource) {
             }
 
             const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
-            //logCallerStack('get:    ' + finalUrl);
+            const request = {method: requestMethod, headers};
 
-            const request = {method, headers};
-            if (Object.keys(body).length > 0) {
+            if (requestMethod !== 'GET' && isDatasourceFetchRoute) {
+                const inputs = {
+                    ...(inputParameters || {}),
+                    ...(filter || {}),
+                };
+                const pagingValues = resolvePagingValues(page, paging);
+                if (pagingValues) {
+                    const { pageParamName, sizeParamName, pageValue, sizeValue } = pagingValues;
+                    inputs[pageParamName] = pageValue;
+                    if (sizeValue != null) {
+                        inputs[sizeParamName] = sizeValue;
+                    }
+                }
+                request["body"] = JSON.stringify({ inputs });
+                request.headers = {
+                    ...headers,
+                    "Content-Type": "application/json",
+                };
+            } else if (Object.keys(body).length > 0) {
                 request["body"] = JSON.stringify(body);
             }
             const log = getLogger('connector');

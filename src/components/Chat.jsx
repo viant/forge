@@ -145,7 +145,7 @@ function StarterTaskGrid({ tasks = [], onSelect }) {
 function isChatDebugEnabled() {
     if (typeof window === 'undefined') return false;
     try {
-        const raw = String(window.localStorage?.getItem('agently.debugStream') || '').trim().toLowerCase();
+        const raw = String(window.localStorage?.getItem('forge.chat.debugStream') || '').trim().toLowerCase();
         return ['1', 'true', 'on', 'yes'].includes(raw);
     } catch (_) {
         return false;
@@ -923,6 +923,8 @@ export default function Chat({
                     reasoningOptions={composerReasoningOptions}
                     reasoningValue={currentReasoning}
                     onReasoningChange={handleReasoningChange}
+                    inputComponent={externalComposerProps?.inputComponent}
+                    inputProps={externalComposerProps?.inputProps}
                     activeChips={activeChips}
                     onChipClear={(chip) => handleChipClear(chip)}
                 />

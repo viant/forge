@@ -4,22 +4,19 @@ import React from "react";
 
 const TableFooter = ({
                          columnsLength,
-                         pagination,
                          context,
                          events,
                          pagingEnabled
                      }) => {
-    if (!pagination) return null;
+    if (!pagingEnabled) return null;
     return (
         <tfoot>
         <tr>
             <td colSpan={columnsLength} align="center">
-                {pagingEnabled ?
-                    <PaginationBar
-                        context={context}
-                        pagination={pagination}
-                        events={events}
-                    /> : <hr/>}
+                <PaginationBar
+                    context={context}
+                    events={events}
+                />
             </td>
         </tr>
         </tfoot>

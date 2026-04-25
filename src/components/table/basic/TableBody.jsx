@@ -20,8 +20,9 @@ const TableBody = ({
                        enforceColumnSize,
                        onShowFullContent,
                    }) => {
+    const rowsCollection = Array.isArray(collection) ? collection : [];
 
-    if (loading || error) {
+    if (error || (loading && rowsCollection.length === 0)) {
         return (
             <tbody>
             <TableBackfill
@@ -36,15 +37,18 @@ const TableBody = ({
         );
     }
     const rows = [];
-    for (let rowIndex = 0; rowIndex < collection.length; rowIndex++) {
-        const rowData = preparedData[rowIndex];
-        const row = collection[rowIndex];
+    for (let rowIndex = 0; rowIndex < rowsCollection.length; rowIndex++) {
+        const preparedRow = preparedData[rowIndex];
+        const rowData = Array.isArray(preparedRow) ? preparedRow : preparedRow?.cells || [];
+        const row = rowsCollection[rowIndex];
         const rowSelection = {rowIndex, row};
         rows.push(
             <TableRow
                 context={context}
                 key={rowIndex}
                 rowData={rowData}
+                rowStyle={preparedRow?.style}
+                rowClassName={preparedRow?.className}
                 rowSelection={rowSelection}
                 columns={columns}
                 columnsHandlers={columnsHandlers}

@@ -4,6 +4,7 @@ export const DASHBOARD_BLOCK_KINDS = [
   'dashboard.kpiTable',
   'dashboard.filters',
   'dashboard.timeline',
+  'dashboard.composition',
   'dashboard.dimensions',
   'dashboard.messages',
   'dashboard.status',

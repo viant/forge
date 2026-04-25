@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef} from 'react';
+import React, {useState, useEffect, useRef, useMemo} from 'react';
 import {Dialog, DialogBody, DialogFooter, Button, Classes, InputGroup} from '@blueprintjs/core';
 import LayoutRenderer from './LayoutRenderer';
 import DataSource from './DataSource.jsx';
@@ -8,6 +8,155 @@ import {dialogHandlers} from "../hooks";
 import {resolveTemplate} from "../utils";
 import { getLogger } from '../utils/logger.js';
 
+function normalizeQuickFilterSpecs(dialog) {
+    const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
+        ? dialog.properties.quickFilters
+        : (dialog?.properties?.quickFilter ? [dialog.properties.quickFilter] : []);
+    if (specs.length === 0) {
+        return [{
+            field: 'name',
+            placeholder: 'Search…',
+            width: 240,
+            icon: 'search',
+            trigger: 'debounce',
+            debounceMs: 220,
+        }];
+    }
+    return specs.map((spec) => ({
+        field: String(spec?.field || 'name').trim() || 'name',
+        placeholder: String(spec?.placeholder || 'Search…').trim() || 'Search…',
+        width: spec?.width,
+        icon: spec?.icon,
+        className: spec?.className,
+        style: spec?.style,
+        trigger: spec?.trigger,
+        debounceMs: spec?.debounceMs,
+    }));
+}
+
+const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
+    const searchable = !(dialog?.properties && dialog.properties.searchable === false);
+    if (!searchable || quickFilterSpecs.length === 0) return null;
+    const quickSearch = dialog?.properties?.quickSearch || {};
+    const timersRef = React.useRef({});
+    const alignMap = {
+        left: 'flex-start',
+        start: 'flex-start',
+        center: 'center',
+        right: 'flex-end',
+        end: 'flex-end',
+    };
+    const wrapperStyle = {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginBottom: 8,
+        ...(quickSearch.align ? { justifyContent: alignMap[quickSearch.align] || quickSearch.align } : {}),
+        ...(quickSearch.gap ? { gap: quickSearch.gap } : {}),
+        ...(quickSearch.style || {}),
+    };
+    const wrapperClassName = [
+        quickSearch.className,
+    ].filter(Boolean).join(' ');
+    const inputStyle = quickSearch.inputStyle || {};
+
+    const [values, setValues] = React.useState(() => {
+        const initial = {};
+        quickFilterSpecs.forEach((spec) => {
+            initial[spec.field] = '';
+        });
+        return initial;
+    });
+
+    React.useEffect(() => {
+        return () => {
+            Object.values(timersRef.current || {}).forEach((timer) => clearTimeout(timer));
+        };
+    }, []);
+
+    React.useEffect(() => {
+        try {
+            const cur = dsCtx?.signals?.input?.peek?.() || {};
+            const next = {};
+            quickFilterSpecs.forEach((spec) => {
+                next[spec.field] = String((cur.filter && cur.filter[spec.field]) || '');
+            });
+            setValues((prev) => {
+                const prevKeys = Object.keys(prev || {});
+                const nextKeys = Object.keys(next);
+                if (prevKeys.length === nextKeys.length && nextKeys.every((key) => prev[key] === next[key])) {
+                    return prev;
+                }
+                return next;
+            });
+        } catch (_) {}
+    }, [dsCtx, quickFilterSpecs]);
+
+    const applySearch = (field, text, debounceMs = 0) => {
+        try {
+            const h = dsCtx?.handlers?.dataSource;
+            h?.setSilentFilterValues?.({ filter: { [field]: text } });
+            const fetch = () => {
+                h?.setInactive?.(false);
+                h?.setLoading?.(true);
+                h?.fetchCollection?.();
+            };
+            if (debounceMs > 0) {
+                if (timersRef.current[field]) clearTimeout(timersRef.current[field]);
+                timersRef.current[field] = setTimeout(fetch, debounceMs);
+            } else {
+                if (timersRef.current[field]) clearTimeout(timersRef.current[field]);
+                fetch();
+            }
+        } catch (_) {}
+    };
+
+    return (
+        <div className={wrapperClassName} style={wrapperStyle}>
+            {quickFilterSpecs.map((spec) => (
+                <InputGroup
+                    key={spec.field}
+                    leftIcon={spec.icon || quickSearch.icon || "search"}
+                    placeholder={spec.placeholder}
+                    value={values[spec.field] || ''}
+                    onChange={(e) => {
+                        const v = e?.target?.value ?? '';
+                        setValues((prev) => ({ ...prev, [spec.field]: v }));
+                        const trigger = spec.trigger || quickSearch.trigger || "commit";
+                        if (trigger === "change" || trigger === "debounce") {
+                            const debounceMs = trigger === "debounce" ? (spec.debounceMs ?? quickSearch.debounceMs ?? 220) : 0;
+                            applySearch(spec.field, v, debounceMs);
+                        }
+                    }}
+                    onBlur={(e) => {
+                        const v = e?.target?.value ?? '';
+                        const trigger = spec.trigger || quickSearch.trigger || "commit";
+                        if (trigger !== "change" && trigger !== "debounce") {
+                            applySearch(spec.field, v);
+                        }
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const v = e?.target?.value ?? '';
+                            applySearch(spec.field, v);
+                        }
+                    }}
+                    style={{
+                        ...inputStyle,
+                        ...(quickSearch.inputWidth ? { width: quickSearch.inputWidth } : {}),
+                        ...(spec.width ? { width: spec.width } : {}),
+                        ...(spec.style || {}),
+                    }}
+                    className={[
+                        "bp4-small",
+                        quickSearch.inputClassName,
+                        spec.className,
+                    ].filter(Boolean).join(" ")}
+                />
+            ))}
+        </div>
+    );
+};
 
 const ViewDialog = ({context, dialog}) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -16,6 +165,12 @@ const ViewDialog = ({context, dialog}) => {
     const resolvedDataSourceRef = dialog?.dataSourceRef || context?.identity?.dataSourceRef || '';
 
     const events = dialogHandlers(context, dialog)
+    const quickFilterConfigKey = useMemo(() => JSON.stringify({
+        quickFilter: dialog?.properties?.quickFilter || null,
+        quickFilters: dialog?.properties?.quickFilters || [],
+    }), [dialog?.properties?.quickFilter, dialog?.properties?.quickFilters]);
+    const quickFilterSpecs = useMemo(() => normalizeQuickFilterSpecs(dialog), [quickFilterConfigKey]);
+
     useSignalEffect(() => {
         const isDialogOpen = handlers.dialog.isOpen();
         log.debug('open effect', { isDialogOpen, wasOpen: isOpen, dsRef: resolvedDataSourceRef });
@@ -69,8 +224,14 @@ const ViewDialog = ({context, dialog}) => {
                         const inSig = dsC?.signals?.input;
                         const args = (inSig?.peek?.() || {}).args || {};
                         const filter = {};
-                        if (args && typeof args === 'object' && args.name) filter.name = args.name;
+                        for (const spec of quickFilterSpecs) {
+                            if (args && typeof args === 'object' && args[spec.field]) {
+                                filter[spec.field] = args[spec.field];
+                            }
+                        }
                         log.debug('deferred fetchCollection', { filter, args });
+                        dsHandlers?.setInactive?.(false);
+                        dsHandlers?.setLoading?.(true);
                         dsHandlers?.fetchCollection?.({ filter });
                     } catch (err) {
                         log.warn('deferred fetchCollection error', { error: String(err?.message || err) });
@@ -142,54 +303,15 @@ const ViewDialog = ({context, dialog}) => {
     const title = resolveTemplate(dialog.title, {input})
 
     const {style={}} = dialog
-    const dialogStyle = {
-        // height: "100%",
-        // display: "flex",
-        // flexDirection: "column",
-        zIndex: 100,
-              ...style,
-    }
-
-    // Quick search is rendered via a child component to keep hook order stable
-    const DialogQuickSearch = ({ dsCtx }) => {
-        const searchable = !(dialog?.properties && dialog.properties.searchable === false);
-        if (!searchable) return null;
-        const [q, setQ] = React.useState('');
-        const debounceRef = React.useRef(null);
-        React.useEffect(() => {
-            try {
-                const cur = dsCtx?.signals?.input?.peek?.() || {};
-                const name = (cur.filter && cur.filter.name) || '';
-                setQ(String(name || ''));
-            } catch (_) {}
-        }, [dsCtx]);
-        const applySearch = (text) => {
-            try {
-                const h = dsCtx?.handlers?.dataSource;
-                h?.setSilentFilterValues?.({ filter: { name: text } });
-                if (debounceRef.current) clearTimeout(debounceRef.current);
-                debounceRef.current = setTimeout(() => h?.fetchCollection?.(), 220);
-            } catch (_) {}
-        };
-        return (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-                <InputGroup
-                    leftIcon="search"
-                    placeholder="Search…"
-                    value={q}
-                    onChange={(e) => {
-                        const v = e?.target?.value ?? '';
-                        setQ(v);
-                        applySearch(v);
-                    }}
-                    style={{ width: 240 }}
-                    className="bp4-small"
-                />
-            </div>
-        );
-    };
-
-
+    const dialogStyle = {...style};
+    const dialogClassName = [
+        dialog.className,
+        dialog?.properties?.className,
+    ].filter(Boolean).join(" ");
+    const bodyClassName = dialog?.properties?.bodyClassName;
+    const bodyStyle = dialog?.properties?.bodyStyle;
+    const contentClassName = dialog?.properties?.contentClassName;
+    const contentStyle = dialog?.properties?.contentStyle;
     // Build footer actions: prefer metadata actions; otherwise provide defaults
     const renderFooterActions = () => {
         if (dialog.actions && Array.isArray(dialog.actions) && dialog.actions.length > 0) return undefined; // keep metadata-driven buttons
@@ -210,9 +332,10 @@ const ViewDialog = ({context, dialog}) => {
             onClose={handleClose}
             title={title}
             isCloseButtonShown={true}
+            className={dialogClassName || undefined}
             style={dialogStyle}
         >
-            <DialogBody>
+            <DialogBody className={bodyClassName} style={bodyStyle}>
                 {/* Mount DataSource + MessageBus for dialog DS to enable fetching */}
                 {dsCtx ? (<>
                     <DataSource context={dsCtx} />
@@ -221,11 +344,13 @@ const ViewDialog = ({context, dialog}) => {
                     <div style={{ color: '#a82a2a', padding: 8 }}>Dialog misconfigured: missing data source “{String(resolvedDataSourceRef)}”.</div>
                 )}
                 {/* Inline quick-search input above the content for a friendlier UX */}
-                <DialogQuickSearch dsCtx={dsCtx} />
-                <LayoutRenderer
-                    context={dsCtx}
-                    container={{dataSourceRef: resolvedDataSourceRef, ...dialog.content}}
-                />
+                <DialogQuickSearch dsCtx={dsCtx} dialog={dialog} quickFilterSpecs={quickFilterSpecs} />
+                <div className={contentClassName} style={contentStyle}>
+                    <LayoutRenderer
+                        context={dsCtx}
+                        container={{dataSourceRef: resolvedDataSourceRef, ...dialog.content}}
+                    />
+                </div>
             </DialogBody>
             <DialogFooter actions={
                 (dialog.actions && dialog.actions.length > 0)

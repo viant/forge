@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { HTMLTable, Dialog } from "@blueprintjs/core";
+import { HTMLTable, Spinner } from "@blueprintjs/core";
 import numeral from "numeral";
 import { useColumnsHandlers, tableHandlers } from "../../hooks/event.js";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
@@ -11,8 +11,11 @@ import SettingsDialog from "./SettingsDialog.jsx";
 import "./Basic.css";
 import Toolbar from "./basic/Toolbar.jsx";
 import FullContentDialog from "./FullContentDialog";
+import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "./formattingRules.js";
 
 const defaultCellWidth = 30; // Adjust as needed
+
+const isFooterToolbarItem = (item = {}) => ["footer", "bottom"].includes(String(item.placement || "").toLowerCase());
 
 export const resolveKey = (holder, name) => {
     if (holder == null) return undefined;
@@ -74,6 +77,10 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     // loading & error come from useDataSourceState hook
 
     const { dataSource, handlers } = context;
+    const formattingRules = useMemo(
+        () => normalizeRuleList(container?.table?.formattingRules || container?.table?.formatting || []),
+        [container?.table?.formattingRules, container?.table?.formatting]
+    );
 
     const events = tableHandlers(context, container);
 
@@ -207,6 +214,9 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         for (let rowIndex = 0; rowIndex < sortedCollection.length; rowIndex++) {
             const item = sortedCollection[rowIndex];
             const rowArray = [];
+            const rowRules = matchingRules(item, formattingRules, "row");
+            const rowStyle = mergeStyles(rowRules);
+            const rowClassName = mergeClassNames(rowRules);
 
             for (let colIndex = 0; colIndex < columnsToUse.length; colIndex++) {
                 const col = columnsToUse[colIndex];
@@ -230,17 +240,24 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                 if (!align && col.numericFormat) {
                     align = "right";
                 }
+                const cellRules = matchingRules(item, formattingRules, "cell", col.id);
                 rowArray.push({
                     id: cellKey,
                     align: align || "left",
                     displayedText: displayedText,
                     value: rawValue,
+                    style: mergeStyles(cellRules),
+                    className: mergeClassNames(cellRules),
                 });
             }
-            newPreparedData.push(rowArray);
+            newPreparedData.push({
+                cells: rowArray,
+                style: rowStyle,
+                className: rowClassName,
+            });
         }
         return newPreparedData;
-    }, [sortedCollection, columnsToUse, loading]);
+    }, [sortedCollection, columnsToUse, loading, formattingRules]);
 
     const handleOpenFilter = () => setIsFilterOpen(true);
     const handleCloseFilter = () => setIsFilterOpen(false);
@@ -286,57 +303,87 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     };
     handlers["dataSource"]["openFilter"] = handleOpenFilter;
 
-    const fullWidth = container?.table?.fullWidth === true;
+    const tableDisplayWidth = container?.table?.width || (container?.table?.fullWidth === true ? "100%" : "90%");
+    const toolbarItems = container?.table?.toolbar?.items || [];
+    const footerToolbarItems = toolbarItems.filter(isFooterToolbarItem);
+    const primaryToolbarItems = toolbarItems.filter((item) => !isFooterToolbarItem(item));
+    const hasFooterToolbar = footerToolbarItems.length > 0;
 
     return (
         <div
-            className="basic-table-wrapper"
+            className={`basic-table-wrapper${loading && sortedCollection.length > 0 ? " is-loading" : ""}`}
             style={{
-                overflow: "auto",
-                width: fullWidth ? "100%" : "90%",
+                height: "100%",
+                width: tableDisplayWidth,
                 boxSizing: "border-box",
             }}
             ref={tableRef}
         >
-            <Toolbar
-                context={context}
-                toolbarItems={container?.table?.toolbar?.items || []}
-            />
-
-            <HTMLTable style={{ width: "100%", tableLayout: "fixed" }}>
-                {/* Table Header */}
-                <TableHeader
-                    context={context}
-                    columns={columnsToUse}
-                    tableTitle={tableTitle}
-                    sortConfig={{ onSort: handleSort, sortColumnId, sortDirection }}
-                />
-
-                {/* Table Body */}
-                <TableBody
-                    context={context}
-                    collection={sortedCollection}
-                    preparedData={preparedData}
-                    columns={columnsToUse}
-                    events={events}
-                    columnsHandlers={columnsHandlers}
-                    backfillCount={backfillCount}
-                    loading={loading}
-                    error={error}
-                    enforceColumnSize={enforceColumnSize}
-                    onShowFullContent={handleShowFullContent}
-                />
-
-                {/* Table Footer */}
-                {pagingSize > 0 ? (
-                    <TableFooter
-                        columnsLength={columnsToUse.length}
-                        pagination={pagination}
+            {primaryToolbarItems.length > 0 ? (
+                <div className="basic-table-filterbar">
+                    <Toolbar
                         context={context}
-                        pagingEnabled={pagingEnabled}
+                        toolbarItems={primaryToolbarItems}
                     />
-                ) : null}
-            </HTMLTable>
+                </div>
+            ) : null}
+
+            <div className="basic-table-scroll">
+                <HTMLTable style={{ width: "100%", tableLayout: "fixed" }}>
+                    {/* Table Header */}
+                    <TableHeader
+                        context={context}
+                        columns={columnsToUse}
+                        tableTitle={tableTitle}
+                        sortConfig={{ onSort: handleSort, sortColumnId, sortDirection }}
+                    />
+
+                    {/* Table Body */}
+                    <TableBody
+                        context={context}
+                        collection={sortedCollection}
+                        preparedData={preparedData}
+                        columns={columnsToUse}
+                        events={events}
+                        columnsHandlers={columnsHandlers}
+                        backfillCount={backfillCount}
+                        loading={loading}
+                        error={error}
+                        enforceColumnSize={enforceColumnSize}
+                        onShowFullContent={handleShowFullContent}
+                    />
+
+                    {/* Table Footer */}
+                    {pagingSize > 0 && !hasFooterToolbar ? (
+                        <TableFooter
+                            columnsLength={columnsToUse.length}
+                            context={context}
+                            pagingEnabled={pagingEnabled}
+                        />
+                    ) : null}
+                </HTMLTable>
+            </div>
+
+            {hasFooterToolbar ? (
+                <div className="basic-table-paginationbar">
+                    <Toolbar
+                        context={context}
+                        toolbarItems={footerToolbarItems}
+                    />
+                </div>
+            ) : null}
+
+            {loading && sortedCollection.length > 0 ? (
+                <div className="table-loading-overlay" role="status" aria-live="polite">
+                    <div className="table-loading-card">
+                        <Spinner size={18} />
+                        <div>
+                            <div className="table-loading-title">Loading data</div>
+                            <div className="table-loading-text">Waiting for the latest rows.</div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
 
             {/* Dialog for Full Cell Content */}
             <FullContentDialog

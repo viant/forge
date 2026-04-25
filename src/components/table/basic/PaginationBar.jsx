@@ -13,11 +13,10 @@ const buttonProperties = {
 
 const PaginationBar = ({
                            context,
-                           pagination,
                        }) => {
     const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [recordCount, setRecordCount] = useState(0);
+    const [totalPages, setTotalPages] = useState(null);
+    const [recordCount, setRecordCount] = useState(null);
     const [inactive, setInactive] = useState(false);
     const handlers = context.handlers;
 
@@ -26,21 +25,26 @@ const PaginationBar = ({
         const isInactive = handlers.dataSource.isInactive();
         setInactive(isInactive);
 
-        let newTotalPages = info?.pageCount || 1;
-        let totalCount = info?.totalCount || 0;
+        let newTotalPages = Number.isFinite(info?.pageCount) && info.pageCount > 0 ? info.pageCount : null;
+        let totalCount = Number.isFinite(info?.totalCount) && info.totalCount >= 0 ? info.totalCount : null;
         if (isInactive) {
-            newTotalPages = 0;
-            totalCount = 0;
+            newTotalPages = null;
+            totalCount = null;
         }
 
         if (totalPages !== newTotalPages) {
             setTotalPages(newTotalPages);
-            // Optional: Reset current page if total pages change
-            if (currentPage > newTotalPages) {
+            if (newTotalPages != null && currentPage > newTotalPages) {
                 setCurrentPage(newTotalPages);
             }
         }
         setRecordCount(totalCount);
+
+        if (info?.page && info.page !== currentPage) {
+            setCurrentPage(info.page);
+        } else if (currentPage < 1) {
+            setCurrentPage(1);
+        }
     });
 
     const onFirstPage = () => {
@@ -65,6 +69,9 @@ const PaginationBar = ({
     };
 
     const onLastPage = () => {
+        if (totalPages == null) {
+            return;
+        }
         setCurrentPage(totalPages);
         handlers.dataSource.setPage(totalPages);
     };
@@ -77,25 +84,34 @@ const PaginationBar = ({
                 onClick={onClick}
                 disabled={disabled}
                 minimal={true}
+                small={true}
+                aria-label={properties.label}
+                title={properties.label}
             />
         );
     };
 
+    const canGoPrevious = !inactive && currentPage > 1;
+    const canGoNext = !inactive && (totalPages == null || currentPage < totalPages);
+    const canGoLast = !inactive && totalPages != null && currentPage < totalPages;
+    const pageLabel = totalPages != null ? `Page ${currentPage} of ${totalPages}` : `Page ${currentPage}`;
+    const countLabel = recordCount != null ? ` (${recordCount})` : '';
+
     return (
         <div className="pagination-bar">
             <div>
-                {renderActionButton("pagination.first", onFirstPage, inactive || currentPage === 1)}
-                {renderActionButton("pagination.previous", onPreviousPage, inactive || currentPage === 1)}
+                {renderActionButton("pagination.first", onFirstPage, !canGoPrevious)}
+                {renderActionButton("pagination.previous", onPreviousPage, !canGoPrevious)}
 
 
                     <span>
-                        Page {currentPage} of {totalPages}&nbsp;({recordCount})
+                        {pageLabel}{countLabel}
                     </span>
 
 
 
-                {renderActionButton("pagination.next", onNextPage, inactive || currentPage >= totalPages)}
-                {renderActionButton("pagination.last", onLastPage, inactive || currentPage >= totalPages)}
+                {renderActionButton("pagination.next", onNextPage, !canGoNext)}
+                {renderActionButton("pagination.last", onLastPage, !canGoLast)}
             </div>
         </div>
     );

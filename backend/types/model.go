@@ -69,6 +69,10 @@ type Chart struct {
 	CartesianGrid CartesianGrid `json:"cartesianGrid,omitempty" yaml:"cartesianGrid,omitempty"`
 	Width         string        `json:"width" yaml:"width"`
 	Height        string        `json:"height" yaml:"height"`
+	CategoryKey   string        `json:"categoryKey,omitempty" yaml:"categoryKey,omitempty"`
+	ValueKey      string        `json:"valueKey,omitempty" yaml:"valueKey,omitempty"`
+	Format        string        `json:"format,omitempty" yaml:"format,omitempty"`
+	Palette       []string      `json:"palette,omitempty" yaml:"palette,omitempty"`
 	Series        ChartSeries   `json:"series" yaml:"series"`
 	On            []*Execute    `json:"on,omitempty" yaml:"on,omitempty"`
 }
@@ -117,6 +121,7 @@ type Dialog struct {
 	Title           string                            `json:"title" yaml:"title"`
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Content         *Container                        `json:"content" yaml:"content"`
+	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
 	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	Properties      *DialogProperties                 `json:"properties,omitempty" yaml:"properties,omitempty"`
 	Actions         []Item                            `json:"actions" yaml:"actions"`
@@ -128,7 +133,39 @@ type Dialog struct {
 // DialogProperties holds optional flags that tweak dialog UI behavior.
 // Example: properties.searchable: false hides the quick-search input in the dialog header.
 type DialogProperties struct {
-	Searchable *bool `json:"searchable,omitempty" yaml:"searchable,omitempty"`
+	Searchable       *bool                    `json:"searchable,omitempty" yaml:"searchable,omitempty"`
+	ClassName        string                   `json:"className,omitempty" yaml:"className,omitempty"`
+	BodyClassName    string                   `json:"bodyClassName,omitempty" yaml:"bodyClassName,omitempty"`
+	BodyStyle        map[string]interface{}   `json:"bodyStyle,omitempty" yaml:"bodyStyle,omitempty"`
+	ContentClassName string                   `json:"contentClassName,omitempty" yaml:"contentClassName,omitempty"`
+	ContentStyle     map[string]interface{}   `json:"contentStyle,omitempty" yaml:"contentStyle,omitempty"`
+	QuickSearch      *DialogQuickSearchConfig `json:"quickSearch,omitempty" yaml:"quickSearch,omitempty"`
+	QuickFilter      *QuickFilterSpec         `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
+	QuickFilters     []QuickFilterSpec        `json:"quickFilters,omitempty" yaml:"quickFilters,omitempty"`
+}
+
+type DialogQuickSearchConfig struct {
+	Align          string                 `json:"align,omitempty" yaml:"align,omitempty"`
+	Gap            string                 `json:"gap,omitempty" yaml:"gap,omitempty"`
+	Icon           string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Trigger        string                 `json:"trigger,omitempty" yaml:"trigger,omitempty"`
+	DebounceMs     int                    `json:"debounceMs,omitempty" yaml:"debounceMs,omitempty"`
+	InputWidth     string                 `json:"inputWidth,omitempty" yaml:"inputWidth,omitempty"`
+	ClassName      string                 `json:"className,omitempty" yaml:"className,omitempty"`
+	InputClassName string                 `json:"inputClassName,omitempty" yaml:"inputClassName,omitempty"`
+	Style          map[string]interface{} `json:"style,omitempty" yaml:"style,omitempty"`
+	InputStyle     map[string]interface{} `json:"inputStyle,omitempty" yaml:"inputStyle,omitempty"`
+}
+
+type QuickFilterSpec struct {
+	Field       string                 `json:"field,omitempty" yaml:"field,omitempty"`
+	Placeholder string                 `json:"placeholder,omitempty" yaml:"placeholder,omitempty"`
+	Width       string                 `json:"width,omitempty" yaml:"width,omitempty"`
+	Icon        string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Trigger     string                 `json:"trigger,omitempty" yaml:"trigger,omitempty"`
+	DebounceMs  int                    `json:"debounceMs,omitempty" yaml:"debounceMs,omitempty"`
+	ClassName   string                 `json:"className,omitempty" yaml:"className,omitempty"`
+	Style       map[string]interface{} `json:"style,omitempty" yaml:"style,omitempty"`
 }
 
 type Window struct {
@@ -341,6 +378,7 @@ type Container struct {
 	Layout          *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
 	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	Toolbar         *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	Report          *DashboardReportOptions           `json:"report,omitempty" yaml:"report,omitempty"`
 	Table           *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
 	FileBrowser     *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
 	Editor          *Editor                           `json:"editor,omitempty" yaml:"editor,omitempty"`
@@ -477,33 +515,44 @@ type DashboardCondition struct {
 	Selector      string   `json:"selector,omitempty" yaml:"selector,omitempty"`
 	Field         string   `json:"field,omitempty" yaml:"field,omitempty"`
 	Key           string   `json:"key,omitempty" yaml:"key,omitempty"`
-	Source    string `json:"source,omitempty" yaml:"source,omitempty"`
-	When     any    `json:"when,omitempty" yaml:"when,omitempty"`
-	Equals   any    `json:"equals,omitempty" yaml:"equals,omitempty"`
-	NotEquals any   `json:"notEquals,omitempty" yaml:"notEquals,omitempty"`
-	In       []any  `json:"in,omitempty" yaml:"in,omitempty"`
-	Gt       *float64 `json:"gt,omitempty" yaml:"gt,omitempty"`
-	Gte      *float64 `json:"gte,omitempty" yaml:"gte,omitempty"`
-	Lt       *float64 `json:"lt,omitempty" yaml:"lt,omitempty"`
-	Lte      *float64 `json:"lte,omitempty" yaml:"lte,omitempty"`
-	Empty    *bool    `json:"empty,omitempty" yaml:"empty,omitempty"`
-	NotEmpty *bool    `json:"notEmpty,omitempty" yaml:"notEmpty,omitempty"`
+	Source        string   `json:"source,omitempty" yaml:"source,omitempty"`
+	When          any      `json:"when,omitempty" yaml:"when,omitempty"`
+	Equals        any      `json:"equals,omitempty" yaml:"equals,omitempty"`
+	NotEquals     any      `json:"notEquals,omitempty" yaml:"notEquals,omitempty"`
+	In            []any    `json:"in,omitempty" yaml:"in,omitempty"`
+	Gt            *float64 `json:"gt,omitempty" yaml:"gt,omitempty"`
+	Gte           *float64 `json:"gte,omitempty" yaml:"gte,omitempty"`
+	Lt            *float64 `json:"lt,omitempty" yaml:"lt,omitempty"`
+	Lte           *float64 `json:"lte,omitempty" yaml:"lte,omitempty"`
+	Empty         *bool    `json:"empty,omitempty" yaml:"empty,omitempty"`
+	NotEmpty      *bool    `json:"notEmpty,omitempty" yaml:"notEmpty,omitempty"`
 }
 
 type Dashboard struct {
-	Summary    *DashboardSummary    `json:"summary,omitempty" yaml:"summary,omitempty"`
-	Compare    *DashboardCompare    `json:"compare,omitempty" yaml:"compare,omitempty"`
-	KPITable   *DashboardKPITable   `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
-	Filters    *DashboardFilters    `json:"filters,omitempty" yaml:"filters,omitempty"`
-	Timeline   *DashboardTimeline   `json:"timeline,omitempty" yaml:"timeline,omitempty"`
-	Dimensions *DashboardDimensions `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
-	Messages   *DashboardMessages   `json:"messages,omitempty" yaml:"messages,omitempty"`
-	Status     *DashboardStatus     `json:"status,omitempty" yaml:"status,omitempty"`
-	Feed       *DashboardFeed       `json:"feed,omitempty" yaml:"feed,omitempty"`
-	Report     *DashboardReport     `json:"report,omitempty" yaml:"report,omitempty"`
-	Detail     *DashboardDetail     `json:"detail,omitempty" yaml:"detail,omitempty"`
-	Badges     *DashboardBadges     `json:"badges,omitempty" yaml:"badges,omitempty"`
-	Table      *DashboardTable      `json:"table,omitempty" yaml:"table,omitempty"`
+	Summary     *DashboardSummary     `json:"summary,omitempty" yaml:"summary,omitempty"`
+	Compare     *DashboardCompare     `json:"compare,omitempty" yaml:"compare,omitempty"`
+	KPITable    *DashboardKPITable    `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
+	Filters     *DashboardFilters     `json:"filters,omitempty" yaml:"filters,omitempty"`
+	Timeline    *DashboardTimeline    `json:"timeline,omitempty" yaml:"timeline,omitempty"`
+	Composition *DashboardComposition `json:"composition,omitempty" yaml:"composition,omitempty"`
+	Dimensions  *DashboardDimensions  `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
+	Messages    *DashboardMessages    `json:"messages,omitempty" yaml:"messages,omitempty"`
+	Status      *DashboardStatus      `json:"status,omitempty" yaml:"status,omitempty"`
+	Feed        *DashboardFeed        `json:"feed,omitempty" yaml:"feed,omitempty"`
+	Report      *DashboardReport      `json:"report,omitempty" yaml:"report,omitempty"`
+	Detail      *DashboardDetail      `json:"detail,omitempty" yaml:"detail,omitempty"`
+	Badges      *DashboardBadges      `json:"badges,omitempty" yaml:"badges,omitempty"`
+	Table       *DashboardTable       `json:"table,omitempty" yaml:"table,omitempty"`
+}
+
+type DashboardReportOptions struct {
+	Enabled     bool     `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	Mode        string   `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Title       string   `json:"title,omitempty" yaml:"title,omitempty"`
+	Subtitle    string   `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
+	DefaultMode string   `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
+	Include     []string `json:"include,omitempty" yaml:"include,omitempty"`
+	Export      []string `json:"export,omitempty" yaml:"export,omitempty"`
 }
 
 type DashboardSummary struct {
@@ -569,6 +618,15 @@ type DashboardTimeline struct {
 	// Annotations are reserved for future timeline overlays; the current JS
 	// runtime ignores this field in v1.
 	Annotations *DashboardAnnotation `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+}
+
+type DashboardComposition struct {
+	CategoryKey string   `json:"categoryKey,omitempty" yaml:"categoryKey,omitempty"`
+	ValueKey    string   `json:"valueKey,omitempty" yaml:"valueKey,omitempty"`
+	Type        string   `json:"type,omitempty" yaml:"type,omitempty"`
+	Format      string   `json:"format,omitempty" yaml:"format,omitempty"`
+	Palette     []string `json:"palette,omitempty" yaml:"palette,omitempty"`
+	LegendLimit int      `json:"legendLimit,omitempty" yaml:"legendLimit,omitempty"`
 }
 
 type DashboardAnnotation struct {
@@ -656,8 +714,21 @@ type DashboardBadgeItem struct {
 }
 
 type DashboardTable struct {
-	Columns []DashboardTableColumn `json:"columns,omitempty" yaml:"columns,omitempty"`
-	Limit   int                    `json:"limit,omitempty" yaml:"limit,omitempty"`
+	Columns         []DashboardTableColumn `json:"columns,omitempty" yaml:"columns,omitempty"`
+	Limit           int                    `json:"limit,omitempty" yaml:"limit,omitempty"`
+	QuickFilter     bool                   `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
+	Density         string                 `json:"density,omitempty" yaml:"density,omitempty"`
+	FormattingRules []TableFormattingRule  `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
+	RowActions      []DashboardTableAction `json:"rowActions,omitempty" yaml:"rowActions,omitempty"`
+}
+
+type DashboardTableAction struct {
+	ID        string `json:"id,omitempty" yaml:"id,omitempty"`
+	Label     string `json:"label,omitempty" yaml:"label,omitempty"`
+	Icon      string `json:"icon,omitempty" yaml:"icon,omitempty"`
+	Field     string `json:"field,omitempty" yaml:"field,omitempty"`
+	Dimension string `json:"dimension,omitempty" yaml:"dimension,omitempty"`
+	Handler   string `json:"handler,omitempty" yaml:"handler,omitempty"`
 }
 
 type DashboardTableColumn struct {
@@ -694,15 +765,31 @@ type Card struct {
 }
 
 type Table struct {
-	Columns           []Column    `json:"columns" yaml:"columns"`
-	Toolbar           *Toolbar    `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	EnforceColumnSize *bool       `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
-	Pagination        interface{} `json:"pagination,omitempty" yaml:"pagination,omitempty"`
-	On                []*Execute  `json:"on,omitempty" yaml:"on,omitempty"`
+	Columns           []Column              `json:"columns" yaml:"columns"`
+	Toolbar           *Toolbar              `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	EnforceColumnSize *bool                 `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
+	Width             string                `json:"width,omitempty" yaml:"width,omitempty"`
+	FullWidth         *bool                 `json:"fullWidth,omitempty" yaml:"fullWidth,omitempty"`
+	Pagination        interface{}           `json:"pagination,omitempty" yaml:"pagination,omitempty"`
+	FormattingRules   []TableFormattingRule `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
+	On                []*Execute            `json:"on,omitempty" yaml:"on,omitempty"`
+}
+
+type TableFormattingRule struct {
+	Field     string                 `json:"field,omitempty" yaml:"field,omitempty"`
+	ColumnID  string                 `json:"columnId,omitempty" yaml:"columnId,omitempty"`
+	Column    string                 `json:"column,omitempty" yaml:"column,omitempty"`
+	Target    string                 `json:"target,omitempty" yaml:"target,omitempty"` // row|cell
+	Operator  string                 `json:"operator,omitempty" yaml:"operator,omitempty"`
+	Value     interface{}            `json:"value,omitempty" yaml:"value,omitempty"`
+	Values    []interface{}          `json:"values,omitempty" yaml:"values,omitempty"`
+	Style     map[string]interface{} `json:"style,omitempty" yaml:"style,omitempty"`
+	ClassName string                 `json:"className,omitempty" yaml:"className,omitempty"`
 }
 
 type Toolbar struct {
 	Items           []Item                            `json:"items" yaml:"items"`
+	Modes           []string                          `json:"modes,omitempty" yaml:"modes,omitempty"`
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
@@ -733,6 +820,7 @@ type TemplateItem struct {
 	ID       string `json:"id"`
 	Label    string `json:"label"`
 	Operator string `json:"operator"`
+	Type     string `json:"type,omitempty" yaml:"type,omitempty"`
 }
 
 // Filter represents a filter with a name, a default indicator, and a template.
@@ -770,6 +858,7 @@ type Item struct {
 	Label                string                            `json:"label" yaml:"label"`
 	LabelPosition        string                            `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
 	Align                string                            `json:"align,omitempty" yaml:"align,omitempty"`
+	Placement            string                            `json:"placement,omitempty" yaml:"placement,omitempty"`
 	Options              []Option                          `json:"options,omitempty" yaml:"options,omitempty"`
 	DateFnsFormat        string                            `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
 	NumericFormat        string                            `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`

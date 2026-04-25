@@ -105,6 +105,16 @@ assert.match(html, /High zero-spend rate/);
 assert.match(html, /td_budget_status: has_budget/);
 assert.match(html, /US dominates spend/);
 assert.match(html, /grid-column: span 8/);
+assert.doesNotMatch(html, /<main class="dashboard-report">/);
+
+const reportModeRequiresEnabled = buildStandaloneDashboardHtml({
+  title: 'Mode Only',
+  report: { mode: 'document' },
+  blocks: [],
+});
+
+assert.doesNotMatch(reportModeRequiresEnabled, /<main class="dashboard-report">/);
+assert.match(reportModeRequiresEnabled, /dashboard-export__grid/);
 
 const localizedHtml = buildStandaloneDashboardHtml({
   title: 'Localized Dashboard',
@@ -122,6 +132,44 @@ const localizedHtml = buildStandaloneDashboardHtml({
 });
 
 assert.match(localizedHtml, /<html lang="de-DE">/);
+
+const reportHtml = buildStandaloneDashboardHtml({
+  title: 'Report Dashboard',
+  subtitle: 'Report mode',
+  generatedAt: '2026-04-07T10:00:00Z',
+  report: {
+    enabled: true,
+    mode: 'document',
+    include: ['summary', 'charts', 'tables'],
+    export: ['html'],
+  },
+  blocks: [
+    {
+      kind: 'dashboard.report',
+      title: 'Report',
+      sections: [
+        { title: 'Executive Summary', tone: 'info', body: ['Spend is healthy.'] },
+      ],
+    },
+    {
+      kind: 'dashboard.composition',
+      title: 'Spend Composition',
+      pieSvg: '<svg id="composition"></svg>',
+    },
+    {
+      kind: 'dashboard.table',
+      title: 'Rows',
+      columns: [{ key: 'status', label: 'Status' }],
+      formattingRules: [{ field: 'status', value: 'critical', target: 'cell', className: 'forge-table-tone-danger' }],
+      rows: [{ raw: { status: 'critical' }, status: 'critical' }],
+    },
+  ],
+});
+
+assert.match(reportHtml, /dashboard-report__shell/);
+assert.match(reportHtml, /Executive Summary/);
+assert.match(reportHtml, /<svg id="composition"><\/svg>/);
+assert.match(reportHtml, /forge-table-tone-danger/);
 
 const fakeRoot = {
   querySelector(selector) {

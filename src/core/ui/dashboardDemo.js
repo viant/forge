@@ -63,7 +63,16 @@ export function createDashboardDemoMetadata() {
         kind: 'dashboard',
         title: 'Performance Dashboard Demo',
         subtitle: 'Generic Forge dashboard blocks with seeded in-memory data',
+        report: {
+          enabled: true,
+          mode: 'document',
+          title: 'Performance and Data Quality Report',
+          subtitle: 'Generated from the same dashboard blocks used in the interactive A+D dashboard view.',
+          include: ['summary', 'charts', 'tables'],
+          export: ['html'],
+        },
         toolbar: {
+          modes: ['dashboard', 'analyze', 'report'],
           items: [
             {
               id: 'resetDashboardFilters',
@@ -375,27 +384,28 @@ export function createDashboardDemoMetadata() {
           },
           {
             id: 'spendPie',
-            kind: 'dashboard.timeline',
+            kind: 'dashboard.composition',
             title: 'Spend Distribution',
             columnSpan: 4,
             dataSourceRef: 'byCountry',
             chart: {
-              type: 'pie',
+              type: 'donut',
               width: '100%',
               height: '340px',
-              series: {
-                nameKey: 'country',
-                valueKey: 'spend',
-                palette: ['#137cbd', '#0f9960', '#d9822b', '#8f398f', '#c23030'],
-              },
+              categoryKey: 'country',
+              valueKey: 'spend',
+              format: 'currency',
+              palette: ['#2367d1', '#16865a', '#b76b00', '#7a4cc2', '#c43c36'],
             },
           },
           {
             id: 'countryTable',
             kind: 'dashboard.table',
-            title: 'Country Detail Table',
+            title: 'Country Performance Table',
             columnSpan: 8,
             dataSourceRef: 'byCountry',
+            quickFilter: true,
+            density: 'compact',
             filterBindings: {
               region: 'region',
             },
@@ -403,6 +413,18 @@ export function createDashboardDemoMetadata() {
               { key: 'country', label: 'Country' },
               { key: 'region', label: 'Region' },
               { key: 'spend', label: 'Spend', format: 'currency' },
+              { key: 'impressions', label: 'Impressions', format: 'compactNumber' },
+              { key: 'ctr', label: 'CTR', format: 'percent' },
+              { key: 'zero_spend_rate', label: 'Zero Spend', format: 'percent' },
+              { key: 'status', label: 'Status' },
+            ],
+            formattingRules: [
+              { field: 'status', target: 'cell', value: 'healthy', className: 'forge-table-tone-success' },
+              { field: 'status', target: 'cell', value: 'watch', className: 'forge-table-tone-warning' },
+              { field: 'status', target: 'cell', value: 'critical', className: 'forge-table-tone-danger' },
+            ],
+            rowActions: [
+              { id: 'inspect', label: 'Inspect', field: 'country', handler: 'dashboardDemo.updateDetailTrend' },
             ],
             limit: 20,
           },
@@ -444,11 +466,11 @@ export function createDashboardDemoSeed() {
     },
     byCountry: {
       collection: [
-        { country: 'US', region: 'NA', spend: 100000 },
-        { country: 'CA', region: 'NA', spend: 12000 },
-        { country: 'GB', region: 'EMEA', spend: 6000 },
-        { country: 'AU', region: 'APAC', spend: 3000 },
-        { country: 'DE', region: 'EMEA', spend: 2000 },
+        { country: 'US', region: 'NA', spend: 100000, impressions: 4200000, ctr: 2.4, zero_spend_rate: 39.1, status: 'watch' },
+        { country: 'CA', region: 'NA', spend: 12000, impressions: 620000, ctr: 2.1, zero_spend_rate: 51.0, status: 'critical' },
+        { country: 'GB', region: 'EMEA', spend: 6000, impressions: 380000, ctr: 2.0, zero_spend_rate: 33.8, status: 'healthy' },
+        { country: 'AU', region: 'APAC', spend: 3000, impressions: 190000, ctr: 1.8, zero_spend_rate: 57.4, status: 'critical' },
+        { country: 'DE', region: 'EMEA', spend: 2000, impressions: 160000, ctr: 1.9, zero_spend_rate: 28.6, status: 'watch' },
       ],
     },
     eligibilityFunnel: {
