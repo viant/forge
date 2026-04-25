@@ -181,7 +181,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     // Extract chart configuration
     const {
         type = "line",
-        xAxis,
+        xAxis = {},
         yAxis = {},
         axes = {},
         cartesianGrid = {strokeDasharray: "3 3"},
@@ -252,7 +252,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     useEffect(() => {
         prepareData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collection, selectedValueKey, directSeriesChart, xAxis.dataKey, leftAxis.label, seriesDefinitions]);
+    }, [collection, selectedValueKey, directSeriesChart, xAxis?.dataKey, leftAxis.label, seriesDefinitions]);
 
     useEffect(() => {
         // Keep selectedDataKeys in sync with availableDataKeys
@@ -284,7 +284,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         }
     }, [embedded, viewMode]);
 
-    const allTableColumns = [xAxis.dataKey, ...availableDataKeys];
+    const allTableColumns = [xAxis?.dataKey, ...availableDataKeys].filter(Boolean);
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
 
     useEffect(() => {
@@ -295,7 +295,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             return next.length ? next : [...allTableColumns];
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [xAxis.dataKey, availableDataKeys.join("|")]);
+    }, [xAxis?.dataKey, availableDataKeys.join("|")]);
 
 
 
@@ -357,7 +357,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         <>
             <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
             <XAxis
-                dataKey={xAxis.dataKey}
+                dataKey={xAxis?.dataKey || "name"}
                 tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
                 tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
                 minTickGap={embedded ? 24 : 5}

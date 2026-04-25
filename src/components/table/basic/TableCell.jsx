@@ -28,6 +28,8 @@ const defaultCellProperties = (item) => {
 const TableCell = ({
                        context,
                        cell,
+                       rowStyle,
+                       rowClassName,
                        cellSelection,
                        columnHandlers,
                        onRowClick,
@@ -66,7 +68,7 @@ const TableCell = ({
         } catch (_) { /* ignore */ }
     }
     const {type} = col;
-    let tdClass = "row";
+    let tdClass = ["row", rowClassName, cell.className].filter(Boolean).join(" ");
     if (isSelected({...cellSelection})) {
         tdClass += " selected-cell";
     }
@@ -159,6 +161,8 @@ const TableCell = ({
 
     const tdStyle = {
         textAlign: align,
+        ...(rowStyle || {}),
+        ...(cell.style || {}),
         ...(cell.maxWidth && {maxWidth: cell.maxWidth, minWidth: cell.minWidth}),
     };
 

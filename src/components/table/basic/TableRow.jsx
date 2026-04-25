@@ -8,6 +8,8 @@ import TableCell from "./TableCell.jsx";
 const TableRow = ({
                       context,
                       rowData,
+                      rowStyle,
+                      rowClassName,
                       rowSelection,
                       columns,
                       columnsHandlers,
@@ -37,6 +39,8 @@ const TableRow = ({
                 context={context}
                 key={cell.id}
                 cell={cell}
+                rowStyle={rowStyle}
+                rowClassName={rowClassName}
                 cellSelection={cellSelection}
                 isSelected={selected}
                 columnHandlers={columnsHandlers[col.id]}
@@ -50,7 +54,8 @@ const TableRow = ({
     return (
         <tr
             onClick={handleRowClick}
-            className={selected ? "selected-row" : "row"}
+            className={[selected ? "selected-row" : "row", rowClassName].filter(Boolean).join(" ")}
+            style={rowStyle}
         >
             {cells}
         </tr>

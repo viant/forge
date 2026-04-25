@@ -1,5 +1,6 @@
 import {resolveKey} from '../../utils/selector.js';
 import {applyDashboardFiltersToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
+import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from '../../components/table/formattingRules.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -8,6 +9,16 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function styleObjectToCss(style = {}) {
+  return Object.entries(style || {})
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => {
+      const cssKey = String(key).replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+      return `${cssKey}:${String(value).replace(/"/g, '&quot;')}`;
+    })
+    .join(';');
 }
 
 const toneClassBySeverity = {
@@ -189,6 +200,10 @@ body {
 .tone-warning { background: #fff5d6; border-color: #f5c542; color: #8a5d00; }
 .tone-danger { background: #fdecea; border-color: #db3737; color: #a82a2a; }
 .tone-success { background: #eef8f0; border-color: #0f9960; color: #0a6640; }
+.forge-table-tone-info { background-color: #edf4ff; color: #1757bc; }
+.forge-table-tone-success { background-color: #ecfdf4; color: #087044; }
+.forge-table-tone-warning { background-color: #fff7e8; color: #8a4b00; }
+.forge-table-tone-danger { background-color: #fff1f0; color: #b42318; }
 .dimension-item__row {
   display: flex;
   justify-content: space-between;
@@ -252,12 +267,122 @@ body {
   font-size: 12px;
   font-weight: 600;
 }
+.dashboard-report {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.dashboard-report__shell {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+}
+.dashboard-report__nav,
+.dashboard-report__page {
+  background: #fff;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(16, 22, 26, 0.04);
+}
+.dashboard-report__nav {
+  padding: 16px;
+  align-self: start;
+}
+.dashboard-report__nav h2,
+.dashboard-report__nav h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.dashboard-report__toc {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 16px;
+}
+.dashboard-report__toc span {
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #30404d;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.dashboard-report__nav-section {
+  border-top: 1px solid var(--track);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.dashboard-report__nav-section ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  color: #30404d;
+  font-size: 12px;
+}
+.dashboard-report__page {
+  padding: 22px;
+}
+.dashboard-report__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+.dashboard-report__header h1 {
+  margin: 0;
+  font-size: 26px;
+}
+.dashboard-report__header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.dashboard-report__meta {
+  min-width: 220px;
+  color: #30404d;
+  font-size: 12px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.dashboard-report__section {
+  border: 1px solid var(--panel-border);
+  background: #fbfdff;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.dashboard-report__section h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+.dashboard-report__section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.dashboard-report__block .dashboard-export__block {
+  grid-column: auto !important;
+  box-shadow: none;
+  height: 100%;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
   }
   .dashboard-export__block {
     grid-column: span 1 !important;
+  }
+  .dashboard-report__shell,
+  .dashboard-report__section-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-report__header {
+    flex-direction: column;
   }
 }
 `;
@@ -523,6 +648,10 @@ function renderTimelineBlock(block) {
   return `<p class="block-subtitle">Chart snapshot unavailable.</p>`;
 }
 
+function renderCompositionBlock(block) {
+  return renderTimelineBlock(block);
+}
+
 function renderDetailBlock(block) {
   return (block.children || []).map(renderBlockBody).join('');
 }
@@ -530,6 +659,7 @@ function renderDetailBlock(block) {
 function renderTableBlock(block) {
   const columns = block.columns || [];
   const rows = block.rows || [];
+  const rules = normalizeRuleList(block.formattingRules || []);
   if (!columns.length) return '';
   return `
     <table class="plain-table">
@@ -539,11 +669,21 @@ function renderTableBlock(block) {
         </tr>
       </thead>
       <tbody>
-        ${rows.map((row) => `
-          <tr>
-            ${columns.map((col) => `<td>${escapeHtml(row?.[col.key] ?? '-')}</td>`).join('')}
+        ${rows.map((row) => {
+          const rowRules = matchingRules(row.raw || row, rules, 'row');
+          const rowClassName = mergeClassNames(rowRules);
+          const rowStyle = styleObjectToCss(mergeStyles(rowRules));
+          return `
+          <tr${rowClassName ? ` class="${escapeHtml(rowClassName)}"` : ''}${rowStyle ? ` style="${rowStyle}"` : ''}>
+            ${columns.map((col) => {
+              const cellRules = matchingRules(row.raw || row, rules, 'cell', col.key);
+              const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(' ');
+              const cellStyle = styleObjectToCss({...mergeStyles(rowRules), ...mergeStyles(cellRules)});
+              return `<td${cellClassName ? ` class="${escapeHtml(cellClassName)}"` : ''}${cellStyle ? ` style="${cellStyle}"` : ''}>${escapeHtml(row?.[col.key] ?? '-')}</td>`;
+            }).join('')}
           </tr>
-        `).join('')}
+        `;
+        }).join('')}
       </tbody>
     </table>
   `;
@@ -561,6 +701,8 @@ function renderBlockBody(block) {
       return renderFiltersBlock(block);
     case 'dashboard.timeline':
       return renderTimelineBlock(block);
+    case 'dashboard.composition':
+      return renderCompositionBlock(block);
     case 'dashboard.dimensions':
       return renderDimensionsBlock(block);
     case 'dashboard.messages':
@@ -591,6 +733,141 @@ function renderBlock(block) {
       ${renderBlockBody(block)}
     </section>
   `;
+}
+
+function classifyReportBlocks(blocks = []) {
+  return {
+    narrative: blocks.filter((block) => block.kind === 'dashboard.report'),
+    kpis: blocks.filter((block) => [
+      'dashboard.summary',
+      'dashboard.compare',
+      'dashboard.kpiTable',
+      'dashboard.badges',
+    ].includes(block.kind)),
+    charts: blocks.filter((block) => [
+      'dashboard.timeline',
+      'dashboard.composition',
+      'dashboard.dimensions',
+      'dashboard.detail',
+    ].includes(block.kind)),
+    tables: blocks.filter((block) => [
+      'dashboard.table',
+      'dashboard.status',
+      'dashboard.messages',
+    ].includes(block.kind)),
+    audit: blocks.filter((block) => block.kind === 'dashboard.feed'),
+  };
+}
+
+function renderReportBlockList(blocks, emptyText) {
+  if (!blocks.length) {
+    return `<p class="block-subtitle">${escapeHtml(emptyText)}</p>`;
+  }
+  return blocks.map((block) => `<div class="dashboard-report__block">${renderBlock(block)}</div>`).join('\n');
+}
+
+function reportIncludes(report, key) {
+  const include = report?.include;
+  if (!Array.isArray(include) || include.length === 0) return true;
+  const aliases = {
+    narrative: ['narrative', 'summary', 'report'],
+    kpis: ['kpis', 'kpi', 'summary', 'metrics'],
+    charts: ['charts', 'chart'],
+    tables: ['tables', 'table', 'actions'],
+    audit: ['audit', 'feed', 'events'],
+  };
+  return (aliases[key] || [key]).some((entry) => include.includes(entry));
+}
+
+function renderReportDocument(model, generatedAt) {
+  const report = model.report || {};
+  const blocks = model.blocks || [];
+  const groups = classifyReportBlocks(blocks);
+  const exportFormats = Array.isArray(report.export) && report.export.length ? report.export : ['html'];
+
+  return `
+  <main class="dashboard-report">
+    <div class="dashboard-report__shell">
+      <aside class="dashboard-report__nav">
+        <h2>Report Options</h2>
+        <div class="dashboard-report__toc">
+          <span>1 Executive Summary</span>
+          <span>2 Key Metrics</span>
+          <span>3 Charts</span>
+          <span>4 Tables</span>
+          <span>5 Compatibility</span>
+        </div>
+        <div class="dashboard-report__nav-section">
+          <h3>Included content</h3>
+          <ul>
+            <li>Narrative summary</li>
+            <li>KPI snapshot</li>
+            <li>Charts</li>
+            <li>Tables</li>
+          </ul>
+        </div>
+        <div class="dashboard-report__nav-section">
+          <h3>Output</h3>
+          <ul>
+            <li>HTML ${exportFormats.includes('html') ? 'ready' : 'future'}</li>
+            <li>PDF ${exportFormats.includes('pdf') ? 'ready' : 'future'}</li>
+            <li>Markdown ${exportFormats.includes('markdown') ? 'ready' : 'future'}</li>
+          </ul>
+        </div>
+      </aside>
+      <article class="dashboard-report__page">
+        <header class="dashboard-report__header">
+          <div>
+            <h1>${escapeHtml(report.title || model.title || 'Dashboard Report')}</h1>
+            ${model.subtitle ? `<p>${escapeHtml(report.subtitle || model.subtitle)}</p>` : ''}
+          </div>
+          <div class="dashboard-report__meta">
+            <span><strong>Generated:</strong> ${escapeHtml(generatedAt)}</span>
+            <span><strong>Mode:</strong> ${escapeHtml(report.mode || 'document')}</span>
+            <span><strong>Locale:</strong> ${escapeHtml(model.locale || 'en-US')}</span>
+          </div>
+        </header>
+        ${buildStateSummary(model)}
+        ${reportIncludes(report, 'narrative') ? `
+        <section class="dashboard-report__section">
+          <h2>Executive Summary</h2>
+          ${renderReportBlockList(groups.narrative, 'No report narrative block is configured.')}
+        </section>` : ''}
+        ${reportIncludes(report, 'kpis') ? `
+        <section class="dashboard-report__section">
+          <h2>Key Metrics</h2>
+          <div class="dashboard-report__section-grid">
+            ${renderReportBlockList(groups.kpis, 'No KPI blocks are configured.')}
+          </div>
+        </section>` : ''}
+        ${reportIncludes(report, 'charts') ? `
+        <section class="dashboard-report__section">
+          <h2>Chart Evidence</h2>
+          <div class="dashboard-report__section-grid">
+            ${renderReportBlockList(groups.charts, 'No chart blocks are configured.')}
+          </div>
+        </section>` : ''}
+        ${reportIncludes(report, 'tables') ? `
+        <section class="dashboard-report__section">
+          <h2>Tables and Actions</h2>
+          <div class="dashboard-report__section-grid">
+            ${renderReportBlockList(groups.tables, 'No table/action blocks are configured.')}
+          </div>
+        </section>` : ''}
+        ${reportIncludes(report, 'audit') ? `
+        <section class="dashboard-report__section">
+          <h2>Audit Trail</h2>
+          <div class="dashboard-report__section-grid">
+            ${renderReportBlockList(groups.audit, 'No audit blocks are configured.')}
+          </div>
+        </section>` : ''}
+        <section class="dashboard-report__section">
+          <h2>Compatibility Contract</h2>
+          <p class="block-subtitle">Existing dashboards continue to render as interactive dashboards. Report mode changes presentation and export composition only when report configuration is present.</p>
+        </section>
+      </article>
+    </div>
+  </main>`;
 }
 
 function formatStateValue(value) {
@@ -808,6 +1085,30 @@ function buildTimelineBlock(container, blockContext, chartSvgs) {
   };
 }
 
+function buildCompositionBlock(container, blockContext, chartSvgs) {
+  const chart = container.chart || {};
+  const categoryKey = chart.categoryKey || chart.nameKey || chart.series?.nameKey || container.categoryKey || 'name';
+  const valueKey = chart.valueKey || chart.series?.valueKey || container.valueKey || 'value';
+  const normalized = {
+    ...container,
+    chart: {
+      ...chart,
+      type: chart.type || container.type || 'donut',
+      xAxis: chart.xAxis || {dataKey: categoryKey, label: chart.categoryLabel || categoryKey},
+      series: {
+        ...(chart.series || {}),
+        nameKey: categoryKey,
+        valueKey,
+        palette: chart.palette || chart.series?.palette,
+      },
+    },
+  };
+  return {
+    ...buildTimelineBlock(normalized, blockContext, chartSvgs),
+    kind: container.kind,
+  };
+}
+
 function buildDimensionsBlock(container, blockContext) {
   const dimensionKey = container.dimension?.key;
   const metric = container.metric || {};
@@ -939,7 +1240,7 @@ function buildTableBlock(container, blockContext) {
   const rows = applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters)
     .slice(0, limit)
     .map((row) => {
-      const out = {};
+      const out = {raw: row};
       for (const col of columns) {
         const raw = resolveKey(row, col.key);
         out[col.key] = col.format ? formatDashboardValue(raw, col.format, blockContext.locale || 'en-US') : (raw ?? '-');
@@ -952,6 +1253,7 @@ function buildTableBlock(container, blockContext) {
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
     columns,
+    formattingRules: normalizeRuleList(container.formattingRules || container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || []),
     rows,
   };
 }
@@ -982,6 +1284,8 @@ function buildExportBlock(container, context, chartSvgs) {
       return buildFiltersBlock(container, blockContext);
     case 'dashboard.timeline':
       return buildTimelineBlock(container, blockContext, chartSvgs);
+    case 'dashboard.composition':
+      return buildCompositionBlock(container, blockContext, chartSvgs);
     case 'dashboard.dimensions':
       return buildDimensionsBlock(container, blockContext);
     case 'dashboard.messages':
@@ -1013,6 +1317,7 @@ export function buildDashboardExportModel({container, context, chartSvgs = {}, t
     subtitle: subtitle || root.subtitle || '',
     locale: context?.locale || root.locale || 'en-US',
     generatedAt: generatedAt || new Date().toISOString(),
+    report: root.report || null,
     dashboardFilters,
     dashboardSelection,
     blocks: blockContainers
@@ -1038,6 +1343,7 @@ export function buildStandaloneDashboardHtml(model = {}) {
   const generatedAt = model.generatedAt || new Date().toISOString();
   const stylesheet = model.stylesheet || defaultDashboardExportStyles;
   const locale = model.locale || 'en-US';
+  const reportMode = model.report?.enabled === true;
 
   return `<!doctype html>
 <html lang="${escapeHtml(normalizeHtmlLang(locale))}">
@@ -1048,7 +1354,7 @@ export function buildStandaloneDashboardHtml(model = {}) {
   <style>${stylesheet}</style>
 </head>
 <body>
-  <main class="dashboard-export">
+  ${reportMode ? renderReportDocument(model, generatedAt) : `<main class="dashboard-export">
     <header class="dashboard-export__header">
       <h1 class="dashboard-export__title">${escapeHtml(title)}</h1>
       ${subtitle ? `<p class="dashboard-export__subtitle">${escapeHtml(subtitle)}</p>` : ''}
@@ -1058,7 +1364,7 @@ export function buildStandaloneDashboardHtml(model = {}) {
     <div class="dashboard-export__grid">
       ${blocks.map(renderBlock).join('\n')}
     </div>
-  </main>
+  </main>`}
 </body>
 </html>`;
 }

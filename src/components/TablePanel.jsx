@@ -68,7 +68,7 @@ const TablePanel = ({
 
     return (
         <div className="table-panel" style={stlye}>
-            <div style={{flexGrow: 1, overflow: "auto"}}>
+            <div style={{flexGrow: 1, overflow: "hidden", minHeight: 0}}>
                 <Basic
                     context={context}
                     container={container}

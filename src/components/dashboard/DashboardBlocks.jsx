@@ -5,6 +5,8 @@ import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
 import {applyDashboardFiltersToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
+import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
+import "./Dashboard.css";
 
 const panelStyle = {
     width: '100%',
@@ -107,6 +109,7 @@ function isDashboardStatusValue(value = '') {
         'overpacing',
         'healthy',
         'warning',
+        'watch',
         'critical',
         'active',
         'inactive',
@@ -142,18 +145,18 @@ function renderDashboardTableCell(cell, column, locale) {
 
 function Panel({container, children, actions = null}) {
     return (
-        <div style={panelStyle}>
+        <div className="forge-dashboard-panel">
             {(container.title || actions) ? (
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px'}}>
-                    <div style={{display: 'flex', flexDirection: 'column', gap: '4px'}}>
-                        {container.title ? <h3 style={titleStyle}>{container.title}</h3> : null}
-                        {container.subtitle ? <p style={subtitleStyle}>{container.subtitle}</p> : null}
+                <div className="forge-dashboard-panel-header">
+                    <div className="forge-dashboard-panel-title">
+                        {container.title ? <h3>{container.title}</h3> : null}
+                        {container.subtitle ? <p>{container.subtitle}</p> : null}
                     </div>
                     {actions}
                 </div>
             ) : null}
-            {(container.title || actions) ? <div style={sectionRuleStyle} /> : null}
-            <div style={{display: 'flex', flexDirection: 'column', gap: '12px', flex: '1 1 auto', minHeight: 0}}>
+            {(container.title || actions) ? <div className="forge-dashboard-panel-rule" /> : null}
+            <div className="forge-dashboard-panel-body">
                 {children}
             </div>
         </div>
@@ -182,23 +185,18 @@ export function DashboardSummary({container, context}) {
 
     return (
         <Panel container={container}>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px'}}>
+            <div className="forge-dashboard-metric-grid">
                 {metricCards.map((metric) => {
                     const isStatus = isDashboardStatusValue(metric.value);
                     const tone = isStatus ? dashboardStatusTone(metric.value) : null;
+                    const accent = metricCardAccent[Math.abs(String(metric.key || '').length) % metricCardAccent.length];
                     return (
                         <div
                             key={metric.key}
-                            style={{
-                                border: '1px solid #d8e1e8',
-                                borderTop: `3px solid ${metricCardAccent[Math.abs(String(metric.key || '').length) % metricCardAccent.length]}`,
-                                borderRadius: '10px',
-                                padding: '12px',
-                                background: 'linear-gradient(180deg, #fbfdff 0%, #f5f8fa 100%)',
-                                boxShadow: '0 1px 2px rgba(16, 22, 26, 0.06)',
-                            }}
+                            className="forge-dashboard-metric-card"
+                            style={{"--forge-dashboard-accent": accent}}
                         >
-                            <div style={{fontSize: '11px', letterSpacing: '0.02em', textTransform: 'uppercase', color: '#5f6b7c', marginBottom: '6px'}}>{metric.label}</div>
+                            <div className="forge-dashboard-metric-label">{metric.label}</div>
                             {isStatus ? (
                                 <div>
                                     <span style={{display: 'inline-flex', alignItems: 'center', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '5px 10px'}}>
@@ -206,7 +204,7 @@ export function DashboardSummary({container, context}) {
                                     </span>
                                 </div>
                             ) : (
-                                <div style={{fontSize: '24px', fontWeight: 700, color: '#182026'}}>{formatDashboardValue(metric.value, metric.format, locale)}</div>
+                                <div className="forge-dashboard-metric-value">{formatDashboardValue(metric.value, metric.format, locale)}</div>
                             )}
                         </div>
                     );
@@ -529,7 +527,33 @@ export function DashboardTimeline({container, context, isActive}) {
         }
         : container;
 
-    if (!normalizedContainer.chart) {
+    const chartConfig = normalizedContainer.chart;
+    const chartContainer = chartConfig && !chartConfig.xAxis
+        ? {
+            ...normalizedContainer,
+            chart: {
+                ...chartConfig,
+                xAxis: {
+                    dataKey: chartConfig.categoryField || chartConfig.series?.nameKey || 'name',
+                    label: chartConfig.categoryLabel || chartConfig.categoryField || 'Category',
+                },
+                series: {
+                    ...(chartConfig.series || {}),
+                    valueKey: chartConfig.series?.valueKey || chartConfig.valueField || 'value',
+                    values: chartConfig.series?.values || [
+                        {
+                            label: chartConfig.valueLabel || chartConfig.series?.valueKey || chartConfig.valueField || 'Value',
+                            value: chartConfig.series?.valueKey || chartConfig.valueField || 'value',
+                            format: chartConfig.format,
+                        },
+                    ],
+                    palette: chartConfig.series?.palette || chartConfig.palette,
+                },
+            },
+        }
+        : normalizedContainer;
+
+    if (!chartContainer.chart) {
         return (
             <Panel container={container}>
                 <div style={subtitleStyle}>Timeline blocks require `container.chart`.</div>
@@ -561,7 +585,7 @@ export function DashboardTimeline({container, context, isActive}) {
     return (
         <Panel container={container}>
             <div style={{flex: '1 1 auto', minHeight: '500px', overflow: 'hidden', border: '1px solid #dbe6ef', borderRadius: '14px', background: 'linear-gradient(180deg, #fdfefe 0%, #f4f8fb 100%)', padding: '12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)'}}>
-                <Chart container={normalizedContainer} context={filteredContext} isActive={isActive} embedded={true}/>
+                <Chart container={chartContainer} context={filteredContext} isActive={isActive} embedded={true}/>
             </div>
         </Panel>
     );
@@ -959,6 +983,82 @@ export function DashboardDetail({container, context, children}) {
     return <Panel container={container}>{visibleChildren}</Panel>;
 }
 
+export function DashboardComposition({container, context, isActive}) {
+    const {collection = [], control, selection} = context?.signals || {};
+    const collectionValue = useSignalSnapshot(collection, []);
+    const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
+    const filteredCollection = useMemo(
+        () => applyDashboardFiltersToCollection(collectionValue || [], container.filterBindings, dashboardFilters),
+        [collectionValue, container.filterBindings, dashboardFilters],
+    );
+    const chart = container.chart || {};
+    const categoryKey = chart.categoryKey || chart.nameKey || chart.series?.nameKey || container.categoryKey || "name";
+    const valueKey = chart.valueKey || chart.series?.valueKey || container.valueKey || "value";
+    const chartType = chart.type || container.type || "donut";
+    const palette = chart.palette || chart.series?.palette || [
+        "#2367d1",
+        "#16865a",
+        "#b76b00",
+        "#7a4cc2",
+        "#c43c36",
+        "#1787a6",
+    ];
+    const normalizedContainer = {
+        ...container,
+        chart: {
+            ...chart,
+            type: chartType,
+            xAxis: chart.xAxis || {dataKey: categoryKey, label: chart.categoryLabel || container.categoryLabel || titleizeDashboardKey(categoryKey)},
+            series: {
+                ...(chart.series || {}),
+                nameKey: categoryKey,
+                valueKey,
+                palette,
+            },
+        },
+    };
+    const filteredContext = useMemo(() => ({
+        ...context,
+        signals: {
+            ...context?.signals,
+            collection: {
+                value: filteredCollection,
+                peek: () => filteredCollection,
+            },
+            control,
+            selection,
+        },
+    }), [context, filteredCollection, control, selection]);
+    const total = filteredCollection.reduce((sum, row) => sum + (Number(resolveKey(row, valueKey)) || 0), 0);
+    const legendRows = [...filteredCollection]
+        .sort((a, b) => Number(resolveKey(b, valueKey) || 0) - Number(resolveKey(a, valueKey) || 0))
+        .slice(0, container.legendLimit || 6);
+
+    return (
+        <Panel container={container}>
+            <div className="forge-dashboard-composition">
+                <div className="forge-dashboard-composition-chart">
+                    <Chart container={normalizedContainer} context={filteredContext} isActive={isActive} embedded={true}/>
+                </div>
+                <div className="forge-dashboard-composition-legend">
+                    {legendRows.map((row, index) => {
+                        const value = Number(resolveKey(row, valueKey)) || 0;
+                        const pct = total > 0 ? `${((value / total) * 100).toFixed(0)}%` : "0%";
+                        return (
+                            <div className="forge-dashboard-composition-legend-row" key={`${resolveKey(row, categoryKey) || index}`}>
+                                <span className="forge-dashboard-composition-swatch" style={{background: palette[index % palette.length]}}/>
+                                <strong>{resolveKey(row, categoryKey) ?? "-"}</strong>
+                                <span>{formatDashboardValue(value, chart.format || container.format, getDashboardLocale(context))} · {pct}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </Panel>
+    );
+}
+
 class DashboardErrorBoundary extends React.Component {
     constructor(props) {
         super(props);
@@ -993,6 +1093,14 @@ export function DashboardTable({container, context}) {
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
     const limit = container.limit || container.dashboard?.table?.limit || 200;
+    const [quickFilter, setQuickFilter] = useState("");
+    const quickFilterEnabled = container.quickFilter === true || container.dashboard?.table?.quickFilter === true;
+    const density = container.density || container.dashboard?.table?.density || "comfortable";
+    const rowActions = container.rowActions || container.dashboard?.table?.rowActions || [];
+    const formattingRules = useMemo(
+        () => normalizeRuleList(container.formattingRules || container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || []),
+        [container.formattingRules, container.dashboard?.table?.formattingRules, container.dashboard?.table?.formatting]
+    );
 
     const rawColumns = container.columns || container.dashboard?.table?.columns || [];
     const normalizedColumns = useMemo(() => rawColumns.map((col) => {
@@ -1008,11 +1116,20 @@ export function DashboardTable({container, context}) {
         [collection, container.filterBindings, dashboardFilters],
     );
 
+    const quickFilteredCollection = useMemo(() => {
+        const query = quickFilter.trim().toLowerCase();
+        if (!query) return filteredCollection;
+        return filteredCollection.filter((row) => normalizedColumns.some((col) => {
+            const value = resolveKey(row, col.key);
+            return String(value ?? '').toLowerCase().includes(query);
+        }));
+    }, [filteredCollection, normalizedColumns, quickFilter]);
+
     const [sortKey, setSortKey] = useState(null);
     const [sortDir, setSortDir] = useState('asc');
 
     const sortedRows = useMemo(() => {
-        const rows = filteredCollection.slice(0, limit);
+        const rows = quickFilteredCollection.slice(0, limit);
         if (!sortKey) return rows;
         return [...rows].sort((a, b) => {
             const av = a?.[sortKey];
@@ -1023,7 +1140,7 @@ export function DashboardTable({container, context}) {
             const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
             return sortDir === 'desc' ? -cmp : cmp;
         });
-    }, [filteredCollection, limit, sortKey, sortDir]);
+    }, [quickFilteredCollection, limit, sortKey, sortDir]);
 
     const handleSort = (key) => {
         if (sortKey === key) {
@@ -1034,14 +1151,42 @@ export function DashboardTable({container, context}) {
         }
     };
 
+    const handleRowAction = (action, row, rowIndex) => {
+        publishDashboardSelection({
+            context,
+            dimension: action.dimension || action.field || normalizedColumns[0]?.key,
+            entityKey: action.field ? resolveKey(row, action.field) : resolveKey(row, normalizedColumns[0]?.key),
+            selected: row,
+            sourceBlockId: container.id,
+        });
+        if (action.handler && typeof context?.lookupHandler === 'function') {
+            const fn = context.lookupHandler(action.handler);
+            if (typeof fn === 'function') {
+                fn({execution: action, context, item: row, rowIndex});
+            }
+        }
+    };
+
     return (
         <Panel container={container}>
             {loading ? <div style={subtitleStyle}>Loading…</div> : null}
             {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
             {!loading && sortedRows.length === 0 ? <div style={subtitleStyle}>No data.</div> : null}
+            {quickFilterEnabled ? (
+                <div className="forge-dashboard-table-tools">
+                    <input
+                        type="search"
+                        className="forge-dashboard-search"
+                        value={quickFilter}
+                        placeholder="Quick filter rows..."
+                        onChange={(event) => setQuickFilter(event.target.value)}
+                    />
+                    <span style={subtitleStyle}>{sortedRows.length} rows</span>
+                </div>
+            ) : null}
             {sortedRows.length > 0 ? (
-                <div style={{overflow: 'auto'}}>
-                    <table style={{width: '100%', borderCollapse: 'separate', borderSpacing: 0}}>
+                <div className="forge-dashboard-table-wrap">
+                    <table className={density === "compact" ? "forge-dashboard-table forge-dashboard-table--compact" : "forge-dashboard-table"}>
                         <thead>
                         <tr>
                             {normalizedColumns.map((col) => {
@@ -1051,49 +1196,51 @@ export function DashboardTable({container, context}) {
                                     <th
                                         key={col.key}
                                         onClick={() => handleSort(col.key)}
-                                        style={{
-                                            textAlign: col.align || 'left',
-                                            borderBottom: '1px solid #d8e1e8',
-                                            padding: '10px 8px',
-                                            background: '#f7fafc',
-                                            fontSize: '11px',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.02em',
-                                            color: active ? '#137cbd' : '#5f6b7c',
-                                            cursor: 'pointer',
-                                            userSelect: 'none',
-                                            position: 'sticky',
-                                            top: 0,
-                                        }}
+                                        style={{textAlign: col.align || 'left', color: active ? '#2367d1' : undefined, cursor: 'pointer', userSelect: 'none'}}
                                     >
                                         {col.label}{arrow}
                                     </th>
                                 );
                             })}
+                            {rowActions.length > 0 ? <th style={{textAlign: 'right'}}>Actions</th> : null}
                         </tr>
                         </thead>
                         <tbody>
-                        {sortedRows.map((row, index) => (
-                            <tr key={index} style={{background: index % 2 === 0 ? '#ffffff' : '#fbfdff'}}>
-                                {normalizedColumns.map((col, ci) => (
-                                    <td
-                                        key={`${index}-${ci}`}
-                                        style={{
-                                            padding: '10px 8px',
-                                            borderBottom: '1px solid #ebf1f5',
-                                            color: ci === 0 ? '#182026' : '#30404d',
-                                            fontWeight: ci === 0 ? 600 : 400,
-                                            fontSize: '12px',
-                                            lineHeight: 1.45,
-                                            textAlign: col.align || 'left',
-                                            whiteSpace: 'nowrap',
-                                        }}
-                                    >
-                                        {renderDashboardTableCell(row?.[col.key], col, locale)}
-                                    </td>
-                                ))}
-                            </tr>
-                        ))}
+                        {sortedRows.map((row, index) => {
+                            const rowRules = matchingRules(row, formattingRules, "row");
+                            const rowStyle = mergeStyles(rowRules);
+                            const rowClassName = mergeClassNames(rowRules);
+                            return (
+                                <tr key={index} className={rowClassName} style={rowStyle}>
+                                    {normalizedColumns.map((col, ci) => {
+                                        const cellRules = matchingRules(row, formattingRules, "cell", col.key);
+                                        const cellStyle = {...rowStyle, ...mergeStyles(cellRules), textAlign: col.align || 'left'};
+                                        const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(" ");
+                                        return (
+                                            <td key={`${index}-${ci}`} className={cellClassName} style={cellStyle}>
+                                                {renderDashboardTableCell(resolveKey(row, col.key), col, locale)}
+                                            </td>
+                                        );
+                                    })}
+                                    {rowActions.length > 0 ? (
+                                        <td style={{textAlign: 'right'}}>
+                                            <div style={{display: 'inline-flex', gap: 6}}>
+                                                {rowActions.map((action) => (
+                                                    <button
+                                                        key={action.id || action.label}
+                                                        type="button"
+                                                        className="forge-dashboard-row-action"
+                                                        onClick={() => handleRowAction(action, row, index)}
+                                                    >
+                                                        {action.label || action.id || 'Action'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </td>
+                                    ) : null}
+                                </tr>
+                            );
+                        })}
                         </tbody>
                     </table>
                 </div>
@@ -1119,6 +1266,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.timeline':
             content = <DashboardTimeline container={container} context={context} isActive={isActive}/>;
+            break;
+        case 'dashboard.composition':
+            content = <DashboardComposition container={container} context={context} isActive={isActive}/>;
             break;
         case 'dashboard.dimensions':
             content = <DashboardDimensions container={container} context={context}/>;

@@ -132,6 +132,8 @@ export default function Composer({
     defaultMicOn = false,
     onToggleMic,
     onCaptureAudio,
+    inputComponent: InputComponent,
+    inputProps = {},
     disabled = false,
     attachments = [],
     onRemoveAttachment,
@@ -171,6 +173,7 @@ export default function Composer({
 	const [queueOpen, setQueueOpen] = useState(false);
 	const [bundlesOpen, setBundlesOpen] = useState(false);
 	const [bundlesMenuOpen, setBundlesMenuOpen] = useState(false);
+	const [inputInvalid, setInputInvalid] = useState(false);
 	const micOn = (micOnProp !== undefined) ? !!micOnProp : micOnInternal;
 	const draftRef = useRef(String(draftValue || ""));
 	const recognitionRef = useRef(null);
@@ -182,6 +185,7 @@ export default function Composer({
 	const mediaChunksRef = useRef([]);
 	const recordingStartTsRef = useRef(0);
 	const lastManualAgentRef = useRef('');
+    const inputValueResolverRef = useRef(null);
 
 	const updateDraft = useCallback((nextValue) => {
 		const prev = String(draftRef.current || "");
@@ -607,10 +611,13 @@ export default function Composer({
     const handleSubmit = (e) => {
         e.preventDefault();
         if (disabled) return; // Block submission while disabled
-        if (!draft.trim()) return;
+        const resolver = inputValueResolverRef.current;
+        const resolvedValue = typeof resolver === 'function' ? resolver() : draftRef.current;
+        const content = String(resolvedValue || '').trim();
+        if (!content) return;
         setHistoryOpen(false);
         storeDraftForConversation(currentConversationIdFromLocation(), '');
-        onSubmit?.({ content: draft, toolNames: selectedTools });
+        onSubmit?.({ content, toolNames: selectedTools });
         updateDraft("");
     };
 
@@ -1157,6 +1164,41 @@ export default function Composer({
     const textPadRight = 32 + (rightIcons - 1) * 36; // allow room for mic + send
     const attachmentsRight = 40 + (rightIcons - 1) * 36; // overlay space for right-side icons
 
+    const renderComposerInput = ({ style, className } = {}) => (
+        InputComponent ? (
+            <InputComponent
+                value={draft}
+                onChange={(next) => { updateDraft(next); updateHistorySuggestions(next); }}
+                onFocus={openHistoryOnFocus}
+                onBlur={closeHistory}
+                data-testid="chat-composer-input"
+                className={className}
+                placeholder="Type your message…"
+                disabled={disabled}
+                onValidityChange={setInputInvalid}
+                onValueResolver={(resolver) => { inputValueResolverRef.current = resolver; }}
+                multiline
+                autoResize={autoResize}
+                style={style}
+                {...inputProps}
+            />
+        ) : (
+            <TextArea
+                fill
+                placeholder="Type your message…"
+                value={draft}
+                autoResize={autoResize}
+                onChange={(e) => { const v = e.target.value; updateDraft(v); updateHistorySuggestions(v); }}
+                onFocus={openHistoryOnFocus}
+                onBlur={closeHistory}
+                data-testid="chat-composer-input"
+                className={className}
+                style={style}
+                disabled={disabled}
+            />
+        )
+    );
+
 	    const currentModelLabel = optionLabel(normalizedModelOptions, modelValue) || 'Model';
 	    const currentAgentLabel = (() => {
 	        const raw = optionLabel(normalizedAgentOptions, agentValue);
@@ -1379,7 +1421,7 @@ export default function Composer({
                                 aria-label={sendTooltip || submitText}
                                 title={sendTooltip || submitText}
                                 type="submit"
-                                disabled={actionDisabled}
+                                disabled={actionDisabled || inputInvalid}
                                 loading={disabled}
                             >
                                 {submitText}
@@ -1441,25 +1483,16 @@ export default function Composer({
                 )}
 
                 <div style={{ position: 'relative', width: '100%' }}>
-                    <TextArea
-                        fill
-                        placeholder="Type your message…"
-                        value={draft}
-                        autoResize={autoResize}
-                        onChange={(e) => { const v = e.target.value; updateDraft(v); updateHistorySuggestions(v); }}
-                        onFocus={openHistoryOnFocus}
-                        onBlur={closeHistory}
-                        data-testid="chat-composer-input"
-                        className="composer-textarea"
-                        style={{
+                    {renderComposerInput({
+                        className: "composer-textarea",
+                        style: {
                             borderRadius: 12,
                             resize: "none",
                             minHeight: 40,
                             maxHeight: `${composerMaxHeightPx(maxRows, 12)}px`,
                             overflowY: autoResize ? 'auto' : undefined,
-                        }}
-                        disabled={disabled}
-                    />
+                        },
+                    })}
                     {historyOpen && (
                         <ul
                             className="composer-history-dropdown"
@@ -1581,16 +1614,8 @@ export default function Composer({
                     )}
 
                     <div style={{ position: 'relative', width: '100%' }}>
-                        <TextArea
-                            fill
-                            placeholder="Type your message…"
-                            value={draft}
-                            autoResize={autoResize}
-                            onChange={(e) => { const v = e.target.value; updateDraft(v); updateHistorySuggestions(v); }}
-                            onFocus={openHistoryOnFocus}
-                            onBlur={closeHistory}
-                            data-testid="chat-composer-input"
-                            style={{
+                        {renderComposerInput({
+                            style: {
                                 borderRadius: 14,
                                 resize: "none",
                                 minHeight: 40,
@@ -1599,9 +1624,8 @@ export default function Composer({
                                 paddingRight: textPadRight,
                                 paddingLeft: textPadLeft,
                                 paddingTop: topPad,
-                            }}
-                            disabled={disabled}
-                        />
+                            },
+                        })}
                         {historyOpen && (
                             <ul
                                 className="composer-history-dropdown"
@@ -1685,7 +1709,7 @@ export default function Composer({
                                     ? { onClick: handleAbort, disabled: false, type: "button" }
                                     : {
                                           type: "submit",
-                                          disabled: actionDisabled,
+                                          disabled: actionDisabled || inputInvalid,
                                           loading: disabled,
                                       }
                             )}

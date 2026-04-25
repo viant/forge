@@ -18,6 +18,7 @@ import './Container.css';
 import TableToolbar from "./table/basic/Toolbar.jsx";
 import GridLayoutRenderer from './GridLayoutRenderer.jsx';
 import {DashboardBlock} from "./dashboard/DashboardBlocks.jsx";
+import DashboardSurface from "./dashboard/DashboardSurface.jsx";
 import {createDashboardContext, evaluateDashboardCondition} from "./dashboard/dashboardUtils.js";
 
 const buildGridStyle = (style, columns, layout) => {
@@ -363,6 +364,41 @@ const Container = ({context, container, isActive}) => {
             </div>
         );
     };
+
+    const renderDashboardBlockContainer = (subContainer) => {
+        const subCtx = effectiveContext.Context(subContainer.dataSourceRef || dataSourceRef);
+        return (
+            <Container
+                key={`dashboard-block-${subContainer.id || subContainer.kind}`}
+                context={subCtx}
+                container={subContainer}
+                isActive={isActive}
+            />
+        );
+    };
+
+    if (isDashboardRoot) {
+        return (
+            <>
+                <DashboardSurface
+                    container={container}
+                    context={effectiveContext}
+                    toolbar={container.toolbar ? renderContainerToolbar() : null}
+                    renderBlock={renderDashboardBlockContainer}
+                >
+                    {renderNestedContainers()}
+                </DashboardSurface>
+                {containerWantsFetcher && (
+                    <DataSourceFetcher
+                        key={`auto-fetcher-${container.id}`}
+                        context={effectiveContext.Context(container.dataSourceRef || dataSourceRef)}
+                        selectFirst={container.selectFirst === true}
+                        fetchData={container.fetchData === true}
+                    />
+                )}
+            </>
+        );
+    }
 
     if (container.kind?.startsWith('dashboard.')) {
         const blockContext = effectiveContext.Context(container.dataSourceRef || dataSourceRef);

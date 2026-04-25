@@ -118,7 +118,7 @@ export function extractData(selectors = {}, paging, data) {
         records = [respData]
     }
 
-    if (paging) {
+    if (paging?.enabled) {
         const {dataInfoSelectors = {}} = paging
         const dataInfoSelector = selectors.dataInfo;
         const summary = dataInfoSelector
@@ -171,6 +171,7 @@ export default function DataSource({context}) {
 
     const {dataSource, signals, connector, handlers, identity} = context
     const {paging, selectors} = dataSource;
+    const pagingEnabled = !!paging?.enabled;
     const {input, collection, selection, collectionInfo, metrics, form} = signals
     const {getUniqueKeyValue, setSelected, setLoading, setError, setInactive} = handlers.dataSource
     const events = dataSourceEvents(context, dataSource);
@@ -469,9 +470,8 @@ export default function DataSource({context}) {
         //     return Promise.resolve();
         // }
 
-        if (paging) {
+        if (pagingEnabled) {
             page = page || 1;
-            inputVal[page] = page;
         }
 
         setLoading(true);
