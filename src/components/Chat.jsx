@@ -354,7 +354,7 @@ export default function Chat({
     // ---------------------------------------------------------------------
     // 🎛️  Command-center composer state (agent/model/tools/reasoning)
     //      Prefer an external resolver when the caller wants to own these
-    //      semantics (for example Agently's chatStore/runtime path).
+    //      semantics in its own chat store/runtime path.
     // ---------------------------------------------------------------------
 
     const resolveComposerProps = context?.lookupHandler?.('chat.resolveComposerProps');
