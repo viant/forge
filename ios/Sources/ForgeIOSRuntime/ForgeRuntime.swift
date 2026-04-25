@@ -29,7 +29,7 @@ public actor ForgeRuntime {
     public init(
         targetContext: ForgeTargetContext = ForgeTargetContext(),
         windowMetadataBaseURL: URL? = nil,
-        windowMetadataBasePath: String = "/v1/api/agently/forge/window",
+        windowMetadataBasePath: String = "/v1/api/forge/window",
         session: URLSession = .shared
     ) {
         self.targetContext = targetContext
@@ -79,7 +79,7 @@ public actor ForgeRuntime {
         return WindowContext(windowID: id, parameters: parameters)
     }
 
-    public func configureWindowMetadata(baseURL: URL?, path: String = "/v1/api/agently/forge/window") {
+    public func configureWindowMetadata(baseURL: URL?, path: String = "/v1/api/forge/window") {
         windowMetadataEndpoint = Self.makeWindowMetadataEndpoint(baseURL: baseURL, path: path)
     }
 

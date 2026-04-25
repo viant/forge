@@ -50,7 +50,7 @@ Forge is divided into two main parts:
 
 Forge should be treated as the canonical owner of the target-aware metadata
 contract used by its generic metadata-driven UI/runtime. Forge is not an
-agentic dependency; applications such as Agently can reuse the same target
+agentic dependency; host applications can reuse the same target
 shape outside Forge when they need consistent client identity elsewhere.
 
 #### Shared target context
