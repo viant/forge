@@ -36,4 +36,27 @@ assert.deepEqual(
 );
 console.log('buildDatasourceFetchInputs ✓ leaves plain inputs unchanged when paging is absent');
 
+const pageNumberPaging = resolvePagingValues(6, {
+  enabled: true,
+  size: 20,
+  parameters: {
+    page: 'Page',
+    size: 'Limit',
+  },
+});
+
+assert.deepEqual(
+  buildDatasourceFetchInputs({
+    inputParameters: { AdOrderId: 2659776 },
+    filter: {},
+    pagingValues: pageNumberPaging,
+  }),
+  {
+    AdOrderId: 2659776,
+    Page: 6,
+    Limit: 20,
+  }
+);
+console.log('buildDatasourceFetchInputs ✓ preserves Page/Limit query-selector paging contracts');
+
 console.log('\nDATASOURCE REQUEST TESTS PASSED');
