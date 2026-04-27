@@ -4,6 +4,7 @@
 import React from "react";
 import {Colors, Icon} from "@blueprintjs/core";
 import SoftSkeleton from '../../SoftSkeleton.jsx';
+import { formatDataSourceError } from "../../../utils/dataSourceError.js";
 
 const TableBackfill = ({context, rowCount, colSpan, collection}) => {
     if (rowCount <= 0) return null;
@@ -13,7 +14,7 @@ const TableBackfill = ({context, rowCount, colSpan, collection}) => {
     const disabled = control.value?.inactive || false;
     const noData = collection?.length === 0;
 
-    const errorMessage = error?.toString()
+    const errorMessage = formatDataSourceError(error);
     const rows = [];
     for (let i = 0; i < rowCount; i++) {
         if (i === 0) {

@@ -345,6 +345,10 @@ export const fileBrowserHandlers = (context, config) => {
     return handlers;
 };
 
+export const treeBrowserHandlers = (context, config) => {
+    return fileBrowserHandlers(context, config);
+};
+
 
 
 

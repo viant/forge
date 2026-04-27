@@ -7,6 +7,7 @@ import {useSignalEffect} from "@preact/signals-react";
 import {dialogHandlers} from "../hooks";
 import {resolveTemplate} from "../utils";
 import { getLogger } from '../utils/logger.js';
+import { getQuickFilterValue, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
 
 function normalizeQuickFilterSpecs(dialog) {
     const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
@@ -78,7 +79,7 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
             const cur = dsCtx?.signals?.input?.peek?.() || {};
             const next = {};
             quickFilterSpecs.forEach((spec) => {
-                next[spec.field] = String((cur.filter && cur.filter[spec.field]) || '');
+                next[spec.field] = getQuickFilterValue(cur.filter, spec.field);
             });
             setValues((prev) => {
                 const prevKeys = Object.keys(prev || {});
@@ -94,7 +95,9 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
     const applySearch = (field, text, debounceMs = 0) => {
         try {
             const h = dsCtx?.handlers?.dataSource;
-            h?.setSilentFilterValues?.({ filter: { [field]: text } });
+            const currentFilter = h?.peekFilter?.() || {};
+            const nextFilter = mergeQuickFilterValue(currentFilter, field, text);
+            h?.setSilentFilterValues?.({ filter: nextFilter });
             const fetch = () => {
                 h?.setInactive?.(false);
                 h?.setLoading?.(true);
@@ -223,10 +226,11 @@ const ViewDialog = ({context, dialog}) => {
                         const dsHandlers = dsC?.handlers?.dataSource;
                         const inSig = dsC?.signals?.input;
                         const args = (inSig?.peek?.() || {}).args || {};
-                        const filter = {};
+                        let filter = {};
                         for (const spec of quickFilterSpecs) {
-                            if (args && typeof args === 'object' && args[spec.field]) {
-                                filter[spec.field] = args[spec.field];
+                            const value = getQuickFilterValue(args, spec.field);
+                            if (value) {
+                                filter = mergeQuickFilterValue(filter, spec.field, value);
                             }
                         }
                         log.debug('deferred fetchCollection', { filter, args });
@@ -288,6 +292,7 @@ const ViewDialog = ({context, dialog}) => {
         try {
             const sel = dsCtx?.signals?.selection?.value;
             const has = !!(sel && (sel.selected || (Array.isArray(sel.selection) && sel.selection.length > 0)));
+            log.info('selection effect', { dsRef: resolvedDataSourceRef, selection: sel, canSelect: has });
             setCanSelect(has);
         } catch (_) {}
     });

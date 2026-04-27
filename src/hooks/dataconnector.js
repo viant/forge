@@ -1,6 +1,8 @@
 import {useSetting} from "../core";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
+import { resolvePagingValues, withPagingInputs } from "./paging.js";
+import { buildDatasourceFetchInputs } from "./datasourceRequest.js";
 
 
 // Toggle with env var or config if you don't always want noisy logs
@@ -24,32 +26,6 @@ function logCallerStack(name , maxFrames = 5) {
     } else {
         console.log('[${name}] (no caller frames available)');
     }
-}
-
-function pagingConfig(paging) {
-    if (!paging || paging.enabled === false) {
-        return null;
-    }
-    return paging;
-}
-
-function resolvePagingValues(page, paging) {
-    const config = pagingConfig(paging);
-    if (page == null || !config) {
-        return null;
-    }
-
-    const pageParameters = config.parameters || {};
-    const pageParamName = pageParameters.page || "page";
-    const sizeParamName = pageParameters.size || "size";
-    const sizeValue = config.size && config.size > 0 ? config.size : undefined;
-    let pageValue = page;
-    if (pageParamName === 'offset') {
-        const pageNumber = Number(page) || 1;
-        const pageSize = Number(sizeValue) || 0;
-        pageValue = Math.max(0, pageNumber - 1) * pageSize;
-    }
-    return { pageParamName, sizeParamName, pageValue, sizeValue };
 }
 
 function useDataConnector(dataSource) {
@@ -226,6 +202,10 @@ function useDataConnector(dataSource) {
             const queryParams = new URLSearchParams();
             const requestMethod = String(method || 'GET').toUpperCase();
             const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
+            const pagingValues = resolvePagingValues(page, paging);
+            const effectiveInputParameters = requestMethod === 'GET'
+                ? { ...(inputParameters || {}) }
+                : withPagingInputs(inputParameters, pagingValues);
             // Merge filter into query string
             if (requestMethod === 'GET') {
                 Object.entries(filter).forEach(([key, val]) => {
@@ -234,7 +214,6 @@ function useDataConnector(dataSource) {
             }
 
             // Handle paging
-            const pagingValues = resolvePagingValues(page, paging);
             if (requestMethod === 'GET' && pagingValues) {
                 const { pageParamName, sizeParamName, pageValue, sizeValue } = pagingValues;
                 queryParams.append(pageParamName, pageValue);
@@ -244,7 +223,7 @@ function useDataConnector(dataSource) {
             }
 
             const body = {};
-            url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            url = applyParameters({url, headers, queryParams, body}, effectiveInputParameters);
             if (dataSource?.service?.includeTargetContext) {
                 appendTargetContextQuery(queryParams, targetContext);
             }
@@ -253,18 +232,11 @@ function useDataConnector(dataSource) {
             const request = {method: requestMethod, headers};
 
             if (requestMethod !== 'GET' && isDatasourceFetchRoute) {
-                const inputs = {
-                    ...(inputParameters || {}),
-                    ...(filter || {}),
-                };
-                const pagingValues = resolvePagingValues(page, paging);
-                if (pagingValues) {
-                    const { pageParamName, sizeParamName, pageValue, sizeValue } = pagingValues;
-                    inputs[pageParamName] = pageValue;
-                    if (sizeValue != null) {
-                        inputs[sizeParamName] = sizeValue;
-                    }
-                }
+                const inputs = buildDatasourceFetchInputs({
+                    inputParameters: effectiveInputParameters,
+                    filter,
+                    pagingValues,
+                });
                 request["body"] = JSON.stringify({ inputs });
                 request.headers = {
                     ...headers,

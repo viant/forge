@@ -9,6 +9,7 @@ import Splitter from './Splitter';
 
 import {expandRepeatItems} from "../utils/repeat.js";
 import FileBrowser from "./FileBrowser.jsx";
+import TreeBrowser from "./TreeBrowser.jsx";
 import DataSourceFetcher from "./DataSourceFetcher.jsx";
 import Editor from "./Editor.jsx";
 import Chat from "./Chat.jsx";
@@ -133,6 +134,18 @@ const Container = ({context, container, isActive}) => {
         );
     }
 
+    let treeBrowserPanel = null;
+    if (container.treeBrowser) {
+        const dsRef = container.treeBrowser.dataSourceRef || dataSourceRef;
+        treeBrowserPanel = (
+            <TreeBrowser
+                context={effectiveContext.Context(dsRef)}
+                config={container.treeBrowser}
+                isActive={isActive}
+            />
+        );
+    }
+
 
     let editorPanel = null;
     if (container.editor) {
@@ -248,7 +261,7 @@ const Container = ({context, container, isActive}) => {
     const hasVisual =
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
-        tablePanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
+        tablePanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual) {
         return (
             <>
@@ -461,6 +474,7 @@ const Container = ({context, container, isActive}) => {
                 {terminalPanel}
                 {tablePanel}
                 {fileBrowserPanel}
+                {treeBrowserPanel}
                 {editorPanel}
                 {schemaFormPanel}
                 {formPanel ? formPanel :

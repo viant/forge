@@ -1,6 +1,6 @@
 import React from 'react';
 import { InputGroup, Button } from '@blueprintjs/core';
-import { openLookup } from '../../utils/lookup.js';
+import { applyLookupSelection, openLookup, resolveLookupValue } from '../../utils/lookup.js';
 
 export default function TextLookup(props) {
     const { value = '', readOnly, context, item, adapter, ...rest } = props;
@@ -10,6 +10,29 @@ export default function TextLookup(props) {
             await openLookup({ item, context, adapter, value });
         } catch (e) {
             console.error('lookup failed', e);
+        }
+    };
+
+    const handleBlur = async (event) => {
+        try {
+            rest?.onBlur?.(event);
+        } catch (_) {}
+        const raw = event?.target?.value ?? value;
+        if (readOnly) return;
+        if (!item?.lookup?.dataSource || !item?.lookup?.resolveInput) return;
+        if (raw == null || String(raw).trim() === '') return;
+        try {
+            const resolved = await resolveLookupValue({ item, value: raw });
+            if (!resolved) return;
+            applyLookupSelection({
+                item,
+                context,
+                adapter,
+                outputs: item?.lookup?.outputs || [],
+                record: resolved,
+            });
+        } catch (e) {
+            console.error('lookup resolve on blur failed', e);
         }
     };
 
@@ -33,6 +56,7 @@ export default function TextLookup(props) {
                 const v = e?.target?.value ?? e;
                 try { adapter.set(v); } catch (_) {}
             }}
+            onBlur={handleBlur}
             rightElement={<Button icon="search" minimal onClick={handleOpen} />}
         />
     );

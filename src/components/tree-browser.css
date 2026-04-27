@@ -1,0 +1,104 @@
+.forge-tree-browser {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+    padding: 4px 2px;
+}
+
+.forge-tree-browser .bp6-tree-root,
+.forge-tree-browser .bp5-tree-root,
+.forge-tree-browser .bp4-tree-root {
+    margin: 0;
+    padding-left: 0;
+}
+
+.forge-tree-browser .bp6-tree-node-list .bp6-tree-node-list,
+.forge-tree-browser .bp5-tree-node-list .bp5-tree-node-list,
+.forge-tree-browser .bp4-tree-node-list .bp4-tree-node-list {
+    border-left: 1px solid rgba(16, 22, 26, 0.12);
+    margin-left: 16px;
+    padding-left: 12px;
+}
+
+.forge-tree-browser .bp6-tree-node-content,
+.forge-tree-browser .bp5-tree-node-content,
+.forge-tree-browser .bp4-tree-node-content {
+    border-radius: 10px;
+    margin: 2px 0;
+    min-height: 34px;
+    padding: 6px 8px;
+}
+
+.forge-tree-browser .bp6-tree-node-content:hover,
+.forge-tree-browser .bp5-tree-node-content:hover,
+.forge-tree-browser .bp4-tree-node-content:hover {
+    background: rgba(16, 22, 26, 0.06);
+}
+
+.forge-tree-browser-row {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    min-width: 0;
+    width: 100%;
+}
+
+.forge-tree-browser-row.is-root .forge-tree-browser-label {
+    color: #182026;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.forge-tree-browser-row.is-branch.is-nested .forge-tree-browser-label {
+    color: #394b59;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.forge-tree-browser-main {
+    align-items: center;
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+}
+
+.forge-tree-browser-label {
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.forge-tree-browser-row.is-leaf .forge-tree-browser-label {
+    color: #5f6b7c;
+    font-weight: 400;
+}
+
+.forge-tree-browser-badge {
+    flex: 0 0 auto;
+}
+
+.forge-tree-browser-row.is-root .forge-tree-browser-badge,
+.forge-tree-browser-row.is-branch .forge-tree-browser-badge {
+    background: rgba(16, 107, 163, 0.08);
+    color: #106ba3;
+}
+
+.forge-tree-browser-row.is-leaf .forge-tree-browser-badge {
+    background: rgba(95, 107, 124, 0.08);
+    color: #5f6b7c;
+}
+
+.forge-tree-browser-state {
+    color: #5f6b7c;
+    padding: 16px;
+}
+
+.forge-tree-browser-error {
+    color: #c23030;
+}
