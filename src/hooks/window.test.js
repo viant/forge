@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import {useWindowHandlers} from './window.js';
 import {setWindowContext, clearWindowContext} from '../core/context/registry.js';
-import {getDashboardFilterSignal, getDashboardSelectionSignal} from '../core/store/signals.js';
+import {getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal} from '../core/store/signals.js';
 
 const windowId = 'W_test_dashboard';
 const dashboardId = 'demoDashboard';
@@ -70,5 +70,25 @@ handlers.resetDashboardState({parameters: {dashboardId}});
 assert.equal(getDashboardFilterSignal(dashboardKey).peek().dateRange, '90d');
 assert.deepEqual(getDashboardFilterSignal(dashboardKey).peek().region, ['NA']);
 assert.equal(getDashboardSelectionSignal(dashboardKey).peek().entityKey, null);
+
+const dialogPromise = handlers.openDialog({
+  execution: {
+    args: ['adOrderPicker', { awaitResult: true }],
+  },
+  parameters: {
+    'filters.adOrderId': '1232',
+  },
+  context: {
+    identity: {
+      dataSourceRef: 'perf',
+    },
+  },
+});
+assert.equal(typeof dialogPromise?.then, 'function');
+const dialogSignal = getDialogSignal(`${windowId}DialogadOrderPicker`).peek();
+assert.equal(dialogSignal.open, true);
+assert.deepEqual(dialogSignal.args, {
+  'filters.adOrderId': '1232',
+});
 
 clearWindowContext(windowId);

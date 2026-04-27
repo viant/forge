@@ -547,18 +547,26 @@ export function useWindowHandlers(windowId) {
         });
 
         // Resolve parameter definitions to a plain args object using caller context
-        let argsObj = {};
+        // and honor explicit caller-provided parameters when present.
+        let inboundParams = {};
         try {
             const callerBase = getWindowContext(windowId);
             const callerRef = props.context?.identity?.dataSourceRef || (callerBase?.identity?.dataSourceRef);
             const callerCtx = callerBase ? callerBase.Context(callerRef) : null;
             if (callerCtx) {
                 const defs = Array.isArray(options.parameters) ? options.parameters : parameterDefinitions;
-                argsObj = resolveParameters(defs || [], callerCtx) || {};
+                inboundParams = resolveParameters(defs || [], callerCtx) || {};
             }
         } catch (e) {
             console.warn('[openDialog] resolveParameters error', e);
         }
+
+        const explicitParameters = (parameters && typeof parameters === 'object')
+            ? parameters
+            : {};
+        const argsObj = Object.keys(explicitParameters).length > 0
+            ? explicitParameters
+            : inboundParams;
 
         // Set dialog signal (open + props + args) in a single write to avoid reactive cycles
         try {

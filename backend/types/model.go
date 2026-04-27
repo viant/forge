@@ -381,6 +381,7 @@ type Container struct {
 	Report          *DashboardReportOptions           `json:"report,omitempty" yaml:"report,omitempty"`
 	Table           *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
 	FileBrowser     *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
+	TreeBrowser     *TreeBrowser                      `json:"treeBrowser,omitempty" yaml:"treeBrowser,omitempty"`
 	Editor          *Editor                           `json:"editor,omitempty" yaml:"editor,omitempty"`
 	Terminal        *Terminal                         `json:"terminal,omitempty" yaml:"terminal,omitempty"`
 	Chart           *Chart                            `json:"chart,omitempty" yaml:"chart,omitempty"`
@@ -479,10 +480,26 @@ type Upload struct {
 }
 
 type FileBrowser struct {
-	Title      string           `json:"title" yaml:"title"`
-	FolderOnly bool             `json:"folderOnly" yaml:"folderOnly"`
-	Style      *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	On         []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
+	Title         string           `json:"title" yaml:"title"`
+	DataSourceRef string           `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	FolderOnly    bool             `json:"folderOnly" yaml:"folderOnly"`
+	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	On            []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
+}
+
+type TreeBrowser struct {
+	Title         string           `json:"title,omitempty" yaml:"title,omitempty"`
+	DataSourceRef string           `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	PathField     string           `json:"pathField,omitempty" yaml:"pathField,omitempty"`
+	LabelField    string           `json:"labelField,omitempty" yaml:"labelField,omitempty"`
+	ValueField    string           `json:"valueField,omitempty" yaml:"valueField,omitempty"`
+	SubtitleField string           `json:"subtitleField,omitempty" yaml:"subtitleField,omitempty"`
+	ChildrenField string           `json:"childrenField,omitempty" yaml:"childrenField,omitempty"`
+	Separator     string           `json:"separator,omitempty" yaml:"separator,omitempty"`
+	LazyExpand    bool             `json:"lazyExpand,omitempty" yaml:"lazyExpand,omitempty"`
+	ClassName     string           `json:"className,omitempty" yaml:"className,omitempty"`
+	Style         *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
+	On            []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type Editor struct {
@@ -881,8 +898,12 @@ type Lookup struct {
 	// Either DialogId (preferred) or WindowId can be provided. When DialogId
 	// is set, the UI opens a Forge dialog which renders a built-in
 	// Cancel/OK footer. WindowId uses a floating window instead.
-	DialogId string `json:"dialogId,omitempty" yaml:"dialogId,omitempty"`
-	WindowId string `json:"windowId,omitempty" yaml:"windowId,omitempty"`
+	DialogId     string `json:"dialogId,omitempty" yaml:"dialogId,omitempty"`
+	WindowId     string `json:"windowId,omitempty" yaml:"windowId,omitempty"`
+	DataSource   string `json:"dataSource,omitempty" yaml:"dataSource,omitempty"`
+	Display      string `json:"display,omitempty" yaml:"display,omitempty"`
+	QueryInput   string `json:"queryInput,omitempty" yaml:"queryInput,omitempty"`
+	ResolveInput string `json:"resolveInput,omitempty" yaml:"resolveInput,omitempty"`
 
 	Title string `json:"title,omitempty" yaml:"title,omitempty"`
 

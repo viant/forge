@@ -8,6 +8,7 @@ import {arrayEquals} from "../utils/equal.js";
 import { getLogger } from "../utils/logger.js";
 import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
+import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 
 function findDataSourceDependencies(dataSourceRef, dataSources) {
     const dependencies = {};
@@ -125,10 +126,9 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
                 caller: caller,
             });
         } catch (_) { /* ignore */ }
-        // Coerce Error objects to string so React can render safely in Chat banner
-        const errorText = (error && (error.message || error.toString?.())) ? String(error.message || error.toString()) : String(error || '');
+        const normalized = normalizeDataSourceError(error);
         // Preserve prior data and mark view as stale; leave clearing to user onError handlers
-        control.value = { ...control.peek(), error: errorText, loading: false, stale: true };
+        control.value = { ...control.peek(), error: normalized, loading: false, stale: true };
     }
 
     const peekLoading = () => {
@@ -282,6 +282,10 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     function setSelected(newSelection) {
+        try {
+            const log = getLogger('ds');
+            log.info('[setSelected]', { ds: identity?.dataSourceRef, selectionMode, selfReference: !!dataSource.selfReference, newSelection });
+        } catch (_) {}
         if (dataSource.selfReference) {
             // Tree structure handling
             if (!newSelection || (selectionMode !== 'multi' && !newSelection.nodePath)) {
@@ -317,8 +321,19 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         }
 
 
+        const hasNodeSelection = !!(
+            newSelection &&
+            newSelection.selected &&
+            Array.isArray(newSelection.nodePath) &&
+            newSelection.nodePath.length > 0
+        );
+
         // Existing flat data handling
-        if (!newSelection || (selectionMode !== 'multi' && newSelection.rowIndex === -1)) {
+        if (!newSelection || (selectionMode !== 'multi' && newSelection.rowIndex === -1 && !hasNodeSelection)) {
+            try {
+                const log = getLogger('ds');
+                log.info('[setSelected] clear', { ds: identity?.dataSourceRef, newSelection, hasNodeSelection });
+            } catch (_) {}
             // For single selection, clear selection
             selection.value = selectionMode === 'multi' ? {selection: []} : {selected: null, rowIndex: -1};
             form.value = {};
@@ -338,6 +353,10 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
         // For single selection
         selection.value = newSelection;
+        try {
+            const log = getLogger('ds');
+            log.info('[setSelected] applied', { ds: identity?.dataSourceRef, newSelection });
+        } catch (_) {}
         form.value = {...newSelection.selected};
         formSnapshot = form.peek();
         formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
