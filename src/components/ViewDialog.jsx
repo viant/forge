@@ -7,7 +7,7 @@ import {useSignalEffect} from "@preact/signals-react";
 import {dialogHandlers} from "../hooks";
 import {resolveTemplate} from "../utils";
 import { getLogger } from '../utils/logger.js';
-import { getQuickFilterValue, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
+import { buildQuickFilterSeed, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
 
 function normalizeQuickFilterSpecs(dialog) {
     const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
@@ -74,12 +74,12 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
         };
     }, []);
 
-    React.useEffect(() => {
+    useSignalEffect(() => {
         try {
-            const cur = dsCtx?.signals?.input?.peek?.() || {};
+            const cur = dsCtx?.signals?.input?.value || {};
             const next = {};
             quickFilterSpecs.forEach((spec) => {
-                next[spec.field] = getQuickFilterValue(cur.filter, spec.field);
+                next[spec.field] = cur?.filter?.[spec.field] == null ? '' : String(cur.filter[spec.field]);
             });
             setValues((prev) => {
                 const prevKeys = Object.keys(prev || {});
@@ -90,7 +90,7 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
                 return next;
             });
         } catch (_) {}
-    }, [dsCtx, quickFilterSpecs]);
+    });
 
     const applySearch = (field, text, debounceMs = 0) => {
         try {
@@ -188,6 +188,10 @@ const ViewDialog = ({context, dialog}) => {
             const dialogDataSourceHandlers = dialogContext?.handlers?.dataSource;
             try {
                 const args = handlers.dialog.callerArgs();
+                const callerProps = handlers.dialog.callerProps?.() || {};
+                const explicitParameters = (callerProps?.parameters && typeof callerProps.parameters === 'object')
+                    ? callerProps.parameters
+                    : {};
                 const current = dialogDataSourceHandlers?.peekInput?.() || {};
                 const nextArgsStr = JSON.stringify(args || {});
                 const prevArgsStr = JSON.stringify((current.args || {}));
@@ -202,7 +206,9 @@ const ViewDialog = ({context, dialog}) => {
                 try {
                     const dsRef = resolvedDataSourceRef;
                     let params = {};
-                    if (args && typeof args === 'object') {
+                    if (Object.keys(explicitParameters).length > 0) {
+                        params = explicitParameters;
+                    } else if (args && typeof args === 'object') {
                         const scoped = (dsRef && args[dsRef]) ? args[dsRef] : args;
                         const inputObj = (scoped && typeof scoped === 'object') ? (scoped.input || scoped) : {};
                         params = (inputObj && typeof inputObj === 'object') ? (inputObj.parameters || inputObj) : {};
@@ -226,17 +232,31 @@ const ViewDialog = ({context, dialog}) => {
                         const dsHandlers = dsC?.handlers?.dataSource;
                         const inSig = dsC?.signals?.input;
                         const args = (inSig?.peek?.() || {}).args || {};
-                        let filter = {};
-                        for (const spec of quickFilterSpecs) {
-                            const value = getQuickFilterValue(args, spec.field);
-                            if (value) {
-                                filter = mergeQuickFilterValue(filter, spec.field, value);
-                            }
-                        }
+                        const callerProps = handlers.dialog.callerProps?.() || {};
+                        const explicitParameters = (callerProps?.parameters && typeof callerProps.parameters === 'object')
+                            ? callerProps.parameters
+                            : {};
+                        const filterSeedSource = Object.keys(explicitParameters).length > 0
+                            ? explicitParameters
+                            : args;
+                        const filter = buildQuickFilterSeed(filterSeedSource, quickFilterSpecs);
+                        console.debug(
+                            '[lookup-dialog][seed]',
+                            JSON.stringify({
+                                dialogId: dialog?.id,
+                                dataSourceRef: resolvedDataSourceRef,
+                                args,
+                                explicitParameters,
+                                filter,
+                            })
+                        );
                         log.debug('deferred fetchCollection', { filter, args });
                         dsHandlers?.setInactive?.(false);
                         dsHandlers?.setLoading?.(true);
-                        dsHandlers?.fetchCollection?.({ filter });
+                        if (Object.keys(filter || {}).length > 0) {
+                            dsHandlers?.setSilentFilterValues?.({ filter });
+                        }
+                        dsHandlers?.fetchCollection?.();
                     } catch (err) {
                         log.warn('deferred fetchCollection error', { error: String(err?.message || err) });
                     }

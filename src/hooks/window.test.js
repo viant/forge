@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {useWindowHandlers} from './window.js';
+import {useDialogHandlers, useWindowHandlers} from './window.js';
 import {setWindowContext, clearWindowContext} from '../core/context/registry.js';
 import {getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal} from '../core/store/signals.js';
 
@@ -86,9 +86,17 @@ const dialogPromise = handlers.openDialog({
 });
 assert.equal(typeof dialogPromise?.then, 'function');
 const dialogSignal = getDialogSignal(`${windowId}DialogadOrderPicker`).peek();
+const dialogHandlers = useDialogHandlers(windowId, 'adOrderPicker');
 assert.equal(dialogSignal.open, true);
 assert.deepEqual(dialogSignal.args, {
   'filters.adOrderId': '1232',
 });
+assert.deepEqual(dialogSignal.props.parameters, {
+  'filters.adOrderId': '1232',
+});
+assert.deepEqual(dialogHandlers.callerProps().parameters, {
+  'filters.adOrderId': '1232',
+});
+console.log('openDialog ✓ preserves explicit caller parameters in dialog props');
 
 clearWindowContext(windowId);

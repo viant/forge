@@ -30,4 +30,21 @@ assert.deepEqual(
 );
 console.log('withPagingInputs ✓ no-op when paging is absent');
 
+const pagePaging = resolvePagingValues(7, {
+  enabled: true,
+  size: 20,
+  parameters: {
+    page: 'Page',
+    size: 'Limit',
+  },
+});
+
+assert.deepEqual(pagePaging, {
+  pageParamName: 'Page',
+  sizeParamName: 'Limit',
+  pageValue: 7,
+  sizeValue: 20,
+});
+console.log('resolvePagingValues ✓ preserves page-number paging for Page/Limit contracts');
+
 console.log('\nDATACONNECTOR PAGING TESTS PASSED');

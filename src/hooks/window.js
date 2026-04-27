@@ -159,6 +159,10 @@ export function useDialogHandlers(windowId, dialogId) {
         const dialogSignal = getDialogSignal(getDialogId(dialogId))
         return dialogArgs(dialogSignal)
     }
+    const callerProps = () => {
+        const dialogSignal = getDialogSignal(getDialogId(dialogId))
+        return dialogSignal.peek()?.props || {}
+    }
     const isOpen = () => {
         const dialogSignal = getDialogSignal(getDialogId(dialogId))
         return dialogSignal.value?.open || false
@@ -167,6 +171,7 @@ export function useDialogHandlers(windowId, dialogId) {
     return {
         isOpen,
         callerArgs,
+        callerProps,
         close,
         commit
     }

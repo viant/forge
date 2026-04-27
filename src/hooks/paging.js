@@ -16,7 +16,7 @@ export function resolvePagingValues(page, paging) {
     const sizeParamName = pageParameters.size || "size";
     const sizeValue = config.size && config.size > 0 ? config.size : undefined;
     let pageValue = page;
-    if (pageParamName === 'offset') {
+    if (String(pageParamName).toLowerCase() === 'offset') {
         const pageNumber = Number(page) || 1;
         const pageSize = Number(sizeValue) || 0;
         pageValue = Math.max(0, pageNumber - 1) * pageSize;
