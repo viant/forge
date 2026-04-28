@@ -1482,7 +1482,7 @@ export default function Composer({
                     </div>
                 )}
 
-                <div style={{ position: 'relative', width: '100%' }}>
+                <div className="composer-input-wrap" style={{ position: 'relative', width: '100%' }}>
                     {renderComposerInput({
                         className: "composer-textarea",
                         style: {
@@ -1543,7 +1543,7 @@ export default function Composer({
     return (
         <form className="chat-composer flex flex-col gap-1" onSubmit={handleSubmit} data-testid="chat-composer">
             <div className="flex w-full items-start">
-                <div className="composer-wrapper" style={{ flex: 1, minWidth: 0 }}>
+                <div className="composer-wrapper composer-input-wrap" style={{ flex: 1, minWidth: 0 }}>
                     {showUpload && (
                         withTooltip(
                             <Button
