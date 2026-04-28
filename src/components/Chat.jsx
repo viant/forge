@@ -340,6 +340,23 @@ export default function Chat({
         }
     });
 
+    useEffect(() => {
+        const handleConversationActive = (event) => {
+            const conversationId = String(event?.detail?.id || '').trim();
+            if (!conversationId) {
+                setComposerDraft('');
+            }
+        };
+        if (typeof window !== 'undefined') {
+            window.addEventListener('forge:conversation-active', handleConversationActive);
+        }
+        return () => {
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('forge:conversation-active', handleConversationActive);
+            }
+        };
+    }, []);
+
     // Track usage data (tokens/cost) for compact display in the composer.
     useSignalEffect(() => {
         try {
