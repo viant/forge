@@ -134,6 +134,37 @@ class DashboardRuntimeTest {
     }
 
     @Test
+    fun dashboardVisibilityPrefersGroupedConditionWithLegacyFallback() {
+        val signals = SignalRegistry()
+        val metadata = Signal<WindowMetadata?>(null)
+        val window = WindowContext(
+            windowId = "W_dash",
+            metadata = metadata,
+            signals = signals,
+            dataSourceRuntime = DataSourceRuntime(
+                signals = signals,
+                restClient = RestClient(EndpointRegistry(emptyMap())),
+                scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)
+            )
+        )
+        val grouped = ContainerDef(
+            id = "summary",
+            visibleWhen = DashboardConditionDef(source = "filters", field = "region", equals = JsonPrimitive("legacy")),
+            dashboard = DashboardDef(
+                visibleWhen = DashboardConditionDef(source = "filters", field = "region", equals = JsonPrimitive("NA"))
+            )
+        )
+        val legacy = ContainerDef(
+            id = "summary",
+            visibleWhen = DashboardConditionDef(source = "filters", field = "region", equals = JsonPrimitive("NA"))
+        )
+
+        assertTrue(window.evaluateDashboardVisibility(grouped, filters = mapOf("region" to "NA")))
+        assertFalse(window.evaluateDashboardVisibility(grouped, filters = mapOf("region" to "legacy")))
+        assertTrue(window.evaluateDashboardVisibility(legacy, filters = mapOf("region" to "NA")))
+    }
+
+    @Test
     fun interpolateDashboardTemplateResolvesMetricsFiltersAndSelection() {
         val method = Class
             .forName("com.viant.forgeandroid.ui.DashboardRendererKt")

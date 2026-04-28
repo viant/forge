@@ -29,7 +29,7 @@ fun WindowContext.evaluateDashboardVisibility(
     filters: Map<String, Any?> = emptyMap(),
     selection: DashboardSelectionState = DashboardSelectionState()
 ): Boolean {
-    return evaluateDashboardCondition(container.visibleWhen, metrics, filters, selection)
+    return evaluateDashboardCondition(container.dashboard?.visibleWhen ?: container.visibleWhen, metrics, filters, selection)
 }
 
 fun evaluateDashboardCondition(

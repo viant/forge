@@ -96,7 +96,8 @@ export function resolveGeoColor({row, value, minValue, maxValue, colorConfig = {
 }
 
 export function buildGeoConfig(container = {}, titleize = (value) => value) {
-    const geo = container.geo || container.dashboard?.geo || {};
+    const groupedGeo = container.dashboard?.geo;
+    const geo = groupedGeo || container.geo || {};
     const metric = geo.metric || container.metric || {};
     const metricKey = metric.key || geo.valueKey || geo.metricKey || 'value';
     const key = geo.key || geo.codeKey || geo.regionKey || 'stateCode';

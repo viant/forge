@@ -397,7 +397,9 @@ export function createDashboardDemoMetadata() {
             kind: 'dashboard.detail',
             title: 'Selected Country Detail',
             columnSpan: 8,
-            visibleWhen: { source: 'selection', field: 'entityKey', notEmpty: true },
+            dashboard: {
+              visibleWhen: { source: 'selection', field: 'entityKey', notEmpty: true },
+            },
             containers: [
               {
                 id: 'detailTrend',

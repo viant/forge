@@ -24,9 +24,14 @@ function normalizeMode(value) {
     return normalized || "dashboard";
 }
 
+function getReportOptions(container = {}) {
+    return container.dashboard?.reportOptions || container.report || {};
+}
+
 function normalizeModes(container = {}) {
     const configured = container.toolbar?.modes || container.modes || container.dashboard?.modes;
-    const reportEnabled = container.report?.enabled === true;
+    const reportOptions = getReportOptions(container);
+    const reportEnabled = reportOptions.enabled === true;
     const modes = Array.isArray(configured) && configured.length > 0
         ? configured.map(normalizeMode)
         : (reportEnabled ? ["dashboard", "analyze", "report"] : ["dashboard"]);
@@ -150,8 +155,9 @@ function ReportBlockList({blocks, renderBlock, emptyText}) {
 
 function DashboardReportMode({container, context, renderBlock, include, onIncludeChange}) {
     const groups = useMemo(() => classifyBlocks(container.containers || []), [container.containers]);
-    const generatedAt = container.report?.generatedAt || new Date().toLocaleString();
-    const exportFormats = container.report?.export || ["html"];
+    const reportOptions = getReportOptions(container);
+    const generatedAt = reportOptions.generatedAt || new Date().toLocaleString();
+    const exportFormats = reportOptions.export || ["html"];
 
     return (
         <div className="forge-report-shell">
@@ -185,18 +191,18 @@ function DashboardReportMode({container, context, renderBlock, include, onInclud
                 </div>
                 <div className="forge-report-nav-section">
                     <h3>Compatibility</h3>
-                    <pre>{`report:\n  enabled: true\n  mode: ${container.report?.mode || "document"}\n  include: [summary, charts, tables]\n  export: [${exportFormats.join(", ")}]`}</pre>
+                    <pre>{`dashboard:\n  reportOptions:\n    enabled: true\n    mode: ${reportOptions.mode || "document"}\n    include: [summary, charts, tables]\n    export: [${exportFormats.join(", ")}]`}</pre>
                 </div>
             </aside>
             <main className="forge-report-page">
                 <header className="forge-report-header">
                     <div>
-                        <h2>{container.report?.title || container.title || "Dashboard Report"}</h2>
-                        <p>{container.report?.subtitle || container.subtitle || "Generated from the same dashboard blocks used in the interactive dashboard view."}</p>
+                        <h2>{reportOptions.title || container.title || "Dashboard Report"}</h2>
+                        <p>{reportOptions.subtitle || container.subtitle || "Generated from the same dashboard blocks used in the interactive dashboard view."}</p>
                     </div>
                     <dl>
                         <div><dt>Generated</dt><dd>{generatedAt}</dd></div>
-                        <div><dt>Mode</dt><dd>{container.report?.mode || "document"}</dd></div>
+                        <div><dt>Mode</dt><dd>{reportOptions.mode || "document"}</dd></div>
                         <div><dt>Dashboard</dt><dd>{context?.dashboardKey || container.id || "dashboard"}</dd></div>
                     </dl>
                 </header>
@@ -256,12 +262,13 @@ function DashboardReportMode({container, context, renderBlock, include, onInclud
 export default function DashboardSurface({container, context, toolbar = null, children, renderBlock}) {
     const modes = useMemo(() => normalizeModes(container), [container]);
     const [mode, setMode] = useState(() => {
-        const initial = normalizeMode(container.report?.defaultMode || container.defaultMode || modes[0]);
+        const reportOptions = getReportOptions(container);
+        const initial = normalizeMode(reportOptions.defaultMode || container.defaultMode || modes[0]);
         return modes.includes(initial) ? initial : modes[0];
     });
     const [include, setInclude] = useState(() => ({
         ...DEFAULT_REPORT_INCLUDE,
-        ...(container.report?.includeState || {}),
+        ...(getReportOptions(container).includeState || {}),
     }));
     const {filters, selection} = useDashboardStateSnapshot(context?.dashboardKey);
     const activeMode = modes.includes(mode) ? mode : modes[0];

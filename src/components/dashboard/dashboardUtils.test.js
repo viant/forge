@@ -10,6 +10,7 @@ import {
   formatDashboardDelta,
   formatDashboardValue,
   getDashboardToneName,
+  getDashboardVisibleWhen,
   publishDashboardSelection,
   withDashboardContext,
 } from './dashboardUtils.js';
@@ -214,6 +215,14 @@ assert.equal(getDashboardToneName(50, { warningAbove: 40, dangerAbove: 25 }), 'd
 assert.equal(getDashboardToneName(30, { warningAbove: 40, dangerAbove: 25 }), 'warning');
 assert.equal(getDashboardToneName(90, { warningBelow: 80, dangerBelow: 95 }), 'warning');
 assert.equal(getDashboardToneName(70, { warningBelow: 80, dangerBelow: 95 }), 'danger');
+assert.deepEqual(
+  getDashboardVisibleWhen({
+    visibleWhen: {selector: 'legacy'},
+    dashboard: {visibleWhen: {source: 'selection', field: 'entityKey'}},
+  }),
+  {source: 'selection', field: 'entityKey'},
+);
+assert.deepEqual(getDashboardVisibleWhen({visibleWhen: {selector: 'legacy'}}), {selector: 'legacy'});
 
 publishDashboardSelection({
   context: dashboardContext,
@@ -233,6 +242,20 @@ const geoConfig = buildGeoConfig({
 });
 assert.equal(geoConfig.key, 'stateCode');
 assert.equal(geoConfig.metricKey, 'spend');
+
+const groupedGeoConfig = buildGeoConfig({
+  dashboard: {
+    geo: {
+      key: 'stateCode',
+      metric: {key: 'spend', label: 'Spend', format: 'currency'},
+      color: {field: 'status', rules: [{value: 'healthy', color: '#1f8f63'}]},
+    },
+  },
+});
+assert.equal(groupedGeoConfig.key, 'stateCode');
+assert.equal(groupedGeoConfig.metricKey, 'spend');
+assert.equal(groupedGeoConfig.color.rules[0].value, 'healthy');
+
 assert.equal(normalizeGeoKey(' ca '), 'CA');
 assert.equal(
   aggregateGeoRows(

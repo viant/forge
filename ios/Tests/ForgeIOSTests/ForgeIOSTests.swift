@@ -294,6 +294,23 @@ final class ForgeIOSTests: XCTestCase {
         )
     }
 
+    func testDashboardDefDecodesGroupedVisibleWhen() throws {
+        let payload = """
+        {
+          "id": "summary",
+          "kind": "dashboard.summary",
+          "visibleWhen": { "source": "filters", "field": "region", "equals": "legacy" },
+          "dashboard": {
+            "visibleWhen": { "source": "filters", "field": "region", "equals": "NA" }
+          }
+        }
+        """
+        let container = try JSONDecoder().decode(ContainerDef.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(container.visibleWhen?.equals, .string("legacy"))
+        XCTAssertEqual(container.dashboard?.visibleWhen?.equals, .string("NA"))
+    }
+
     func testInterpolateDashboardTemplateResolvesMetricsFiltersAndSelection() {
         let result = DashboardRuntime.interpolateDashboardTemplate(
             "Spend {{ summary.total_spend }} in ${filters.region} for ${selection.entityKey}",

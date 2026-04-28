@@ -369,6 +369,7 @@ public struct FormFieldDef: Codable, Sendable, Identifiable {
 
 public struct DashboardDef: Codable, Sendable {
     public let key: String?
+    public let visibleWhen: DashboardConditionDef?
     public let summary: DashboardSummaryDef?
     public let compare: DashboardCompareDef?
     public let kpiTable: DashboardKPITableDef?
@@ -383,6 +384,7 @@ public struct DashboardDef: Codable, Sendable {
 
     public init(
         key: String? = nil,
+        visibleWhen: DashboardConditionDef? = nil,
         summary: DashboardSummaryDef? = nil,
         compare: DashboardCompareDef? = nil,
         kpiTable: DashboardKPITableDef? = nil,
@@ -396,6 +398,7 @@ public struct DashboardDef: Codable, Sendable {
         detail: DashboardDetailDef? = nil
     ) {
         self.key = key
+        self.visibleWhen = visibleWhen
         self.summary = summary
         self.compare = compare
         self.kpiTable = kpiTable
@@ -675,6 +678,25 @@ public struct DashboardConditionDef: Codable, Sendable {
         self.lte = lte
         self.empty = empty
         self.notEmpty = notEmpty
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        source = try container.decodeIfPresent(String.self, forKey: .source)
+        dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
+        selector = try container.decodeIfPresent(String.self, forKey: .selector)
+        field = try container.decodeIfPresent(String.self, forKey: .field)
+        key = try container.decodeIfPresent(String.self, forKey: .key)
+        whenValue = try container.decodeIfPresent(JSONPrimitive.self, forKey: .whenValue)
+        equals = try container.decodeIfPresent(JSONPrimitive.self, forKey: .equals)
+        notEquals = try container.decodeIfPresent(JSONPrimitive.self, forKey: .notEquals)
+        inValues = try container.decodeIfPresent([JSONPrimitive].self, forKey: .inValues) ?? []
+        gt = try container.decodeIfPresent(Double.self, forKey: .gt)
+        gte = try container.decodeIfPresent(Double.self, forKey: .gte)
+        lt = try container.decodeIfPresent(Double.self, forKey: .lt)
+        lte = try container.decodeIfPresent(Double.self, forKey: .lte)
+        empty = try container.decodeIfPresent(Bool.self, forKey: .empty)
+        notEmpty = try container.decodeIfPresent(Bool.self, forKey: .notEmpty)
     }
 }
 

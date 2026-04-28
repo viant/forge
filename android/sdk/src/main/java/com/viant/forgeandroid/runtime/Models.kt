@@ -155,6 +155,7 @@ data class DashboardConditionDef(
 @Serializable
 data class DashboardDef(
     val key: String? = null,
+    val visibleWhen: DashboardConditionDef? = null,
     val summary: DashboardSummaryDef? = null,
     val compare: DashboardCompareDef? = null,
     val kpiTable: DashboardKPITableDef? = null,

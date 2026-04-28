@@ -99,6 +99,7 @@ class DashboardModelsTest {
                           "id": "timeline",
                           "kind": "dashboard.timeline",
                           "dashboard": {
+                            "visibleWhen": { "source": "filters", "field": "dateRange", "notEmpty": true },
                             "timeline": {
                               "viewModes": ["daily", "weekly"],
                               "annotations": { "selector": "annotations.deployments" }
@@ -201,6 +202,7 @@ class DashboardModelsTest {
 
         val timeline = root?.containers?.firstOrNull { it.id == "timeline" }
         assertEquals("dashboard.timeline", timeline?.kind)
+        assertEquals("filters", timeline?.dashboard?.visibleWhen?.source)
         assertEquals(listOf("daily", "weekly"), timeline?.dashboard?.timeline?.viewModes)
         assertEquals("annotations.deployments", timeline?.dashboard?.timeline?.annotations?.selector)
 

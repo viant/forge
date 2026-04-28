@@ -1,5 +1,5 @@
 import {resolveKey} from '../../utils/selector.js';
-import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
+import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from '../../components/dashboard/geoMapUtils.js';
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from '../../components/table/formattingRules.js';
 
@@ -1204,12 +1204,13 @@ function getBlockContext(context, container) {
 }
 
 function buildSummaryBlock(container, blockContext) {
+  const summaryConfig = container.dashboard?.summary || {};
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    metrics: (container.metrics || []).map((metric) => {
+    metrics: (summaryConfig.metrics || container.metrics || []).map((metric) => {
       const raw = resolveKey(blockContext.metrics, metric.selector);
       return {
         id: metric.id,
@@ -1230,12 +1231,13 @@ function severityForDelta(delta, positiveIsUp = true) {
 }
 
 function buildCompareBlock(container, blockContext) {
+  const compareConfig = container.dashboard?.compare || {};
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    items: (container.items || []).map((item) => {
+    items: (compareConfig.items || container.items || []).map((item) => {
       const currentRaw = resolveKey(blockContext.metrics, item.current);
       const previousRaw = resolveKey(blockContext.metrics, item.previous);
       const deltaRaw = currentRaw == null || previousRaw == null
@@ -1258,12 +1260,13 @@ function buildCompareBlock(container, blockContext) {
 }
 
 function buildKPITableBlock(container, blockContext) {
+  const kpiTableConfig = container.dashboard?.kpiTable || {};
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    rows: (container.rows || []).map((row) => ({
+    rows: (kpiTableConfig.rows || container.rows || []).map((row) => ({
       id: row.id,
       label: row.label,
       value: formatDashboardValue(resolveKey(blockContext.metrics, row.value), row.format, blockContext.locale || 'en-US'),
@@ -1275,12 +1278,13 @@ function buildKPITableBlock(container, blockContext) {
 
 function buildFiltersBlock(container, blockContext) {
   const dashboardFilters = blockContext.dashboardFilters || {};
+  const filtersConfig = container.dashboard?.filters || {};
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    items: (container.items || []).map((item) => {
+    items: (filtersConfig.items || container.items || []).map((item) => {
       const field = item.field || item.id;
       const currentValue = dashboardFilters[field];
       const currentValues = Array.isArray(currentValue)
@@ -1302,6 +1306,7 @@ function buildFiltersBlock(container, blockContext) {
 
 function buildGeoMapBlock(container, blockContext) {
   const config = buildGeoConfig(container);
+  const geoLimit = container.dashboard?.geo?.limit || container.limit || 5;
   const filteredRows = applyDashboardSelectionToCollection(
     applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
     container.selectionBindings,
@@ -1337,7 +1342,7 @@ function buildGeoMapBlock(container, blockContext) {
   const ranking = regions
     .filter((region) => Number.isFinite(Number(region.rawValue)))
     .sort((a, b) => Number(b.rawValue) - Number(a.rawValue))
-    .slice(0, container.limit || 5)
+    .slice(0, geoLimit)
     .map((region) => ({
       ...region,
       width: range.max > 0 ? `${Math.max((Number(region.rawValue) / range.max) * 100, 4)}%` : '4%',
@@ -1435,20 +1440,21 @@ function buildTimelineBlock(container, blockContext, chartSvgs) {
 }
 
 function buildCompositionBlock(container, blockContext, chartSvgs) {
+  const compositionConfig = container.dashboard?.composition || {};
   const chart = container.chart || {};
-  const categoryKey = chart.categoryKey || chart.nameKey || chart.series?.nameKey || container.categoryKey || 'name';
-  const valueKey = chart.valueKey || chart.series?.valueKey || container.valueKey || 'value';
+  const categoryKey = chart.categoryKey || chart.nameKey || chart.series?.nameKey || container.categoryKey || compositionConfig.categoryKey || 'name';
+  const valueKey = chart.valueKey || chart.series?.valueKey || container.valueKey || compositionConfig.valueKey || 'value';
   const normalized = {
     ...container,
     chart: {
       ...chart,
-      type: chart.type || container.type || 'donut',
+      type: chart.type || container.type || compositionConfig.type || 'donut',
       xAxis: chart.xAxis || {dataKey: categoryKey, label: chart.categoryLabel || categoryKey},
       series: {
         ...(chart.series || {}),
         nameKey: categoryKey,
         valueKey,
-        palette: chart.palette || chart.series?.palette,
+        palette: chart.palette || chart.series?.palette || compositionConfig.palette,
       },
     },
   };
@@ -1459,8 +1465,10 @@ function buildCompositionBlock(container, blockContext, chartSvgs) {
 }
 
 function buildDimensionsBlock(container, blockContext) {
-  const dimensionKey = container.dimension?.key;
-  const metric = container.metric || {};
+  const dimensionsConfig = container.dashboard?.dimensions || {};
+  const dimension = dimensionsConfig.dimension || container.dimension || {};
+  const dimensionKey = dimension.key;
+  const metric = dimensionsConfig.metric || container.metric || {};
   const metricKey = metric.key;
   const rows = [...applyDashboardSelectionToCollection(
     applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
@@ -1468,7 +1476,7 @@ function buildDimensionsBlock(container, blockContext) {
     blockContext.dashboardSelection,
   )]
     .sort((a, b) => Number(b?.[metricKey] || 0) - Number(a?.[metricKey] || 0))
-    .slice(0, container.limit || 10)
+    .slice(0, dimensionsConfig.limit || container.limit || 10)
     .map((row) => ({
       label: row?.[dimensionKey] ?? '-',
       rawValue: Number(row?.[metricKey] || 0),
@@ -1480,14 +1488,15 @@ function buildDimensionsBlock(container, blockContext) {
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    viewMode: (container.viewModes || [])[0] || 'chart',
-    dimensionLabel: container.dimension?.label || dimensionKey || 'Dimension',
+    viewMode: (dimensionsConfig.viewModes || container.viewModes || [])[0] || 'chart',
+    dimensionLabel: dimension.label || dimensionKey || 'Dimension',
     metricLabel: metric.label || metricKey || 'Value',
     rows,
   };
 }
 
 function buildMessagesBlock(container, blockContext) {
+  const messagesConfig = container.dashboard?.messages || {};
   const interpolationScope = {
     ...(blockContext.metrics || {}),
     metrics: blockContext.metrics || {},
@@ -1499,7 +1508,7 @@ function buildMessagesBlock(container, blockContext) {
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    items: (container.items || []).filter((item) => evaluateCondition(item.visibleWhen, blockContext, blockContext.dashboardKey)).map((item) => ({
+    items: (messagesConfig.items || container.items || []).filter((item) => evaluateCondition(item.visibleWhen, blockContext, blockContext.dashboardKey)).map((item) => ({
       severity: item.severity || 'info',
       title: interpolateDashboardTemplate(item.title, interpolationScope),
       body: interpolateDashboardTemplate(item.body, interpolationScope),
@@ -1508,12 +1517,13 @@ function buildMessagesBlock(container, blockContext) {
 }
 
 function buildStatusBlock(container, blockContext) {
+  const statusConfig = container.dashboard?.status || {};
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    items: (container.checks || []).map((check) => {
+    items: (statusConfig.checks || container.checks || []).map((check) => {
       const raw = resolveKey(blockContext.metrics, check.selector);
       return {
         label: check.label,
@@ -1526,7 +1536,8 @@ function buildStatusBlock(container, blockContext) {
 }
 
 function buildFeedBlock(container, blockContext) {
-  const fields = container.fields || {};
+  const feedConfig = container.dashboard?.feed || {};
+  const fields = feedConfig.fields || container.fields || {};
   const rows = applyDashboardSelectionToCollection(
     applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
     container.selectionBindings,
@@ -1546,6 +1557,7 @@ function buildFeedBlock(container, blockContext) {
 }
 
 function buildBadgesBlock(container, blockContext) {
+  const badgesConfig = container.dashboard?.badges || {};
   const interpolationScope = {
     ...(blockContext.metrics || {}),
     metrics: blockContext.metrics || {},
@@ -1557,7 +1569,7 @@ function buildBadgesBlock(container, blockContext) {
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    items: (container.items || []).map((item) => ({
+    items: (badgesConfig.items || container.items || []).map((item) => ({
       label: interpolateDashboardTemplate(item.label, interpolationScope),
       value: interpolateDashboardTemplate(item.value, interpolationScope),
       tone: item.tone || item.severity || 'info',
@@ -1566,6 +1578,7 @@ function buildBadgesBlock(container, blockContext) {
 }
 
 function buildReportBlock(container, blockContext = {}) {
+  const reportConfig = container.dashboard?.report || {};
   const interpolationScope = {
     ...(blockContext.metrics || {}),
     metrics: blockContext.metrics || {},
@@ -1577,7 +1590,7 @@ function buildReportBlock(container, blockContext = {}) {
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    sections: (container.sections || [])
+    sections: (reportConfig.sections || container.sections || [])
       .filter((section) => evaluateCondition(section.visibleWhen, blockContext, blockContext.dashboardKey))
       .map((section) => ({
         id: section.id,
@@ -1589,12 +1602,12 @@ function buildReportBlock(container, blockContext = {}) {
 }
 
 function buildTableBlock(container, blockContext) {
-  const rawColumns = container.columns || container.dashboard?.table?.columns || [];
+  const rawColumns = container.dashboard?.table?.columns || container.columns || [];
   const columns = rawColumns.map((col) => {
     if (typeof col === 'string') return {key: col, label: col};
     return {key: col?.key || '', label: col?.label || col?.key || '', format: col?.format};
   }).filter((col) => !!col.key);
-  const limit = container.limit || container.dashboard?.table?.limit || 200;
+  const limit = container.dashboard?.table?.limit || container.limit || 200;
   const rows = applyDashboardSelectionToCollection(
     applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
     container.selectionBindings,
@@ -1615,7 +1628,7 @@ function buildTableBlock(container, blockContext) {
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
     columns,
-    formattingRules: normalizeRuleList(container.formattingRules || container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || []),
+    formattingRules: normalizeRuleList(container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || container.formattingRules || []),
     rows,
   };
 }
@@ -1627,7 +1640,10 @@ function buildDetailBlock(container, context, chartSvgs) {
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
     children: (container.containers || [])
-      .filter((child) => !child.visibleWhen || evaluateCondition(child.visibleWhen, getBlockContext(context, child), context.dashboardKey))
+      .filter((child) => {
+        const visibleWhen = getDashboardVisibleWhen(child);
+        return !visibleWhen || evaluateCondition(visibleWhen, getBlockContext(context, child), context.dashboardKey);
+      })
       .map((child) => buildExportBlock(child, context, chartSvgs))
       .filter(Boolean),
   };
@@ -1676,16 +1692,20 @@ export function buildDashboardExportModel({container, context, chartSvgs = {}, t
   const blockContainers = root.kind === 'dashboard' || root.dashboard ? (root.containers || []) : [root];
   const dashboardFilters = context?.dashboardFilters || {};
   const dashboardSelection = context?.dashboardSelection || {};
+  const reportOptions = root.dashboard?.reportOptions || root.report || null;
   return {
     title: title || root.title || 'Dashboard Export',
     subtitle: subtitle || root.subtitle || '',
     locale: context?.locale || root.locale || 'en-US',
     generatedAt: generatedAt || new Date().toISOString(),
-    report: root.report || null,
+    report: reportOptions,
     dashboardFilters,
     dashboardSelection,
     blocks: blockContainers
-      .filter((block) => !block.visibleWhen || evaluateCondition(block.visibleWhen, getBlockContext(context, block), context?.dashboardKey))
+      .filter((block) => {
+        const visibleWhen = getDashboardVisibleWhen(block);
+        return !visibleWhen || evaluateCondition(visibleWhen, getBlockContext(context, block), context?.dashboardKey);
+      })
       .map((block) => buildExportBlock(block, context, chartSvgs))
       .filter(Boolean),
   };
