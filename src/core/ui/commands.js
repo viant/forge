@@ -27,7 +27,7 @@ import { resolveSelector } from '../../utils/selector.js';
 import { buildStandaloneDashboardDocument, buildStandaloneDashboardHtml, downloadDashboardHtml } from './dashboardExport.js';
 import { createDashboardDemoBundle, createDashboardDemoMetadata, createDashboardDemoSeed, DEFAULT_DASHBOARD_DEMO_VARIANT, listDashboardDemoVariants } from './dashboardDemo.js';
 import { buildDashboardDemoStandaloneHtml, getDashboardDemoExportFilename, listDashboardDemoArtifacts } from './dashboardDemoArtifacts.js';
-import { DASHBOARD_BLOCK_KINDS, DASHBOARD_CHART_TYPES, DASHBOARD_COMMANDS } from './dashboardCapabilities.js';
+import { DASHBOARD_BLOCK_KINDS, DASHBOARD_CHART_TYPES, DASHBOARD_COMMANDS, DASHBOARD_METADATA_SCHEMA } from './dashboardCapabilities.js';
 import { getWindowContext } from '../context/registry.js';
 import { buildDashboardDefaultFilters, setDashboardSelectionState } from '../../components/dashboard/dashboardUtils.js';
 
@@ -297,6 +297,7 @@ export async function runUICommand(cmd = {}) {
         blockKinds: DASHBOARD_BLOCK_KINDS,
         chartTypes: DASHBOARD_CHART_TYPES,
         commands: DASHBOARD_COMMANDS,
+        schema: DASHBOARD_METADATA_SCHEMA,
         demos: listDashboardDemoVariants(),
       };
     }

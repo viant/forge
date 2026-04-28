@@ -36,6 +36,7 @@ assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.
 assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.composition'), true);
 assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.kpiTable'), true);
 assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.filters'), true);
+assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.geoMap'), true);
 assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.dimensions'), true);
 assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.report'), true);
 assert.equal(metadata.view.content.containers.find((c) => c.id === 'byCountry').on[0].handler, 'dashboardDemo.updateDetailTrend');
@@ -49,6 +50,8 @@ assert.equal(typeof actions.dashboardDemo.updateDetailTrend, 'function');
 assert.equal(seed.perf.metrics.summary.total_spend, 123000);
 assert.equal(seed.perf.metrics.summary.previous_total_spend, 118000);
 assert.equal(seed.detailTrend.collection[0].series, 'US');
+assert.equal(seed.byState.collection.some((row) => row.stateCode === 'CA'), true);
+assert.equal(seed.byDma.collection.some((row) => row.dma === 'Los Angeles'), true);
 assert.equal(opsMetadata.view.content.title, 'Operations Dashboard Demo');
 assert.equal(opsMetadata.view.content.containers.some((c) => c.kind === 'dashboard.status'), true);
 assert.equal(opsSeed.ops.metrics.summary.open_incidents, 7);

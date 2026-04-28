@@ -13,6 +13,7 @@ assert.equal(performanceContext.dashboardFilters.dateRange, '90d');
 assert.deepEqual(performanceContext.dashboardFilters.region, ['NA']);
 assert.equal(performanceContext.Context('perf').signals.metrics.peek().summary.total_spend, 123000);
 assert.equal(Array.isArray(performanceContext.Context('byCountry').signals.collection.peek()), true);
+assert.equal(performanceContext.Context('byState').signals.collection.peek().some((row) => row.stateCode === 'CA'), true);
 
 const opsModel = buildDashboardDemoExportModel('operations', { generatedAt: '2026-04-07T12:00:00.000Z' });
 assert.equal(opsModel.title, 'Operations Dashboard Demo');

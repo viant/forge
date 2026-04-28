@@ -3,9 +3,10 @@ import {useSignalEffect} from '@preact/signals-react';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
-import {applyDashboardFiltersToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
+import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
+import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from "./geoMapUtils.js";
 import "./Dashboard.css";
 
 const panelStyle = {
@@ -501,6 +502,216 @@ export function DashboardFilters({container, context}) {
     );
 }
 
+export function DashboardGeoMap({container, context}) {
+    const {collection, loading, error} = useDataSourceState(context);
+    const locale = getDashboardLocale(context);
+    const config = useMemo(() => buildGeoConfig(container, titleizeDashboardKey), [container]);
+    const [hoveredKey, setHoveredKey] = useState(null);
+    const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
+    const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
+    const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
+
+    const filteredCollection = useMemo(() => {
+        const afterFilters = applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters);
+        return applyDashboardSelectionToCollection(afterFilters, container.selectionBindings, dashboardSelection);
+    }, [collection, container.filterBindings, container.selectionBindings, dashboardFilters, dashboardSelection]);
+
+    const geoRows = useMemo(
+        () => aggregateGeoRows(filteredCollection, config),
+        [filteredCollection, config],
+    );
+
+    const valueRange = useMemo(() => {
+        const values = Array.from(geoRows.values()).map((entry) => Number(entry.value)).filter(Number.isFinite);
+        if (!values.length) {
+            return {min: 0, max: 0};
+        }
+        return {min: Math.min(...values), max: Math.max(...values)};
+    }, [geoRows]);
+
+    const regions = useMemo(() => {
+        const tiles = config.shape === 'us-states' || config.shape === 'us-state-tiles'
+            ? US_STATE_TILES
+            : [];
+        return tiles.map((tile) => {
+            const entry = geoRows.get(tile.key);
+            const dataRow = entry?.row || null;
+            const label = config.labelKey && dataRow ? resolveKey(dataRow, config.labelKey) : tile.label;
+            const value = entry ? entry.value : null;
+            const color = entry
+                ? resolveGeoColor({row: dataRow, value, minValue: valueRange.min, maxValue: valueRange.max, colorConfig: config.color})
+                : config.color.empty;
+            return {
+                ...tile,
+                label,
+                dataRow,
+                rows: entry?.rows || [],
+                value,
+                color,
+                formattedValue: entry ? formatDashboardValue(value, config.format, locale) : '-',
+            };
+        });
+    }, [config, geoRows, locale, valueRange]);
+
+    const selectedKey = normalizeGeoKey(dashboardSelection?.entityKey);
+    const sortedRegions = useMemo(
+        () => regions
+            .filter((region) => Number.isFinite(Number(region.value)))
+            .sort((a, b) => Number(b.value) - Number(a.value)),
+        [regions],
+    );
+    const activeRegion = regions.find((region) => region.key === hoveredKey)
+        || regions.find((region) => region.key === selectedKey)
+        || sortedRegions[0]
+        || null;
+    const activeRule = activeRegion ? findGeoColorRule(activeRegion.dataRow, config.color) : null;
+    const colorRules = config.color.field && Array.isArray(config.color.rules)
+        ? config.color.rules.filter((rule) => rule?.color)
+        : [];
+
+    const onSelect = (region, rowIndex = 0) => {
+        if (!region?.key) {
+            return;
+        }
+        const selected = region.dataRow || {[config.key]: region.key, label: region.label};
+        context.handlers?.dataSource?.setSelected?.({selected, rowIndex});
+        publishDashboardSelection({
+            context,
+            dimension: config.dimension,
+            entityKey: region.key,
+            selected,
+            sourceBlockId: container.id,
+        });
+
+        const selectExecution = (container.on || []).find((entry) => entry?.event === 'onSelect');
+        if (selectExecution && typeof context?.lookupHandler === 'function') {
+            try {
+                const fn = context.lookupHandler(selectExecution.handler);
+                if (typeof fn === 'function') {
+                    fn({execution: selectExecution, context, item: selected, rowIndex});
+                }
+            } catch (e) {
+                console.error('dashboard geo onSelect handler failed', e);
+            }
+        }
+    };
+
+    if (config.shape !== 'us-states' && config.shape !== 'us-state-tiles') {
+        return (
+            <Panel container={container}>
+                <div style={subtitleStyle}>Unsupported geo shape: {config.shape}</div>
+            </Panel>
+        );
+    }
+
+    const totalValue = sortedRegions.reduce((sum, region) => sum + (Number(region.value) || 0), 0);
+    const topRegion = sortedRegions[0];
+
+    return (
+        <Panel container={container}>
+            {loading ? <div style={subtitleStyle}>Loading…</div> : null}
+            {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
+            {!loading && !error && sortedRegions.length === 0 ? <div style={subtitleStyle}>No geo data.</div> : null}
+            <div className="forge-dashboard-geo">
+                <div className="forge-dashboard-geo-stage">
+                    <div className="forge-dashboard-geo-summary">
+                        <span><strong>{sortedRegions.length}</strong> Regions</span>
+                        <span><strong>{formatDashboardValue(totalValue, config.format, locale)}</strong> Total {config.metricLabel}</span>
+                        <span><strong>{topRegion?.key || '-'}</strong> Top Region</span>
+                    </div>
+                    <div className="forge-dashboard-geo-map" role="list" aria-label={container.title || 'Geo map'}>
+                        {regions.map((region, index) => {
+                            const isSelected = selectedKey === region.key;
+                            const isEmpty = !region.dataRow;
+                            return (
+                                <button
+                                    key={region.key}
+                                    type="button"
+                                    role="listitem"
+                                    className={[
+                                        'forge-dashboard-geo-tile',
+                                        isSelected ? 'is-selected' : '',
+                                        isEmpty ? 'is-empty' : '',
+                                    ].filter(Boolean).join(' ')}
+                                    style={{
+                                        gridColumn: region.col,
+                                        gridRow: region.row,
+                                        '--forge-dashboard-geo-fill': region.color,
+                                    }}
+                                    title={`${region.label} (${region.key}): ${region.formattedValue}`}
+                                    onMouseEnter={() => setHoveredKey(region.key)}
+                                    onMouseLeave={() => setHoveredKey(null)}
+                                    onFocus={() => setHoveredKey(region.key)}
+                                    onBlur={() => setHoveredKey(null)}
+                                    onClick={() => onSelect(region, index)}
+                                >
+                                    <span>{region.key}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+                <aside className="forge-dashboard-geo-detail">
+                    <div
+                        className="forge-dashboard-geo-detail-card"
+                        style={{'--forge-dashboard-geo-active-color': activeRule?.color || activeRegion?.color || '#2367d1'}}
+                    >
+                        <span className="forge-dashboard-geo-detail-label">Selected Area</span>
+                        <strong>{activeRegion ? `${activeRegion.label} (${activeRegion.key})` : '-'}</strong>
+                        <span className="forge-dashboard-geo-detail-value">{config.metricLabel}: {activeRegion?.formattedValue || '-'}</span>
+                        {activeRule ? (
+                            <span className="forge-dashboard-geo-detail-status" style={{'--forge-dashboard-geo-status-color': activeRule.color}}>
+                                {activeRule.label || activeRule.value || activeRule.equals || activeRule.when}
+                            </span>
+                        ) : null}
+                    </div>
+                    {config.legend ? (
+                        colorRules.length > 0 ? (
+                            <div className="forge-dashboard-geo-rule-legend" aria-label="Geo legend">
+                                {colorRules.map((rule) => (
+                                    <span key={`${rule.value ?? rule.equals ?? rule.when}`}>
+                                        <i style={{background: rule.color}}/>
+                                        {rule.label || rule.value || rule.equals || rule.when}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="forge-dashboard-geo-legend" aria-label="Geo legend">
+                                <span>{formatDashboardValue(valueRange.min, config.format, locale)}</span>
+                                <div>
+                                    {(config.color.palette || DEFAULT_GEO_PALETTE).map((color) => (
+                                        <i key={color} style={{background: color}}/>
+                                    ))}
+                                </div>
+                                <span>{formatDashboardValue(valueRange.max, config.format, locale)}</span>
+                            </div>
+                        )
+                    ) : null}
+                    <div className="forge-dashboard-geo-ranking">
+                        <div className="forge-dashboard-geo-detail-label">Top Regions</div>
+                        {sortedRegions.slice(0, container.limit || 5).map((region) => {
+                            const width = valueRange.max > 0 ? `${Math.max((Number(region.value) / valueRange.max) * 100, 4)}%` : '4%';
+                            return (
+                                <button
+                                    key={region.key}
+                                    type="button"
+                                    className={selectedKey === region.key ? 'is-selected' : ''}
+                                    onClick={() => onSelect(region)}
+                                >
+                                    <span>{region.key}</span>
+                                    <div><i style={{width, background: region.color}}/></div>
+                                    <strong>{region.formattedValue}</strong>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </aside>
+            </div>
+        </Panel>
+    );
+}
+
 export function DashboardTimeline({container, context, isActive}) {
     const normalizedContainer = !container.chart && (container.dataSource || container.mapping)
         ? {
@@ -562,13 +773,15 @@ export function DashboardTimeline({container, context, isActive}) {
     }
 
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
+    const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
     const {collection = [], control, selection} = context?.signals || {};
     const collectionValue = useSignalSnapshot(collection, []);
-    const filteredCollection = useMemo(
-        () => applyDashboardFiltersToCollection(collectionValue || [], normalizedContainer.filterBindings, dashboardFilters),
-        [collectionValue, normalizedContainer.filterBindings, dashboardFilters],
-    );
+    const filteredCollection = useMemo(() => {
+        const afterFilters = applyDashboardFiltersToCollection(collectionValue || [], normalizedContainer.filterBindings, dashboardFilters);
+        return applyDashboardSelectionToCollection(afterFilters, normalizedContainer.selectionBindings, dashboardSelection);
+    }, [collectionValue, normalizedContainer.filterBindings, normalizedContainer.selectionBindings, dashboardFilters, dashboardSelection]);
     const filteredContext = useMemo(() => ({
         ...context,
         signals: {
@@ -612,11 +825,13 @@ export function DashboardDimensions({container, context}) {
     });
 
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
-    const filteredCollection = useMemo(
-        () => applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters),
-        [collection, container.filterBindings, dashboardFilters],
-    );
+    const selectionSnapshot = useSignalSnapshot(dashboardSelectionSignal, {});
+    const filteredCollection = useMemo(() => {
+        const afterFilters = applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters);
+        return applyDashboardSelectionToCollection(afterFilters, container.selectionBindings, selectionSnapshot);
+    }, [collection, container.filterBindings, container.selectionBindings, dashboardFilters, selectionSnapshot]);
 
     const selectedEntityKey = context?.dashboardKey
         ? dashboardSelection?.entityKey
@@ -838,11 +1053,13 @@ export function DashboardStatus({container, context}) {
 export function DashboardFeed({container, context}) {
     const {collection, loading, error} = useDataSourceState(context);
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
-    const items = useMemo(
-        () => applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters),
-        [collection, container.filterBindings, dashboardFilters],
-    );
+    const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
+    const items = useMemo(() => {
+        const afterFilters = applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters);
+        return applyDashboardSelectionToCollection(afterFilters, container.selectionBindings, dashboardSelection);
+    }, [collection, container.filterBindings, container.selectionBindings, dashboardFilters, dashboardSelection]);
     const fields = container.fields || container.dashboard?.feed?.fields || {};
 
     return (
@@ -987,11 +1204,13 @@ export function DashboardComposition({container, context, isActive}) {
     const {collection = [], control, selection} = context?.signals || {};
     const collectionValue = useSignalSnapshot(collection, []);
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
-    const filteredCollection = useMemo(
-        () => applyDashboardFiltersToCollection(collectionValue || [], container.filterBindings, dashboardFilters),
-        [collectionValue, container.filterBindings, dashboardFilters],
-    );
+    const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
+    const filteredCollection = useMemo(() => {
+        const afterFilters = applyDashboardFiltersToCollection(collectionValue || [], container.filterBindings, dashboardFilters);
+        return applyDashboardSelectionToCollection(afterFilters, container.selectionBindings, dashboardSelection);
+    }, [collectionValue, container.filterBindings, container.selectionBindings, dashboardFilters, dashboardSelection]);
     const chart = container.chart || {};
     const categoryKey = chart.categoryKey || chart.nameKey || chart.series?.nameKey || container.categoryKey || "name";
     const valueKey = chart.valueKey || chart.series?.valueKey || container.valueKey || "value";
@@ -1091,7 +1310,9 @@ export function DashboardTable({container, context}) {
     const locale = getDashboardLocale(context);
     const {collection, loading, error} = useDataSourceState(context);
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
+    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
+    const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
     const limit = container.limit || container.dashboard?.table?.limit || 200;
     const [quickFilter, setQuickFilter] = useState("");
     const quickFilterEnabled = container.quickFilter === true || container.dashboard?.table?.quickFilter === true;
@@ -1111,10 +1332,10 @@ export function DashboardTable({container, context}) {
         return {key, label: col?.label || titleizeDashboardKey(key), format: col?.format, align: col?.align};
     }).filter((col) => !!col.key), [rawColumns]);
 
-    const filteredCollection = useMemo(
-        () => applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters),
-        [collection, container.filterBindings, dashboardFilters],
-    );
+    const filteredCollection = useMemo(() => {
+        const afterFilters = applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters);
+        return applyDashboardSelectionToCollection(afterFilters, container.selectionBindings, dashboardSelection);
+    }, [collection, container.filterBindings, container.selectionBindings, dashboardFilters, dashboardSelection]);
 
     const quickFilteredCollection = useMemo(() => {
         const query = quickFilter.trim().toLowerCase();
@@ -1263,6 +1484,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.filters':
             content = <DashboardFilters container={container} context={context}/>;
+            break;
+        case 'dashboard.geoMap':
+            content = <DashboardGeoMap container={container} context={context}/>;
             break;
         case 'dashboard.timeline':
             content = <DashboardTimeline container={container} context={context} isActive={isActive}/>;
