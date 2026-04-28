@@ -192,7 +192,13 @@ assert.equal(dashboardCapabilities.demos.some((item) => item.id === 'operations'
 assert.equal(dashboardCapabilities.schema.additionalProperties, true);
 assert.equal(dashboardCapabilities.schema.$defs.block.additionalProperties, true);
 assert.equal(dashboardCapabilities.schema.$defs.block.properties.kind.enum.includes('dashboard.geoMap'), true);
+assert.equal(dashboardCapabilities.schema.$defs.block.properties.dashboard.$ref, '#/$defs/dashboardConfig');
+assert.equal(dashboardCapabilities.schema.$defs.block.properties.visibleWhen.$ref, '#/$defs/condition');
+assert.equal(dashboardCapabilities.schema.$defs.dashboardConfig.properties.visibleWhen.$ref, '#/$defs/condition');
+assert.equal(dashboardCapabilities.schema.$defs.dashboardConfig.properties.reportOptions.$ref, '#/$defs/reportConfig');
+assert.equal(dashboardCapabilities.schema.$defs.dashboardConfig.properties.geo.$ref, '#/$defs/geoConfig');
 assert.equal(dashboardCapabilities.schema.$defs.geoConfig.properties.color.properties.rules.type, 'array');
+assert.equal(dashboardCapabilities.schema.$defs.geoConfig.properties.limit.minimum, 1);
 assert.equal(dashboardCapabilities.schema.$defs.block.properties.selectionBindings.$ref, '#/$defs/bindings');
 assert.equal(dashboardCapabilities.schema.$defs.reportConfig.properties.enabled.type, 'boolean');
 

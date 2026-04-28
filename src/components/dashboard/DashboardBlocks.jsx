@@ -3,7 +3,7 @@ import {useSignalEffect} from '@preact/signals-react';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
-import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
+import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from "./geoMapUtils.js";
@@ -167,7 +167,7 @@ function Panel({container, children, actions = null}) {
 export function DashboardSummary({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
-    const metrics = container.metrics || container.dashboard?.summary?.metrics || [];
+    const metrics = container.dashboard?.summary?.metrics || container.metrics || [];
     const metricCards = Array.isArray(metrics)
         ? metrics.map((metric) => ({
             key: metric.id || metric.selector,
@@ -218,7 +218,7 @@ export function DashboardSummary({container, context}) {
 export function DashboardCompare({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
-    const items = container.items || container.dashboard?.compare?.items || [];
+    const items = container.dashboard?.compare?.items || container.items || [];
     const compareAccent = ['#137cbd', '#0f9960', '#d9822b', '#8f3985', '#c23030'];
 
     return (
@@ -296,9 +296,14 @@ export function DashboardKPITable({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
     const {collection = []} = useDataSourceState(context);
-    const directRows = container.rows || container.dashboard?.kpiTable?.rows || [];
+    const kpiTableConfig = container.dashboard?.kpiTable || {};
+    const directRows = kpiTableConfig.rows || container.rows || [];
     const rows = Array.isArray(directRows) && directRows.length > 0 ? directRows : (Array.isArray(collection) ? collection : []);
-    const columns = Array.isArray(container.columns) ? container.columns : null;
+    const columns = Array.isArray(kpiTableConfig.columns)
+        ? kpiTableConfig.columns
+        : Array.isArray(container.columns)
+            ? container.columns
+            : null;
     const usesDirectTable = Array.isArray(columns) && columns.length > 0;
     const normalizedColumns = usesDirectTable
         ? columns.map((column) => {
@@ -385,7 +390,7 @@ export function DashboardKPITable({container, context}) {
 }
 
 export function DashboardFilters({container, context}) {
-    const items = container.items || container.dashboard?.filters?.items || [];
+    const items = container.dashboard?.filters?.items || container.items || [];
     const dashboardKey = context?.dashboardKey;
     const [filters, setFilters] = useState(dashboardKey ? getDashboardFilterSignal(dashboardKey).peek() : {});
 
@@ -690,7 +695,7 @@ export function DashboardGeoMap({container, context}) {
                     ) : null}
                     <div className="forge-dashboard-geo-ranking">
                         <div className="forge-dashboard-geo-detail-label">Top Regions</div>
-                        {sortedRegions.slice(0, container.limit || 5).map((region) => {
+                        {sortedRegions.slice(0, container.dashboard?.geo?.limit || container.limit || 5).map((region) => {
                             const width = valueRange.max > 0 ? `${Math.max((Number(region.value) / valueRange.max) * 100, 4)}%` : '4%';
                             return (
                                 <button
@@ -807,13 +812,16 @@ export function DashboardTimeline({container, context, isActive}) {
 export function DashboardDimensions({container, context}) {
     const {collection, loading, error, selection} = useDataSourceState(context);
     const locale = getDashboardLocale(context);
-    const [viewMode, setViewMode] = useState((container.viewModes || [])[0] || 'chart');
+    const dimensionsConfig = container.dashboard?.dimensions || {};
+    const viewModes = dimensionsConfig.viewModes || container.viewModes || [];
+    const [viewMode, setViewMode] = useState((viewModes || [])[0] || 'chart');
     const [dashboardSelection, setDashboardSelection] = useState(
         context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey).peek() : null,
     );
-    const limit = container.limit || 10;
-    const dimensionKey = container.dimension?.key;
-    const metric = container.metric || {};
+    const limit = dimensionsConfig.limit || container.limit || 10;
+    const dimension = dimensionsConfig.dimension || container.dimension || {};
+    const dimensionKey = dimension.key;
+    const metric = dimensionsConfig.metric || container.metric || {};
     const metricKey = metric.key;
     const metricLabel = metric.label || metricKey;
 
@@ -874,9 +882,9 @@ export function DashboardDimensions({container, context}) {
     return (
         <Panel
             container={container}
-            actions={(container.viewModes || []).length > 1 ? (
+            actions={(viewModes || []).length > 1 ? (
                 <div style={{display: 'flex', gap: '8px'}}>
-                    {(container.viewModes || []).map((mode) => (
+                    {(viewModes || []).map((mode) => (
                         <button
                             key={mode}
                             type="button"
@@ -962,7 +970,7 @@ export function DashboardDimensions({container, context}) {
 
 export function DashboardMessages({container, context}) {
     const metricsData = useMetrics(context);
-    const items = container.items || container.dashboard?.messages?.items || [];
+    const items = container.dashboard?.messages?.items || container.items || [];
     const normalizedItems = Array.isArray(items) && items.length > 0
         ? items
         : Array.isArray(container.messages)
@@ -1026,7 +1034,7 @@ export function DashboardMessages({container, context}) {
 export function DashboardStatus({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
-    const checks = container.checks || container.dashboard?.status?.checks || [];
+    const checks = container.dashboard?.status?.checks || container.checks || [];
 
     return (
         <Panel container={container}>
@@ -1060,7 +1068,7 @@ export function DashboardFeed({container, context}) {
         const afterFilters = applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters);
         return applyDashboardSelectionToCollection(afterFilters, container.selectionBindings, dashboardSelection);
     }, [collection, container.filterBindings, container.selectionBindings, dashboardFilters, dashboardSelection]);
-    const fields = container.fields || container.dashboard?.feed?.fields || {};
+    const fields = container.dashboard?.feed?.fields || container.fields || {};
 
     return (
         <Panel container={container}>
@@ -1082,7 +1090,7 @@ export function DashboardFeed({container, context}) {
 
 export function DashboardBadges({container, context}) {
     const metricsData = useMetrics(context);
-    const items = container.items || container.dashboard?.badges?.items || [];
+    const items = container.dashboard?.badges?.items || container.items || [];
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
     const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
@@ -1129,7 +1137,7 @@ export function DashboardBadges({container, context}) {
 
 export function DashboardReport({container, context}) {
     const metricsData = useMetrics(context);
-    const sections = container.sections || container.dashboard?.report?.sections || [];
+    const sections = container.dashboard?.report?.sections || container.sections || [];
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
     const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
@@ -1187,11 +1195,12 @@ export function DashboardDetail({container, context, children}) {
             return true;
         }
         const childContainer = child.props?.container;
-        if (!childContainer?.visibleWhen) {
+        const visibleWhen = getDashboardVisibleWhen(childContainer);
+        if (!visibleWhen) {
             return true;
         }
         const childContext = child.props?.context || context;
-        return evaluateDashboardCondition(childContainer.visibleWhen, {
+        return evaluateDashboardCondition(visibleWhen, {
             context: childContext,
             dashboardKey: childContext?.dashboardKey || context?.dashboardKey,
         });
@@ -1313,17 +1322,17 @@ export function DashboardTable({container, context}) {
     const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
     const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
-    const limit = container.limit || container.dashboard?.table?.limit || 200;
+    const limit = container.dashboard?.table?.limit || container.limit || 200;
     const [quickFilter, setQuickFilter] = useState("");
-    const quickFilterEnabled = container.quickFilter === true || container.dashboard?.table?.quickFilter === true;
-    const density = container.density || container.dashboard?.table?.density || "comfortable";
-    const rowActions = container.rowActions || container.dashboard?.table?.rowActions || [];
+    const quickFilterEnabled = container.dashboard?.table?.quickFilter === true || container.quickFilter === true;
+    const density = container.dashboard?.table?.density || container.density || "comfortable";
+    const rowActions = container.dashboard?.table?.rowActions || container.rowActions || [];
     const formattingRules = useMemo(
-        () => normalizeRuleList(container.formattingRules || container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || []),
-        [container.formattingRules, container.dashboard?.table?.formattingRules, container.dashboard?.table?.formatting]
+        () => normalizeRuleList(container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || container.formattingRules || []),
+        [container.dashboard?.table?.formattingRules, container.dashboard?.table?.formatting, container.formattingRules]
     );
 
-    const rawColumns = container.columns || container.dashboard?.table?.columns || [];
+    const rawColumns = container.dashboard?.table?.columns || container.columns || [];
     const normalizedColumns = useMemo(() => rawColumns.map((col) => {
         if (typeof col === 'string') {
             return {key: col, label: titleizeDashboardKey(col)};

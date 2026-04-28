@@ -340,6 +340,19 @@ const model = buildDashboardExportModel({
           },
         ],
       },
+      {
+        id: 'hiddenGroupedVisibility',
+        kind: 'dashboard.summary',
+        title: 'Hidden',
+        dashboard: {
+          visibleWhen: { source: 'filters', field: 'dateRange', equals: 'never' },
+          summary: {
+            metrics: [
+              { id: 'hiddenSpend', label: 'Hidden Spend', selector: 'summary.total_spend', format: 'currency' },
+            ],
+          },
+        },
+      },
     ],
   },
   context: {
@@ -368,6 +381,92 @@ assert.equal(model.blocks[6].rows[0].label, 'US');
 assert.equal(model.blocks[6].rows.length, 2);
 assert.equal(model.blocks[7].sections[0].title, 'Spend 123000');
 assert.equal(model.blocks[7].sections[0].body[0], 'Selected US');
+
+const groupedModel = buildDashboardExportModel({
+  container: {
+    kind: 'dashboard',
+    title: 'Grouped Dashboard',
+    containers: [
+      {
+        id: 'summary',
+        kind: 'dashboard.summary',
+        dashboard: {
+          summary: {
+            metrics: [
+              { id: 'spend', label: 'Spend', selector: 'summary.total_spend', format: 'currency' },
+            ],
+          },
+        },
+      },
+      {
+        id: 'dimensions',
+        kind: 'dashboard.dimensions',
+        filterBindings: { region: 'region' },
+        dashboard: {
+          dimensions: {
+            dimension: { key: 'country', label: 'Country' },
+            metric: { key: 'spend', label: 'Spend', format: 'currency' },
+            limit: 1,
+          },
+        },
+      },
+      {
+        id: 'geo',
+        kind: 'dashboard.geoMap',
+        dataSourceRef: 'states',
+        dashboard: {
+          geo: {
+            key: 'stateCode',
+            labelKey: 'stateName',
+            metric: { key: 'spend', label: 'Spend', format: 'currency' },
+            color: { field: 'status', rules: [{ value: 'critical', label: 'Critical', color: '#c23030' }] },
+            limit: 1,
+          },
+        },
+      },
+      {
+        id: 'report',
+        kind: 'dashboard.report',
+        dashboard: {
+          report: {
+            sections: [
+              { title: 'Grouped ${summary.total_spend}', body: ['Rows ${selection.entityKey}'], tone: 'info' },
+            ],
+          },
+        },
+      },
+    ],
+  },
+  context: {
+    ...context,
+    dashboardFilters: { region: 'NA' },
+    dashboardSelection: { entityKey: 'CA' },
+    Context(dataSourceRef) {
+      if (dataSourceRef === 'states') {
+        return {
+          ...this,
+          signals: {
+            ...this.signals,
+            collection: {
+              peek: () => [{ stateCode: 'CA', stateName: 'California', spend: 10, status: 'critical' }],
+            },
+          },
+          Context: this.Context,
+        };
+      }
+      return this;
+    },
+  },
+  chartSvgs: {},
+});
+
+assert.equal(groupedModel.blocks[0].metrics[0].value, '$123,000');
+assert.equal(groupedModel.blocks[1].rows.length, 1);
+assert.equal(groupedModel.blocks[1].rows[0].label, 'US');
+assert.equal(groupedModel.blocks[2].ranking.length, 1);
+assert.equal(groupedModel.blocks[2].ranking[0].key, 'CA');
+assert.equal(groupedModel.blocks[2].activeRegion.statusLabel, 'Critical');
+assert.equal(groupedModel.blocks[3].sections[0].title, 'Grouped 123000');
 
 const nestedModel = buildDashboardExportModel({
   container: {

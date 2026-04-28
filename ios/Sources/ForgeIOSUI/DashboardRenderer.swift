@@ -22,7 +22,7 @@ public struct DashboardRenderer: View {
 
     private func dashboardBody(_ container: ContainerDef) -> AnyView {
         let metrics = dashboardMetrics(container)
-        if !DashboardRuntime.evaluateDashboardCondition(container.visibleWhen, metrics: metrics) {
+        if !DashboardRuntime.evaluateDashboardCondition(container.dashboard?.visibleWhen ?? container.visibleWhen, metrics: metrics) {
             return AnyView(EmptyView())
         } else {
             switch container.kind?.trimmingCharacters(in: .whitespacesAndNewlines) {

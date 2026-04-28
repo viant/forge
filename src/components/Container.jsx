@@ -20,7 +20,7 @@ import TableToolbar from "./table/basic/Toolbar.jsx";
 import GridLayoutRenderer from './GridLayoutRenderer.jsx';
 import {DashboardBlock} from "./dashboard/DashboardBlocks.jsx";
 import DashboardSurface from "./dashboard/DashboardSurface.jsx";
-import {createDashboardContext, evaluateDashboardCondition} from "./dashboard/dashboardUtils.js";
+import {createDashboardContext, evaluateDashboardCondition, getDashboardVisibleWhen} from "./dashboard/dashboardUtils.js";
 
 const buildGridStyle = (style, columns, layout) => {
     const display = (style && Object.prototype.hasOwnProperty.call(style, 'display')) ? style.display : 'grid';
@@ -47,8 +47,9 @@ const Container = ({context, container, isActive}) => {
     const {identity} = effectiveContext
     const dataSourceRef = container.dataSourceRef || identity.dataSourceRef
 
-    if (container.visibleWhen && effectiveContext?.dashboardKey) {
-        const visible = evaluateDashboardCondition(container.visibleWhen, {
+    const visibleWhen = getDashboardVisibleWhen(container);
+    if (visibleWhen && effectiveContext?.dashboardKey) {
+        const visible = evaluateDashboardCondition(visibleWhen, {
             context: effectiveContext,
             dashboardKey: effectiveContext.dashboardKey,
         });

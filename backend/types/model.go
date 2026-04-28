@@ -363,42 +363,73 @@ type UnitedSize struct {
 }
 
 type Container struct {
-	ID              string `json:"id" yaml:"id"`
-	Binding         `yaml:",inline"`
-	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
-	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
-	State           *Parameter                        `json:"state,omitempty" yaml:"state,omitempty"`
-	Title           string                            `json:"title,omitempty" yaml:"title,omitempty"`
-	Kind            string                            `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Role            string                            `json:"role,omitempty" yaml:"role,omitempty"`
-	FilterBindings  map[string]string                 `json:"filterBindings,omitempty" yaml:"filterBindings,omitempty"`
-	ColumnSpan      int                               `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
-	RowSpan         int                               `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
-	VisibleWhen     *DashboardCondition               `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	Layout          *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
-	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
-	Toolbar         *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	Report          *DashboardReportOptions           `json:"report,omitempty" yaml:"report,omitempty"`
-	Table           *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
-	FileBrowser     *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
-	TreeBrowser     *TreeBrowser                      `json:"treeBrowser,omitempty" yaml:"treeBrowser,omitempty"`
-	Editor          *Editor                           `json:"editor,omitempty" yaml:"editor,omitempty"`
-	Terminal        *Terminal                         `json:"terminal,omitempty" yaml:"terminal,omitempty"`
-	Chart           *Chart                            `json:"chart,omitempty" yaml:"chart,omitempty"`
-	Chat            *Chat                             `json:"chat,omitempty" yaml:"chat,omitempty"`
-	Section         *Section                          `json:"section,omitempty" yaml:"section,omitempty"`
-	Items           []Item                            `json:"items,omitempty" yaml:"items,omitempty"`
-	Card            *Card                             `json:"card,omitempty" yaml:"card,omitempty"`
-	Footer          *Container                        `json:"footer,omitempty" yaml:"footer,omitempty"`
-	Containers      []Container                       `json:"containers,omitempty" yaml:"containers,omitempty"`
-	SchemaBasedForm *SchemaBasedForm                  `json:"schemaBasedForm,omitempty" yaml:"schemaBasedForm,omitempty"`
-	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
-	Tabs            *Tabs                             `json:"tabs,omitempty" yaml:"tabs,omitempty"`
-	Dialogs         []string                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
-	Repeat          *Repeat                           `json:"repeat,omitempty" yaml:"repeat,omitempty"`
-	SelectFirst     bool                              `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
-	FetchData       bool                              `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
-	Dashboard       *Dashboard                        `json:"dashboard,omitempty" yaml:"dashboard,omitempty"`
+	ID                string `json:"id" yaml:"id"`
+	Binding           `yaml:",inline"`
+	Target            *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides   map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	State             *Parameter                        `json:"state,omitempty" yaml:"state,omitempty"`
+	Title             string                            `json:"title,omitempty" yaml:"title,omitempty"`
+	Subtitle          string                            `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
+	Kind              string                            `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Role              string                            `json:"role,omitempty" yaml:"role,omitempty"`
+	FilterBindings    map[string]string                 `json:"filterBindings,omitempty" yaml:"filterBindings,omitempty"`
+	SelectionBindings map[string]string                 `json:"selectionBindings,omitempty" yaml:"selectionBindings,omitempty"`
+	ColumnSpan        int                               `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
+	RowSpan           int                               `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
+	DefaultMode       string                            `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
+	Layout            *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Style             *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	Toolbar           *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	Table             *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
+	FileBrowser       *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
+	TreeBrowser       *TreeBrowser                      `json:"treeBrowser,omitempty" yaml:"treeBrowser,omitempty"`
+	Editor            *Editor                           `json:"editor,omitempty" yaml:"editor,omitempty"`
+	Terminal          *Terminal                         `json:"terminal,omitempty" yaml:"terminal,omitempty"`
+	Chart             *Chart                            `json:"chart,omitempty" yaml:"chart,omitempty"`
+	Chat              *Chat                             `json:"chat,omitempty" yaml:"chat,omitempty"`
+	Section           *Section                          `json:"section,omitempty" yaml:"section,omitempty"`
+	Items             []Item                            `json:"items,omitempty" yaml:"items,omitempty"`
+	Card              *Card                             `json:"card,omitempty" yaml:"card,omitempty"`
+	Footer            *Container                        `json:"footer,omitempty" yaml:"footer,omitempty"`
+	Containers        []Container                       `json:"containers,omitempty" yaml:"containers,omitempty"`
+	SchemaBasedForm   *SchemaBasedForm                  `json:"schemaBasedForm,omitempty" yaml:"schemaBasedForm,omitempty"`
+	On                []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Tabs              *Tabs                             `json:"tabs,omitempty" yaml:"tabs,omitempty"`
+	Dialogs           []string                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
+	Repeat            *Repeat                           `json:"repeat,omitempty" yaml:"repeat,omitempty"`
+	SelectFirst       bool                              `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
+	FetchData         bool                              `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
+	Dashboard         *Dashboard                        `json:"dashboard,omitempty" yaml:"dashboard,omitempty"`
+}
+
+func (c *Container) UnmarshalJSON(data []byte) error {
+	type alias Container
+	var decoded alias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	var compact dashboardCompactAliases
+	if err := json.Unmarshal(data, &compact); err != nil {
+		return err
+	}
+	*c = Container(decoded)
+	c.applyDashboardCompactAliases(compact)
+	return nil
+}
+
+func (c *Container) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type alias Container
+	var decoded alias
+	if err := unmarshal(&decoded); err != nil {
+		return err
+	}
+	var compact dashboardCompactAliases
+	if err := unmarshal(&compact); err != nil {
+		return err
+	}
+	*c = Container(decoded)
+	c.applyDashboardCompactAliases(compact)
+	return nil
 }
 
 // Terminal declares a terminal-like, scrollable log/command view in a container.
@@ -546,10 +577,12 @@ type DashboardCondition struct {
 }
 
 type Dashboard struct {
+	VisibleWhen *DashboardCondition   `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 	Summary     *DashboardSummary     `json:"summary,omitempty" yaml:"summary,omitempty"`
 	Compare     *DashboardCompare     `json:"compare,omitempty" yaml:"compare,omitempty"`
 	KPITable    *DashboardKPITable    `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
 	Filters     *DashboardFilters     `json:"filters,omitempty" yaml:"filters,omitempty"`
+	Geo         *DashboardGeoMap      `json:"geo,omitempty" yaml:"geo,omitempty"`
 	Timeline    *DashboardTimeline    `json:"timeline,omitempty" yaml:"timeline,omitempty"`
 	Composition *DashboardComposition `json:"composition,omitempty" yaml:"composition,omitempty"`
 	Dimensions  *DashboardDimensions  `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
@@ -557,19 +590,189 @@ type Dashboard struct {
 	Status      *DashboardStatus      `json:"status,omitempty" yaml:"status,omitempty"`
 	Feed        *DashboardFeed        `json:"feed,omitempty" yaml:"feed,omitempty"`
 	Report      *DashboardReport      `json:"report,omitempty" yaml:"report,omitempty"`
-	Detail      *DashboardDetail      `json:"detail,omitempty" yaml:"detail,omitempty"`
-	Badges      *DashboardBadges      `json:"badges,omitempty" yaml:"badges,omitempty"`
-	Table       *DashboardTable       `json:"table,omitempty" yaml:"table,omitempty"`
+	// ReportOptions controls the dashboard-level report mode. The older
+	// compact alias is Container.report.
+	ReportOptions *DashboardReportOptions `json:"reportOptions,omitempty" yaml:"reportOptions,omitempty"`
+	Detail        *DashboardDetail        `json:"detail,omitempty" yaml:"detail,omitempty"`
+	Badges        *DashboardBadges        `json:"badges,omitempty" yaml:"badges,omitempty"`
+	Table         *DashboardTable         `json:"table,omitempty" yaml:"table,omitempty"`
+}
+
+func (c *Container) ensureDashboard() *Dashboard {
+	if c.Dashboard == nil {
+		c.Dashboard = &Dashboard{}
+	}
+	return c.Dashboard
+}
+
+func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases) {
+	if compact.VisibleWhen != nil {
+		dashboard := c.ensureDashboard()
+		if dashboard.VisibleWhen == nil {
+			dashboard.VisibleWhen = compact.VisibleWhen
+		}
+	}
+	if compact.Report != nil {
+		c.ensureDashboard().ReportOptions = compact.Report
+	}
+
+	switch c.Kind {
+	case "dashboard.summary":
+		if len(compact.Metrics) > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.Summary == nil {
+				dashboard.Summary = &DashboardSummary{}
+			}
+			if len(dashboard.Summary.Metrics) == 0 {
+				dashboard.Summary.Metrics = compact.Metrics
+			}
+		}
+	case "dashboard.kpiTable":
+		if len(compact.Rows) > 0 || len(compact.Columns) > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.KPITable == nil {
+				dashboard.KPITable = &DashboardKPITable{}
+			}
+			if len(dashboard.KPITable.Rows) == 0 {
+				dashboard.KPITable.Rows = compact.Rows
+			}
+			if len(dashboard.KPITable.Columns) == 0 {
+				dashboard.KPITable.Columns = compact.Columns
+			}
+		}
+	case "dashboard.geoMap":
+		if compact.Geo != nil || compact.Metric != nil || compact.Limit > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.Geo == nil {
+				dashboard.Geo = &DashboardGeoMap{}
+			}
+			if compact.Geo != nil {
+				geo := *compact.Geo
+				dashboard.Geo = &geo
+			}
+			if dashboard.Geo.Metric == nil {
+				dashboard.Geo.Metric = compact.Metric
+			}
+			if dashboard.Geo.Limit == 0 {
+				dashboard.Geo.Limit = compact.Limit
+			}
+		}
+	case "dashboard.dimensions":
+		if compact.Dimension != nil || compact.Metric != nil || len(compact.ViewModes) > 0 || compact.Limit > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.Dimensions == nil {
+				dashboard.Dimensions = &DashboardDimensions{}
+			}
+			if dashboard.Dimensions.Dimension == nil {
+				dashboard.Dimensions.Dimension = compact.Dimension
+			}
+			if dashboard.Dimensions.Metric == nil {
+				dashboard.Dimensions.Metric = compact.Metric
+			}
+			if len(dashboard.Dimensions.ViewModes) == 0 {
+				dashboard.Dimensions.ViewModes = compact.ViewModes
+			}
+			if dashboard.Dimensions.Limit == 0 {
+				dashboard.Dimensions.Limit = compact.Limit
+			}
+		}
+	case "dashboard.status":
+		if len(compact.Checks) > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.Status == nil {
+				dashboard.Status = &DashboardStatus{}
+			}
+			if len(dashboard.Status.Checks) == 0 {
+				dashboard.Status.Checks = compact.Checks
+			}
+		}
+	case "dashboard.feed":
+		if compact.Fields != nil {
+			dashboard := c.ensureDashboard()
+			if dashboard.Feed == nil {
+				dashboard.Feed = &DashboardFeed{}
+			}
+			if dashboard.Feed.Fields == nil {
+				dashboard.Feed.Fields = compact.Fields
+			}
+		}
+	case "dashboard.report":
+		if len(compact.Sections) > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.Report == nil {
+				dashboard.Report = &DashboardReport{}
+			}
+			if len(dashboard.Report.Sections) == 0 {
+				dashboard.Report.Sections = compact.Sections
+			}
+		}
+	case "dashboard.table":
+		if len(compact.Columns) > 0 || compact.Limit > 0 || compact.QuickFilter || compact.Density != "" || len(compact.FormattingRules) > 0 || len(compact.RowActions) > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.Table == nil {
+				dashboard.Table = &DashboardTable{}
+			}
+			if len(dashboard.Table.Columns) == 0 {
+				dashboard.Table.Columns = compact.Columns
+			}
+			if dashboard.Table.Limit == 0 {
+				dashboard.Table.Limit = compact.Limit
+			}
+			if !dashboard.Table.QuickFilter {
+				dashboard.Table.QuickFilter = compact.QuickFilter
+			}
+			if dashboard.Table.Density == "" {
+				dashboard.Table.Density = compact.Density
+			}
+			if len(dashboard.Table.FormattingRules) == 0 {
+				dashboard.Table.FormattingRules = compact.FormattingRules
+			}
+			if len(dashboard.Table.RowActions) == 0 {
+				dashboard.Table.RowActions = compact.RowActions
+			}
+		}
+	}
+}
+
+// dashboardCompactAliases preserves the original compact metadata shape:
+//
+//	kind: dashboard.geoMap
+//	geo: ...
+//	metric: ...
+//
+// New metadata should prefer the grouped form under Container.dashboard, but
+// these aliases remain encoded at the container level for backward
+// compatibility and concise hand-written YAML.
+type dashboardCompactAliases struct {
+	VisibleWhen     *DashboardCondition      `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	Report          *DashboardReportOptions  `json:"report,omitempty" yaml:"report,omitempty"`
+	Metrics         []DashboardMetric        `json:"metrics,omitempty" yaml:"metrics,omitempty"`
+	Rows            []DashboardKPIRow        `json:"rows,omitempty" yaml:"rows,omitempty"`
+	Checks          []DashboardStatusCheck   `json:"checks,omitempty" yaml:"checks,omitempty"`
+	Fields          *DashboardFeedFields     `json:"fields,omitempty" yaml:"fields,omitempty"`
+	Sections        []DashboardReportSection `json:"sections,omitempty" yaml:"sections,omitempty"`
+	Metric          *DashboardField          `json:"metric,omitempty" yaml:"metric,omitempty"`
+	Dimension       *DashboardField          `json:"dimension,omitempty" yaml:"dimension,omitempty"`
+	Geo             *DashboardGeoMap         `json:"geo,omitempty" yaml:"geo,omitempty"`
+	Limit           int                      `json:"limit,omitempty" yaml:"limit,omitempty"`
+	ViewModes       []string                 `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
+	Columns         []DashboardTableColumn   `json:"columns,omitempty" yaml:"columns,omitempty"`
+	QuickFilter     bool                     `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
+	Density         string                   `json:"density,omitempty" yaml:"density,omitempty"`
+	FormattingRules []TableFormattingRule    `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
+	RowActions      []DashboardTableAction   `json:"rowActions,omitempty" yaml:"rowActions,omitempty"`
 }
 
 type DashboardReportOptions struct {
-	Enabled     bool     `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Mode        string   `json:"mode,omitempty" yaml:"mode,omitempty"`
-	Title       string   `json:"title,omitempty" yaml:"title,omitempty"`
-	Subtitle    string   `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
-	DefaultMode string   `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
-	Include     []string `json:"include,omitempty" yaml:"include,omitempty"`
-	Export      []string `json:"export,omitempty" yaml:"export,omitempty"`
+	Enabled      bool            `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	Mode         string          `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Title        string          `json:"title,omitempty" yaml:"title,omitempty"`
+	Subtitle     string          `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
+	DefaultMode  string          `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
+	GeneratedAt  string          `json:"generatedAt,omitempty" yaml:"generatedAt,omitempty"`
+	Include      []string        `json:"include,omitempty" yaml:"include,omitempty"`
+	Export       []string        `json:"export,omitempty" yaml:"export,omitempty"`
+	IncludeState map[string]bool `json:"includeState,omitempty" yaml:"includeState,omitempty"`
 }
 
 type DashboardSummary struct {
@@ -592,7 +795,8 @@ type DashboardCompareItem struct {
 }
 
 type DashboardKPITable struct {
-	Rows []DashboardKPIRow `json:"rows,omitempty" yaml:"rows,omitempty"`
+	Rows    []DashboardKPIRow      `json:"rows,omitempty" yaml:"rows,omitempty"`
+	Columns []DashboardTableColumn `json:"columns,omitempty" yaml:"columns,omitempty"`
 }
 
 type DashboardKPIRow struct {
@@ -662,6 +866,42 @@ type DashboardField struct {
 	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
 	Label  string `json:"label,omitempty" yaml:"label,omitempty"`
 	Format string `json:"format,omitempty" yaml:"format,omitempty"`
+}
+
+type DashboardGeoMap struct {
+	Shape      string             `json:"shape,omitempty" yaml:"shape,omitempty"`
+	Key        string             `json:"key,omitempty" yaml:"key,omitempty"`
+	CodeKey    string             `json:"codeKey,omitempty" yaml:"codeKey,omitempty"`
+	RegionKey  string             `json:"regionKey,omitempty" yaml:"regionKey,omitempty"`
+	LabelKey   string             `json:"labelKey,omitempty" yaml:"labelKey,omitempty"`
+	NameKey    string             `json:"nameKey,omitempty" yaml:"nameKey,omitempty"`
+	Dimension  string             `json:"dimension,omitempty" yaml:"dimension,omitempty"`
+	Metric     *DashboardField    `json:"metric,omitempty" yaml:"metric,omitempty"`
+	MetricKey  string             `json:"metricKey,omitempty" yaml:"metricKey,omitempty"`
+	ValueKey   string             `json:"valueKey,omitempty" yaml:"valueKey,omitempty"`
+	ValueLabel string             `json:"valueLabel,omitempty" yaml:"valueLabel,omitempty"`
+	Format     string             `json:"format,omitempty" yaml:"format,omitempty"`
+	Aggregate  string             `json:"aggregate,omitempty" yaml:"aggregate,omitempty"`
+	Legend     *bool              `json:"legend,omitempty" yaml:"legend,omitempty"`
+	Palette    []string           `json:"palette,omitempty" yaml:"palette,omitempty"`
+	EmptyColor string             `json:"emptyColor,omitempty" yaml:"emptyColor,omitempty"`
+	Color      *DashboardGeoColor `json:"color,omitempty" yaml:"color,omitempty"`
+	Limit      int                `json:"limit,omitempty" yaml:"limit,omitempty"`
+}
+
+type DashboardGeoColor struct {
+	Field   string                  `json:"field,omitempty" yaml:"field,omitempty"`
+	Palette []string                `json:"palette,omitempty" yaml:"palette,omitempty"`
+	Empty   string                  `json:"empty,omitempty" yaml:"empty,omitempty"`
+	Rules   []DashboardGeoColorRule `json:"rules,omitempty" yaml:"rules,omitempty"`
+}
+
+type DashboardGeoColorRule struct {
+	Value  interface{} `json:"value,omitempty" yaml:"value,omitempty"`
+	Equals interface{} `json:"equals,omitempty" yaml:"equals,omitempty"`
+	When   interface{} `json:"when,omitempty" yaml:"when,omitempty"`
+	Label  string      `json:"label,omitempty" yaml:"label,omitempty"`
+	Color  string      `json:"color,omitempty" yaml:"color,omitempty"`
 }
 
 type DashboardMessages struct {

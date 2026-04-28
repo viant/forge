@@ -41,6 +41,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
       },
     },
     report: { $ref: '#/$defs/reportConfig' },
+    dashboard: { $ref: '#/$defs/dashboardConfig' },
     containers: {
       type: 'array',
       items: { $ref: '#/$defs/block' },
@@ -83,6 +84,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
         dataSourceRef: { type: 'string' },
         filterBindings: { $ref: '#/$defs/bindings' },
         selectionBindings: { $ref: '#/$defs/bindings' },
+        visibleWhen: { $ref: '#/$defs/condition' },
         metric: { $ref: '#/$defs/metric' },
         dimension: {
           type: 'object',
@@ -100,6 +102,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
           },
         },
         geo: { $ref: '#/$defs/geoConfig' },
+        dashboard: { $ref: '#/$defs/dashboardConfig' },
         report: { $ref: '#/$defs/reportConfig' },
         containers: {
           type: 'array',
@@ -122,9 +125,144 @@ export const DASHBOARD_METADATA_SCHEMA = {
         },
       },
     },
+    dashboardConfig: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        visibleWhen: { $ref: '#/$defs/condition' },
+        reportOptions: { $ref: '#/$defs/reportConfig' },
+        summary: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            metrics: {
+              type: 'array',
+              items: { $ref: '#/$defs/metric' },
+            },
+          },
+        },
+        compare: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            items: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+        kpiTable: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            rows: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            columns: { type: 'array', items: { type: ['string', 'object'] } },
+          },
+        },
+        filters: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            items: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+        geo: { $ref: '#/$defs/geoConfig' },
+        dimensions: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            dimension: {
+              type: 'object',
+              additionalProperties: true,
+              properties: {
+                key: { type: 'string' },
+                label: { type: 'string' },
+              },
+            },
+            metric: { $ref: '#/$defs/metric' },
+            viewModes: {
+              type: 'array',
+              items: { enum: ['chart', 'table'] },
+            },
+            limit: { type: 'number', minimum: 1 },
+          },
+        },
+        messages: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            items: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+        status: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            checks: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+        feed: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            fields: { type: 'object', additionalProperties: true },
+          },
+        },
+        report: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            sections: {
+              type: 'array',
+              items: { type: 'object', additionalProperties: true },
+            },
+          },
+        },
+        badges: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            items: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+        table: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            columns: { type: 'array', items: { type: ['string', 'object'] } },
+            limit: { type: 'number', minimum: 1 },
+            quickFilter: { type: 'boolean' },
+            density: { type: 'string' },
+            formattingRules: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            rowActions: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+      },
+    },
     bindings: {
       type: 'object',
       additionalProperties: { type: 'string' },
+    },
+    condition: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        source: { enum: ['metrics', 'filters', 'selection'] },
+        dataSourceRef: { type: 'string' },
+        selector: { type: 'string' },
+        field: { type: 'string' },
+        key: { type: 'string' },
+        when: {},
+        equals: {},
+        notEquals: {},
+        in: {
+          type: 'array',
+          items: {},
+        },
+        gt: { type: 'number' },
+        gte: { type: 'number' },
+        lt: { type: 'number' },
+        lte: { type: 'number' },
+        empty: { type: 'boolean' },
+        notEmpty: { type: 'boolean' },
+      },
     },
     metric: {
       type: 'object',
@@ -153,6 +291,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
         valueLabel: { type: 'string' },
         format: { enum: ['currency', 'number', 'percent', 'compact'] },
         aggregate: { enum: ['sum', 'avg', 'min', 'max', 'first'] },
+        limit: { type: 'number', minimum: 1 },
         legend: { type: 'boolean' },
         palette: {
           type: 'array',

@@ -43,6 +43,10 @@ export const createDashboardContext = (context, container) => {
     return nextContext;
 };
 
+export const getDashboardVisibleWhen = (container = {}) => (
+    container?.dashboard?.visibleWhen || container?.visibleWhen || null
+);
+
 const collectDashboardContainers = (containers = []) => {
     const result = [];
     for (const entry of containers || []) {
