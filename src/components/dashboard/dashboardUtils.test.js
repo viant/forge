@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
   applyDashboardFiltersToCollection,
+  applyDashboardSelectionToCollection,
   buildDashboardDefaultFilters,
   createDashboardConditionSnapshot,
   evaluateDashboardCondition,
@@ -17,6 +18,12 @@ import {
   getDashboardFilterSignal,
   getDashboardSelectionSignal,
 } from '../../core/store/signals.js';
+import {
+  aggregateGeoRows,
+  buildGeoConfig,
+  normalizeGeoKey,
+  resolveGeoColor,
+} from './geoMapUtils.js';
 
 const baseContext = {
   identity: { windowId: 'W1', dataSourceRef: 'perf' },
@@ -171,6 +178,31 @@ assert.deepEqual(
   ['US'],
 );
 
+assert.deepEqual(
+  applyDashboardSelectionToCollection(
+    [
+      {stateCode: 'CA', dma: 'Los Angeles'},
+      {stateCode: 'CA', dma: 'San Francisco'},
+      {stateCode: 'TX', dma: 'Dallas-Fort Worth'},
+    ],
+    {entityKey: 'stateCode'},
+    {dimension: 'stateCode', entityKey: 'CA'},
+  ).map((row) => row.dma),
+  ['Los Angeles', 'San Francisco'],
+);
+
+assert.deepEqual(
+  applyDashboardSelectionToCollection(
+    [
+      {stateCode: 'CA', dma: 'Los Angeles'},
+      {stateCode: 'TX', dma: 'Dallas-Fort Worth'},
+    ],
+    {entityKey: 'stateCode'},
+    {},
+  ).map((row) => row.stateCode),
+  ['CA', 'TX'],
+);
+
 assert.equal(formatDashboardValue(1234.5, 'number', 'de-DE'), '1.234,5');
 assert.equal(formatDashboardValue(1234, 'currency', 'de-DE').includes('1.234'), true);
 assert.equal(formatDashboardValue(19.37, 'percent', 'en-US'), '19.4%');
@@ -195,3 +227,31 @@ assert.equal(getDashboardSelectionSignal('W1:perfDashboard').value.entityKey, 'C
 const busMessages = getBusSignal('W1').value;
 assert.equal(busMessages[busMessages.length - 1].type, 'dashboard.selection.changed');
 assert.equal(busMessages[busMessages.length - 1].sourceBlockId, 'byCountry');
+
+const geoConfig = buildGeoConfig({
+  geo: {key: 'stateCode', metric: {key: 'spend', label: 'Spend', format: 'currency'}},
+});
+assert.equal(geoConfig.key, 'stateCode');
+assert.equal(geoConfig.metricKey, 'spend');
+assert.equal(normalizeGeoKey(' ca '), 'CA');
+assert.equal(
+  aggregateGeoRows(
+    [
+      {stateCode: 'CA', spend: 10},
+      {stateCode: 'CA', spend: 5},
+      {stateCode: 'TX', spend: 7},
+    ],
+    geoConfig,
+  ).get('CA').value,
+  15,
+);
+assert.equal(
+  resolveGeoColor({
+    row: {status: 'critical'},
+    value: 10,
+    minValue: 0,
+    maxValue: 20,
+    colorConfig: {field: 'status', rules: [{value: 'critical', color: '#c23030'}]},
+  }),
+  '#c23030',
+);

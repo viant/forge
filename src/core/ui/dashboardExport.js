@@ -1,5 +1,6 @@
 import {resolveKey} from '../../utils/selector.js';
-import {applyDashboardFiltersToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
+import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardDelta, formatDashboardValue, getDashboardToneName, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
+import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from '../../components/dashboard/geoMapUtils.js';
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from '../../components/table/formattingRules.js';
 
 function escapeHtml(value) {
@@ -222,6 +223,198 @@ body {
   height: 100%;
   background: var(--primary);
 }
+.geo-export {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(220px, 280px);
+  gap: 16px;
+  align-items: stretch;
+}
+.geo-export__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e2eb;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.92), rgba(247,250,252,0.96)),
+    #f8fbfd;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.geo-export__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.geo-export__summary span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e2e9f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+.geo-export__summary strong {
+  color: #17202a;
+  font-size: 15px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.geo-export__map {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(28px, 1fr));
+  grid-template-rows: repeat(8, minmax(30px, 1fr));
+  gap: 7px;
+  min-height: 330px;
+  padding: 16px;
+  border: 1px solid #d7e2ec;
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+    linear-gradient(180deg, #fbfdff 0%, #eef5f8 100%);
+  background-size: 32px 32px, 32px 32px, auto;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 8px 18px rgba(20, 33, 45, 0.045);
+}
+.geo-export__tile {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(31, 64, 77, 0.16);
+  border-radius: 9px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 2px 4px rgba(20, 33, 45, 0.12);
+}
+.geo-export__tile.is-selected {
+  border-color: #0f5cc0;
+  box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 0 0 3px rgba(35, 103, 209, 0.22), 0 10px 22px rgba(20, 33, 45, 0.2);
+}
+.geo-export__tile.is-empty {
+  color: #8b98a7;
+  border-style: dashed;
+  text-shadow: none;
+  box-shadow: none;
+}
+.geo-export__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.geo-export__detail,
+.geo-export__ranking {
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  padding: 14px;
+  box-shadow: 0 8px 18px rgba(20, 33, 45, 0.04);
+}
+.geo-export__detail {
+  min-height: 108px;
+}
+.geo-export__detail::before {
+  content: "";
+  display: block;
+  width: 32px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--geo-active-color, #2367d1);
+  margin-bottom: 8px;
+}
+.geo-export__detail span,
+.geo-export__label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.geo-export__detail strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 18px;
+}
+.geo-export__status {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-height: 22px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--geo-status-color, #2367d1);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--geo-status-color, #2367d1);
+  font-size: 11px;
+  font-weight: 800;
+}
+.geo-export__legend {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.geo-export__legend div {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+}
+.geo-export__rule-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.geo-export__rule-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.geo-export__rule-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.geo-export__ranking-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: #f8fbfd;
+  font-size: 12px;
+}
+.geo-export__ranking-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+.geo-export__ranking-bar span {
+  display: block;
+  height: 100%;
+}
 .plain-table {
   width: 100%;
   border-collapse: collapse;
@@ -370,6 +563,14 @@ body {
   box-shadow: none;
   height: 100%;
 }
+.dashboard-report__block .geo-export {
+  grid-template-columns: 1fr;
+}
+.dashboard-report__block .geo-export__map {
+  grid-template-columns: repeat(12, minmax(20px, 1fr));
+  min-height: 280px;
+  gap: 5px;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
@@ -379,6 +580,9 @@ body {
   }
   .dashboard-report__shell,
   .dashboard-report__section-grid {
+    grid-template-columns: 1fr;
+  }
+  .geo-export {
     grid-template-columns: 1fr;
   }
   .dashboard-report__header {
@@ -525,6 +729,65 @@ function renderDimensionsBlock(block) {
       <div class="dimension-bar"><span style="width:${Math.max((Number(row.rawValue ?? 0) / max) * 100, 2)}%"></span></div>
     </div>
   `).join('')}</div>`;
+}
+
+function renderGeoMapBlock(block) {
+  const regions = block.regions || [];
+  const ranking = block.ranking || [];
+  const activeRegion = block.activeRegion || ranking[0] || null;
+  const legend = block.legend || null;
+  const summary = block.summary || {};
+  return `
+    <div class="geo-export">
+      <div class="geo-export__stage">
+        <div class="geo-export__summary">
+          <span><strong>${escapeHtml(summary.regionCount ?? ranking.length)}</strong> Regions</span>
+          <span><strong>${escapeHtml(summary.totalValue || '-')}</strong> Total ${escapeHtml(block.metricLabel || 'Value')}</span>
+          <span><strong>${escapeHtml(summary.topKey || '-')}</strong> Top Region</span>
+        </div>
+        <div class="geo-export__map" role="img" aria-label="${escapeHtml(block.title || 'Geo map')}">
+          ${regions.map((region) => `
+            <span
+              class="geo-export__tile${region.selected ? ' is-selected' : ''}${region.empty ? ' is-empty' : ''}"
+              style="grid-column:${Number(region.col) || 1};grid-row:${Number(region.row) || 1};background:${escapeHtml(region.color)};"
+              title="${escapeHtml(`${region.label} (${region.key}): ${region.value}`)}"
+            >${escapeHtml(region.key)}</span>
+          `).join('')}
+        </div>
+      </div>
+      <aside class="geo-export__side">
+        <div class="geo-export__detail" style="--geo-active-color:${escapeHtml(activeRegion?.statusColor || activeRegion?.color || '#2367d1')};--geo-status-color:${escapeHtml(activeRegion?.statusColor || activeRegion?.color || '#2367d1')};">
+          <span>Selected Area</span>
+          <strong>${activeRegion ? escapeHtml(`${activeRegion.label} (${activeRegion.key})`) : '-'}</strong>
+          <div>${escapeHtml(block.metricLabel || 'Value')}: ${activeRegion ? escapeHtml(activeRegion.value) : '-'}</div>
+          ${activeRegion?.statusLabel ? `<span class="geo-export__status">${escapeHtml(activeRegion.statusLabel)}</span>` : ''}
+        </div>
+        ${legend?.rules ? `
+          <div class="geo-export__rule-legend">
+            ${legend.rules.map((rule) => `
+              <span><i style="background:${escapeHtml(rule.color)}"></i>${escapeHtml(rule.label)}</span>
+            `).join('')}
+          </div>
+        ` : legend ? `
+          <div class="geo-export__legend">
+            <span>${escapeHtml(legend.min)}</span>
+            <div>${(legend.palette || []).map((color) => `<i style="background:${escapeHtml(color)}"></i>`).join('')}</div>
+            <span>${escapeHtml(legend.max)}</span>
+          </div>
+        ` : ''}
+        <div class="geo-export__ranking">
+          <div class="geo-export__label">Top Regions</div>
+          ${ranking.map((region) => `
+            <div class="geo-export__ranking-row">
+              <strong>${escapeHtml(region.key)}</strong>
+              <div class="geo-export__ranking-bar"><span style="width:${escapeHtml(region.width)};background:${escapeHtml(region.color)}"></span></div>
+              <span>${escapeHtml(region.value)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </aside>
+    </div>
+  `;
 }
 
 function generatePieSvg(slices, palette, size = 280) {
@@ -699,6 +962,8 @@ function renderBlockBody(block) {
       return renderKPITableBlock(block);
     case 'dashboard.filters':
       return renderFiltersBlock(block);
+    case 'dashboard.geoMap':
+      return renderGeoMapBlock(block);
     case 'dashboard.timeline':
       return renderTimelineBlock(block);
     case 'dashboard.composition':
@@ -745,6 +1010,7 @@ function classifyReportBlocks(blocks = []) {
       'dashboard.badges',
     ].includes(block.kind)),
     charts: blocks.filter((block) => [
+      'dashboard.geoMap',
       'dashboard.timeline',
       'dashboard.composition',
       'dashboard.dimensions',
@@ -1034,8 +1300,91 @@ function buildFiltersBlock(container, blockContext) {
   };
 }
 
+function buildGeoMapBlock(container, blockContext) {
+  const config = buildGeoConfig(container);
+  const filteredRows = applyDashboardSelectionToCollection(
+    applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
+    container.selectionBindings,
+    blockContext.dashboardSelection,
+  );
+  const geoRows = aggregateGeoRows(filteredRows, config);
+  const values = Array.from(geoRows.values()).map((entry) => Number(entry.value)).filter(Number.isFinite);
+  const range = values.length
+    ? {min: Math.min(...values), max: Math.max(...values)}
+    : {min: 0, max: 0};
+  const selectedKey = normalizeGeoKey(blockContext.dashboardSelection?.entityKey);
+  const regions = US_STATE_TILES.map((tile) => {
+    const entry = geoRows.get(tile.key);
+    const row = entry?.row || null;
+    const label = config.labelKey && row ? resolveKey(row, config.labelKey) : tile.label;
+    const rawValue = entry ? entry.value : null;
+    const colorRule = entry ? findGeoColorRule(row, config.color) : null;
+    const color = entry
+      ? resolveGeoColor({row, value: rawValue, minValue: range.min, maxValue: range.max, colorConfig: config.color})
+      : config.color.empty;
+    return {
+      ...tile,
+      label,
+      color,
+      empty: !entry,
+      selected: selectedKey === tile.key,
+      rawValue,
+      statusColor: colorRule?.color || '',
+      statusLabel: colorRule ? colorRule.label || colorRule.value || colorRule.equals || colorRule.when || '' : '',
+      value: entry ? formatDashboardValue(rawValue, config.format, blockContext.locale || 'en-US') : '-',
+    };
+  });
+  const ranking = regions
+    .filter((region) => Number.isFinite(Number(region.rawValue)))
+    .sort((a, b) => Number(b.rawValue) - Number(a.rawValue))
+    .slice(0, container.limit || 5)
+    .map((region) => ({
+      ...region,
+      width: range.max > 0 ? `${Math.max((Number(region.rawValue) / range.max) * 100, 4)}%` : '4%',
+    }));
+  const valuedRegions = regions.filter((region) => Number.isFinite(Number(region.rawValue)));
+  const totalValue = valuedRegions.reduce((sum, region) => sum + (Number(region.rawValue) || 0), 0);
+  const colorRules = config.color.field && Array.isArray(config.color.rules)
+    ? config.color.rules.filter((rule) => rule?.color)
+    : [];
+
+  return {
+    kind: container.kind,
+    title: container.title,
+    subtitle: container.subtitle,
+    columnSpan: container.columnSpan,
+    metricLabel: config.metricLabel,
+    regions,
+    ranking,
+    activeRegion: regions.find((region) => region.selected) || ranking[0] || null,
+    summary: {
+      regionCount: valuedRegions.length,
+      totalValue: formatDashboardValue(totalValue, config.format, blockContext.locale || 'en-US'),
+      topKey: ranking[0]?.key || '',
+    },
+    legend: config.legend ? (
+      colorRules.length > 0
+        ? {
+          rules: colorRules.map((rule) => ({
+            color: rule.color,
+            label: rule.label || rule.value || rule.equals || rule.when,
+          })),
+        }
+        : {
+          min: formatDashboardValue(range.min, config.format, blockContext.locale || 'en-US'),
+          max: formatDashboardValue(range.max, config.format, blockContext.locale || 'en-US'),
+          palette: config.color.palette || DEFAULT_GEO_PALETTE,
+        }
+    ) : null,
+  };
+}
+
 function buildTimelineBlock(container, blockContext, chartSvgs) {
-  const rows = applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters)
+  const rows = applyDashboardSelectionToCollection(
+    applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
+    container.selectionBindings,
+    blockContext.dashboardSelection,
+  )
     .map((row) => ({ ...row }));
   const chartType = container.chart?.type || 'line';
   const isPie = chartType === 'pie' || chartType === 'donut';
@@ -1113,7 +1462,11 @@ function buildDimensionsBlock(container, blockContext) {
   const dimensionKey = container.dimension?.key;
   const metric = container.metric || {};
   const metricKey = metric.key;
-  const rows = [...applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters)]
+  const rows = [...applyDashboardSelectionToCollection(
+    applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
+    container.selectionBindings,
+    blockContext.dashboardSelection,
+  )]
     .sort((a, b) => Number(b?.[metricKey] || 0) - Number(a?.[metricKey] || 0))
     .slice(0, container.limit || 10)
     .map((row) => ({
@@ -1174,12 +1527,17 @@ function buildStatusBlock(container, blockContext) {
 
 function buildFeedBlock(container, blockContext) {
   const fields = container.fields || {};
+  const rows = applyDashboardSelectionToCollection(
+    applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
+    container.selectionBindings,
+    blockContext.dashboardSelection,
+  );
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    items: applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters).map((item) => ({
+    items: rows.map((item) => ({
       timestamp: fields.timestamp ? resolveKey(item, fields.timestamp) : undefined,
       title: fields.title ? resolveKey(item, fields.title) : undefined,
       body: fields.body ? resolveKey(item, fields.body) : undefined,
@@ -1237,7 +1595,11 @@ function buildTableBlock(container, blockContext) {
     return {key: col?.key || '', label: col?.label || col?.key || '', format: col?.format};
   }).filter((col) => !!col.key);
   const limit = container.limit || container.dashboard?.table?.limit || 200;
-  const rows = applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters)
+  const rows = applyDashboardSelectionToCollection(
+    applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
+    container.selectionBindings,
+    blockContext.dashboardSelection,
+  )
     .slice(0, limit)
     .map((row) => {
       const out = {raw: row};
@@ -1282,6 +1644,8 @@ function buildExportBlock(container, context, chartSvgs) {
       return buildKPITableBlock(container, blockContext);
     case 'dashboard.filters':
       return buildFiltersBlock(container, blockContext);
+    case 'dashboard.geoMap':
+      return buildGeoMapBlock(container, blockContext);
     case 'dashboard.timeline':
       return buildTimelineBlock(container, blockContext, chartSvgs);
     case 'dashboard.composition':

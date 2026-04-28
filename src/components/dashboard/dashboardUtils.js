@@ -117,6 +117,33 @@ export const applyDashboardFiltersToCollection = (collection = [], filterBinding
     });
 };
 
+export const applyDashboardSelectionToCollection = (collection = [], selectionBindings = {}, dashboardSelection = {}) => {
+    const entries = Object.entries(selectionBindings || {}).filter(([, rowField]) => rowField);
+    if (!entries.length) {
+        return collection || [];
+    }
+
+    const activeEntries = entries
+        .map(([selectionField, rowField]) => ({
+            selectionField,
+            rowField,
+            value: resolveKey(dashboardSelection || {}, selectionField),
+        }))
+        .filter(({value}) => !(value == null || value === '' || (Array.isArray(value) && value.length === 0)));
+
+    if (!activeEntries.length) {
+        return collection || [];
+    }
+
+    return (collection || []).filter((row) => activeEntries.every(({rowField, value}) => {
+        const rowValue = resolveKey(row, rowField);
+        if (Array.isArray(value)) {
+            return value.some((entry) => equalsFilterValue(entry, rowValue));
+        }
+        return equalsFilterValue(value, rowValue);
+    }));
+};
+
 export const createDashboardConditionSnapshot = ({context, dashboardKey, metrics, dashboardFilters, dashboardSelection} = {}) => {
     const resolvedDashboardKey = dashboardKey || context?.dashboardKey;
     return {

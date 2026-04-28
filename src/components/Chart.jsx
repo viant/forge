@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useMemo} from "react";
 import {
     Button,
     Dialog,
@@ -191,28 +191,23 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     } = chart;
     const {palette = []} = series;
     const directSeriesChart = isDirectSeriesChart(chart);
-    const seriesDefinitions = getSeriesDefinitions(chart);
-    const leftAxis = {...yAxis, ...(axes.left || {})};
-    const rightAxis = axes.right || null;
+    const seriesDefinitions = useMemo(() => getSeriesDefinitions(chart), [chart]);
+    const leftAxis = useMemo(() => ({...yAxis, ...(axes.left || {})}), [yAxis, axes]);
+    const rightAxis = useMemo(() => axes.right || null, [axes]);
     const hasRightAxis = !!rightAxis || seriesDefinitions.some((entry) => entry.axis === "right");
-
-    const [chartData, setChartData] = useState([]);
     const [selectedDataKeys, setSelectedDataKeys] = useState([]);
-    const [availableDataKeys, setAvailableDataKeys] = useState([]);
     const [viewMode, setViewMode] = useState("chart");
     const [showColumnDialog, setShowColumnDialog] = useState(false);
     const [columnWidths, setColumnWidths] = useState({});
     const [expandedCell, setExpandedCell] = useState(null);
 
     const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || seriesDefinitions[0]?.value || "");
-    const [yAxisLabel, setYAxisLabel] = useState(leftAxis.label || "");
 
     const { collection, loading, error } = useDataSourceState(context);
 
     const isPieChart = type === "pie" || type === "donut";
     const isHorizontalBar = isHorizontalBarType(type);
-
-    function prepareData() {
+    const prepared = useMemo(() => {
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
@@ -221,44 +216,44 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 value: Number(row[valueKey]) || 0,
                 _raw: row,
             })).filter((row) => row.value > 0);
-            setChartData(rows);
-            setAvailableDataKeys(rows.map((row) => row.name));
-            setYAxisLabel("");
-            return;
+            return {
+                chartData: rows,
+                availableDataKeys: rows.map((row) => row.name),
+                yAxisLabel: "",
+            };
         }
 
         if (directSeriesChart) {
             const sorted = [...(collection || [])].sort(
                 (a, b) => new Date(a?.[xAxis?.dataKey]) - new Date(b?.[xAxis?.dataKey])
             );
-            const keys = seriesDefinitions.map((entry) => entry.value);
-            setChartData(sorted);
-            setAvailableDataKeys(keys);
-            setYAxisLabel(leftAxis.label || "");
-            return;
+            return {
+                chartData: sorted,
+                availableDataKeys: seriesDefinitions.map((entry) => entry.value),
+                yAxisLabel: leftAxis.label || "",
+            };
         }
 
         const {data, keys} = transformData(collection, chart, selectedValueKey);
-        setChartData(data);
-        setAvailableDataKeys(keys); // Update available data keys
-
-        // Update yAxis label based on selectedValueKey
         const selectedValue = (series.values || []).find((val) => val.value === selectedValueKey);
-        if (selectedValue) {
-            setYAxisLabel(selectedValue.name);
-        }
-    }
+        return {
+            chartData: data,
+            availableDataKeys: keys,
+            yAxisLabel: selectedValue ? selectedValue.name : (leftAxis.label || ""),
+        };
+    }, [chart, collection, directSeriesChart, isPieChart, leftAxis.label, selectedValueKey, series, seriesDefinitions, xAxis?.dataKey]);
 
-    useEffect(() => {
-        prepareData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [collection, selectedValueKey, directSeriesChart, xAxis?.dataKey, leftAxis.label, seriesDefinitions]);
+    const chartData = prepared.chartData;
+    const availableDataKeys = prepared.availableDataKeys;
+    const yAxisLabel = prepared.yAxisLabel;
 
     useEffect(() => {
         // Keep selectedDataKeys in sync with availableDataKeys
         if (selectedDataKeys.length === 0) {
             // Initialize selectedDataKeys to all availableDataKeys
-            setSelectedDataKeys(availableDataKeys);
+            if (availableDataKeys.length > 0) {
+                setSelectedDataKeys(availableDataKeys);
+            }
         } else {
             // Remove unavailable keys from selectedDataKeys
             const filteredSelectedKeys = selectedDataKeys.filter(key => availableDataKeys.includes(key));
@@ -405,7 +400,6 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             <Legend {...legendProps}/>
             {selectedSeriesDefinitions.map((entry, index) => {
                 const commonProps = {
-                    key: entry.value,
                     dataKey: entry.value,
                     name: entry.name || entry.label,
                     yAxisId: entry.axis || "left",
@@ -418,12 +412,12 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 };
 
                 if (entry.type === "bar") {
-                    return <Bar {...commonProps} stackId={entry.stackId} />;
+                    return <Bar key={entry.value} {...commonProps} stackId={entry.stackId} />;
                 }
                 if (entry.type === "area") {
-                    return <Area {...commonProps} type="monotone" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+                    return <Area key={entry.value} {...commonProps} type="monotone" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
                 }
-                return <Line {...commonProps} type="monotone" strokeLinecap="round" strokeLinejoin="round" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+                return <Line key={entry.value} {...commonProps} type="monotone" strokeLinecap="round" strokeLinejoin="round" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
             })}
         </>
     );
@@ -644,7 +638,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
 
     return (
         <div
-            style={{width: resolvedWidth, height: resolvedHeight, margin: isHorizontalBar ? "0 auto" : undefined}}
+            style={{width: resolvedWidth, height: resolvedHeight, minWidth: 0, minHeight: 0, margin: isHorizontalBar ? "0 auto" : undefined}}
             ref={chartRef}
             data-dashboard-chart-id={chartExportId}
         >
@@ -713,7 +707,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
 
             {viewMode === "chart" ? (
                 chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
                         {isPieChart
                             ? pieChart
                             : isHorizontalBar

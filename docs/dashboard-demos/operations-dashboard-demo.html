@@ -198,6 +198,198 @@ body {
   height: 100%;
   background: var(--primary);
 }
+.geo-export {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(220px, 280px);
+  gap: 16px;
+  align-items: stretch;
+}
+.geo-export__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e2eb;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.92), rgba(247,250,252,0.96)),
+    #f8fbfd;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.geo-export__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.geo-export__summary span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e2e9f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+.geo-export__summary strong {
+  color: #17202a;
+  font-size: 15px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.geo-export__map {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(28px, 1fr));
+  grid-template-rows: repeat(8, minmax(30px, 1fr));
+  gap: 7px;
+  min-height: 330px;
+  padding: 16px;
+  border: 1px solid #d7e2ec;
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+    linear-gradient(180deg, #fbfdff 0%, #eef5f8 100%);
+  background-size: 32px 32px, 32px 32px, auto;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 8px 18px rgba(20, 33, 45, 0.045);
+}
+.geo-export__tile {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(31, 64, 77, 0.16);
+  border-radius: 9px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 2px 4px rgba(20, 33, 45, 0.12);
+}
+.geo-export__tile.is-selected {
+  border-color: #0f5cc0;
+  box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 0 0 3px rgba(35, 103, 209, 0.22), 0 10px 22px rgba(20, 33, 45, 0.2);
+}
+.geo-export__tile.is-empty {
+  color: #8b98a7;
+  border-style: dashed;
+  text-shadow: none;
+  box-shadow: none;
+}
+.geo-export__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.geo-export__detail,
+.geo-export__ranking {
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  padding: 14px;
+  box-shadow: 0 8px 18px rgba(20, 33, 45, 0.04);
+}
+.geo-export__detail {
+  min-height: 108px;
+}
+.geo-export__detail::before {
+  content: "";
+  display: block;
+  width: 32px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--geo-active-color, #2367d1);
+  margin-bottom: 8px;
+}
+.geo-export__detail span,
+.geo-export__label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.geo-export__detail strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 18px;
+}
+.geo-export__status {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-height: 22px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--geo-status-color, #2367d1);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--geo-status-color, #2367d1);
+  font-size: 11px;
+  font-weight: 800;
+}
+.geo-export__legend {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.geo-export__legend div {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+}
+.geo-export__rule-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.geo-export__rule-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.geo-export__rule-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.geo-export__ranking-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: #f8fbfd;
+  font-size: 12px;
+}
+.geo-export__ranking-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+.geo-export__ranking-bar span {
+  display: block;
+  height: 100%;
+}
 .plain-table {
   width: 100%;
   border-collapse: collapse;
@@ -346,6 +538,14 @@ body {
   box-shadow: none;
   height: 100%;
 }
+.dashboard-report__block .geo-export {
+  grid-template-columns: 1fr;
+}
+.dashboard-report__block .geo-export__map {
+  grid-template-columns: repeat(12, minmax(20px, 1fr));
+  min-height: 280px;
+  gap: 5px;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
@@ -355,6 +555,9 @@ body {
   }
   .dashboard-report__shell,
   .dashboard-report__section-grid {
+    grid-template-columns: 1fr;
+  }
+  .geo-export {
     grid-template-columns: 1fr;
   }
   .dashboard-report__header {
@@ -368,7 +571,7 @@ body {
     <header class="dashboard-export__header">
       <h1 class="dashboard-export__title">Operations Dashboard Demo</h1>
       <p class="dashboard-export__subtitle">A second dashboard variant showing service health and incident flow</p>
-      <p class="dashboard-export__subtitle">Generated 2026-04-24T21:10:44.620Z</p>
+      <p class="dashboard-export__subtitle">Generated 2026-04-28T16:03:10.582Z</p>
       <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>severity=critical, warning</span></div>
     </header>
     <div class="dashboard-export__grid">

@@ -198,6 +198,198 @@ body {
   height: 100%;
   background: var(--primary);
 }
+.geo-export {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(220px, 280px);
+  gap: 16px;
+  align-items: stretch;
+}
+.geo-export__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d8e2eb;
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.92), rgba(247,250,252,0.96)),
+    #f8fbfd;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+.geo-export__summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.geo-export__summary span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e2e9f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+.geo-export__summary strong {
+  color: #17202a;
+  font-size: 15px;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.geo-export__map {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(28px, 1fr));
+  grid-template-rows: repeat(8, minmax(30px, 1fr));
+  gap: 7px;
+  min-height: 330px;
+  padding: 16px;
+  border: 1px solid #d7e2ec;
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+    linear-gradient(180deg, #fbfdff 0%, #eef5f8 100%);
+  background-size: 32px 32px, 32px 32px, auto;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 8px 18px rgba(20, 33, 45, 0.045);
+}
+.geo-export__tile {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(31, 64, 77, 0.16);
+  border-radius: 9px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 2px 4px rgba(20, 33, 45, 0.12);
+}
+.geo-export__tile.is-selected {
+  border-color: #0f5cc0;
+  box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 0 0 3px rgba(35, 103, 209, 0.22), 0 10px 22px rgba(20, 33, 45, 0.2);
+}
+.geo-export__tile.is-empty {
+  color: #8b98a7;
+  border-style: dashed;
+  text-shadow: none;
+  box-shadow: none;
+}
+.geo-export__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.geo-export__detail,
+.geo-export__ranking {
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+  padding: 14px;
+  box-shadow: 0 8px 18px rgba(20, 33, 45, 0.04);
+}
+.geo-export__detail {
+  min-height: 108px;
+}
+.geo-export__detail::before {
+  content: "";
+  display: block;
+  width: 32px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--geo-active-color, #2367d1);
+  margin-bottom: 8px;
+}
+.geo-export__detail span,
+.geo-export__label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.geo-export__detail strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 18px;
+}
+.geo-export__status {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-height: 22px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--geo-status-color, #2367d1);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--geo-status-color, #2367d1);
+  font-size: 11px;
+  font-weight: 800;
+}
+.geo-export__legend {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.geo-export__legend div {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+}
+.geo-export__rule-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.geo-export__rule-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.geo-export__rule-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+.geo-export__ranking-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  background: #f8fbfd;
+  font-size: 12px;
+}
+.geo-export__ranking-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--track);
+}
+.geo-export__ranking-bar span {
+  display: block;
+  height: 100%;
+}
 .plain-table {
   width: 100%;
   border-collapse: collapse;
@@ -346,6 +538,14 @@ body {
   box-shadow: none;
   height: 100%;
 }
+.dashboard-report__block .geo-export {
+  grid-template-columns: 1fr;
+}
+.dashboard-report__block .geo-export__map {
+  grid-template-columns: repeat(12, minmax(20px, 1fr));
+  min-height: 280px;
+  gap: 5px;
+}
 @media (max-width: 900px) {
   .dashboard-export__grid {
     grid-template-columns: 1fr;
@@ -355,6 +555,9 @@ body {
   }
   .dashboard-report__shell,
   .dashboard-report__section-grid {
+    grid-template-columns: 1fr;
+  }
+  .geo-export {
     grid-template-columns: 1fr;
   }
   .dashboard-report__header {
@@ -401,7 +604,7 @@ body {
             <p>Generated from the same dashboard blocks used in the interactive A+D dashboard view.</p>
           </div>
           <div class="dashboard-report__meta">
-            <span><strong>Generated:</strong> 2026-04-24T21:10:44.604Z</span>
+            <span><strong>Generated:</strong> 2026-04-28T16:03:10.564Z</span>
             <span><strong>Mode:</strong> document</span>
             <span><strong>Locale:</strong> en-US</span>
           </div>
@@ -573,6 +776,385 @@ body {
     </section>
   </div>
 <div class="dashboard-report__block">
+    <section class="dashboard-export__block" style="grid-column: span 8;">
+      <h2>US State Performance</h2>
+      <p class="block-subtitle">State tile map with exact-code selection for DMA drilldown</p>
+      
+    <div class="geo-export">
+      <div class="geo-export__stage">
+        <div class="geo-export__summary">
+          <span><strong>51</strong> Regions</span>
+          <span><strong>$148,000</strong> Total Spend</span>
+          <span><strong>CA</strong> Top Region</span>
+        </div>
+        <div class="geo-export__map" role="img" aria-label="US State Performance">
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:1;grid-row:1;background:#eef3f8;"
+              title="Alaska (AK): -"
+            >AK</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:12;grid-row:1;background:#eef3f8;"
+              title="Maine (ME): -"
+            >ME</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:10;grid-row:2;background:#eef3f8;"
+              title="Vermont (VT): -"
+            >VT</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:11;grid-row:2;background:#eef3f8;"
+              title="New Hampshire (NH): -"
+            >NH</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:12;grid-row:2;background:#eef3f8;"
+              title="Massachusetts (MA): -"
+            >MA</span>
+          
+            <span
+              class="geo-export__tile"
+              style="grid-column:1;grid-row:3;background:#1f8f63;"
+              title="Washington (WA): $11,000"
+            >WA</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:2;grid-row:3;background:#eef3f8;"
+              title="Idaho (ID): -"
+            >ID</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:3;grid-row:3;background:#eef3f8;"
+              title="Montana (MT): -"
+            >MT</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:4;grid-row:3;background:#eef3f8;"
+              title="North Dakota (ND): -"
+            >ND</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:5;grid-row:3;background:#eef3f8;"
+              title="Minnesota (MN): -"
+            >MN</span>
+          
+            <span
+              class="geo-export__tile"
+              style="grid-column:6;grid-row:3;background:#1f8f63;"
+              title="Illinois (IL): $14,000"
+            >IL</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:7;grid-row:3;background:#eef3f8;"
+              title="Wisconsin (WI): -"
+            >WI</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:8;grid-row:3;background:#eef3f8;"
+              title="Michigan (MI): -"
+            >MI</span>
+          
+            <span
+              class="geo-export__tile"
+              style="grid-column:10;grid-row:3;background:#1f8f63;"
+              title="New York (NY): $23,000"
+            >NY</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:11;grid-row:3;background:#eef3f8;"
+              title="Rhode Island (RI): -"
+            >RI</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:12;grid-row:3;background:#eef3f8;"
+              title="Connecticut (CT): -"
+            >CT</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:1;grid-row:4;background:#eef3f8;"
+              title="Oregon (OR): -"
+            >OR</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:2;grid-row:4;background:#eef3f8;"
+              title="Nevada (NV): -"
+            >NV</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:3;grid-row:4;background:#eef3f8;"
+              title="Wyoming (WY): -"
+            >WY</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:4;grid-row:4;background:#eef3f8;"
+              title="South Dakota (SD): -"
+            >SD</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:5;grid-row:4;background:#eef3f8;"
+              title="Iowa (IA): -"
+            >IA</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:6;grid-row:4;background:#eef3f8;"
+              title="Indiana (IN): -"
+            >IN</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:7;grid-row:4;background:#eef3f8;"
+              title="Ohio (OH): -"
+            >OH</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:8;grid-row:4;background:#eef3f8;"
+              title="Pennsylvania (PA): -"
+            >PA</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:10;grid-row:4;background:#eef3f8;"
+              title="New Jersey (NJ): -"
+            >NJ</span>
+          
+            <span
+              class="geo-export__tile"
+              style="grid-column:1;grid-row:5;background:#c23030;"
+              title="California (CA): $44,000"
+            >CA</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:2;grid-row:5;background:#eef3f8;"
+              title="Utah (UT): -"
+            >UT</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:3;grid-row:5;background:#eef3f8;"
+              title="Colorado (CO): -"
+            >CO</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:4;grid-row:5;background:#eef3f8;"
+              title="Nebraska (NE): -"
+            >NE</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:5;grid-row:5;background:#eef3f8;"
+              title="Missouri (MO): -"
+            >MO</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:6;grid-row:5;background:#eef3f8;"
+              title="Kentucky (KY): -"
+            >KY</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:7;grid-row:5;background:#eef3f8;"
+              title="West Virginia (WV): -"
+            >WV</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:8;grid-row:5;background:#eef3f8;"
+              title="Virginia (VA): -"
+            >VA</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:9;grid-row:5;background:#eef3f8;"
+              title="Maryland (MD): -"
+            >MD</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:10;grid-row:5;background:#eef3f8;"
+              title="Delaware (DE): -"
+            >DE</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:2;grid-row:6;background:#eef3f8;"
+              title="Arizona (AZ): -"
+            >AZ</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:3;grid-row:6;background:#eef3f8;"
+              title="New Mexico (NM): -"
+            >NM</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:4;grid-row:6;background:#eef3f8;"
+              title="Kansas (KS): -"
+            >KS</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:5;grid-row:6;background:#eef3f8;"
+              title="Arkansas (AR): -"
+            >AR</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:6;grid-row:6;background:#eef3f8;"
+              title="Tennessee (TN): -"
+            >TN</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:7;grid-row:6;background:#eef3f8;"
+              title="North Carolina (NC): -"
+            >NC</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:8;grid-row:6;background:#eef3f8;"
+              title="South Carolina (SC): -"
+            >SC</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:9;grid-row:6;background:#eef3f8;"
+              title="District of Columbia (DC): -"
+            >DC</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:1;grid-row:7;background:#eef3f8;"
+              title="Hawaii (HI): -"
+            >HI</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:4;grid-row:7;background:#eef3f8;"
+              title="Oklahoma (OK): -"
+            >OK</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:5;grid-row:7;background:#eef3f8;"
+              title="Louisiana (LA): -"
+            >LA</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:6;grid-row:7;background:#eef3f8;"
+              title="Mississippi (MS): -"
+            >MS</span>
+          
+            <span
+              class="geo-export__tile is-empty"
+              style="grid-column:7;grid-row:7;background:#eef3f8;"
+              title="Alabama (AL): -"
+            >AL</span>
+          
+            <span
+              class="geo-export__tile"
+              style="grid-column:8;grid-row:7;background:#d9822b;"
+              title="Georgia (GA): $9,000"
+            >GA</span>
+          
+            <span
+              class="geo-export__tile"
+              style="grid-column:4;grid-row:8;background:#d9822b;"
+              title="Texas (TX): $28,000"
+            >TX</span>
+          
+            <span
+              class="geo-export__tile"
+              style="grid-column:9;grid-row:8;background:#d9822b;"
+              title="Florida (FL): $19,000"
+            >FL</span>
+          
+        </div>
+      </div>
+      <aside class="geo-export__side">
+        <div class="geo-export__detail" style="--geo-active-color:#c23030;--geo-status-color:#c23030;">
+          <span>Selected Area</span>
+          <strong>California (CA)</strong>
+          <div>Spend: $44,000</div>
+          <span class="geo-export__status">Critical</span>
+        </div>
+        
+          <div class="geo-export__rule-legend">
+            
+              <span><i style="background:#1f8f63"></i>Healthy</span>
+            
+              <span><i style="background:#d9822b"></i>Watch</span>
+            
+              <span><i style="background:#c23030"></i>Critical</span>
+            
+          </div>
+        
+        <div class="geo-export__ranking">
+          <div class="geo-export__label">Top Regions</div>
+          
+            <div class="geo-export__ranking-row">
+              <strong>CA</strong>
+              <div class="geo-export__ranking-bar"><span style="width:100%;background:#c23030"></span></div>
+              <span>$44,000</span>
+            </div>
+          
+            <div class="geo-export__ranking-row">
+              <strong>TX</strong>
+              <div class="geo-export__ranking-bar"><span style="width:63.63636363636363%;background:#d9822b"></span></div>
+              <span>$28,000</span>
+            </div>
+          
+            <div class="geo-export__ranking-row">
+              <strong>NY</strong>
+              <div class="geo-export__ranking-bar"><span style="width:52.27272727272727%;background:#1f8f63"></span></div>
+              <span>$23,000</span>
+            </div>
+          
+            <div class="geo-export__ranking-row">
+              <strong>FL</strong>
+              <div class="geo-export__ranking-bar"><span style="width:43.18181818181818%;background:#d9822b"></span></div>
+              <span>$19,000</span>
+            </div>
+          
+            <div class="geo-export__ranking-row">
+              <strong>IL</strong>
+              <div class="geo-export__ranking-bar"><span style="width:31.818181818181817%;background:#1f8f63"></span></div>
+              <span>$14,000</span>
+            </div>
+          
+        </div>
+      </aside>
+    </div>
+  
+    </section>
+  </div>
+<div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 6;">
       <h2>Restrictive funnel</h2>
       
@@ -670,6 +1252,72 @@ body {
           <h2>Tables and Actions</h2>
           <div class="dashboard-report__section-grid">
             <div class="dashboard-report__block">
+    <section class="dashboard-export__block" style="grid-column: span 4;">
+      <h2>DMA / City Detail</h2>
+      <p class="block-subtitle">Filtered by selected state when a state tile is selected</p>
+      
+    <table class="plain-table">
+      <thead>
+        <tr>
+          <th>State</th><th>DMA</th><th>City</th><th>Spend</th><th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+          <tr>
+            <td>CA</td><td>Los Angeles</td><td>Los Angeles</td><td>$18,000</td><td class="forge-table-tone-danger">critical</td>
+          </tr>
+        
+          <tr>
+            <td>CA</td><td>San Francisco-Oakland-San Jose</td><td>San Francisco</td><td>$12,000</td><td class="forge-table-tone-warning">watch</td>
+          </tr>
+        
+          <tr>
+            <td>CA</td><td>San Diego</td><td>San Diego</td><td>$7,000</td><td class="forge-table-tone-success">healthy</td>
+          </tr>
+        
+          <tr>
+            <td>TX</td><td>Dallas-Fort Worth</td><td>Dallas</td><td>$11,000</td><td class="forge-table-tone-warning">watch</td>
+          </tr>
+        
+          <tr>
+            <td>TX</td><td>Houston</td><td>Houston</td><td>$9,000</td><td class="forge-table-tone-warning">watch</td>
+          </tr>
+        
+          <tr>
+            <td>TX</td><td>Austin</td><td>Austin</td><td>$5,200</td><td class="forge-table-tone-success">healthy</td>
+          </tr>
+        
+          <tr>
+            <td>NY</td><td>New York</td><td>New York</td><td>$17,000</td><td class="forge-table-tone-success">healthy</td>
+          </tr>
+        
+          <tr>
+            <td>NY</td><td>Buffalo</td><td>Buffalo</td><td>$2,500</td><td class="forge-table-tone-success">healthy</td>
+          </tr>
+        
+          <tr>
+            <td>FL</td><td>Miami-Fort Lauderdale</td><td>Miami</td><td>$8,200</td><td class="forge-table-tone-warning">watch</td>
+          </tr>
+        
+          <tr>
+            <td>FL</td><td>Tampa-St. Petersburg</td><td>Tampa</td><td>$6,100</td><td class="forge-table-tone-warning">watch</td>
+          </tr>
+        
+          <tr>
+            <td>IL</td><td>Chicago</td><td>Chicago</td><td>$11,600</td><td class="forge-table-tone-success">healthy</td>
+          </tr>
+        
+          <tr>
+            <td>WA</td><td>Seattle-Tacoma</td><td>Seattle</td><td>$9,800</td><td class="forge-table-tone-success">healthy</td>
+          </tr>
+        
+      </tbody>
+    </table>
+  
+    </section>
+  </div>
+<div class="dashboard-report__block">
     <section class="dashboard-export__block" style="grid-column: span 4;">
       <h2>Messages</h2>
       

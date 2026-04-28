@@ -182,11 +182,19 @@ const dashboardCapabilities = await runUICommand({
 assert.equal(dashboardCapabilities.ok, true);
 assert.equal(dashboardCapabilities.blockKinds.includes('dashboard.filters'), true);
 assert.equal(dashboardCapabilities.blockKinds.includes('dashboard.badges'), true);
+assert.equal(dashboardCapabilities.blockKinds.includes('dashboard.geoMap'), true);
 assert.equal(dashboardCapabilities.chartTypes.includes('area'), true);
+assert.equal(dashboardCapabilities.chartTypes.includes('geoMap'), true);
 assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.capabilities'), true);
 assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.state.reset'), true);
 assert.equal(dashboardCapabilities.commands.includes('ui.dashboard.generateDemoArtifacts'), true);
 assert.equal(dashboardCapabilities.demos.some((item) => item.id === 'operations'), true);
+assert.equal(dashboardCapabilities.schema.additionalProperties, true);
+assert.equal(dashboardCapabilities.schema.$defs.block.additionalProperties, true);
+assert.equal(dashboardCapabilities.schema.$defs.block.properties.kind.enum.includes('dashboard.geoMap'), true);
+assert.equal(dashboardCapabilities.schema.$defs.geoConfig.properties.color.properties.rules.type, 'array');
+assert.equal(dashboardCapabilities.schema.$defs.block.properties.selectionBindings.$ref, '#/$defs/bindings');
+assert.equal(dashboardCapabilities.schema.$defs.reportConfig.properties.enabled.type, 'boolean');
 
 const defaultDemoBundle = await runUICommand({
   method: 'ui.dashboard.getDemo',

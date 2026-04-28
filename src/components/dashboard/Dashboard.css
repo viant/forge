@@ -340,6 +340,284 @@
     color: #1f5db8;
 }
 
+.forge-dashboard-geo {
+    display: grid;
+    grid-template-columns: minmax(460px, 1fr) minmax(240px, 310px);
+    gap: 16px;
+    align-items: stretch;
+    min-height: 390px;
+}
+
+.forge-dashboard-geo-stage {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #d8e2eb;
+    border-radius: 10px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(247,250,252,0.96)),
+        #f8fbfd;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+.forge-dashboard-geo-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.forge-dashboard-geo-summary span {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid #e2e9f0;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.forge-dashboard-geo-summary strong {
+    color: #17202a;
+    font-size: 16px;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.forge-dashboard-geo-map {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(34px, 1fr));
+    grid-template-rows: repeat(8, minmax(34px, 1fr));
+    gap: 8px;
+    min-height: 340px;
+    padding: 18px;
+    border: 1px solid #d7e2ec;
+    border-radius: 10px;
+    background:
+        linear-gradient(90deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+        linear-gradient(180deg, rgba(216,226,235,0.28) 1px, transparent 1px),
+        linear-gradient(180deg, #fbfdff 0%, #eef5f8 100%);
+    background-size: 32px 32px, 32px 32px, auto;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.96), 0 8px 18px rgba(20, 33, 45, 0.045);
+}
+
+.forge-dashboard-geo-tile {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid rgba(19, 34, 46, 0.16);
+    border-radius: 9px;
+    background: var(--forge-dashboard-geo-fill, #eef3f8);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+    box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 2px 4px rgba(20, 33, 45, 0.12);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease, filter 120ms ease;
+}
+
+.forge-dashboard-geo-tile:hover,
+.forge-dashboard-geo-tile:focus-visible {
+    border-color: #1f6feb;
+    filter: saturate(1.08);
+    box-shadow: inset 0 -10px 18px rgba(0,0,0,0.04), 0 9px 18px rgba(20, 33, 45, 0.18);
+    transform: translateY(-2px);
+    outline: none;
+}
+
+.forge-dashboard-geo-tile.is-selected {
+    border-color: #0f5cc0;
+    box-shadow: inset 0 -10px 18px rgba(0,0,0,0.08), 0 0 0 3px rgba(35, 103, 209, 0.22), 0 10px 22px rgba(20, 33, 45, 0.2);
+}
+
+.forge-dashboard-geo-tile.is-empty {
+    color: #8b98a7;
+    border-style: dashed;
+    background: rgba(238,243,248,0.86);
+    text-shadow: none;
+    box-shadow: none;
+}
+
+.forge-dashboard-geo-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.forge-dashboard-geo-detail-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 108px;
+    padding: 14px;
+    border: 1px solid #d8e2eb;
+    border-radius: 10px;
+    background:
+        linear-gradient(180deg, #ffffff 0%, #f8fbfd 100%);
+    box-shadow: 0 8px 18px rgba(20, 33, 45, 0.045);
+    position: relative;
+}
+
+.forge-dashboard-geo-detail-card::before {
+    content: "";
+    width: 32px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--forge-dashboard-geo-active-color, #2367d1);
+    margin-bottom: 4px;
+}
+
+.forge-dashboard-geo-detail-card strong {
+    color: #17202a;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.forge-dashboard-geo-detail-value {
+    color: #536579;
+    font-size: 12px;
+}
+
+.forge-dashboard-geo-detail-status {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    min-height: 22px;
+    padding: 0 9px;
+    border: 1px solid color-mix(in srgb, var(--forge-dashboard-geo-status-color, #2367d1) 45%, #ffffff);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--forge-dashboard-geo-status-color, #2367d1) 12%, #ffffff);
+    color: var(--forge-dashboard-geo-status-color, #2367d1) !important;
+    font-size: 11px !important;
+    font-weight: 800;
+}
+
+.forge-dashboard-geo-detail-label {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.forge-dashboard-geo-legend {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+    color: #536579;
+    font-size: 11px;
+}
+
+.forge-dashboard-geo-legend div {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    height: 9px;
+    overflow: hidden;
+    border-radius: 999px;
+    border: 1px solid #d8e2eb;
+}
+
+.forge-dashboard-geo-legend i {
+    display: block;
+}
+
+.forge-dashboard-geo-rule-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.forge-dashboard-geo-rule-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 24px;
+    padding: 0 8px;
+    border: 1px solid #d8e2eb;
+    border-radius: 999px;
+    background: #fff;
+    color: #536579;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.forge-dashboard-geo-rule-legend i {
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
+}
+
+.forge-dashboard-geo-ranking {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 14px;
+    border: 1px solid #d8e2eb;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 8px 18px rgba(20, 33, 45, 0.035);
+}
+
+.forge-dashboard-geo-ranking button {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    min-height: 28px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 3px 5px;
+    background: transparent;
+    color: #314154;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.forge-dashboard-geo-ranking button:hover,
+.forge-dashboard-geo-ranking button.is-selected {
+    border-color: #d8e7fb;
+    background: #f5f9ff;
+}
+
+.forge-dashboard-geo-ranking button > span {
+    font-weight: 800;
+}
+
+.forge-dashboard-geo-ranking button > div {
+    height: 9px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e8eef4;
+}
+
+.forge-dashboard-geo-ranking button i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+}
+
+.forge-dashboard-geo-ranking button strong {
+    color: #17202a;
+    font-weight: 700;
+}
+
+.forge-dashboard-geo-ranking button.is-selected span,
+.forge-dashboard-geo-ranking button.is-selected strong {
+    color: #1f5db8;
+}
+
 .forge-dashboard-tone-pill {
     display: inline-flex;
     min-width: 70px;
@@ -695,6 +973,10 @@
 
     .forge-report-shell,
     .forge-report-section-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .forge-dashboard-geo {
         grid-template-columns: 1fr;
     }
 
