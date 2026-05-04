@@ -29,6 +29,7 @@ import {
 } from "recharts";
 import {format} from "date-fns";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
+import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
 
 function useMeasuredContainer() {
     const ref = React.useRef(null);
@@ -173,6 +174,16 @@ function escapeCsvCell(value) {
     return v;
 }
 
+function areKeyListsEqual(left = [], right = []) {
+    if (left === right) return true;
+    if (!Array.isArray(left) || !Array.isArray(right)) return false;
+    if (left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i += 1) {
+        if (left[i] !== right[i]) return false;
+    }
+    return true;
+}
+
 const Chart = ({container, context, isActive = true, embedded = false}) => {
     const {chart} = container;
     const [chartRef, chartSize] = useMeasuredContainer();
@@ -196,6 +207,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const rightAxis = useMemo(() => axes.right || null, [axes]);
     const hasRightAxis = !!rightAxis || seriesDefinitions.some((entry) => entry.axis === "right");
     const [selectedDataKeys, setSelectedDataKeys] = useState([]);
+    const selectionStateRef = React.useRef({initialized: false, touched: false});
     const [viewMode, setViewMode] = useState("chart");
     const [showColumnDialog, setShowColumnDialog] = useState(false);
     const [columnWidths, setColumnWidths] = useState({});
@@ -248,20 +260,16 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const yAxisLabel = prepared.yAxisLabel;
 
     useEffect(() => {
-        // Keep selectedDataKeys in sync with availableDataKeys
-        if (selectedDataKeys.length === 0) {
-            // Initialize selectedDataKeys to all availableDataKeys
-            if (availableDataKeys.length > 0) {
-                setSelectedDataKeys(availableDataKeys);
-            }
-        } else {
-            // Remove unavailable keys from selectedDataKeys
-            const filteredSelectedKeys = selectedDataKeys.filter(key => availableDataKeys.includes(key));
-            if (filteredSelectedKeys.length !== selectedDataKeys.length) {
-                setSelectedDataKeys(filteredSelectedKeys);
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        setSelectedDataKeys((previousKeys) => {
+            const nextSelection = reconcileSelectedDataKeys(previousKeys, availableDataKeys, selectionStateRef.current);
+            selectionStateRef.current = {
+                ...selectionStateRef.current,
+                initialized: nextSelection.initialized,
+            };
+            return areKeyListsEqual(previousKeys, nextSelection.selectedDataKeys)
+                ? previousKeys
+                : nextSelection.selectedDataKeys;
+        });
     }, [availableDataKeys]);
 
     useEffect(() => {
@@ -297,16 +305,12 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
 
     // Function to handle selection changes for dataKeys
     const handleDataKeySelect = (dataKey) => {
-        if (selectedDataKeys.includes(dataKey)) {
-            // Remove dataKey
-            setSelectedDataKeys(selectedDataKeys.filter((key) => key !== dataKey));
-        } else {
-            // Add dataKey
-            setSelectedDataKeys([...selectedDataKeys, dataKey]);
-        }
+        selectionStateRef.current = {initialized: true, touched: true};
+        setSelectedDataKeys((previousKeys) => toggleSelectedDataKey(previousKeys, dataKey));
     };
 
     const handleClearSelection = () => {
+        selectionStateRef.current = {initialized: true, touched: true};
         setSelectedDataKeys([]);
     };
 
@@ -336,6 +340,17 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const legendProps = embedded
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
         : {};
+    const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
+    const showChartLegend = !showEmbeddedSeriesSelector;
+
+    const seriesToggleOptions = useMemo(() => availableDataKeys.map((dataKey, index) => {
+        const seriesDef = seriesDefinitions.find((entry) => entry.value === dataKey);
+        return {
+            value: dataKey,
+            label: seriesDef?.label || seriesDef?.name || dataKey,
+            color: seriesDef?.color || palette[index % Math.max(palette.length, 1)] || "#137cbd",
+        };
+    }), [availableDataKeys, palette, seriesDefinitions]);
 
     const selectedSeriesDefinitions = directSeriesChart
         ? seriesDefinitions.filter((entry) => selectedDataKeys.includes(entry.value))
@@ -397,7 +412,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 }}
                 contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
             />
-            <Legend {...legendProps}/>
+            {showChartLegend ? <Legend {...legendProps}/> : null}
             {selectedSeriesDefinitions.map((entry, index) => {
                 const commonProps = {
                     dataKey: entry.value,
@@ -547,9 +562,11 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 formatter={(value) => formatLargeNumber(value)}
                 contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
             />
-            <Legend
-                {...(embedded ? {wrapperStyle: {fontSize: "11px"}, iconSize: 10} : {})}
-            />
+            {showChartLegend ? (
+                <Legend
+                    {...(embedded ? {wrapperStyle: {fontSize: "11px"}, iconSize: 10} : {})}
+                />
+            ) : null}
         </PieChart>
     );
 
@@ -635,6 +652,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const resolvedHeight = isHorizontalBar
         ? (height || (embedded ? 320 : "100%"))
         : (height || (embedded ? 460 : "100%"));
+    const canRenderChartSelection = isPieChart ? pieFilteredData.length > 0 : selectedSeriesDefinitions.length > 0;
 
     return (
         <div
@@ -642,6 +660,55 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             ref={chartRef}
             data-dashboard-chart-id={chartExportId}
         >
+            {showEmbeddedSeriesSelector ? (
+                <div
+                    aria-label="Chart series selector"
+                    style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                        gap: "6px 12px",
+                        padding: "0 4px 10px",
+                    }}
+                >
+                    {seriesToggleOptions.map((option) => {
+                        const checked = selectedDataKeys.includes(option.value);
+                        return (
+                            <label
+                                key={option.value}
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 6,
+                                    fontSize: 11,
+                                    lineHeight: 1.2,
+                                    color: checked ? "#41566d" : "#7d8da1",
+                                    cursor: "pointer",
+                                    userSelect: "none",
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => handleDataKeySelect(option.value)}
+                                    style={{margin: 0}}
+                                />
+                                <span
+                                    aria-hidden="true"
+                                    style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: "999px",
+                                        background: option.color,
+                                        opacity: checked ? 1 : 0.35,
+                                    }}
+                                />
+                                <span>{option.label}</span>
+                            </label>
+                        );
+                    })}
+                </div>
+            ) : null}
             {!embedded ? (
                 <>
                     {!directSeriesChart && !isPieChart ? (
@@ -706,7 +773,22 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             )}
 
             {viewMode === "chart" ? (
-                chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
+                !canRenderChartSelection && !loading && !error ? (
+                    <div
+                        style={{
+                            height: "100%",
+                            minHeight: embedded ? 220 : 260,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            textAlign: "center",
+                            color: "#7d8da1",
+                            fontSize: 12,
+                        }}
+                    >
+                        Select at least one series to render the chart.
+                    </div>
+                ) : chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
                     <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
                         {isPieChart
                             ? pieChart

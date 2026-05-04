@@ -5,8 +5,12 @@ import { resolvePagingValues, withPagingInputs } from "./paging.js";
 import { buildDatasourceFetchInputs } from "./datasourceRequest.js";
 
 
-// Toggle with env var or config if you don't always want noisy logs
-const STACK_DEBUG = process.env.STACK_DEBUG === '1';
+// Toggle with env var or config if you don't always want noisy logs.
+// Guard `process` access because standalone browser previews may execute
+// outside a Node-style global.
+const STACK_DEBUG =
+    typeof process !== 'undefined' &&
+    process?.env?.STACK_DEBUG === '1';
 
 function logCallerStack(name , maxFrames = 5) {
     const err = new Error();
