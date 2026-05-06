@@ -141,7 +141,11 @@ function renderDashboardTableCell(cell, column, locale) {
             </span>
         );
     }
-    return text;
+    return (
+        <span className="forge-dashboard-table-cell-text" title={text}>
+            {text}
+        </span>
+    );
 }
 
 function Panel({container, children, actions = null}) {
