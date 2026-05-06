@@ -312,7 +312,7 @@ export function DashboardKPITable({container, context}) {
                 const format = lower === 'ctr' || lower === 'vtr' ? 'percent' : undefined;
                 return {key: column, label: titleizeDashboardKey(column), format};
             }
-            const key = String(column?.key || column?.id || '').trim();
+            const key = String(column?.key || column?.field || column?.id || '').trim();
             const lower = key.toLowerCase();
             const inferredFormat = lower === 'ctr' || lower === 'vtr' ? 'percent' : undefined;
             return {
@@ -824,6 +824,16 @@ export function DashboardDimensions({container, context}) {
     const metric = dimensionsConfig.metric || container.metric || {};
     const metricKey = metric.key;
     const metricLabel = metric.label || metricKey;
+    const palette = container.palette || dimensionsConfig.palette || metric.palette || [
+        '#2f6de1',
+        '#7a46d8',
+        '#db2f7d',
+        '#f55d1f',
+        '#d79619',
+        '#2aa84a',
+        '#24a0c7',
+        '#5a5ce6',
+    ];
 
     useSignalEffect(() => {
         if (!context?.dashboardKey) {
@@ -918,7 +928,7 @@ export function DashboardDimensions({container, context}) {
                         <tbody>
                         {rows.map((row, index) => (
                             <tr
-                                key={`${row?.[dimensionKey] || index}`}
+                                key={`${row?.[dimensionKey] ?? 'dimension'}:${index}`}
                                 onClick={() => onSelect(row, index)}
                                 style={{cursor: 'pointer', background: selectedEntityKey === row?.[dimensionKey] ? '#ebf1f5' : 'transparent'}}
                             >
@@ -935,16 +945,17 @@ export function DashboardDimensions({container, context}) {
                         const value = Number(row?.[metricKey] || 0);
                         const width = `${Math.max((value / maxValue) * 100, 2)}%`;
                         const isSelected = selectedEntityKey === row?.[dimensionKey];
+                        const barColor = palette[index % Math.max(palette.length, 1)] || '#137cbd';
                         return (
                             <button
-                                key={`${row?.[dimensionKey] || index}`}
+                                key={`${row?.[dimensionKey] ?? 'dimension'}:${index}`}
                                 type="button"
                                 onClick={() => onSelect(row, index)}
                                 style={{
                                     display: 'flex',
                                     flexDirection: 'column',
                                     gap: '6px',
-                                    border: isSelected ? '1px solid #137cbd' : '1px solid #d8e1e8',
+                                    border: isSelected ? `1px solid ${barColor}` : '1px solid #d8e1e8',
                                     background: '#ffffff',
                                     borderRadius: '8px',
                                     padding: '10px',
@@ -957,7 +968,7 @@ export function DashboardDimensions({container, context}) {
                                     <span style={{color: '#30404d'}}>{formatDashboardValue(value, metric.format, locale)}</span>
                                 </div>
                                 <div style={{height: '8px', background: '#ebf1f5', borderRadius: '999px', overflow: 'hidden'}}>
-                                    <div style={{height: '100%', width, background: '#137cbd'}}/>
+                                    <div style={{height: '100%', width, background: barColor}}/>
                                 </div>
                             </button>
                         );
@@ -970,6 +981,7 @@ export function DashboardDimensions({container, context}) {
 
 export function DashboardMessages({container, context}) {
     const metricsData = useMetrics(context);
+    const {collection} = useDataSourceState(context);
     const items = container.dashboard?.messages?.items || container.items || [];
     const normalizedItems = Array.isArray(items) && items.length > 0
         ? items
@@ -990,6 +1002,7 @@ export function DashboardMessages({container, context}) {
         filters: dashboardFilters,
         selection: dashboardSelection,
     };
+    const sourceRows = Array.isArray(collection) ? collection : [];
     const conditionSnapshot = createDashboardConditionSnapshot({
         context: {
             ...context,
@@ -1012,18 +1025,31 @@ export function DashboardMessages({container, context}) {
             {visibleItems.length === 0 ? <div style={subtitleStyle}>No active messages.</div> : null}
             {visibleItems.map((item, index) => {
                 const tone = toneColors[item.severity] || toneColors.info;
+                const sourceRow = sourceRows[Math.max(0, Number(item.rowIndex) || 0)] || sourceRows[0] || {};
+                const resolvedTitle = item.title
+                    ? interpolateDashboardTemplate(item.title, interpolationScope)
+                    : '';
+                const resolvedBody = item.body
+                    ? interpolateDashboardTemplate(item.body, interpolationScope)
+                    : item.text
+                        ? interpolateDashboardTemplate(item.text, interpolationScope)
+                        : item.field
+                            ? resolveKey(sourceRow, item.field)
+                            : item.bodyField
+                                ? resolveKey(sourceRow, item.bodyField)
+                                : '';
                 return (
                     <div
-                        key={`${item.title || item.body || index}`}
+                        key={`${resolvedTitle || resolvedBody || index}`}
                         style={{padding: '16px', borderRadius: '12px', border: `1px solid ${tone.border}`, borderLeft: `4px solid ${tone.border}`, background: tone.background, color: tone.text, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 1px 2px rgba(16, 22, 26, 0.04)'}}
                     >
                         <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px'}}>
-                            {item.title ? <div style={{fontWeight: 700}}>{interpolateDashboardTemplate(item.title, interpolationScope)}</div> : <div />}
+                            {resolvedTitle ? <div style={{fontWeight: 700}}>{resolvedTitle}</div> : <div />}
                             <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px', background: '#ffffffaa', color: tone.text}}>
                                 {String(item.severity || 'info')}
                             </span>
                         </div>
-                        <div style={{fontSize: '13px', lineHeight: 1.7, maxWidth: '92ch'}}>{interpolateDashboardTemplate(item.body, interpolationScope)}</div>
+                        <div style={{fontSize: '13px', lineHeight: 1.7, maxWidth: '92ch'}}>{resolvedBody}</div>
                     </div>
                 );
             })}
@@ -1170,13 +1196,19 @@ export function DashboardReport({container, context}) {
             <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
                 {visibleSections.map((section, index) => {
                     const tone = toneColors[section.tone] || toneColors.info;
+                    const rawBody = section.body;
+                    const bodyItems = Array.isArray(rawBody)
+                        ? rawBody
+                        : rawBody == null || rawBody === ''
+                            ? []
+                            : [rawBody];
                     return (
                         <div
                             key={section.id || section.title || index}
                             style={{border: `1px solid ${tone.border}`, background: tone.background, color: tone.text, borderRadius: '8px', padding: '12px'}}
                         >
                             {section.title ? <div style={{fontWeight: 700, marginBottom: '6px'}}>{interpolateDashboardTemplate(section.title, interpolationScope)}</div> : null}
-                            {(section.body || []).map((paragraph, bodyIndex) => (
+                            {bodyItems.map((paragraph, bodyIndex) => (
                                 <p key={bodyIndex} style={{margin: bodyIndex === 0 ? '0 0 8px' : '0 0 8px', lineHeight: 1.5}}>
                                     {interpolateDashboardTemplate(paragraph, interpolationScope)}
                                 </p>
@@ -1337,7 +1369,7 @@ export function DashboardTable({container, context}) {
         if (typeof col === 'string') {
             return {key: col, label: titleizeDashboardKey(col)};
         }
-        const key = String(col?.key || col?.id || '').trim();
+        const key = String(col?.key || col?.field || col?.id || '').trim();
         return {key, label: col?.label || titleizeDashboardKey(key), format: col?.format, align: col?.align};
     }).filter((col) => !!col.key), [rawColumns]);
 
