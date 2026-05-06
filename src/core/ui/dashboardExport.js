@@ -424,6 +424,9 @@ body {
   padding: 8px;
   border-bottom: 1px solid #ebf1f5;
   text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .plain-table th:last-child,
 .plain-table td:last-child {
