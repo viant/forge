@@ -6,9 +6,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -56,13 +58,26 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
         }
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val compact = maxWidth < 720.dp
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 2.dp)) {
-                itemsIndexed(rows) { index, row ->
-                    val isSelected = selection.rowIndex == index
-                    if (compact) {
+            if (compact) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    itemsIndexed(rows) { index, row ->
+                        val isSelected = selection.rowIndex == index
                         MobileTableCard(runtime, context, table, row, index, isSelected)
-                    } else {
-                        DesktopTableRow(runtime, context, table, row, index, isSelected)
+                    }
+                }
+            } else {
+                val horizontalScroll = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(horizontalScroll)
+                ) {
+                    DesktopTableHeader(table)
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        itemsIndexed(rows) { index, row ->
+                            val isSelected = selection.rowIndex == index
+                            DesktopTableRow(runtime, context, table, row, index, isSelected)
+                        }
                     }
                 }
             }
@@ -73,6 +88,23 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                 metrics = metrics,
                 currentPage = input.page ?: 1
             )
+        }
+    }
+}
+
+@Composable
+private fun DesktopTableHeader(table: TableDef) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF6F8FB), shape = RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 10.dp)
+    ) {
+        displayColumns(table).forEach { col ->
+            HeaderColumnCell(text = col.label ?: col.name ?: col.id.orEmpty())
+        }
+        if (buttonColumns(table).isNotEmpty() || iconColumns(table).isNotEmpty()) {
+            HeaderColumnCell(text = "Actions", weight = 0.8f)
         }
     }
 }
@@ -199,22 +231,64 @@ private fun DesktopTableRow(
                 else -> {
                     val key = col.id ?: col.name ?: ""
                     val value = row[key]?.toString() ?: ""
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 12.dp)
+                    ValueColumnCell(value = value)
+                }
+            }
+        }
+        if (buttonColumns(table).isNotEmpty() || iconColumns(table).isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .weight(0.8f)
+                    .padding(start = 4.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                buttonColumns(table).forEach { col ->
+                    Button(
+                        onClick = { executeRowAction(runtime, context, col, row, index) },
+                        modifier = Modifier.padding(end = 8.dp)
                     ) {
-                        Text(
-                            text = col.label ?: col.name ?: key,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF6A7280)
+                        Text(col.label ?: col.icon ?: col.id ?: "Action")
+                    }
+                }
+                iconColumns(table).forEach { col ->
+                    IconButton(
+                        onClick = { executeRowAction(runtime, context, col, row, index, event = "onClick") }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = col.label ?: col.icon ?: col.id ?: "Open"
                         )
-                        Text(text = value, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun RowScope.HeaderColumnCell(text: String, weight: Float = 1f) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = Color(0xFF6A7280),
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier
+            .weight(weight)
+            .widthIn(min = 140.dp)
+            .padding(end = 12.dp)
+    )
+}
+
+@Composable
+private fun RowScope.ValueColumnCell(value: String, weight: Float = 1f) {
+    Text(
+        text = value.ifBlank { "-" },
+        style = MaterialTheme.typography.bodyMedium,
+        modifier = Modifier
+            .weight(weight)
+            .widthIn(min = 140.dp)
+            .padding(end = 12.dp)
+    )
 }
 
 private fun displayColumns(table: TableDef): List<ColumnDef> {

@@ -142,6 +142,64 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(containers.last?.title, "Tablet Title")
     }
 
+    func testTableRendererUsesCompactCardsForPhoneAndRegularGridForTablet() {
+        XCTAssertEqual(
+            TableRenderer.resolvePresentationMode(
+                targetContext: ForgeTargetContext(platform: "ios", formFactor: "phone"),
+                horizontalSizeClass: .regular
+            ),
+            .compactCards
+        )
+        XCTAssertEqual(
+            TableRenderer.resolvePresentationMode(
+                targetContext: ForgeTargetContext(platform: "ios", formFactor: "tablet"),
+                horizontalSizeClass: .compact
+            ),
+            .regularGrid
+        )
+        XCTAssertEqual(
+            TableRenderer.resolvePresentationMode(
+                targetContext: nil,
+                horizontalSizeClass: .regular
+            ),
+            .regularGrid
+        )
+    }
+
+    func testTableDefDecodesLegacyStringColumnsAndRichActionColumns() throws {
+        let payload = """
+        {
+          "title": "Orders",
+          "columns": [
+            "campaign",
+            {
+              "id": "budget",
+              "label": "Budget"
+            },
+            {
+              "id": "open",
+              "type": "button",
+              "label": "Open",
+              "on": [
+                { "action": "window.openWindow", "args": ["detail"] }
+              ]
+            }
+          ]
+        }
+        """
+
+        let table = try JSONDecoder().decode(TableDef.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(table.title, "Orders")
+        XCTAssertEqual(table.columns.count, 3)
+        XCTAssertEqual(table.columns[0].id, "campaign")
+        XCTAssertEqual(table.columns[0].label, "campaign")
+        XCTAssertEqual(table.columns[1].id, "budget")
+        XCTAssertEqual(table.columns[1].label, "Budget")
+        XCTAssertEqual(table.columns[2].type, "button")
+        XCTAssertEqual(table.columns[2].on.first?.action, "window.openWindow")
+    }
+
     func testWindowOpensInline() async throws {
         let runtime = ForgeRuntime()
         let state = await runtime.openWindowInline(

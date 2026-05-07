@@ -746,11 +746,179 @@ public struct ChartDef: Codable, Sendable {
 
 public struct TableDef: Codable, Sendable {
     public let title: String?
-    public let columns: [String]
+    public let columns: [ColumnDef]
+    public let toolbar: ToolbarDef?
+    public let on: [ExecutionDef]
+    public let target: JSONValue?
+    public let targetOverrides: [String: JSONValue]
 
-    public init(title: String? = nil, columns: [String] = []) {
+    enum CodingKeys: String, CodingKey {
+        case title
+        case columns
+        case toolbar
+        case on
+        case target
+        case targetOverrides
+    }
+
+    public init(
+        title: String? = nil,
+        columns: [String] = [],
+        toolbar: ToolbarDef? = nil,
+        on: [ExecutionDef] = [],
+        target: JSONValue? = nil,
+        targetOverrides: [String: JSONValue] = [:]
+    ) {
+        self.title = title
+        self.columns = columns.map { ColumnDef(id: $0, name: $0, label: $0) }
+        self.toolbar = toolbar
+        self.on = on
+        self.target = target
+        self.targetOverrides = targetOverrides
+    }
+
+    public init(
+        title: String? = nil,
+        columns: [ColumnDef] = [],
+        toolbar: ToolbarDef? = nil,
+        on: [ExecutionDef] = [],
+        target: JSONValue? = nil,
+        targetOverrides: [String: JSONValue] = [:]
+    ) {
         self.title = title
         self.columns = columns
+        self.toolbar = toolbar
+        self.on = on
+        self.target = target
+        self.targetOverrides = targetOverrides
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        columns = try container.decodeIfPresent([ColumnDef].self, forKey: .columns) ?? []
+        toolbar = try container.decodeIfPresent(ToolbarDef.self, forKey: .toolbar)
+        on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
+        target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
+        targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
+    }
+}
+
+public struct ToolbarDef: Codable, Sendable {
+    public let items: [ToolbarItemDef]
+    public let target: JSONValue?
+    public let targetOverrides: [String: JSONValue]
+
+    public init(
+        items: [ToolbarItemDef] = [],
+        target: JSONValue? = nil,
+        targetOverrides: [String: JSONValue] = [:]
+    ) {
+        self.items = items
+        self.target = target
+        self.targetOverrides = targetOverrides
+    }
+}
+
+public struct ToolbarItemDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let icon: String?
+    public let align: String?
+    public let on: [ExecutionDef]
+    public let target: JSONValue?
+    public let targetOverrides: [String: JSONValue]
+
+    public init(
+        id: String? = nil,
+        label: String? = nil,
+        icon: String? = nil,
+        align: String? = nil,
+        on: [ExecutionDef] = [],
+        target: JSONValue? = nil,
+        targetOverrides: [String: JSONValue] = [:]
+    ) {
+        self.id = id
+        self.label = label
+        self.icon = icon
+        self.align = align
+        self.on = on
+        self.target = target
+        self.targetOverrides = targetOverrides
+    }
+}
+
+public struct ColumnDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let name: String?
+    public let label: String?
+    public let type: String?
+    public let width: Int?
+    public let icon: String?
+    public let on: [ExecutionDef]
+    public let target: JSONValue?
+    public let targetOverrides: [String: JSONValue]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case label
+        case type
+        case width
+        case icon
+        case on
+        case target
+        case targetOverrides
+    }
+
+    public init(
+        id: String? = nil,
+        name: String? = nil,
+        label: String? = nil,
+        type: String? = nil,
+        width: Int? = nil,
+        icon: String? = nil,
+        on: [ExecutionDef] = [],
+        target: JSONValue? = nil,
+        targetOverrides: [String: JSONValue] = [:]
+    ) {
+        self.id = id
+        self.name = name
+        self.label = label
+        self.type = type
+        self.width = width
+        self.icon = icon
+        self.on = on
+        self.target = target
+        self.targetOverrides = targetOverrides
+    }
+
+    public init(from decoder: Decoder) throws {
+        if let single = try? decoder.singleValueContainer(),
+           let raw = try? single.decode(String.self) {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.id = trimmed
+            self.name = trimmed
+            self.label = trimmed
+            self.type = nil
+            self.width = nil
+            self.icon = nil
+            self.on = []
+            self.target = nil
+            self.targetOverrides = [:]
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        type = try container.decodeIfPresent(String.self, forKey: .type)
+        width = try container.decodeIfPresent(Int.self, forKey: .width)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
+        target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
+        targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
     }
 }
 
@@ -878,10 +1046,23 @@ public struct ExecutionDef: Codable, Sendable {
     public let args: [String]
     public let parameters: [ParameterDef]
 
+    enum CodingKeys: String, CodingKey {
+        case action
+        case args
+        case parameters
+    }
+
     public init(action: String, args: [String] = [], parameters: [ParameterDef] = []) {
         self.action = action
         self.args = args
         self.parameters = parameters
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.action = try container.decode(String.self, forKey: .action)
+        self.args = try container.decodeIfPresent([String].self, forKey: .args) ?? []
+        self.parameters = try container.decodeIfPresent([ParameterDef].self, forKey: .parameters) ?? []
     }
 }
 
