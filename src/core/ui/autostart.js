@@ -63,9 +63,21 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
 
   try {
     if (cfgURL.startsWith('http://') || cfgURL.startsWith('https://')) {
-      stopFn = startUIBridgeHTTP({ url: cfgURL, token: cfgToken });
+      stopFn = startUIBridgeHTTP({
+        url: cfgURL,
+        token: cfgToken,
+        snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
+        snapshotBuilder: connectorConfig?.uiBridge?.snapshotBuilder,
+        clientId: connectorConfig?.uiBridge?.clientId,
+      });
     } else {
-      stopFn = startUIBridge({ url: cfgURL, token: cfgToken });
+      stopFn = startUIBridge({
+        url: cfgURL,
+        token: cfgToken,
+        snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
+        snapshotBuilder: connectorConfig?.uiBridge?.snapshotBuilder,
+        clientId: connectorConfig?.uiBridge?.clientId,
+      });
     }
     started = true;
     return stopFn;

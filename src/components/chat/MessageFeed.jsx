@@ -13,6 +13,21 @@ const DefaultBubbleRenderer = ({ message, context, resolveIcon, messageIndex }) 
 
 export const defaultClassifier = () => 'bubble';
 export const defaultRenderers  = { bubble: DefaultBubbleRenderer };
+export const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 48;
+
+export function isNearBottom(element, threshold = AUTO_SCROLL_BOTTOM_THRESHOLD_PX) {
+    const scrollHeight = Number(element?.scrollHeight);
+    const scrollTop = Number(element?.scrollTop);
+    const clientHeight = Number(element?.clientHeight);
+    if (!Number.isFinite(scrollHeight) || !Number.isFinite(scrollTop) || !Number.isFinite(clientHeight)) {
+        return true;
+    }
+    return scrollHeight - (scrollTop + clientHeight) <= threshold;
+}
+
+export function shouldAutoScrollFeed({ isFollowingBottom, hasMessages }) {
+    return !!hasMessages && !!isFollowingBottom;
+}
 
 export default function MessageFeed({
     messages,
@@ -27,15 +42,33 @@ export default function MessageFeed({
 
     const containerRef = useRef(null);
     const bottomRef = useRef(null);
+    const isFollowingBottomRef = useRef(true);
 
     const slice = messages.slice(Math.max(0, messages.length - visibleCount));
 
-    // Auto-scroll to bottom whenever new messages arrive
     useEffect(() => {
+        const el = containerRef.current;
+        if (!el || typeof window === 'undefined') return undefined;
+        const syncFollowState = () => {
+            isFollowingBottomRef.current = isNearBottom(el);
+        };
+        syncFollowState();
+        el.addEventListener('scroll', syncFollowState, { passive: true });
+        return () => el.removeEventListener('scroll', syncFollowState);
+    }, []);
+
+    useEffect(() => {
+        if (!shouldAutoScrollFeed({
+            isFollowingBottom: isFollowingBottomRef.current,
+            hasMessages: messages.length > 0,
+        })) {
+            return;
+        }
         // Scroll parent container to bottom
         const el = containerRef.current;
         if (el) {
             el.scrollTop = el.scrollHeight;
+            isFollowingBottomRef.current = true;
         }
 
         // Additionally bring sentinel into view (handles nested scroll areas)
