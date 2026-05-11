@@ -31,6 +31,9 @@ export function startUIBridge(options = {}) {
 
   const clientId = options.clientId || randomId();
   const snapshotOptions = options.snapshotOptions || { includeCollection: false };
+  const snapshotBuilder = typeof options.snapshotBuilder === 'function'
+    ? options.snapshotBuilder
+    : () => buildUISnapshot(snapshotOptions);
   const snapshotIntervalMs = Math.max(100, options.snapshotIntervalMs || 750);
 
   let closed = false;
@@ -44,7 +47,7 @@ export function startUIBridge(options = {}) {
   };
 
   const publishSnapshot = () => {
-    const snap = buildUISnapshot(snapshotOptions);
+    const snap = snapshotBuilder();
     const text = JSON.stringify(snap);
     if (text === lastSnapshotText) return;
     lastSnapshotText = text;
@@ -128,6 +131,9 @@ export function startUIBridgeHTTP(options = {}) {
 
   const clientId = options.clientId || randomId();
   const snapshotOptions = options.snapshotOptions || { includeCollection: false };
+  const snapshotBuilder = typeof options.snapshotBuilder === 'function'
+    ? options.snapshotBuilder
+    : () => buildUISnapshot(snapshotOptions);
   const snapshotIntervalMs = Math.max(200, options.snapshotIntervalMs || 1000);
   const reconnectDelayMs = Math.max(500, options.reconnectDelayMs || 1000);
   const sessionHeader = options.sessionHeader || 'Mcp-Session-Id';
@@ -166,7 +172,7 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const publishSnapshot = async () => {
-    const snap = buildUISnapshot(snapshotOptions);
+    const snap = snapshotBuilder();
     const text = JSON.stringify(snap);
     if (text === lastSnapshotText) return;
     lastSnapshotText = text;

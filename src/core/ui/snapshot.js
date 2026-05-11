@@ -174,6 +174,7 @@ export function buildUISnapshot(options = {}) {
         windowKey: w.windowKey,
         windowTitle: w.windowTitle,
         parentKey: w.parentKey,
+        parameters: safeJSON(w.parameters, options),
         inTab: w.inTab !== false,
         isModal: !!w.isModal,
         isMinimized: !!w.isMinimized,
