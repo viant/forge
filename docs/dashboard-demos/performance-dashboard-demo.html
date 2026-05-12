@@ -399,6 +399,9 @@ body {
   padding: 8px;
   border-bottom: 1px solid #ebf1f5;
   text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .plain-table th:last-child,
 .plain-table td:last-child {
@@ -406,6 +409,15 @@ body {
 }
 .plain-table td.metric-label {
   font-weight: 600;
+}
+.plain-table .table-link {
+  color: #1757bc;
+  font-weight: 600;
+  text-decoration: none;
+}
+.plain-table .table-link:hover {
+  color: #0f4aa3;
+  text-decoration: underline;
 }
 .chart-shell svg {
   width: 100%;
@@ -604,7 +616,7 @@ body {
             <p>Generated from the same dashboard blocks used in the interactive A+D dashboard view.</p>
           </div>
           <div class="dashboard-report__meta">
-            <span><strong>Generated:</strong> 2026-04-28T16:03:10.564Z</span>
+            <span><strong>Generated:</strong> 2026-05-12T19:42:54.293Z</span>
             <span><strong>Mode:</strong> document</span>
             <span><strong>Locale:</strong> en-US</span>
           </div>
@@ -1265,51 +1277,51 @@ body {
       <tbody>
         
           <tr>
-            <td>CA</td><td>Los Angeles</td><td>Los Angeles</td><td>$18,000</td><td class="forge-table-tone-danger">critical</td>
+            <td>CA</td><td>Los Angeles</td><td><a class="table-link" href="https://example.com/demo/dma/los-angeles" target="_blank" rel="noopener noreferrer" title="Los Angeles">Los Angeles</a></td><td>$18,000</td><td class="forge-table-tone-danger">critical</td>
           </tr>
         
           <tr>
-            <td>CA</td><td>San Francisco-Oakland-San Jose</td><td>San Francisco</td><td>$12,000</td><td class="forge-table-tone-warning">watch</td>
+            <td>CA</td><td>San Francisco-Oakland-San Jose</td><td><a class="table-link" href="https://example.com/demo/dma/san-francisco" target="_blank" rel="noopener noreferrer" title="San Francisco">San Francisco</a></td><td>$12,000</td><td class="forge-table-tone-warning">watch</td>
           </tr>
         
           <tr>
-            <td>CA</td><td>San Diego</td><td>San Diego</td><td>$7,000</td><td class="forge-table-tone-success">healthy</td>
+            <td>CA</td><td>San Diego</td><td><a class="table-link" href="https://example.com/demo/dma/san-diego" target="_blank" rel="noopener noreferrer" title="San Diego">San Diego</a></td><td>$7,000</td><td class="forge-table-tone-success">healthy</td>
           </tr>
         
           <tr>
-            <td>TX</td><td>Dallas-Fort Worth</td><td>Dallas</td><td>$11,000</td><td class="forge-table-tone-warning">watch</td>
+            <td>TX</td><td>Dallas-Fort Worth</td><td><a class="table-link" href="https://example.com/demo/dma/dallas" target="_blank" rel="noopener noreferrer" title="Dallas">Dallas</a></td><td>$11,000</td><td class="forge-table-tone-warning">watch</td>
           </tr>
         
           <tr>
-            <td>TX</td><td>Houston</td><td>Houston</td><td>$9,000</td><td class="forge-table-tone-warning">watch</td>
+            <td>TX</td><td>Houston</td><td><a class="table-link" href="https://example.com/demo/dma/houston" target="_blank" rel="noopener noreferrer" title="Houston">Houston</a></td><td>$9,000</td><td class="forge-table-tone-warning">watch</td>
           </tr>
         
           <tr>
-            <td>TX</td><td>Austin</td><td>Austin</td><td>$5,200</td><td class="forge-table-tone-success">healthy</td>
+            <td>TX</td><td>Austin</td><td><a class="table-link" href="https://example.com/demo/dma/austin" target="_blank" rel="noopener noreferrer" title="Austin">Austin</a></td><td>$5,200</td><td class="forge-table-tone-success">healthy</td>
           </tr>
         
           <tr>
-            <td>NY</td><td>New York</td><td>New York</td><td>$17,000</td><td class="forge-table-tone-success">healthy</td>
+            <td>NY</td><td>New York</td><td><a class="table-link" href="https://example.com/demo/dma/new-york" target="_blank" rel="noopener noreferrer" title="New York">New York</a></td><td>$17,000</td><td class="forge-table-tone-success">healthy</td>
           </tr>
         
           <tr>
-            <td>NY</td><td>Buffalo</td><td>Buffalo</td><td>$2,500</td><td class="forge-table-tone-success">healthy</td>
+            <td>NY</td><td>Buffalo</td><td><a class="table-link" href="https://example.com/demo/dma/buffalo" target="_blank" rel="noopener noreferrer" title="Buffalo">Buffalo</a></td><td>$2,500</td><td class="forge-table-tone-success">healthy</td>
           </tr>
         
           <tr>
-            <td>FL</td><td>Miami-Fort Lauderdale</td><td>Miami</td><td>$8,200</td><td class="forge-table-tone-warning">watch</td>
+            <td>FL</td><td>Miami-Fort Lauderdale</td><td><a class="table-link" href="https://example.com/demo/dma/miami" target="_blank" rel="noopener noreferrer" title="Miami">Miami</a></td><td>$8,200</td><td class="forge-table-tone-warning">watch</td>
           </tr>
         
           <tr>
-            <td>FL</td><td>Tampa-St. Petersburg</td><td>Tampa</td><td>$6,100</td><td class="forge-table-tone-warning">watch</td>
+            <td>FL</td><td>Tampa-St. Petersburg</td><td><a class="table-link" href="https://example.com/demo/dma/tampa" target="_blank" rel="noopener noreferrer" title="Tampa">Tampa</a></td><td>$6,100</td><td class="forge-table-tone-warning">watch</td>
           </tr>
         
           <tr>
-            <td>IL</td><td>Chicago</td><td>Chicago</td><td>$11,600</td><td class="forge-table-tone-success">healthy</td>
+            <td>IL</td><td>Chicago</td><td><a class="table-link" href="https://example.com/demo/dma/chicago" target="_blank" rel="noopener noreferrer" title="Chicago">Chicago</a></td><td>$11,600</td><td class="forge-table-tone-success">healthy</td>
           </tr>
         
           <tr>
-            <td>WA</td><td>Seattle-Tacoma</td><td>Seattle</td><td>$9,800</td><td class="forge-table-tone-success">healthy</td>
+            <td>WA</td><td>Seattle-Tacoma</td><td><a class="table-link" href="https://example.com/demo/dma/seattle" target="_blank" rel="noopener noreferrer" title="Seattle">Seattle</a></td><td>$9,800</td><td class="forge-table-tone-success">healthy</td>
           </tr>
         
       </tbody>
@@ -1374,11 +1386,11 @@ body {
       <tbody>
         
           <tr>
-            <td>US</td><td>NA</td><td>$100,000</td><td>4.2M</td><td>2.4%</td><td>39.1%</td><td class="forge-table-tone-warning">watch</td>
+            <td><a class="table-link" href="https://example.com/demo/reports/country/us" target="_blank" rel="noopener noreferrer" title="US">US</a></td><td>NA</td><td>$100,000</td><td>4.2M</td><td>2.4%</td><td>39.1%</td><td class="forge-table-tone-warning">watch</td>
           </tr>
         
           <tr>
-            <td>CA</td><td>NA</td><td>$12,000</td><td>620K</td><td>2.1%</td><td>51.0%</td><td class="forge-table-tone-danger">critical</td>
+            <td><a class="table-link" href="https://example.com/demo/reports/country/ca" target="_blank" rel="noopener noreferrer" title="CA">CA</a></td><td>NA</td><td>$12,000</td><td>620K</td><td>2.1%</td><td>51.0%</td><td class="forge-table-tone-danger">critical</td>
           </tr>
         
       </tbody>

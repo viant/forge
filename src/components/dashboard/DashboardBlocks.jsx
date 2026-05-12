@@ -3,6 +3,7 @@ import {useSignalEffect} from '@preact/signals-react';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
+import {resolveTableLink} from "../../utils/tableLink.js";
 import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
@@ -128,7 +129,22 @@ function dashboardStatusTone(value = '') {
     return toneColors.warning;
 }
 
-function renderDashboardTableCell(cell, column, locale) {
+function renderDashboardTableCell(cell, row, column, locale) {
+    const link = resolveTableLink({row, column, value: cell});
+    if (link) {
+        return (
+            <a
+                href={link.href}
+                target={link.target}
+                rel={link.rel}
+                title={link.title || link.text}
+                className="forge-dashboard-table-link"
+                onClick={(event) => event.stopPropagation()}
+            >
+                {link.text}
+            </a>
+        );
+    }
     if (typeof cell === 'number') {
         return formatDashboardValue(cell, column?.format, locale);
     }
@@ -1374,7 +1390,7 @@ export function DashboardTable({container, context}) {
             return {key: col, label: titleizeDashboardKey(col)};
         }
         const key = String(col?.key || col?.field || col?.id || '').trim();
-        return {key, label: col?.label || titleizeDashboardKey(key), format: col?.format, align: col?.align};
+        return {key, label: col?.label || titleizeDashboardKey(key), format: col?.format, align: col?.align, type: col?.type, link: col?.link};
     }).filter((col) => !!col.key), [rawColumns]);
 
     const filteredCollection = useMemo(() => {
@@ -1387,7 +1403,9 @@ export function DashboardTable({container, context}) {
         if (!query) return filteredCollection;
         return filteredCollection.filter((row) => normalizedColumns.some((col) => {
             const value = resolveKey(row, col.key);
-            return String(value ?? '').toLowerCase().includes(query);
+            const link = resolveTableLink({row, column: col, value});
+            const candidate = link ? link.text : value;
+            return String(candidate ?? '').toLowerCase().includes(query);
         }));
     }, [filteredCollection, normalizedColumns, quickFilter]);
 
@@ -1397,16 +1415,21 @@ export function DashboardTable({container, context}) {
     const sortedRows = useMemo(() => {
         const rows = quickFilteredCollection.slice(0, limit);
         if (!sortKey) return rows;
+        const sortColumn = normalizedColumns.find((col) => col.key === sortKey);
         return [...rows].sort((a, b) => {
-            const av = a?.[sortKey];
-            const bv = b?.[sortKey];
+            const avRaw = resolveKey(a, sortKey);
+            const bvRaw = resolveKey(b, sortKey);
+            const avLink = resolveTableLink({row: a, column: sortColumn, value: avRaw});
+            const bvLink = resolveTableLink({row: b, column: sortColumn, value: bvRaw});
+            const av = avLink ? avLink.text : avRaw;
+            const bv = bvLink ? bvLink.text : bvRaw;
             const an = Number(av);
             const bn = Number(bv);
             const numeric = Number.isFinite(an) && Number.isFinite(bn);
             const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
             return sortDir === 'desc' ? -cmp : cmp;
         });
-    }, [quickFilteredCollection, limit, sortKey, sortDir]);
+    }, [quickFilteredCollection, limit, normalizedColumns, sortKey, sortDir]);
 
     const handleSort = (key) => {
         if (sortKey === key) {
@@ -1484,7 +1507,7 @@ export function DashboardTable({container, context}) {
                                         const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(" ");
                                         return (
                                             <td key={`${index}-${ci}`} className={cellClassName} style={cellStyle}>
-                                                {renderDashboardTableCell(resolveKey(row, col.key), col, locale)}
+                                                {renderDashboardTableCell(resolveKey(row, col.key), row, col, locale)}
                                             </td>
                                         );
                                     })}

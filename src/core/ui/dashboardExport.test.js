@@ -87,6 +87,13 @@ const html = buildStandaloneDashboardHtml({
         { title: 'Summary', tone: 'info', body: ['US dominates spend.', 'Zero-spend rate is elevated.'] },
       ],
     },
+    {
+      kind: 'dashboard.table',
+      title: 'Accounts',
+      columnSpan: 6,
+      columns: [{ key: 'account', label: 'Account', type: 'link', link: { href: 'accountUrl' } }],
+      rows: [{ raw: { account: 'Primary', accountUrl: 'https://example.com/accounts/primary' }, account: 'Primary' }],
+    },
   ],
 });
 
@@ -104,6 +111,8 @@ assert.match(html, /country=US/);
 assert.match(html, /High zero-spend rate/);
 assert.match(html, /td_budget_status: has_budget/);
 assert.match(html, /US dominates spend/);
+assert.match(html, /href="https:\/\/example\.com\/accounts\/primary"/);
+assert.match(html, />Primary<\/a>/);
 assert.match(html, /grid-column: span 8/);
 assert.doesNotMatch(html, /<main class="dashboard-report">/);
 

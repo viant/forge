@@ -399,6 +399,9 @@ body {
   padding: 8px;
   border-bottom: 1px solid #ebf1f5;
   text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .plain-table th:last-child,
 .plain-table td:last-child {
@@ -406,6 +409,15 @@ body {
 }
 .plain-table td.metric-label {
   font-weight: 600;
+}
+.plain-table .table-link {
+  color: #1757bc;
+  font-weight: 600;
+  text-decoration: none;
+}
+.plain-table .table-link:hover {
+  color: #0f4aa3;
+  text-decoration: underline;
 }
 .chart-shell svg {
   width: 100%;
@@ -571,7 +583,7 @@ body {
     <header class="dashboard-export__header">
       <h1 class="dashboard-export__title">Operations Dashboard Demo</h1>
       <p class="dashboard-export__subtitle">A second dashboard variant showing service health and incident flow</p>
-      <p class="dashboard-export__subtitle">Generated 2026-04-28T16:03:10.582Z</p>
+      <p class="dashboard-export__subtitle">Generated 2026-05-12T19:42:54.315Z</p>
       <div class="dashboard-export__state"><span class="dashboard-export__state-chip"><strong>Filter</strong>severity=critical, warning</span></div>
     </header>
     <div class="dashboard-export__grid">

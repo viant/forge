@@ -244,6 +244,17 @@
     margin: 0;
 }
 
+.forge-table-link {
+    color: #1757bc;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.forge-table-link:hover {
+    color: #0f4aa3;
+    text-decoration: underline;
+}
+
 
 .show-more-icon {
     cursor: pointer;

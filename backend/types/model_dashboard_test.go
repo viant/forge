@@ -72,6 +72,11 @@ view:
             label: State
           - key: dma
             label: DMA
+          - key: city
+            label: City
+            type: link
+            link:
+              href: cityDashboardUrl
         quickFilter: true
         density: compact
         formattingRules:
@@ -130,8 +135,11 @@ view:
 	if tableBlock.Dashboard.Table.QuickFilter != true || tableBlock.Dashboard.Table.Density != "compact" {
 		t.Fatalf("table options were not normalized under dashboard.table: %#v", tableBlock.Dashboard.Table)
 	}
-	if len(tableBlock.Dashboard.Table.Columns) != 2 || len(tableBlock.Dashboard.Table.FormattingRules) != 1 {
+	if len(tableBlock.Dashboard.Table.Columns) != 3 || len(tableBlock.Dashboard.Table.FormattingRules) != 1 {
 		t.Fatalf("table columns/formatting were not normalized under dashboard.table: %#v", tableBlock.Dashboard.Table)
+	}
+	if tableBlock.Dashboard.Table.Columns[2].Type != "link" || tableBlock.Dashboard.Table.Columns[2].Link == nil || tableBlock.Dashboard.Table.Columns[2].Link.Href != "cityDashboardUrl" {
+		t.Fatalf("table link column was not preserved under dashboard.table: %#v", tableBlock.Dashboard.Table.Columns[2])
 	}
 
 	encoded, err := json.Marshal(root)
@@ -212,6 +220,11 @@ view:
                 label: State
               - key: dma
                 label: DMA
+              - key: city
+                label: City
+                type: link
+                link:
+                  href: cityDashboardUrl
             limit: 50
             quickFilter: true
             density: compact
@@ -255,8 +268,11 @@ view:
 	if tableBlock.Dashboard.Table.Limit != 50 || !tableBlock.Dashboard.Table.QuickFilter {
 		t.Fatalf("grouped table options were not preserved: %#v", tableBlock.Dashboard.Table)
 	}
-	if len(tableBlock.Dashboard.Table.Columns) != 2 || len(tableBlock.Dashboard.Table.FormattingRules) != 1 {
+	if len(tableBlock.Dashboard.Table.Columns) != 3 || len(tableBlock.Dashboard.Table.FormattingRules) != 1 {
 		t.Fatalf("grouped table columns/formatting were not preserved: %#v", tableBlock.Dashboard.Table)
+	}
+	if tableBlock.Dashboard.Table.Columns[2].Type != "link" || tableBlock.Dashboard.Table.Columns[2].Link == nil || tableBlock.Dashboard.Table.Columns[2].Link.Href != "cityDashboardUrl" {
+		t.Fatalf("grouped table link column was not preserved: %#v", tableBlock.Dashboard.Table.Columns[2])
 	}
 
 	encoded, err := json.Marshal(root)

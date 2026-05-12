@@ -12,6 +12,7 @@ import "./Basic.css";
 import Toolbar from "./basic/Toolbar.jsx";
 import FullContentDialog from "./FullContentDialog";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "./formattingRules.js";
+import {resolveTableCellText, resolveTableLink} from "../../utils/tableLink.js";
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -145,9 +146,15 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             return collection;
         }
 
+        const sortColumn = columnsToUse.find((col) => col.id === sortColumnId) || columns.find((col) => col.id === sortColumnId);
+
         return [...collection].sort((a, b) => {
-            const aVal = resolveKey(a, sortColumnId);
-            const bVal = resolveKey(b, sortColumnId);
+            const aRaw = resolveKey(a, sortColumnId);
+            const bRaw = resolveKey(b, sortColumnId);
+            const aLink = resolveTableLink({row: a, column: sortColumn, value: aRaw});
+            const bLink = resolveTableLink({row: b, column: sortColumn, value: bRaw});
+            const aVal = aLink ? aLink.text : aRaw;
+            const bVal = bLink ? bLink.text : bRaw;
 
             // Handle null/undefined values
             if (aVal === undefined || aVal === null) return sortDirection === "asc" ? -1 : 1;
@@ -221,7 +228,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             for (let colIndex = 0; colIndex < columnsToUse.length; colIndex++) {
                 const col = columnsToUse[colIndex];
                 const rawValue = resolveKey(item, col.id);
-                let displayedText = rawValue
+                let displayedText = resolveTableCellText({row: item, column: col, value: rawValue});
                 if (col.numericFormat) {
                     const format = numeralFormats[col.numericFormat] || col.numericFormat
                     let numeralValue = 0.0

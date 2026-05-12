@@ -29,3 +29,38 @@ Rule fields:
 - `value` / `values`: Expected value or values.
 - `style`: CSS style object applied to the rendered cell.
 - `className`: CSS class applied in addition to the style. Built-in tone classes are `forge-table-tone-info`, `forge-table-tone-success`, `forge-table-tone-warning`, and `forge-table-tone-danger`.
+
+## Link Columns
+
+Links are explicit in column metadata. Use the display field as the column key,
+then point `link.href` at the exact row field that contains the URL.
+
+```yaml
+table:
+  columns:
+    - id: customerName
+      name: Customer
+      type: link
+      link:
+        href: customerUrl
+
+dashboard:
+  table:
+    columns:
+      - key: city
+        label: City
+        type: link
+        link:
+          href: cityDashboardUrl
+```
+
+The row can also emit a structured link value directly:
+
+```json
+{
+  "city": {
+    "href": "https://example.com/demo/dma/seattle",
+    "label": "Seattle"
+  }
+}
+```

@@ -40,6 +40,10 @@ assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.
 assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.dimensions'), true);
 assert.equal(metadata.view.content.containers.some((c) => c.kind === 'dashboard.report'), true);
 assert.equal(metadata.view.content.containers.find((c) => c.id === 'byCountry').on[0].handler, 'dashboardDemo.updateDetailTrend');
+assert.equal(metadata.view.content.containers.find((c) => c.id === 'countryTable').columns[0].type, 'link');
+assert.equal(metadata.view.content.containers.find((c) => c.id === 'countryTable').columns[0].link.href, 'reportUrl');
+assert.equal(metadata.view.content.containers.find((c) => c.id === 'dmaTable').columns[2].type, 'link');
+assert.equal(metadata.view.content.containers.find((c) => c.id === 'dmaTable').columns[2].link.href, 'cityDashboardUrl');
 
 const actions = metadata.actions.import({
   identity: { windowId: 'W1' },
@@ -52,6 +56,8 @@ assert.equal(seed.perf.metrics.summary.previous_total_spend, 118000);
 assert.equal(seed.detailTrend.collection[0].series, 'US');
 assert.equal(seed.byState.collection.some((row) => row.stateCode === 'CA'), true);
 assert.equal(seed.byDma.collection.some((row) => row.dma === 'Los Angeles'), true);
+assert.equal(seed.byCountry.collection.some((row) => row.reportUrl === 'https://example.com/demo/reports/country/us'), true);
+assert.equal(seed.byDma.collection.some((row) => row.cityDashboardUrl === 'https://example.com/demo/dma/los-angeles'), true);
 assert.equal(opsMetadata.view.content.title, 'Operations Dashboard Demo');
 assert.equal(opsMetadata.view.content.containers.some((c) => c.kind === 'dashboard.status'), true);
 assert.equal(opsSeed.ops.metrics.summary.open_incidents, 7);
