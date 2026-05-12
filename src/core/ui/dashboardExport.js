@@ -1,4 +1,5 @@
 import {resolveKey} from '../../utils/selector.js';
+import {resolveTableLink} from '../../utils/tableLink.js';
 import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, createDashboardConditionSnapshot, evaluateDashboardConditionSnapshot, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate} from '../../components/dashboard/dashboardUtils.js';
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from '../../components/dashboard/geoMapUtils.js';
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from '../../components/table/formattingRules.js';
@@ -20,6 +21,21 @@ function styleObjectToCss(style = {}) {
       return `${cssKey}:${String(value).replace(/"/g, '&quot;')}`;
     })
     .join(';');
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(String(value ?? ''));
+}
+
+function renderExportTableCellContent(row, column) {
+  const rawRow = row?.raw || row;
+  const value = resolveKey(rawRow, column.key);
+  const link = resolveTableLink({row: rawRow, column, value});
+  if (link) {
+    const title = link.title || link.text;
+    return `<a class="table-link" href="${escapeAttribute(link.href)}" target="${escapeAttribute(link.target)}" rel="${escapeAttribute(link.rel)}"${title ? ` title="${escapeAttribute(title)}"` : ''}>${escapeHtml(link.text)}</a>`;
+  }
+  return escapeHtml(row?.[column.key] ?? '-');
 }
 
 const toneClassBySeverity = {
@@ -434,6 +450,15 @@ body {
 }
 .plain-table td.metric-label {
   font-weight: 600;
+}
+.plain-table .table-link {
+  color: #1757bc;
+  font-weight: 600;
+  text-decoration: none;
+}
+.plain-table .table-link:hover {
+  color: #0f4aa3;
+  text-decoration: underline;
 }
 .chart-shell svg {
   width: 100%;
@@ -945,7 +970,7 @@ function renderTableBlock(block) {
               const cellRules = matchingRules(row.raw || row, rules, 'cell', col.key);
               const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(' ');
               const cellStyle = styleObjectToCss({...mergeStyles(rowRules), ...mergeStyles(cellRules)});
-              return `<td${cellClassName ? ` class="${escapeHtml(cellClassName)}"` : ''}${cellStyle ? ` style="${cellStyle}"` : ''}>${escapeHtml(row?.[col.key] ?? '-')}</td>`;
+              return `<td${cellClassName ? ` class="${escapeHtml(cellClassName)}"` : ''}${cellStyle ? ` style="${cellStyle}"` : ''}>${renderExportTableCellContent(row, col)}</td>`;
             }).join('')}
           </tr>
         `;
@@ -1608,7 +1633,7 @@ function buildTableBlock(container, blockContext) {
   const rawColumns = container.dashboard?.table?.columns || container.columns || [];
   const columns = rawColumns.map((col) => {
     if (typeof col === 'string') return {key: col, label: col};
-    return {key: col?.key || '', label: col?.label || col?.key || '', format: col?.format};
+    return {key: col?.key || '', label: col?.label || col?.key || '', format: col?.format, type: col?.type, link: col?.link, align: col?.align};
   }).filter((col) => !!col.key);
   const limit = container.dashboard?.table?.limit || container.limit || 200;
   const rows = applyDashboardSelectionToCollection(

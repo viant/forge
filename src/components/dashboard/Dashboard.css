@@ -327,6 +327,19 @@
     -webkit-line-clamp: 3;
 }
 
+.forge-dashboard-table-link {
+    color: #1757bc;
+    font-weight: 600;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.forge-dashboard-table-link:hover {
+    color: #0f4aa3;
+    text-decoration: underline;
+}
+
 .forge-dashboard-table tbody tr:nth-child(even) td {
     background: #fbfdff;
 }

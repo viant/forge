@@ -989,10 +989,12 @@ type DashboardTableAction struct {
 }
 
 type DashboardTableColumn struct {
-	Key    string `json:"key,omitempty" yaml:"key,omitempty"`
-	Label  string `json:"label,omitempty" yaml:"label,omitempty"`
-	Format string `json:"format,omitempty" yaml:"format,omitempty"`
-	Align  string `json:"align,omitempty" yaml:"align,omitempty"`
+	Key    string     `json:"key,omitempty" yaml:"key,omitempty"`
+	Label  string     `json:"label,omitempty" yaml:"label,omitempty"`
+	Format string     `json:"format,omitempty" yaml:"format,omitempty"`
+	Align  string     `json:"align,omitempty" yaml:"align,omitempty"`
+	Type   string     `json:"type,omitempty" yaml:"type,omitempty"`
+	Link   *TableLink `json:"link,omitempty" yaml:"link,omitempty"`
 }
 
 // DashboardDetail is a marker block. Nested detail content is described by the
@@ -1044,6 +1046,13 @@ type TableFormattingRule struct {
 	ClassName string                 `json:"className,omitempty" yaml:"className,omitempty"`
 }
 
+type TableLink struct {
+	Href   string `json:"href,omitempty" yaml:"href,omitempty"`
+	Label  string `json:"label,omitempty" yaml:"label,omitempty"`
+	Target string `json:"target,omitempty" yaml:"target,omitempty"`
+	Rel    string `json:"rel,omitempty" yaml:"rel,omitempty"`
+}
+
 type Toolbar struct {
 	Items           []Item                            `json:"items" yaml:"items"`
 	Modes           []string                          `json:"modes,omitempty" yaml:"modes,omitempty"`
@@ -1065,6 +1074,7 @@ type Column struct {
 	Type              string                 `json:"type,omitempty" yaml:"type,omitempty"`
 	MultiSelect       bool                   `json:"multiSelect,omitempty" yaml:"multiSelect,omitempty"`
 	EnforceColumnSize bool                   `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
+	Link              *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
 	CellProperties    map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
 	HeadProperties    map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
 	Progress          *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`

@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from "react";
 import {Button, Icon, Checkbox} from "@blueprintjs/core";
 import ProgressBar from "../../control/ProgressBar.jsx";
 import {useCellEvents} from "../../../hooks/event.js";
+import {resolveTableLink} from "../../../utils/tableLink.js";
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -126,6 +127,22 @@ const TableCell = ({
         case "checkbox":
             cellContent = <Checkbox checked={!!value} {...cellProps} />;
             break;
+        case "link": {
+            const link = resolveTableLink({row, column: col, value});
+            cellContent = link ? (
+                <a
+                    href={link.href}
+                    target={link.target}
+                    rel={link.rel}
+                    title={link.title || link.text}
+                    className="forge-table-link"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    {link.text}
+                </a>
+            ) : displayedText;
+            break;
+        }
         default:
             if (enforceCellSize) {
                 cellContent = (
