@@ -1,4 +1,5 @@
 import React, {useState, useEffect, useMemo} from "react";
+import {useSignalEffect} from "@preact/signals-react";
 import {
     Button,
     Dialog,
@@ -30,6 +31,7 @@ import {
 import {format} from "date-fns";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
+import { resolveSelector } from "../utils/selector.js";
 
 function useMeasuredContainer() {
     const ref = React.useRef(null);
@@ -188,6 +190,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const {chart} = container;
     const [chartRef, chartSize] = useMeasuredContainer();
     const [chartReady, setChartReady] = useState(false);
+    const [, forceRender] = useState(0);
 
     // Extract chart configuration
     const {
@@ -214,8 +217,62 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const [expandedCell, setExpandedCell] = useState(null);
 
     const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || seriesDefinitions[0]?.value || "");
+    const resolveChartContext = () => {
+        if (!chart) return context;
+        const refs = chart.dataSourceRefs || {};
+        const selector = chart.dataSourceRefSelector || chart.dataSourceSelector;
+        const source = String(chart.dataSourceRefSource || 'windowForm').toLowerCase();
+        let directRef = chart.dataSourceRef || null;
+        if (!directRef && selector && refs && typeof refs === 'object') {
+            let scope = {};
+            switch (source) {
+                case 'form':
+                    scope = context?.signals?.form?.peek?.() || {};
+                    break;
+                case 'filter':
+                case 'filters':
+                    scope = context?.handlers?.dataSource?.peekFilter?.() || {};
+                    break;
+                case 'input':
+                    scope = context?.signals?.input?.peek?.() || {};
+                    break;
+                case 'windowform':
+                default:
+                    scope = context?.signals?.windowForm?.peek?.() || {};
+                    break;
+            }
+            const key = resolveSelector(scope, selector);
+            if (key != null && refs[key]) {
+                directRef = refs[key];
+            }
+        }
+        return directRef ? context.Context(directRef) : context;
+    };
 
-    const { collection, loading, error } = useDataSourceState(context);
+    useSignalEffect(() => {
+        if (!chart?.dataSourceRefSelector) return;
+        const source = String(chart.dataSourceRefSource || 'windowForm').toLowerCase();
+        switch (source) {
+            case 'form':
+                context?.signals?.form?.value;
+                break;
+            case 'filter':
+            case 'filters':
+                context?.signals?.input?.value?.filter;
+                break;
+            case 'input':
+                context?.signals?.input?.value;
+                break;
+            case 'windowform':
+            default:
+                context?.signals?.windowForm?.value;
+                break;
+        }
+        forceRender((x) => x + 1);
+    });
+
+    const chartContext = resolveChartContext();
+    const { collection, loading, error } = useDataSourceState(chartContext);
 
     const isPieChart = type === "pie" || type === "donut";
     const isHorizontalBar = isHorizontalBarType(type);

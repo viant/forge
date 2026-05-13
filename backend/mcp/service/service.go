@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -69,6 +70,7 @@ func (s *Service) UISnapshot(ctx context.Context, in *UISnapshotInput) (*UISnaps
 
 type UICommandInput struct {
 	ClientID  string      `json:"clientId,omitempty"`
+	Namespace string      `json:"namespace,omitempty"`
 	Method    string      `json:"method"`
 	Params    interface{} `json:"params,omitempty"`
 	TimeoutMs int         `json:"timeoutMs,omitempty"`
@@ -93,7 +95,10 @@ func (s *Service) UICommand(ctx context.Context, in *UICommandInput) (*UICommand
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	ns, _ := s.ns.Namespace(ctx)
+	ns := strings.TrimSpace(in.Namespace)
+	if ns == "" {
+		ns, _ = s.ns.Namespace(ctx)
+	}
 	resp, err := s.hub.Call(ctx, ns, in.ClientID, in.Method, in.Params)
 	if err != nil {
 		return nil, err

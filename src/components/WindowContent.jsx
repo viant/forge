@@ -1,10 +1,15 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {useSignals} from '@preact/signals-react/runtime';
+import {useSignalEffect} from '@preact/signals-react';
 
 import {Spinner} from '@blueprintjs/core';
 import SoftSkeleton, { SoftBlock } from './SoftSkeleton.jsx';
 
 import {
     getMetadataSignal,
+    getCollectionSignal,
+    getControlSignal,
+    getInputSignal,
     removeWindow,
 } from '../core';
 
@@ -20,6 +25,96 @@ import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 import useDataConnector from '../hooks/dataconnector.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
+import { resolveParameters } from '../hooks/parameters.js';
+import { resolveSelector } from '../utils/selector.js';
+
+function resolveInitialWindowFormValues(metadata) {
+    const windowCfg = metadata?.window || {};
+    const onEntries = [
+        ...(Array.isArray(windowCfg.on) ? windowCfg.on : []),
+        ...(Array.isArray(metadata?.on) ? metadata.on : []),
+    ];
+    const initial = {};
+    for (const entry of onEntries) {
+        if (entry?.event !== 'onInit' || entry?.handler !== 'dataSource.setWindowFormData') continue;
+        const parameters = Array.isArray(entry?.parameters) ? entry.parameters : [];
+        for (const parameter of parameters) {
+            if (parameter?.in !== 'const') continue;
+            const name = String(parameter?.name || '').trim();
+            if (!name) continue;
+            initial[name] = parameter?.location;
+        }
+    }
+    return initial;
+}
+
+function collectRequiredDataSourceRefs(node, scope, refs) {
+    if (!node || typeof node !== 'object') return;
+
+    const addRef = (ref) => {
+        const value = String(ref || '').trim();
+        if (value) refs.add(value);
+    };
+
+    const resolveMappedRef = (entry) => {
+        const selector = String(entry?.dataSourceRefSelector || entry?.dataSourceSelector || '').trim();
+        const mapping = entry?.dataSourceRefs;
+        if (!selector || !mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+            return '';
+        }
+        const key = resolveSelector(scope || {}, selector);
+        return key != null ? String(mapping[key] || '').trim() : '';
+    };
+
+    const addMappedRefs = (entry) => {
+        const mapping = entry?.dataSourceRefs;
+        if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+            return;
+        }
+        for (const value of Object.values(mapping)) {
+            addRef(value);
+        }
+    };
+
+    addRef(node.dataSourceRef);
+    addMappedRefs(node);
+    addRef(resolveMappedRef(node));
+
+    if (node.chart) {
+        addRef(node.chart.dataSourceRef);
+        addMappedRefs(node.chart);
+        addRef(resolveMappedRef(node.chart));
+    }
+
+    if (Array.isArray(node.items)) {
+        for (const item of node.items) {
+            addRef(item?.dataSourceRef);
+            addMappedRefs(item);
+            addRef(resolveMappedRef(item));
+        }
+    }
+
+    if (Array.isArray(node.containers)) {
+        for (const child of node.containers) {
+            collectRequiredDataSourceRefs(child, scope, refs);
+        }
+    }
+}
+
+function expandRequiredDataSourceRefs(metadata, refs) {
+    const all = metadata?.dataSource || {};
+    const result = new Set(refs);
+    const queue = [...result];
+    while (queue.length > 0) {
+        const ref = queue.shift();
+        const parentRef = String(all?.[ref]?.dataSourceRef || '').trim();
+        if (parentRef && !result.has(parentRef)) {
+            result.add(parentRef);
+            queue.push(parentRef);
+        }
+    }
+    return Array.from(result);
+}
 
 
 /* ------------------------------------------------------------------
@@ -29,8 +124,14 @@ import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
  * ------------------------------------------------------------------ */
 
 function WindowContentInner({window, metadata, services}) {
+    useSignals();
     const {windowKey, windowData, windowId, parameters = {}} = window;
     const baseKey = (windowKey || '').split('?')[0];
+    const defaultDataSourceRef = metadata?.view?.dataSourceRef || Object.keys(metadata?.dataSource || {})[0];
+    const initialWindowFormSeed = useMemo(() => ({
+        ...(parameters && typeof parameters === 'object' ? parameters : {}),
+        ...resolveInitialWindowFormValues(metadata),
+    }), [parameters, metadata]);
 
     // Build Forge context (calls React hooks inside)
     const context = useMemo(() => {
@@ -42,9 +143,30 @@ function WindowContentInner({window, metadata, services}) {
         }
         const ctx = Context(windowId, metadata, dsRef, services);
         ctx.init();
+        if (Object.keys(initialWindowFormSeed).length > 0 && ctx?.signals?.windowForm) {
+            ctx.signals.windowForm.value = initialWindowFormSeed;
+        }
         return ctx;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, metadata]);
+    }, [windowId, metadata, initialWindowFormSeed]);
+
+    const [windowFormSnapshot, setWindowFormSnapshot] = useState(() => ({
+        ...initialWindowFormSeed,
+        ...(context?.signals?.windowForm?.peek?.() || {}),
+    }));
+    const windowFormSignatureRef = useRef('');
+    useSignalEffect(() => {
+        const next = {
+            ...initialWindowFormSeed,
+            ...(context?.signals?.windowForm?.value || {}),
+        };
+        const signature = JSON.stringify(next);
+        if (windowFormSignatureRef.current === signature) {
+            return;
+        }
+        windowFormSignatureRef.current = signature;
+        setWindowFormSnapshot(next);
+    });
 
     /* ------------------------------------------------------------
      * Execute window-level onInit events (declared in metadata.window.on)
@@ -62,8 +184,15 @@ function WindowContentInner({window, metadata, services}) {
             evts.forEach((ev) => {
                 try {
                     const { handler: handlerId, args = [], parameters = [] } = ev;
-                    const fn = context.lookupHandler(handlerId);
-                    fn({ execution: { id: handlerId, args, parameters }, context });
+                    const handlerContext = context.Context(defaultDataSourceRef);
+                    const fn = handlerContext.lookupHandler(handlerId);
+                    const resolvedParameters = resolveParameters(parameters, handlerContext);
+                    fn({
+                        execution: { id: handlerId, args, parameters },
+                        args,
+                        parameters: resolvedParameters,
+                        context: handlerContext,
+                    });
                 } catch (err) {
                     console.error(`window.${eventName} handler failed`, ev.handler, err);
                 }
@@ -80,6 +209,20 @@ function WindowContentInner({window, metadata, services}) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [context]);
 
+    useEffect(() => {
+        const rootContainer = metadata?.view?.content || null;
+        if (!rootContainer || rootContainer.kind !== 'dashboard') return;
+        if (!windowId || !rootContainer.id) return;
+        try {
+            context.handlers?.window?.resetDashboardState?.({
+                context,
+                parameters: { dashboardId: rootContainer.id }
+            });
+        } catch (err) {
+            console.error('window dashboard init failed', err);
+        }
+    }, [context, metadata, windowId]);
+
     const dataSources = metadata.dataSource || {};
     const dialogs     = metadata.dialogs   || [];
 
@@ -87,10 +230,42 @@ function WindowContentInner({window, metadata, services}) {
      * Rendering helpers
      * ---------------------------------------------------------- */
 
+    const requiredDataSourceRefs = useMemo(() => {
+        const refs = new Set();
+        if (defaultDataSourceRef) refs.add(defaultDataSourceRef);
+        collectRequiredDataSourceRefs(metadata?.view?.content || null, windowFormSnapshot, refs);
+        return expandRequiredDataSourceRefs(metadata, refs);
+    }, [metadata, defaultDataSourceRef, windowFormSnapshot]);
+
+    useEffect(() => {
+        for (const ref of requiredDataSourceRefs) {
+            const dsID = `${windowId}DS${ref}`;
+            const inputSignal = getInputSignal(dsID);
+            const controlSignal = getControlSignal(dsID);
+            const collectionSignal = getCollectionSignal(dsID);
+            const prevInput = inputSignal?.peek?.() || {};
+            const prevParams = prevInput.parameters || {};
+            const nextParams = parameters?.[ref]?.parameters || {};
+            const paramsChanged = JSON.stringify(prevParams) !== JSON.stringify(nextParams);
+            const collection = collectionSignal?.peek?.() || [];
+            const control = controlSignal?.peek?.() || {};
+            const shouldFetch = (paramsChanged || (Array.isArray(collection) && collection.length === 0))
+                && !control.loading;
+            if (!paramsChanged && !shouldFetch) {
+                continue;
+            }
+            inputSignal.value = {
+                ...prevInput,
+                parameters: nextParams,
+                fetch: shouldFetch || !!prevInput.fetch,
+            };
+        }
+    }, [requiredDataSourceRefs, parameters, windowId]);
+
     const renderDataSources = () => {
         return (
             <>
-                {Object.keys(dataSources).map((key) => (
+                {requiredDataSourceRefs.map((key) => (
                     <DataSourceContainer
                         key={key}
                         windowContext={context}

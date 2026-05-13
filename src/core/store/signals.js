@@ -338,6 +338,35 @@ export const activeWindows = signal([]);
 export const selectedWindowId = signal(null);
 export const selectedTabId = signal(null);
 
+export const restoreWindowsFromSnapshot = (snapshot) => {
+    const windows = Array.isArray(snapshot?.windows) ? snapshot.windows : [];
+    const previous = Array.isArray(activeWindows.peek?.()) ? activeWindows.peek() : [];
+    const nextIds = new Set(windows.map((win) => String(win?.windowId || '').trim()).filter(Boolean));
+    for (const win of previous) {
+        const id = String(win?.windowId || '').trim();
+        if (id && !nextIds.has(id)) {
+            removeSignalsForKey(id);
+        }
+    }
+    activeWindows.value = windows.map((win) => ({
+        windowTitle: win?.windowTitle || win?.windowKey || '',
+        windowId: win?.windowId || '',
+        parentKey: win?.parentKey || null,
+        windowKey: win?.windowKey || '',
+        windowData: win?.windowData || '',
+        inTab: win?.inTab !== false,
+        parameters: win?.parameters || {},
+        isModal: !!win?.isModal,
+        isMinimized: !!win?.isMinimized,
+        zIndex: win?.zIndex ?? null,
+        x: win?.position?.x ?? win?.x ?? undefined,
+        y: win?.position?.y ?? win?.y ?? undefined,
+        size: win?.size || undefined,
+    }));
+    selectedTabId.value = snapshot?.selected?.tabId || null;
+    selectedWindowId.value = snapshot?.selected?.windowId || null;
+};
+
 
 
 
@@ -452,6 +481,7 @@ export const removeWindow = (windowId) => {
     activeWindows.value = activeWindows.value.filter(
         (win) => win.windowId !== windowId
     );
+    removeSignalsForKey(windowId);
 
     if (windowToRemove && windowToRemove.inTab !== false) {
         // Update selectedTabId if necessary

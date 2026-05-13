@@ -39,6 +39,7 @@ import { registerWrapper } from '../../runtime/wrapperRegistry.js';
 import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
 import MarkdownView from '../../components/MarkdownView.jsx';
 import MarkdownEditor from '../../components/MarkdownEditor.jsx';
+import { formatDisplayValue } from '../../utils/formatValue.js';
 
 /* ------------------------ Widget implementation ----------------------- */
 
@@ -538,7 +539,9 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Label ------------------------------------- */
-    registerWidget('label', ({ value, ...rest }) => <Label {...rest}>{value}</Label>, { framework: 'blueprint' });
+    registerWidget('label', ({ value, format, locale, timeZone, ...rest }) => (
+        <Label {...rest}>{formatDisplayValue(value, format, locale, {timeZone})}</Label>
+    ), { framework: 'blueprint' });
 
     /* -------------------- Math (MathQuill) -------------------------- */
     // Ensure MathQuill CSS injected once

@@ -237,6 +237,9 @@ export const useControlEvents = (context, items = [], state) => {
                 case 'filter':
                     changeHandler = 'dataSource.setFilterValue';
                     break;
+                case 'windowForm':
+                    changeHandler = 'dataSource.setWindowFormField';
+                    break;
                 default:
                     changeHandler = 'dataSource.setFormField';
                     break;

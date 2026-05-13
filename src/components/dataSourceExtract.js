@@ -47,16 +47,13 @@ export function extractData(selectors = {}, paging, data) {
     let stats = {};
     const dataSelector = selectors.data;
     let respData;
-    if (!dataSelector) {
-        respData = extractEnvelopeRecords(data);
-        if (typeof respData === "undefined") {
-            respData = data;
-        }
+    const envelopeRecords = extractEnvelopeRecords(data);
+    if (typeof envelopeRecords !== "undefined") {
+        respData = envelopeRecords;
+    } else if (!dataSelector) {
+        respData = data;
     } else {
         respData = resolveKey(data, dataSelector);
-        if (typeof respData === "undefined") {
-            respData = extractEnvelopeRecords(data);
-        }
         if (typeof respData === "undefined") {
             respData = data;
         }
@@ -71,9 +68,12 @@ export function extractData(selectors = {}, paging, data) {
     if (paging?.enabled) {
         const { dataInfoSelectors = {} } = paging;
         const dataInfoSelector = selectors.dataInfo;
-        const summary = dataInfoSelector
-            ? (resolveKey(data, dataInfoSelector) || extractEnvelopeInfo(data))
-            : extractEnvelopeInfo(data);
+        const envelopeInfo = extractEnvelopeInfo(data);
+        const summary = (data && typeof data === "object" && data.dataInfo && typeof data.dataInfo === "object")
+            ? data.dataInfo
+            : dataInfoSelector
+                ? (resolveKey(data, dataInfoSelector) || envelopeInfo)
+                : envelopeInfo;
         info = {
             pageCount: resolveKey(summary, dataInfoSelectors.pageCount || "pageCount")
                 ?? resolveKey(data, dataInfoSelectors.pageCount || "pageCount")
@@ -87,9 +87,13 @@ export function extractData(selectors = {}, paging, data) {
         info.value = info || {};
     }
 
-    const metricsSelector = selectors.metrics;
-    if (metricsSelector) {
-        stats = resolveKey(data, metricsSelector) || [];
+    if (data && typeof data === "object" && data.metrics && typeof data.metrics === "object" && !Array.isArray(data.metrics)) {
+        stats = data.metrics;
+    } else {
+        const metricsSelector = selectors.metrics;
+        if (metricsSelector) {
+            stats = resolveKey(data, metricsSelector) || [];
+        }
     }
     return { records, info, stats };
 }

@@ -296,3 +296,137 @@ view:
 		t.Fatalf("marshaled grouped dashboard block dropped dashboard.visibleWhen: %s", encoded)
 	}
 }
+
+func TestDashboardFilterCompactShapePreservesDefaults(t *testing.T) {
+	const source = `
+view:
+  content:
+    id: orderPerformanceDashboard
+    kind: dashboard
+    containers:
+      - id: periodSelector
+        kind: dashboard.filters
+        title: Period
+        items:
+          - id: periodView
+            label: Period
+            field: periodView
+            options:
+              - label: Today
+                value: today
+                default: true
+              - label: 7D
+                value: 7d
+`
+
+	var window Window
+	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
+		t.Fatalf("unmarshal dashboard filter metadata: %v", err)
+	}
+
+	root := window.View.Content
+	if root == nil || len(root.Containers) != 1 {
+		t.Fatalf("expected one dashboard filter block, got %#v", root)
+	}
+
+	filterBlock := root.Containers[0]
+	if filterBlock.Kind != "dashboard.filters" {
+		t.Fatalf("unexpected block kind: %q", filterBlock.Kind)
+	}
+	if len(filterBlock.Items) != 0 {
+		t.Fatalf("dashboard.filters should normalize compact top-level items under dashboard.filters and clear generic items: %#v", filterBlock.Items)
+	}
+	if filterBlock.Dashboard == nil || filterBlock.Dashboard.Filters == nil {
+		t.Fatalf("dashboard.filters compact items were not normalized under dashboard: %#v", filterBlock.Dashboard)
+	}
+	if len(filterBlock.Dashboard.Filters.Items) != 1 {
+		t.Fatalf("expected one normalized dashboard filter item, got %#v", filterBlock.Dashboard.Filters.Items)
+	}
+	item := filterBlock.Dashboard.Filters.Items[0]
+	if item.Field != "periodView" {
+		t.Fatalf("dashboard filter field was not preserved: %#v", item)
+	}
+	if len(item.Options) != 2 || !item.Options[0].Default {
+		t.Fatalf("dashboard filter defaults were not preserved: %#v", item.Options)
+	}
+
+	encoded, err := json.Marshal(filterBlock)
+	if err != nil {
+		t.Fatalf("marshal dashboard filter metadata: %v", err)
+	}
+	var asMap map[string]interface{}
+	if err := json.Unmarshal(encoded, &asMap); err != nil {
+		t.Fatalf("unmarshal marshaled dashboard filter metadata: %v", err)
+	}
+	if _, ok := asMap["items"]; ok {
+		t.Fatalf("marshaled dashboard.filters block should emit normalized dashboard.filters.items, not generic top-level items: %s", encoded)
+	}
+	dashboard, _ := asMap["dashboard"].(map[string]interface{})
+	filters, _ := dashboard["filters"].(map[string]interface{})
+	items, _ := filters["items"].([]interface{})
+	if len(items) != 1 {
+		t.Fatalf("marshaled dashboard.filters block dropped normalized dashboard.filters.items: %s", encoded)
+	}
+	first, _ := items[0].(map[string]interface{})
+	if first["field"] != "periodView" {
+		t.Fatalf("marshaled dashboard.filters item dropped field: %s", encoded)
+	}
+	options, _ := first["options"].([]interface{})
+	if len(options) != 2 {
+		t.Fatalf("marshaled dashboard.filters item dropped options: %s", encoded)
+	}
+	opt0, _ := options[0].(map[string]interface{})
+	if opt0["default"] != true {
+		t.Fatalf("marshaled dashboard.filters option dropped default flag: %s", encoded)
+	}
+}
+
+func TestDashboardKPIRowPreservesTimeZoneSelector(t *testing.T) {
+	const source = `
+view:
+  content:
+    id: orderPerformanceDashboard
+    kind: dashboard
+    containers:
+      - id: orderSnapshot
+        kind: dashboard.kpiTable
+        rows:
+          - label: Flight Start
+            value: startDate
+            format: date
+            timeZoneSelector: ianaTimezone
+      - id: points
+        kind: dashboard.table
+        columns:
+          - key: advertiserTime
+            label: Hour
+            format: wallClockHour
+            timeZoneSelector: ianaTimezone
+`
+
+	var window Window
+	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
+		t.Fatalf("unmarshal dashboard timezone metadata: %v", err)
+	}
+
+	root := window.View.Content
+	if root == nil || len(root.Containers) != 2 {
+		t.Fatalf("expected dashboard blocks, got %#v", root)
+	}
+
+	kpiBlock := root.Containers[0]
+	if kpiBlock.Dashboard == nil || kpiBlock.Dashboard.KPITable == nil || len(kpiBlock.Dashboard.KPITable.Rows) != 1 {
+		t.Fatalf("expected normalized kpi table rows, got %#v", kpiBlock.Dashboard)
+	}
+	if kpiBlock.Dashboard.KPITable.Rows[0].TimeZoneSelector != "ianaTimezone" {
+		t.Fatalf("kpi row timeZoneSelector was not preserved: %#v", kpiBlock.Dashboard.KPITable.Rows[0])
+	}
+
+	tableBlock := root.Containers[1]
+	if tableBlock.Dashboard == nil || tableBlock.Dashboard.Table == nil || len(tableBlock.Dashboard.Table.Columns) != 1 {
+		t.Fatalf("expected normalized table columns, got %#v", tableBlock.Dashboard)
+	}
+	if tableBlock.Dashboard.Table.Columns[0].TimeZoneSelector != "ianaTimezone" {
+		t.Fatalf("table column timeZoneSelector was not preserved: %#v", tableBlock.Dashboard.Table.Columns[0])
+	}
+}

@@ -17,12 +17,14 @@ assert.ok(res.windowId);
 assert.equal(activeWindows.peek().length, 1);
 assert.equal(selectedTabId.peek(), res.windowId);
 assert.equal(selectedWindowId.peek(), res.windowId);
+getDashboardFilterSignal(`${res.windowId}:demoDashboard`).value = { periodView: 'today' };
 
 await runUICommand({ method: 'ui.window.activate', params: { windowId: res.windowId } });
 assert.equal(selectedWindowId.peek(), res.windowId);
 
 await runUICommand({ method: 'ui.window.close', params: { windowId: res.windowId } });
 assert.equal(activeWindows.peek().length, 0);
+assert.deepEqual(getDashboardFilterSignal(`${res.windowId}:demoDashboard`).peek(), {});
 
 const regKey = registerControlTarget(
   { windowId: 'W1', dataSourceRef: 'ds', controlId: 'name', label: 'Name', type: 'text', scope: 'form' },
@@ -61,6 +63,9 @@ assert.equal(exported.ok, true);
 assert.equal(exported.filename, 'perf.html');
 assert.match(exported.html, /<!doctype html>/i);
 assert.match(exported.html, /Perf/);
+
+const freshDashboardKey = `${res.windowId}:demoDashboard`;
+getDashboardFilterSignal(freshDashboardKey).value = {};
 
 const exportedFromContainer = await runUICommand({
   method: 'ui.dashboard.exportFromContainer',

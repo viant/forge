@@ -4,7 +4,7 @@ import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
 import {resolveTableLink} from "../../utils/tableLink.js";
-import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate, publishDashboardSelection} from "./dashboardUtils.js";
+import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate, publishDashboardSelection, shouldShowDashboardKPIContext} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from "./geoMapUtils.js";
@@ -145,8 +145,11 @@ function renderDashboardTableCell(cell, row, column, locale) {
             </a>
         );
     }
-    if (typeof cell === 'number') {
-        return formatDashboardValue(cell, column?.format, locale);
+    const formatOptions = {
+        timeZone: column?.timeZone || (column?.timeZoneSelector ? resolveKey(row, column.timeZoneSelector) : undefined),
+    };
+    if (typeof cell === 'number' || column?.format === 'date' || column?.format === 'dateTime' || column?.format === 'wallClockHour' || column?.format === 'wallClockDate') {
+        return formatDashboardValue(cell, column?.format, locale, formatOptions);
     }
     const text = String(cell ?? '-');
     if (isDashboardStatusValue(text)) {
@@ -342,6 +345,7 @@ export function DashboardKPITable({container, context}) {
             };
         }).filter((column) => !!column.key)
         : [];
+    const showContextColumn = shouldShowDashboardKPIContext(rows);
 
     return (
         <Panel container={container}>
@@ -379,7 +383,9 @@ export function DashboardKPITable({container, context}) {
                             <tr>
                                 <th style={{textAlign: 'left', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Metric</th>
                                 <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Value</th>
-                                <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Context</th>
+                                {showContextColumn ? (
+                                    <th style={{textAlign: 'right', borderBottom: '1px solid #d8e1e8', padding: '8px'}}>Context</th>
+                                ) : null}
                             </tr>
                             </thead>
                             <tbody>
@@ -389,14 +395,18 @@ export function DashboardKPITable({container, context}) {
                                 return (
                                     <tr key={row.id || row.label || index}>
                                         <td style={{padding: '8px', borderBottom: '1px solid #ebf1f5', fontWeight: 600}}>{row.label}</td>
-                                        <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>{formatDashboardValue(value, row.format, locale)}</td>
-                                        <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>
-                                            {row.context ? (
-                                                <span style={{fontSize: '12px', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
-                                                    {row.context}
-                                                </span>
-                                            ) : '-'}
-                                        </td>
+                                        <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>{formatDashboardValue(value, row.format, locale, {
+                                            timeZone: row.timeZone || (row.timeZoneSelector ? resolveKey(metricsData, row.timeZoneSelector) : undefined),
+                                        })}</td>
+                                        {showContextColumn ? (
+                                            <td style={{padding: '8px', textAlign: 'right', borderBottom: '1px solid #ebf1f5'}}>
+                                                {row.context ? (
+                                                    <span style={{fontSize: '12px', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
+                                                        {row.context}
+                                                    </span>
+                                                ) : '-'}
+                                            </td>
+                                        ) : null}
                                     </tr>
                                 );
                             })}
@@ -503,6 +513,8 @@ export function DashboardFilters({container, context}) {
                                         <button
                                             key={option.value}
                                             type="button"
+                                            aria-pressed={active ? 'true' : 'false'}
+                                            className={active ? 'forge-dashboard-filter-chip is-active' : 'forge-dashboard-filter-chip'}
                                             onClick={() => toggleOption(item, option.value)}
                                             style={{
                                                 border: '1px solid #ced9e0',
@@ -1261,6 +1273,14 @@ export function DashboardDetail({container, context, children}) {
     return <Panel container={container}>{visibleChildren}</Panel>;
 }
 
+export function DashboardChart({container, context, isActive}) {
+    return (
+        <Panel container={container}>
+            <Chart container={container} context={context} isActive={isActive} embedded={false}/>
+        </Panel>
+    );
+}
+
 export function DashboardComposition({container, context, isActive}) {
     const {collection = [], control, selection} = context?.signals || {};
     const collectionValue = useSignalSnapshot(collection, []);
@@ -1558,6 +1578,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.timeline':
             content = <DashboardTimeline container={container} context={context} isActive={isActive}/>;
+            break;
+        case 'dashboard.chart':
+            content = <DashboardChart container={container} context={context} isActive={isActive}/>;
             break;
         case 'dashboard.composition':
             content = <DashboardComposition container={container} context={context} isActive={isActive}/>;

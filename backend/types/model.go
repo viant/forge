@@ -63,18 +63,23 @@ func (t *TargetSpec) UnmarshalYAML(unmarshal func(interface{}) error) error {
 }
 
 type Chart struct {
-	Type          string        `json:"type" yaml:"type"`
-	XAxis         ChartXAxis    `json:"xAxis" yaml:"xAxis"`
-	YAxis         ChartYAxis    `json:"yAxis" yaml:"yAxis"`
-	CartesianGrid CartesianGrid `json:"cartesianGrid,omitempty" yaml:"cartesianGrid,omitempty"`
-	Width         string        `json:"width" yaml:"width"`
-	Height        string        `json:"height" yaml:"height"`
-	CategoryKey   string        `json:"categoryKey,omitempty" yaml:"categoryKey,omitempty"`
-	ValueKey      string        `json:"valueKey,omitempty" yaml:"valueKey,omitempty"`
-	Format        string        `json:"format,omitempty" yaml:"format,omitempty"`
-	Palette       []string      `json:"palette,omitempty" yaml:"palette,omitempty"`
-	Series        ChartSeries   `json:"series" yaml:"series"`
-	On            []*Execute    `json:"on,omitempty" yaml:"on,omitempty"`
+	Type                  string            `json:"type" yaml:"type"`
+	DataSourceRef         string            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	DataSourceRefSelector string            `json:"dataSourceRefSelector,omitempty" yaml:"dataSourceRefSelector,omitempty"`
+	DataSourceRefSource   string            `json:"dataSourceRefSource,omitempty" yaml:"dataSourceRefSource,omitempty"`
+	DataSourceRefs        map[string]string `json:"dataSourceRefs,omitempty" yaml:"dataSourceRefs,omitempty"`
+	XAxis                 ChartXAxis        `json:"xAxis" yaml:"xAxis"`
+	YAxis                 ChartYAxis        `json:"yAxis" yaml:"yAxis"`
+	Axes                  *ChartAxes        `json:"axes,omitempty" yaml:"axes,omitempty"`
+	CartesianGrid         CartesianGrid     `json:"cartesianGrid,omitempty" yaml:"cartesianGrid,omitempty"`
+	Width                 string            `json:"width" yaml:"width"`
+	Height                string            `json:"height" yaml:"height"`
+	CategoryKey           string            `json:"categoryKey,omitempty" yaml:"categoryKey,omitempty"`
+	ValueKey              string            `json:"valueKey,omitempty" yaml:"valueKey,omitempty"`
+	Format                string            `json:"format,omitempty" yaml:"format,omitempty"`
+	Palette               []string          `json:"palette,omitempty" yaml:"palette,omitempty"`
+	Series                ChartSeries       `json:"series" yaml:"series"`
+	On                    []*Execute        `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type ChartXAxis struct {
@@ -84,7 +89,14 @@ type ChartXAxis struct {
 }
 
 type ChartYAxis struct {
-	Label string `json:"label,omitempty" yaml:"label,omitempty"`
+	Label  string        `json:"label,omitempty" yaml:"label,omitempty"`
+	Format string        `json:"format,omitempty" yaml:"format,omitempty"`
+	Domain []interface{} `json:"domain,omitempty" yaml:"domain,omitempty"`
+}
+
+type ChartAxes struct {
+	Left  *ChartYAxis `json:"left,omitempty" yaml:"left,omitempty"`
+	Right *ChartYAxis `json:"right,omitempty" yaml:"right,omitempty"`
 }
 
 type CartesianGrid struct {
@@ -99,8 +111,18 @@ type ChartSeries struct {
 }
 
 type ChartSeriesValue struct {
-	Label string `json:"label" yaml:"label"`
-	Value string `json:"value" yaml:"value"`
+	Label           string  `json:"label" yaml:"label"`
+	Name            string  `json:"name,omitempty" yaml:"name,omitempty"`
+	Value           string  `json:"value" yaml:"value"`
+	Type            string  `json:"type,omitempty" yaml:"type,omitempty"`
+	Axis            string  `json:"axis,omitempty" yaml:"axis,omitempty"`
+	Format          string  `json:"format,omitempty" yaml:"format,omitempty"`
+	Color           string  `json:"color,omitempty" yaml:"color,omitempty"`
+	StrokeWidth     float64 `json:"strokeWidth,omitempty" yaml:"strokeWidth,omitempty"`
+	StrokeDasharray string  `json:"strokeDasharray,omitempty" yaml:"strokeDasharray,omitempty"`
+	FillOpacity     float64 `json:"fillOpacity,omitempty" yaml:"fillOpacity,omitempty"`
+	Opacity         float64 `json:"opacity,omitempty" yaml:"opacity,omitempty"`
+	StackID         string  `json:"stackId,omitempty" yaml:"stackId,omitempty"`
 }
 
 type NavigationItem struct {
@@ -379,6 +401,7 @@ type Container struct {
 	DefaultMode       string                            `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
 	Layout            *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
 	Style             *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	VisibleWhen       map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 	Toolbar           *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
 	Table             *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
 	FileBrowser       *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
@@ -414,6 +437,9 @@ func (c *Container) UnmarshalJSON(data []byte) error {
 	}
 	*c = Container(decoded)
 	c.applyDashboardCompactAliases(compact)
+	if c.Kind == "dashboard.filters" && c.Dashboard != nil && c.Dashboard.Filters != nil && len(c.Dashboard.Filters.Items) > 0 {
+		c.Items = nil
+	}
 	return nil
 }
 
@@ -429,6 +455,9 @@ func (c *Container) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 	*c = Container(decoded)
 	c.applyDashboardCompactAliases(compact)
+	if c.Kind == "dashboard.filters" && c.Dashboard != nil && c.Dashboard.Filters != nil && len(c.Dashboard.Filters.Items) > 0 {
+		c.Items = nil
+	}
 	return nil
 }
 
@@ -640,6 +669,16 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 				dashboard.KPITable.Columns = compact.Columns
 			}
 		}
+	case "dashboard.filters":
+		if len(compact.FilterItems) > 0 {
+			dashboard := c.ensureDashboard()
+			if dashboard.Filters == nil {
+				dashboard.Filters = &DashboardFilters{}
+			}
+			if len(dashboard.Filters.Items) == 0 {
+				dashboard.Filters.Items = compact.FilterItems
+			}
+		}
 	case "dashboard.geoMap":
 		if compact.Geo != nil || compact.Metric != nil || compact.Limit > 0 {
 			dashboard := c.ensureDashboard()
@@ -750,6 +789,7 @@ type dashboardCompactAliases struct {
 	Rows            []DashboardKPIRow        `json:"rows,omitempty" yaml:"rows,omitempty"`
 	Checks          []DashboardStatusCheck   `json:"checks,omitempty" yaml:"checks,omitempty"`
 	Fields          *DashboardFeedFields     `json:"fields,omitempty" yaml:"fields,omitempty"`
+	FilterItems     []DashboardFilterItem    `json:"items,omitempty" yaml:"items,omitempty"`
 	Sections        []DashboardReportSection `json:"sections,omitempty" yaml:"sections,omitempty"`
 	Metric          *DashboardField          `json:"metric,omitempty" yaml:"metric,omitempty"`
 	Dimension       *DashboardField          `json:"dimension,omitempty" yaml:"dimension,omitempty"`
@@ -800,12 +840,14 @@ type DashboardKPITable struct {
 }
 
 type DashboardKPIRow struct {
-	ID          string `json:"id,omitempty" yaml:"id,omitempty"`
-	Label       string `json:"label,omitempty" yaml:"label,omitempty"`
-	Value       string `json:"value,omitempty" yaml:"value,omitempty"`
-	Format      string `json:"format,omitempty" yaml:"format,omitempty"`
-	Context     string `json:"context,omitempty" yaml:"context,omitempty"`
-	ContextTone string `json:"contextTone,omitempty" yaml:"contextTone,omitempty"`
+	ID               string `json:"id,omitempty" yaml:"id,omitempty"`
+	Label            string `json:"label,omitempty" yaml:"label,omitempty"`
+	Value            string `json:"value,omitempty" yaml:"value,omitempty"`
+	Format           string `json:"format,omitempty" yaml:"format,omitempty"`
+	TimeZone         string `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	TimeZoneSelector string `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
+	Context          string `json:"context,omitempty" yaml:"context,omitempty"`
+	ContextTone      string `json:"contextTone,omitempty" yaml:"contextTone,omitempty"`
 }
 
 type DashboardFilters struct {
@@ -989,12 +1031,14 @@ type DashboardTableAction struct {
 }
 
 type DashboardTableColumn struct {
-	Key    string     `json:"key,omitempty" yaml:"key,omitempty"`
-	Label  string     `json:"label,omitempty" yaml:"label,omitempty"`
-	Format string     `json:"format,omitempty" yaml:"format,omitempty"`
-	Align  string     `json:"align,omitempty" yaml:"align,omitempty"`
-	Type   string     `json:"type,omitempty" yaml:"type,omitempty"`
-	Link   *TableLink `json:"link,omitempty" yaml:"link,omitempty"`
+	Key              string     `json:"key,omitempty" yaml:"key,omitempty"`
+	Label            string     `json:"label,omitempty" yaml:"label,omitempty"`
+	Format           string     `json:"format,omitempty" yaml:"format,omitempty"`
+	TimeZone         string     `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	TimeZoneSelector string     `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
+	Align            string     `json:"align,omitempty" yaml:"align,omitempty"`
+	Type             string     `json:"type,omitempty" yaml:"type,omitempty"`
+	Link             *TableLink `json:"link,omitempty" yaml:"link,omitempty"`
 }
 
 // DashboardDetail is a marker block. Nested detail content is described by the
@@ -1107,12 +1151,15 @@ type Section struct {
 }
 
 type Binding struct {
-	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	DataField     string `json:"dataField,omitempty" yaml:"dataField,omitempty"`
-	OptionsField  string `json:"optionsField,omitempty" yaml:"optionsField,omitempty"`
-	Path          string `json:"bindingPath,omitempty" yaml:"bindingPath,omitempty"`
-	Scope         string `json:"scope,omitempty" yaml:"scope,omitempty"`
-	MutationMode  string `json:"mutationMode,omitempty" yaml:"mutationMode,omitempty"`
+	DataSourceRef         string            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	DataSourceRefSelector string            `json:"dataSourceRefSelector,omitempty" yaml:"dataSourceRefSelector,omitempty"`
+	DataSourceRefSource   string            `json:"dataSourceRefSource,omitempty" yaml:"dataSourceRefSource,omitempty"`
+	DataSourceRefs        map[string]string `json:"dataSourceRefs,omitempty" yaml:"dataSourceRefs,omitempty"`
+	DataField             string            `json:"dataField,omitempty" yaml:"dataField,omitempty"`
+	OptionsField          string            `json:"optionsField,omitempty" yaml:"optionsField,omitempty"`
+	Path                  string            `json:"bindingPath,omitempty" yaml:"bindingPath,omitempty"`
+	Scope                 string            `json:"scope,omitempty" yaml:"scope,omitempty"`
+	MutationMode          string            `json:"mutationMode,omitempty" yaml:"mutationMode,omitempty"`
 }
 type Item struct {
 	ID                   string `json:"id" yaml:"id"`
@@ -1131,10 +1178,14 @@ type Item struct {
 	NumericFormat        string                            `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
 	Icon                 string                            `json:"icon,omitempty" yaml:"icon,omitempty"`
 	Type                 string                            `json:"type,omitempty" yaml:"type,omitempty"`
+	Widget               string                            `json:"widget,omitempty" yaml:"widget,omitempty"`
+	HideLabel            bool                              `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
+	VisibleWhen          map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
 	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
 	ColumnSpan int                    `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
 	RowSpan    int                    `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
+	Aggregate  interface{}            `json:"aggregate,omitempty" yaml:"aggregate,omitempty"`
 	Properties map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`
 	Enabled    bool                   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	On         []*Execute             `json:"on,omitempty" yaml:"on,omitempty"` // For message-bus events

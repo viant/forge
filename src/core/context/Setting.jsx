@@ -1,5 +1,6 @@
-import React, {createContext, useContext, useEffect, useRef} from 'react';
+import React, {createContext, useContext, useLayoutEffect, useRef} from 'react';
 import { maybeAutoStartUIBridge } from '../ui/autostart.js';
+import { ensureUIBridgeClientId } from '../ui/bridge.js';
 
 
 const Setting = createContext({});
@@ -11,8 +12,11 @@ export const SettingProvider = ({endpoints, connectorConfig, authContext, servic
     const useAuth = () => useContext(safeAuthContext);
     const stopRef = useRef(null);
 
+    // Allocate a stable bridge client id before the rest of the tree becomes interactive.
+    ensureUIBridgeClientId(connectorConfig?.uiBridge?.clientId);
+
     // Opt-in UI bridge auto-connect (no-op unless URL is provided via env/settings).
-    useEffect(() => {
+    useLayoutEffect(() => {
         stopRef.current = maybeAutoStartUIBridge({ endpoints, connectorConfig });
         return () => {
             try { stopRef.current?.(); } catch(_) {}

@@ -142,6 +142,11 @@ function StarterTaskGrid({ tasks = [], onSelect }) {
     );
 }
 
+function ExternalFeedBoundary({ renderFeed, conversationId, context }) {
+    if (typeof renderFeed !== 'function') return null;
+    return renderFeed({ conversationId, context });
+}
+
 function isChatDebugEnabled() {
     if (typeof window === 'undefined') return false;
     try {
@@ -226,6 +231,18 @@ export default function Chat({
     const classifyMessage = classifyMessageProp || chatService.classifyMessage || defaultClassifier;
     const renderers = renderersProp || chatService.renderers || defaultRenderers;
     const fallback = fallbackProp || chatService.fallback || renderers?.bubble || defaultRenderers.bubble;
+
+    const abortVisibleSpec = chatCfg?.abortVisible;
+    const abortDataSourceRef = abortVisibleSpec?.dataSourceRef || context?.identity?.dataSourceRef;
+    const abortCtx = (typeof context?.useDsContext === 'function')
+        ? context.useDsContext(abortDataSourceRef)
+        : context.Context(abortDataSourceRef);
+    const conversationsCtx = (typeof context?.useDsContext === 'function')
+        ? context.useDsContext('conversations')
+        : context.Context('conversations');
+    const usageCtx = (typeof context?.useDsContext === 'function')
+        ? context.useDsContext('usage')
+        : context.Context('usage');
 
     // -----------------------------------------------------------------
     // 🎭  Avatar icon mapping resolution hierarchy
@@ -322,23 +339,20 @@ export default function Chat({
 
     // Subscribe to form changes so visibility updates with polling/async state
     useSignalEffect(() => {
-        const spec = chatCfg?.abortVisible;
-        const dsCtx = spec?.dataSourceRef ? context.Context(spec.dataSourceRef) : context;
         // Touch the correct form signal to subscribe
-        const _ = dsCtx?.signals?.form?.value;
+        const _ = abortCtx?.signals?.form?.value;
         setAbortVisible(computeAbortVisible());
-    });
+    }, [abortCtx, computeAbortVisible]);
 
     // Track conversation-level state (running/queued) for integrated queue UX.
     useSignalEffect(() => {
         try {
-            const convCtx = context.Context('conversations');
-            const formValue = convCtx?.signals?.form?.value;
+            const formValue = conversationsCtx?.signals?.form?.value;
             setConversationSnapshot(formValue || {});
         } catch (_) {
             setConversationSnapshot({});
         }
-    });
+    }, [conversationsCtx]);
 
     useEffect(() => {
         const handleConversationActive = (event) => {
@@ -360,13 +374,12 @@ export default function Chat({
     // Track usage data (tokens/cost) for compact display in the composer.
     useSignalEffect(() => {
         try {
-            const usageCtx = context.Context('usage');
             const formValue = usageCtx?.signals?.form?.value;
             setUsageSnapshot(formValue || {});
         } catch (_) {
             setUsageSnapshot({});
         }
-    });
+    }, [usageCtx]);
 
     // ---------------------------------------------------------------------
     // 🎛️  Command-center composer state (agent/model/tools/reasoning)
@@ -376,14 +389,18 @@ export default function Chat({
 
     const resolveComposerProps = context?.lookupHandler?.('chat.resolveComposerProps');
     const externalComposerProps = (typeof resolveComposerProps === 'function')
-        ? (resolveComposerProps({ context, container }) || {})
+        ? (resolveComposerProps({ context, container, conversationsCtx }) || {})
         : null;
     const usesExternalComposerProps = !!externalComposerProps;
     const commandCenterCfg = chatCfg?.commandCenter;
     const commandCenterEnabled = !!(externalComposerProps?.commandCenter ?? commandCenterCfg);
-    const metaCtx = (!usesExternalComposerProps && commandCenterEnabled)
-        ? context.Context((typeof commandCenterCfg === 'object' && commandCenterCfg.dataSourceRef) ? commandCenterCfg.dataSourceRef : 'meta')
-        : null;
+    const commandCenterDataSourceRef = (typeof commandCenterCfg === 'object' && commandCenterCfg.dataSourceRef)
+        ? commandCenterCfg.dataSourceRef
+        : 'meta';
+    const commandMetaCtx = (typeof context?.useDsContext === 'function')
+        ? context.useDsContext(commandCenterDataSourceRef)
+        : context.Context(commandCenterDataSourceRef);
+    const metaCtx = commandCenterEnabled ? commandMetaCtx : null;
 
     useSignalEffect(() => {
         if (!metaCtx) return;
@@ -850,10 +867,11 @@ export default function Chat({
                         />
                     </div>
                 ) : usesExternalFeedState ? (
-                    renderFeed({
-                        conversationId: conversationID,
-                        context,
-                    })
+                    <ExternalFeedBoundary
+                        renderFeed={renderFeed}
+                        conversationId={conversationID}
+                        context={context}
+                    />
                 ) : (
                     <MessageFeed
                         messages={messages}
