@@ -1,6 +1,7 @@
 import React, {useMemo, useState} from "react";
 import {useSignalEffect} from "@preact/signals-react";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
+import { seedDashboardDefaultFilters } from "./dashboardUtils.js";
 import "./Dashboard.css";
 
 const MODE_LABELS = {
@@ -28,6 +29,10 @@ function getReportOptions(container = {}) {
     return container.dashboard?.reportOptions || container.report || {};
 }
 
+function getChromeOptions(container = {}) {
+    return container.dashboard?.chrome || container.chrome || {};
+}
+
 function normalizeModes(container = {}) {
     const configured = container.toolbar?.modes || container.modes || container.dashboard?.modes;
     const reportOptions = getReportOptions(container);
@@ -52,7 +57,7 @@ function formatStateValue(value) {
     return String(value);
 }
 
-function useDashboardStateSnapshot(dashboardKey) {
+function useDashboardStateSnapshot(dashboardKey, container = null) {
     const [snapshot, setSnapshot] = useState({filters: {}, selection: {}});
 
     useSignalEffect(() => {
@@ -60,6 +65,7 @@ function useDashboardStateSnapshot(dashboardKey) {
             setSnapshot({filters: {}, selection: {}});
             return;
         }
+        seedDashboardDefaultFilters(dashboardKey, container || {});
         setSnapshot({
             filters: getDashboardFilterSignal(dashboardKey).value || {},
             selection: getDashboardSelectionSignal(dashboardKey).value || {},
@@ -270,8 +276,12 @@ export default function DashboardSurface({container, context, toolbar = null, ch
         ...DEFAULT_REPORT_INCLUDE,
         ...(getReportOptions(container).includeState || {}),
     }));
-    const {filters, selection} = useDashboardStateSnapshot(context?.dashboardKey);
+    const {filters, selection} = useDashboardStateSnapshot(context?.dashboardKey, container);
     const activeMode = modes.includes(mode) ? mode : modes[0];
+    const chrome = getChromeOptions(container);
+    const showHeader = chrome.showHeader !== false;
+    const showStateStrip = chrome.showStateStrip !== false;
+    const stickyHeader = chrome.stickyHeader !== false;
 
     const toggleInclude = (id) => {
         setInclude((prev) => ({...prev, [id]: !prev[id]}));
@@ -279,33 +289,35 @@ export default function DashboardSurface({container, context, toolbar = null, ch
 
     return (
         <section className="forge-dashboard-shell" data-dashboard-mode={activeMode}>
-            <header className="forge-dashboard-topbar">
-                <div className="forge-dashboard-title">
-                    <h1>{container.title || "Dashboard"}</h1>
-                    {container.subtitle ? <p>{container.subtitle}</p> : null}
-                </div>
-                <div className="forge-dashboard-actions">
-                    {modes.length > 1 ? (
-                        <div className="forge-dashboard-mode-toggle" role="tablist" aria-label="Dashboard mode">
-                            {modes.map((candidate) => (
-                                <button
-                                    key={candidate}
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={activeMode === candidate}
-                                    className={activeMode === candidate ? "is-active" : ""}
-                                    onClick={() => setMode(candidate)}
-                                >
-                                    {MODE_LABELS[candidate] || candidate}
-                                </button>
-                            ))}
-                        </div>
-                    ) : null}
-                    {toolbar ? <div className="forge-dashboard-toolbar">{toolbar}</div> : null}
-                </div>
-            </header>
+            {showHeader ? (
+                <header className={stickyHeader ? "forge-dashboard-topbar" : "forge-dashboard-topbar is-static"}>
+                    <div className="forge-dashboard-title">
+                        <h1>{container.title || "Dashboard"}</h1>
+                        {container.subtitle ? <p>{container.subtitle}</p> : null}
+                    </div>
+                    <div className="forge-dashboard-actions">
+                        {modes.length > 1 ? (
+                            <div className="forge-dashboard-mode-toggle" role="tablist" aria-label="Dashboard mode">
+                                {modes.map((candidate) => (
+                                    <button
+                                        key={candidate}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={activeMode === candidate}
+                                        className={activeMode === candidate ? "is-active" : ""}
+                                        onClick={() => setMode(candidate)}
+                                    >
+                                        {MODE_LABELS[candidate] || candidate}
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
+                        {toolbar ? <div className="forge-dashboard-toolbar">{toolbar}</div> : null}
+                    </div>
+                </header>
+            ) : null}
 
-            {activeMode !== "report" ? <DashboardStateStrip filters={filters} selection={selection}/> : null}
+            {activeMode !== "report" && showStateStrip ? <DashboardStateStrip filters={filters} selection={selection}/> : null}
 
             {activeMode === "report" ? (
                 <DashboardReportMode

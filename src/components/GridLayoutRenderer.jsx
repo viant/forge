@@ -75,7 +75,7 @@ function buildContainerStyle(layout, rows) {
     const columns = layout?.columns || 1;
     const labels = layout?.labels || {};
     const labelMode = (labels.mode || 'left');
-    const align = labels.align || (labelMode === 'left' ? 'baseline' : 'center');
+    const align = labels.align || (labelMode === 'left' ? 'baseline' : (labelMode === 'top' ? 'start' : 'start'));
     const gap = layout?.gap;
     const rowGap = layout?.rowGap;
     const columnGap = layout?.columnGap;

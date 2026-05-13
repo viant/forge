@@ -21,7 +21,7 @@ const WindowLayout = ({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '4px',
+        padding: '0',
         height: '100%',
         width: '100%',
         minHeight: 0,

@@ -69,6 +69,110 @@ registerStateAdapter('form', (ctx, item) => {
     };
 });
 
+registerStateAdapter('filter', (ctx, item) => {
+    const dsHandlers = ctx?.handlers?.dataSource;
+    const fieldKey = item.dataField || item.bindingPath || item.id;
+    return {
+        get: () => {
+            const data = dsHandlers?.peekFilter?.() || {};
+            return resolveSelector(data, fieldKey);
+        },
+        getOptions: () => [],
+        set: (v) => {
+            dsHandlers?.setFilterValue?.({ item, value: v });
+        },
+    };
+});
+
+registerStateAdapter('input', (ctx, item) => {
+    const fieldKey = item.dataField || item.bindingPath || item.id;
+    return {
+        get: () => resolveSelector(ctx?.signals?.input?.peek?.() || {}, fieldKey),
+        getOptions: () => [],
+        set: (v) => {
+            const prev = ctx?.signals?.input?.peek?.() || {};
+            if (ctx?.signals?.input) {
+                ctx.signals.input.value = { ...prev, [fieldKey]: v };
+            }
+        },
+    };
+});
+
+registerStateAdapter('selection', (ctx, item) => {
+    const fieldKey = item.dataField || item.bindingPath || item.id;
+    return {
+        get: () => resolveSelector(ctx?.signals?.selection?.peek?.() || {}, fieldKey),
+        getOptions: () => [],
+        set: () => {},
+    };
+});
+
+registerStateAdapter('metrics', (ctx, item) => {
+    const fieldKey = item.dataField || item.bindingPath || item.id;
+    return {
+        get: () => resolveSelector(ctx?.signals?.metrics?.peek?.() || {}, fieldKey),
+        getOptions: () => [],
+        set: () => {},
+    };
+});
+
+registerStateAdapter('windowForm', (ctx, item) => {
+    const fieldKey = item.dataField || item.bindingPath || item.id;
+    return {
+        get: () => resolveSelector(ctx?.signals?.windowForm?.peek?.() || {}, fieldKey),
+        getOptions: () => [],
+        set: (v) => {
+            const prev = ctx?.signals?.windowForm?.peek?.() || {};
+            if (ctx?.signals?.windowForm) {
+                ctx.signals.windowForm.value = {
+                    ...prev,
+                    [fieldKey]: v,
+                };
+            }
+        },
+    };
+});
+
+registerStateAdapter('collection', (ctx, item) => {
+    const fieldKey = item.dataField || item.bindingPath || item.id;
+    const aggregate = item.aggregate || item.properties?.aggregate || 'last';
+
+    const get = () => {
+        const rows = Array.isArray(ctx?.signals?.collection?.peek?.()) ? ctx.signals.collection.peek() : [];
+        const numericValues = rows
+            .map((row) => resolveSelector(row, fieldKey))
+            .filter((value) => value !== undefined && value !== null && value !== '')
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value));
+
+        if (typeof aggregate === 'object' && aggregate) {
+            const op = String(aggregate.op || 'last').toLowerCase();
+            const window = Number(aggregate.window || 0);
+            const scopedRows = window > 0 ? rows.slice(-window) : rows;
+            const scopedValues = scopedRows
+                .map((row) => resolveSelector(row, fieldKey))
+                .filter((value) => value !== undefined && value !== null && value !== '')
+                .map((value) => Number(value))
+                .filter((value) => Number.isFinite(value));
+            if (op === 'sum') return scopedValues.reduce((sum, value) => sum + value, 0);
+            if (op === 'avg' || op === 'average') return scopedValues.length ? scopedValues.reduce((sum, value) => sum + value, 0) / scopedValues.length : undefined;
+            if (op === 'last') return scopedRows.length ? resolveSelector(scopedRows[scopedRows.length - 1], fieldKey) : undefined;
+        }
+
+        const op = String(aggregate || 'last').toLowerCase();
+        if (op === 'sum') return numericValues.reduce((sum, value) => sum + value, 0);
+        if (op === 'avg' || op === 'average') return numericValues.length ? numericValues.reduce((sum, value) => sum + value, 0) / numericValues.length : undefined;
+        if (op === 'last') return rows.length ? resolveSelector(rows[rows.length - 1], fieldKey) : undefined;
+        return undefined;
+    };
+
+    return {
+        get,
+        getOptions: () => [],
+        set: () => {},
+    };
+});
+
 // --------------------------- Event adapters ------------------------------
 
 const eventAdapters = new Map(); // key → map

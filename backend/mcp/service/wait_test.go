@@ -11,7 +11,7 @@ func TestPredicateMatch(t *testing.T) {
 	p := &UIPredicate{
 		All: []UICondition{
 			{Path: "selected.windowId", Exists: boolPtr(true)},
-			{Path: "selected.windowId", Equals: mustJSON(`"W1"`)},
+			{Path: "selected.windowId", Equals: mustJSONTest(`"W1"`)},
 		},
 		Any: []UICondition{
 			{Path: "windows.#.windowKey", Contains: "files"},
@@ -55,6 +55,6 @@ func TestUIWaitChange(t *testing.T) {
 
 func boolPtr(v bool) *bool { return &v }
 
-func mustJSON(s string) json.RawMessage {
+func mustJSONTest(s string) json.RawMessage {
 	return json.RawMessage([]byte(s))
 }

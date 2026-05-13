@@ -13,6 +13,7 @@ import {useSignalEffect} from '@preact/signals-react';
 import {classify} from './widgetClassifier.js';
 import {getWidgetEntry} from './widgetRegistry.jsx';
 import {getEventAdapter, resolveStateAdapter, runDynamicEvaluators,} from './binding.js';
+import {resolveSelector} from '../utils/selector.js';
 
 import ControlWrapper from './ControlWrapper.jsx';
 
@@ -25,6 +26,37 @@ export default function WidgetRenderer({
     state = undefined, // optional override pair {get,set}
 }) {
     if (!item) return null;
+
+    const resolveItemContext = () => {
+        const refs = item?.dataSourceRefs || {};
+        const selector = item?.dataSourceRefSelector || '';
+        const source = String(item?.dataSourceRefSource || 'windowForm').toLowerCase();
+        if (!selector || !refs || typeof refs !== 'object' || Array.isArray(refs)) {
+            return item?.dataSourceRef ? context.Context(item.dataSourceRef) : context;
+        }
+        let scope = {};
+        switch (source) {
+            case 'form':
+                scope = context?.signals?.form?.peek?.() || {};
+                break;
+            case 'filter':
+            case 'filters':
+                scope = context?.handlers?.dataSource?.peekFilter?.() || {};
+                break;
+            case 'input':
+                scope = context?.signals?.input?.peek?.() || {};
+                break;
+            case 'windowform':
+            default:
+                scope = context?.signals?.windowForm?.peek?.() || {};
+                break;
+        }
+        const key = resolveSelector(scope, selector);
+        const mapped = key != null ? refs[key] : '';
+        if (mapped) return context.Context(mapped);
+        return item?.dataSourceRef ? context.Context(item.dataSourceRef) : context;
+    };
+    const resolvedContext = resolveItemContext();
 
     // ------------------------------------------------------------------
     // 1. Resolve widget key / factory
@@ -49,17 +81,45 @@ export default function WidgetRenderer({
             case 'form':
                 context?.signals?.form?.value; // establish dependency
                 break;
+            case 'windowForm':
+                context?.signals?.windowForm?.value;
+                break;
             case 'selection':
                 context?.signals?.selection?.value;
+                break;
+            case 'collection':
+                resolvedContext?.signals?.collection?.value;
+                break;
+            case 'metrics':
+                resolvedContext?.signals?.metrics?.value;
                 break;
             default:
                 context?.signals?.control?.value;
                 break;
         }
+        if (item?.dataSourceRefSelector) {
+            const source = String(item?.dataSourceRefSource || 'windowForm').toLowerCase();
+            switch (source) {
+                case 'form':
+                    context?.signals?.form?.value;
+                    break;
+                case 'filter':
+                case 'filters':
+                    context?.signals?.input?.value?.filter;
+                    break;
+                case 'input':
+                    context?.signals?.input?.value;
+                    break;
+                case 'windowform':
+                default:
+                    context?.signals?.windowForm?.value;
+                    break;
+            }
+        }
         forceRender((c) => c + 1);
     });
     const adapterFactory = resolveStateAdapter(scope) || resolveStateAdapter('noop');
-    const adapter = adapterFactory(context, item, state);
+    const adapter = adapterFactory(resolvedContext, item, state);
 
     // ------------------------------------------------------------------
     // 3. Events mapping
@@ -68,7 +128,7 @@ export default function WidgetRenderer({
     const events = {};
     const allowedEventKeys = new Set(Object.keys(eventMap));
     for (const [evtName, builder] of Object.entries(eventMap)) {
-        events[evtName] = builder({ adapter: adapter, item, context });
+        events[evtName] = builder({ adapter: adapter, item, context: resolvedContext });
     }
 
 
@@ -79,23 +139,23 @@ export default function WidgetRenderer({
     // Evaluate legacy stateEvents when provided (local dynamic logic)
     let dynValue = undefined;
     if (stateEvents?.onValue) {
-        dynValue = stateEvents.onValue({ data: undefined, item, value: adapter.get(), context });
+        dynValue = stateEvents.onValue({ data: undefined, item, value: adapter.get(), context: resolvedContext });
     }
     let dynReadonlyLocal = undefined;
     if (stateEvents?.onReadonly) {
-        dynReadonlyLocal = stateEvents.onReadonly({ data: undefined, item, value: adapter.get(), context });
+        dynReadonlyLocal = stateEvents.onReadonly({ data: undefined, item, value: adapter.get(), context: resolvedContext });
     }
     let dynPropsLocal = {};
     if (stateEvents?.onProperties) {
-        dynPropsLocal = stateEvents.onProperties({ data: undefined, item, value: adapter.get(), context }) || {};
+        dynPropsLocal = stateEvents.onProperties({ data: undefined, item, value: adapter.get(), context: resolvedContext }) || {};
     }
 
     const currentVal = adapter.get();
 
-    const dynReadonlyGlobal = runDynamicEvaluators('onReadonly', { item, context, value: currentVal });
-    const dynDisabledGlobal = runDynamicEvaluators('onDisabled', { item, context, value: currentVal });
-    const validationMsg = runDynamicEvaluators('onValidate', { item, context, value: currentVal });
-    const dynPropsGlobal = runDynamicEvaluators('onProperties', { item, context, value: adapter.get() }) || {};
+    const dynReadonlyGlobal = runDynamicEvaluators('onReadonly', { item, context: resolvedContext, value: currentVal });
+    const dynDisabledGlobal = runDynamicEvaluators('onDisabled', { item, context: resolvedContext, value: currentVal });
+    const validationMsg = runDynamicEvaluators('onValidate', { item, context: resolvedContext, value: currentVal });
+    const dynPropsGlobal = runDynamicEvaluators('onProperties', { item, context: resolvedContext, value: adapter.get() }) || {};
 
     const combinedProps = { ...dynPropsGlobal, ...dynPropsLocal };
 
@@ -133,12 +193,11 @@ export default function WidgetRenderer({
 
     const options = item.options || adapter.getOptions()
 
-
     const baseValue = (dynValue !== undefined ? dynValue : adapter.get());
-    const safeValue = (baseValue === null || baseValue === undefined) ? '' : baseValue;
+    const safeValue = widgetKey === 'label' ? baseValue : ((baseValue === null || baseValue === undefined) ? '' : baseValue);
 
     const widgetProps = {
-        context,
+        context: resolvedContext,
         adapter: adapter,
         item,
         value: safeValue,
@@ -173,15 +232,15 @@ export default function WidgetRenderer({
 
 
     // Visibility: allow dynamic evaluator and simple visibleWhen rule on item
-    let visible = runDynamicEvaluators('onVisible', { item, context, value: currentVal });
+    let visible = runDynamicEvaluators('onVisible', { item, context: resolvedContext, value: currentVal });
     // If not decided yet, check item-level handler mapping: onVisible → handler
     if (visible === undefined && Array.isArray(item?.on)) {
         try {
             const h = item.on.find(e => e && e.event === 'onVisible');
-            if (h && typeof context?.lookupHandler === 'function') {
-                const fn = context.lookupHandler(h.handler);
+            if (h && typeof resolvedContext?.lookupHandler === 'function') {
+                const fn = resolvedContext.lookupHandler(h.handler);
                 if (typeof fn === 'function') {
-                    const res = fn({ item, context, value: currentVal });
+                    const res = fn({ item, context: resolvedContext, value: currentVal });
                     if (typeof res === 'boolean') {
                         visible = res;
                     }
@@ -191,11 +250,34 @@ export default function WidgetRenderer({
     }
     if (visible === undefined) {
         const vw = item?.visibleWhen;
-        if (vw && context?.handlers?.dataSource?.getFormData) {
+        if (vw) {
             try {
-                const data = context.handlers.dataSource.getFormData() || {};
+                const source = String(vw.source || 'form').toLowerCase();
+                let data = {};
+                switch (source) {
+                    case 'windowform':
+                        data = resolvedContext?.signals?.windowForm?.peek?.() || {};
+                        break;
+                    case 'filter':
+                    case 'filters':
+                        data = resolvedContext?.handlers?.dataSource?.peekFilter?.() || {};
+                        break;
+                    case 'selection':
+                        data = resolvedContext?.signals?.selection?.peek?.() || {};
+                        break;
+                    case 'metrics':
+                        data = resolvedContext?.signals?.metrics?.peek?.() || {};
+                        break;
+                    case 'input':
+                        data = resolvedContext?.signals?.input?.peek?.() || {};
+                        break;
+                    case 'form':
+                    default:
+                        data = resolvedContext?.handlers?.dataSource?.getFormData?.() || {};
+                        break;
+                }
                 const field = vw.field || vw.selector || vw.key;
-                const actual = field ? (data[field]) : undefined;
+                const actual = field ? resolveSelector(data, field) : undefined;
                 if (vw.equals !== undefined) {
                     visible = (actual === vw.equals);
                 } else if (Array.isArray(vw.in)) {
@@ -212,7 +294,7 @@ export default function WidgetRenderer({
         widgetProps.intent = 'danger';
     }
     return (
-        <ControlWrapper item={itemWithError} container={container} context={context} framework={framework} >
+        <ControlWrapper item={itemWithError} container={container} context={resolvedContext} framework={framework} >
             <Widget { ...widgetProps} />
         </ControlWrapper>
     );

@@ -1,5 +1,6 @@
 import {getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {resolveKey} from "../../utils/selector.js";
+import {formatDisplayValue} from "../../utils/formatValue.js";
 
 export const getDashboardKeyForContainer = (context, container) => {
     if (container?.dashboard?.key) {
@@ -38,13 +39,13 @@ export const createDashboardContext = (context, container) => {
     }
 
     const nextContext = withDashboardContext(context, dashboardKey);
-    getDashboardFilterSignal(dashboardKey, {});
+    seedDashboardDefaultFilters(dashboardKey, container);
     getDashboardSelectionSignal(dashboardKey, {dimension: null, entityKey: null, pointKey: null});
     return nextContext;
 };
 
 export const getDashboardVisibleWhen = (container = {}) => (
-    container?.dashboard?.visibleWhen || container?.visibleWhen || null
+    container?.visibleWhen || container?.dashboard?.visibleWhen || null
 );
 
 const collectDashboardContainers = (containers = []) => {
@@ -81,6 +82,19 @@ export const buildDashboardDefaultFilters = (container) => {
     }
 
     return defaults;
+};
+
+export const seedDashboardDefaultFilters = (dashboardKey, container) => {
+    const key = String(dashboardKey || '').trim();
+    if (!key) return {};
+    const defaultFilters = buildDashboardDefaultFilters(container);
+    const filterSignal = getDashboardFilterSignal(key, defaultFilters);
+    const currentFilters = filterSignal.peek() || {};
+    if (Object.keys(currentFilters).length === 0 && Object.keys(defaultFilters).length > 0) {
+        filterSignal.value = defaultFilters;
+        return defaultFilters;
+    }
+    return currentFilters;
 };
 
 const equalsFilterValue = (filterValue, rowValue) => {
@@ -173,33 +187,9 @@ export const interpolateDashboardTemplate = (template, scope = {}) => {
     });
 };
 
-export const formatDashboardValue = (value, format, locale = 'en-US') => {
-    if (value == null) return '-';
-
-    const numeric = Number(value);
-    const isNumeric = Number.isFinite(numeric);
-
-    if (!isNumeric) {
-        if (typeof value === 'string' && value.trim() !== '') {
-            return value;
-        }
-        return '-';
-    }
-
-    switch (format) {
-        case 'currency':
-            return new Intl.NumberFormat(locale, {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(numeric);
-        case 'compactNumber':
-            return new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(numeric);
-        case 'percent':
-            return `${numeric.toFixed(1)}%`;
-        case 'percentFraction':
-            return `${(numeric * 100).toFixed(1)}%`;
-        case 'number':
-        default:
-            return new Intl.NumberFormat(locale, {maximumFractionDigits: 2}).format(numeric);
-    }
-};
+export const formatDashboardValue = (value, format, locale = 'en-US', options = {}) => (
+    formatDisplayValue(value, format, locale, options)
+);
 
 export const formatDashboardDelta = (value, format = 'numberDelta', locale = 'en-US') => {
     if (value == null) {
@@ -249,6 +239,13 @@ export const getDashboardToneName = (value, tone = {}) => {
     if (normalizedTone.warningBelow !== undefined && numeric <= Number(normalizedTone.warningBelow)) return 'warning';
     if (normalizedTone.successBelow !== undefined && numeric <= Number(normalizedTone.successBelow)) return 'success';
     return 'info';
+};
+
+export const shouldShowDashboardKPIContext = (rows = []) => {
+    return (rows || []).some((row) => {
+        const value = row?.context;
+        return !(value == null || value === '');
+    });
 };
 
 const pickConditionValue = (condition, snapshot) => {

@@ -705,6 +705,15 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         updateDirtyFlag();
     }
 
+    const setWindowFormField = ({item, value}) => {
+        const fieldKey = item.dataField || item.bindingPath || item.id;
+        const previous = signals.windowForm?.peek?.() || {};
+        if (signals.windowForm) {
+            signals.windowForm.value = setSelector(previous, fieldKey, value);
+        }
+        return true;
+    }
+
     const setSilentFormField = ({item, value}) => {
         const fieldKey = item.dataField || item.bindingPath || item.id;
         const prev = form.peek();
@@ -734,16 +743,26 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     };
 
 
-    const setFormData = ({values = {}}) => {
-        form.value = values;
-        formSnapshot = values;
+    const setFormData = ({values = {}, parameters = {}}) => {
+        const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
+        form.value = nextValues;
+        formSnapshot = nextValues;
         formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
     }
 
-    const setSilentFormData = ({values = {}}) => {
+    const setWindowFormData = ({values = {}, parameters = {}}) => {
+        const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
+        if (signals.windowForm) {
+            signals.windowForm.value = nextValues;
+        }
+        return true;
+    }
+
+    const setSilentFormData = ({values = {}, parameters = {}}) => {
+        const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
         form.value = {
             ...form.peek(),
-            ...values,
+            ...nextValues,
         };
         return true;
         // note: snapshot not updated for silent sets
@@ -753,9 +772,17 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         return form.value || {};
     };
 
+    const getWindowFormData = () => {
+        return signals.windowForm?.value || {};
+    };
+
 
     const peekFormData = () => {
         return form.peek() || {};
+    };
+
+    const peekWindowFormData = () => {
+        return signals.windowForm?.peek?.() || {};
     };
 
 
@@ -780,6 +807,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
                 return getCollection();
             case 'form':
                 return getFormData();
+            case 'windowForm':
+                return getWindowFormData();
             case 'filter':
                 return getFilter();
             case 'filterSet':
@@ -798,6 +827,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
                 return peekCollection();
             case 'form':
                 return peekFormData();
+            case 'windowForm':
+                return peekWindowFormData();
             case 'filter':
                 return peekFilter();
             case 'filterSet':
@@ -926,10 +957,14 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         getUniqueKeyFilter,
         getUniqueKeyValue,
         getFormData,
+        getWindowFormData,
         setFormData,
+        setWindowFormData,
         setSilentFormData,
         peekFormData,
+        peekWindowFormData,
         setFormField,
+        setWindowFormField,
         setSilentFormField,
         // dirty helpers
         isFormDirty: () => formStatus.peek().dirty,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -25,7 +26,7 @@ type Hub struct {
 
 	mu        sync.RWMutex
 	clients   map[string]map[string]*client // ns -> clientId -> client
-	snapshots map[string]map[string]json.RawMessage
+	snapshots map[string]map[string]snapshotState
 	watchers  map[string]map[string]map[chan json.RawMessage]struct{} // ns -> clientId -> set(ch)
 	queues    map[string]map[string]*commandQueue
 	notifiers map[string]map[string]transport.Notifier
@@ -57,6 +58,11 @@ type snapshotMsg struct {
 	Type     string          `json:"type"`
 	ClientID string          `json:"clientId"`
 	Data     json.RawMessage `json:"data"`
+}
+
+type snapshotState struct {
+	Data      json.RawMessage
+	UpdatedAt time.Time
 }
 
 type rpcResponse struct {
@@ -94,7 +100,7 @@ func NewHub(cfg *Config) *Hub {
 		origins:      origins,
 		ns:           NewNamespaceService(),
 		clients:      map[string]map[string]*client{},
-		snapshots:    map[string]map[string]json.RawMessage{},
+		snapshots:    map[string]map[string]snapshotState{},
 		watchers:     map[string]map[string]map[chan json.RawMessage]struct{}{},
 		queues:       map[string]map[string]*commandQueue{},
 		notifiers:    map[string]map[string]transport.Notifier{},
@@ -116,9 +122,12 @@ func (h *Hub) setSnapshot(ns, clientID string, data json.RawMessage) {
 	}
 	h.mu.Lock()
 	if h.snapshots[ns] == nil {
-		h.snapshots[ns] = map[string]json.RawMessage{}
+		h.snapshots[ns] = map[string]snapshotState{}
 	}
-	h.snapshots[ns][clientID] = data
+	h.snapshots[ns][clientID] = snapshotState{
+		Data:      data,
+		UpdatedAt: time.Now(),
+	}
 
 	if h.watchers[ns] != nil && h.watchers[ns][clientID] != nil {
 		for ch := range h.watchers[ns][clientID] {
@@ -247,13 +256,40 @@ func (h *Hub) ListClients(ns string) []string {
 	return out
 }
 
+type SnapshotEntry struct {
+	Namespace string
+	ClientID  string
+	Snapshot  json.RawMessage
+	UpdatedAt time.Time
+}
+
+func (h *Hub) SnapshotEntries() []SnapshotEntry {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	var out []SnapshotEntry
+	for ns, clients := range h.snapshots {
+		for clientID, snap := range clients {
+			if len(snap.Data) == 0 {
+				continue
+			}
+			out = append(out, SnapshotEntry{
+				Namespace: ns,
+				ClientID:  clientID,
+				Snapshot:  snap.Data,
+				UpdatedAt: snap.UpdatedAt,
+			})
+		}
+	}
+	return out
+}
+
 func (h *Hub) Snapshot(ns, clientID string) json.RawMessage {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	if h.snapshots[ns] == nil {
 		return nil
 	}
-	return h.snapshots[ns][clientID]
+	return h.snapshots[ns][clientID].Data
 }
 
 func (h *Hub) DefaultClient(ns string) (string, bool) {
@@ -447,6 +483,15 @@ func (h *Hub) Call(ctx context.Context, ns, clientID string, method string, para
 	h.pendingMu.Unlock()
 
 	req := rpcRequest{ID: id, Method: method, Params: params}
+	log.Printf("[forge-ui] call ns=%q client=%q method=%q mode=%s id=%q", ns, clientID, method, func() string {
+		if c != nil && c.ws != nil {
+			return "ws"
+		}
+		if n != nil {
+			return "notifier"
+		}
+		return "queue"
+	}(), id)
 	if c != nil && c.ws != nil {
 		c.mu.Lock()
 		err := c.ws.WriteJSON(req)
@@ -471,11 +516,13 @@ func (h *Hub) Call(ctx context.Context, ns, clientID string, method string, para
 
 	select {
 	case <-ctx.Done():
+		log.Printf("[forge-ui] call timeout ns=%q client=%q method=%q id=%q err=%v", ns, clientID, method, id, ctx.Err())
 		h.pendingMu.Lock()
 		delete(h.pending, id)
 		h.pendingMu.Unlock()
 		return nil, ctx.Err()
 	case resp := <-ch:
+		log.Printf("[forge-ui] call response ns=%q client=%q method=%q id=%q ok=%v err=%q", ns, clientID, method, id, resp.OK, resp.Error)
 		return resp, nil
 	}
 }

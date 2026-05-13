@@ -140,6 +140,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const standardSignals = {
                 input: getInputSignal(identity.dataSourceId),
                 form: getFormSignal(identity.dataSourceId),
+                windowForm: getFormSignal(`${windowId}:windowForm`),
                 control: getControlSignal(identity.dataSourceId),
                 message: getMessageSignal(identity.dataSourceId),
                 formStatus: getFormStatusSignal(identity.dataSourceId),
@@ -188,6 +189,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const standardSignals = {
                 input: getInputSignal(identity.dataSourceId),
                 form: getFormSignal(identity.dataSourceId),
+                windowForm: getFormSignal(`${windowId}:windowForm`),
                 control: getControlSignal(identity.dataSourceId),
                 message: getMessageSignal(identity.dataSourceId),
                 formStatus: getFormStatusSignal(identity.dataSourceId),
@@ -281,6 +283,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const standardSignals = {
                 input: getInputSignal(identity.dataSourceId),
                 form: getFormSignal(identity.dataSourceId),
+                windowForm: getFormSignal(`${windowId}:windowForm`),
                 control: getControlSignal(identity.dataSourceId),
                 message: getMessageSignal(identity.dataSourceId),
                 formStatus: getFormStatusSignal(identity.dataSourceId),

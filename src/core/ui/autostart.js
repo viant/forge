@@ -48,6 +48,12 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
     endpoints?.forgeUIHTTP ||
     connectorConfig?.uiBridge?.url ||
     readViteEnv('VITE_FORGE_UI_BRIDGE_URL');
+  const cfgTransport = String(
+    connectorConfig?.uiBridge?.transport
+    || endpoints?.uiBridgeTransport
+    || endpoints?.forgeUITransport
+    || ''
+  ).trim().toLowerCase();
 
   if (!cfgURL) return null;
   if (!envEnabled && readViteEnv('VITE_FORGE_UI_BRIDGE_ENABLED') !== undefined && !envEnabled) {
@@ -62,7 +68,11 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
     readViteEnv('VITE_FORGE_UI_BRIDGE_TOKEN');
 
   try {
-    if (cfgURL.startsWith('http://') || cfgURL.startsWith('https://')) {
+    const isHTTP = cfgTransport === 'http'
+      || cfgURL.startsWith('http://')
+      || cfgURL.startsWith('https://')
+      || cfgURL.startsWith('/');
+    if (isHTTP) {
       stopFn = startUIBridgeHTTP({
         url: cfgURL,
         token: cfgToken,

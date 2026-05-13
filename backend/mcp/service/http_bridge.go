@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -60,7 +61,7 @@ func (h *Hub) httpStreamable() http.Handler {
 	return h.httpHandler
 }
 
-func (b *httpRPCBridge) newHandler(_ context.Context, transport transport.Transport) transport.Handler {
+func (b *httpRPCBridge) newHandler(ctx context.Context, transport transport.Transport) transport.Handler {
 	return &uiRPCHandler{bridge: b, transport: transport}
 }
 
@@ -147,8 +148,10 @@ func (h *uiRPCHandler) handle(ctx context.Context, method string, params json.Ra
 			ns = namespaceFromTokenString(normalizeBearer(p.Token), ns)
 		}
 		h.bridge.hub.registerHTTPClient(ns, p.ClientID)
-		h.bridge.hub.RegisterHTTPNotifier(ns, p.ClientID, h.transport)
-		h.bridge.bindSession(ctx, p.ClientID, ns, h.transport)
+		// HTTP bridge clients consume commands through explicit ui.poll
+		// round-trips rather than transport notifications. Keep the
+		// client/session registration, but do not bind a notifier here.
+		h.bridge.bindSession(ctx, p.ClientID, ns, nil)
 		return mustJSON(map[string]any{"ok": true, "clientId": p.ClientID}), nil
 	case "ui.snapshot":
 		var p struct {
@@ -175,6 +178,33 @@ func (h *uiRPCHandler) handle(ctx context.Context, method string, params json.Ra
 		}
 		h.bridge.hub.setSnapshot(ns, clientID, p.Data)
 		return mustJSON(map[string]any{"ok": true}), nil
+	case "ui.snapshot.get":
+		var p struct {
+			ClientID string `json:"clientId,omitempty"`
+		}
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &p); err != nil {
+				return nil, jsonrpc.NewInvalidParamsError("invalid params", nil)
+			}
+		}
+		info := h.bridge.sessionInfo(ctx)
+		clientID := p.ClientID
+		ns := "default"
+		if info != nil {
+			if clientID == "" {
+				clientID = info.clientID
+			}
+			ns = info.ns
+		}
+		if clientID == "" {
+			return mustJSON(map[string]any{"clientId": "", "connected": false}), nil
+		}
+		snap := h.bridge.hub.Snapshot(ns, clientID)
+		return mustJSON(map[string]any{
+			"clientId":  clientID,
+			"snapshot":  json.RawMessage(snap),
+			"connected": len(snap) > 0,
+		}), nil
 	case "ui.poll":
 		var p struct {
 			ClientID  string `json:"clientId"`
@@ -205,7 +235,12 @@ func (h *uiRPCHandler) handle(ctx context.Context, method string, params json.Ra
 		if err != nil || reqCmd == nil {
 			return mustJSON(nil), nil
 		}
-		return mustJSON(reqCmd), nil
+		log.Printf("[forge-ui] poll deliver ns=%q client=%q cmd=%q method=%q", ns, clientID, reqCmd.ID, reqCmd.Method)
+		return mustJSON(map[string]any{
+			"id":     reqCmd.ID,
+			"method": "ui.command",
+			"params": reqCmd,
+		}), nil
 	case "ui.response":
 		var p rpcResponse
 		if err := json.Unmarshal(params, &p); err != nil {

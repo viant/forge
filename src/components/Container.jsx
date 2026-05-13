@@ -1,10 +1,11 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo, useRef, useState} from 'react';
+import {Card, Section} from '@blueprintjs/core';
 import ControlRenderer from './ControlRenderer.jsx';
 import {useControlEvents} from "../hooks";
 import TablePanel from "./TablePanel.jsx";
 import FormPanel from "./FormPanel.jsx";
 import Chart from "./Chart.jsx";
-import {resolveParameterValue, resolveTemplate} from "../utils/selector.js";
+import {resolveParameterValue, resolveSelector, resolveTemplate} from "../utils/selector.js";
 import Splitter from './Splitter';
 
 import {expandRepeatItems} from "../utils/repeat.js";
@@ -21,6 +22,71 @@ import GridLayoutRenderer from './GridLayoutRenderer.jsx';
 import {DashboardBlock} from "./dashboard/DashboardBlocks.jsx";
 import DashboardSurface from "./dashboard/DashboardSurface.jsx";
 import {createDashboardContext, evaluateDashboardCondition, getDashboardVisibleWhen} from "./dashboard/dashboardUtils.js";
+import { getDashboardFilterSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
+import {useSignalEffect} from "@preact/signals-react";
+import {isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
+
+const evaluatePlainVisibleWhen = (visibleWhen, context) => {
+    if (!visibleWhen || !context) return true;
+    const source = String(visibleWhen.source || 'form').toLowerCase();
+    const field = visibleWhen.field || visibleWhen.selector || visibleWhen.key;
+
+    let scope = {};
+    switch (source) {
+        case 'windowform':
+            scope = context.signals?.windowForm?.peek?.() || {};
+            break;
+        case 'filter':
+        case 'filters':
+            scope = context.handlers?.dataSource?.peekFilter?.() || {};
+            break;
+        case 'selection':
+            scope = context.signals?.selection?.peek?.() || {};
+            break;
+        case 'input':
+            scope = context.signals?.input?.peek?.() || {};
+            break;
+        case 'metrics':
+            scope = context.signals?.metrics?.peek?.() || {};
+            break;
+        case 'form':
+        default:
+            scope = context.handlers?.dataSource?.peekFormData?.() || {};
+            break;
+    }
+
+    const actual = field ? resolveSelector(scope, field) : scope;
+    if (visibleWhen.equals !== undefined) {
+        return actual === visibleWhen.equals;
+    }
+    if (Array.isArray(visibleWhen.in)) {
+        return visibleWhen.in.includes(actual);
+    }
+    if (visibleWhen.notEquals !== undefined) {
+        return actual !== visibleWhen.notEquals;
+    }
+    return !!actual;
+};
+
+const wrapContainerChrome = (container, content) => {
+    if (!container?.section && !container?.card) {
+        return content;
+    }
+
+    let wrapped = content;
+    if (container?.card) {
+        wrapped = <Card {...container.card}>{wrapped}</Card>;
+    }
+    if (container?.section) {
+        const sectionProperties = container.section.properties || {};
+        wrapped = (
+            <Section title={container.title || ''} {...sectionProperties}>
+                {wrapped}
+            </Section>
+        );
+    }
+    return wrapped;
+};
 
 const buildGridStyle = (style, columns, layout) => {
     const display = (style && Object.prototype.hasOwnProperty.call(style, 'display')) ? style.display : 'grid';
@@ -38,8 +104,12 @@ const buildGridStyle = (style, columns, layout) => {
 };
 
 const Container = ({context, container, isActive}) => {
+    const isDashboardBlock = isSemanticDashboardBlock(container);
     const isDashboardRoot = (container.kind === 'dashboard' || !!container.dashboard) && !context?.dashboardKey;
     const effectiveContext = isDashboardRoot ? createDashboardContext(context, container) : context;
+    const dashboardSnapshotRef = useRef('');
+    const visibleWhenSnapshotRef = useRef('');
+    const [, setDashboardVersion] = useState(0);
     const {items = [], containers = [], layout, table, chart} = container;
     const columns = layout?.columns || 1;
     const orientation = layout?.orientation || 'vertical';
@@ -47,16 +117,51 @@ const Container = ({context, container, isActive}) => {
     const {identity} = effectiveContext
     const dataSourceRef = container.dataSourceRef || identity.dataSourceRef
 
-    const visibleWhen = getDashboardVisibleWhen(container);
-    if (visibleWhen && effectiveContext?.dashboardKey) {
-        const visible = evaluateDashboardCondition(visibleWhen, {
-            context: effectiveContext,
-            dashboardKey: effectiveContext.dashboardKey,
+    useSignalEffect(() => {
+        const dashboardKey = effectiveContext?.dashboardKey;
+        if (!dashboardKey) return;
+        const snapshot = JSON.stringify({
+            filters: getDashboardFilterSignal(dashboardKey).value || {},
+            selection: getDashboardSelectionSignal(dashboardKey).value || {},
         });
-        if (!visible) {
-            return null;
+        if (dashboardSnapshotRef.current === snapshot) return;
+        dashboardSnapshotRef.current = snapshot;
+        setDashboardVersion((value) => value + 1);
+    });
+
+    useSignalEffect(() => {
+        const visibleWhen = getDashboardVisibleWhen(container);
+        if (!visibleWhen || effectiveContext?.dashboardKey) return;
+
+        const source = String(visibleWhen.source || 'form').toLowerCase();
+        let snapshotValue;
+        switch (source) {
+            case 'windowform':
+                snapshotValue = effectiveContext?.signals?.windowForm?.value;
+                break;
+            case 'filter':
+            case 'filters':
+                snapshotValue = effectiveContext?.signals?.input?.value?.filter || {};
+                break;
+            case 'selection':
+                snapshotValue = effectiveContext?.signals?.selection?.value;
+                break;
+            case 'input':
+                snapshotValue = effectiveContext?.signals?.input?.value;
+                break;
+            case 'metrics':
+                snapshotValue = effectiveContext?.signals?.metrics?.value;
+                break;
+            case 'form':
+            default:
+                snapshotValue = effectiveContext?.signals?.form?.value;
+                break;
         }
-    }
+        const snapshot = JSON.stringify(snapshotValue || {});
+        if (visibleWhenSnapshotRef.current === snapshot) return;
+        visibleWhenSnapshotRef.current = snapshot;
+        setDashboardVersion((value) => value + 1);
+    });
 
     const stateTuple = useState(() => (
         container.state
@@ -263,7 +368,7 @@ const Container = ({context, container, isActive}) => {
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
         tablePanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
-    if (!hasVisual) {
+    if (!hasVisual && !shouldSkipGenericNonVisualEarlyReturn(container)) {
         return (
             <>
                 {containerWantsFetcher && (
@@ -278,7 +383,18 @@ const Container = ({context, container, isActive}) => {
         );
     }
 
-    const handlers = (visualItems?.length || 0) > 0 ? useControlEvents(effectiveContext, visualItems, state) : {}
+    const handlers = useControlEvents(effectiveContext, visualItems || [], state)
+
+    const visibleWhen = getDashboardVisibleWhen(container);
+    if (visibleWhen) {
+        const visible = effectiveContext?.dashboardKey
+            ? evaluateDashboardCondition(visibleWhen, {
+                context: effectiveContext,
+                dashboardKey: effectiveContext.dashboardKey,
+            })
+            : evaluatePlainVisibleWhen(visibleWhen, effectiveContext);
+        if (!visible) return null;
+    }
 
     // Optional container-level toolbar
     const renderContainerToolbar = () => {
@@ -314,7 +430,7 @@ const Container = ({context, container, isActive}) => {
                     baseDataSourceRef={dataSourceRef}
                     style={style}
                     renderEntry={({entry, context: subCtx, css}) => (
-                        <div key={`${entry.id}-container`} style={{...css.ctrl, display: 'flex', minHeight: 0, minWidth: 0}}>
+                        <div key={`${entry.id}-container`} style={{...css.ctrl, display: 'flex', minHeight: 0, minWidth: 0, height: '100%', alignSelf: 'stretch'}}>
                             <Container
                                 context={subCtx}
                                 container={entry}
@@ -414,7 +530,7 @@ const Container = ({context, container, isActive}) => {
         );
     }
 
-    if (container.kind?.startsWith('dashboard.')) {
+    if (isDashboardBlock) {
         const blockContext = effectiveContext.Context(container.dataSourceRef || dataSourceRef);
         return (
             <>
@@ -437,7 +553,8 @@ const Container = ({context, container, isActive}) => {
         );
     }
 
-    return (<>
+    return wrapContainerChrome(container, (
+        <>
             <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 {container.toolbar ? renderContainerToolbar() : null}
                 {(visualItems?.length || 0) > 0 ? (
@@ -493,7 +610,7 @@ const Container = ({context, container, isActive}) => {
                 />
             )}
         </>
-    );
+    ));
 };
 
 export default Container;

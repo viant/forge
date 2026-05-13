@@ -4,6 +4,7 @@ import {
   applyDashboardFiltersToCollection,
   applyDashboardSelectionToCollection,
   buildDashboardDefaultFilters,
+  createDashboardContext,
   createDashboardConditionSnapshot,
   evaluateDashboardCondition,
   evaluateDashboardConditionSnapshot,
@@ -12,6 +13,7 @@ import {
   getDashboardToneName,
   getDashboardVisibleWhen,
   publishDashboardSelection,
+  shouldShowDashboardKPIContext,
   withDashboardContext,
 } from './dashboardUtils.js';
 import {
@@ -154,6 +156,51 @@ assert.deepEqual(
   {domain: ['customer']},
 );
 
+const initializedDashboardContext = createDashboardContext(baseContext, {
+  kind: 'dashboard',
+  id: 'orderDashboard',
+  containers: [
+    {
+      kind: 'dashboard.filters',
+      items: [
+        {
+          id: 'periodView',
+          field: 'periodView',
+          options: [
+            { label: 'Today', value: 'today', default: true },
+            { label: '7D', value: '7d' },
+          ],
+        },
+      ],
+    },
+  ],
+});
+assert.equal(initializedDashboardContext.dashboardKey, 'W1:orderDashboard');
+assert.deepEqual(getDashboardFilterSignal('W1:orderDashboard').peek(), { periodView: 'today' });
+
+getDashboardFilterSignal('W1:preexistingDashboard').value = {};
+const reseededDashboardContext = createDashboardContext(baseContext, {
+  kind: 'dashboard',
+  id: 'preexistingDashboard',
+  containers: [
+    {
+      kind: 'dashboard.filters',
+      items: [
+        {
+          id: 'periodView',
+          field: 'periodView',
+          options: [
+            { label: 'Today', value: 'today', default: true },
+            { label: '7D', value: '7d' },
+          ],
+        },
+      ],
+    },
+  ],
+});
+assert.equal(reseededDashboardContext.dashboardKey, 'W1:preexistingDashboard');
+assert.deepEqual(getDashboardFilterSignal('W1:preexistingDashboard').peek(), { periodView: 'today' });
+
 assert.deepEqual(
   applyDashboardFiltersToCollection(
     [
@@ -208,10 +255,16 @@ assert.equal(formatDashboardValue(1234.5, 'number', 'de-DE'), '1.234,5');
 assert.equal(formatDashboardValue(1234, 'currency', 'de-DE').includes('1.234'), true);
 assert.equal(formatDashboardValue(19.37, 'percent', 'en-US'), '19.4%');
 assert.equal(formatDashboardValue(0.1937, 'percentFraction', 'en-US'), '19.4%');
+assert.equal(formatDashboardValue('2026-05-01T04:00:00Z', 'date', 'en-US').includes('2026'), true);
+assert.equal(formatDashboardValue('2026-05-01T04:00:00Z', 'dateTime', 'en-US').includes('2026'), true);
+assert.equal(formatDashboardValue('2026-05-01T04:00:00Z', 'date', 'en-US', { timeZone: 'America/New_York' }), 'May 1, 2026');
+assert.equal(formatDashboardValue('2026-05-13T00:00:00Z', 'wallClockHour', 'en-US'), '12 AM');
 assert.equal(formatDashboardDelta(5000, 'currencyDelta', 'de-DE'), '+5.000 $');
 assert.equal(formatDashboardDelta(-12.5, 'percentDelta', 'en-US'), '-12.5%');
 assert.equal(formatDashboardDelta(-0.125, 'percentFractionDelta', 'en-US'), '-12.5%');
 assert.equal(getDashboardToneName(50, { warningAbove: 40, dangerAbove: 25 }), 'danger');
+assert.equal(shouldShowDashboardKPIContext([{label: 'Budget', context: ''}, {label: 'CTR'}]), false);
+assert.equal(shouldShowDashboardKPIContext([{label: 'Status', context: 'Healthy'}]), true);
 assert.equal(getDashboardToneName(30, { warningAbove: 40, dangerAbove: 25 }), 'warning');
 assert.equal(getDashboardToneName(90, { warningBelow: 80, dangerBelow: 95 }), 'warning');
 assert.equal(getDashboardToneName(70, { warningBelow: 80, dangerBelow: 95 }), 'danger');
