@@ -199,6 +199,23 @@ export function startUIBridgeHTTP(options = {}) {
   let lastEventId = null;
   let streamAbort = null;
   let detachListeners = null;
+  let detachLifecycle = null;
+  const inflightRPC = new Set();
+
+  const registerRPC = (controller) => {
+    if (controller) inflightRPC.add(controller);
+  };
+
+  const unregisterRPC = (controller) => {
+    if (controller) inflightRPC.delete(controller);
+  };
+
+  const abortInflightRPC = () => {
+    for (const controller of inflightRPC) {
+      try { controller.abort(); } catch (_) {}
+    }
+    inflightRPC.clear();
+  };
 
   const rpc = async (method, params, id) => {
     const body = {
@@ -209,21 +226,28 @@ export function startUIBridgeHTTP(options = {}) {
     };
     const headers = { 'Content-Type': 'application/json' };
     if (sessionId) headers[sessionHeader] = sessionId;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    });
-    const nextSession = res.headers.get(sessionHeader);
-    if (nextSession) sessionId = nextSession;
-    if (res.status === 202 || res.status === 204) return null;
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text = await res.text();
-    if (!text) return null;
-    const data = safeParseJSON(text);
-    if (!data) throw new Error('invalid jsonrpc response');
-    if (data.error) throw new Error(data.error.message || 'rpc error');
-    return data.result;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    registerRPC(controller);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: controller?.signal,
+      });
+      const nextSession = res.headers.get(sessionHeader);
+      if (nextSession) sessionId = nextSession;
+      if (res.status === 202 || res.status === 204) return null;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      if (!text) return null;
+      const data = safeParseJSON(text);
+      if (!data) throw new Error('invalid jsonrpc response');
+      if (data.error) throw new Error(data.error.message || 'rpc error');
+      return data.result;
+    } finally {
+      unregisterRPC(controller);
+    }
   };
 
   const publishSnapshot = async () => {
@@ -249,6 +273,19 @@ export function startUIBridgeHTTP(options = {}) {
     events.forEach((eventName) => window.addEventListener(eventName, handler));
     return () => {
       events.forEach((eventName) => window.removeEventListener(eventName, handler));
+    };
+  };
+
+  const bindLifecycleListeners = (stop) => {
+    if (typeof window === 'undefined') return () => {};
+    const handler = () => {
+      stop();
+    };
+    window.addEventListener('pagehide', handler);
+    window.addEventListener('beforeunload', handler);
+    return () => {
+      window.removeEventListener('pagehide', handler);
+      window.removeEventListener('beforeunload', handler);
     };
   };
 
@@ -336,20 +373,27 @@ export function startUIBridgeHTTP(options = {}) {
     await publishSnapshot();
     snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
     detachListeners = bindImmediateSnapshotListeners();
+    detachLifecycle = bindLifecycleListeners(stop);
     pollLoop();
   };
 
   start();
 
-  return function stop() {
+  function stop() {
+    if (stopped) return;
     stopped = true;
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
+    try { detachLifecycle?.(); } catch (_) {}
+    detachLifecycle = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
+    abortInflightRPC();
     try { streamAbort?.abort(); } catch (_) {}
     if (snapshotTimer) clearInterval(snapshotTimer);
     snapshotTimer = null;
-  };
+  }
+
+  return stop;
 }
 
 export async function publishUIBridgeSnapshotNow() {

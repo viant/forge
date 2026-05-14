@@ -184,6 +184,8 @@ function resolveParameter(context, inWhere, location) {
             return resolveFromSelection(context, location);
         case 'form':
             return resolveFromValuesForm(context, location);
+        case 'windowForm':
+            return resolveFromWindowForm(context, location);
         case 'metadata':
             return resolveFromMetadata(context, location);
         case 'filterSet':
@@ -279,6 +281,14 @@ function resolveFromValuesForm(context, location) {
     return resolveSelector(formData, fieldPath);
 }
 
+function resolveFromWindowForm(context, location) {
+    const formData = context?.signals?.windowForm?.peek?.() || {};
+    if (!location) {
+        return formData;
+    }
+    return resolveSelector(formData, location);
+}
+
 
 
 
@@ -346,4 +356,3 @@ function resolveFromDataSource(context, location, scope = 'form') {
     if (!fieldPath) return storeObj;
     return resolveSelector(storeObj, fieldPath);
 }
-

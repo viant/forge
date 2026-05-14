@@ -24,6 +24,8 @@ assert.equal(selectedWindowId.peek(), res.windowId);
 
 await runUICommand({ method: 'ui.window.close', params: { windowId: res.windowId } });
 assert.equal(activeWindows.peek().length, 0);
+assert.equal(selectedWindowId.peek(), null);
+assert.equal(selectedTabId.peek(), null);
 assert.deepEqual(getDashboardFilterSignal(`${res.windowId}:demoDashboard`).peek(), {});
 
 const regKey = registerControlTarget(

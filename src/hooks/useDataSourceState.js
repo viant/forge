@@ -1,8 +1,9 @@
 // useDataSourceState.js – unified helper to subscribe to core DataSource signals
 // and expose plain React state values (collection, loading, error, selection).
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSignalEffect } from '@preact/signals-react';
+import { getLogger } from '../utils/logger.js';
 
 /**
  * Small wrapper that converts Forge runtime signals to ordinary React state so
@@ -12,6 +13,7 @@ import { useSignalEffect } from '@preact/signals-react';
  * @returns {{collection:Array, loading:boolean, error:any, selection:Object}}
  */
 export function useDataSourceState(context) {
+    const log = getLogger('ds-state');
     const { signals } = context || {};
     if (!signals) {
         throw new Error('useDataSourceState expects a Forge context with signals');
@@ -25,6 +27,23 @@ export function useDataSourceState(context) {
         return { loading, error };
     });
     const [sel, setSel]             = useState(selection?.peek?.());
+
+    useEffect(() => {
+        const nextData = collection.peek() || [];
+        const { loading = false, error = null } = control.peek() || {};
+        const nextSelection = selection?.peek?.();
+        try {
+            log.debug('[useDataSourceState] source changed', {
+                ds: context?.identity?.dataSourceRef,
+                rows: Array.isArray(nextData) ? nextData.length : undefined,
+                loading,
+                hasError: !!error,
+            });
+        } catch (_) {}
+        setData(nextData);
+        setFlags({ loading, error });
+        setSel(nextSelection);
+    }, [collection, control, selection, context?.identity?.dataSourceRef]);
 
     // keep data in sync
     useSignalEffect(() => {

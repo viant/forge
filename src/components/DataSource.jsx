@@ -72,7 +72,7 @@ export default function DataSource({context}) {
     const {dataSource, signals, connector, handlers, identity} = context
     const {paging, selectors} = dataSource;
     const pagingEnabled = !!paging?.enabled;
-    const {input, collection, selection, collectionInfo, metrics, form} = signals
+    const {input, collection, selection, collectionInfo, metrics, form, control} = signals
     const {getUniqueKeyValue, setSelected, setLoading, setError, setInactive} = handlers.dataSource
     const events = dataSourceEvents(context, dataSource);
     const selectionMode = dataSource.selectionMode || 'single';
@@ -135,9 +135,14 @@ export default function DataSource({context}) {
     useSignalEffect(() => {
         const inputVal = input.value || {};
         const {fetch, refresh = false} = inputVal;
-        try { log.debug('[watch] flags', { ds: context?.identity?.dataSourceRef, fetch, refresh, input: inputVal }); } catch(_) {}
+        const loadingNow = !!(control.value || {}).loading;
+        try { log.debug('[watch] flags', { ds: context?.identity?.dataSourceRef, fetch, refresh, loading: loadingNow, input: inputVal }); } catch(_) {}
         if (!fetch && !refresh) {
             try { log.debug('[watch] skip (no flags)', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
+            return;
+        }
+        if (loadingNow) {
+            try { log.debug('[watch] defer (loading)', { ds: context?.identity?.dataSourceRef, fetch, refresh }); } catch(_) {}
             return;
         }
 

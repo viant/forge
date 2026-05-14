@@ -32,6 +32,7 @@ import {format} from "date-fns";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
 import { resolveSelector } from "../utils/selector.js";
+import { getLogger } from "../utils/logger.js";
 
 function useMeasuredContainer() {
     const ref = React.useRef(null);
@@ -157,6 +158,37 @@ function formatTimestamp(timestamp, fmt = "MM/dd") {
     }
 }
 
+function resolveMappedConfigValue(baseContext, entry = {}, valueKey = "", defaultSource = "windowForm") {
+    const selector = String(entry?.[`${valueKey}Selector`] || "").trim();
+    const mapping = entry?.[`${valueKey}s`];
+    if (!selector || !mapping || typeof mapping !== "object" || Array.isArray(mapping)) {
+        return entry?.[valueKey];
+    }
+    let scope = {};
+    const source = String(entry?.[`${valueKey}Source`] || defaultSource).toLowerCase();
+    switch (source) {
+        case "form":
+            scope = baseContext?.signals?.form?.peek?.() || {};
+            break;
+        case "filter":
+        case "filters":
+            scope = baseContext?.handlers?.dataSource?.peekFilter?.() || {};
+            break;
+        case "input":
+            scope = baseContext?.signals?.input?.peek?.() || {};
+            break;
+        case "windowform":
+        default:
+            scope = baseContext?.signals?.windowForm?.peek?.() || {};
+            break;
+    }
+    const key = resolveSelector(scope, selector);
+    if (key == null) {
+        return entry?.[valueKey];
+    }
+    return mapping[key] ?? entry?.[valueKey];
+}
+
 // Function to format large numbers with commas
 function formatLargeNumber(value) {
     if (value >= 1e9) {
@@ -187,6 +219,7 @@ function areKeyListsEqual(left = [], right = []) {
 }
 
 const Chart = ({container, context, isActive = true, embedded = false}) => {
+    const log = getLogger('chart');
     const {chart} = container;
     const [chartRef, chartSize] = useMeasuredContainer();
     const [chartReady, setChartReady] = useState(false);
@@ -272,6 +305,17 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     });
 
     const chartContext = resolveChartContext();
+    useEffect(() => {
+        try {
+            log.debug('[chart] resolved datasource', {
+                containerId: container?.id,
+                baseDs: context?.identity?.dataSourceRef,
+                resolvedDs: chartContext?.identity?.dataSourceRef,
+                selector: chart?.dataSourceRefSelector || chart?.dataSourceSelector || null,
+            });
+        } catch (_) {}
+    }, [chartContext, chart?.dataSourceRefSelector, chart?.dataSourceSelector, container?.id, context?.identity?.dataSourceRef]);
+    const resolvedTickFormat = resolveMappedConfigValue(context, xAxis, "tickFormat", "windowForm");
     const { collection, loading, error } = useDataSourceState(chartContext);
 
     const isPieChart = type === "pie" || type === "donut";
@@ -425,7 +469,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
-                tickFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
+                tickFormatter={(val) => formatTimestamp(val, resolvedTickFormat)}
                 tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
                 minTickGap={embedded ? 24 : 5}
                 label={{
@@ -462,7 +506,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 />
             ) : null}
             <Tooltip
-                labelFormatter={(val) => formatTimestamp(val, xAxis.tickFormat)}
+                labelFormatter={(val) => formatTimestamp(val, resolvedTickFormat)}
                 formatter={(value, name, item) => {
                     const formatType = item?.payload?.__seriesFormats?.[item?.dataKey] || item?.payload?.__seriesAxes?.[item?.dataKey];
                     return [tooltipFormatterForFormat(formatType)(value), name];

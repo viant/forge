@@ -483,6 +483,20 @@ export const removeWindow = (windowId) => {
     );
     removeSignalsForKey(windowId);
 
+    if (selectedWindowId.value === windowId) {
+        if (windowToRemove && windowToRemove.inTab !== false) {
+            const remainingTabbedWindows = activeWindows.value.filter(win => win.inTab !== false);
+            selectedWindowId.value = remainingTabbedWindows.length > 0
+                ? remainingTabbedWindows[remainingTabbedWindows.length - 1].windowId
+                : null;
+        } else {
+            const remainingWindows = activeWindows.value;
+            selectedWindowId.value = remainingWindows.length > 0
+                ? remainingWindows[remainingWindows.length - 1].windowId
+                : null;
+        }
+    }
+
     if (windowToRemove && windowToRemove.inTab !== false) {
         // Update selectedTabId if necessary
         if (selectedTabId.value === windowId) {

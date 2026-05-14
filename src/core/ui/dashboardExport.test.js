@@ -391,6 +391,60 @@ assert.equal(model.blocks[6].rows.length, 2);
 assert.equal(model.blocks[7].sections[0].title, 'Spend 123000');
 assert.equal(model.blocks[7].sections[0].body[0], 'Selected US');
 
+const summaryItemsModel = buildDashboardExportModel({
+  container: {
+    kind: 'dashboard',
+    title: 'Summary Items',
+    containers: [
+      {
+        id: 'summary-items',
+        kind: 'dashboard.summary',
+        title: 'Blocker posture',
+        items: [
+          { label: 'Primary blocker', field: 'summary.primary_blocker_family' },
+          { label: 'Pacing', field: 'summary.pacing_rate', format: 'percentFraction' },
+        ],
+      },
+    ],
+  },
+  context: {
+    locale: 'en-US',
+    dashboardKey: 'W1:summary-items',
+    signals: {
+      metrics: {
+        peek: () => ({
+          summary: {
+            primary_blocker_family: 'Supply',
+            pacing_rate: 0.411,
+          },
+        }),
+      },
+      collection: {
+        peek: () => ([]),
+      },
+    },
+    Context() {
+      return this;
+    },
+  },
+  chartSvgs: {},
+});
+
+assert.deepEqual(summaryItemsModel.blocks[0].metrics, [
+  {
+    id: 'summary.primary_blocker_family',
+    label: 'Primary blocker',
+    rawValue: 'Supply',
+    value: 'Supply',
+  },
+  {
+    id: 'summary.pacing_rate',
+    label: 'Pacing',
+    rawValue: 0.411,
+    value: '41.1%',
+  },
+]);
+
 const groupedModel = buildDashboardExportModel({
   container: {
     kind: 'dashboard',
@@ -476,6 +530,46 @@ assert.equal(groupedModel.blocks[2].ranking.length, 1);
 assert.equal(groupedModel.blocks[2].ranking[0].key, 'CA');
 assert.equal(groupedModel.blocks[2].activeRegion.statusLabel, 'Critical');
 assert.equal(groupedModel.blocks[3].sections[0].title, 'Grouped 123000');
+
+const fieldBasedDimensionsModel = buildDashboardExportModel({
+  container: {
+    kind: 'dashboard',
+    title: 'Field Dimensions',
+    containers: [
+      {
+        id: 'dimensions',
+        kind: 'dashboard.dimensions',
+        dashboard: {
+          dimensions: {
+            dimension: { field: 'factor', label: 'Factor' },
+            metric: { field: 'share', label: 'Share', format: 'percentFraction' },
+            limit: 2,
+          },
+        },
+      },
+    ],
+  },
+  context: {
+    ...context,
+    signals: {
+      ...context.signals,
+      collection: {
+        peek: () => [
+          { factor: 'location.metrocode', share: 0.1919 },
+          { factor: 'profile.agg', share: 0.1215 },
+        ],
+      },
+    },
+    Context() {
+      return this;
+    },
+  },
+  chartSvgs: {},
+});
+
+assert.equal(fieldBasedDimensionsModel.blocks[0].rows[0].label, 'location.metrocode');
+assert.equal(fieldBasedDimensionsModel.blocks[0].rows[0].value, '19.2%');
+assert.equal(fieldBasedDimensionsModel.blocks[0].rows[1].value, '12.2%');
 
 const nestedModel = buildDashboardExportModel({
   container: {
