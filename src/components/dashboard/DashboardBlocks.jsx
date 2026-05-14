@@ -190,16 +190,29 @@ function Panel({container, children, actions = null}) {
 export function DashboardSummary({container, context}) {
     const metricsData = useMetrics(context);
     const locale = getDashboardLocale(context);
-    const metrics = container.dashboard?.summary?.metrics || container.metrics || [];
-    const metricCards = Array.isArray(metrics)
-        ? metrics.map((metric) => ({
-            key: metric.id || metric.selector,
-            label: metric.label,
-            value: resolveKey(metricsData, metric.selector),
-            format: metric.format,
-        }))
-        : metrics && typeof metrics === 'object'
-            ? Object.entries(metrics).map(([key, value]) => ({
+    const summaryConfig = container.dashboard?.summary || {};
+    const summaryContext = container?.dataSourceRef && typeof context?.Context === 'function'
+        ? context.Context(container.dataSourceRef)
+        : context;
+    const {collection: summaryCollection = []} = useDataSourceState(summaryContext);
+    const summaryRow = Array.isArray(summaryCollection) && summaryCollection.length > 0 && summaryCollection[0] && typeof summaryCollection[0] === 'object'
+        ? summaryCollection[0]
+        : null;
+    const summaryEntries = summaryConfig.items || container.items || summaryConfig.metrics || container.metrics || [];
+    const metricCards = Array.isArray(summaryEntries)
+        ? summaryEntries.map((metric) => {
+            const selector = metric.selector || metric.field || metric.key;
+            const rowValue = selector && summaryRow ? resolveKey(summaryRow, selector) : undefined;
+            const value = rowValue !== undefined ? rowValue : (selector ? resolveKey(metricsData, selector) : metric.value);
+            return {
+                key: metric.id || selector || metric.label,
+                label: metric.label,
+                value,
+                format: metric.format,
+            };
+        })
+        : summaryEntries && typeof summaryEntries === 'object'
+            ? Object.entries(summaryEntries).map(([key, value]) => ({
                 key,
                 label: titleizeDashboardKey(key),
                 value,
@@ -852,9 +865,9 @@ export function DashboardDimensions({container, context}) {
     );
     const limit = dimensionsConfig.limit || container.limit || 10;
     const dimension = dimensionsConfig.dimension || container.dimension || {};
-    const dimensionKey = dimension.key;
+    const dimensionKey = dimension.key || dimension.field;
     const metric = dimensionsConfig.metric || container.metric || {};
-    const metricKey = metric.key;
+    const metricKey = metric.key || metric.field;
     const metricLabel = metric.label || metricKey;
     const palette = container.palette || dimensionsConfig.palette || metric.palette || [
         '#2f6de1',

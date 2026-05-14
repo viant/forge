@@ -1233,15 +1233,21 @@ function getBlockContext(context, container) {
 
 function buildSummaryBlock(container, blockContext) {
   const summaryConfig = container.dashboard?.summary || {};
+  const summaryEntries = summaryConfig.items || container.items || summaryConfig.metrics || container.metrics || [];
+  const summaryRow = Array.isArray(blockContext.collection) && blockContext.collection.length > 0 && blockContext.collection[0] && typeof blockContext.collection[0] === 'object'
+    ? blockContext.collection[0]
+    : null;
   return {
     kind: container.kind,
     title: container.title,
     subtitle: container.subtitle,
     columnSpan: container.columnSpan,
-    metrics: (summaryConfig.metrics || container.metrics || []).map((metric) => {
-      const raw = resolveKey(blockContext.metrics, metric.selector);
+    metrics: summaryEntries.map((metric) => {
+      const selector = metric.selector || metric.field || metric.key;
+      const rowValue = selector && summaryRow ? resolveKey(summaryRow, selector) : undefined;
+      const raw = rowValue !== undefined ? rowValue : (selector ? resolveKey(blockContext.metrics, selector) : metric.value);
       return {
-        id: metric.id,
+        id: metric.id || selector || metric.label,
         label: metric.label,
         rawValue: raw,
         value: formatDashboardValue(raw, metric.format, blockContext.locale || 'en-US'),
@@ -1495,9 +1501,9 @@ function buildCompositionBlock(container, blockContext, chartSvgs) {
 function buildDimensionsBlock(container, blockContext) {
   const dimensionsConfig = container.dashboard?.dimensions || {};
   const dimension = dimensionsConfig.dimension || container.dimension || {};
-  const dimensionKey = dimension.key;
+  const dimensionKey = dimension.key || dimension.field;
   const metric = dimensionsConfig.metric || container.metric || {};
-  const metricKey = metric.key;
+  const metricKey = metric.key || metric.field;
   const rows = [...applyDashboardSelectionToCollection(
     applyDashboardFiltersToCollection(blockContext.collection || [], container.filterBindings, blockContext.dashboardFilters),
     container.selectionBindings,

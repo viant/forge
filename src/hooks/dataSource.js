@@ -10,6 +10,11 @@ import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 
+export const mergeWindowFormValues = (previous = {}, next = {}) => ({
+    ...(previous && typeof previous === 'object' ? previous : {}),
+    ...(next && typeof next === 'object' ? next : {}),
+});
+
 function findDataSourceDependencies(dataSourceRef, dataSources) {
     const dependencies = {};
     Object.entries(dataSources).forEach(([ref, dataSource]) => {
@@ -743,20 +748,21 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
     };
 
 
-    const setFormData = ({values = {}, parameters = {}}) => {
-        const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
-        form.value = nextValues;
-        formSnapshot = nextValues;
-        formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
-    }
+const setFormData = ({values = {}, parameters = {}}) => {
+    const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
+    form.value = nextValues;
+    formSnapshot = nextValues;
+    formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
+}
 
-    const setWindowFormData = ({values = {}, parameters = {}}) => {
-        const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
-        if (signals.windowForm) {
-            signals.windowForm.value = nextValues;
-        }
-        return true;
+const setWindowFormData = ({values = {}, parameters = {}}) => {
+    const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
+    if (signals.windowForm) {
+        const previousValues = signals.windowForm.peek?.() || {};
+        signals.windowForm.value = mergeWindowFormValues(previousValues, nextValues);
     }
+    return true;
+}
 
     const setSilentFormData = ({values = {}, parameters = {}}) => {
         const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;

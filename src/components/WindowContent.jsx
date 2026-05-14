@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {useSignalEffect} from '@preact/signals-react';
 
@@ -10,6 +10,7 @@ import {
     getCollectionSignal,
     getControlSignal,
     getInputSignal,
+    getFormSignal,
     removeWindow,
 } from '../core';
 
@@ -23,10 +24,12 @@ import ViewDialog from './ViewDialog.jsx';
 import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
 import useDataConnector from '../hooks/dataconnector.js';
+import { mergeWindowFormValues } from '../hooks/dataSource.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 import { resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
+import { getLogger } from '../utils/logger.js';
 
 function resolveInitialWindowFormValues(metadata) {
     const windowCfg = metadata?.window || {};
@@ -125,6 +128,7 @@ function expandRequiredDataSourceRefs(metadata, refs) {
 
 function WindowContentInner({window, metadata, services}) {
     useSignals();
+    const log = getLogger('window');
     const {windowKey, windowData, windowId, parameters = {}} = window;
     const baseKey = (windowKey || '').split('?')[0];
     const defaultDataSourceRef = metadata?.view?.dataSourceRef || Object.keys(metadata?.dataSource || {})[0];
@@ -132,6 +136,7 @@ function WindowContentInner({window, metadata, services}) {
         ...(parameters && typeof parameters === 'object' ? parameters : {}),
         ...resolveInitialWindowFormValues(metadata),
     }), [parameters, metadata]);
+    const windowFormSignal = useMemo(() => getFormSignal(`${windowId}:windowForm`), [windowId]);
 
     // Build Forge context (calls React hooks inside)
     const context = useMemo(() => {
@@ -143,30 +148,50 @@ function WindowContentInner({window, metadata, services}) {
         }
         const ctx = Context(windowId, metadata, dsRef, services);
         ctx.init();
-        if (Object.keys(initialWindowFormSeed).length > 0 && ctx?.signals?.windowForm) {
-            ctx.signals.windowForm.value = initialWindowFormSeed;
+        if (Object.keys(initialWindowFormSeed).length > 0 && windowFormSignal) {
+            try {
+                log.debug('[window.windowFormSeed]', {
+                    windowId,
+                    windowKey,
+                    seed: initialWindowFormSeed,
+                    before: windowFormSignal.peek?.() || {},
+                });
+            } catch (_) {}
+            windowFormSignal.value = initialWindowFormSeed;
+            try {
+                log.debug('[window.windowFormSeedApplied]', {
+                    windowId,
+                    windowKey,
+                    after: windowFormSignal.peek?.() || {},
+                });
+            } catch (_) {}
         }
         return ctx;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, metadata, initialWindowFormSeed]);
+    }, [windowId, metadata, initialWindowFormSeed, windowFormSignal]);
 
-    const [windowFormSnapshot, setWindowFormSnapshot] = useState(() => ({
+    const liveWindowForm = windowFormSignal?.value || {};
+    const windowFormSnapshot = useMemo(() => ({
         ...initialWindowFormSeed,
-        ...(context?.signals?.windowForm?.peek?.() || {}),
-    }));
-    const windowFormSignatureRef = useRef('');
-    useSignalEffect(() => {
-        const next = {
-            ...initialWindowFormSeed,
-            ...(context?.signals?.windowForm?.value || {}),
-        };
-        const signature = JSON.stringify(next);
-        if (windowFormSignatureRef.current === signature) {
+        ...liveWindowForm,
+    }), [initialWindowFormSeed, liveWindowForm]);
+    useEffect(() => {
+        const currentSignature = JSON.stringify(liveWindowForm);
+        const mergedSignature = JSON.stringify(windowFormSnapshot);
+        if (currentSignature === mergedSignature || !windowFormSignal) {
             return;
         }
-        windowFormSignatureRef.current = signature;
-        setWindowFormSnapshot(next);
-    });
+        try {
+            log.debug('[window.windowFormReconcile]', {
+                windowId,
+                windowKey,
+                seed: initialWindowFormSeed,
+                current: liveWindowForm,
+                reconciled: windowFormSnapshot,
+            });
+        } catch (_) {}
+        windowFormSignal.value = windowFormSnapshot;
+    }, [initialWindowFormSeed, liveWindowForm, windowFormSignal, windowFormSnapshot, windowId, windowKey]);
 
     /* ------------------------------------------------------------
      * Execute window-level onInit events (declared in metadata.window.on)
@@ -184,15 +209,69 @@ function WindowContentInner({window, metadata, services}) {
             evts.forEach((ev) => {
                 try {
                     const { handler: handlerId, args = [], parameters = [] } = ev;
+                    if (handlerId === 'dataSource.setWindowFormData') {
+                        const resolvedParameters = resolveParameters(parameters, {
+                            identity: { dataSourceRef: defaultDataSourceRef },
+                            signals: { windowForm: windowFormSignal },
+                            dataSources: metadata?.dataSource || {},
+                            Context() { return this; },
+                            handlers: {
+                                dataSource: {
+                                    peekFormData: () => ({}),
+                                    peekSelection: () => ({ selected: null }),
+                                    peekFilter: () => ({}),
+                                },
+                            },
+                        });
+                        try {
+                            log.debug('[window.onInit]', {
+                                windowId,
+                                windowKey,
+                                handlerId,
+                                parameters,
+                                resolvedParameters,
+                                before: windowFormSignal?.peek?.() || {},
+                            });
+                        } catch (_) {}
+                        windowFormSignal.value = mergeWindowFormValues(windowFormSignal.peek?.() || {}, resolvedParameters || {});
+                        try {
+                            log.debug('[window.onInitApplied]', {
+                                windowId,
+                                windowKey,
+                                handlerId,
+                                after: windowFormSignal?.peek?.() || {},
+                            });
+                        } catch (_) {}
+                        return;
+                    }
+
                     const handlerContext = context.Context(defaultDataSourceRef);
                     const fn = handlerContext.lookupHandler(handlerId);
                     const resolvedParameters = resolveParameters(parameters, handlerContext);
+                    try {
+                        log.debug('[window.onInit]', {
+                            windowId,
+                            windowKey,
+                            handlerId,
+                            parameters,
+                            resolvedParameters,
+                            before: handlerContext?.signals?.windowForm?.peek?.() || {},
+                        });
+                    } catch (_) {}
                     fn({
                         execution: { id: handlerId, args, parameters },
                         args,
                         parameters: resolvedParameters,
                         context: handlerContext,
                     });
+                    try {
+                        log.debug('[window.onInitApplied]', {
+                            windowId,
+                            windowKey,
+                            handlerId,
+                            after: handlerContext?.signals?.windowForm?.peek?.() || {},
+                        });
+                    } catch (_) {}
                 } catch (err) {
                     console.error(`window.${eventName} handler failed`, ev.handler, err);
                 }
@@ -234,33 +313,73 @@ function WindowContentInner({window, metadata, services}) {
         const refs = new Set();
         if (defaultDataSourceRef) refs.add(defaultDataSourceRef);
         collectRequiredDataSourceRefs(metadata?.view?.content || null, windowFormSnapshot, refs);
-        return expandRequiredDataSourceRefs(metadata, refs);
+        const resolvedRefs = expandRequiredDataSourceRefs(metadata, refs);
+        try {
+            log.debug('[window.requiredDataSourceRefs]', {
+                windowId,
+                windowKey,
+                windowForm: windowFormSnapshot,
+                refs: resolvedRefs,
+            });
+        } catch (_) {}
+        return resolvedRefs;
     }, [metadata, defaultDataSourceRef, windowFormSnapshot]);
 
-    useEffect(() => {
-        for (const ref of requiredDataSourceRefs) {
+    useSignalEffect(() => {
+        const currentWindowForm = windowFormSignal?.value || {};
+        const refs = new Set();
+        if (defaultDataSourceRef) refs.add(defaultDataSourceRef);
+        collectRequiredDataSourceRefs(metadata?.view?.content || null, {
+            ...initialWindowFormSeed,
+            ...currentWindowForm,
+        }, refs);
+        const resolvedRefs = expandRequiredDataSourceRefs(metadata, refs);
+        const dataSourceDefs = metadata?.dataSource || {};
+        for (const ref of resolvedRefs) {
             const dsID = `${windowId}DS${ref}`;
             const inputSignal = getInputSignal(dsID);
             const controlSignal = getControlSignal(dsID);
             const collectionSignal = getCollectionSignal(dsID);
             const prevInput = inputSignal?.peek?.() || {};
             const prevParams = prevInput.parameters || {};
-            const nextParams = parameters?.[ref]?.parameters || {};
+            const dsContext = context?.Context?.(ref);
+            const resolvedMetaParamsRaw = Array.isArray(dataSourceDefs?.[ref]?.parameters)
+                ? resolveParameters(dataSourceDefs[ref].parameters, dsContext || context)
+                : {};
+            const resolvedMetaParams = resolvedMetaParamsRaw && typeof resolvedMetaParamsRaw === 'object' && resolvedMetaParamsRaw.inbound
+                ? resolvedMetaParamsRaw.inbound
+                : (resolvedMetaParamsRaw || {});
+            const nextParams = {
+                ...(resolvedMetaParams || {}),
+                ...((parameters?.[ref]?.parameters) || {}),
+            };
             const paramsChanged = JSON.stringify(prevParams) !== JSON.stringify(nextParams);
             const collection = collectionSignal?.peek?.() || [];
             const control = controlSignal?.peek?.() || {};
-            const shouldFetch = (paramsChanged || (Array.isArray(collection) && collection.length === 0))
-                && !control.loading;
+            const shouldFetch = paramsChanged || (Array.isArray(collection) && collection.length === 0);
             if (!paramsChanged && !shouldFetch) {
                 continue;
             }
+            try {
+                log.debug('[window.datasourceParams]', {
+                    windowId,
+                    ref,
+                    windowForm: currentWindowForm,
+                    prevParams,
+                    nextParams,
+                    resolvedMetaParams,
+                    paramsChanged,
+                    shouldFetch,
+                    collectionSize: Array.isArray(collection) ? collection.length : 0,
+                });
+            } catch (_) {}
             inputSignal.value = {
                 ...prevInput,
                 parameters: nextParams,
                 fetch: shouldFetch || !!prevInput.fetch,
             };
         }
-    }, [requiredDataSourceRefs, parameters, windowId]);
+    });
 
     const renderDataSources = () => {
         return (

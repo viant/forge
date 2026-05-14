@@ -1,7 +1,8 @@
 import {useState, useEffect, useRef} from 'react';
+import {useSignals} from '@preact/signals-react/runtime';
 import {Tabs, Tab, Card} from '@blueprintjs/core';
 import WindowContent from './WindowContent';
-import {selectedWindowId, getWindowStatusSignal, appStatusSignal} from '../core';
+import {selectedWindowId, getMetricsSignal, getWindowStatusSignal, appStatusSignal} from '../core';
 import {
     activeWindows,
     selectedTabId,
@@ -17,6 +18,7 @@ import WindowControls from './WindowControls';
 import './WindowManager.css';
 
 const WindowManager = () => {
+    useSignals();
     const [windows, setWindows] = useState(() => activeWindows.value || []);
     const [tabId, setTabId] = useState(() => selectedTabId.value || null);
     const containerRef = useRef(null);
@@ -116,6 +118,19 @@ const WindowManager = () => {
         );
     };
 
+    const resolveDisplayWindowTitle = (win) => {
+        const windowKey = String(win?.windowKey || '').trim();
+        if (windowKey === 'orderPerformance' && win?.windowId) {
+            const metrics = getMetricsSignal(`${win.windowId}DSorder_performance_period_today`).value || {};
+            const name = String(metrics?.name || '').trim();
+            const orderId = String(metrics?.orderId ?? metrics?.orderID ?? win?.parameters?.AdOrderId?.[0] ?? '').trim();
+            if (name && orderId) return `${name} (${orderId})`;
+            if (name) return name;
+            if (orderId) return `Order ${orderId}`;
+        }
+        return String(win?.windowTitle || win?.windowKey || '').trim();
+    };
+
     return (
         <div
             ref={containerRef}
@@ -136,17 +151,20 @@ const WindowManager = () => {
                         key={win.windowId}
                         style={{paddingLeft: '3px'}}
                         title={
-                            <div style={{display: 'flex', alignItems: 'center'}}>
-                                <WindowControls
-                                    onClose={(e) => handleTabClose(win.windowId, e)}
-                                    onMaximize={(e) => {
-                                        e.stopPropagation();
-                                        undockWindow(win.windowId);
-                                    }}
-                                    showMinimize={false} // Do not show minimize in tabbed mode
-                                    showMaximize={true} // Show maximize (undock) in tabbed mode
-                                />
-                                <span style={{marginLeft: 8}}>{win.windowTitle}</span>
+                            <div style={{display: 'grid', gridTemplateColumns: '44px 1fr 44px', alignItems: 'center', width: '100%'}}>
+                                <div style={{justifySelf: 'start'}}>
+                                    <WindowControls
+                                        onClose={(e) => handleTabClose(win.windowId, e)}
+                                        onMaximize={(e) => {
+                                            e.stopPropagation();
+                                            undockWindow(win.windowId);
+                                        }}
+                                        showMinimize={false}
+                                        showMaximize={true}
+                                    />
+                                </div>
+                                <span style={{textAlign: 'center', fontWeight: 600}}>{resolveDisplayWindowTitle(win)}</span>
+                                <div />
                             </div>
                         }
                         panel={
@@ -294,31 +312,35 @@ const WindowManager = () => {
                         <div
                             className="window-header"
                             style={{
-                                background: '#f0f0f0',
-                                padding: '5px',
+                                background: 'linear-gradient(135deg, #eef4ff 0%, #dce8fb 100%)',
+                                borderBottom: '1px solid rgba(148, 163, 184, 0.28)',
+                                padding: '8px 12px',
                                 cursor: 'move',
-                                display: 'flex',
-                                justifyContent: 'flex-start',
+                                display: 'grid',
+                                gridTemplateColumns: '56px 1fr 56px',
                                 alignItems: 'center',
                             }}
                         >
-                            <WindowControls
-                                onClose={(e) => {
-                                    e.stopPropagation();
-                                    removeWindow(win.windowId);
-                                }}
-                                onMinimize={(e) => {
-                                    e.stopPropagation();
-                                    minimizeWindow(win.windowId);
-                                }}
-                                onMaximize={(e) => {
-                                    e.stopPropagation();
-                                    dockWindow(win.windowId);
-                                }}
-                                showMinimize={!win.isModal}
-                                showMaximize={!win.isModal}
-                            />
-                            <span style={{marginLeft: 8}}>{win.windowTitle}</span>
+                            <div style={{justifySelf: 'start'}}>
+                                <WindowControls
+                                    onClose={(e) => {
+                                        e.stopPropagation();
+                                        removeWindow(win.windowId);
+                                    }}
+                                    onMinimize={(e) => {
+                                        e.stopPropagation();
+                                        minimizeWindow(win.windowId);
+                                    }}
+                                    onMaximize={(e) => {
+                                        e.stopPropagation();
+                                        dockWindow(win.windowId);
+                                    }}
+                                    showMinimize={!win.isModal}
+                                    showMaximize={!win.isModal}
+                                />
+                            </div>
+                            <span style={{textAlign: 'center', fontWeight: 700, color: '#1f2a44'}}>{resolveDisplayWindowTitle(win)}</span>
+                            <div />
                         </div>
                         <div
                             className="window-content"
