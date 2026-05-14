@@ -149,13 +149,15 @@ function tooltipFormatterForFormat(formatType) {
     return (value) => formatValueByFormat(value, formatType);
 }
 
-function formatTimestamp(timestamp, fmt = "MM/dd") {
-    try {
-        return format(new Date(timestamp), fmt);
-    } catch (err) {
-        console.error("Invalid timestamp:", timestamp);
-        return timestamp;
+export function formatTimestamp(timestamp, fmt = "MM/dd") {
+    if (timestamp === null || timestamp === undefined || timestamp === "") {
+        return "";
     }
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+        return String(timestamp);
+    }
+    return format(date, fmt);
 }
 
 function resolveMappedConfigValue(baseContext, entry = {}, valueKey = "", defaultSource = "windowForm") {

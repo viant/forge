@@ -15,6 +15,7 @@ export { default as SchemaExplorer} from './../widgets/SchemaExplorer.jsx';
 export { default as BasicTable} from './table/Basic';
 export { default as AvatarIcon } from './AvatarIcon.jsx';
 export { default as Terminal } from './Terminal.jsx';
+export { default as CompactFeedList } from './feed/CompactFeedList.jsx';
 export { DashboardBlock } from './dashboard/DashboardBlocks.jsx';
 export {
     normalizeString,

@@ -4,6 +4,7 @@ import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
 import {resolveTableLink} from "../../utils/tableLink.js";
+import ReportBuilder from "./ReportBuilder.jsx";
 import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate, publishDashboardSelection, shouldShowDashboardKPIContext} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
@@ -1615,6 +1616,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.report':
             content = <DashboardReport container={container} context={context}/>;
+            break;
+        case 'dashboard.reportBuilder':
+            content = <ReportBuilder container={container} context={context}/>;
             break;
         case 'dashboard.table':
             content = <DashboardTable container={container} context={context}/>;
