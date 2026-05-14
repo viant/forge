@@ -45,7 +45,7 @@ export VITE_FORGE_UI_BRIDGE_ENABLED=true
 - `forgeUICommand`: sends `{method, params}` to the UI and returns `{ok,result,error}`.
 - `forgeUIWait`: blocks until snapshot changes or predicate matches.
 - Typed convenience tools (wrappers over `forgeUICommand`):
-  - `forgeWindowOpen`, `forgeWindowOpenDynamic`, `forgeWindowClose`, `forgeWindowActivate`
+  - `forgeWindowOpen`, `forgeWindowOpenDynamic`, `forgeWindowClose`, `forgeWindowActivate`, `forgeWindowSelectTab`
   - `forgeFocusSet`, `forgeFocusGet`, `forgeControlSetValue`
   - `forgeControlsList`, `forgeControlsSearch`
   - `forgeFilterSet`, `forgeDataFetch`

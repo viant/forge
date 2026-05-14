@@ -14,6 +14,7 @@ import {
   getCollectionSignal,
   getMetricsSignal,
   getControlSignal,
+  getViewSignal,
   getBusSignal,
   getDashboardFilterSignal,
   getDashboardSelectionSignal,
@@ -22,6 +23,7 @@ import {
 } from '../store/signals.js';
 
 import { focusControl, listControlTargets, getFocusedControlMeta, enableFocusTracking } from './registry.js';
+import { sendBusMessage } from '../bus.js';
 import { setSelector } from '../../utils/selector.js';
 import { resolveSelector } from '../../utils/selector.js';
 import { buildStandaloneDashboardDocument, buildStandaloneDashboardHtml, downloadDashboardHtml } from './dashboardExport.js';
@@ -511,6 +513,30 @@ export async function runUICommand(cmd = {}) {
       if (w.inTab === false) bringFloatingWindowToFront(windowId);
       return { ok: true };
     }
+    case 'ui.window.selectTab': {
+      const windowId = requireString('windowId', params.windowId);
+      const tabId = requireString('tabId', params.tabId);
+      const w = getWindowById(windowId);
+      if (!w) throw new Error(`window not found: ${windowId}`);
+      const containerId = params.containerId ? requireString('containerId', params.containerId) : undefined;
+      const viewSignal = getViewSignal(windowId);
+      const previous = viewSignal.peek() || {};
+      const nextTabs = {
+        ...(previous?.tabs || {}),
+        ...(containerId ? { [containerId]: tabId } : {}),
+      };
+      viewSignal.value = {
+        ...previous,
+        tabs: nextTabs,
+      };
+      sendBusMessage(windowId, { type: 'selectTab', tabId, containerId });
+      if (params.activate !== false) {
+        selectedWindowId.value = windowId;
+        if (w.inTab !== false) selectedTabId.value = windowId;
+        if (w.inTab === false) bringFloatingWindowToFront(windowId);
+      }
+      return { ok: true };
+    }
     case 'ui.window.dock': {
       const windowId = requireString('windowId', params.windowId);
       dockWindow(windowId);
@@ -540,17 +566,16 @@ export async function runUICommand(cmd = {}) {
     case 'ui.control.setValue': {
       const windowId = requireString('windowId', params.windowId);
       const controlId = requireString('controlId', params.controlId);
-      const { dataSourceId } = getDataSourceId(windowId, params.dataSourceRef);
-
       const item = {
         id: controlId,
         bindingPath: params.bindingPath || controlId,
         dataField: params.dataField,
       };
       const value = params.value;
-      const scope = params.scope || 'form';
+      const scope = String(params.scope || 'form').trim() || 'form';
 
       if (scope === 'filter') {
+        const { dataSourceId } = getDataSourceId(windowId, params.dataSourceRef);
         const input = getInputSignal(dataSourceId);
         const prev = input.peek() || {};
         const filterPrev = prev.filter || {};
@@ -559,7 +584,12 @@ export async function runUICommand(cmd = {}) {
           ...prev,
           filter: setSelector(filterPrev, fieldKey, value),
         };
+      } else if (scope === 'windowForm') {
+        const windowForm = getFormSignal(`${windowId}:windowForm`);
+        const fieldKey = item.dataField || item.bindingPath || item.id;
+        windowForm.value = setSelector(windowForm.peek() || {}, fieldKey, value);
       } else {
+        const { dataSourceId } = getDataSourceId(windowId, params.dataSourceRef);
         const form = getFormSignal(dataSourceId);
         const fieldKey = item.dataField || item.bindingPath || item.id;
         form.value = setSelector(form.peek() || {}, fieldKey, value);

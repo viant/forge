@@ -120,7 +120,7 @@ const WindowManager = () => {
 
     const resolveDisplayWindowTitle = (win) => {
         const windowKey = String(win?.windowKey || '').trim();
-        if (windowKey === 'orderPerformance' && win?.windowId) {
+        if ((windowKey === 'orderPerformance' || windowKey === 'order') && win?.windowId) {
             const metrics = getMetricsSignal(`${win.windowId}DSorder_performance_period_today`).value || {};
             const name = String(metrics?.name || '').trim();
             const orderId = String(metrics?.orderId ?? metrics?.orderID ?? win?.parameters?.AdOrderId?.[0] ?? '').trim();

@@ -6,6 +6,7 @@ import {
   getInputSignal,
   getControlSignal,
   getFormSignal,
+  getViewSignal,
   getSelectionSignal,
   getCollectionSignal,
   getCollectionInfoSignal,
@@ -77,6 +78,46 @@ function getWindowMetadataSummary(windowId, options) {
 
     const view = meta.view || {};
     const content = view.content || {};
+    const tabs = [];
+    const controls = [];
+    const collectTabs = (node) => {
+      if (!node || typeof node !== 'object') return;
+      const items = Array.isArray(node.items) ? node.items : [];
+      const containers = Array.isArray(node.containers) ? node.containers : [];
+      for (const item of items) {
+        const controlId = String(item?.id || '').trim();
+        if (!controlId) continue;
+        controls.push({
+          id: controlId,
+          label: String(item?.label || controlId).trim(),
+          type: String(item?.type || item?.widget || '').trim() || null,
+          scope: String(item?.scope || '').trim() || null,
+          bindingPath: String(item?.bindingPath || item?.path || '').trim() || null,
+          dataField: String(item?.dataField || '').trim() || null,
+          options: Array.isArray(item?.options)
+            ? item.options.map((option) => ({
+                value: option?.value ?? null,
+                label: String(option?.label || option?.value || '').trim() || null,
+              }))
+            : undefined,
+        });
+      }
+      if (node.tabs && containers.length > 0) {
+        for (const tab of containers) {
+          const tabId = String(tab?.id || '').trim();
+          if (!tabId) continue;
+          tabs.push({
+            containerId: String(node?.id || '').trim() || null,
+            tabId,
+            title: String(tab?.title || tabId).trim(),
+          });
+        }
+      }
+      for (const child of containers) {
+        collectTabs(child);
+      }
+    };
+    collectTabs(content);
 
     return {
       loaded: true,
@@ -88,6 +129,8 @@ function getWindowMetadataSummary(windowId, options) {
         dataSourceRef: view.dataSourceRef || null,
         contentType: content.type || null,
         contentId: content.id || null,
+        tabs,
+        controls,
       },
       raw: options?.includeMetadata ? safeJSON(meta, options) : undefined,
     };
@@ -175,6 +218,8 @@ export function buildUISnapshot(options = {}) {
         windowTitle: w.windowTitle,
         parentKey: w.parentKey,
         parameters: safeJSON(w.parameters, options),
+        windowForm: safeJSON(getFormSignal(`${w.windowId}:windowForm`).peek() || {}, options),
+        viewState: safeJSON(getViewSignal(w.windowId).peek() || {}, options),
         inTab: w.inTab !== false,
         isModal: !!w.isModal,
         isMinimized: !!w.isMinimized,

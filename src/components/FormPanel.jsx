@@ -5,27 +5,67 @@ import {
 } from '@blueprintjs/core';
 import Container from './Container';
 import {useSignalEffect} from "@preact/signals-react";
-import {getBusSignal} from "../core";
+import {getBusSignal, getViewSignal} from "../core";
 
 const FormPanel = ({context, container, children}) => {
     const containers = container.containers || [];
-    const [selectedTabId, setSelectedTabId] = useState(containers[0]?.id);
+    const windowId = context?.identity?.windowId;
+    const panelId = container?.id || containers[0]?.id || 'root';
+    const viewSignal = windowId ? getViewSignal(windowId) : null;
+    const resolveInitialTabId = () => {
+        const viewState = viewSignal?.peek?.() || {};
+        const savedTabId = String(viewState?.tabs?.[panelId] || '').trim();
+        if (savedTabId && containers.some((entry) => String(entry?.id || '').trim() === savedTabId)) {
+            return savedTabId;
+        }
+        const configured = String(container?.tabs?.selectedTabId || container?.tabs?.defaultSelectedTabId || '').trim();
+        if (configured && containers.some((entry) => String(entry?.id || '').trim() === configured)) {
+            return configured;
+        }
+        return containers[0]?.id;
+    };
+    const [selectedTabId, setSelectedTabId] = useState(resolveInitialTabId);
     const handleTabChange = (newTabId) => {
         setSelectedTabId(newTabId);
+        if (viewSignal) {
+            const previous = viewSignal.peek?.() || {};
+            viewSignal.value = {
+                ...previous,
+                tabs: {
+                    ...(previous?.tabs || {}),
+                    [panelId]: newTabId,
+                },
+            };
+        }
     };
 
     // Listen for bus messages requesting tab switches
-    const windowId = context?.identity?.windowId;
     useSignalEffect(() => {
         if (!windowId) return;
+        const nextSelected = String(viewSignal?.value?.tabs?.[panelId] || '').trim();
+        if (nextSelected && nextSelected !== selectedTabId && containers.some((entry) => String(entry?.id || '').trim() === nextSelected)) {
+            setSelectedTabId(nextSelected);
+            return;
+        }
         const bus = getBusSignal(windowId);
         const messages = bus.value;
         if (!Array.isArray(messages) || messages.length === 0) return;
         const last = messages[messages.length - 1];
-        if (last?.type === 'selectTab' && last?.tabId) {
+        const targetPanelId = String(last?.containerId || '').trim();
+        if (last?.type === 'selectTab' && last?.tabId && (!targetPanelId || targetPanelId === panelId)) {
             const target = containers.find(c => c.id === last.tabId);
             if (target) {
                 setSelectedTabId(last.tabId);
+                if (viewSignal) {
+                    const previous = viewSignal.peek?.() || {};
+                    viewSignal.value = {
+                        ...previous,
+                        tabs: {
+                            ...(previous?.tabs || {}),
+                            [panelId]: last.tabId,
+                        },
+                    };
+                }
             }
         }
     });

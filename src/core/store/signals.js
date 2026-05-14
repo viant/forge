@@ -249,7 +249,7 @@ export const getFormStatusSignal = (sourceId) => {
 export const getViewSignal = (sourceId) => {
     //console.log("getViewSignal for key", sourceId);
     if (!viewSignals.value[sourceId]) {
-        const newSignal = signal([]);
+        const newSignal = signal({});
         viewSignals.value = {
             ...viewSignals.peek(),
             [sourceId]: newSignal,

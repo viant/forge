@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getMetricsSignal } from '../store/signals.js';
+import { activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetricsSignal, getViewSignal } from '../store/signals.js';
 import { runUICommand } from './commands.js';
 import { registerControlTarget, unregisterControlTarget } from './registry.js';
 
@@ -22,6 +22,13 @@ getDashboardFilterSignal(`${res.windowId}:demoDashboard`).value = { periodView: 
 await runUICommand({ method: 'ui.window.activate', params: { windowId: res.windowId } });
 assert.equal(selectedWindowId.peek(), res.windowId);
 
+await runUICommand({ method: 'ui.window.selectTab', params: { windowId: res.windowId, containerId: 'analysisPane', tabId: 'kpiTab' } });
+const busMessages = getBusSignal(res.windowId).peek();
+assert.equal(busMessages[busMessages.length - 1].type, 'selectTab');
+assert.equal(busMessages[busMessages.length - 1].tabId, 'kpiTab');
+assert.equal(busMessages[busMessages.length - 1].containerId, 'analysisPane');
+assert.equal(getViewSignal(res.windowId).peek().tabs.analysisPane, 'kpiTab');
+
 await runUICommand({ method: 'ui.window.close', params: { windowId: res.windowId } });
 assert.equal(activeWindows.peek().length, 0);
 assert.equal(selectedWindowId.peek(), null);
@@ -40,6 +47,12 @@ assert.equal(list.controls.length, 1);
 
 const search = await runUICommand({ method: 'ui.controls.search', params: { query: 'nam', windowId: 'W1' } });
 assert.equal(search.controls.length, 1);
+
+await runUICommand({
+  method: 'ui.control.setValue',
+  params: { windowId: 'W1', controlId: 'granularity', scope: 'windowForm', value: 'hour' },
+});
+assert.equal(getFormSignal('W1:windowForm').peek().granularity, 'hour');
 
 const focusInfo = await runUICommand({ method: 'ui.focus.get', params: {} });
 assert.ok('focused' in focusInfo);

@@ -29,6 +29,9 @@ var descWindowClose string
 //go:embed tools/forgeWindowActivate.md
 var descWindowActivate string
 
+//go:embed tools/forgeWindowSelectTab.md
+var descWindowSelectTab string
+
 //go:embed tools/forgeFocusSet.md
 var descFocusSet string
 
@@ -139,6 +142,17 @@ func registerTools(base *protoserver.DefaultHandler, h *Handler) error {
 		out := &ForgeOKOutput{}
 		return out, callAndDecode(ctx, svc, in.ClientID, in.TimeoutMs, "ui.window.activate", map[string]any{
 			"windowId": in.WindowID,
+		}, out)
+	}); err != nil {
+		return err
+	}
+
+	if err := registerTool[ForgeWindowSelectTabInput, ForgeOKOutput](base.Registry, "forgeWindowSelectTab", descWindowSelectTab, svc, func(ctx context.Context, in *ForgeWindowSelectTabInput) (*ForgeOKOutput, error) {
+		out := &ForgeOKOutput{}
+		return out, callAndDecode(ctx, svc, in.ClientID, in.TimeoutMs, "ui.window.selectTab", map[string]any{
+			"windowId": in.WindowID,
+			"tabId":    in.TabID,
+			"activate": in.Activate,
 		}, out)
 	}); err != nil {
 		return err
@@ -398,6 +412,14 @@ type ForgeWindowActivateInput struct {
 	ClientID  string `json:"clientId,omitempty"`
 	TimeoutMs int    `json:"timeoutMs,omitempty"`
 	WindowID  string `json:"windowId"`
+}
+
+type ForgeWindowSelectTabInput struct {
+	ClientID  string `json:"clientId,omitempty"`
+	TimeoutMs int    `json:"timeoutMs,omitempty"`
+	WindowID  string `json:"windowId"`
+	TabID     string `json:"tabId"`
+	Activate  *bool  `json:"activate,omitempty"`
 }
 
 type ForgeFocusSetInput struct {
