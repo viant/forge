@@ -122,9 +122,12 @@ const WindowManager = () => {
         const windowKey = String(win?.windowKey || '').trim();
         if ((windowKey === 'orderPerformance' || windowKey === 'order') && win?.windowId) {
             const metrics = getMetricsSignal(`${win.windowId}DSorder_performance_period_today`).value || {};
+            const parameterOrderId = String(win?.parameters?.AdOrderId?.[0] ?? '').trim();
+            const metricsOrderId = String(metrics?.orderId ?? metrics?.orderID ?? '').trim();
             const name = String(metrics?.name || '').trim();
-            const orderId = String(metrics?.orderId ?? metrics?.orderID ?? win?.parameters?.AdOrderId?.[0] ?? '').trim();
-            if (name && orderId) return `${name} (${orderId})`;
+            const orderId = parameterOrderId || metricsOrderId;
+            if (name && orderId && (!parameterOrderId || metricsOrderId === parameterOrderId)) return `${name} (${orderId})`;
+            if (parameterOrderId && metricsOrderId && metricsOrderId !== parameterOrderId) return `Order ${parameterOrderId}`;
             if (name) return name;
             if (orderId) return `Order ${orderId}`;
         }

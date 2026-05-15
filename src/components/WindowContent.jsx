@@ -31,7 +31,27 @@ import { resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { getLogger } from '../utils/logger.js';
 
-function resolveInitialWindowFormValues(metadata) {
+function collectInitialWindowFormItemValues(node, initial) {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node.items)) {
+        for (const item of node.items) {
+            if (!item || typeof item !== 'object') continue;
+            if (String(item.scope || '').trim() === 'windowForm') {
+                const fieldKey = String(item.bindingPath || item.dataField || item.id || '').trim();
+                if (fieldKey && item.value !== undefined) {
+                    initial[fieldKey] = item.value;
+                }
+            }
+        }
+    }
+    if (Array.isArray(node.containers)) {
+        for (const child of node.containers) {
+            collectInitialWindowFormItemValues(child, initial);
+        }
+    }
+}
+
+export function resolveInitialWindowFormValues(metadata) {
     const windowCfg = metadata?.window || {};
     const onEntries = [
         ...(Array.isArray(windowCfg.on) ? windowCfg.on : []),
@@ -48,6 +68,7 @@ function resolveInitialWindowFormValues(metadata) {
             initial[name] = parameter?.location;
         }
     }
+    collectInitialWindowFormItemValues(metadata?.view?.content || null, initial);
     return initial;
 }
 
@@ -286,7 +307,7 @@ function WindowContentInner({window, metadata, services}) {
             runHandlers('onDestroy');
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [context]);
+    }, [windowId]);
 
     useEffect(() => {
         const rootContainer = metadata?.view?.content || null;

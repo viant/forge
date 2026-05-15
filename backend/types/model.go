@@ -193,6 +193,8 @@ type QuickFilterSpec struct {
 type Window struct {
 	Ns              []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
 	Namespace       string                            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Presentation    string                            `json:"presentation,omitempty" yaml:"presentation,omitempty"`
+	Region          string                            `json:"region,omitempty" yaml:"region,omitempty"`
 	DataSource      map[string]DataSource             `json:"dataSource" yaml:"dataSource"`
 	View            View                              `json:"view" yaml:"view"`
 	Dialogs         []Dialog                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
