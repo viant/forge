@@ -221,7 +221,7 @@ export default function WidgetRenderer({
     // ------------------------------------------------------------------
     // 5. Pass-through of common display properties present directly on item
     // ------------------------------------------------------------------
-    ['icon', 'leftIcon', 'rightIcon', 'intent'].forEach((k) => {
+    ['icon', 'leftIcon', 'rightIcon', 'intent', 'appearance'].forEach((k) => {
         if (item?.[k] !== undefined && widgetProps[k] === undefined) {
             widgetProps[k] = item[k];
         }

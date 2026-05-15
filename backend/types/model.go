@@ -1179,6 +1179,7 @@ type Item struct {
 	Icon                 string                            `json:"icon,omitempty" yaml:"icon,omitempty"`
 	Type                 string                            `json:"type,omitempty" yaml:"type,omitempty"`
 	Widget               string                            `json:"widget,omitempty" yaml:"widget,omitempty"`
+	Appearance           string                            `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	HideLabel            bool                              `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
 	VisibleWhen          map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
