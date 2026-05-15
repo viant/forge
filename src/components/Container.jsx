@@ -422,6 +422,7 @@ const Container = ({context, container, isActive}) => {
         }
 
         if (layout?.kind === 'grid') {
+            const stretchItems = layout?.itemStretch !== false;
             return (
                 <GridLayoutRenderer
                     context={effectiveContext}
@@ -430,7 +431,17 @@ const Container = ({context, container, isActive}) => {
                     baseDataSourceRef={dataSourceRef}
                     style={style}
                     renderEntry={({entry, context: subCtx, css}) => (
-                        <div key={`${entry.id}-container`} style={{...css.ctrl, display: 'flex', minHeight: 0, minWidth: 0, height: '100%', alignSelf: 'stretch'}}>
+                        <div
+                            key={`${entry.id}-container`}
+                            style={{
+                                ...css.ctrl,
+                                display: 'flex',
+                                minHeight: 0,
+                                minWidth: 0,
+                                height: stretchItems ? '100%' : 'auto',
+                                alignSelf: stretchItems ? 'stretch' : 'start',
+                            }}
+                        >
                             <Container
                                 context={subCtx}
                                 container={entry}

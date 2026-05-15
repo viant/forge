@@ -17,6 +17,29 @@ assert.ok(res.windowId);
 assert.equal(activeWindows.peek().length, 1);
 assert.equal(selectedTabId.peek(), res.windowId);
 assert.equal(selectedWindowId.peek(), res.windowId);
+
+const updated = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowKey: 'demo',
+    windowTitle: 'Demo Hosted',
+    inTab: true,
+    options: {
+      conversationId: 'conv-1',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+    },
+  },
+});
+assert.equal(updated.windowId, res.windowId);
+assert.equal(activeWindows.peek().length, 1);
+assert.equal(activeWindows.peek()[0].windowTitle, 'Demo Hosted');
+assert.equal(activeWindows.peek()[0].conversationId, 'conv-1');
+assert.equal(activeWindows.peek()[0].presentation, 'hosted');
+assert.equal(activeWindows.peek()[0].region, 'chat.top');
+assert.deepEqual(activeWindows.peek()[0].parameters, {});
+
 getDashboardFilterSignal(`${res.windowId}:demoDashboard`).value = { periodView: 'today' };
 
 await runUICommand({ method: 'ui.window.activate', params: { windowId: res.windowId } });

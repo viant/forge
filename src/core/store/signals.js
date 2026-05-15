@@ -351,8 +351,11 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
     activeWindows.value = windows.map((win) => ({
         windowTitle: win?.windowTitle || win?.windowKey || '',
         windowId: win?.windowId || '',
+        conversationId: win?.conversationId || null,
         parentKey: win?.parentKey || null,
         windowKey: win?.windowKey || '',
+        presentation: win?.presentation || '',
+        region: win?.region || '',
         windowData: win?.windowData || '',
         inTab: win?.inTab !== false,
         parameters: win?.parameters || {},
@@ -420,8 +423,11 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         let newWindow = {
             windowTitle: computedTitle,
             windowId,
+            conversationId: String(options.conversationId || '').trim() || undefined,
             parentKey,
             windowKey,
+            presentation: String(options.presentation || '').trim() || undefined,
+            region: String(options.region || '').trim() || undefined,
             windowData,
             inTab,
             parameters,
@@ -451,6 +457,49 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             newWindow,
         ];
         result = newWindow;
+    } else {
+        const computedTitle = computeWindowTitle(windowTitle, options && options.autoIndexTitle === true, instanceIndex);
+        const nextConversationId = String(options.conversationId || '').trim() || undefined;
+        const nextPresentation = String(options.presentation || '').trim() || undefined;
+        const nextRegion = String(options.region || '').trim() || undefined;
+        const nextWindow = {
+            ...existingWindow,
+            windowTitle: computedTitle,
+            conversationId: nextConversationId,
+            parentKey,
+            windowKey,
+            presentation: nextPresentation,
+            region: nextRegion,
+            windowData,
+            inTab,
+            parameters,
+            isModal: !!options.modal,
+        };
+        if (options.inlineMetadata !== undefined) {
+            nextWindow.inlineMetadata = options.inlineMetadata;
+        }
+        if (options.size !== undefined) {
+            nextWindow.size = options.size;
+        }
+        if (options.x !== undefined) {
+            nextWindow.x = options.x;
+        }
+        if (options.y !== undefined) {
+            nextWindow.y = options.y;
+        }
+        if (options.footer !== undefined) {
+            nextWindow.footer = options.footer;
+        }
+        if (inTab !== false) {
+            delete nextWindow.zIndex;
+            nextWindow.isMinimized = false;
+        } else if (existingWindow.isMinimized) {
+            nextWindow.isMinimized = false;
+        }
+        activeWindows.value = activeWindows.value.map((win) =>
+            win.windowId === existingWindow.windowId ? nextWindow : win
+        );
+        result = nextWindow;
     }
 
     if (existingWindow && existingWindow.isMinimized) {
