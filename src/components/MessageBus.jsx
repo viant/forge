@@ -1,5 +1,5 @@
-import React from "react";
-import { useSignalEffect } from "@preact/signals-react";
+import React, {useEffect} from "react";
+import {useSignals} from '@preact/signals-react/runtime';
 
 
 
@@ -53,15 +53,16 @@ const onMessage = async (context, message) => {
  * MessageBus Component.
  */
 export default function MessageBus({ context }) {
+    useSignals();
     const {identity, signals} = context;
     const {message} = signals;
-    useSignalEffect(() => {
-        if (!message.value || message.value.length === 0) return;
-        const processMessages = async () => {
-            const msg = message.value.shift();
-            await onMessage(context, msg);
-        };
-        processMessages()
-    });
+    const queue = Array.isArray(message.value) ? message.value : [];
+    useEffect(() => {
+        if (queue.length === 0) return;
+        const [nextMessage, ...rest] = queue;
+        if (!nextMessage) return;
+        message.value = rest;
+        void onMessage(context, nextMessage);
+    }, [queue, context, message]);
     return null;
 }

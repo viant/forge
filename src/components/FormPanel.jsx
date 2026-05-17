@@ -1,19 +1,22 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useMemo} from 'react';
 import {
     Tabs,
     Tab,
 } from '@blueprintjs/core';
 import Container from './Container';
-import {useSignalEffect} from "@preact/signals-react";
-import {getBusSignal, getViewSignal} from "../core";
+import {useSignals} from '@preact/signals-react/runtime';
+import {findBusSignal, findViewSignal} from "../core";
 
 const FormPanel = ({context, container, children}) => {
+    useSignals();
     const containers = container.containers || [];
     const windowId = context?.identity?.windowId;
     const panelId = container?.id || containers[0]?.id || 'root';
-    const viewSignal = windowId ? getViewSignal(windowId) : null;
-    const resolveInitialTabId = () => {
-        const viewState = viewSignal?.peek?.() || {};
+    const viewSignal = windowId ? findViewSignal(windowId) : null;
+    const viewValue = viewSignal?.value || {};
+    const busMessages = windowId ? ((findBusSignal(windowId)?.value) || []) : [];
+    const resolveSelectedTabId = () => {
+        const viewState = viewValue || {};
         const savedTabId = String(viewState?.tabs?.[panelId] || '').trim();
         if (savedTabId && containers.some((entry) => String(entry?.id || '').trim() === savedTabId)) {
             return savedTabId;
@@ -24,9 +27,8 @@ const FormPanel = ({context, container, children}) => {
         }
         return containers[0]?.id;
     };
-    const [selectedTabId, setSelectedTabId] = useState(resolveInitialTabId);
+    const selectedTabId = useMemo(resolveSelectedTabId, [viewValue, panelId, container?.tabs?.selectedTabId, container?.tabs?.defaultSelectedTabId, containers]);
     const handleTabChange = (newTabId) => {
-        setSelectedTabId(newTabId);
         if (viewSignal) {
             const previous = viewSignal.peek?.() || {};
             viewSignal.value = {
@@ -40,22 +42,16 @@ const FormPanel = ({context, container, children}) => {
     };
 
     // Listen for bus messages requesting tab switches
-    useSignalEffect(() => {
+    useEffect(() => {
         if (!windowId) return;
-        const nextSelected = String(viewSignal?.value?.tabs?.[panelId] || '').trim();
-        if (nextSelected && nextSelected !== selectedTabId && containers.some((entry) => String(entry?.id || '').trim() === nextSelected)) {
-            setSelectedTabId(nextSelected);
-            return;
-        }
-        const bus = getBusSignal(windowId);
-        const messages = bus.value;
+        const nextSelected = String(viewValue?.tabs?.[panelId] || '').trim();
+        const messages = busMessages;
         if (!Array.isArray(messages) || messages.length === 0) return;
         const last = messages[messages.length - 1];
         const targetPanelId = String(last?.containerId || '').trim();
         if (last?.type === 'selectTab' && last?.tabId && (!targetPanelId || targetPanelId === panelId)) {
             const target = containers.find(c => c.id === last.tabId);
             if (target) {
-                setSelectedTabId(last.tabId);
                 if (viewSignal) {
                     const previous = viewSignal.peek?.() || {};
                     viewSignal.value = {
@@ -68,7 +64,7 @@ const FormPanel = ({context, container, children}) => {
                 }
             }
         }
-    });
+    }, [windowId, viewValue, busMessages, panelId, containers, selectedTabId, viewSignal]);
     return (
         <div className="form-panel">
             <Tabs id={`form-tabs-${containers[0]?.id || 'root'}`} className="forge-form-panel-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} renderActiveTabPanelOnly={true}>

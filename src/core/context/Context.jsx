@@ -1,22 +1,21 @@
 import {useDataSourceHandlers} from "../../hooks";
 import {
-    getCollectionSignal,
     getControlSignal,
     getCollectionInfoSignal,
-    getInputSignal,
-    getSelectionSignal,
-    getMetricsSignal,
-    getMessageSignal,
+    getCollectionSignal,
+    getFormSignal,
     getFormStatusSignal,
-    getFormSignal
+    getInputSignal,
+    getMessageSignal,
+    getMetricsSignal,
+    findControlSignal,
+    getSelectionSignal,
 } from "../store/signals.js";
 
 
 import {resolveHandler} from "../../actions";
-import {setWindowContext, getWindowContext} from "./registry.js";
-
 import {useDialogHandlers, useWindowHandlers} from "../../hooks";
-import useDataConnector from "../../hooks/dataconnector";
+import {createDataConnector} from "../../hooks/dataconnector";
 
 function resolveActionHandler(actions, handlers, name) {
     if (!actions) return null;
@@ -63,10 +62,11 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             return true; // allow default handler to proceed
         };
     }
+    const connectorRuntime = services?.__connectorRuntime || {};
     const dataSourceContextCache = {};
     const dialogContextCache = {}
     const signalIds = {}
-    const windowControlSignal = getControlSignal(windowId);
+    const windowControlSignal = findControlSignal(windowId);
     const windowHandlers = useWindowHandlers(windowId);
 
 
@@ -102,8 +102,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             this.actions = actions
         },
 
-        dialogContext: function (dialog, dataSourceRef) {
-            const key = getDialogId(dialog.id)
+        dialogContext: function (dialog, dataSourceRef, options = {}) {
+            const selectionModeKey = String(options?.selectionMode || "").trim().toLowerCase();
+            const key = `${getDialogId(dialog.id)}::${selectionModeKey || "default"}`
             if (dialogContextCache[key]) {
                 return dialogContextCache[key]
             }
@@ -111,7 +112,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             // a data-source scoped context so signals are available to handlers
             const base = Context(windowId, metadata, dataSourceRef, services)
             base.init();
-            const dsCtx = base.Context(dataSourceRef);
+            const dsCtx = base.Context(dataSourceRef, options);
             dsCtx.handlers = {...dsCtx.handlers, dialog: useDialogHandlers(windowId, dialog.id)};
             dsCtx.lookupHandler = (name) => resolveActionHandler(dsCtx.actions, dsCtx.handlers, name);
             dialogContextCache[key] = dsCtx
@@ -133,7 +134,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             const selectionSignals = hasSelection ? {
                 collection: getCollectionSignal(identity.dataSourceId),
                 collectionInfo: getCollectionInfoSignal(identity.dataSourceId),
-                selection: getSelectionSignal(identity.dataSourceId, []),
+                selection: getSelectionSignal(identity.dataSourceId, initialSelectionValue),
                 metrics: getMetricsSignal(identity.dataSourceId),
             } : {}
 
@@ -155,22 +156,27 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             return signals
         },
 
-        Context: function (dataSourceRef) {
+        Context: function (dataSourceRef, options = {}) {
             if (!dataSourceRef) {
                 dataSourceRef = this.identity.dataSourceRef
             }
+            const selectionModeOverride = String(options?.selectionMode || "").trim().toLowerCase();
+            const contextCacheKey = `${dataSourceRef}::${selectionModeOverride || "default"}`;
             const identity = {
                 ...this.identity,
                 dataSourceRef,
                 ns,
                 dataSourceId: getDataSourceId(dataSourceRef)
             }
-            const dataSource = metadata.dataSource[dataSourceRef]
+            const baseDataSource = metadata.dataSource[dataSourceRef]
+            const dataSource = selectionModeOverride
+                ? { ...baseDataSource, selectionMode: selectionModeOverride }
+                : baseDataSource;
             if (!dataSource) {
                 throw new Error(`DataSource not found: ${dataSourceRef}`, identity)
             }
 
-            let result = dataSourceContextCache[dataSourceRef]
+            let result = dataSourceContextCache[contextCacheKey]
             if (result) {
                 return result
             }
@@ -203,7 +209,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             }
 
 
-            const connector = useDataConnector(dataSource);
+            const connector = createDataConnector(dataSource, connectorRuntime);
             result = {
                 ...this,
                 // Preserve existing handlers (e.g., dialog) and merge DS/window + services
@@ -214,7 +220,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 identity,
                 connector,
                 signals,
-                dataSource: metadata.dataSource[dataSourceRef],
+                dataSource,
                 itemId: (container, item) => {
                     return `${windowId}DS${dataSourceRef}.(${container.id}||'').${item.id}`
                 },
@@ -239,17 +245,18 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             result.lookupHandler = (name) => {
                 return resolveActionHandler(result.actions, result.handlers, name);
             }
-            dataSourceContextCache[dataSourceRef] = result
-            setWindowContext(windowId, this); // register top-level window context
-            this.dataSources[dataSourceRef] = dataSourceContextCache[dataSourceRef];
-            return dataSourceContextCache[dataSourceRef];
+            dataSourceContextCache[contextCacheKey] = result
+            this.dataSources[contextCacheKey] = dataSourceContextCache[contextCacheKey];
+            return dataSourceContextCache[contextCacheKey];
         },
 
         // Hook-safe variant for React components. Always call from inside a component.
-        useDsContext: function (dataSourceRef) {
+        useDsContext: function (dataSourceRef, options = {}) {
             if (!dataSourceRef) {
                 dataSourceRef = this.identity.dataSourceRef;
             }
+            const selectionModeOverride = String(options?.selectionMode || "").trim().toLowerCase();
+            const contextCacheKey = `${dataSourceRef}::${selectionModeOverride || "default"}`;
 
             const identity = {
                 ...this.identity,
@@ -257,15 +264,17 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 ns,
                 dataSourceId: getDataSourceId(dataSourceRef)
             };
-            const dataSource = metadata.dataSource[dataSourceRef];
+            const baseDataSource = metadata.dataSource[dataSourceRef];
+            const dataSource = selectionModeOverride
+                ? { ...baseDataSource, selectionMode: selectionModeOverride }
+                : baseDataSource;
             if (!dataSource) {
                 throw new Error(`DataSource not found: ${dataSourceRef}`, identity);
             }
 
-            // Always call the hook here; React requires consistent hook calls per render
-            const connector = useDataConnector(dataSource);
+            const connector = createDataConnector(dataSource, connectorRuntime);
 
-            let cached = dataSourceContextCache[dataSourceRef];
+            let cached = dataSourceContextCache[contextCacheKey];
             if (cached) {
                 return cached;
             }
@@ -299,7 +308,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 identity,
                 connector,
                 signals,
-                dataSource: metadata.dataSource[dataSourceRef],
+                dataSource,
                 itemId: (container, item) => `${windowId}DS${dataSourceRef}.(${container.id}||'').${item.id}`,
                 getSignalId: (key) => {
                     this.signalIds[key] = true;
@@ -317,10 +326,9 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             result.actions = metadata.actions.import(result) || {};
             result.lookupHandler = (name) => resolveActionHandler(result.actions, result.handlers, name);
 
-            dataSourceContextCache[dataSourceRef] = result;
-            setWindowContext(windowId, this);
-            this.dataSources[dataSourceRef] = dataSourceContextCache[dataSourceRef];
-            return dataSourceContextCache[dataSourceRef];
+            dataSourceContextCache[contextCacheKey] = result;
+            this.dataSources[contextCacheKey] = dataSourceContextCache[contextCacheKey];
+            return dataSourceContextCache[contextCacheKey];
         }
 
 

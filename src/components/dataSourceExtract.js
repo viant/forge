@@ -47,14 +47,17 @@ export function extractData(selectors = {}, paging, data) {
     let stats = {};
     const dataSelector = selectors.data;
     let respData;
-    const envelopeRecords = extractEnvelopeRecords(data);
-    if (typeof envelopeRecords !== "undefined") {
-        respData = envelopeRecords;
-    } else if (!dataSelector) {
-        respData = data;
-    } else {
+    if (dataSelector) {
         respData = resolveKey(data, dataSelector);
         if (typeof respData === "undefined") {
+            const envelopeRecords = extractEnvelopeRecords(data);
+            respData = typeof envelopeRecords !== "undefined" ? envelopeRecords : undefined;
+        }
+    } else {
+        const envelopeRecords = extractEnvelopeRecords(data);
+        if (typeof envelopeRecords !== "undefined") {
+            respData = envelopeRecords;
+        } else {
             respData = data;
         }
     }

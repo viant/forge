@@ -1,6 +1,7 @@
 import {signal} from '@preact/signals-react';
 
 import {generateIntHash} from "../../utils/hash.js";
+import { injectActions } from '../../actions/action.js';
 // Create per-key signals for metadata and data
 
 
@@ -64,6 +65,10 @@ export const getBusSignal = (windowId) => {
     return busSignals.value[windowId];
 };
 
+export const findBusSignal = (windowId) => {
+    return busSignals.value[windowId] || null;
+};
+
 export const getDashboardFilterSignal = (dashboardKey, initialValue = {}) => {
     if (!dashboardFilterSignals.value[dashboardKey]) {
         dashboardFilterSignals.value = {
@@ -72,6 +77,10 @@ export const getDashboardFilterSignal = (dashboardKey, initialValue = {}) => {
         };
     }
     return dashboardFilterSignals.value[dashboardKey];
+};
+
+export const findDashboardFilterSignal = (dashboardKey) => {
+    return dashboardFilterSignals.value[dashboardKey] || null;
 };
 
 export const getDashboardSelectionSignal = (
@@ -85,6 +94,10 @@ export const getDashboardSelectionSignal = (
         };
     }
     return dashboardSelectionSignals.value[dashboardKey];
+};
+
+export const findDashboardSelectionSignal = (dashboardKey) => {
+    return dashboardSelectionSignals.value[dashboardKey] || null;
 };
 
 
@@ -107,6 +120,10 @@ export const getMetadataSignal = (windowId) => {
     return metadataSignals.value[windowId];
 };
 
+export const findMetadataSignal = (windowId) => {
+    return metadataSignals.value[windowId] || null;
+};
+
 
 
 // Get or create data signal for a unique window key
@@ -119,6 +136,10 @@ export const getInputSignal = (sourceId) => {
         };
     }
     return inputSignals.value[sourceId];
+};
+
+export const findInputSignal = (sourceId) => {
+    return inputSignals.value[sourceId] || null;
 };
 
 
@@ -135,6 +156,10 @@ export const getCollectionSignal = (sourceId) => {
     return dataSignals.value[sourceId];
 };
 
+export const findCollectionSignal = (sourceId) => {
+    return dataSignals.value[sourceId] || null;
+};
+
 
 // Get or create data signal for a unique window key
 export const getSelectionSignal = (sourceId, initialValue) => {
@@ -146,6 +171,10 @@ export const getSelectionSignal = (sourceId, initialValue) => {
         };
     }
     return selectionSignals.value[sourceId];
+};
+
+export const findSelectionSignal = (sourceId) => {
+    return selectionSignals.value[sourceId] || null;
 };
 
 
@@ -162,6 +191,10 @@ export const getFormSignal = (sourceId) => {
     return formSignals.value[sourceId];
 };
 
+export const findFormSignal = (sourceId) => {
+    return formSignals.value[sourceId] || null;
+};
+
 export const getMessageSignal = (sourceId) => {
     if (!messageSignals.value[sourceId]) {
         const newSignal = signal([]);
@@ -171,6 +204,10 @@ export const getMessageSignal = (sourceId) => {
         };
     }
     return messageSignals.value[sourceId];
+}
+
+export const findMessageSignal = (sourceId) => {
+    return messageSignals.value[sourceId] || null;
 }
 
 
@@ -185,6 +222,10 @@ export const getDialogSignal = (sourceId) => {
     return dialogSignals.value[sourceId];
 }
 
+export const findDialogSignal = (sourceId) => {
+    return dialogSignals.value[sourceId] || null;
+};
+
 
 
 // Get or create data signal for a unique window key
@@ -197,6 +238,10 @@ export const getCollectionInfoSignal = (sourceId) => {
         };
     }
     return collectionInfoSignals.value[sourceId];
+};
+
+export const findCollectionInfoSignal = (sourceId) => {
+    return collectionInfoSignals.value[sourceId] || null;
 };
 
 
@@ -214,6 +259,10 @@ export const getMetricsSignal = (sourceId) => {
     return metricsSignals.value[sourceId];
 };
 
+export const findMetricsSignal = (sourceId) => {
+    return metricsSignals.value[sourceId] || null;
+};
+
 
 // Get or create data signal for a unique window key
 export const getControlSignal = (sourceId) => {
@@ -226,6 +275,10 @@ export const getControlSignal = (sourceId) => {
         };
     }
     return controlSignals.value[sourceId];
+};
+
+export const findControlSignal = (sourceId) => {
+    return controlSignals.value[sourceId] || null;
 };
 
 // -------------------------------------------------------------
@@ -244,6 +297,10 @@ export const getFormStatusSignal = (sourceId) => {
     return formStatusSignals.value[sourceId];
 };
 
+export const findFormStatusSignal = (sourceId) => {
+    return formStatusSignals.value[sourceId] || null;
+};
+
 
 // Get or create data signal for a unique window key
 export const getViewSignal = (sourceId) => {
@@ -256,6 +313,49 @@ export const getViewSignal = (sourceId) => {
         };
     }
     return viewSignals.value[sourceId];
+};
+
+export const findViewSignal = (sourceId) => {
+    return viewSignals.value[sourceId] || null;
+};
+
+export const primeWindowSignals = (windowId, metadata = null) => {
+    const id = String(windowId || '').trim();
+    if (!id || !metadata || typeof metadata !== 'object') return;
+
+    getBusSignal(id);
+    getControlSignal(id);
+    getFormSignal(`${id}:windowForm`);
+    getViewSignal(id);
+    getMessageSignal(id);
+
+    const dataSources = metadata?.dataSource && typeof metadata.dataSource === 'object'
+        ? metadata.dataSource
+        : {};
+    for (const [dataSourceRef, dataSource] of Object.entries(dataSources)) {
+        const sourceId = `${id}DS${dataSourceRef}`;
+        getInputSignal(sourceId);
+        getControlSignal(sourceId);
+        getFormSignal(sourceId);
+        getCollectionSignal(sourceId);
+        getCollectionInfoSignal(sourceId);
+        getMetricsSignal(sourceId);
+        getMessageSignal(sourceId);
+        getFormStatusSignal(sourceId);
+
+        const selectionMode = String(dataSource?.selectionMode || '').trim().toLowerCase();
+        const initialSelection = selectionMode === 'multi'
+            ? { selection: [] }
+            : { selected: null, rowIndex: -1 };
+        getSelectionSignal(sourceId, initialSelection);
+    }
+
+    const dialogs = Array.isArray(metadata?.dialogs) ? metadata.dialogs : [];
+    for (const dialog of dialogs) {
+        const dialogId = String(dialog?.id || '').trim();
+        if (!dialogId) continue;
+        getDialogSignal(`${id}Dialog${dialogId}`);
+    }
 };
 
 
@@ -338,13 +438,80 @@ export const activeWindows = signal([]);
 export const selectedWindowId = signal(null);
 export const selectedTabId = signal(null);
 
+function restoreWindowSignalsFromSnapshot(win) {
+    const windowId = String(win?.windowId || '').trim();
+    if (!windowId) return;
+
+    const inlineMetadata = win?.inlineMetadata;
+    if (inlineMetadata && typeof inlineMetadata === 'object') {
+        try {
+            injectActions(inlineMetadata);
+            getMetadataSignal(windowId).value = inlineMetadata;
+        } catch (_) {}
+    }
+
+    if (win?.windowForm && typeof win.windowForm === 'object') {
+        getFormSignal(`${windowId}:windowForm`).value = win.windowForm;
+    }
+
+    if (win?.viewState && typeof win.viewState === 'object') {
+        getViewSignal(windowId).value = win.viewState;
+    }
+
+    const dataSources = win?.dataSources && typeof win.dataSources === 'object'
+        ? Object.values(win.dataSources)
+        : [];
+    for (const snapshot of dataSources) {
+        const dataSourceRef = String(snapshot?.dataSourceRef || '').trim();
+        if (!dataSourceRef) continue;
+        const dataSourceId = `${windowId}DS${dataSourceRef}`;
+        if (snapshot?.input && typeof snapshot.input === 'object') {
+            getInputSignal(dataSourceId).value = snapshot.input;
+        }
+        if (snapshot?.control && typeof snapshot.control === 'object') {
+            getControlSignal(dataSourceId).value = snapshot.control;
+        }
+        if (snapshot?.form && typeof snapshot.form === 'object') {
+            getFormSignal(dataSourceId).value = snapshot.form;
+        }
+        if (Object.prototype.hasOwnProperty.call(snapshot || {}, 'selection')) {
+            getSelectionSignal(dataSourceId, null).value = snapshot.selection;
+        }
+        if (Array.isArray(snapshot?.collection)) {
+            getCollectionSignal(dataSourceId).value = snapshot.collection;
+        }
+        if (snapshot?.collectionInfo && typeof snapshot.collectionInfo === 'object') {
+            getCollectionInfoSignal(dataSourceId).value = snapshot.collectionInfo;
+        }
+        if (snapshot?.metrics && typeof snapshot.metrics === 'object') {
+            getMetricsSignal(dataSourceId).value = snapshot.metrics;
+        }
+        if (snapshot?.formStatus && typeof snapshot.formStatus === 'object') {
+            getFormStatusSignal(dataSourceId).value = snapshot.formStatus;
+        }
+    }
+
+    const dialogs = Array.isArray(win?.dialogs) ? win.dialogs : [];
+    for (const dialog of dialogs) {
+        const dialogId = String(dialog?.id || '').trim();
+        if (!dialogId) continue;
+        const signal = getDialogSignal(`${windowId}Dialog${dialogId}`);
+        const previous = signal.peek?.() || signal.value || {};
+        signal.value = {
+            ...previous,
+            open: !!dialog?.open,
+            selectionMode: dialog?.selectionMode ?? previous?.selectionMode,
+            args: dialog?.args ?? previous?.args,
+        };
+    }
+}
+
 export const restoreWindowsFromSnapshot = (snapshot) => {
     const windows = Array.isArray(snapshot?.windows) ? snapshot.windows : [];
     const previous = Array.isArray(activeWindows.peek?.()) ? activeWindows.peek() : [];
-    const nextIds = new Set(windows.map((win) => String(win?.windowId || '').trim()).filter(Boolean));
     for (const win of previous) {
         const id = String(win?.windowId || '').trim();
-        if (id && !nextIds.has(id)) {
+        if (id) {
             removeSignalsForKey(id);
         }
     }
@@ -356,6 +523,8 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         windowKey: win?.windowKey || '',
         presentation: win?.presentation || '',
         region: win?.region || '',
+        workspaceSharePct: win?.workspaceSharePct ?? undefined,
+        workspaceMinHeight: win?.workspaceMinHeight ?? undefined,
         windowData: win?.windowData || '',
         inTab: win?.inTab !== false,
         parameters: win?.parameters || {},
@@ -365,7 +534,11 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         x: win?.position?.x ?? win?.x ?? undefined,
         y: win?.position?.y ?? win?.y ?? undefined,
         size: win?.size || undefined,
+        inlineMetadata: win?.inlineMetadata && typeof win.inlineMetadata === 'object' ? win.inlineMetadata : undefined,
     }));
+    for (const win of windows) {
+        restoreWindowSignalsFromSnapshot(win);
+    }
     selectedTabId.value = snapshot?.selected?.tabId || null;
     selectedWindowId.value = snapshot?.selected?.windowId || null;
 };
@@ -391,29 +564,88 @@ const computeWindowId = (baseId, forceNew, instanceIndex) => {
     return `${baseId}__${Date.now()}_${(instanceIndex || 0) + 1}`;
 };
 
+const computeHostedConversationScopedWindowId = (baseId, options = {}) => {
+    const conversationId = String(options.conversationId || '').trim();
+    const presentation = normalizeHostedRegionKey(options.presentation);
+    const region = normalizeHostedRegionKey(options.region);
+    if (!conversationId || presentation !== 'hosted' || !region) return baseId;
+    return `${baseId}__${conversationId}`;
+};
+
 const computeWindowTitle = (baseTitle, autoIndex, instanceIndex) => {
     if (!autoIndex || typeof baseTitle !== 'string' || baseTitle.trim().length === 0) return baseTitle;
     return `${baseTitle} <${(instanceIndex || 0) + 1}>`;
+};
+
+const normalizeHostedRegionKey = (value) => String(value || '').trim().toLowerCase();
+
+const currentMainChatConversationId = (windows = []) => {
+    const mainChat = (Array.isArray(windows) ? windows : []).find((win) => String(win?.windowId || '').trim() === 'chat/new');
+    if (!mainChat || typeof mainChat !== 'object') {
+        return '';
+    }
+    return String(
+        mainChat?.parameters?.conversations?.form?.id
+        || mainChat?.parameters?.messages?.input?.parameters?.convID
+        || ''
+    ).trim();
+};
+
+const shouldAutoSelectWindow = (inTab, windowId, options = {}, windows = []) => {
+    if (inTab === false) {
+        return false;
+    }
+    const presentation = normalizeHostedRegionKey(options.presentation);
+    const region = normalizeHostedRegionKey(options.region);
+    const conversationId = String(options.conversationId || '').trim();
+    if (presentation !== 'hosted' || region !== 'chat.top' || !conversationId) {
+        return true;
+    }
+    const activeConversationId = currentMainChatConversationId(windows);
+    if (!activeConversationId) {
+        return true;
+    }
+    return activeConversationId === conversationId;
+};
+
+const resolveHostedRegionReplacementWindow = (windows, parentKey, inTab, options = {}) => {
+    const conversationId = String(options.conversationId || '').trim();
+    const presentation = normalizeHostedRegionKey(options.presentation);
+    const region = normalizeHostedRegionKey(options.region);
+    const explicitParentKey = String(options.parentKey || parentKey || '').trim();
+    if (options.replaceHostedRegion !== true) return null;
+    if (!conversationId || !presentation || !region) return null;
+    return (Array.isArray(windows) ? windows : []).find((win) => {
+        if (!win) return false;
+        if ((win.inTab === false) !== (inTab === false)) return false;
+        if (String(win.conversationId || '').trim() !== conversationId) return false;
+        if (normalizeHostedRegionKey(win.presentation) !== presentation) return false;
+        if (normalizeHostedRegionKey(win.region) !== region) return false;
+        return String(win.parentKey || '').trim() === explicitParentKey;
+    }) || null;
 };
 
 export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab = true, parameters = {}, options = {}) => {
     if(windowData) {
         parameters['windowData'] = windowData;
     }
+    const explicitWindowId = String(options.windowId || '').trim();
     const hash = Object.keys(parameters).length > 0 ? generateIntHash(parameters) : ''
     const baseWindowId = hash ? `${windowKey}_${hash}` : windowKey;
+    const scopedBaseWindowId = computeHostedConversationScopedWindowId(baseWindowId, options);
 
     // Support explicitly opening a new instance even if a window with the same
     // key/parameters already exists. When requested, compute a unique ID and
     // optionally auto-index the title (e.g., "chat <N+1>").
     const forceNewInstance = options && options.newInstance === true;
     const instanceIndex = nextInstanceIndex(activeWindows.peek(), windowKey);
-    const windowId = computeWindowId(baseWindowId, forceNewInstance, instanceIndex);
+    const windowId = explicitWindowId || computeWindowId(scopedBaseWindowId, forceNewInstance, instanceIndex);
 
 
     const existingWindow = forceNewInstance
         ? undefined
-        : activeWindows.value.find((win) => win.windowId === windowId);
+        : activeWindows.value.find((win) => win.windowId === windowId)
+            || resolveHostedRegionReplacementWindow(activeWindows.value, parentKey, inTab, options);
     let result = existingWindow
     if (!existingWindow) {
         // Optionally auto-index title for a nicer UX when multiple instances
@@ -448,6 +680,12 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         if (options.footer) {
             newWindow.footer = options.footer;
         }
+        if (options.workspaceSharePct !== undefined) {
+            newWindow.workspaceSharePct = options.workspaceSharePct;
+        }
+        if (options.workspaceMinHeight !== undefined) {
+            newWindow.workspaceMinHeight = options.workspaceMinHeight;
+        }
         if (inTab === false) {
             floatingWindowZIndex += 1;
             newWindow.zIndex = floatingWindowZIndex;
@@ -458,12 +696,19 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         ];
         result = newWindow;
     } else {
+        const replacingSemanticWindow =
+            existingWindow.windowId !== windowId
+            || String(existingWindow.windowKey || '').trim() !== String(windowKey || '').trim();
+        if (replacingSemanticWindow) {
+            removeSignalsForKey(existingWindow.windowId);
+        }
         const computedTitle = computeWindowTitle(windowTitle, options && options.autoIndexTitle === true, instanceIndex);
         const nextConversationId = String(options.conversationId || '').trim() || undefined;
         const nextPresentation = String(options.presentation || '').trim() || undefined;
         const nextRegion = String(options.region || '').trim() || undefined;
         const nextWindow = {
             ...existingWindow,
+            windowId,
             windowTitle: computedTitle,
             conversationId: nextConversationId,
             parentKey,
@@ -490,6 +735,12 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         if (options.footer !== undefined) {
             nextWindow.footer = options.footer;
         }
+        if (options.workspaceSharePct !== undefined) {
+            nextWindow.workspaceSharePct = options.workspaceSharePct;
+        }
+        if (options.workspaceMinHeight !== undefined) {
+            nextWindow.workspaceMinHeight = options.workspaceMinHeight;
+        }
         if (inTab !== false) {
             delete nextWindow.zIndex;
             nextWindow.isMinimized = false;
@@ -512,10 +763,10 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
     }
 
     // Update selectedTabId if the window is in tab
-    if (inTab !== false) {
+    if (shouldAutoSelectWindow(inTab, windowId, options, activeWindows.peek())) {
         selectedTabId.value = windowId;
         selectedWindowId.value = windowId;
-    } else {
+    } else if (inTab === false) {
         // For floating windows, bring them to front
         bringFloatingWindowToFront(windowId);
     }

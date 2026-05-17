@@ -1,19 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Icon } from "@blueprintjs/core";
-import { useSignalEffect } from "@preact/signals-react";
+import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
+import { mergeWindowFormValues } from "../../hooks/dataSource.js";
 import { resolveKey, setSelector } from "../../utils/selector.js";
 import { formatDashboardValue } from "./dashboardUtils.js";
 import {
+    applyReportBuilderComputedMeasures,
     addDynamicFilterRow,
     buildReportBuilderColumns,
     buildReportBuilderDefaultState,
     buildReportBuilderRequest,
+    canAutoFetchReportBuilder,
+    getSelectableReportBuilderMeasures,
+    getVisibleReportBuilderDimensions,
     mergeReportBuilderState,
-    projectLookupSelection,
+    projectLookupSelections,
     removeDynamicFilterRow,
+    resolveReportBuilderMeasure,
+    resolveReportBuilderReadiness,
+    sanitizeReportBuilderState,
     updateDynamicFilterRow,
 } from "./reportBuilderUtils.js";
 
@@ -21,12 +29,87 @@ function getBuilderConfig(container = {}) {
     return container.dashboard?.reportBuilder || container.reportBuilder || container.builder || {};
 }
 
+function getLookupExtensionConfig(config = {}) {
+    const extension = config?.extensions?.lookupFilters;
+    if (extension && typeof extension === "object") {
+        return extension;
+    }
+    return {};
+}
+
+export function resolveReportBuilderHookHandler(builderContext, handlerName = "") {
+    const directName = String(handlerName || "").trim();
+    if (!directName || !builderContext?.lookupHandler) {
+        return null;
+    }
+    try {
+        return builderContext.lookupHandler(directName);
+    } catch (error) {
+        const namespace = String(builderContext?.metadata?.namespace || "").trim();
+        const namespacedName = namespace && !directName.startsWith(`${namespace}.`)
+            ? `${namespace}.${directName}`
+            : "";
+        if (!namespacedName) {
+            throw error;
+        }
+        return builderContext.lookupHandler(namespacedName);
+    }
+}
+
+function applyRequestHook(builderContext, config = {}, state = {}, request = {}) {
+    const handlerName = String(config?.hooks?.buildRequest || "").trim();
+    if (!handlerName || !builderContext?.lookupHandler) {
+        return request;
+    }
+    try {
+        const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
+        const result = handler({
+            context: builderContext,
+            request,
+            state,
+            config,
+        });
+        return (result && typeof result === "object") ? result : request;
+    } catch (error) {
+        console.error("reportBuilder request hook failed", error);
+        return request;
+    }
+}
+
+export function applyReportBuilderStateHook(builderContext, config = {}, state = {}, windowForm = {}) {
+    const handlerName = String(config?.hooks?.initializeState || "").trim();
+    if (!handlerName || !builderContext?.lookupHandler) {
+        return state;
+    }
+    try {
+        const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
+        const result = handler({
+            context: builderContext,
+            state,
+            config,
+            windowForm,
+        });
+        return (result && typeof result === "object") ? result : state;
+    } catch (error) {
+        console.error("reportBuilder state hook failed", error);
+        return state;
+    }
+}
+
+function prefillSignature(windowForm = {}) {
+    const prefill = windowForm?.prefill;
+    if (!prefill || typeof prefill !== "object" || Array.isArray(prefill)) {
+        return "";
+    }
+    return JSON.stringify(prefill);
+}
+
 function getBuilderStateKey(container = {}) {
     return String(container.stateKey || container.id || "reportBuilder").trim() || "reportBuilder";
 }
 
 function measureById(config = {}, id = "") {
-    return (config.measures || []).find((entry) => String(entry?.id || "").trim() === String(id || "").trim()) || null;
+    return resolveReportBuilderMeasure(config, id);
 }
 
 function dimensionById(config = {}, id = "") {
@@ -37,8 +120,99 @@ function groupByOption(config = {}, value = "") {
     return (config?.groupBy?.options || []).find((entry) => String(entry?.value || "").trim() === String(value || "").trim()) || null;
 }
 
-function shallowEqualJSON(left, right) {
-    return JSON.stringify(left) === JSON.stringify(right);
+function resolveMeasureSections(config = {}, measures = []) {
+    const sectionConfig = Array.isArray(config.measureSections) ? config.measureSections : [];
+    const configIndex = new Map(
+        sectionConfig
+            .map((section, index) => ({
+                id: String(section?.id || "").trim(),
+                label: section?.label,
+                order: Number.isFinite(Number(section?.order)) ? Number(section.order) : index,
+            }))
+            .filter((section) => section.id)
+            .map((section) => [section.id, section]),
+    );
+    const grouped = new Map();
+    measures.forEach((measure) => {
+        const sectionId = String(measure?.section || "").trim() || "default";
+        const sectionMeta = configIndex.get(sectionId) || {};
+        const existing = grouped.get(sectionId) || {
+            id: sectionId,
+            label: sectionMeta.label || (sectionId === "default" ? "" : sectionId),
+            order: Number.isFinite(sectionMeta.order) ? sectionMeta.order : Number.MAX_SAFE_INTEGER,
+            measures: [],
+        };
+        existing.measures.push(measure);
+        grouped.set(sectionId, existing);
+    });
+    return Array.from(grouped.values())
+        .filter((section) => Array.isArray(section.measures) && section.measures.length > 0)
+        .sort((left, right) => {
+            if (left.order !== right.order) {
+                return left.order - right.order;
+            }
+            return String(left.label || left.id).localeCompare(String(right.label || right.id));
+        });
+}
+
+function hasConfiguredFilterValue(filter = {}, value) {
+    if (filter.type === "dateRange") {
+        return !!(value?.start || value?.end);
+    }
+    if (filter.multiple) {
+        return Array.isArray(value) && value.length > 0;
+    }
+    return value != null && value !== "";
+}
+
+function countConfiguredFilterValue(filter = {}, value) {
+    if (!hasConfiguredFilterValue(filter, value)) {
+        return 0;
+    }
+    if (filter.type === "dateRange") {
+        return 1;
+    }
+    if (filter.multiple) {
+        return Array.isArray(value) ? value.length : 0;
+    }
+    return 1;
+}
+
+function countConfiguredDynamicSelections(rows = []) {
+    return (Array.isArray(rows) ? rows : []).reduce((total, row) => (
+        total + (Array.isArray(row?.selections) ? row.selections.length : 0)
+    ), 0);
+}
+
+function filterCategoryIcon(categoryId = "") {
+    switch (String(categoryId || "").trim()) {
+        case "channelIds":
+            return "layers";
+        case "scope":
+            return "target";
+        case "inventory":
+            return "box";
+        case "targeting":
+            return "diagram-tree";
+        default:
+            return "filter";
+    }
+}
+
+function filterCategoryStateLabel({ active = false, configuredCount = 0 } = {}) {
+    if (configuredCount > 0) {
+        return String(configuredCount);
+    }
+    return active ? "Shown" : "Add";
+}
+
+function filterCategoryTitle(label = "", { active = false, configuredCount = 0 } = {}) {
+    const parts = [String(label || "").trim()].filter(Boolean);
+    if (configuredCount > 0) {
+        parts.push(`${configuredCount} configured`);
+    }
+    parts.push(active ? "shown" : "available");
+    return parts.join(" • ");
 }
 
 function buildChartContainer(container = {}, config = {}, state = {}) {
@@ -72,10 +246,12 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
         valueKey: primaryMeasure?.key || primaryMeasure?.id,
         palette,
     };
+    const preferDirectSeries = selectedMeasures.length > 1;
 
     return {
         ...container,
         dataSourceRef: container.dataSourceRef,
+        collection: container.collection,
         chart: {
             type: config.result?.chartType || "line",
             xAxis: {
@@ -85,7 +261,7 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
             yAxis: {
                 format: primaryMeasure?.format,
             },
-            series: groupDimension ? groupedSeries : directSeries,
+            series: !preferDirectSeries && groupDimension ? groupedSeries : directSeries,
         },
     };
 }
@@ -133,18 +309,11 @@ function resolveFilterOptions(filter = {}, collection = []) {
 }
 
 function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) {
+    useSignals();
     const optionContext = filter.optionsDataSourceRef && typeof context?.Context === "function"
         ? context.Context(filter.optionsDataSourceRef)
         : null;
-    const [optionCollection, setOptionCollection] = useState(() => optionContext?.signals?.collection?.peek?.() || []);
-
-    useSignalEffect(() => {
-        if (!optionContext?.signals?.collection) {
-            setOptionCollection([]);
-            return;
-        }
-        setOptionCollection(optionContext.signals.collection.value || []);
-    });
+    const optionCollection = optionContext?.signals?.collection?.value || [];
 
     useEffect(() => {
         if (!optionContext || filter.autoFetchOptions === false) {
@@ -161,8 +330,16 @@ function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) 
 
     if (filter.type === "dateRange") {
         return (
-            <section className="forge-report-builder__panel forge-report-builder__panel--bottom">
-                <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
+            <section className={[
+                "forge-report-builder__panel",
+                "forge-report-builder__panel--bottom",
+                "forge-report-builder__panel--date-range",
+                filter.required ? "forge-report-builder__panel--required" : "",
+            ].filter(Boolean).join(" ")}>
+                <div className="forge-report-builder__panel-headerline">
+                    <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
+                    {filter.required ? <span className="forge-report-builder__panel-badge">Required</span> : null}
+                </div>
                 <div className="forge-report-builder__date-range">
                     <input
                         type="date"
@@ -181,16 +358,27 @@ function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) 
     }
 
     return (
-        <section className="forge-report-builder__panel forge-report-builder__panel--bottom">
-            <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
-            <div className="forge-report-builder-icon-row">
+        <section className={[
+            "forge-report-builder__panel",
+            "forge-report-builder__panel--bottom",
+            filter.required ? "forge-report-builder__panel--required" : "",
+        ].filter(Boolean).join(" ")}>
+            <div className="forge-report-builder__panel-headerline">
+                <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
+                {filter.required ? <span className="forge-report-builder__panel-badge">Required</span> : null}
+            </div>
+            <div className={String(filter.id || "").trim() === "channelIds" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
                 {options.map((option) => {
                     const active = activeValues.includes(option.value);
                     return (
                         <button
                             key={String(option.value)}
                             type="button"
-                            className={active ? "forge-report-builder-icon-button is-active" : "forge-report-builder-icon-button"}
+                            className={[
+                                "forge-report-builder-icon-button",
+                                String(filter.id || "").trim() === "channelIds" ? "forge-report-builder-icon-button--compact" : "",
+                                active ? "is-active" : "",
+                            ].filter(Boolean).join(" ")}
                             onClick={() => onToggle(option.value)}
                             title={option.label}
                         >
@@ -240,27 +428,29 @@ function DynamicFilterGroup({
                     const dialogId = selectedFilter?.dialogId || selectedFilter?.lookup?.dialogId || "";
                     return (
                         <div key={row.id} className="forge-report-builder-dynamic-row">
-                            <select
-                                className="forge-report-builder-select"
-                                value={row.filterId || ""}
-                                onChange={(event) => onChangeFilter(row.id, event.target.value)}
-                            >
-                                {filters.map((entry) => (
-                                    <option key={entry.id} value={entry.id}>
-                                        {entry.label || entry.id}
-                                    </option>
-                                ))}
-                            </select>
-                            <Button
-                                small
-                                icon="search-template"
-                                outlined
-                                onClick={() => onPick(row.id, selectedFilter)}
-                                disabled={!dialogId}
-                            >
-                                {placeholder}
-                            </Button>
-                            <div className="forge-report-builder-dynamic-row__chips">
+                            <div className="forge-report-builder-dynamic-row__controls">
+                                <select
+                                    className="forge-report-builder-select"
+                                    value={row.filterId || ""}
+                                    onChange={(event) => onChangeFilter(row.id, event.target.value)}
+                                >
+                                    {filters.map((entry) => (
+                                        <option key={entry.id} value={entry.id}>
+                                            {entry.label || entry.id}
+                                        </option>
+                                    ))}
+                                </select>
+                                <Button
+                                    small
+                                    icon="search-template"
+                                    outlined
+                                    onClick={() => onPick(row.id, selectedFilter)}
+                                    disabled={!dialogId}
+                                >
+                                    {placeholder}
+                                </Button>
+                            </div>
+                            <div className="forge-report-builder-dynamic-row__selection-line">
                                 {(row.selections || []).map((selection, index) => (
                                     <FilterChip
                                         key={`${row.id}_${index}_${selection.value}`}
@@ -269,14 +459,16 @@ function DynamicFilterGroup({
                                     />
                                 ))}
                             </div>
-                            <button
-                                type="button"
-                                className="forge-report-builder-remove-row"
-                                onClick={() => onRemoveRow(row.id)}
-                                aria-label="Remove filter row"
-                            >
-                                ×
-                            </button>
+                            <div className="forge-report-builder-dynamic-row__actions">
+                                <button
+                                    type="button"
+                                    className="forge-report-builder-remove-row"
+                                    onClick={() => onRemoveRow(row.id)}
+                                    aria-label="Remove filter row"
+                                >
+                                    ×
+                                </button>
+                            </div>
                         </div>
                     );
                 })}
@@ -286,54 +478,136 @@ function DynamicFilterGroup({
 }
 
 export default function ReportBuilder({ container, context }) {
+    useSignals();
     const config = useMemo(() => getBuilderConfig(container), [container]);
     const builderContext = container?.dataSourceRef && typeof context?.Context === "function"
         ? context.Context(container.dataSourceRef)
         : context;
     const stateKey = useMemo(() => getBuilderStateKey(container), [container]);
     const windowFormSignal = builderContext?.signals?.windowForm;
-    const persistedState = resolveKey(windowFormSignal?.peek?.() || {}, stateKey);
-    const [state, setState] = useState(() => mergeReportBuilderState(config, persistedState));
+    const persistedState = resolveKey(windowFormSignal?.value || {}, stateKey);
+    const state = useMemo(() => mergeReportBuilderState(config, persistedState), [config, persistedState]);
     const requestFingerprintRef = useRef("");
+    const lastManualRunFingerprintRef = useRef("");
+    const seededDefaultsRef = useRef(false);
+    const appliedPrefillSignatureRef = useRef("");
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
     const { collection = [], loading, error } = useDataSourceState(builderContext);
     const locale = context?.locale || "en-US";
-    const [collectionInfo, setCollectionInfo] = useState(builderContext?.signals?.collectionInfo?.peek?.() || {});
-
-    useSignalEffect(() => {
-        const nextPersisted = resolveKey(windowFormSignal?.value || {}, stateKey);
-        const merged = mergeReportBuilderState(config, nextPersisted);
-        setState((current) => (shallowEqualJSON(current, merged) ? current : merged));
-    });
-
-    useSignalEffect(() => {
-        setCollectionInfo(builderContext?.signals?.collectionInfo?.value || {});
-    });
+    const collectionInfo = builderContext?.signals?.collectionInfo?.value || {};
+    const computedCollection = useMemo(
+        () => applyReportBuilderComputedMeasures(collection, config),
+        [collection, config],
+    );
 
     const persistState = React.useCallback((next) => {
-        setState(next);
-        const payload = setSelector({}, stateKey, next);
+        const normalized = sanitizeReportBuilderState(config, next);
+        const payload = setSelector({}, stateKey, normalized);
+        if (windowFormSignal) {
+            windowFormSignal.value = mergeWindowFormValues(windowFormSignal.peek?.() || {}, payload);
+            return;
+        }
         builderContext?.handlers?.dataSource?.setWindowFormData?.({ values: payload });
-    }, [builderContext, stateKey]);
+    }, [builderContext, config, stateKey, windowFormSignal]);
 
     useEffect(() => {
-        const request = buildReportBuilderRequest(config, state);
+        if (seededDefaultsRef.current) {
+            return;
+        }
+        const currentPersisted = resolveKey(windowFormSignal?.peek?.() || {}, stateKey);
+        if (currentPersisted && typeof currentPersisted === "object" && Object.keys(currentPersisted).length > 0) {
+            seededDefaultsRef.current = true;
+            return;
+        }
+        seededDefaultsRef.current = true;
+        const defaults = mergeReportBuilderState(config, currentPersisted);
+        const initialized = mergeReportBuilderState(
+            config,
+            applyReportBuilderStateHook(
+                builderContext,
+                config,
+                defaults,
+                windowFormSignal?.peek?.() || {},
+            ),
+        );
+        const payload = setSelector({}, stateKey, initialized);
+        if (windowFormSignal) {
+            windowFormSignal.value = mergeWindowFormValues(windowFormSignal.peek?.() || {}, payload);
+        } else {
+            builderContext?.handlers?.dataSource?.setWindowFormData?.({ values: payload });
+        }
+    }, [builderContext, config, stateKey, windowFormSignal]);
+
+    useEffect(() => {
+        const currentPersisted = resolveKey(windowFormSignal?.peek?.() || {}, stateKey);
+        if (!currentPersisted || typeof currentPersisted !== "object" || Object.keys(currentPersisted).length === 0) {
+            return;
+        }
+        const persistedFingerprint = JSON.stringify(currentPersisted);
+        const stateFingerprint = JSON.stringify(state);
+        if (persistedFingerprint === stateFingerprint) {
+            return;
+        }
+        persistState(state);
+    }, [persistState, state, stateKey, windowFormSignal]);
+
+    useEffect(() => {
+        const signature = prefillSignature(windowFormSignal?.peek?.() || {});
+        if (!signature || appliedPrefillSignatureRef.current === signature) {
+            return;
+        }
+        const next = mergeReportBuilderState(
+            config,
+            applyReportBuilderStateHook(
+                builderContext,
+                config,
+                state,
+                windowFormSignal?.peek?.() || {},
+            ),
+        );
+        appliedPrefillSignatureRef.current = signature;
+        if (JSON.stringify(next) === JSON.stringify(state)) {
+            return;
+        }
+        persistState(next);
+    }, [builderContext, config, persistState, state, windowFormSignal]);
+
+    useEffect(() => {
+        const request = applyRequestHook(
+            builderContext,
+            config,
+            state,
+            buildReportBuilderRequest(config, state),
+        );
         const fingerprint = JSON.stringify(request);
         if (!fingerprint || requestFingerprintRef.current === fingerprint) {
             return;
         }
         requestFingerprintRef.current = fingerprint;
-        builderContext?.handlers?.dataSource?.setInputParameters?.(request);
-        if (config.request?.autoFetch === false) {
+        const inputSignal = builderContext?.signals?.input;
+        const shouldFetch = config.request?.autoFetch !== false && canAutoFetchReportBuilder(config, state);
+        if (inputSignal) {
+            const previous = inputSignal.peek?.() || {};
+            inputSignal.value = {
+                ...previous,
+                parameters: request,
+                fetch: shouldFetch,
+            };
             return;
         }
-        builderContext?.handlers?.dataSource?.fetchCollection?.();
+        builderContext?.handlers?.dataSource?.setInputParameters?.(request);
+        if (shouldFetch) {
+            builderContext?.handlers?.dataSource?.fetchCollection?.();
+        }
     }, [builderContext, config, state]);
 
-    const measures = Array.isArray(config.measures) ? config.measures : [];
-    const dimensions = Array.isArray(config.dimensions) ? config.dimensions : [];
+    const measures = useMemo(() => getSelectableReportBuilderMeasures(config), [config]);
+    const measureSections = useMemo(() => resolveMeasureSections(config, measures), [config, measures]);
+    const dimensions = useMemo(() => getVisibleReportBuilderDimensions(config), [config]);
     const staticFilters = Array.isArray(config.staticFilters) ? config.staticFilters : [];
     const dynamicFilterGroups = Array.isArray(config.dynamicFilterGroups) ? config.dynamicFilterGroups : [];
+    const lookupExtension = useMemo(() => getLookupExtensionConfig(config), [config]);
     const viewModes = Array.isArray(config?.result?.viewModes) && config.result.viewModes.length > 0
         ? config.result.viewModes
         : ["chart", "table"];
@@ -345,8 +619,104 @@ export default function ReportBuilder({ container, context }) {
         : [25, 50, 100];
 
     const selectedColumns = useMemo(() => buildReportBuilderColumns(config, state), [config, state]);
-    const chartContainer = useMemo(() => buildChartContainer(container, config, state), [container, config, state]);
+    const chartContainer = useMemo(
+        () => buildChartContainer({ ...container, collection: computedCollection }, config, state),
+        [collection, computedCollection, container, config, state],
+    );
+    const currentRequestFingerprint = useMemo(
+        () => JSON.stringify(buildReportBuilderRequest(config, state)),
+        [config, state],
+    );
     const hasMore = collectionInfo?.hasMore ?? (Array.isArray(collection) && collection.length >= state.pageSize);
+    const readiness = useMemo(() => resolveReportBuilderReadiness(config, state), [config, state]);
+    const canRunReport = readiness.canRun;
+    const requiredStaticFilters = useMemo(() => staticFilters.filter((filter) => filter?.required), [staticFilters]);
+    const optionalStaticFilters = useMemo(() => staticFilters.filter((filter) => !filter?.required), [staticFilters]);
+    const [filterPanels, setFilterPanels] = useState({ common: true, advanced: false });
+    const [activeOptionalFilterKeys, setActiveOptionalFilterKeys] = useState([]);
+    const [activeDynamicGroupIds, setActiveDynamicGroupIds] = useState([]);
+    const activeStaticFilterCount = useMemo(() => (
+        staticFilters.reduce((count, filter) => {
+            const key = String(filter.id || filter.field || "").trim();
+            return key && hasConfiguredFilterValue(filter, state?.staticFilters?.[key]) ? count + 1 : count;
+        }, 0)
+    ), [staticFilters, state]);
+    const activeDynamicFilterCount = useMemo(() => (
+        dynamicFilterGroups.reduce((count, group) => (
+            count + (state?.dynamicGroups?.[group.id] || []).filter((row) => Array.isArray(row.selections) && row.selections.length > 0).length
+        ), 0)
+    ), [dynamicFilterGroups, state]);
+
+    useEffect(() => {
+        const nextOptional = optionalStaticFilters
+            .filter((filter) => {
+                const key = String(filter.id || filter.field || "").trim();
+                return key && hasConfiguredFilterValue(filter, state?.staticFilters?.[key]);
+            })
+            .map((filter) => String(filter.id || filter.field || "").trim())
+            .filter(Boolean);
+        setActiveOptionalFilterKeys((current) => {
+            const currentSorted = [...current].sort();
+            const nextSorted = [...nextOptional].sort();
+            return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextOptional;
+        });
+    }, [optionalStaticFilters, state]);
+
+    useEffect(() => {
+        const nextGroups = dynamicFilterGroups
+            .filter((group) => Array.isArray(state?.dynamicGroups?.[group.id]) && state.dynamicGroups[group.id].length > 0)
+            .map((group) => String(group.id || "").trim())
+            .filter(Boolean);
+        setActiveDynamicGroupIds((current) => {
+            const currentSorted = [...current].sort();
+            const nextSorted = [...nextGroups].sort();
+            return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextGroups;
+        });
+    }, [dynamicFilterGroups, state]);
+    const renderStaticFilterSection = (filter) => {
+        const filterKey = String(filter.id || filter.field || "").trim();
+        const currentValue = state?.staticFilters?.[filterKey];
+        return (
+            <StaticFilterSection
+                key={filterKey}
+                filter={filter}
+                context={builderContext}
+                value={currentValue}
+                onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
+                onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
+            />
+        );
+    };
+    const runReport = React.useCallback(() => {
+        const request = applyRequestHook(
+            builderContext,
+            config,
+            state,
+            buildReportBuilderRequest(config, state),
+        );
+        const fingerprint = JSON.stringify(request);
+        requestFingerprintRef.current = fingerprint;
+        lastManualRunFingerprintRef.current = fingerprint;
+        const inputSignal = builderContext?.signals?.input;
+        if (inputSignal) {
+            const previous = inputSignal.peek?.() || {};
+            inputSignal.value = {
+                ...previous,
+                parameters: request,
+                fetch: true,
+            };
+            return;
+        }
+        builderContext?.handlers?.dataSource?.setInputParameters?.(request);
+        builderContext?.handlers?.dataSource?.fetchCollection?.();
+    }, [builderContext, config, state]);
+    const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
+    const canShowResults = canRunReport && hasRows;
+    const hasCompletedCurrentRun = canRunReport
+        && !loading
+        && !error
+        && lastManualRunFingerprintRef.current !== ""
+        && lastManualRunFingerprintRef.current === currentRequestFingerprint;
 
     const toggleMeasure = (measureId) => {
         const id = String(measureId || "").trim();
@@ -394,6 +764,42 @@ export default function ReportBuilder({ container, context }) {
             ...state,
             viewMode,
         });
+    };
+
+    const toggleFilterPanel = (key) => {
+        setFilterPanels((current) => ({
+            ...current,
+            [key]: !current[key],
+        }));
+    };
+
+    const toggleOptionalFilterCategory = (filterKey) => {
+        setActiveOptionalFilterKeys((current) => (
+            current.includes(filterKey)
+                ? current.filter((entry) => entry !== filterKey)
+                : [...current, filterKey]
+        ));
+    };
+
+    const toggleDynamicGroupCategory = (groupId) => {
+        const nextIsActive = !activeDynamicGroupIds.includes(groupId);
+        setActiveDynamicGroupIds((current) => (
+            current.includes(groupId)
+                ? current.filter((entry) => entry !== groupId)
+                : [...current, groupId]
+        ));
+        if (!nextIsActive) {
+            return;
+        }
+        const group = dynamicFilterGroups.find((entry) => entry?.id === groupId);
+        if (!group) {
+            return;
+        }
+        const existingRows = state?.dynamicGroups?.[groupId] || [];
+        if (Array.isArray(existingRows) && existingRows.length > 0) {
+            return;
+        }
+        persistState(addDynamicFilterRow(state, group));
     };
 
     const setGroupBy = (value) => {
@@ -516,20 +922,25 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         try {
-            const record = await builderContext?.handlers?.window?.openDialog?.({
+            const payload = await builderContext?.handlers?.window?.openDialog?.({
                 execution: {
-                    args: [dialogId, { awaitResult: true }],
+                    args: [dialogId, { awaitResult: true, multiple: filterDef?.multiple !== false }],
                 },
                 context: builderContext,
             });
-            if (!record) return;
-            const selection = projectLookupSelection(filterDef, record);
+            const selections = projectLookupSelections(filterDef, payload);
+            if (selections.length === 0) return;
             const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
                 if (row.id !== rowId) return row;
                 const currentSelections = Array.isArray(row.selections) ? row.selections : [];
                 const nextSelections = filterDef.multiple === false
-                    ? [selection]
-                    : [...currentSelections.filter((entry) => entry.value !== selection.value), selection];
+                    ? [selections[0]]
+                    : [
+                        ...currentSelections.filter(
+                            (entry) => !selections.some((selection) => entry.value === selection.value),
+                        ),
+                        ...selections,
+                    ];
                 return {
                     ...row,
                     selections: nextSelections,
@@ -551,34 +962,137 @@ export default function ReportBuilder({ container, context }) {
         <div className="forge-report-builder">
             <div className="forge-report-builder__top">
                 <div className="forge-report-builder__shelf">
-                    <div className="forge-report-builder__shelf-label">Measures</div>
-                    <div className="forge-report-builder__measure-row">
-                        {measures.map((measure) => {
-                            const active = state.selectedMeasures.includes(measure.id);
-                            const primary = state.primaryMeasure === measure.id;
-                            return (
+                    <div className="forge-report-builder__topline">
+                        <div className="forge-report-builder__toolbar forge-report-builder__toolbar--inline">
+                            <div className="forge-report-builder__settings-anchor">
                                 <button
-                                    key={measure.id}
                                     type="button"
-                                    className={[
-                                        "forge-report-builder__measure-pill",
-                                        active ? "is-active" : "",
-                                        primary ? "is-primary" : "",
-                                    ].filter(Boolean).join(" ")}
-                                    onClick={() => (active ? setPrimaryMeasure(measure.id) : toggleMeasure(measure.id))}
-                                    onDoubleClick={() => setPrimaryMeasure(measure.id)}
+                                    className="forge-report-builder__toolbar-button forge-report-builder__toolbar-button--icon"
+                                    aria-label="Performance metrics settings"
+                                    title="Report settings"
+                                    aria-expanded={settingsOpen}
+                                    onClick={() => setSettingsOpen((current) => !current)}
                                 >
-                                    <span className="forge-report-builder__measure-toggle" onClick={(event) => {
-                                        event.stopPropagation();
-                                        toggleMeasure(measure.id);
-                                    }}>
-                                        {active ? "✓" : "+"}
-                                    </span>
-                                    <span>{measure.label || measure.id}</span>
-                                    {primary ? <strong>Chart</strong> : null}
+                                    <Icon icon="cog" size={14} />
                                 </button>
-                            );
-                        })}
+                                {settingsOpen ? (
+                                    <div className="forge-report-builder__settings-popover">
+                                        {config.groupBy?.options?.length ? (
+                                            <div className="forge-report-builder__control-cluster">
+                                                <label>Break down by</label>
+                                                <select
+                                                    className="forge-report-builder-select"
+                                                    value={state.groupBy || ""}
+                                                    onChange={(event) => setGroupBy(event.target.value)}
+                                                >
+                                                    <option value="">None</option>
+                                                    {config.groupBy.options.map((option) => (
+                                                        <option key={option.value} value={option.value}>
+                                                            {option.label || option.value}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        ) : null}
+                                        {orderFields.length > 0 ? (
+                                            <div className="forge-report-builder__control-cluster">
+                                                <label>Order by</label>
+                                                <select
+                                                    className="forge-report-builder-select"
+                                                    value={state.orderField || ""}
+                                                    onChange={(event) => setOrderField(event.target.value)}
+                                                >
+                                                    {orderFields.map((field) => (
+                                                        <option key={field.value || field.field} value={field.value || field.field}>
+                                                            {field.label || field.value || field.field}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <select
+                                                    className="forge-report-builder-select"
+                                                    value={state.orderDir || "desc"}
+                                                    onChange={(event) => setOrderDir(event.target.value)}
+                                                >
+                                                    <option value="asc">Ascending</option>
+                                                    <option value="desc">Descending</option>
+                                                </select>
+                                            </div>
+                                        ) : null}
+                                        <div className="forge-report-builder__control-cluster">
+                                            <label>Page size</label>
+                                            <select
+                                                className="forge-report-builder-select"
+                                                value={state.pageSize}
+                                                onChange={(event) => setPageSize(event.target.value)}
+                                            >
+                                                {pageSizeOptions.map((value) => (
+                                                    <option key={value} value={value}>
+                                                        {value}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                            <Button
+                                small
+                                intent="primary"
+                                className="forge-report-builder__run-button"
+                                disabled={!canRunReport || loading}
+                                onClick={runReport}
+                            >
+                                <Icon icon="flash" size={12} />
+                                Run
+                            </Button>
+                            <div className="forge-report-builder__view-toggle">
+                                {viewModes.map((mode) => (
+                                    <button
+                                        key={mode}
+                                        type="button"
+                                        className={state.viewMode === mode ? "is-active" : ""}
+                                        onClick={() => setViewMode(mode)}
+                                    >
+                                        <Icon icon={mode === "table" ? "th" : "timeline-line-chart"} size={12} />
+                                        {mode}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="forge-report-builder__measure-sections">
+                            {measureSections.map((section) => (
+                                <div key={section.id} className="forge-report-builder__measure-section">
+                                    {section.label ? (
+                                        <div className="forge-report-builder__measure-section-label">{section.label}</div>
+                                    ) : null}
+                                    <div className="forge-report-builder__measure-row">
+                                        {section.measures.map((measure) => {
+                                            const active = state.selectedMeasures.includes(measure.id);
+                                            const primary = state.primaryMeasure === measure.id;
+                                            return (
+                                                <button
+                                                    key={measure.id}
+                                                    type="button"
+                                                    className={[
+                                                        "forge-report-builder__measure-pill",
+                                                        active ? "is-active" : "",
+                                                        primary ? "is-primary" : "",
+                                                    ].filter(Boolean).join(" ")}
+                                                    onClick={() => (active ? setPrimaryMeasure(measure.id) : toggleMeasure(measure.id))}
+                                                    onDoubleClick={() => setPrimaryMeasure(measure.id)}
+                                                >
+                                                    <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"} onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        toggleMeasure(measure.id);
+                                                    }}>{active ? "✓" : ""}</span>
+                                                    <span>{measure.label || measure.id}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -586,7 +1100,6 @@ export default function ReportBuilder({ container, context }) {
             <div className="forge-report-builder__body">
                 <aside className="forge-report-builder__left">
                     <section className="forge-report-builder__panel">
-                        <div className="forge-report-builder__panel-title">Dimensions</div>
                         <div className="forge-report-builder__dimension-list">
                             {dimensions.map((dimension) => {
                                 const active = state.selectedDimensions.includes(dimension.id);
@@ -597,101 +1110,40 @@ export default function ReportBuilder({ container, context }) {
                                         className={active ? "forge-report-builder__dimension-item is-active" : "forge-report-builder__dimension-item"}
                                         onClick={() => toggleDimension(dimension.id)}
                                     >
-                                        <span>{active ? "✓" : "○"}</span>
+                                        <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>{active ? "✓" : ""}</span>
                                         <span>{dimension.label || dimension.id}</span>
                                     </button>
                                 );
                             })}
                         </div>
                     </section>
-                    {config.groupBy?.options?.length ? (
-                        <section className="forge-report-builder__panel">
-                            <div className="forge-report-builder__panel-title">Group By</div>
-                            <select
-                                className="forge-report-builder-select"
-                                value={state.groupBy || ""}
-                                onChange={(event) => setGroupBy(event.target.value)}
-                            >
-                                <option value="">None</option>
-                                {config.groupBy.options.map((option) => (
-                                    <option key={option.value} value={option.value}>
-                                        {option.label || option.value}
-                                    </option>
-                                ))}
-                            </select>
-                        </section>
-                    ) : null}
                 </aside>
 
                 <main className="forge-report-builder__center">
                     <div className="forge-report-builder__result-header">
-                        <div>
-                            <h3>{container.title || config.title || "Report Builder"}</h3>
-                            <p>{container.subtitle || config.subtitle || "Switch between chart and table while changing measures, dimensions, and lookup-backed filters."}</p>
-                        </div>
-                        <div className="forge-report-builder__controls">
-                            {orderFields.length > 0 ? (
-                                <div className="forge-report-builder__control-cluster">
-                                    <label>Order by</label>
-                                    <select
-                                        className="forge-report-builder-select"
-                                        value={state.orderField || ""}
-                                        onChange={(event) => setOrderField(event.target.value)}
-                                    >
-                                        {orderFields.map((field) => (
-                                            <option key={field.value || field.field} value={field.value || field.field}>
-                                                {field.label || field.value || field.field}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        className="forge-report-builder-select"
-                                        value={state.orderDir || "desc"}
-                                        onChange={(event) => setOrderDir(event.target.value)}
-                                    >
-                                        <option value="asc">Ascending</option>
-                                        <option value="desc">Descending</option>
-                                    </select>
-                                </div>
-                            ) : null}
-                            <div className="forge-report-builder__control-cluster">
-                                <label>Page size</label>
-                                <select
-                                    className="forge-report-builder-select"
-                                    value={state.pageSize}
-                                    onChange={(event) => setPageSize(event.target.value)}
-                                >
-                                    {pageSizeOptions.map((value) => (
-                                        <option key={value} value={value}>
-                                            {value}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="forge-report-builder__view-toggle">
-                                {viewModes.map((mode) => (
-                                    <button
-                                        key={mode}
-                                        type="button"
-                                        className={state.viewMode === mode ? "is-active" : ""}
-                                        onClick={() => setViewMode(mode)}
-                                    >
-                                        {mode}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
+                        <h3>{container.title || config.title || "Report Builder"}</h3>
                     </div>
 
                     <div className="forge-report-builder__result-frame">
                         {loading ? <div className="forge-report-builder__empty">Loading report data…</div> : null}
                         {error ? <div className="forge-report-builder__empty is-error">{String(error)}</div> : null}
-                        {!loading && !error && state.viewMode !== "table" ? (
+                        {!loading && !error && !canShowResults ? (
+                            <div className="forge-report-builder__empty forge-report-builder__empty--compact">
+                                {canRunReport
+                                    ? (hasCompletedCurrentRun
+                                        ? "No rows returned for the current scope and date range."
+                                        : "Run the report to preview results.")
+                                    : readiness.reason === "scope"
+                                        ? "Choose an advertiser, campaign, ad order, or audience to preview results."
+                                        : "Set the required filters to preview results."}
+                            </div>
+                        ) : null}
+                        {!loading && !error && canShowResults && state.viewMode !== "table" ? (
                             <div className="forge-report-builder__chart-wrap">
                                 <Chart container={chartContainer} context={builderContext} embedded />
                             </div>
                         ) : null}
-                        {!loading && !error && state.viewMode === "table" ? (
+                        {!loading && !error && canShowResults && state.viewMode === "table" ? (
                             <div className="forge-report-builder__table-wrap">
                                 <table className="forge-report-builder__table">
                                     <thead>
@@ -704,7 +1156,7 @@ export default function ReportBuilder({ container, context }) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {(collection || []).map((row, index) => (
+                                        {(computedCollection || []).map((row, index) => (
                                             <tr key={index}>
                                                 {selectedColumns.map((column) => {
                                                     const value = resolveKey(row, column.key);
@@ -739,33 +1191,137 @@ export default function ReportBuilder({ container, context }) {
             </div>
 
             <div className="forge-report-builder__bottom">
-                {staticFilters.map((filter) => {
-                    const filterKey = String(filter.id || filter.field || "").trim();
-                    const currentValue = state?.staticFilters?.[filterKey];
-                    return (
-                        <StaticFilterSection
-                            key={filterKey}
-                            filter={filter}
-                            context={builderContext}
-                            value={currentValue}
-                            onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
-                            onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
-                        />
-                    );
-                })}
-
-                {dynamicFilterGroups.map((group) => (
-                    <DynamicFilterGroup
-                        key={group.id}
-                        group={group}
-                        rows={state?.dynamicGroups?.[group.id] || []}
-                        onAddRow={() => addRow(group)}
-                        onChangeFilter={(rowId, filterId) => changeDynamicFilterType(group, rowId, filterId)}
-                        onPick={(rowId, filterDef) => pickDynamicSelection(group, rowId, filterDef)}
-                        onRemoveSelection={(rowId, index) => removeDynamicSelection(group, rowId, index)}
-                        onRemoveRow={(rowId) => removeRow(group, rowId)}
-                    />
-                ))}
+                <section className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static" aria-label="Filters">
+                    <div className="forge-report-builder__bottom-header">
+                        <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => toggleFilterPanel("common")}>
+                            <span>{activeStaticFilterCount} active</span>
+                            <span>{filterPanels.common ? "Hide" : "Show"}</span>
+                        </button>
+                    </div>
+                    {filterPanels.common ? (
+                        <>
+                            {(optionalStaticFilters.length > 0 || dynamicFilterGroups.length > 0) ? (
+                                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
+                                    {optionalStaticFilters.map((filter) => {
+                                        const filterKey = String(filter.id || filter.field || "").trim();
+                                        const active = activeOptionalFilterKeys.includes(filterKey);
+                                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                                        const categoryLabel = filter.label || filter.id;
+                                        return (
+                                            <button
+                                                key={filterKey}
+                                                type="button"
+                                                className={[
+                                                    "forge-report-builder__category-chip",
+                                                    active ? "is-active" : "is-inactive",
+                                                    configuredCount > 0 ? "has-configured-state" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                onClick={() => toggleOptionalFilterCategory(filterKey)}
+                                                aria-pressed={active}
+                                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                            >
+                                                <span className="forge-report-builder__category-chip-icon">
+                                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                                </span>
+                                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                                {configuredCount > 0 ? (
+                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                                ) : (
+                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                    {dynamicFilterGroups.map((group) => {
+                                        const active = activeDynamicGroupIds.includes(group.id);
+                                        const configuredCount = countConfiguredDynamicSelections(state?.dynamicGroups?.[group.id] || []);
+                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                                        const categoryLabel = group.label || group.id;
+                                        return (
+                                            <button
+                                                key={group.id}
+                                                type="button"
+                                                className={[
+                                                    "forge-report-builder__category-chip",
+                                                    active ? "is-active" : "is-inactive",
+                                                    configuredCount > 0 ? "has-configured-state" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                onClick={() => toggleDynamicGroupCategory(group.id)}
+                                                aria-pressed={active}
+                                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                            >
+                                                <span className="forge-report-builder__category-chip-icon">
+                                                    <Icon icon={filterCategoryIcon(group.id)} size={12} />
+                                                </span>
+                                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                                {configuredCount > 0 ? (
+                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                                ) : (
+                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : null}
+                            <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--static">
+                                {requiredStaticFilters.map((filter) => {
+                                    const filterKey = String(filter.id || filter.field || "").trim();
+                                    const currentValue = state?.staticFilters?.[filterKey];
+                                    return (
+                                        <StaticFilterSection
+                                            key={filterKey}
+                                            filter={filter}
+                                            context={builderContext}
+                                            value={currentValue}
+                                            onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
+                                            onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            {optionalStaticFilters
+                                .filter((filter) => activeOptionalFilterKeys.includes(String(filter.id || filter.field || "").trim()))
+                                .map((filter) => {
+                                    const filterKey = String(filter.id || filter.field || "").trim();
+                                    const currentValue = state?.staticFilters?.[filterKey];
+                                    return (
+                                        <div key={`row-${filterKey}`} className="forge-report-builder__optional-filter-row">
+                                            <StaticFilterSection
+                                                key={filterKey}
+                                                filter={filter}
+                                                context={builderContext}
+                                                value={currentValue}
+                                                onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
+                                                onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
+                                            />
+                                        </div>
+                                    );
+                                })}
+                            {activeDynamicGroupIds.length > 0 ? (
+                                <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--dynamic">
+                                    {dynamicFilterGroups
+                                        .filter((group) => activeDynamicGroupIds.includes(group.id))
+                                        .map((group) => (
+                                            <DynamicFilterGroup
+                                                key={group.id}
+                                                group={group}
+                                                rows={state?.dynamicGroups?.[group.id] || []}
+                                                onAddRow={() => addRow(group)}
+                                                onChangeFilter={(rowId, filterId) => changeDynamicFilterType(group, rowId, filterId)}
+                                                onPick={(rowId, filterDef) => pickDynamicSelection(group, rowId, filterDef)}
+                                                onRemoveSelection={(rowId, index) => removeDynamicSelection(group, rowId, index)}
+                                                onRemoveRow={(rowId) => removeRow(group, rowId)}
+                                            />
+                                        ))}
+                                </div>
+                            ) : null}
+                        </>
+                    ) : null}
+                </section>
             </div>
         </div>
     );

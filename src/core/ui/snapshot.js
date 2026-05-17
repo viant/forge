@@ -68,6 +68,35 @@ function safeJSON(value, options) {
   return toJSONValue(value, options, new WeakSet(), 0);
 }
 
+function toSerializableDefinition(value, seen = new WeakSet()) {
+  if (value === null || value === undefined) return value;
+  const type = typeof value;
+  if (type === 'function' || type === 'symbol' || type === 'undefined') {
+    return undefined;
+  }
+  if (type !== 'object') return value;
+  if (seen.has(value)) return undefined;
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => toSerializableDefinition(entry, seen))
+      .filter((entry) => entry !== undefined);
+  }
+  const result = {};
+  for (const [key, entry] of Object.entries(value)) {
+    const next = toSerializableDefinition(entry, seen);
+    if (next !== undefined) {
+      result[key] = next;
+    }
+  }
+  return result;
+}
+
+export function serializeInlineMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return null;
+  return toSerializableDefinition(metadata);
+}
+
 function getWindowMetadataSummary(windowId, options) {
   try {
     const meta = getMetadataSignal(windowId).peek();
@@ -157,14 +186,23 @@ function getDialogStates(windowId, metaSummary, options) {
 function getDataSourceSnapshot(windowId, dataSourceRef, options) {
   const dataSourceId = `${windowId}DS${dataSourceRef}`;
 
-  const input = getInputSignal(dataSourceId).peek() || {};
-  const control = getControlSignal(dataSourceId).peek() || {};
+  const inputSnapshot = getInputSignal(dataSourceId).peek() || {};
+  const controlSnapshot = getControlSignal(dataSourceId).peek() || {};
   const form = getFormSignal(dataSourceId).peek() || {};
   const selection = getSelectionSignal(dataSourceId, {}).peek();
   const collection = getCollectionSignal(dataSourceId).peek() || [];
   const collectionInfo = getCollectionInfoSignal(dataSourceId).peek() || {};
   const metrics = getMetricsSignal(dataSourceId).peek() || {};
   const formStatus = getFormStatusSignal(dataSourceId).peek() || {};
+  const input = {
+    ...inputSnapshot,
+    fetch: false,
+    refresh: false,
+  };
+  const control = {
+    ...controlSnapshot,
+    loading: false,
+  };
 
   return {
     dataSourceRef,
@@ -179,6 +217,13 @@ function getDataSourceSnapshot(windowId, dataSourceRef, options) {
     metrics: safeJSON(metrics, options),
     formStatus: safeJSON(formStatus, options),
   };
+}
+
+function getInlineMetadataSnapshot(windowId, options) {
+  if (!options?.includeInlineMetadata) return undefined;
+  const meta = getMetadataSignal(windowId).peek();
+  if (!meta || typeof meta !== 'object') return undefined;
+  return serializeInlineMetadata(meta);
 }
 
 /**
@@ -219,6 +264,8 @@ export function buildUISnapshot(options = {}) {
         conversationId: w.conversationId || null,
         presentation: w.presentation || null,
         region: w.region || null,
+        workspaceSharePct: w.workspaceSharePct ?? null,
+        workspaceMinHeight: w.workspaceMinHeight ?? null,
         parentKey: w.parentKey,
         parameters: safeJSON(w.parameters, options),
         windowForm: safeJSON(getFormSignal(`${w.windowId}:windowForm`).peek() || {}, options),
@@ -229,6 +276,7 @@ export function buildUISnapshot(options = {}) {
         zIndex: w.zIndex ?? null,
         position: { x: w.x ?? null, y: w.y ?? null },
         size: w.size ? safeJSON(w.size, options) : undefined,
+        inlineMetadata: getInlineMetadataSnapshot(w.windowId, options),
         metadata: metaSummary,
         dialogs: dialogStates,
         dataSources,

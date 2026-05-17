@@ -20,6 +20,8 @@ export const ruleMatches = (row, rule) => {
     const expected = rule.value;
     const expectedValues = Array.isArray(rule.values) ? rule.values : (Array.isArray(expected) ? expected : [expected]);
     if (!Array.isArray(rule.values) && expected === undefined) return false;
+    const actualNumber = Number(actual);
+    const firstExpectedNumber = Number(expectedValues[0]);
 
     switch (operator) {
         case "=":
@@ -38,6 +40,26 @@ export const ruleMatches = (row, rule) => {
             return expectedValues.some((value) => asComparable(actual) === asComparable(value));
         case "contains":
             return expectedValues.some((value) => asComparable(actual).includes(asComparable(value)));
+        case ">":
+        case "gt":
+        case "greater_than":
+        case "greater-than":
+            return Number.isFinite(actualNumber) && Number.isFinite(firstExpectedNumber) && actualNumber > firstExpectedNumber;
+        case ">=":
+        case "gte":
+        case "greater_or_equal":
+        case "greater-or-equal":
+            return Number.isFinite(actualNumber) && Number.isFinite(firstExpectedNumber) && actualNumber >= firstExpectedNumber;
+        case "<":
+        case "lt":
+        case "less_than":
+        case "less-than":
+            return Number.isFinite(actualNumber) && Number.isFinite(firstExpectedNumber) && actualNumber < firstExpectedNumber;
+        case "<=":
+        case "lte":
+        case "less_or_equal":
+        case "less-or-equal":
+            return Number.isFinite(actualNumber) && Number.isFinite(firstExpectedNumber) && actualNumber <= firstExpectedNumber;
         default:
             return false;
     }

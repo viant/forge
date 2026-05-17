@@ -50,6 +50,65 @@ function convertWidthsToPct(columns, tableWidth) {
     return converted;
 }
 
+export function resolveTableColumnsForSelection(columns = [], context = null) {
+    const baseColumns = Array.isArray(columns) ? columns : [];
+    const selectionMode = String(context?.dataSource?.selectionMode || "").trim().toLowerCase();
+    if (selectionMode !== "multi") {
+        return baseColumns;
+    }
+    const hasSelectionColumn = baseColumns.some((col) => col?.multiSelect === true);
+    if (hasSelectionColumn) {
+        return baseColumns;
+    }
+    return [
+        {
+            id: "__select__",
+            name: "",
+            displayName: "",
+            type: "checkbox",
+            width: 42,
+            align: "center",
+            multiSelect: true,
+            sortable: false,
+            visible: true,
+            nonExcludable: true,
+            enforceColumnSize: false,
+            cellProperties: {
+                disabled: false,
+            },
+        },
+        ...baseColumns,
+    ];
+}
+
+export function reconcileConfiguredColumns(savedColumns = [], sourceColumns = []) {
+    const saved = Array.isArray(savedColumns) ? savedColumns : [];
+    const source = Array.isArray(sourceColumns) ? sourceColumns : [];
+    if (saved.length === 0) {
+        return source;
+    }
+    const savedById = new Map(
+        saved
+            .filter((col) => col && col.id)
+            .map((col) => [col.id, col]),
+    );
+    return source.map((column) => {
+        const savedColumn = savedById.get(column.id);
+        if (!savedColumn) {
+            return column;
+        }
+        return {
+            ...column,
+            ...savedColumn,
+            id: column.id,
+            multiSelect: column.multiSelect,
+            nonExcludable: column.nonExcludable,
+            type: column.type,
+            width: savedColumn.width ?? column.width,
+        };
+    });
+}
+
 const Basic = ({ context, container, columns, pagination, children }) => {
     const tableRef = useRef(null);
 
@@ -78,6 +137,10 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     // loading & error come from useDataSourceState hook
 
     const { dataSource, handlers } = context;
+    const resolvedColumns = useMemo(
+        () => resolveTableColumnsForSelection(columns, context),
+        [columns, context],
+    );
     const formattingRules = useMemo(
         () => normalizeRuleList(container?.table?.formattingRules || container?.table?.formatting || []),
         [container?.table?.formattingRules, container?.table?.formatting]
@@ -114,15 +177,15 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         if (savedColumns) {
             try {
                 const parsedColumns = JSON.parse(savedColumns);
-                setConfiguredColumns(parsedColumns);
+                setConfiguredColumns(reconcileConfiguredColumns(parsedColumns, initConfiguredColumns(resolvedColumns)));
             } catch (e) {
                 console.error('Error parsing saved column settings:', e);
-                setConfiguredColumns(initConfiguredColumns(columns));
+                setConfiguredColumns(initConfiguredColumns(resolvedColumns));
             }
         } else {
-            setConfiguredColumns(initConfiguredColumns(columns));
+            setConfiguredColumns(initConfiguredColumns(resolvedColumns));
         }
-    }, [columns, container.id]);
+    }, [resolvedColumns, container.id]);
 
     // Ensure non-excludable columns are always visible
     const visibleColumns = useMemo(
@@ -133,7 +196,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const [columnsToUse, setColumnsToUse] = useState(visibleColumns);
 
     useEffect(() => {
-        setColumnsHandlers(useColumnsHandlers(context, columns));
+        setColumnsHandlers(useColumnsHandlers(context, resolvedColumns));
         const data = handlers.dataSource.getCollection();
         if (!data?.length && collection?.length === 0) {
             events.onInit.execute({});
@@ -146,7 +209,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             return collection;
         }
 
-        const sortColumn = columnsToUse.find((col) => col.id === sortColumnId) || columns.find((col) => col.id === sortColumnId);
+        const sortColumn = columnsToUse.find((col) => col.id === sortColumnId) || resolvedColumns.find((col) => col.id === sortColumnId);
 
         return [...collection].sort((a, b) => {
             const aRaw = resolveKey(a, sortColumnId);

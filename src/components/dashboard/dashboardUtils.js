@@ -1,4 +1,4 @@
-import {getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
+import {findDashboardFilterSignal, findDashboardSelectionSignal, getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {resolveKey} from "../../utils/selector.js";
 import {formatDisplayValue} from "../../utils/formatValue.js";
 
@@ -38,14 +38,11 @@ export const createDashboardContext = (context, container) => {
         return context;
     }
 
-    const nextContext = withDashboardContext(context, dashboardKey);
-    seedDashboardDefaultFilters(dashboardKey, container);
-    getDashboardSelectionSignal(dashboardKey, {dimension: null, entityKey: null, pointKey: null});
-    return nextContext;
+    return withDashboardContext(context, dashboardKey);
 };
 
 export const getDashboardVisibleWhen = (container = {}) => (
-    container?.visibleWhen || container?.dashboard?.visibleWhen || null
+    container?.dashboard?.visibleWhen || container?.visibleWhen || null
 );
 
 const collectDashboardContainers = (containers = []) => {
@@ -169,10 +166,10 @@ export const createDashboardConditionSnapshot = ({context, dashboardKey, metrics
         dashboardKey: resolvedDashboardKey,
         metrics: metrics ?? context?.signals?.metrics?.value ?? context?.signals?.metrics?.peek?.() ?? {},
         dashboardFilters: dashboardFilters ?? (
-            resolvedDashboardKey ? (getDashboardFilterSignal(resolvedDashboardKey).value || {}) : {}
+            resolvedDashboardKey ? (findDashboardFilterSignal(resolvedDashboardKey)?.value || {}) : {}
         ),
         dashboardSelection: dashboardSelection ?? (
-            resolvedDashboardKey ? (getDashboardSelectionSignal(resolvedDashboardKey).value || {}) : {}
+            resolvedDashboardKey ? (findDashboardSelectionSignal(resolvedDashboardKey)?.value || {}) : {}
         ),
     };
 };

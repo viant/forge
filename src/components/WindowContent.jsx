@@ -1,21 +1,24 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
-import {useSignalEffect} from '@preact/signals-react';
 
 import {Spinner} from '@blueprintjs/core';
 import SoftSkeleton, { SoftBlock } from './SoftSkeleton.jsx';
 
 import {
     getMetadataSignal,
+    findMetadataSignal,
     getCollectionSignal,
     getControlSignal,
+    findDialogSignal,
     getInputSignal,
-    getFormSignal,
+    findFormSignal,
+    primeWindowSignals,
     removeWindow,
 } from '../core';
 
 import {Context} from '../core';
 import {useSetting} from '../core';
+import {clearWindowContext, getWindowContext, setWindowContext} from '../core/context/registry.js';
 
 import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
@@ -90,30 +93,17 @@ function collectRequiredDataSourceRefs(node, scope, refs) {
         return key != null ? String(mapping[key] || '').trim() : '';
     };
 
-    const addMappedRefs = (entry) => {
-        const mapping = entry?.dataSourceRefs;
-        if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
-            return;
-        }
-        for (const value of Object.values(mapping)) {
-            addRef(value);
-        }
-    };
-
     addRef(node.dataSourceRef);
-    addMappedRefs(node);
     addRef(resolveMappedRef(node));
 
     if (node.chart) {
         addRef(node.chart.dataSourceRef);
-        addMappedRefs(node.chart);
         addRef(resolveMappedRef(node.chart));
     }
 
     if (Array.isArray(node.items)) {
         for (const item of node.items) {
             addRef(item?.dataSourceRef);
-            addMappedRefs(item);
             addRef(resolveMappedRef(item));
         }
     }
@@ -121,6 +111,20 @@ function collectRequiredDataSourceRefs(node, scope, refs) {
     if (Array.isArray(node.containers)) {
         for (const child of node.containers) {
             collectRequiredDataSourceRefs(child, scope, refs);
+        }
+    }
+}
+
+function collectFetcherOwnedDataSourceRefs(node, refs) {
+    if (!node || typeof node !== "object") return;
+
+    if ((node.fetchData === true || node.selectFirst === true) && String(node.dataSourceRef || "").trim()) {
+        refs.add(String(node.dataSourceRef).trim());
+    }
+
+    if (Array.isArray(node.containers)) {
+        for (const child of node.containers) {
+            collectFetcherOwnedDataSourceRefs(child, refs);
         }
     }
 }
@@ -140,6 +144,36 @@ function expandRequiredDataSourceRefs(metadata, refs) {
     return Array.from(result);
 }
 
+export function resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef = '', scope = {}) {
+    const refs = new Set();
+    if (defaultDataSourceRef) refs.add(String(defaultDataSourceRef).trim());
+    collectRequiredDataSourceRefs(metadata?.view?.content || null, scope, refs);
+    return expandRequiredDataSourceRefs(metadata, refs);
+}
+
+export function resolveFetcherOwnedDataSourceRefs(metadata) {
+    const refs = new Set();
+    collectFetcherOwnedDataSourceRefs(metadata?.view?.content || null, refs);
+    return Array.from(refs);
+}
+
+export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false) {
+    const autoFetchEnabled = dataSource?.autoFetch !== false;
+    const hasCollection = Array.isArray(collection) && collection.length > 0;
+    return !!prevInput.fetch || (autoFetchEnabled && (paramsChanged || !hasCollection));
+}
+
+function hasOwnDataSourceParameters(dataSource = {}, windowParameters = {}) {
+    const metadataParameters = Array.isArray(dataSource?.parameters) ? dataSource.parameters : [];
+    if (metadataParameters.length > 0) {
+        return true;
+    }
+    if (windowParameters && typeof windowParameters === 'object') {
+        return Object.keys(windowParameters).length > 0;
+    }
+    return false;
+}
+
 
 /* ------------------------------------------------------------------
  * WindowContentInner – rendered ONLY after metadata has been fetched so
@@ -151,51 +185,37 @@ function WindowContentInner({window, metadata, services}) {
     useSignals();
     const log = getLogger('window');
     const {windowKey, windowData, windowId, parameters = {}} = window;
+    const isHostedWorkspaceSurface = String(window?.presentation || '').trim().toLowerCase() === 'hosted'
+        && String(window?.region || '').trim().toLowerCase() === 'chat.top';
     const baseKey = (windowKey || '').split('?')[0];
     const defaultDataSourceRef = metadata?.view?.dataSourceRef || Object.keys(metadata?.dataSource || {})[0];
     const initialWindowFormSeed = useMemo(() => ({
         ...(parameters && typeof parameters === 'object' ? parameters : {}),
         ...resolveInitialWindowFormValues(metadata),
     }), [parameters, metadata]);
-    const windowFormSignal = useMemo(() => getFormSignal(`${windowId}:windowForm`), [windowId]);
+    const windowFormSignal = useMemo(() => findFormSignal(`${windowId}:windowForm`), [windowId]);
 
-    // Build Forge context (calls React hooks inside)
-    const context = useMemo(() => {
-        const dataSources = metadata.dataSource || {};
-        const view = metadata.view || {};
-        let dsRef = view.dataSourceRef;
-        if (!dsRef) {
-            dsRef = Object.keys(dataSources)[0];
-        }
-        const ctx = Context(windowId, metadata, dsRef, services);
-        ctx.init();
-        if (Object.keys(initialWindowFormSeed).length > 0 && windowFormSignal) {
-            try {
-                log.debug('[window.windowFormSeed]', {
-                    windowId,
-                    windowKey,
-                    seed: initialWindowFormSeed,
-                    before: windowFormSignal.peek?.() || {},
-                });
-            } catch (_) {}
-            windowFormSignal.value = initialWindowFormSeed;
-            try {
-                log.debug('[window.windowFormSeedApplied]', {
-                    windowId,
-                    windowKey,
-                    after: windowFormSignal.peek?.() || {},
-                });
-            } catch (_) {}
-        }
-        return ctx;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, metadata, initialWindowFormSeed, windowFormSignal]);
+    const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
+    const existingContext = getWindowContext(windowId);
+    const context = existingContext?.metadata === metadata ? existingContext : hookContext;
 
     const liveWindowForm = windowFormSignal?.value || {};
     const windowFormSnapshot = useMemo(() => ({
         ...initialWindowFormSeed,
         ...liveWindowForm,
     }), [initialWindowFormSeed, liveWindowForm]);
+
+    useEffect(() => {
+        if (!context) {
+            return undefined;
+        }
+        context.init?.();
+        setWindowContext(windowId, context);
+        return () => {
+            clearWindowContext(windowId);
+        };
+    }, [windowId, context]);
+
     useEffect(() => {
         const currentSignature = JSON.stringify(liveWindowForm);
         const mergedSignature = JSON.stringify(windowFormSnapshot);
@@ -331,10 +351,7 @@ function WindowContentInner({window, metadata, services}) {
      * ---------------------------------------------------------- */
 
     const requiredDataSourceRefs = useMemo(() => {
-        const refs = new Set();
-        if (defaultDataSourceRef) refs.add(defaultDataSourceRef);
-        collectRequiredDataSourceRefs(metadata?.view?.content || null, windowFormSnapshot, refs);
-        const resolvedRefs = expandRequiredDataSourceRefs(metadata, refs);
+        const resolvedRefs = resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef, windowFormSnapshot);
         try {
             log.debug('[window.requiredDataSourceRefs]', {
                 windowId,
@@ -345,16 +362,17 @@ function WindowContentInner({window, metadata, services}) {
         } catch (_) {}
         return resolvedRefs;
     }, [metadata, defaultDataSourceRef, windowFormSnapshot]);
+    const fetcherOwnedDataSourceRefs = useMemo(
+        () => new Set(resolveFetcherOwnedDataSourceRefs(metadata)),
+        [metadata],
+    );
 
-    useSignalEffect(() => {
+    useEffect(() => {
         const currentWindowForm = windowFormSignal?.value || {};
-        const refs = new Set();
-        if (defaultDataSourceRef) refs.add(defaultDataSourceRef);
-        collectRequiredDataSourceRefs(metadata?.view?.content || null, {
+        const resolvedRefs = resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef, {
             ...initialWindowFormSeed,
             ...currentWindowForm,
-        }, refs);
-        const resolvedRefs = expandRequiredDataSourceRefs(metadata, refs);
+        });
         const dataSourceDefs = metadata?.dataSource || {};
         for (const ref of resolvedRefs) {
             const dsID = `${windowId}DS${ref}`;
@@ -364,6 +382,8 @@ function WindowContentInner({window, metadata, services}) {
             const prevInput = inputSignal?.peek?.() || {};
             const prevParams = prevInput.parameters || {};
             const dsContext = context?.Context?.(ref);
+            const explicitWindowParams = (parameters?.[ref]?.parameters) || {};
+            const dataSourceDef = dataSourceDefs?.[ref] || {};
             const resolvedMetaParamsRaw = Array.isArray(dataSourceDefs?.[ref]?.parameters)
                 ? resolveParameters(dataSourceDefs[ref].parameters, dsContext || context)
                 : {};
@@ -372,12 +392,24 @@ function WindowContentInner({window, metadata, services}) {
                 : (resolvedMetaParamsRaw || {});
             const nextParams = {
                 ...(resolvedMetaParams || {}),
-                ...((parameters?.[ref]?.parameters) || {}),
+                ...(explicitWindowParams || {}),
             };
+            const ownsParameters = hasOwnDataSourceParameters(dataSourceDef, explicitWindowParams);
             const paramsChanged = JSON.stringify(prevParams) !== JSON.stringify(nextParams);
             const collection = collectionSignal?.peek?.() || [];
             const control = controlSignal?.peek?.() || {};
-            const shouldFetch = paramsChanged || (Array.isArray(collection) && collection.length === 0);
+            const shouldFetch = shouldPrimeDataSourceFetch(dataSourceDef, prevInput, collection, paramsChanged);
+            const fetchOwnedByContainer = fetcherOwnedDataSourceRefs.has(ref);
+            if (!ownsParameters && !shouldFetch) {
+                continue;
+            }
+            if (!ownsParameters && shouldFetch) {
+                inputSignal.value = {
+                    ...prevInput,
+                    fetch: fetchOwnedByContainer ? !!prevInput.fetch : true,
+                };
+                continue;
+            }
             if (!paramsChanged && !shouldFetch) {
                 continue;
             }
@@ -389,20 +421,23 @@ function WindowContentInner({window, metadata, services}) {
                     prevParams,
                     nextParams,
                     resolvedMetaParams,
+                    ownsParameters,
                     paramsChanged,
                     shouldFetch,
+                    fetchOwnedByContainer,
                     collectionSize: Array.isArray(collection) ? collection.length : 0,
                 });
             } catch (_) {}
             inputSignal.value = {
                 ...prevInput,
                 parameters: nextParams,
-                fetch: shouldFetch || !!prevInput.fetch,
+                fetch: fetchOwnedByContainer ? !!prevInput.fetch : shouldFetch,
             };
         }
-    });
+    }, [windowFormSignal, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs]);
 
     const renderDataSources = () => {
+        if (!context) return null;
         return (
             <>
                 {requiredDataSourceRefs.map((key) => (
@@ -418,18 +453,38 @@ function WindowContentInner({window, metadata, services}) {
     };
 
     const renderDialogs = () => {
+        if (!context) return null;
         if (!dialogs || dialogs.length === 0) return null;
         const view = metadata.view || {};
         const dataSourceRef = view.dataSourceRef || Object.keys(dataSources)[0];
         return (
             <>
-                {dialogs.map((dialog) => (
-                    <ViewDialog
-                        key={`${windowId}/D/${dialog.id}`}
-                        context={context.dialogContext(dialog, dialog.dataSourceRef || dataSourceRef)}
-                        dialog={dialog}
-                    />
-                ))}
+                {dialogs
+                    .filter((dialog) => {
+                        const dialogId = String(dialog?.id || '').trim();
+                        if (!dialogId) return false;
+                        return !!findDialogSignal(`${windowId}Dialog${dialogId}`)?.value?.open;
+                    })
+                    .map((dialog) => {
+                        const dialogId = String(dialog?.id || '').trim();
+                        const dialogSignal = findDialogSignal(`${windowId}Dialog${dialogId}`)?.value || {};
+                        const dialogProps = dialogSignal?.props || {};
+                        const selectionMode = String(dialogSignal?.selectionMode || dialog?.selectionMode || dialog?.properties?.selectionMode || '').trim().toLowerCase()
+                            || (dialogProps?.multiple === true
+                                ? 'multi'
+                                : (dialogProps?.multiple === false ? 'single' : ''));
+                        return (
+                            <ViewDialog
+                                key={`${windowId}/D/${dialog.id}`}
+                                context={context.dialogContext(
+                                    dialog,
+                                    dialog.dataSourceRef || dataSourceRef,
+                                    selectionMode ? { selectionMode } : {},
+                                )}
+                                dialog={dialog}
+                            />
+                        );
+                    })}
             </>
         );
     };
@@ -440,19 +495,10 @@ function WindowContentInner({window, metadata, services}) {
     //   cancel: { handler?: 'ns.fn', label?: 'Cancel' }
     // }
     const FloatingFooter = () => {
+        if (!context) return null;
         const dsCtx = context.Context(context.identity.dataSourceRef);
-        const [canSelect, setCanSelect] = useState(false);
-        useEffect(() => {
-            const update = () => {
-                try {
-                    const sel = dsCtx?.signals?.selection?.value;
-                    const has = !!(sel && (sel.selected || (Array.isArray(sel.selection) && sel.selection.length > 0)));
-                    setCanSelect(has);
-                } catch (_) {}
-            };
-            update();
-            return () => {};
-        }, [dsCtx]);
+        const selectionValue = dsCtx?.signals?.selection?.value;
+        const canSelect = !!(selectionValue && (selectionValue.selected || (Array.isArray(selectionValue.selection) && selectionValue.selection.length > 0)));
 
         const footerCfg = window.footer || {};
         const okCfg = footerCfg.ok || {};
@@ -497,8 +543,28 @@ function WindowContentInner({window, metadata, services}) {
         );
     };
 
+    if (!windowFormSignal || !context) {
+        return (
+            <div style={{ padding: 16, height: '100%', minHeight: 0 }}>
+                <SoftSkeleton lines={1} height={18} style={{ marginBottom: 12 }} />
+                <SoftBlock height={180} />
+            </div>
+        );
+    }
+
     return (
-        <div data-window-id={windowId} style={{ height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div
+            data-window-id={windowId}
+            style={{
+                height: isHostedWorkspaceSurface ? 'auto' : '100%',
+                minHeight: isHostedWorkspaceSurface ? 'max-content' : 0,
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                flex: isHostedWorkspaceSurface ? '0 0 auto' : 1,
+                overflow: isHostedWorkspaceSurface ? 'visible' : 'hidden',
+            }}
+        >
             {renderDataSources()}
             {renderDialogs()}
             <WindowLayout
@@ -508,6 +574,7 @@ function WindowContentInner({window, metadata, services}) {
                     removeWindow(windowId);
                 }}
                 isInTab={window.isInTab}
+                fillParent={!isHostedWorkspaceSurface}
             />
             {window.isInTab === false && !(window.footer && window.footer.hide === true) ? <FloatingFooter /> : null}
         </div>
@@ -522,25 +589,56 @@ function WindowContentInner({window, metadata, services}) {
 
 export default function WindowContent({window, isInTab = false}) {
     const {windowKey, windowId} = window;
+    const baseKey = windowKey.split('?')[0];
 
-    const metadataSignal = getMetadataSignal(windowId);
-    const [loading, setLoading] = useState(true);
+    const [metadataSignalHandle, setMetadataSignalHandle] = useState(() => findMetadataSignal(windowId));
+    const [loading, setLoading] = useState(() => !(metadataSignalHandle?.peek?.()));
     const [fetchError, setFetchError] = useState(null);
+    const [signalsReady, setSignalsReady] = useState(() => !!(metadataSignalHandle?.peek?.()));
 
     // Settings & connector
-    const {connectorConfig = {}, services = {}, targetContext = {}} = useSetting();
+    const {endpoints = {}, connectorConfig = {}, services = {}, targetContext = {}, useAuth = () => ({})} = useSetting();
+    const auth = useAuth();
+    const resolvedServices = useMemo(() => ({
+        ...(services || {}),
+        __connectorRuntime: {
+            endpoints,
+            targetContext,
+            auth,
+        },
+    }), [services, endpoints, targetContext, auth]);
     if (!connectorConfig.window) {
         throw new Error('No connectorConfig.window found');
     }
 
     const {service} = connectorConfig.window;
-    const baseKey = windowKey.split('?')[0];
     const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
     const connector = useDataConnector(config);
+
+    useEffect(() => {
+        const existingSignal = findMetadataSignal(windowId);
+        if (existingSignal) {
+            setMetadataSignalHandle(existingSignal);
+            return;
+        }
+        const createdSignal = getMetadataSignal(windowId);
+        setMetadataSignalHandle(createdSignal);
+    }, [windowId]);
 
     // Fetch metadata once per windowId
     useEffect(() => {
         let cancelled = false;
+        if (!metadataSignalHandle) {
+            return () => { cancelled = true; };
+        }
+        const existingMetadata = metadataSignalHandle.peek?.();
+        const existingWindowKey = String(existingMetadata?.__windowKey || '').trim();
+        if (existingMetadata && existingWindowKey === baseKey) {
+            setFetchError(null);
+            setLoading(false);
+            return () => { cancelled = true; };
+        }
+        setSignalsReady(false);
         setLoading(true);
         setFetchError(null);
 
@@ -548,7 +646,7 @@ export default function WindowContent({window, isInTab = false}) {
         if (window && window.inlineMetadata) {
             try {
                 injectActions(window.inlineMetadata);
-                metadataSignal.value = window.inlineMetadata;
+                metadataSignalHandle.value = { ...window.inlineMetadata, __windowKey: baseKey };
             } catch (e) {
                 console.error('Error applying inline metadata', e);
             } finally {
@@ -562,7 +660,7 @@ export default function WindowContent({window, isInTab = false}) {
                 if (cancelled) return;
                 setFetchError(null);
                 injectActions(resp.data);
-                metadataSignal.value = resp.data;
+                metadataSignalHandle.value = { ...resp.data, __windowKey: baseKey };
             })
             .catch((err) => {
                 if (!cancelled) {
@@ -578,11 +676,18 @@ export default function WindowContent({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId]);
+    }, [windowId, baseKey, metadataSignalHandle]);
 
-    const metadata = metadataSignal.peek();
+    useEffect(() => {
+        const metadata = metadataSignalHandle?.value;
+        if (!metadata || typeof metadata !== 'object') return;
+        primeWindowSignals(windowId, metadata);
+        setSignalsReady(true);
+    }, [windowId, metadataSignalHandle?.value, resolvedServices]);
 
-    if (loading) {
+    const metadata = metadataSignalHandle?.peek?.();
+
+    if (loading || !signalsReady) {
         // Soft loading placeholder for window content
         return (
             <div style={{ padding: 16, height: '100%', minHeight: 0 }}>
@@ -609,7 +714,7 @@ export default function WindowContent({window, isInTab = false}) {
         <WindowContentInner
             window={{...window, isInTab}}
             metadata={metadata}
-            services={services}
+            services={resolvedServices}
         />
     );
 }

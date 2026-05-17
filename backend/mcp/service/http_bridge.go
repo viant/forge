@@ -235,7 +235,11 @@ func (h *uiRPCHandler) handle(ctx context.Context, method string, params json.Ra
 		if err != nil || reqCmd == nil {
 			return mustJSON(nil), nil
 		}
-		log.Printf("[forge-ui] poll deliver ns=%q client=%q cmd=%q method=%q", ns, clientID, reqCmd.ID, reqCmd.Method)
+		if reqCmd.Method == "ui.window.open" {
+			log.Printf("[forge-ui] poll deliver ns=%q client=%q cmd=%q method=%q params=%s", ns, clientID, reqCmd.ID, reqCmd.Method, string(mustJSON(reqCmd.Params)))
+		} else {
+			log.Printf("[forge-ui] poll deliver ns=%q client=%q cmd=%q method=%q", ns, clientID, reqCmd.ID, reqCmd.Method)
+		}
 		return mustJSON(map[string]any{
 			"id":     reqCmd.ID,
 			"method": "ui.command",

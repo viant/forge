@@ -4,9 +4,20 @@ import { activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollec
 import { runUICommand } from './commands.js';
 import { registerControlTarget, unregisterControlTarget } from './registry.js';
 
-activeWindows.value = [];
-selectedTabId.value = null;
-selectedWindowId.value = null;
+activeWindows.value = [{
+  windowId: 'chat/new',
+  windowKey: 'chat/new',
+  inTab: true,
+  parameters: {
+    conversations: {
+      form: {
+        id: 'conv-1',
+      },
+    },
+  },
+}];
+selectedTabId.value = 'chat/new';
+selectedWindowId.value = 'chat/new';
 
 const res = await runUICommand({
   method: 'ui.window.open',
@@ -14,7 +25,7 @@ const res = await runUICommand({
 });
 
 assert.ok(res.windowId);
-assert.equal(activeWindows.peek().length, 1);
+assert.equal(activeWindows.peek().length, 2);
 assert.equal(selectedTabId.peek(), res.windowId);
 assert.equal(selectedWindowId.peek(), res.windowId);
 
@@ -32,13 +43,103 @@ const updated = await runUICommand({
     },
   },
 });
-assert.equal(updated.windowId, res.windowId);
-assert.equal(activeWindows.peek().length, 1);
-assert.equal(activeWindows.peek()[0].windowTitle, 'Demo Hosted');
-assert.equal(activeWindows.peek()[0].conversationId, 'conv-1');
-assert.equal(activeWindows.peek()[0].presentation, 'hosted');
-assert.equal(activeWindows.peek()[0].region, 'chat.top');
-assert.deepEqual(activeWindows.peek()[0].parameters, {});
+assert.equal(updated.windowId, 'demo__conv-1');
+assert.equal(activeWindows.peek().length, 3);
+assert.equal(activeWindows.peek()[2].windowTitle, 'Demo Hosted');
+assert.equal(activeWindows.peek()[2].conversationId, 'conv-1');
+assert.equal(activeWindows.peek()[2].presentation, 'hosted');
+assert.equal(activeWindows.peek()[2].region, 'chat.top');
+assert.deepEqual(activeWindows.peek()[2].parameters, {});
+const replacedHosted = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowKey: 'order',
+    windowTitle: 'Order 2609393',
+    inTab: true,
+    parameters: { AdOrderId: [2609393] },
+    options: {
+      conversationId: 'conv-1',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+      replaceHostedRegion: true,
+    },
+  },
+});
+assert.equal(replacedHosted.windowId.endsWith('__conv-1'), true);
+assert.equal(activeWindows.peek().length, 3);
+assert.equal(activeWindows.peek()[2].windowKey, 'order');
+assert.deepEqual(activeWindows.peek()[2].parameters, { AdOrderId: [2609393] });
+assert.equal(activeWindows.peek()[2].parentKey, 'chat/new');
+
+const appendedHosted = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowKey: 'order',
+    windowTitle: 'Order 2656980',
+    inTab: true,
+    parameters: { AdOrderId: [2656980] },
+    options: {
+      conversationId: 'conv-1',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+      replaceHostedRegion: false,
+    },
+  },
+});
+assert.equal(activeWindows.peek().length, 4);
+assert.deepEqual(
+  activeWindows.peek().filter((win) => win.windowKey === 'order').map((win) => win.parameters.AdOrderId[0]),
+  [2609393, 2656980]
+);
+assert.equal(appendedHosted.windowId, activeWindows.peek()[3].windowId);
+
+const crossConversationHosted = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowKey: 'order',
+    windowTitle: 'Order 2656980 Conversation 2',
+    inTab: true,
+    parameters: { AdOrderId: [2656980] },
+    options: {
+      conversationId: 'conv-2',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+      replaceHostedRegion: false,
+    },
+  },
+});
+assert.equal(activeWindows.peek().filter((win) => win.windowKey === 'order').length, 3);
+assert.notEqual(crossConversationHosted.windowId, appendedHosted.windowId);
+assert.equal(
+  activeWindows.peek().filter((win) => win.windowKey === 'order' && win.conversationId === 'conv-2').length,
+  1
+);
+assert.equal(selectedWindowId.peek(), appendedHosted.windowId);
+assert.equal(selectedTabId.peek(), appendedHosted.windowId);
+
+const replacedBuilder = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowKey: 'metricReportBuilder',
+    windowTitle: 'Metric Report Builder',
+    inTab: true,
+    options: {
+      conversationId: 'conv-1',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+      replaceHostedRegion: true,
+    },
+  },
+});
+assert.notEqual(replacedBuilder.windowId, replacedHosted.windowId);
+assert.equal(activeWindows.peek().length, 5);
+assert.equal(activeWindows.peek().filter((win) => win.windowKey === 'metricReportBuilder').length, 1);
+assert.equal(activeWindows.peek().find((win) => win.windowKey === 'metricReportBuilder').windowId, replacedBuilder.windowId);
+assert.equal(activeWindows.peek().find((win) => win.windowKey === 'metricReportBuilder').parentKey, 'chat/new');
 
 getDashboardFilterSignal(`${res.windowId}:demoDashboard`).value = { periodView: 'today' };
 
@@ -53,9 +154,14 @@ assert.equal(busMessages[busMessages.length - 1].containerId, 'analysisPane');
 assert.equal(getViewSignal(res.windowId).peek().tabs.analysisPane, 'kpiTab');
 
 await runUICommand({ method: 'ui.window.close', params: { windowId: res.windowId } });
-assert.equal(activeWindows.peek().length, 0);
-assert.equal(selectedWindowId.peek(), null);
-assert.equal(selectedTabId.peek(), null);
+await runUICommand({ method: 'ui.window.close', params: { windowId: replacedHosted.windowId } });
+await runUICommand({ method: 'ui.window.close', params: { windowId: appendedHosted.windowId } });
+await runUICommand({ method: 'ui.window.close', params: { windowId: crossConversationHosted.windowId } });
+await runUICommand({ method: 'ui.window.close', params: { windowId: replacedBuilder.windowId } });
+assert.equal(activeWindows.peek().length, 1);
+assert.equal(activeWindows.peek()[0].windowId, 'chat/new');
+assert.equal(selectedWindowId.peek(), 'chat/new');
+assert.equal(selectedTabId.peek(), 'chat/new');
 assert.deepEqual(getDashboardFilterSignal(`${res.windowId}:demoDashboard`).peek(), {});
 
 const regKey = registerControlTarget(
@@ -76,6 +182,64 @@ await runUICommand({
   params: { windowId: 'W1', controlId: 'granularity', scope: 'windowForm', value: 'hour' },
 });
 assert.equal(getFormSignal('W1:windowForm').peek().granularity, 'hour');
+
+await runUICommand({
+  method: 'ui.window.setFormData',
+  params: {
+    windowId: 'W1',
+    values: {
+      prefill: {
+        advertiserId: 123,
+        dealId: 'deal-xyz',
+      },
+    },
+  },
+});
+assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
+  granularity: 'hour',
+  prefill: {
+    advertiserId: 123,
+    dealId: 'deal-xyz',
+  },
+});
+
+await runUICommand({
+  method: 'ui.window.setFormData',
+  params: {
+    windowId: 'W1',
+    values: {
+      prefill: {
+        targetingIncl: 'iris:1466062,123',
+      },
+    },
+  },
+});
+assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
+  granularity: 'hour',
+  prefill: {
+    advertiserId: 123,
+    dealId: 'deal-xyz',
+    targetingIncl: 'iris:1466062,123',
+  },
+});
+
+await runUICommand({
+  method: 'ui.window.setFormData',
+  params: {
+    windowId: 'W1',
+    replace: true,
+    values: {
+      prefill: {
+        advertiserId: 999,
+      },
+    },
+  },
+});
+assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
+  prefill: {
+    advertiserId: 999,
+  },
+});
 
 const focusInfo = await runUICommand({ method: 'ui.focus.get', params: {} });
 assert.ok('focused' in focusInfo);
