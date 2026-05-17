@@ -10,10 +10,24 @@ import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 
-export const mergeWindowFormValues = (previous = {}, next = {}) => ({
-    ...(previous && typeof previous === 'object' ? previous : {}),
-    ...(next && typeof next === 'object' ? next : {}),
-});
+function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+export const mergeWindowFormValues = (previous = {}, next = {}) => {
+    const left = isPlainObject(previous) ? previous : {};
+    const right = isPlainObject(next) ? next : {};
+    const merged = { ...left };
+    Object.entries(right).forEach(([key, value]) => {
+        const prevValue = merged[key];
+        if (isPlainObject(prevValue) && isPlainObject(value)) {
+            merged[key] = mergeWindowFormValues(prevValue, value);
+            return;
+        }
+        merged[key] = value;
+    });
+    return merged;
+};
 
 function findDataSourceDependencies(dataSourceRef, dataSources) {
     const dependencies = {};

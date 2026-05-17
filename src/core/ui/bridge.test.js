@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { ensureUIBridgeClientId, startUIBridgeHTTP } from './bridge.js';
+import { ensureUIBridgeClientId, publishUIBridgeSnapshotNow, startUIBridgeHTTP } from './bridge.js';
 
 const originalFetch = globalThis.fetch;
 const originalWindow = globalThis.window;
@@ -71,6 +71,140 @@ try {
   assert.equal(snapshotCalls.length, 2);
   assert.deepEqual(snapshotCalls[0].params?.data, snapshotCalls[1].params?.data);
   console.log('bridge auth snapshot retry ✓ resends identical snapshot after auth recovery');
+
+  const orderedCalls = [];
+  let snapshotGetResolved = false;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    orderedCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-restore' });
+    if (body.method === 'ui.hello') {
+      await sleep(20);
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      await sleep(20);
+      snapshotGetResolved = true;
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { snapshot: { selected: { windowId: 'chat/new', tabId: 'chat/new' }, windows: [] } }
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopOrdering = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10_000,
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [{ windowId: 'chat/new', windowKey: 'chat/new' }],
+      conversationId: 'conv-restore',
+    })
+  });
+
+  await publishUIBridgeSnapshotNow();
+  await sleep(80);
+  stopOrdering();
+  assert.equal(snapshotGetResolved, true);
+  assert.deepEqual(orderedCalls.slice(0, 3), ['ui.hello', 'ui.snapshot.get', 'ui.snapshot']);
+  console.log('bridge restore ordering ✓ blocks eager snapshot publish until snapshot.get finishes');
+
+  const duplicateRestoreCalls = [];
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    duplicateRestoreCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-restore-same' });
+    if (body.method === 'ui.hello') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: {
+          snapshot: {
+            selected: { windowId: 'chat/new', tabId: 'chat/new' },
+            windows: [],
+          },
+        },
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopDuplicate = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10_000,
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [],
+    })
+  });
+
+  await sleep(60);
+  stopDuplicate();
+  assert.deepEqual(duplicateRestoreCalls.slice(0, 3), ['ui.hello', 'ui.snapshot.get', 'ui.poll']);
+  console.log('bridge restore dedupe ✓ skips immediate snapshot publish when restored snapshot already matches local state');
+
+  const readyEventCalls = [];
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    readyEventCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-ready' });
+    if (body.method === 'ui.hello') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { snapshot: { selected: { windowId: 'chat/new', tabId: 'chat/new' }, windows: [] } }
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopReady = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10_000,
+    startupReadyEvent: 'forge:conversation-active',
+    startupReadyTimeoutMs: 500,
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [{ windowId: 'chat/new', windowKey: 'chat/new' }],
+      conversationId: 'conv-ready',
+    })
+  });
+
+  await sleep(25);
+  window.dispatchEvent(new Event('forge:conversation-active'));
+  await sleep(40);
+  stopReady();
+  assert.deepEqual(readyEventCalls.slice(0, 4), ['ui.hello', 'ui.snapshot.get', 'ui.snapshot', 'ui.poll']);
+  console.log('bridge startup readiness ✓ defers first publish/poll until the configured startup event');
 
   let aborted = false;
   globalThis.fetch = async (_url, options = {}) => {

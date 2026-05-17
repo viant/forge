@@ -1,7 +1,6 @@
 import React, {useMemo, useState} from "react";
-import {useSignalEffect} from "@preact/signals-react";
+import {useSignals} from "@preact/signals-react/runtime";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
-import { seedDashboardDefaultFilters } from "./dashboardUtils.js";
 import "./Dashboard.css";
 
 const MODE_LABELS = {
@@ -58,21 +57,14 @@ function formatStateValue(value) {
 }
 
 function useDashboardStateSnapshot(dashboardKey, container = null) {
-    const [snapshot, setSnapshot] = useState({filters: {}, selection: {}});
-
-    useSignalEffect(() => {
-        if (!dashboardKey) {
-            setSnapshot({filters: {}, selection: {}});
-            return;
-        }
-        seedDashboardDefaultFilters(dashboardKey, container || {});
-        setSnapshot({
-            filters: getDashboardFilterSignal(dashboardKey).value || {},
-            selection: getDashboardSelectionSignal(dashboardKey).value || {},
-        });
-    });
-
-    return snapshot;
+    useSignals();
+    if (!dashboardKey) {
+        return {filters: {}, selection: {}};
+    }
+    return {
+        filters: getDashboardFilterSignal(dashboardKey).value || {},
+        selection: getDashboardSelectionSignal(dashboardKey).value || {},
+    };
 }
 
 function StateChip({label, value, tone = "neutral"}) {

@@ -2,7 +2,7 @@ import {useState, useEffect, useRef} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {Tabs, Tab, Card} from '@blueprintjs/core';
 import WindowContent from './WindowContent';
-import {selectedWindowId, getMetricsSignal, getWindowStatusSignal, appStatusSignal} from '../core';
+import {selectedWindowId, getWindowStatusSignal, appStatusSignal} from '../core';
 import {
     activeWindows,
     selectedTabId,
@@ -12,32 +12,26 @@ import {
     undockWindow,
 } from '../core';
 
-import {useSignalEffect} from '@preact/signals-react';
 import {Rnd} from 'react-rnd';
 import WindowControls from './WindowControls';
 import './WindowManager.css';
+import { resolveTabWindows, resolveVisibleTabId } from './windowManagerState.js';
 
 const WindowManager = () => {
     useSignals();
-    const [windows, setWindows] = useState(() => activeWindows.value || []);
-    const [tabId, setTabId] = useState(() => selectedTabId.value || null);
+    const windows = activeWindows.value || [];
+    const tabId = selectedTabId.value || null;
     const containerRef = useRef(null);
     const [containerSize, setContainerSize] = useState({width: 0, height: 0});
     const defaultSizePadding = 40;
 
-    // Update windows and selected tab when signals change
-    useSignalEffect(() => {
-        setWindows(activeWindows.value);
-        setTabId(selectedTabId.value);
-    });
-
     // Sync global app status into the focused window whenever focus changes
-    useSignalEffect(() => {
+    useEffect(() => {
         const winId = selectedWindowId.value;
         if (!winId) return;
         const winStatus = getWindowStatusSignal(winId);
         winStatus.value = appStatusSignal.peek();
-    });
+    }, [selectedWindowId.value]);
 
     useEffect(() => {
         const removeResizeListener = () => {
@@ -74,10 +68,11 @@ const WindowManager = () => {
     }, [windows]);
 
     // Separate windows into tabbed and floating
-    const tabWindows = windows.filter((win) => win.inTab !== false);
+    const tabWindows = resolveTabWindows(windows);
     const floatingWindows = windows.filter(
         (win) => win.inTab === false && !win.isMinimized
     );
+    const visibleTabId = resolveVisibleTabId(tabWindows, tabId);
 
     const handleTabChange = (newTabId) => {
         selectedTabId.value = newTabId || null;
@@ -121,15 +116,8 @@ const WindowManager = () => {
     const resolveDisplayWindowTitle = (win) => {
         const windowKey = String(win?.windowKey || '').trim();
         if ((windowKey === 'orderPerformance' || windowKey === 'order') && win?.windowId) {
-            const metrics = getMetricsSignal(`${win.windowId}DSorder_performance_period_today`).value || {};
             const parameterOrderId = String(win?.parameters?.AdOrderId?.[0] ?? '').trim();
-            const metricsOrderId = String(metrics?.orderId ?? metrics?.orderID ?? '').trim();
-            const name = String(metrics?.name || '').trim();
-            const orderId = parameterOrderId || metricsOrderId;
-            if (name && orderId && (!parameterOrderId || metricsOrderId === parameterOrderId)) return `${name} (${orderId})`;
-            if (parameterOrderId && metricsOrderId && metricsOrderId !== parameterOrderId) return `Order ${parameterOrderId}`;
-            if (name) return name;
-            if (orderId) return `Order ${orderId}`;
+            if (parameterOrderId) return `Order ${parameterOrderId}`;
         }
         return String(win?.windowTitle || win?.windowKey || '').trim();
     };
@@ -142,7 +130,7 @@ const WindowManager = () => {
             {/* Tabs for windows in tabbed mode */}
             <Tabs
                 id="window-manager-tabs"
-                selectedTabId={tabId}
+                selectedTabId={visibleTabId}
                 onChange={handleTabChange}
                 renderActiveTabPanelOnly
                 large
@@ -171,7 +159,7 @@ const WindowManager = () => {
                             </div>
                         }
                         panel={
-                            win.windowId === tabId ? (
+                            win.windowId === visibleTabId ? (
                                 <WindowContent window={win}
                                     isInTab={true}
                                 />

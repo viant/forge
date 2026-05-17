@@ -1,9 +1,9 @@
-import React, {useState, useEffect, useRef, useMemo} from 'react';
+import React, {useEffect, useRef, useMemo} from 'react';
 import {Dialog, DialogBody, DialogFooter, Button, Classes, InputGroup} from '@blueprintjs/core';
 import LayoutRenderer from './LayoutRenderer';
 import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
-import {useSignalEffect} from "@preact/signals-react";
+import {useSignalEffect, useSignals} from '@preact/signals-react/runtime';
 import {dialogHandlers} from "../hooks";
 import {resolveTemplate} from "../utils";
 import { getLogger } from '../utils/logger.js';
@@ -30,12 +30,13 @@ function normalizeQuickFilterSpecs(dialog) {
         icon: spec?.icon,
         className: spec?.className,
         style: spec?.style,
-        trigger: spec?.trigger,
+        trigger: spec?.trigger || 'debounce',
         debounceMs: spec?.debounceMs,
     }));
 }
 
 const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
+    useSignals();
     const searchable = !(dialog?.properties && dialog.properties.searchable === false);
     if (!searchable || quickFilterSpecs.length === 0) return null;
     const quickSearch = dialog?.properties?.quickSearch || {};
@@ -74,12 +75,12 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
         };
     }, []);
 
-    useSignalEffect(() => {
+    const dialogInputValue = dsCtx?.signals?.input?.value || {};
+    useEffect(() => {
         try {
-            const cur = dsCtx?.signals?.input?.value || {};
             const next = {};
             quickFilterSpecs.forEach((spec) => {
-                next[spec.field] = cur?.filter?.[spec.field] == null ? '' : String(cur.filter[spec.field]);
+                next[spec.field] = dialogInputValue?.filter?.[spec.field] == null ? '' : String(dialogInputValue.filter[spec.field]);
             });
             setValues((prev) => {
                 const prevKeys = Object.keys(prev || {});
@@ -90,18 +91,15 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
                 return next;
             });
         } catch (_) {}
-    });
+    }, [dialogInputValue, quickFilterSpecs]);
 
     const applySearch = (field, text, debounceMs = 0) => {
         try {
             const h = dsCtx?.handlers?.dataSource;
             const currentFilter = h?.peekFilter?.() || {};
             const nextFilter = mergeQuickFilterValue(currentFilter, field, text);
-            h?.setSilentFilterValues?.({ filter: nextFilter });
             const fetch = () => {
-                h?.setInactive?.(false);
-                h?.setLoading?.(true);
-                h?.fetchCollection?.();
+                h?.setFilter?.({ filter: nextFilter });
             };
             if (debounceMs > 0) {
                 if (timersRef.current[field]) clearTimeout(timersRef.current[field]);
@@ -113,6 +111,16 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
         } catch (_) {}
     };
 
+    const updateQuickFilterValue = (spec, rawValue) => {
+        const v = rawValue ?? '';
+        setValues((prev) => ({ ...prev, [spec.field]: v }));
+        const trigger = spec.trigger || quickSearch.trigger || "commit";
+        if (trigger === "change" || trigger === "debounce") {
+            const debounceMs = trigger === "debounce" ? (spec.debounceMs ?? quickSearch.debounceMs ?? 220) : 0;
+            applySearch(spec.field, v, debounceMs);
+        }
+    };
+
     return (
         <div className={wrapperClassName} style={wrapperStyle}>
             {quickFilterSpecs.map((spec) => (
@@ -121,15 +129,8 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
                     leftIcon={spec.icon || quickSearch.icon || "search"}
                     placeholder={spec.placeholder}
                     value={values[spec.field] || ''}
-                    onChange={(e) => {
-                        const v = e?.target?.value ?? '';
-                        setValues((prev) => ({ ...prev, [spec.field]: v }));
-                        const trigger = spec.trigger || quickSearch.trigger || "commit";
-                        if (trigger === "change" || trigger === "debounce") {
-                            const debounceMs = trigger === "debounce" ? (spec.debounceMs ?? quickSearch.debounceMs ?? 220) : 0;
-                            applySearch(spec.field, v, debounceMs);
-                        }
-                    }}
+                    onChange={(e) => updateQuickFilterValue(spec, e?.target?.value)}
+                    onInput={(e) => updateQuickFilterValue(spec, e?.target?.value)}
                     onBlur={(e) => {
                         const v = e?.target?.value ?? '';
                         const trigger = spec.trigger || quickSearch.trigger || "commit";
@@ -161,11 +162,30 @@ const DialogQuickSearch = ({ dsCtx, dialog, quickFilterSpecs }) => {
     );
 };
 
+export function resolveDialogSelectionMode(dialog = {}, callerProps = {}) {
+    if (callerProps?.multiple === true) return "multi";
+    if (callerProps?.multiple === false) return "single";
+    const explicitMode = String(
+        dialog?.selectionMode
+        || dialog?.properties?.selectionMode
+        || ""
+    ).trim().toLowerCase();
+    if (explicitMode === "multi" || explicitMode === "single") {
+        return explicitMode;
+    }
+    const explicitMultiple = dialog?.multiple ?? dialog?.properties?.multiple;
+    if (explicitMultiple === true) return "multi";
+    if (explicitMultiple === false) return "single";
+    return "";
+}
+
 const ViewDialog = ({context, dialog}) => {
-    const [isOpen, setIsOpen] = useState(false);
+    useSignals();
     const log = getLogger('dialog');
     const {handlers} = context
     const resolvedDataSourceRef = dialog?.dataSourceRef || context?.identity?.dataSourceRef || '';
+    const callerProps = handlers.dialog.callerProps?.() || {};
+    const selectionModeOverride = resolveDialogSelectionMode(dialog, callerProps);
 
     const events = dialogHandlers(context, dialog)
     const quickFilterConfigKey = useMemo(() => JSON.stringify({
@@ -174,10 +194,13 @@ const ViewDialog = ({context, dialog}) => {
     }), [dialog?.properties?.quickFilter, dialog?.properties?.quickFilters]);
     const quickFilterSpecs = useMemo(() => normalizeQuickFilterSpecs(dialog), [quickFilterConfigKey]);
 
-    useSignalEffect(() => {
-        const isDialogOpen = handlers.dialog.isOpen();
-        log.debug('open effect', { isDialogOpen, wasOpen: isOpen, dsRef: resolvedDataSourceRef });
-        if (isDialogOpen && !isOpen) {
+    const dialogOpen = handlers.dialog.isOpen();
+    const previousOpenRef = useRef(false);
+    useEffect(() => {
+        const isDialogOpen = dialogOpen;
+        const wasOpen = previousOpenRef.current;
+        log.debug('open effect', { isDialogOpen, wasOpen, dsRef: resolvedDataSourceRef });
+        if (isDialogOpen && !wasOpen) {
             const dialogContext = (() => {
                 try {
                     return resolvedDataSourceRef ? context?.Context?.(resolvedDataSourceRef) : null;
@@ -252,7 +275,6 @@ const ViewDialog = ({context, dialog}) => {
                         );
                         log.debug('deferred fetchCollection', { filter, args });
                         dsHandlers?.setInactive?.(false);
-                        dsHandlers?.setLoading?.(true);
                         if (Object.keys(filter || {}).length > 0) {
                             dsHandlers?.setSilentFilterValues?.({ filter });
                         }
@@ -268,10 +290,8 @@ const ViewDialog = ({context, dialog}) => {
                 events.onOpen.execute({ context, dialog });
             }
         }
-        if (isOpen !== isDialogOpen) {
-            setIsOpen(isDialogOpen);
-        }
-    });
+        previousOpenRef.current = isDialogOpen;
+    }, [dialogOpen, handlers, resolvedDataSourceRef, context, dialog, events, quickFilterSpecs, log]);
 
     const handleClose = () => {
         handlers.dialog.close();
@@ -295,7 +315,12 @@ const ViewDialog = ({context, dialog}) => {
                 callers,
             });
         }
-        dsCtx = resolvedDataSourceRef ? context.Context(resolvedDataSourceRef) : null;
+        const reuseDirectContext = resolvedDataSourceRef
+            && context?.identity?.dataSourceRef === resolvedDataSourceRef
+            && (!selectionModeOverride || String(context?.dataSource?.selectionMode || "").trim().toLowerCase() === selectionModeOverride);
+        dsCtx = reuseDirectContext
+            ? context
+            : (resolvedDataSourceRef ? context.Context(resolvedDataSourceRef, { selectionMode: selectionModeOverride }) : null);
     } catch (e) {
         let callers = [];
         try {
@@ -306,18 +331,50 @@ const ViewDialog = ({context, dialog}) => {
         dsCtx = null;
     }
 
-    // Selection state to drive default footer button enablement (reactive)
-    const [canSelect, setCanSelect] = React.useState(false);
+    if (dsCtx?.dataSource && selectionModeOverride) {
+        dsCtx.dataSource.selectionMode = selectionModeOverride;
+    }
+
     useSignalEffect(() => {
-        try {
-            const sel = dsCtx?.signals?.selection?.value;
-            const has = !!(sel && (sel.selected || (Array.isArray(sel.selection) && sel.selection.length > 0)));
-            log.info('selection effect', { dsRef: resolvedDataSourceRef, selection: sel, canSelect: has });
-            setCanSelect(has);
-        } catch (_) {}
+        if (!dialogOpen || !dsCtx?.signals?.selection || !selectionModeOverride) {
+            return;
+        }
+        const current = dsCtx.signals.selection.value || {};
+        if (selectionModeOverride === 'multi') {
+            if (!Array.isArray(current.selection)) {
+                dsCtx.signals.selection.value = { selection: [] };
+            }
+            return;
+        }
+        if (Array.isArray(current.selection)) {
+            dsCtx.signals.selection.value = { selected: null, rowIndex: -1 };
+        }
     });
 
-    if (!isOpen) {
+    useSignalEffect(() => {
+        if (!dialogOpen || !dsCtx?.handlers?.dataSource || !dsCtx?.signals?.collection || !dsCtx?.signals?.selection) {
+            return;
+        }
+        const selectionMode = selectionModeOverride || String(dsCtx?.dataSource?.selectionMode || "").trim().toLowerCase() || "single";
+        if (selectionMode === "multi") {
+            return;
+        }
+        const collection = Array.isArray(dsCtx.signals.collection.value) ? dsCtx.signals.collection.value : [];
+        const currentSelection = dsCtx.signals.selection.value || {};
+        if (collection.length !== 1) {
+            return;
+        }
+        if (currentSelection?.selected && (currentSelection?.rowIndex ?? -1) >= 0) {
+            return;
+        }
+        dsCtx.handlers.dataSource.setSelected?.({ selected: collection[0], rowIndex: 0 });
+    });
+
+    // Selection state to drive default footer button enablement (reactive)
+    const selectionValue = dsCtx?.signals?.selection?.value;
+    const canSelect = !!(selectionValue && (selectionValue.selected || (Array.isArray(selectionValue.selection) && selectionValue.selection.length > 0)));
+
+    if (!dialogOpen) {
         return null;
     }
 
@@ -353,7 +410,7 @@ const ViewDialog = ({context, dialog}) => {
         <div             onMouseDown={(e) => e.stopPropagation()} >
 
         <Dialog
-            isOpen={isOpen}
+            isOpen={dialogOpen}
             onClose={handleClose}
             title={title}
             isCloseButtonShown={true}

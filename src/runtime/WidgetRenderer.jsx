@@ -7,8 +7,8 @@
  * 4. Render within ControlWrapper for label / span.
  * ---------------------------------------------------------------------- */
 
-import React, {useState} from 'react';
-import {useSignalEffect} from '@preact/signals-react';
+import React from 'react';
+import {useSignals} from '@preact/signals-react/runtime';
 
 import {classify} from './widgetClassifier.js';
 import {getWidgetEntry} from './widgetRegistry.jsx';
@@ -25,6 +25,7 @@ export default function WidgetRenderer({
     stateEvents = {},
     state = undefined, // optional override pair {get,set}
 }) {
+    useSignals();
     if (!item) return null;
 
     const resolveItemContext = () => {
@@ -37,18 +38,18 @@ export default function WidgetRenderer({
         let scope = {};
         switch (source) {
             case 'form':
-                scope = context?.signals?.form?.peek?.() || {};
+                scope = context?.signals?.form?.value || {};
                 break;
             case 'filter':
             case 'filters':
-                scope = context?.handlers?.dataSource?.peekFilter?.() || {};
+                scope = context?.signals?.input?.value?.filter || {};
                 break;
             case 'input':
-                scope = context?.signals?.input?.peek?.() || {};
+                scope = context?.signals?.input?.value || {};
                 break;
             case 'windowform':
             default:
-                scope = context?.signals?.windowForm?.peek?.() || {};
+                scope = context?.signals?.windowForm?.value || {};
                 break;
         }
         const key = resolveSelector(scope, selector);
@@ -68,56 +69,6 @@ export default function WidgetRenderer({
     // ------------------------------------------------------------------
     const scope = item.scope || 'form';
 
-    // --------------------------------------------------------------
-    // 2a. Reactivity: re-render when any signal the adapter depends
-    //     on changes (mainly for 'form' scope).
-    // --------------------------------------------------------------
-
-    const [, forceRender] = useState(0);
-
-    // Re-render when the underlying signal for 'form' or other scopes changes
-    useSignalEffect(() => {
-        switch (scope) {
-            case 'form':
-                context?.signals?.form?.value; // establish dependency
-                break;
-            case 'windowForm':
-                context?.signals?.windowForm?.value;
-                break;
-            case 'selection':
-                context?.signals?.selection?.value;
-                break;
-            case 'collection':
-                resolvedContext?.signals?.collection?.value;
-                break;
-            case 'metrics':
-                resolvedContext?.signals?.metrics?.value;
-                break;
-            default:
-                context?.signals?.control?.value;
-                break;
-        }
-        if (item?.dataSourceRefSelector) {
-            const source = String(item?.dataSourceRefSource || 'windowForm').toLowerCase();
-            switch (source) {
-                case 'form':
-                    context?.signals?.form?.value;
-                    break;
-                case 'filter':
-                case 'filters':
-                    context?.signals?.input?.value?.filter;
-                    break;
-                case 'input':
-                    context?.signals?.input?.value;
-                    break;
-                case 'windowform':
-                default:
-                    context?.signals?.windowForm?.value;
-                    break;
-            }
-        }
-        forceRender((c) => c + 1);
-    });
     const adapterFactory = resolveStateAdapter(scope) || resolveStateAdapter('noop');
     const adapter = adapterFactory(resolvedContext, item, state);
 

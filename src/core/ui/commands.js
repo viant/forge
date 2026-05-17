@@ -32,6 +32,7 @@ import { buildDashboardDemoStandaloneHtml, getDashboardDemoExportFilename, listD
 import { DASHBOARD_BLOCK_KINDS, DASHBOARD_CHART_TYPES, DASHBOARD_COMMANDS, DASHBOARD_METADATA_SCHEMA } from './dashboardCapabilities.js';
 import { getWindowContext } from '../context/registry.js';
 import { buildDashboardDefaultFilters, setDashboardSelectionState } from '../../components/dashboard/dashboardUtils.js';
+import { mergeWindowFormValues } from '../../hooks/dataSource.js';
 
 function requireString(name, v) {
   if (typeof v !== 'string' || v.trim() === '') {
@@ -263,10 +264,11 @@ export async function runUICommand(cmd = {}) {
       const { metadata, seed } = createDashboardDemoBundle(variant);
       const windowKey = params.windowKey || `dashboard-demo-${randomSuffix()}`;
       const windowTitle = params.windowTitle || params.title || 'Dashboard Demo';
-      const parentKey = params.parentKey || selectedWindowId.peek() || 'root';
+      const rawOptions = params.options || {};
+      const parentKey = rawOptions.parentKey || params.parentKey || selectedWindowId.peek() || 'root';
       const inTab = params.inTab !== false;
       const options = {
-        ...(params.options || {}),
+        ...rawOptions,
         inlineMetadata: metadata,
         newInstance: true,
       };
@@ -473,11 +475,14 @@ export async function runUICommand(cmd = {}) {
     case 'ui.window.open': {
       const windowKey = requireString('windowKey', params.windowKey);
       const windowTitle = params.windowTitle || params.title || windowKey;
-      const parentKey = params.parentKey || selectedWindowId.peek() || 'root';
+      const options = params.options || {};
+      const parentKey = options.parentKey || params.parentKey || selectedWindowId.peek() || 'root';
       const inTab = params.inTab !== false;
       const windowData = params.windowData || '';
-      const options = params.options || {};
-      const win = addWindow(windowTitle, parentKey, windowKey, windowData, inTab, params.parameters || {}, options);
+      const win = addWindow(windowTitle, parentKey, windowKey, windowData, inTab, params.parameters || {}, {
+        ...options,
+        windowId: params.windowId || options.windowId,
+      });
       return { windowId: win?.windowId || null };
     }
 
@@ -487,11 +492,12 @@ export async function runUICommand(cmd = {}) {
 
       const windowKey = params.windowKey || `dynamic__${randomSuffix()}`;
       const windowTitle = params.windowTitle || params.title || windowKey;
-      const parentKey = params.parentKey || selectedWindowId.peek() || 'root';
+      const rawOptions = params.options || {};
+      const parentKey = rawOptions.parentKey || params.parentKey || selectedWindowId.peek() || 'root';
       const inTab = params.inTab !== false;
       const windowData = params.windowData || '';
       const options = {
-        ...(params.options || {}),
+        ...rawOptions,
         inlineMetadata: metadata,
         newInstance: true,
       };
@@ -502,6 +508,18 @@ export async function runUICommand(cmd = {}) {
     case 'ui.window.close': {
       const windowId = requireString('windowId', params.windowId);
       removeWindow(windowId);
+      return { ok: true };
+    }
+    case 'ui.window.setFormData': {
+      const windowId = requireString('windowId', params.windowId);
+      const values = params.values || params.parameters || {};
+      if (!values || typeof values !== 'object' || Array.isArray(values)) {
+        throw new Error('values must be an object');
+      }
+      const windowForm = getFormSignal(`${windowId}:windowForm`);
+      const previous = windowForm.peek() || {};
+      const replace = params.replace === true;
+      windowForm.value = replace ? values : mergeWindowFormValues(previous, values);
       return { ok: true };
     }
     case 'ui.window.activate': {

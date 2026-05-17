@@ -608,19 +608,20 @@ type DashboardCondition struct {
 }
 
 type Dashboard struct {
-	VisibleWhen *DashboardCondition   `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	Summary     *DashboardSummary     `json:"summary,omitempty" yaml:"summary,omitempty"`
-	Compare     *DashboardCompare     `json:"compare,omitempty" yaml:"compare,omitempty"`
-	KPITable    *DashboardKPITable    `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
-	Filters     *DashboardFilters     `json:"filters,omitempty" yaml:"filters,omitempty"`
-	Geo         *DashboardGeoMap      `json:"geo,omitempty" yaml:"geo,omitempty"`
-	Timeline    *DashboardTimeline    `json:"timeline,omitempty" yaml:"timeline,omitempty"`
-	Composition *DashboardComposition `json:"composition,omitempty" yaml:"composition,omitempty"`
-	Dimensions  *DashboardDimensions  `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
-	Messages    *DashboardMessages    `json:"messages,omitempty" yaml:"messages,omitempty"`
-	Status      *DashboardStatus      `json:"status,omitempty" yaml:"status,omitempty"`
-	Feed        *DashboardFeed        `json:"feed,omitempty" yaml:"feed,omitempty"`
-	Report      *DashboardReport      `json:"report,omitempty" yaml:"report,omitempty"`
+	VisibleWhen   *DashboardCondition    `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	Summary       *DashboardSummary      `json:"summary,omitempty" yaml:"summary,omitempty"`
+	Compare       *DashboardCompare      `json:"compare,omitempty" yaml:"compare,omitempty"`
+	KPITable      *DashboardKPITable     `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
+	Filters       *DashboardFilters      `json:"filters,omitempty" yaml:"filters,omitempty"`
+	Geo           *DashboardGeoMap       `json:"geo,omitempty" yaml:"geo,omitempty"`
+	Timeline      *DashboardTimeline     `json:"timeline,omitempty" yaml:"timeline,omitempty"`
+	Composition   *DashboardComposition  `json:"composition,omitempty" yaml:"composition,omitempty"`
+	Dimensions    *DashboardDimensions   `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
+	Messages      *DashboardMessages     `json:"messages,omitempty" yaml:"messages,omitempty"`
+	Status        *DashboardStatus       `json:"status,omitempty" yaml:"status,omitempty"`
+	Feed          *DashboardFeed         `json:"feed,omitempty" yaml:"feed,omitempty"`
+	Report        *DashboardReport       `json:"report,omitempty" yaml:"report,omitempty"`
+	ReportBuilder map[string]interface{} `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
 	// ReportOptions controls the dashboard-level report mode. The older
 	// compact alias is Container.report.
 	ReportOptions *DashboardReportOptions `json:"reportOptions,omitempty" yaml:"reportOptions,omitempty"`
@@ -747,6 +748,13 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 				dashboard.Report.Sections = compact.Sections
 			}
 		}
+	case "dashboard.reportBuilder":
+		if compact.ReportBuilder != nil {
+			dashboard := c.ensureDashboard()
+			if dashboard.ReportBuilder == nil {
+				dashboard.ReportBuilder = compact.ReportBuilder
+			}
+		}
 	case "dashboard.table":
 		if len(compact.Columns) > 0 || compact.Limit > 0 || compact.QuickFilter || compact.Density != "" || len(compact.FormattingRules) > 0 || len(compact.RowActions) > 0 {
 			dashboard := c.ensureDashboard()
@@ -787,6 +795,7 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 type dashboardCompactAliases struct {
 	VisibleWhen     *DashboardCondition      `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 	Report          *DashboardReportOptions  `json:"report,omitempty" yaml:"report,omitempty"`
+	ReportBuilder   map[string]interface{}   `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
 	Metrics         []DashboardMetric        `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 	Rows            []DashboardKPIRow        `json:"rows,omitempty" yaml:"rows,omitempty"`
 	Checks          []DashboardStatusCheck   `json:"checks,omitempty" yaml:"checks,omitempty"`
@@ -1275,6 +1284,7 @@ type DataSource struct {
 	Paging          *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
 	FilterSet       []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
 	AutoSelect      *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
+	AutoFetch       *bool                             `json:"autoFetch,omitempty" yaml:"autoFetch,omitempty"`
 	SelfReference   string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
 	// QuickFilterSet selects which filterSet should be rendered in the toolbar as quick filters.
 	// Accepts either a string (filterSet.name) or an integer index (0-based).

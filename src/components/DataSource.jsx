@@ -1,11 +1,11 @@
 // DataSource.jsx
-import React, {useState} from "react";
+import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
-import {useSignalEffect} from "@preact/signals-react";
+import {useSignals} from '@preact/signals-react/runtime';
 import {isMapEquals} from "../utils";
 import { extractData } from "./dataSourceExtract.js";
 import {
-    getSelectionSignal,
+    findSelectionSignal,
 
 } from "../core";
 
@@ -64,6 +64,7 @@ function getNodeByPath(nodes, path, selfReference) {
  *  - context
  */
 export default function DataSource({context}) {
+    useSignals();
     const log = getLogger('ds');
     try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
     let prevFilter = {};
@@ -80,10 +81,7 @@ export default function DataSource({context}) {
     // object so that downstream code can safely access `.selected` without
     // additional null-checks.
     const upstream = dataSource.dataSourceRef
-        ? getSelectionSignal(
-            identity.getDataSourceId(dataSource.dataSourceRef),
-            {selected: null, rowIndex: -1},
-        )
+        ? findSelectionSignal(identity.getDataSourceId(dataSource.dataSourceRef))
         : null;
 
     const handleUpstream = () => {
@@ -123,19 +121,21 @@ export default function DataSource({context}) {
     }
 
 
+    const inputValue = input.value || {};
+    const controlValue = control.value || {};
+
     // Log input signal changes to help diagnose missing fetch triggers
-    useSignalEffect(() => {
+    useEffect(() => {
         try {
-            const snap = input.value || {};
-            log.debug('[input changed]', { ds: context?.identity?.dataSourceRef, input: snap });
+            log.debug('[input changed]', { ds: context?.identity?.dataSourceRef, input: inputValue });
         } catch (_) {}
-    });
+    }, [context?.identity?.dataSourceRef, inputValue, log]);
 
     // Watch for input.fetch or input.refresh
-    useSignalEffect(() => {
-        const inputVal = input.value || {};
+    useEffect(() => {
+        const inputVal = inputValue || {};
         const {fetch, refresh = false} = inputVal;
-        const loadingNow = !!(control.value || {}).loading;
+        const loadingNow = !!(controlValue || {}).loading;
         try { log.debug('[watch] flags', { ds: context?.identity?.dataSourceRef, fetch, refresh, loading: loadingNow, input: inputVal }); } catch(_) {}
         if (!fetch && !refresh) {
             try { log.debug('[watch] skip (no flags)', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
@@ -147,36 +147,48 @@ export default function DataSource({context}) {
         }
 
         if (refresh) {
+            input.value = {
+                ...input.peek(),
+                fetch: false,
+                refresh: false,
+            };
             if (dataSource.dataSourceRef) {
                 try { log.debug('[watch] refresh: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
                 handleUpstream()
                 return
             }
             try { log.debug('[watch] refresh: direct branch', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
-            return refreshRecords().finally(() => {
+            void refreshRecords().finally(() => {
                 flagReadDone();
             });
+            return;
         }
         if (dataSource.dataSourceRef) {
+            input.value = {
+                ...input.peek(),
+                fetch: false,
+                refresh: false,
+            };
             try { log.debug('[watch] fetch: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
             handleUpstream()
             return
         }
 
         try { log.debug('[watch] fetch: direct branch', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
-        return doFetchRecords().finally(() => {
-            // Publish a new object so that the change propagates.
-            input.value = {
-                ...input.peek(),
-                fetch: false,
-            };
-            try { log.debug('[watch] fetch flag cleared', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
+        input.value = {
+            ...input.peek(),
+            fetch: false,
+            refresh: false,
+        };
+        void doFetchRecords().finally(() => {
+            try { log.debug('[watch] fetch flag consumed', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         });
-    });
+        return;
+    }, [context?.identity?.dataSourceRef, inputValue, controlValue, dataSource, log]);
 
     // Fire onSelection (alias onItemSelect) when DS selection changes
     const prevSelectionKey = useRef('');
-    useSignalEffect(() => {
+    useEffect(() => {
         try {
             const sel = selection.value || {};
             let key = 'none';
@@ -226,7 +238,7 @@ export default function DataSource({context}) {
                 }
             }
         } catch (_) { /* ignore */ }
-    });
+    }, [selection.value, selectionMode, dataSource.selfReference, events, getUniqueKeyValue]);
 
 
     function flagReadDone() {
@@ -380,6 +392,7 @@ export default function DataSource({context}) {
         }
 
         setLoading(true);
+        control.value = { ...control.peek(), error: null, stale: false };
         try {
             // If filter changed, reset to first page
             if (!isMapEquals(filter, prevFilter)) {
@@ -434,6 +447,7 @@ export default function DataSource({context}) {
             }
             collectionInfo.value = info;
             metrics.value = stats;
+            control.value = { ...control.peek(), error: null, stale: false };
 
             // Mark this signature as the latest successful fetch
             prevQuerySig.current = requestSig;

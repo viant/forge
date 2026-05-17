@@ -4,6 +4,8 @@ import { appendTargetContextQuery } from "../runtime/targetContext.js";
 import { resolvePagingValues, withPagingInputs } from "./paging.js";
 import { buildDatasourceFetchInputs } from "./datasourceRequest.js";
 
+const inFlightGetRequests = new Map();
+
 
 // Toggle with env var or config if you don't always want noisy logs.
 // Guard `process` access because standalone browser previews may execute
@@ -32,12 +34,14 @@ function logCallerStack(name , maxFrames = 5) {
     }
 }
 
-function useDataConnector(dataSource) {
-    const {endpoints, useAuth} = useSetting();
-    const auth = useAuth();
+export function createDataConnector(dataSource, runtime = {}) {
+    const {
+        endpoints = {},
+        targetContext = {},
+        auth = {},
+    } = runtime || {};
     const {authStates, defaultAuthProvider} = auth;
     const {paging, parameters = []} = dataSource;
-    const {targetContext = {}} = useSetting();
 
     function notifyUnauthorized(error) {
         if (!error || (error.status !== 401 && error.status !== 403)) {
@@ -251,15 +255,33 @@ function useDataConnector(dataSource) {
             }
             const log = getLogger('connector');
             try { log.debug('[request]', { method, url: finalUrl, request }); } catch(_) {}
-            const resp = await fetch(finalUrl, request);
-            if (!resp.ok) {
-                const err = makeRequestError(resp, 'GET error');
-                notifyUnauthorized(err);
-                throw err;
+            const requestKey = requestMethod === 'GET'
+                ? JSON.stringify({ url: finalUrl, headers: request.headers || {} })
+                : '';
+            if (requestKey && inFlightGetRequests.has(requestKey)) {
+                return inFlightGetRequests.get(requestKey);
             }
-            const json = await resp.json();
-            try { log.debug('[response]', { url: finalUrl, status: resp.status }); } catch(_) {}
-            return json;
+            const performRequest = (async () => {
+                const resp = await fetch(finalUrl, request);
+                if (!resp.ok) {
+                    const err = makeRequestError(resp, 'GET error');
+                    notifyUnauthorized(err);
+                    throw err;
+                }
+                const json = await resp.json();
+                try { log.debug('[response]', { url: finalUrl, status: resp.status }); } catch(_) {}
+                return json;
+            })();
+            if (requestKey) {
+                inFlightGetRequests.set(requestKey, performRequest);
+            }
+            try {
+                return await performRequest;
+            } finally {
+                if (requestKey) {
+                    inFlightGetRequests.delete(requestKey);
+                }
+            }
         } catch (err) {
             console.error("Failed to fetch data", err);
             throw err;
@@ -382,6 +404,12 @@ function useDataConnector(dataSource) {
         del,
         // you can add post/update/delete if needed...
     };
+}
+
+function useDataConnector(dataSource) {
+    const {endpoints = {}, useAuth = () => ({}), targetContext = {}} = useSetting();
+    const auth = useAuth();
+    return createDataConnector(dataSource, { endpoints, targetContext, auth });
 }
 
 export default useDataConnector;

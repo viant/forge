@@ -78,7 +78,7 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
                     flexShrink: 0,
                     marginRight: '5px',
                     marginLeft: '5px',
-                    overflow: 'auto',
+                    overflow: 'hidden',
                     minHeight: 0,
                     minWidth: 0,
                 }

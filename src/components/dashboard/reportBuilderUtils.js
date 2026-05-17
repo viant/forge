@@ -38,6 +38,43 @@ function normalizeArray(values = []) {
     return Array.isArray(values) ? values.filter(Boolean) : [];
 }
 
+function formatDateISO(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function resolveRelativeDateRangeDefault(seed = {}) {
+    const preset = String(seed?.preset || "").trim().toLowerCase();
+    if (!preset) {
+        return null;
+    }
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start = new Date(end);
+    switch (preset) {
+        case "last7days":
+        case "last_7_days":
+        case "7d":
+            start.setDate(end.getDate() - 6);
+            break;
+        case "last30days":
+        case "last_30_days":
+        case "30d":
+            start.setDate(end.getDate() - 29);
+            break;
+        case "today":
+            break;
+        default:
+            return null;
+    }
+    return {
+        start: formatDateISO(start),
+        end: formatDateISO(end),
+    };
+}
+
 function defaultSelectedIds(items = [], fallbackCount = 1) {
     const explicit = normalizeArray(items)
         .filter((item) => item?.default)
@@ -55,6 +92,10 @@ function defaultSelectedIds(items = [], fallbackCount = 1) {
 function defaultStaticFilterValue(filter = {}) {
     if (filter.type === "dateRange") {
         const seeded = filter.default && typeof filter.default === "object" ? filter.default : {};
+        const relative = resolveRelativeDateRangeDefault(seeded);
+        if (relative) {
+            return relative;
+        }
         return {
             start: seeded.start || "",
             end: seeded.end || "",
@@ -85,9 +126,150 @@ function normalizeDynamicRow(row = {}, group = {}, index = 0) {
     };
 }
 
+function rowHasSelections(row = {}) {
+    return Array.isArray(row?.selections) && row.selections.length > 0;
+}
+
+function normalizeDynamicGroupRows(rows = [], group = {}) {
+    const normalizedRows = normalizeArray(rows).map((row, index) => normalizeDynamicRow(row, group, index));
+    const selectedRows = normalizedRows.filter((row) => rowHasSelections(row));
+    const firstDraftRow = normalizedRows.find((row) => !rowHasSelections(row)) || null;
+    return firstDraftRow ? [...selectedRows, firstDraftRow] : selectedRows;
+}
+
+function firstResolvedValue(record = null, selectors = []) {
+    for (const selector of selectors) {
+        const key = String(selector || "").trim();
+        if (!key) continue;
+        const value = resolveKey(record, key);
+        if (value !== undefined && value !== null && value !== "") {
+            return value;
+        }
+    }
+    return undefined;
+}
+
+function compactLookupRecord(filterDef = {}, record = {}) {
+    if (!record || typeof record !== "object") {
+        return null;
+    }
+    const selectors = [
+        filterDef.valueSelector,
+        filterDef.labelSelector,
+        filterDef.groupSelector,
+        ...(Array.isArray(filterDef.recordSelectors) ? filterDef.recordSelectors : []),
+    ].map((entry) => String(entry || "").trim()).filter(Boolean);
+    const compact = {};
+    selectors.forEach((selector) => {
+        const value = resolveKey(record, selector);
+        if (value === undefined || value === null || value === "") {
+            return;
+        }
+        compact[selector] = value;
+    });
+    return Object.keys(compact).length > 0 ? compact : null;
+}
+
+function isVisibleField(entry = {}) {
+    if (!entry || typeof entry !== "object") {
+        return false;
+    }
+    if (entry.hidden === true) {
+        return false;
+    }
+    if (entry.visible === false) {
+        return false;
+    }
+    if (entry.expose === false) {
+        return false;
+    }
+    return true;
+}
+
+export function getVisibleReportBuilderMeasures(config = {}) {
+    return normalizeArray(config.measures).filter((entry) => isVisibleField(entry));
+}
+
+export function getComputedReportBuilderMeasures(config = {}) {
+    return normalizeArray(config.computedMeasures).filter((entry) => isVisibleField(entry));
+}
+
+export function getSelectableReportBuilderMeasures(config = {}) {
+    return [
+        ...getVisibleReportBuilderMeasures(config),
+        ...getComputedReportBuilderMeasures(config),
+    ];
+}
+
+export function getVisibleReportBuilderDimensions(config = {}) {
+    return normalizeArray(config.dimensions).filter((entry) => isVisibleField(entry));
+}
+
+export function resolveReportBuilderMeasure(config = {}, id = "") {
+    const targetId = String(id || "").trim();
+    if (!targetId) {
+        return null;
+    }
+    return getSelectableReportBuilderMeasures(config).find(
+        (entry) => String(entry?.id || "").trim() === targetId,
+    ) || null;
+}
+
+function normalizeComputedMeasure(definition = {}) {
+    if (!definition || typeof definition !== "object") {
+        return null;
+    }
+    const compute = definition.compute || {};
+    return {
+        ...definition,
+        key: definition.key || definition.id,
+        dependencies: normalizeArray(definition.dependencies || compute.dependencies).map((entry) => String(entry).trim()).filter(Boolean),
+        compute,
+    };
+}
+
+export function applyReportBuilderComputedMeasures(rows = [], config = {}) {
+    const computedMeasures = getComputedReportBuilderMeasures(config).map((entry) => normalizeComputedMeasure(entry)).filter(Boolean);
+    if (computedMeasures.length === 0) {
+        return Array.isArray(rows) ? rows : [];
+    }
+    return normalizeArray(rows).map((row) => {
+        const next = { ...(row || {}) };
+        computedMeasures.forEach((definition) => {
+            const outputKey = String(definition.key || definition.id || "").trim();
+            if (!outputKey) {
+                return;
+            }
+            const compute = definition.compute || {};
+            switch (String(compute.type || "").trim().toLowerCase()) {
+                case "ratio": {
+                    const numeratorKey = String(compute.numerator || "").trim();
+                    const denominatorKey = String(compute.denominator || "").trim();
+                    const numerator = Number(resolveKey(next, numeratorKey));
+                    const denominator = Number(resolveKey(next, denominatorKey));
+                    const scale = Number(compute.scale || 1);
+                    const decimals = Number.isFinite(Number(compute.decimals)) ? Number(compute.decimals) : null;
+                    let value = 0;
+                    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+                        value = (numerator / denominator) * scale;
+                    }
+                    if (decimals != null) {
+                        value = Number(value.toFixed(decimals));
+                    }
+                    next[outputKey] = value;
+                    break;
+                }
+                default:
+                    break;
+            }
+        });
+        return next;
+    });
+}
+
 export function buildReportBuilderDefaultState(config = {}) {
-    const measures = normalizeArray(config.measures);
-    const dimensions = normalizeArray(config.dimensions);
+    const measures = getSelectableReportBuilderMeasures(config);
+    const dimensions = getVisibleReportBuilderDimensions(config);
     const staticFilters = normalizeArray(config.staticFilters);
     const dynamicFilterGroups = normalizeArray(config.dynamicFilterGroups);
 
@@ -158,7 +340,7 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
         const groupId = String(group.id || "").trim();
         if (!groupId) return;
         const persistedRows = normalizeArray(persisted?.dynamicGroups?.[groupId]);
-        next.dynamicGroups[groupId] = persistedRows.map((row, index) => normalizeDynamicRow(row, group, index));
+        next.dynamicGroups[groupId] = normalizeDynamicGroupRows(persistedRows, group);
     });
 
     next.selectedMeasures = normalizeArray(next.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
@@ -177,10 +359,23 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
     return next;
 }
 
+export function sanitizeReportBuilderState(config = {}, state = {}) {
+    const next = clone(state || {});
+    const dynamicGroups = Array.isArray(next.dynamicGroups) ? {} : { ...(next.dynamicGroups || {}) };
+    normalizeArray(config?.dynamicFilterGroups).forEach((group) => {
+        const groupId = String(group?.id || "").trim();
+        if (!groupId) return;
+        dynamicGroups[groupId] = normalizeDynamicGroupRows(next?.dynamicGroups?.[groupId], group);
+    });
+    next.dynamicGroups = dynamicGroups;
+    return next;
+}
+
 export function buildReportBuilderRequest(config = {}, state = {}) {
     const requestConfig = config.request || {};
     const resultConfig = config.result || {};
     const measures = normalizeArray(config.measures);
+    const computedMeasures = normalizeArray(config.computedMeasures).map((entry) => normalizeComputedMeasure(entry)).filter(Boolean);
     const dimensions = normalizeArray(config.dimensions);
     const staticFilters = normalizeArray(config.staticFilters);
     const dynamicFilterGroups = normalizeArray(config.dynamicFilterGroups);
@@ -191,8 +386,17 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
 
     normalizeArray(state.selectedMeasures).forEach((id) => {
         const match = measures.find((item) => String(item?.id || "").trim() === String(id).trim());
-        if (!match) return;
-        setNestedValue(request, match.paramPath || `measures.${match.id}`, true);
+        if (match) {
+            setNestedValue(request, match.paramPath || `measures.${match.id}`, true);
+            return;
+        }
+        const computed = computedMeasures.find((item) => String(item?.id || "").trim() === String(id).trim());
+        if (!computed) return;
+        computed.dependencies.forEach((dependencyId) => {
+            const dependency = measures.find((item) => String(item?.id || "").trim() === String(dependencyId).trim());
+            if (!dependency) return;
+            setNestedValue(request, dependency.paramPath || `measures.${dependency.id}`, true);
+        });
     });
 
     const selectedDimensionIds = new Set(
@@ -244,10 +448,14 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
         rows.forEach((row) => {
             const filterDef = normalizeArray(group.filters).find((entry) => String(entry?.id || "").trim() === String(row.filterId || "").trim());
             if (!filterDef) return;
+            if (filterDef.requestMapping === "hook" || filterDef.handledByHook === true) {
+                return;
+            }
             const paramPath = String(filterDef.paramPath || `filters.${filterDef.id}`).trim();
             const values = normalizeArray(row.selections).map((entry) => entry?.value).filter((entry) => entry !== undefined && entry !== null && entry !== "");
             if (!paramPath || values.length === 0) return;
-            if (filterDef.multiple === false) {
+            const emitArray = filterDef.emitArray === true || filterDef.valueMode === "array";
+            if (filterDef.multiple === false && !emitArray) {
                 dynamicAggregates[paramPath] = values[0];
                 return;
             }
@@ -301,6 +509,42 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     return request;
 }
 
+export function resolveReportBuilderReadiness(config = {}, state = {}) {
+    const selectedMeasures = normalizeArray(state?.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
+    if (selectedMeasures.length === 0) {
+        return { canRun: false, reason: "measure" };
+    }
+
+    const staticFilters = normalizeArray(config?.staticFilters);
+    for (const filter of staticFilters) {
+        if (!filter?.required) continue;
+        const filterId = String(filter.id || filter.field || "").trim();
+        if (!filterId) continue;
+        const value = state?.staticFilters?.[filterId];
+        if (filter.type === "dateRange") {
+            if (!value?.start || !value?.end) {
+                return { canRun: false, reason: "requiredFilter" };
+            }
+            continue;
+        }
+        if (filter.multiple) {
+            if (!Array.isArray(value) || value.length === 0) {
+                return { canRun: false, reason: "requiredFilter" };
+            }
+            continue;
+        }
+        if (value == null || value === "") {
+            return { canRun: false, reason: "requiredFilter" };
+        }
+    }
+
+    return { canRun: true, reason: "" };
+}
+
+export function canAutoFetchReportBuilder(config = {}, state = {}) {
+    return resolveReportBuilderReadiness(config, state).canRun;
+}
+
 export function projectLookupSelection(filterDef = {}, record = {}) {
     const valueSelector = String(filterDef.valueSelector || filterDef.valueField || filterDef.field || "id").trim();
     const labelSelector = String(filterDef.labelSelector || filterDef.previewSelector || filterDef.labelField || valueSelector).trim();
@@ -312,12 +556,21 @@ export function projectLookupSelection(filterDef = {}, record = {}) {
         value,
         label: label == null || label === "" ? String(value ?? "") : String(label),
         group: group == null ? "" : String(group),
-        record,
+        record: compactLookupRecord(filterDef, record),
     };
 }
 
+export function projectLookupSelections(filterDef = {}, payload = null) {
+    const records = Array.isArray(payload)
+        ? payload
+        : (payload == null ? [] : [payload]);
+    return records
+        .filter((record) => record && typeof record === "object")
+        .map((record) => projectLookupSelection(filterDef, record));
+}
+
 export function buildReportBuilderColumns(config = {}, state = {}) {
-    const measures = normalizeArray(config.measures);
+    const measures = getSelectableReportBuilderMeasures(config);
     const dimensions = normalizeArray(config.dimensions);
 
     const selectedDimensions = normalizeArray(state.selectedDimensions)
@@ -353,7 +606,7 @@ export function addDynamicFilterRow(state = {}, group = {}) {
         ...state,
         dynamicGroups: {
             ...(state.dynamicGroups || {}),
-            [groupId]: nextRows,
+            [groupId]: normalizeDynamicGroupRows(nextRows, group),
         },
     };
 }
@@ -375,7 +628,7 @@ export function updateDynamicFilterRow(state = {}, group = {}, rowId = "", patch
         ...state,
         dynamicGroups: {
             ...(state.dynamicGroups || {}),
-            [groupId]: nextRows,
+            [groupId]: normalizeDynamicGroupRows(nextRows, group),
         },
     };
 }
@@ -387,7 +640,10 @@ export function removeDynamicFilterRow(state = {}, group = {}, rowId = "") {
         ...state,
         dynamicGroups: {
             ...(state.dynamicGroups || {}),
-            [groupId]: normalizeArray(state?.dynamicGroups?.[groupId]).filter((row) => String(row?.id || "").trim() !== rowId),
+            [groupId]: normalizeDynamicGroupRows(
+                normalizeArray(state?.dynamicGroups?.[groupId]).filter((row) => String(row?.id || "").trim() !== rowId),
+                group,
+            ),
         },
     };
 }

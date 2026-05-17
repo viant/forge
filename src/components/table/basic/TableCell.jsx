@@ -125,7 +125,21 @@ const TableCell = ({
             );
             break;
         case "checkbox":
-            cellContent = <Checkbox checked={!!value} {...cellProps} />;
+            if (col.multiSelect) {
+                cellContent = (
+                    <input
+                        type="checkbox"
+                        checked={isSelected({...cellSelection})}
+                        onChange={(event) => {
+                            event.stopPropagation();
+                            context?.handlers?.dataSource?.toggleSelection?.(cellSelection);
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                    />
+                );
+            } else {
+                cellContent = <Checkbox checked={!!value} {...cellProps} />;
+            }
             break;
         case "link": {
             const link = resolveTableLink({row, column: col, value});

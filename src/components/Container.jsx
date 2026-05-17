@@ -1,4 +1,5 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {useSignals} from '@preact/signals-react/runtime';
 import {Card, Section} from '@blueprintjs/core';
 import ControlRenderer from './ControlRenderer.jsx';
 import {useControlEvents} from "../hooks";
@@ -21,10 +22,9 @@ import TableToolbar from "./table/basic/Toolbar.jsx";
 import GridLayoutRenderer from './GridLayoutRenderer.jsx';
 import {DashboardBlock} from "./dashboard/DashboardBlocks.jsx";
 import DashboardSurface from "./dashboard/DashboardSurface.jsx";
-import {createDashboardContext, evaluateDashboardCondition, getDashboardVisibleWhen} from "./dashboard/dashboardUtils.js";
-import { getDashboardFilterSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
-import {useSignalEffect} from "@preact/signals-react";
-import {isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
+import {createDashboardContext, evaluateDashboardCondition, getDashboardVisibleWhen, seedDashboardDefaultFilters} from "./dashboard/dashboardUtils.js";
+import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
+import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
 
 const evaluatePlainVisibleWhen = (visibleWhen, context) => {
     if (!visibleWhen || !context) return true;
@@ -73,14 +73,38 @@ const wrapContainerChrome = (container, content) => {
         return content;
     }
 
-    let wrapped = content;
+    const framedContent = (
+        <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            {content}
+        </div>
+    );
+
+    let wrapped = framedContent;
     if (container?.card) {
-        wrapped = <Card {...container.card}>{wrapped}</Card>;
+        const cardStyle = {
+            flex: '1 1 auto',
+            height: '100%',
+            minHeight: 0,
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            ...(container.card?.style || {}),
+        };
+        wrapped = <Card {...container.card} style={cardStyle}>{wrapped}</Card>;
     }
     if (container?.section) {
         const sectionProperties = container.section.properties || {};
+        const sectionStyle = {
+            flex: '1 1 auto',
+            height: '100%',
+            minHeight: 0,
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            ...(sectionProperties.style || {}),
+        };
         wrapped = (
-            <Section title={container.title || ''} {...sectionProperties}>
+            <Section title={container.title || ''} {...sectionProperties} style={sectionStyle}>
                 {wrapped}
             </Section>
         );
@@ -103,65 +127,66 @@ const buildGridStyle = (style, columns, layout) => {
     };
 };
 
+const resolveChildContext = (baseContext, dataSourceRef) => {
+    const targetRef = dataSourceRef || baseContext?.identity?.dataSourceRef;
+    if (!targetRef) {
+        return baseContext;
+    }
+    if (baseContext?.signals && baseContext?.identity?.dataSourceRef === targetRef) {
+        return baseContext;
+    }
+    return baseContext.Context(targetRef);
+};
+
 const Container = ({context, container, isActive}) => {
+    useSignals();
     const isDashboardBlock = isSemanticDashboardBlock(container);
-    const isDashboardRoot = (container.kind === 'dashboard' || !!container.dashboard) && !context?.dashboardKey;
+    const isDashboardRoot = isDashboardRootContainer(container, context);
     const effectiveContext = isDashboardRoot ? createDashboardContext(context, container) : context;
-    const dashboardSnapshotRef = useRef('');
-    const visibleWhenSnapshotRef = useRef('');
-    const [, setDashboardVersion] = useState(0);
     const {items = [], containers = [], layout, table, chart} = container;
     const columns = layout?.columns || 1;
     const orientation = layout?.orientation || 'vertical';
 
     const {identity} = effectiveContext
     const dataSourceRef = container.dataSourceRef || identity.dataSourceRef
-
-    useSignalEffect(() => {
-        const dashboardKey = effectiveContext?.dashboardKey;
-        if (!dashboardKey) return;
-        const snapshot = JSON.stringify({
-            filters: getDashboardFilterSignal(dashboardKey).value || {},
-            selection: getDashboardSelectionSignal(dashboardKey).value || {},
-        });
-        if (dashboardSnapshotRef.current === snapshot) return;
-        dashboardSnapshotRef.current = snapshot;
-        setDashboardVersion((value) => value + 1);
-    });
-
-    useSignalEffect(() => {
-        const visibleWhen = getDashboardVisibleWhen(container);
-        if (!visibleWhen || effectiveContext?.dashboardKey) return;
-
-        const source = String(visibleWhen.source || 'form').toLowerCase();
-        let snapshotValue;
+    const dashboardKey = effectiveContext?.dashboardKey;
+    if (dashboardKey) {
+        findDashboardFilterSignal(dashboardKey)?.value;
+        findDashboardSelectionSignal(dashboardKey)?.value;
+    }
+    useEffect(() => {
+        if (!dashboardKey || !isDashboardRoot) {
+            return;
+        }
+        seedDashboardDefaultFilters(dashboardKey, container);
+        getDashboardSelectionSignal(dashboardKey, {dimension: null, entityKey: null, pointKey: null});
+    }, [dashboardKey, isDashboardRoot, container]);
+    const trackedVisibleWhen = getDashboardVisibleWhen(container);
+    if (trackedVisibleWhen && !dashboardKey) {
+        const source = String(trackedVisibleWhen.source || 'form').toLowerCase();
         switch (source) {
             case 'windowform':
-                snapshotValue = effectiveContext?.signals?.windowForm?.value;
+                effectiveContext?.signals?.windowForm?.value;
                 break;
             case 'filter':
             case 'filters':
-                snapshotValue = effectiveContext?.signals?.input?.value?.filter || {};
+                effectiveContext?.signals?.input?.value?.filter;
                 break;
             case 'selection':
-                snapshotValue = effectiveContext?.signals?.selection?.value;
+                effectiveContext?.signals?.selection?.value;
                 break;
             case 'input':
-                snapshotValue = effectiveContext?.signals?.input?.value;
+                effectiveContext?.signals?.input?.value;
                 break;
             case 'metrics':
-                snapshotValue = effectiveContext?.signals?.metrics?.value;
+                effectiveContext?.signals?.metrics?.value;
                 break;
             case 'form':
             default:
-                snapshotValue = effectiveContext?.signals?.form?.value;
+                effectiveContext?.signals?.form?.value;
                 break;
         }
-        const snapshot = JSON.stringify(snapshotValue || {});
-        if (visibleWhenSnapshotRef.current === snapshot) return;
-        visibleWhenSnapshotRef.current = snapshot;
-        setDashboardVersion((value) => value + 1);
-    });
+    }
 
     const stateTuple = useState(() => (
         container.state
@@ -174,21 +199,21 @@ const Container = ({context, container, isActive}) => {
     let formPanel = null
     if (container.tabs) {
         formPanel = (<>
-            <FormPanel context={effectiveContext.Context(dataSourceRef)} container={container} isActive={isActive}></FormPanel>
+            <FormPanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={container} isActive={isActive}></FormPanel>
         </>);
     }
 
     let tablePanel = null
     if (table) {
         tablePanel = (<>
-            <TablePanel context={effectiveContext.Context(dataSourceRef)} container={container} isActive={isActive}></TablePanel>
+            <TablePanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={container} isActive={isActive}></TablePanel>
         </>);
     }
 
     let chartPanel = null
     if (chart) {
         chartPanel = (<>
-            <Chart context={effectiveContext.Context(dataSourceRef)} container={container} isActive={isActive}></Chart>
+            <Chart context={resolveChildContext(effectiveContext, dataSourceRef)} container={container} isActive={isActive}></Chart>
         </>);
     }
 
@@ -198,7 +223,7 @@ const Container = ({context, container, isActive}) => {
         const dsRef = container.chat.dataSourceRef || dataSourceRef;
         chatPanel = (
             <Chat
-                context={effectiveContext.Context(dsRef)}
+                context={resolveChildContext(effectiveContext, dsRef)}
                 container={container}
                 isActive={isActive}
             />
@@ -213,7 +238,7 @@ const Container = ({context, container, isActive}) => {
         const autoScroll = term.autoScroll !== false; // default true
         terminalPanel = (
             <Terminal
-                context={effectiveContext.Context(dsRef)}
+                context={resolveChildContext(effectiveContext, dsRef)}
                 height={term.height || '320px'}
                 prompt={term.prompt || '$'}
                 autoScroll={autoScroll}
@@ -233,7 +258,7 @@ const Container = ({context, container, isActive}) => {
         const dsRef = container.fileBrowser.dataSourceRef || dataSourceRef
         fileBrowserPanel = (
             <FileBrowser
-                context={effectiveContext.Context(dsRef)}
+                context={resolveChildContext(effectiveContext, dsRef)}
                 config={container.fileBrowser}
                 isActive={isActive}
             />
@@ -245,7 +270,7 @@ const Container = ({context, container, isActive}) => {
         const dsRef = container.treeBrowser.dataSourceRef || dataSourceRef;
         treeBrowserPanel = (
             <TreeBrowser
-                context={effectiveContext.Context(dsRef)}
+                context={resolveChildContext(effectiveContext, dsRef)}
                 config={container.treeBrowser}
                 isActive={isActive}
             />
@@ -257,7 +282,7 @@ const Container = ({context, container, isActive}) => {
     if (container.editor) {
         editorPanel = (
             <Editor
-                context={effectiveContext.Context(dataSourceRef)}
+                    context={resolveChildContext(effectiveContext, dataSourceRef)}
                 container={container}
                 isActive={isActive}
             />
@@ -274,7 +299,7 @@ const Container = ({context, container, isActive}) => {
         // 1. formCfg.datasourceRef  2. container-level dataSourceRef 3. ctx identity
         const dsRef = formCfg?.datasourceRef || formCfg?.dataSourceRef || dataSourceRef;
 
-        const subCtx = effectiveContext.Context(dsRef);
+        const subCtx = resolveChildContext(effectiveContext, dsRef);
 
         // Resolve dynamic template strings in id / schema when provided
         const dynId = typeof formCfg.id === 'string' ? resolveTemplate(formCfg.id, subCtx) : formCfg.id;
@@ -374,7 +399,7 @@ const Container = ({context, container, isActive}) => {
                 {containerWantsFetcher && (
                     <DataSourceFetcher
                         key={`auto-fetcher-${container.id}`}
-                        context={effectiveContext.Context(container.dataSourceRef || dataSourceRef)}
+                        context={resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef)}
                         selectFirst={container.selectFirst === true}
                         fetchData={container.fetchData === true}
                     />
@@ -383,7 +408,10 @@ const Container = ({context, container, isActive}) => {
         );
     }
 
-    const handlers = useControlEvents(effectiveContext, visualItems || [], state)
+    const controlContext = effectiveContext?.signals
+        ? effectiveContext
+        : resolveChildContext(effectiveContext, dataSourceRef);
+    const handlers = useControlEvents(controlContext, visualItems || [], state)
 
     const visibleWhen = getDashboardVisibleWhen(container);
     if (visibleWhen) {
@@ -402,7 +430,7 @@ const Container = ({context, container, isActive}) => {
         if (!tb) return null;
         let tbContext = effectiveContext;
         if (tb.dataSourceRef) {
-            tbContext = effectiveContext.Context(tb.dataSourceRef);
+            tbContext = resolveChildContext(effectiveContext, tb.dataSourceRef);
         }
         if (Array.isArray(tb.items)) {
             const wrapperStyle = tb.style || {};
@@ -458,10 +486,20 @@ const Container = ({context, container, isActive}) => {
             return (
                 <Splitter key={'s' + identity.id} orientation={orientation} divider={layout?.divider}>
                     {containers.map((subContainer) => (
-                        <div key={'dSc' + subContainer.id}>
+                        <div
+                            key={'dSc' + subContainer.id}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                minHeight: 0,
+                                minWidth: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                            }}
+                        >
                             <Container
                                 key={'Sc' + subContainer.id}
-                                context={effectiveContext.Context(subContainer.dataSourceRef || dataSourceRef)}
+                                context={resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef)}
                                 container={subContainer}
                                 isActive={isActive}
                             />
@@ -495,7 +533,7 @@ const Container = ({context, container, isActive}) => {
                         <div key={'dSc' + subContainer.id} style={childStyle}>
                             <Container
                                 key={'Sc' + subContainer.id}
-                                context={effectiveContext.Context(subContainer.dataSourceRef || dataSourceRef)}
+                                context={resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef)}
                                 container={subContainer}
                                 isActive={isActive}
                             />
@@ -506,8 +544,20 @@ const Container = ({context, container, isActive}) => {
         );
     };
 
+    const shouldAllocateChartRemainder =
+        !!chartPanel &&
+        !tablePanel &&
+        !chatPanel &&
+        !terminalPanel &&
+        !fileBrowserPanel &&
+        !treeBrowserPanel &&
+        !editorPanel &&
+        !schemaFormPanel &&
+        !formPanel &&
+        (!containers || containers.length === 0);
+
     const renderDashboardBlockContainer = (subContainer) => {
-        const subCtx = effectiveContext.Context(subContainer.dataSourceRef || dataSourceRef);
+        const subCtx = resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef);
         return (
             <Container
                 key={`dashboard-block-${subContainer.id || subContainer.kind}`}
@@ -532,7 +582,7 @@ const Container = ({context, container, isActive}) => {
                 {containerWantsFetcher && (
                     <DataSourceFetcher
                         key={`auto-fetcher-${container.id}`}
-                        context={effectiveContext.Context(container.dataSourceRef || dataSourceRef)}
+                        context={resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef)}
                         selectFirst={container.selectFirst === true}
                         fetchData={container.fetchData === true}
                     />
@@ -542,7 +592,7 @@ const Container = ({context, container, isActive}) => {
     }
 
     if (isDashboardBlock) {
-        const blockContext = effectiveContext.Context(container.dataSourceRef || dataSourceRef);
+        const blockContext = resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef);
         return (
             <>
                 <DashboardBlock
@@ -582,7 +632,7 @@ const Container = ({context, container, isActive}) => {
                     ) : (
                         <div style={gridStyle}>
                             {visualItems.map((item) => {
-                                const subCtx = effectiveContext.Context(item.dataSourceRef || dataSourceRef)
+                                const subCtx = resolveChildContext(effectiveContext, item.dataSourceRef || dataSourceRef)
                                 return (
                                     <ControlRenderer
                                         key={item.id}
@@ -598,7 +648,11 @@ const Container = ({context, container, isActive}) => {
                         </div>
                     )
                 ) : null}
-                {chartPanel}
+                {shouldAllocateChartRemainder ? (
+                    <div style={{ flex: '1 1 0', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                        {chartPanel}
+                    </div>
+                ) : chartPanel}
                 {chatPanel}
                 {terminalPanel}
                 {tablePanel}
@@ -615,7 +669,7 @@ const Container = ({context, container, isActive}) => {
             {containerWantsFetcher && (
                 <DataSourceFetcher
                     key={`auto-fetcher-${container.id}`}
-                    context={effectiveContext.Context(container.dataSourceRef || dataSourceRef)}
+                    context={resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef)}
                     selectFirst={container.selectFirst === true}
                     fetchData={container.fetchData === true}
                 />

@@ -1,5 +1,5 @@
 import React, {useState, useEffect, useMemo} from "react";
-import {useSignalEffect} from "@preact/signals-react";
+import {useSignals} from '@preact/signals-react/runtime';
 import {
     Button,
     Dialog,
@@ -84,6 +84,41 @@ export function transformData(rawData, chart, valueKey) {
     );
     const keys = Array.from(keysSet);
     return {data, keys};
+}
+
+export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDefinitions = []) {
+    const key = String(xAxisKey || "").trim();
+    if (!key || !Array.isArray(rawData) || rawData.length === 0) {
+        return Array.isArray(rawData) ? rawData : [];
+    }
+    const valueKeys = (Array.isArray(seriesDefinitions) ? seriesDefinitions : [])
+        .map((entry) => String(entry?.value || "").trim())
+        .filter(Boolean);
+    if (valueKeys.length === 0) {
+        return rawData;
+    }
+    const grouped = new Map();
+    rawData.forEach((row) => {
+        const bucketKey = row?.[key];
+        if (bucketKey == null || bucketKey === "") {
+            return;
+        }
+        const existing = grouped.get(bucketKey) || { [key]: bucketKey };
+        valueKeys.forEach((valueKey) => {
+            const numeric = Number(row?.[valueKey]);
+            if (!Number.isFinite(numeric)) {
+                if (!(valueKey in existing) && row?.[valueKey] !== undefined) {
+                    existing[valueKey] = row[valueKey];
+                }
+                return;
+            }
+            existing[valueKey] = Number(existing[valueKey] || 0) + numeric;
+        });
+        grouped.set(bucketKey, existing);
+    });
+    return Array.from(grouped.values()).sort(
+        (left, right) => new Date(left?.[key]) - new Date(right?.[key]),
+    );
 }
 
 function isDirectSeriesChart(chart = {}) {
@@ -220,12 +255,46 @@ function areKeyListsEqual(left = [], right = []) {
     return true;
 }
 
+function normalizeChartExtent(value, fallback) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+    }
+    if (typeof value === 'string') {
+        const normalized = value.trim();
+        return normalized || fallback;
+    }
+    return fallback;
+}
+
+export function resolveVisibleChartState({ chartData = [], availableDataKeys = [], yAxisLabel = "", loading = false, error = null, previousState = null, sourceKey = "" } = {}) {
+    const currentRows = Array.isArray(chartData) ? chartData : [];
+    const currentKeys = Array.isArray(availableDataKeys) ? availableDataKeys : [];
+    const previousRows = Array.isArray(previousState?.chartData) ? previousState.chartData : [];
+    const previousKeys = Array.isArray(previousState?.availableDataKeys) ? previousState.availableDataKeys : [];
+    const sameSourceKey = String(previousState?.sourceKey || "") === String(sourceKey || "");
+    const canReusePrevious = loading && !error && sameSourceKey && currentRows.length === 0 && previousRows.length > 0;
+    if (canReusePrevious) {
+        return {
+            chartData: previousRows,
+            availableDataKeys: previousKeys,
+            yAxisLabel: String(previousState?.yAxisLabel || "").trim(),
+            staleWhileLoading: true,
+        };
+    }
+    return {
+        chartData: currentRows,
+        availableDataKeys: currentKeys,
+        yAxisLabel,
+        staleWhileLoading: false,
+    };
+}
+
 const Chart = ({container, context, isActive = true, embedded = false}) => {
+    useSignals();
     const log = getLogger('chart');
     const {chart} = container;
     const [chartRef, chartSize] = useMeasuredContainer();
     const [chartReady, setChartReady] = useState(false);
-    const [, forceRender] = useState(0);
 
     // Extract chart configuration
     const {
@@ -246,6 +315,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const hasRightAxis = !!rightAxis || seriesDefinitions.some((entry) => entry.axis === "right");
     const [selectedDataKeys, setSelectedDataKeys] = useState([]);
     const selectionStateRef = React.useRef({initialized: false, touched: false});
+    const lastRenderableStateRef = React.useRef(null);
     const [viewMode, setViewMode] = useState("chart");
     const [showColumnDialog, setShowColumnDialog] = useState(false);
     const [columnWidths, setColumnWidths] = useState({});
@@ -259,21 +329,21 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         const source = String(chart.dataSourceRefSource || 'windowForm').toLowerCase();
         let directRef = chart.dataSourceRef || null;
         if (!directRef && selector && refs && typeof refs === 'object') {
-            let scope = {};
-            switch (source) {
-                case 'form':
-                    scope = context?.signals?.form?.peek?.() || {};
+        let scope = {};
+        switch (source) {
+            case 'form':
+                    scope = context?.signals?.form?.value || {};
                     break;
                 case 'filter':
                 case 'filters':
-                    scope = context?.handlers?.dataSource?.peekFilter?.() || {};
+                    scope = context?.signals?.input?.value?.filter || {};
                     break;
                 case 'input':
-                    scope = context?.signals?.input?.peek?.() || {};
+                    scope = context?.signals?.input?.value || {};
                     break;
                 case 'windowform':
                 default:
-                    scope = context?.signals?.windowForm?.peek?.() || {};
+                    scope = context?.signals?.windowForm?.value || {};
                     break;
             }
             const key = resolveSelector(scope, selector);
@@ -283,28 +353,6 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         }
         return directRef ? context.Context(directRef) : context;
     };
-
-    useSignalEffect(() => {
-        if (!chart?.dataSourceRefSelector) return;
-        const source = String(chart.dataSourceRefSource || 'windowForm').toLowerCase();
-        switch (source) {
-            case 'form':
-                context?.signals?.form?.value;
-                break;
-            case 'filter':
-            case 'filters':
-                context?.signals?.input?.value?.filter;
-                break;
-            case 'input':
-                context?.signals?.input?.value;
-                break;
-            case 'windowform':
-            default:
-                context?.signals?.windowForm?.value;
-                break;
-        }
-        forceRender((x) => x + 1);
-    });
 
     const chartContext = resolveChartContext();
     useEffect(() => {
@@ -319,6 +367,14 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     }, [chartContext, chart?.dataSourceRefSelector, chart?.dataSourceSelector, container?.id, context?.identity?.dataSourceRef]);
     const resolvedTickFormat = resolveMappedConfigValue(context, xAxis, "tickFormat", "windowForm");
     const { collection, loading, error } = useDataSourceState(chartContext);
+    const effectiveCollection = Array.isArray(container?.collection) ? container.collection : collection;
+    const chartSourceKey = useMemo(() => {
+        const dataSourceId = String(chartContext?.identity?.dataSourceId || chartContext?.identity?.dataSourceRef || "");
+        const inputSnapshot = chartContext?.signals?.input?.peek?.() || {};
+        const params = inputSnapshot.parameters || {};
+        const filter = inputSnapshot.filter || {};
+        return JSON.stringify({ dataSourceId, params, filter });
+    }, [chartContext, chartContext?.signals?.input?.value]);
 
     const isPieChart = type === "pie" || type === "donut";
     const isHorizontalBar = isHorizontalBarType(type);
@@ -326,7 +382,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = (collection || []).map((row) => ({
+            const rows = (effectiveCollection || []).map((row) => ({
                 name: row[nameKey] ?? "unknown",
                 value: Number(row[valueKey]) || 0,
                 _raw: row,
@@ -339,9 +395,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         }
 
         if (directSeriesChart) {
-            const sorted = [...(collection || [])].sort(
-                (a, b) => new Date(a?.[xAxis?.dataKey]) - new Date(b?.[xAxis?.dataKey])
-            );
+            const sorted = aggregateDirectSeriesData(effectiveCollection || [], xAxis?.dataKey, seriesDefinitions);
             return {
                 chartData: sorted,
                 availableDataKeys: seriesDefinitions.map((entry) => entry.value),
@@ -349,18 +403,40 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             };
         }
 
-        const {data, keys} = transformData(collection, chart, selectedValueKey);
+        const {data, keys} = transformData(effectiveCollection, chart, selectedValueKey);
         const selectedValue = (series.values || []).find((val) => val.value === selectedValueKey);
         return {
             chartData: data,
             availableDataKeys: keys,
             yAxisLabel: selectedValue ? selectedValue.name : (leftAxis.label || ""),
         };
-    }, [chart, collection, directSeriesChart, isPieChart, leftAxis.label, selectedValueKey, series, seriesDefinitions, xAxis?.dataKey]);
+    }, [chart, directSeriesChart, effectiveCollection, isPieChart, leftAxis.label, selectedValueKey, series, seriesDefinitions, xAxis?.dataKey]);
 
-    const chartData = prepared.chartData;
-    const availableDataKeys = prepared.availableDataKeys;
-    const yAxisLabel = prepared.yAxisLabel;
+    const visibleState = resolveVisibleChartState({
+        chartData: prepared.chartData,
+        availableDataKeys: prepared.availableDataKeys,
+        yAxisLabel: prepared.yAxisLabel,
+        loading,
+        error,
+        sourceKey: chartSourceKey,
+        previousState: lastRenderableStateRef.current,
+    });
+
+    const chartData = visibleState.chartData;
+    const availableDataKeys = visibleState.availableDataKeys;
+    const yAxisLabel = visibleState.yAxisLabel;
+    const staleWhileLoading = visibleState.staleWhileLoading;
+
+    useEffect(() => {
+        if (!loading && !error && Array.isArray(prepared.chartData) && prepared.chartData.length > 0) {
+            lastRenderableStateRef.current = {
+                chartData: prepared.chartData,
+                availableDataKeys: prepared.availableDataKeys,
+                yAxisLabel: prepared.yAxisLabel,
+                sourceKey: chartSourceKey,
+            };
+        }
+    }, [prepared.chartData, prepared.availableDataKeys, prepared.yAxisLabel, loading, error, chartSourceKey]);
 
     useEffect(() => {
         setSelectedDataKeys((previousKeys) => {
@@ -749,19 +825,31 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         ? container.id
         : undefined;
 
-    const resolvedWidth = isHorizontalBar
-        ? (width || (embedded ? "82%" : "85%"))
-        : (width || "100%");
-    const resolvedHeight = isHorizontalBar
-        ? (height || (embedded ? 320 : "100%"))
-        : (height || (embedded ? 460 : "100%"));
     const canRenderChartSelection = isPieChart ? pieFilteredData.length > 0 : selectedSeriesDefinitions.length > 0;
 
+    const resolvedWidth = isHorizontalBar
+        ? normalizeChartExtent(width, embedded ? "82%" : "85%")
+        : normalizeChartExtent(width, "100%");
+    const resolvedHeight = isHorizontalBar
+        ? normalizeChartExtent(height, embedded ? 320 : 260)
+        : normalizeChartExtent(height, embedded ? (canRenderChartSelection ? 380 : 160) : 240);
+    const resolvedMinHeight = (() => {
+        if (typeof resolvedHeight === 'number') {
+            return resolvedHeight;
+        }
+        const normalized = typeof resolvedHeight === 'string' ? resolvedHeight.trim().toLowerCase() : '';
+        if (normalized === '100%') {
+            return embedded ? 220 : 420;
+        }
+        return 0;
+    })();
     return (
         <div
-            style={{width: resolvedWidth, height: resolvedHeight, minWidth: 0, minHeight: 0, margin: isHorizontalBar ? "0 auto" : undefined}}
+            style={{width: resolvedWidth, height: resolvedHeight, minWidth: 0, minHeight: resolvedMinHeight, margin: isHorizontalBar ? "0 auto" : undefined, position: "relative"}}
             ref={chartRef}
             data-dashboard-chart-id={chartExportId}
+            data-chart-loading={loading ? "true" : "false"}
+            data-chart-stale={staleWhileLoading ? "true" : "false"}
         >
             {showEmbeddedSeriesSelector ? (
                 <div
@@ -868,7 +956,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     </div>
                 </>
             ) : null}
-            {loading && (
+            {loading && !staleWhileLoading && (
                 <div style={{textAlign: 'center', padding: 4}}>Loading…</div>
             )}
             {error && (
@@ -880,7 +968,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     <div
                         style={{
                             height: "100%",
-                            minHeight: embedded ? 220 : 260,
+                            minHeight: embedded ? 110 : 180,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -932,6 +1020,27 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     </BpTable>
                 </div>
             )}
+
+            {staleWhileLoading ? (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: embedded ? 6 : 10,
+                        right: embedded ? 6 : 10,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        background: "rgba(255,255,255,0.9)",
+                        border: "1px solid rgba(148,163,184,0.35)",
+                        color: "#5f6b7c",
+                        fontSize: 11,
+                        lineHeight: 1.4,
+                        backdropFilter: "blur(4px)",
+                        pointerEvents: "none",
+                    }}
+                >
+                    Refreshing…
+                </div>
+            ) : null}
 
             <Dialog isOpen={!embedded && showColumnDialog} onClose={() => setShowColumnDialog(false)} title="Column customization">
                 <div style={{padding: 12, display: "flex", flexDirection: "column", gap: 10}}>

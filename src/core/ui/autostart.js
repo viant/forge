@@ -79,6 +79,8 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
         snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
         snapshotBuilder: connectorConfig?.uiBridge?.snapshotBuilder,
         clientId: connectorConfig?.uiBridge?.clientId,
+        startupReadyEvent: connectorConfig?.uiBridge?.startupReadyEvent,
+        startupReadyTimeoutMs: connectorConfig?.uiBridge?.startupReadyTimeoutMs,
       });
     } else {
       stopFn = startUIBridge({
@@ -87,6 +89,8 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
         snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
         snapshotBuilder: connectorConfig?.uiBridge?.snapshotBuilder,
         clientId: connectorConfig?.uiBridge?.clientId,
+        startupReadyEvent: connectorConfig?.uiBridge?.startupReadyEvent,
+        startupReadyTimeoutMs: connectorConfig?.uiBridge?.startupReadyTimeoutMs,
       });
     }
     started = true;

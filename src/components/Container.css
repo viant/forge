@@ -1,3 +1,35 @@
 .numeric-input {
     direction: rtl; text-align: right;
 }
+
+.form-panel,
+.forge-form-panel-tabs.bp4-tabs,
+.forge-form-panel-tabs.bp5-tabs,
+.forge-form-panel-tabs.bp6-tabs {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.forge-form-panel-tabs .bp4-tab-list,
+.forge-form-panel-tabs .bp5-tab-list,
+.forge-form-panel-tabs .bp6-tab-list {
+    flex: 0 0 auto;
+}
+
+.forge-form-panel-tabs .bp4-tab-panels,
+.forge-form-panel-tabs .bp5-tab-panels,
+.forge-form-panel-tabs .bp6-tab-panels {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+}
+
+.forge-form-panel-tabs .bp4-tab-panel,
+.forge-form-panel-tabs .bp5-tab-panel,
+.forge-form-panel-tabs .bp6-tab-panel {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}

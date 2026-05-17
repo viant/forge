@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import {useDialogHandlers, useWindowHandlers} from './window.js';
 import {setWindowContext, clearWindowContext} from '../core/context/registry.js';
-import {getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal} from '../core/store/signals.js';
+import {activeWindows, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal} from '../core/store/signals.js';
 
 const windowId = 'W_test_dashboard';
 const dashboardId = 'demoDashboard';
@@ -73,7 +73,7 @@ assert.equal(getDashboardSelectionSignal(dashboardKey).peek().entityKey, null);
 
 const dialogPromise = handlers.openDialog({
   execution: {
-    args: ['adOrderPicker', { awaitResult: true }],
+    args: ['adOrderPicker', { awaitResult: true, multiple: true }],
   },
   parameters: {
     'filters.adOrderId': '1232',
@@ -97,6 +97,33 @@ assert.deepEqual(dialogSignal.props.parameters, {
 assert.deepEqual(dialogHandlers.callerProps().parameters, {
   'filters.adOrderId': '1232',
 });
+assert.equal(dialogHandlers.callerProps().multiple, true);
 console.log('openDialog ✓ preserves explicit caller parameters in dialog props');
+
+handlers.openWindow({
+  execution: {
+    args: ['metrics/report', 'Performance Metrics', '', true],
+  },
+  parameters: {
+    prefill: {
+      advertiserId: 123,
+      dealId: 'deal-xyz',
+    },
+  },
+  context: {
+    identity: {
+      dataSourceRef: 'perf',
+    },
+  },
+});
+const openedWindow = activeWindows.peek().find((entry) => entry.windowKey === 'metrics/report');
+assert.equal(openedWindow.windowTitle, 'Performance Metrics');
+assert.deepEqual(openedWindow.parameters, {
+  prefill: {
+    advertiserId: 123,
+    dealId: 'deal-xyz',
+  },
+});
+console.log('openWindow ✓ preserves explicit prefill parameters for windowForm seeding');
 
 clearWindowContext(windowId);

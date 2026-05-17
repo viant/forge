@@ -13,6 +13,7 @@ import {
   getDashboardToneName,
   getDashboardVisibleWhen,
   publishDashboardSelection,
+  seedDashboardDefaultFilters,
   shouldShowDashboardKPIContext,
   withDashboardContext,
 } from './dashboardUtils.js';
@@ -176,6 +177,25 @@ const initializedDashboardContext = createDashboardContext(baseContext, {
   ],
 });
 assert.equal(initializedDashboardContext.dashboardKey, 'W1:orderDashboard');
+seedDashboardDefaultFilters('W1:orderDashboard', {
+  kind: 'dashboard',
+  id: 'orderDashboard',
+  containers: [
+    {
+      kind: 'dashboard.filters',
+      items: [
+        {
+          id: 'periodView',
+          field: 'periodView',
+          options: [
+            { label: 'Today', value: 'today', default: true },
+            { label: '7D', value: '7d' },
+          ],
+        },
+      ],
+    },
+  ],
+});
 assert.deepEqual(getDashboardFilterSignal('W1:orderDashboard').peek(), { periodView: 'today' });
 
 getDashboardFilterSignal('W1:preexistingDashboard').value = {};
@@ -199,6 +219,25 @@ const reseededDashboardContext = createDashboardContext(baseContext, {
   ],
 });
 assert.equal(reseededDashboardContext.dashboardKey, 'W1:preexistingDashboard');
+seedDashboardDefaultFilters('W1:preexistingDashboard', {
+  kind: 'dashboard',
+  id: 'preexistingDashboard',
+  containers: [
+    {
+      kind: 'dashboard.filters',
+      items: [
+        {
+          id: 'periodView',
+          field: 'periodView',
+          options: [
+            { label: 'Today', value: 'today', default: true },
+            { label: '7D', value: '7d' },
+          ],
+        },
+      ],
+    },
+  ],
+});
 assert.deepEqual(getDashboardFilterSignal('W1:preexistingDashboard').peek(), { periodView: 'today' });
 
 assert.deepEqual(

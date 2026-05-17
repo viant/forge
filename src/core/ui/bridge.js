@@ -74,6 +74,7 @@ export function startUIBridge(options = {}) {
   let lastSnapshotText = '';
   let timer = null;
   let detachListeners = null;
+  let readyToPublish = false;
 
   const send = (obj) => {
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -81,6 +82,7 @@ export function startUIBridge(options = {}) {
   };
 
   const publishSnapshot = () => {
+    if (!readyToPublish) return;
     const snap = snapshotBuilder();
     const text = snapshotFingerprint(snap);
     if (text === lastSnapshotText) return;
@@ -88,6 +90,7 @@ export function startUIBridge(options = {}) {
     send({ type: 'ui.snapshot', clientId, data: snap });
   };
   activeSnapshotPublisher = () => {
+    if (!readyToPublish) return Promise.resolve(false);
     publishSnapshot();
     return Promise.resolve(true);
   };
@@ -116,6 +119,7 @@ export function startUIBridge(options = {}) {
         commands: true,
       },
     });
+    readyToPublish = true;
     publishSnapshot();
     timer = setInterval(publishSnapshot, snapshotIntervalMs);
     detachListeners = bindImmediateSnapshotListeners();
@@ -164,6 +168,7 @@ export function startUIBridge(options = {}) {
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
+    readyToPublish = false;
     if (timer) clearInterval(timer);
     timer = null;
     try {
@@ -200,7 +205,10 @@ export function startUIBridgeHTTP(options = {}) {
   let streamAbort = null;
   let detachListeners = null;
   let detachLifecycle = null;
+  let readyToPublish = false;
   const inflightRPC = new Set();
+  const startupReadyEvent = String(options.startupReadyEvent || '').trim();
+  const startupReadyTimeoutMs = Math.max(0, Number(options.startupReadyTimeoutMs || 0) || 0);
 
   const registerRPC = (controller) => {
     if (controller) inflightRPC.add(controller);
@@ -251,6 +259,7 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const publishSnapshot = async () => {
+    if (!readyToPublish) return;
     const snap = snapshotBuilder();
     const text = snapshotFingerprint(snap);
     if (text === lastSnapshotText) return;
@@ -260,6 +269,7 @@ export function startUIBridgeHTTP(options = {}) {
     } catch (_) {}
   };
   activeSnapshotPublisher = async () => {
+    if (!readyToPublish) return false;
     await publishSnapshot();
     return true;
   };
@@ -287,6 +297,28 @@ export function startUIBridgeHTTP(options = {}) {
       window.removeEventListener('pagehide', handler);
       window.removeEventListener('beforeunload', handler);
     };
+  };
+
+  const waitForStartupReady = () => {
+    if (typeof window === 'undefined' || !startupReadyEvent) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      let settled = false;
+      let timer = null;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        window.removeEventListener(startupReadyEvent, onReady);
+        resolve();
+      };
+      const onReady = () => finish();
+      window.addEventListener(startupReadyEvent, onReady, { once: true });
+      if (startupReadyTimeoutMs > 0) {
+        timer = setTimeout(finish, startupReadyTimeoutMs);
+      }
+    });
   };
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -363,6 +395,7 @@ export function startUIBridgeHTTP(options = {}) {
       const snapshot = result?.snapshot;
       if (snapshot && typeof snapshot === 'object') {
         restoreWindowsFromSnapshot(snapshot);
+        lastSnapshotText = snapshotFingerprint(snapshot);
       }
     } catch (_) {}
   };
@@ -370,6 +403,8 @@ export function startUIBridgeHTTP(options = {}) {
   const start = async () => {
     await rpc('ui.hello', { clientId, token: options.token || undefined }, 1);
     await restoreSnapshot();
+    await waitForStartupReady();
+    readyToPublish = true;
     await publishSnapshot();
     snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
     detachListeners = bindImmediateSnapshotListeners();
@@ -387,6 +422,7 @@ export function startUIBridgeHTTP(options = {}) {
     try { detachLifecycle?.(); } catch (_) {}
     detachLifecycle = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
+    readyToPublish = false;
     abortInflightRPC();
     try { streamAbort?.abort(); } catch (_) {}
     if (snapshotTimer) clearInterval(snapshotTimer);

@@ -11,7 +11,9 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
     const log = getLogger('ds');
     // Guard hook order: ensure the first hook is always useRef
     const firstHookGuard = useRef(true);
-    // All hooks for the DS live here, ensuring stable ordering within this component
+    // All hooks for the datasource context live here so this child keeps a
+    // stable hook sequence when the window render path mounts datasource
+    // plumbing before the layout tree.
     const dsContext = (typeof windowContext.useDsContext === 'function')
         ? windowContext.useDsContext(dsKey)
         : windowContext.Context(dsKey);
@@ -27,7 +29,7 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
             if (k === 'filter' || k === 'parameters') {
                 const input = dsContext.signals.input;
                 const prev = input.peek();
-                input.value = { ...prev, [k]: v, fetch: true };
+                input.value = { ...prev, [k]: v, fetch: k === 'filter' ? true : !!prev.fetch };
                 return;
             }
             const signal = dsContext.signals[k];

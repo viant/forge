@@ -1,8 +1,8 @@
 // useDataSourceState.js – unified helper to subscribe to core DataSource signals
-// and expose plain React state values (collection, loading, error, selection).
+// and expose a plain snapshot (collection, loading, error, selection).
 
-import { useEffect, useState } from 'react';
-import { useSignalEffect } from '@preact/signals-react';
+import { useEffect } from 'react';
+import { useSignals } from '@preact/signals-react/runtime';
 import { getLogger } from '../utils/logger.js';
 
 /**
@@ -13,6 +13,7 @@ import { getLogger } from '../utils/logger.js';
  * @returns {{collection:Array, loading:boolean, error:any, selection:Object}}
  */
 export function useDataSourceState(context) {
+    useSignals();
     const log = getLogger('ds-state');
     const { signals } = context || {};
     if (!signals) {
@@ -20,46 +21,20 @@ export function useDataSourceState(context) {
     }
 
     const { collection, control, selection } = signals;
-
-    const [data, setData]           = useState(collection.peek() || []);
-    const [flags, setFlags]         = useState(() => {
-        const { loading = false, error = null } = control.peek() || {};
-        return { loading, error };
-    });
-    const [sel, setSel]             = useState(selection?.peek?.());
+    const data = collection?.value || [];
+    const { loading = false, error = null } = control?.value || {};
+    const sel = selection?.value;
 
     useEffect(() => {
-        const nextData = collection.peek() || [];
-        const { loading = false, error = null } = control.peek() || {};
-        const nextSelection = selection?.peek?.();
         try {
             log.debug('[useDataSourceState] source changed', {
                 ds: context?.identity?.dataSourceRef,
-                rows: Array.isArray(nextData) ? nextData.length : undefined,
+                rows: Array.isArray(data) ? data.length : undefined,
                 loading,
                 hasError: !!error,
             });
         } catch (_) {}
-        setData(nextData);
-        setFlags({ loading, error });
-        setSel(nextSelection);
-    }, [collection, control, selection, context?.identity?.dataSourceRef]);
+    }, [context?.identity?.dataSourceRef, data, loading, error]);
 
-    // keep data in sync
-    useSignalEffect(() => {
-        setData(collection.value || []);
-    });
-
-    // keep loading / error in sync
-    useSignalEffect(() => {
-        const { loading = false, error = null } = control.value || {};
-        setFlags({ loading, error });
-    });
-
-    // keep selection in sync (optional)
-    useSignalEffect(() => {
-        setSel(selection?.value);
-    });
-
-    return { collection: data, ...flags, selection: sel };
+    return { collection: data, loading, error, selection: sel };
 }

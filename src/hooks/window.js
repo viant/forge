@@ -577,15 +577,27 @@ export function useWindowHandlers(windowId) {
         try {
             const sig = getDialogSignal(dialogKey);
             const prev = sig.peek();
+            const selectionMode = options?.multiple === true
+                ? 'multi'
+                : (options?.multiple === false ? 'single' : prev?.selectionMode);
             sig.value = {
                 ...prev,
                 open: true,
-                props: { ...props, parameters },
+                selectionMode,
+                props: {
+                    ...props,
+                    ...options,
+                    parameters,
+                },
                 args: argsObj,
             };
         } catch (_) {
             // Fallback to legacy helper
-            openViewDialog(dialogSignal, { ...props, parameters });
+            openViewDialog(dialogSignal, {
+                ...props,
+                ...options,
+                parameters,
+            });
         }
 
         const entryBase = {
