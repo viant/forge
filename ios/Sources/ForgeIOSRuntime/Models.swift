@@ -380,6 +380,7 @@ public struct DashboardDef: Codable, Sendable {
     public let status: DashboardStatusDef?
     public let feed: DashboardFeedDef?
     public let report: DashboardReportDef?
+    public let reportBuilder: DashboardReportBuilderDef?
     public let detail: DashboardDetailDef?
 
     public init(
@@ -395,6 +396,7 @@ public struct DashboardDef: Codable, Sendable {
         status: DashboardStatusDef? = nil,
         feed: DashboardFeedDef? = nil,
         report: DashboardReportDef? = nil,
+        reportBuilder: DashboardReportBuilderDef? = nil,
         detail: DashboardDetailDef? = nil
     ) {
         self.key = key
@@ -409,8 +411,163 @@ public struct DashboardDef: Codable, Sendable {
         self.status = status
         self.feed = feed
         self.report = report
+        self.reportBuilder = reportBuilder
         self.detail = detail
     }
+}
+
+public struct DashboardReportBuilderDef: Codable, Sendable {
+    public let measures: [ReportBuilderMeasureDef]
+    public let dimensions: [ReportBuilderDimensionDef]
+    public let staticFilters: [ReportBuilderStaticFilterDef]
+    public let result: ReportBuilderResultDef?
+
+    public init(
+        measures: [ReportBuilderMeasureDef] = [],
+        dimensions: [ReportBuilderDimensionDef] = [],
+        staticFilters: [ReportBuilderStaticFilterDef] = [],
+        result: ReportBuilderResultDef? = nil
+    ) {
+        self.measures = measures
+        self.dimensions = dimensions
+        self.staticFilters = staticFilters
+        self.result = result
+    }
+}
+
+public struct ReportBuilderMeasureDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let key: String?
+    public let label: String?
+    public let format: String?
+    public let defaultValue: Bool?
+    public let color: String?
+    public let hidden: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case key
+        case label
+        case format
+        case defaultValue = "default"
+        case color
+        case hidden
+    }
+
+    public var identityKey: String { key ?? id ?? UUID().uuidString }
+}
+
+public struct ReportBuilderDimensionDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let key: String?
+    public let label: String?
+    public let format: String?
+    public let defaultValue: Bool?
+    public let chartAxis: Bool?
+    public let hidden: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case key
+        case label
+        case format
+        case defaultValue = "default"
+        case chartAxis
+        case hidden
+    }
+
+    public var identityKey: String { key ?? id ?? UUID().uuidString }
+}
+
+public struct ReportBuilderResultDef: Codable, Sendable {
+    public let chartCreationMode: String?
+    public let defaultMode: String?
+    public let viewModes: [String]
+    public let chartType: String?
+    public let chartWizard: ReportBuilderChartWizardDef?
+    public let defaultChartSpecs: [ReportBuilderChartSpecDef]
+
+    public init(
+        chartCreationMode: String? = nil,
+        defaultMode: String? = nil,
+        viewModes: [String] = [],
+        chartType: String? = nil,
+        chartWizard: ReportBuilderChartWizardDef? = nil,
+        defaultChartSpecs: [ReportBuilderChartSpecDef] = []
+    ) {
+        self.chartCreationMode = chartCreationMode
+        self.defaultMode = defaultMode
+        self.viewModes = viewModes
+        self.chartType = chartType
+        self.chartWizard = chartWizard
+        self.defaultChartSpecs = defaultChartSpecs
+    }
+}
+
+public struct ReportBuilderStaticFilterDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let type: String?
+    public let required: Bool?
+    public let multiple: Bool?
+    public let options: [ReportBuilderStaticFilterOptionDef]
+    public let defaultValue: JSONValue?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case type
+        case required
+        case multiple
+        case options
+        case defaultValue = "default"
+    }
+
+    public var identityKey: String { id ?? label ?? UUID().uuidString }
+}
+
+public struct ReportBuilderStaticFilterOptionDef: Codable, Sendable, Identifiable {
+    public let value: JSONValue?
+    public let label: String?
+    public let icon: String?
+    public let defaultValue: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case value
+        case label
+        case icon
+        case defaultValue = "default"
+    }
+
+    public var id: String { value?.stringValue ?? label ?? UUID().uuidString }
+}
+
+public struct ReportBuilderChartWizardDef: Codable, Sendable {
+    public let supportedTypes: [String]
+}
+
+public struct ReportBuilderChartSpecDef: Codable, Sendable, Identifiable {
+    public let title: String?
+    public let type: String?
+    public let xField: String?
+    public let yFields: [String]
+    public let seriesField: String?
+
+    public init(
+        title: String? = nil,
+        type: String? = nil,
+        xField: String? = nil,
+        yFields: [String] = [],
+        seriesField: String? = nil
+    ) {
+        self.title = title
+        self.type = type
+        self.xField = xField
+        self.yFields = yFields
+        self.seriesField = seriesField
+    }
+
+    public var id: String { title ?? xField ?? UUID().uuidString }
 }
 
 public struct DashboardSummaryDef: Codable, Sendable {

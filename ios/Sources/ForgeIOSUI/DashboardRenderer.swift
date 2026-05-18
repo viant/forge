@@ -64,6 +64,15 @@ public struct DashboardRenderer: View {
                 return AnyView(dashboardPanel(container) {
                     reportBlock(container, metrics: metrics)
                 })
+            case "dashboard.reportBuilder":
+                if let reportBuilder = container.dashboard?.reportBuilder {
+                    return AnyView(dashboardPanel(container) {
+                        ReportBuilderRenderer(runtime: runtime, window: window, container: container, config: reportBuilder)
+                    })
+                }
+                return AnyView(dashboardPanel(container) {
+                    unsupportedBlock("dashboard report builder has no config")
+                })
             case "dashboard.feed":
                 return AnyView(dashboardPanel(container) {
                     feedBlock(container, metrics: metrics)
