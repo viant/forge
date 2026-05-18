@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Icon } from "@blueprintjs/core";
+import { Button, Dialog, Icon } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
@@ -10,19 +10,30 @@ import { formatDashboardValue } from "./dashboardUtils.js";
 import {
     applyReportBuilderComputedMeasures,
     addDynamicFilterRow,
+    buildDefaultReportBuilderChartSpec,
+    buildExplicitReportBuilderChartContainer,
+    buildReportBuilderChartFields,
     buildReportBuilderColumns,
+    buildReportBuilderDefaultChartSpecs,
     buildReportBuilderDefaultState,
     buildReportBuilderRequest,
+    buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
     getSelectableReportBuilderMeasures,
+    getReportBuilderSupportedChartTypes,
     getVisibleReportBuilderDimensions,
+    isExplicitReportBuilderChartMode,
+    isReportBuilderChartSpecStale,
     mergeReportBuilderState,
+    normalizeReportBuilderChartSpec,
+    projectManualSelection,
     projectLookupSelections,
     removeDynamicFilterRow,
     resolveReportBuilderMeasure,
     resolveReportBuilderReadiness,
     sanitizeReportBuilderState,
     updateDynamicFilterRow,
+    validateReportBuilderChartSpec,
 } from "./reportBuilderUtils.js";
 
 function getBuilderConfig(container = {}) {
@@ -35,6 +46,24 @@ function getLookupExtensionConfig(config = {}) {
         return extension;
     }
     return {};
+}
+
+export function resolveReportBuilderNotices(config = {}, state = {}) {
+    const notices = Array.isArray(config?.notices) ? config.notices : [];
+    return notices.map((notice) => {
+        const sourcePath = String(notice?.sourcePath || "").trim();
+        const rawValue = sourcePath ? resolveKey(state, sourcePath) : undefined;
+        const items = Array.isArray(rawValue)
+            ? rawValue.filter((entry) => entry !== undefined && entry !== null && entry !== "").map((entry) => String(entry))
+            : [];
+        return {
+            id: String(notice?.id || "").trim(),
+            level: String(notice?.level || "info").trim().toLowerCase() || "info",
+            title: String(notice?.title || "").trim(),
+            description: String(notice?.description || "").trim(),
+            items,
+        };
+    }).filter((notice) => notice.id && notice.items.length > 0);
 }
 
 export function resolveReportBuilderHookHandler(builderContext, handlerName = "") {
@@ -215,6 +244,23 @@ function filterCategoryTitle(label = "", { active = false, configuredCount = 0 }
     return parts.join(" • ");
 }
 
+function renderReportBuilderError(error) {
+    if (error == null) {
+        return "";
+    }
+    if (typeof error === "string") {
+        return error;
+    }
+    if (typeof error?.message === "string" && error.message.trim()) {
+        return error.message.trim();
+    }
+    try {
+        return JSON.stringify(error);
+    } catch (_) {
+        return "Unexpected error";
+    }
+}
+
 function buildChartContainer(container = {}, config = {}, state = {}) {
     const selectedMeasures = (state.selectedMeasures || [])
         .map((id) => measureById(config, id))
@@ -266,6 +312,252 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
     };
 }
 
+const REPORT_BUILDER_CHART_PRESET_PREFIX = "reportBuilder.chartPresets";
+
+function chartPresetStorageKey(storageScope = "") {
+    const normalized = String(storageScope || "").trim() || "reportBuilder";
+    return `${REPORT_BUILDER_CHART_PRESET_PREFIX}.${normalized}`;
+}
+
+function loadStoredChartPresets(storageScope = "") {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return [];
+    }
+    try {
+        const raw = window.localStorage.getItem(chartPresetStorageKey(storageScope));
+        if (!raw) {
+            return [];
+        }
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function persistStoredChartPresets(storageScope = "", presets = []) {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return;
+    }
+    try {
+        window.localStorage.setItem(chartPresetStorageKey(storageScope), JSON.stringify(presets));
+    } catch (_) {}
+}
+
+function dedupeChartPresets(presets = []) {
+    const seen = new Map();
+    normalizeArray(presets).forEach((preset) => {
+        const title = String(preset?.title || "").trim();
+        const settingsHash = String(preset?.settingsHash || "").trim();
+        const chartSpec = normalizeReportBuilderChartSpec(preset?.chartSpec);
+        if (!title || !settingsHash || !chartSpec) {
+            return;
+        }
+        const key = JSON.stringify({ title, settingsHash, chartSpec });
+        if (seen.has(key)) {
+            return;
+        }
+        seen.set(key, {
+            title,
+            settingsHash,
+            chartSpec,
+            updatedAt: Number(preset?.updatedAt || Date.now()) || Date.now(),
+        });
+    });
+    return Array.from(seen.values()).sort((left, right) => Number(right.updatedAt || 0) - Number(left.updatedAt || 0));
+}
+
+function upsertChartPreset(presets = [], nextPreset = null) {
+    return dedupeChartPresets([nextPreset, ...normalizeArray(presets)]);
+}
+
+function chartErrorMessage(error = {}) {
+    switch (String(error?.code || "").trim()) {
+        case "missingField":
+            return `${error.field} is no longer available in the current table.`;
+        case "wrongKind":
+            return `${error.field} has the wrong field type for this chart.`;
+        case "duplicateField":
+            return `${error.field} duplicates another chart field.`;
+        case "unsupportedType":
+            return `This chart type is not supported by the current renderer.`;
+        case "empty":
+            return `${error.field} requires at least one selection.`;
+        case "missing":
+        default:
+            return `Chart settings are incomplete.`;
+    }
+}
+
+function ReportBuilderChartDialog({
+    isOpen = false,
+    onClose,
+    draft,
+    onChange,
+    onApply,
+    supportedTypes = [],
+    dimensions = [],
+    measures = [],
+    validation = { valid: false, errors: [] },
+}) {
+    const errorSet = new Set((validation?.errors || []).map((entry) => String(entry?.field || "").trim()));
+    const selectedXField = String(draft?.xField || "").trim();
+    const availableSeriesDimensions = dimensions.filter((entry) => entry.key !== selectedXField);
+    const selectedYField = String(Array.isArray(draft?.yFields) ? draft.yFields[0] || "" : "").trim();
+    return (
+        <Dialog
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Create Chart"
+            style={{ width: "min(720px, calc(100vw - 48px))" }}
+        >
+            <div className="forge-report-builder__chart-dialog">
+                <div className="forge-report-builder__chart-dialog-grid">
+                    <label className="forge-report-builder__chart-field">
+                        <span>Title</span>
+                        <input
+                            type="text"
+                            className="forge-report-builder-select"
+                            value={draft?.title || ""}
+                            onChange={(event) => onChange({ title: event.target.value })}
+                            placeholder="Enter chart title"
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Chart Type</span>
+                        <select
+                            className="forge-report-builder-select"
+                            value={draft?.type || supportedTypes[0] || "line"}
+                            onChange={(event) => onChange({ type: event.target.value })}
+                        >
+                            {supportedTypes.map((entry) => (
+                                <option key={entry} value={entry}>{entry}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>X-axis</span>
+                        <select
+                            className={errorSet.has("xField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={selectedXField}
+                            onChange={(event) => onChange({ xField: event.target.value })}
+                        >
+                            {dimensions.map((entry) => (
+                                <option key={entry.key} value={entry.key}>{entry.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Y-axis</span>
+                        <select
+                            className={(validation?.errors || []).some((entry) => String(entry?.field || "").startsWith("yFields")) ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={selectedYField}
+                            onChange={(event) => onChange({ yFields: [event.target.value] })}
+                        >
+                            {measures.map((entry) => (
+                                <option key={entry.key} value={entry.key}>{entry.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Series / Color</span>
+                        <select
+                            className={errorSet.has("seriesField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.seriesField || ""}
+                            onChange={(event) => onChange({ seriesField: event.target.value || null })}
+                        >
+                            <option value="">None</option>
+                            {availableSeriesDimensions.map((entry) => (
+                                <option key={entry.key} value={entry.key}>{entry.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+                {validation?.errors?.length > 0 ? (
+                    <div className="forge-report-builder__chart-errors">
+                        {validation.errors.map((entry, index) => (
+                            <div key={`${entry.field}_${entry.code}_${index}`} className="forge-report-builder__chart-error">
+                                {chartErrorMessage(entry)}
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+            <div className="forge-report-builder__chart-dialog-actions">
+                <Button outlined onClick={onClose}>Cancel</Button>
+                <Button intent="primary" onClick={onApply} disabled={!validation?.valid}>Apply Chart</Button>
+            </div>
+        </Dialog>
+    );
+}
+
+function ReportBuilderChartTile({
+    title = "Chart",
+    description = "",
+    canCreate = false,
+    onCreate,
+    defaultChartSpecs = [],
+    onApplyDefault,
+    previousChartPresets = [],
+    selectedPreviousTitle = "",
+    onSelectPrevious,
+    onApplyPrevious,
+    previousDisabled = true,
+    warning = false,
+    onRemove,
+}) {
+    return (
+        <section className={warning ? "forge-report-builder__chart-tile is-warning" : "forge-report-builder__chart-tile"}>
+            <div className="forge-report-builder__chart-tile-copy">
+                <div className="forge-report-builder__chart-tile-eyebrow">{warning ? "Chart needs attention" : "Chart"}</div>
+                <h4>{title}</h4>
+                {description ? <p>{description}</p> : null}
+                <div className="forge-report-builder__chart-tile-helper">
+                    Only fields visible in the table can be charted.
+                </div>
+            </div>
+            <div className="forge-report-builder__chart-tile-actions">
+                <Button intent="primary" icon="add" disabled={!canCreate} onClick={onCreate}>
+                    Create Chart
+                </Button>
+                {defaultChartSpecs.length > 0 ? (
+                    <div className="forge-report-builder__chart-preset-list">
+                        {defaultChartSpecs.map((entry) => (
+                            <button
+                                key={`${entry.title}_${entry.type}_${entry.xField}`}
+                                type="button"
+                                className="forge-report-builder__chart-preset-button"
+                                onClick={() => onApplyDefault(entry)}
+                            >
+                                <span className="forge-report-builder__chart-preset-title">{entry.title}</span>
+                                <span className="forge-report-builder__chart-preset-meta">{entry.type}</span>
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
+                <div className="forge-report-builder__chart-previous">
+                    <select
+                        className="forge-report-builder-select"
+                        value={selectedPreviousTitle}
+                        onChange={(event) => onSelectPrevious(event.target.value)}
+                    >
+                        <option value="">Previous</option>
+                        {previousChartPresets.map((preset) => (
+                            <option key={`${preset.title}_${preset.updatedAt}`} value={preset.title}>{preset.title}</option>
+                        ))}
+                    </select>
+                    <Button outlined disabled={previousDisabled} onClick={onApplyPrevious}>
+                        Apply
+                    </Button>
+                </div>
+                {warning && onRemove ? (
+                    <Button outlined intent="danger" onClick={onRemove}>Remove Chart</Button>
+                ) : null}
+            </div>
+        </section>
+    );
+}
+
 function FilterChip({ label, onRemove }) {
     return (
         <span className="forge-report-builder-filter-chip">
@@ -289,6 +581,16 @@ function collectOptionRows(rows = [], childKeys = ["children", "childNodes"], re
         });
     });
     return result;
+}
+
+function normalizeArray(value) {
+    if (Array.isArray(value)) {
+        return value.filter((entry) => entry !== undefined && entry !== null && entry !== "");
+    }
+    if (value === undefined || value === null || value === "") {
+        return [];
+    }
+    return [value];
 }
 
 function resolveFilterOptions(filter = {}, collection = []) {
@@ -338,7 +640,6 @@ function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) 
             ].filter(Boolean).join(" ")}>
                 <div className="forge-report-builder__panel-headerline">
                     <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
-                    {filter.required ? <span className="forge-report-builder__panel-badge">Required</span> : null}
                 </div>
                 <div className="forge-report-builder__date-range">
                     <input
@@ -365,7 +666,6 @@ function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) 
         ].filter(Boolean).join(" ")}>
             <div className="forge-report-builder__panel-headerline">
                 <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
-                {filter.required ? <span className="forge-report-builder__panel-badge">Required</span> : null}
             </div>
             <div className={String(filter.id || "").trim() === "channelIds" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
                 {options.map((option) => {
@@ -400,10 +700,13 @@ function DynamicFilterGroup({
     onAddRow,
     onChangeFilter,
     onPick,
+    onAddManualSelection,
     onRemoveSelection,
+    onToggleEnabled,
     onRemoveRow,
 }) {
     const filters = Array.isArray(group.filters) ? group.filters : [];
+    const [manualDrafts, setManualDrafts] = useState({});
 
     return (
         <section className="forge-report-builder-dynamic-group">
@@ -426,8 +729,14 @@ function DynamicFilterGroup({
                     const selectedFilter = filters.find((entry) => String(entry?.id || "").trim() === String(row.filterId || "").trim()) || filters[0] || null;
                     const placeholder = selectedFilter?.placeholder || selectedFilter?.label || "Select value";
                     const dialogId = selectedFilter?.dialogId || selectedFilter?.lookup?.dialogId || "";
+                    const enabled = row?.enabled !== false;
+                    const allowManualEntry = selectedFilter?.manualEntry === true;
+                    const manualDraft = manualDrafts[row.id] || "";
                     return (
-                        <div key={row.id} className="forge-report-builder-dynamic-row">
+                        <div key={row.id} className={[
+                            "forge-report-builder-dynamic-row",
+                            enabled ? "" : "is-disabled",
+                        ].filter(Boolean).join(" ")}>
                             <div className="forge-report-builder-dynamic-row__controls">
                                 <select
                                     className="forge-report-builder-select"
@@ -440,15 +749,59 @@ function DynamicFilterGroup({
                                         </option>
                                     ))}
                                 </select>
-                                <Button
-                                    small
-                                    icon="search-template"
-                                    outlined
-                                    onClick={() => onPick(row.id, selectedFilter)}
-                                    disabled={!dialogId}
-                                >
-                                    {placeholder}
-                                </Button>
+                                {dialogId ? (
+                                    <Button
+                                        small
+                                        icon="search-template"
+                                        outlined
+                                        onClick={() => onPick(row.id, selectedFilter)}
+                                    >
+                                        {placeholder}
+                                    </Button>
+                                ) : null}
+                                {allowManualEntry ? (
+                                    <div className="forge-report-builder-dynamic-row__manual-entry">
+                                        <input
+                                            type="text"
+                                            className="forge-report-builder-select forge-report-builder-manual-input"
+                                            value={manualDraft}
+                                            placeholder={selectedFilter?.manualPlaceholder || "Enter value"}
+                                            onChange={(event) => setManualDrafts((current) => ({
+                                                ...current,
+                                                [row.id]: event.target.value,
+                                            }))}
+                                            onKeyDown={(event) => {
+                                                if (event.key !== "Enter") {
+                                                    return;
+                                                }
+                                                event.preventDefault();
+                                                const added = onAddManualSelection(row.id, selectedFilter, manualDraft);
+                                                if (added) {
+                                                    setManualDrafts((current) => ({
+                                                        ...current,
+                                                        [row.id]: "",
+                                                    }));
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            small
+                                            outlined
+                                            icon="plus"
+                                            onClick={() => {
+                                                const added = onAddManualSelection(row.id, selectedFilter, manualDraft);
+                                                if (added) {
+                                                    setManualDrafts((current) => ({
+                                                        ...current,
+                                                        [row.id]: "",
+                                                    }));
+                                                }
+                                            }}
+                                        >
+                                            Add value
+                                        </Button>
+                                    </div>
+                                ) : null}
                             </div>
                             <div className="forge-report-builder-dynamic-row__selection-line">
                                 {(row.selections || []).map((selection, index) => (
@@ -460,6 +813,19 @@ function DynamicFilterGroup({
                                 ))}
                             </div>
                             <div className="forge-report-builder-dynamic-row__actions">
+                                <button
+                                    type="button"
+                                    className={[
+                                        "forge-report-builder-row-toggle",
+                                        enabled ? "is-enabled" : "is-disabled",
+                                    ].join(" ")}
+                                    onClick={() => onToggleEnabled(row.id)}
+                                    aria-pressed={enabled}
+                                    title={enabled ? "Filter is active" : "Filter is off"}
+                                >
+                                    <Icon icon={enabled ? "eye-open" : "eye-off"} size={12} />
+                                    <span>{enabled ? "On" : "Off"}</span>
+                                </button>
                                 <button
                                     type="button"
                                     className="forge-report-builder-remove-row"
@@ -477,6 +843,246 @@ function DynamicFilterGroup({
     );
 }
 
+function resolveFamilyOptionKey(filterDef = {}, fallbackId = "") {
+    const direct = String(filterDef?.targetingFeatureKey || "").trim();
+    if (direct) {
+        return direct;
+    }
+    const filterId = String(filterDef?.id || fallbackId || "").trim();
+    return filterId.replace(/^(include|exclude)/i, "");
+}
+
+function buildDynamicFamilyOptions(family = {}, dynamicFilterGroups = []) {
+    const includeGroup = dynamicFilterGroups.find((entry) => String(entry?.id || "").trim() === "include");
+    const excludeGroup = dynamicFilterGroups.find((entry) => String(entry?.id || "").trim() === "exclude");
+    const includeById = new Map(normalizeArray(includeGroup?.filters).map((entry) => [String(entry?.id || "").trim(), entry]));
+    const excludeById = new Map(normalizeArray(excludeGroup?.filters).map((entry) => [String(entry?.id || "").trim(), entry]));
+    const optionMap = new Map();
+
+    const register = (direction, filterId) => {
+        const keyId = String(filterId || "").trim();
+        if (!keyId) return;
+        const filterDef = direction === "include" ? includeById.get(keyId) : excludeById.get(keyId);
+        if (!filterDef) return;
+        const optionKey = resolveFamilyOptionKey(filterDef, keyId);
+        const existing = optionMap.get(optionKey) || {
+            key: optionKey,
+            label: String(filterDef?.label || optionKey).trim(),
+            includeFilter: null,
+            excludeFilter: null,
+        };
+        existing[direction === "include" ? "includeFilter" : "excludeFilter"] = filterDef;
+        if (!existing.label) {
+            existing.label = String(filterDef?.label || optionKey).trim();
+        }
+        optionMap.set(optionKey, existing);
+    };
+
+    normalizeArray(family.includeFilterIds).forEach((filterId) => register("include", filterId));
+    normalizeArray(family.excludeFilterIds).forEach((filterId) => register("exclude", filterId));
+
+    return Array.from(optionMap.values());
+}
+
+function buildDynamicFamilyRows(state = {}, family = {}, dynamicFilterGroups = []) {
+    const options = buildDynamicFamilyOptions(family, dynamicFilterGroups);
+    const includeRows = normalizeArray(state?.dynamicGroups?.include).filter((row) => normalizeArray(family.includeFilterIds).includes(String(row?.filterId || "").trim()));
+    const excludeRows = normalizeArray(state?.dynamicGroups?.exclude).filter((row) => normalizeArray(family.excludeFilterIds).includes(String(row?.filterId || "").trim()));
+    const enrich = (rows, direction) => rows.map((row) => {
+        const option = options.find((entry) => {
+            const target = direction === "include" ? entry.includeFilter : entry.excludeFilter;
+            return String(target?.id || "").trim() === String(row?.filterId || "").trim();
+        }) || null;
+        return {
+            ...row,
+            direction,
+            optionKey: option?.key || "",
+        };
+    });
+    return [...enrich(includeRows, "include"), ...enrich(excludeRows, "exclude")];
+}
+
+function DynamicFamilyGroup({
+    family,
+    rows,
+    options,
+    onAddRow,
+    onChangeFilter,
+    onChangeDirection,
+    onPick,
+    onAddManualSelection,
+    onRemoveSelection,
+    onToggleEnabled,
+    onRemoveRow,
+}) {
+    const [manualDrafts, setManualDrafts] = useState({});
+
+    return (
+        <section className="forge-report-builder-dynamic-group forge-report-builder-dynamic-group--family">
+            <div className="forge-report-builder-dynamic-group__header">
+                <div>
+                    <h4>{family.label}</h4>
+                    {family.description ? <p>{family.description}</p> : null}
+                </div>
+                <Button small outlined icon="add" onClick={onAddRow}>
+                    Add line
+                </Button>
+            </div>
+            <div className="forge-report-builder-dynamic-group__rows">
+                {rows.map((row) => {
+                    const option = options.find((entry) => entry.key === row.optionKey) || options[0] || null;
+                    const selectedFilter = row.direction === "exclude" ? option?.excludeFilter : option?.includeFilter;
+                    const fallbackFilter = selectedFilter || option?.includeFilter || option?.excludeFilter || null;
+                    const placeholder = fallbackFilter?.placeholder || fallbackFilter?.label || "Select value";
+                    const dialogId = fallbackFilter?.dialogId || fallbackFilter?.lookup?.dialogId || "";
+                    const enabled = row?.enabled !== false;
+                    const allowManualEntry = fallbackFilter?.manualEntry === true;
+                    const manualDraft = manualDrafts[row.id] || "";
+                    const canInclude = !!option?.includeFilter;
+                    const canExclude = !!option?.excludeFilter;
+                    return (
+                        <div key={row.id} className={["forge-report-builder-dynamic-row", enabled ? "" : "is-disabled"].filter(Boolean).join(" ")}>
+                            <div className="forge-report-builder-dynamic-row__controls">
+                                <select
+                                    className="forge-report-builder-select"
+                                    value={row.optionKey || option?.key || ""}
+                                    onChange={(event) => onChangeFilter(row.id, row.direction, event.target.value)}
+                                >
+                                    {options.map((entry) => (
+                                        <option key={entry.key} value={entry.key}>{entry.label}</option>
+                                    ))}
+                                </select>
+                                <div className="forge-report-builder-direction-toggle" role="radiogroup" aria-label="Filter direction">
+                                    <button
+                                        type="button"
+                                        className={["forge-report-builder-direction-toggle__button", row.direction === "include" ? "is-active" : ""].filter(Boolean).join(" ")}
+                                        disabled={!canInclude}
+                                        onClick={() => onChangeDirection(row.id, row.direction, row.optionKey, "include")}
+                                    >
+                                        Include
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={["forge-report-builder-direction-toggle__button", row.direction === "exclude" ? "is-active" : ""].filter(Boolean).join(" ")}
+                                        disabled={!canExclude}
+                                        onClick={() => onChangeDirection(row.id, row.direction, row.optionKey, "exclude")}
+                                    >
+                                        Exclude
+                                    </button>
+                                </div>
+                                {dialogId ? (
+                                    <Button small icon="search-template" outlined onClick={() => onPick(row.id, row.direction, fallbackFilter)}>
+                                        {placeholder}
+                                    </Button>
+                                ) : null}
+                                {allowManualEntry ? (
+                                    <div className="forge-report-builder-dynamic-row__manual-entry">
+                                        <input
+                                            type="text"
+                                            className="forge-report-builder-select forge-report-builder-manual-input"
+                                            value={manualDraft}
+                                            placeholder={fallbackFilter?.manualPlaceholder || "Enter value"}
+                                            onChange={(event) => setManualDrafts((current) => ({ ...current, [row.id]: event.target.value }))}
+                                            onKeyDown={(event) => {
+                                                if (event.key !== "Enter") return;
+                                                event.preventDefault();
+                                                const added = onAddManualSelection(row.id, row.direction, fallbackFilter, manualDraft);
+                                                if (added) {
+                                                    setManualDrafts((current) => ({ ...current, [row.id]: "" }));
+                                                }
+                                            }}
+                                        />
+                                        <Button
+                                            small
+                                            outlined
+                                            icon="plus"
+                                            onClick={() => {
+                                                const added = onAddManualSelection(row.id, row.direction, fallbackFilter, manualDraft);
+                                                if (added) {
+                                                    setManualDrafts((current) => ({ ...current, [row.id]: "" }));
+                                                }
+                                            }}
+                                        >
+                                            Add value
+                                        </Button>
+                                    </div>
+                                ) : null}
+                            </div>
+                            <div className="forge-report-builder-dynamic-row__selection-line">
+                                {(row.selections || []).map((selection, index) => (
+                                    <FilterChip
+                                        key={`${row.id}_${index}_${selection.value}`}
+                                        label={selection.label || String(selection.value)}
+                                        onRemove={() => onRemoveSelection(row.id, row.direction, index)}
+                                    />
+                                ))}
+                            </div>
+                            <div className="forge-report-builder-dynamic-row__actions">
+                                <button
+                                    type="button"
+                                    className={["forge-report-builder-row-toggle", enabled ? "is-enabled" : "is-disabled"].join(" ")}
+                                    onClick={() => onToggleEnabled(row.id, row.direction)}
+                                    aria-pressed={enabled}
+                                >
+                                    <Icon icon={enabled ? "eye-open" : "eye-off"} size={12} />
+                                    <span>{enabled ? "On" : "Off"}</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    className="forge-report-builder-remove-row"
+                                    onClick={() => onRemoveRow(row.id, row.direction)}
+                                    aria-label="Remove filter row"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </section>
+    );
+}
+
+function resolveDynamicGroupLayout(config = {}, activeGroupIds = []) {
+    const active = Array.isArray(activeGroupIds) ? activeGroupIds : [];
+    const layout = config?.dynamicGroupLayout;
+    if (!layout || typeof layout !== "object") {
+        return {
+            fullWidthIds: [],
+            columnRows: [active],
+        };
+    }
+    const fullWidthIds = normalizeArray(layout.fullWidthIds)
+        .map((entry) => String(entry || "").trim())
+        .filter((entry) => active.includes(entry));
+    const used = new Set(fullWidthIds);
+    const columnRows = normalizeArray(layout.columnRows)
+        .map((row) => normalizeArray(row).map((entry) => String(entry || "").trim()).filter((entry) => active.includes(entry) && !used.has(entry)))
+        .filter((row) => row.length > 0);
+    columnRows.forEach((row) => row.forEach((entry) => used.add(entry)));
+    const remaining = active.filter((entry) => !used.has(entry));
+    if (remaining.length > 0) {
+        columnRows.push(remaining);
+    }
+    return {
+        fullWidthIds,
+        columnRows: columnRows.length > 0 ? columnRows : [active.filter((entry) => !fullWidthIds.includes(entry))],
+    };
+}
+
+function resolveDynamicFilterFamilies(config = {}) {
+    return normalizeArray(config?.dynamicFilterFamilies).map((entry, index) => ({
+        id: String(entry?.id || "").trim(),
+        label: String(entry?.label || entry?.id || "").trim(),
+        description: String(entry?.description || "").trim(),
+        includeFilterIds: normalizeArray(entry?.includeFilterIds).map((value) => String(value || "").trim()).filter(Boolean),
+        excludeFilterIds: normalizeArray(entry?.excludeFilterIds).map((value) => String(value || "").trim()).filter(Boolean),
+        order: Number.isFinite(Number(entry?.order)) ? Number(entry.order) : index,
+    })).filter((entry) => entry.id && (entry.includeFilterIds.length > 0 || entry.excludeFilterIds.length > 0))
+      .sort((left, right) => left.order - right.order);
+}
+
 export default function ReportBuilder({ container, context }) {
     useSignals();
     const config = useMemo(() => getBuilderConfig(container), [container]);
@@ -492,6 +1098,10 @@ export default function ReportBuilder({ container, context }) {
     const seededDefaultsRef = useRef(false);
     const appliedPrefillSignatureRef = useRef("");
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [chartDialogOpen, setChartDialogOpen] = useState(false);
+    const [chartDraft, setChartDraft] = useState(null);
+    const [storedChartPresets, setStoredChartPresets] = useState([]);
+    const [selectedPreviousChartTitle, setSelectedPreviousChartTitle] = useState("");
 
     const { collection = [], loading, error } = useDataSourceState(builderContext);
     const locale = context?.locale || "en-US";
@@ -607,7 +1217,19 @@ export default function ReportBuilder({ container, context }) {
     const dimensions = useMemo(() => getVisibleReportBuilderDimensions(config), [config]);
     const staticFilters = Array.isArray(config.staticFilters) ? config.staticFilters : [];
     const dynamicFilterGroups = Array.isArray(config.dynamicFilterGroups) ? config.dynamicFilterGroups : [];
+    const dynamicFilterFamilies = useMemo(() => resolveDynamicFilterFamilies(config), [config]);
+    const familyMode = dynamicFilterFamilies.length > 0;
+    const hiddenDynamicGroupIds = useMemo(
+        () => new Set(normalizeArray(config.hiddenDynamicGroupIds).map((entry) => String(entry || "").trim()).filter(Boolean)),
+        [config],
+    );
+    const pinnedDynamicGroupIds = useMemo(
+        () => normalizeArray(config.pinnedDynamicGroupIds).map((entry) => String(entry || "").trim()).filter(Boolean),
+        [config],
+    );
+    const showFilterCategoryBar = config.showFilterCategoryBar !== false;
     const lookupExtension = useMemo(() => getLookupExtensionConfig(config), [config]);
+    const explicitChartMode = isExplicitReportBuilderChartMode(config);
     const viewModes = Array.isArray(config?.result?.viewModes) && config.result.viewModes.length > 0
         ? config.result.viewModes
         : ["chart", "table"];
@@ -619,9 +1241,25 @@ export default function ReportBuilder({ container, context }) {
         : [25, 50, 100];
 
     const selectedColumns = useMemo(() => buildReportBuilderColumns(config, state), [config, state]);
+    const chartFields = useMemo(() => buildReportBuilderChartFields(config, state), [config, state]);
+    const chartDimensions = useMemo(() => chartFields.filter((entry) => entry.kind === "dimension"), [chartFields]);
+    const chartMeasures = useMemo(() => chartFields.filter((entry) => entry.kind === "measure"), [chartFields]);
+    const supportedChartTypes = useMemo(() => getReportBuilderSupportedChartTypes(config), [config]);
+    const defaultChartSpecs = useMemo(() => buildReportBuilderDefaultChartSpecs(config, state), [config, state]);
+    const chartSpecValidation = useMemo(
+        () => validateReportBuilderChartSpec(config, state.chartSpec, chartFields),
+        [config, state.chartSpec, chartFields],
+    );
+    const hasValidChartSpec = !!state.chartSpec && chartSpecValidation.valid;
+    const hasStaleChartSpec = !!state.chartSpec && isReportBuilderChartSpecStale(config, state.chartSpec, chartFields);
+    const settingsHash = useMemo(() => buildReportBuilderSettingsHash(state), [state.selectedDimensions, state.selectedMeasures]);
     const chartContainer = useMemo(
-        () => buildChartContainer({ ...container, collection: computedCollection }, config, state),
-        [collection, computedCollection, container, config, state],
+        () => (
+            explicitChartMode && hasValidChartSpec
+                ? buildExplicitReportBuilderChartContainer({ ...container, collection: computedCollection }, config, state, state.chartSpec)
+                : buildChartContainer({ ...container, collection: computedCollection }, config, state)
+        ),
+        [collection, computedCollection, container, config, explicitChartMode, hasValidChartSpec, state],
     );
     const currentRequestFingerprint = useMemo(
         () => JSON.stringify(buildReportBuilderRequest(config, state)),
@@ -635,6 +1273,8 @@ export default function ReportBuilder({ container, context }) {
     const [filterPanels, setFilterPanels] = useState({ common: true, advanced: false });
     const [activeOptionalFilterKeys, setActiveOptionalFilterKeys] = useState([]);
     const [activeDynamicGroupIds, setActiveDynamicGroupIds] = useState([]);
+    const [activeDynamicFamilyIds, setActiveDynamicFamilyIds] = useState([]);
+    const [dimensionsCollapsed, setDimensionsCollapsed] = useState(false);
     const activeStaticFilterCount = useMemo(() => (
         staticFilters.reduce((count, filter) => {
             const key = String(filter.id || filter.field || "").trim();
@@ -642,10 +1282,29 @@ export default function ReportBuilder({ container, context }) {
         }, 0)
     ), [staticFilters, state]);
     const activeDynamicFilterCount = useMemo(() => (
-        dynamicFilterGroups.reduce((count, group) => (
-            count + (state?.dynamicGroups?.[group.id] || []).filter((row) => Array.isArray(row.selections) && row.selections.length > 0).length
-        ), 0)
-    ), [dynamicFilterGroups, state]);
+        dynamicFilterGroups.reduce((count, group) => {
+            if (hiddenDynamicGroupIds.has(group.id)) {
+                return count;
+            }
+            return count + (state?.dynamicGroups?.[group.id] || []).filter((row) => Array.isArray(row.selections) && row.selections.length > 0).length;
+        }, 0)
+    ), [dynamicFilterGroups, hiddenDynamicGroupIds, state]);
+    const visibleActiveDynamicGroupIds = useMemo(
+        () => activeDynamicGroupIds.filter((groupId) => !hiddenDynamicGroupIds.has(groupId)),
+        [activeDynamicGroupIds, hiddenDynamicGroupIds],
+    );
+    const dynamicGroupLayout = useMemo(
+        () => resolveDynamicGroupLayout(config, visibleActiveDynamicGroupIds),
+        [config, visibleActiveDynamicGroupIds],
+    );
+    const notices = useMemo(() => resolveReportBuilderNotices(config, state), [config, state]);
+    const familyConfiguredCount = React.useCallback((family) => {
+        const includeRows = state?.dynamicGroups?.include || [];
+        const excludeRows = state?.dynamicGroups?.exclude || [];
+        const includeCount = includeRows.filter((row) => family.includeFilterIds.includes(String(row?.filterId || "").trim()) && Array.isArray(row.selections) && row.selections.length > 0).length;
+        const excludeCount = excludeRows.filter((row) => family.excludeFilterIds.includes(String(row?.filterId || "").trim()) && Array.isArray(row.selections) && row.selections.length > 0).length;
+        return includeCount + excludeCount;
+    }, [state]);
 
     useEffect(() => {
         const nextOptional = optionalStaticFilters
@@ -663,8 +1322,25 @@ export default function ReportBuilder({ container, context }) {
     }, [optionalStaticFilters, state]);
 
     useEffect(() => {
+        if (!familyMode) {
+            return;
+        }
+        const configuredFamilies = dynamicFilterFamilies
+            .filter((family) => familyConfiguredCount(family) > 0)
+            .map((family) => family.id);
+        setActiveDynamicFamilyIds((current) => {
+            const validCurrent = current.filter((familyId) => dynamicFilterFamilies.some((family) => family.id === familyId));
+            const nextFamilies = Array.from(new Set([...validCurrent, ...configuredFamilies]));
+            const currentSorted = [...validCurrent].sort();
+            const nextSorted = [...nextFamilies].sort();
+            return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextFamilies;
+        });
+    }, [dynamicFilterFamilies, familyConfiguredCount, familyMode]);
+
+    useEffect(() => {
         const nextGroups = dynamicFilterGroups
-            .filter((group) => Array.isArray(state?.dynamicGroups?.[group.id]) && state.dynamicGroups[group.id].length > 0)
+            .filter((group) => !hiddenDynamicGroupIds.has(group.id))
+            .filter((group) => pinnedDynamicGroupIds.includes(group.id) || (Array.isArray(state?.dynamicGroups?.[group.id]) && state.dynamicGroups[group.id].length > 0))
             .map((group) => String(group.id || "").trim())
             .filter(Boolean);
         setActiveDynamicGroupIds((current) => {
@@ -672,7 +1348,7 @@ export default function ReportBuilder({ container, context }) {
             const nextSorted = [...nextGroups].sort();
             return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextGroups;
         });
-    }, [dynamicFilterGroups, state]);
+    }, [dynamicFilterGroups, hiddenDynamicGroupIds, pinnedDynamicGroupIds, state]);
     const renderStaticFilterSection = (filter) => {
         const filterKey = String(filter.id || filter.field || "").trim();
         const currentValue = state?.staticFilters?.[filterKey];
@@ -712,11 +1388,23 @@ export default function ReportBuilder({ container, context }) {
     }, [builderContext, config, state]);
     const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
     const canShowResults = canRunReport && hasRows;
+    const canCreateChart = chartDimensions.length > 0 && chartMeasures.length > 0 && supportedChartTypes.length > 0;
     const hasCompletedCurrentRun = canRunReport
         && !loading
         && !error
         && lastManualRunFingerprintRef.current !== ""
         && lastManualRunFingerprintRef.current === currentRequestFingerprint;
+    const compatiblePreviousChartPresets = useMemo(
+        () => storedChartPresets.filter((preset) => (
+            String(preset?.settingsHash || "").trim() === settingsHash
+            && validateReportBuilderChartSpec(config, preset?.chartSpec, chartFields).valid
+        )),
+        [chartFields, config, settingsHash, storedChartPresets],
+    );
+
+    useEffect(() => {
+        setStoredChartPresets(loadStoredChartPresets(stateKey));
+    }, [stateKey]);
 
     const toggleMeasure = (measureId) => {
         const id = String(measureId || "").trim();
@@ -760,11 +1448,88 @@ export default function ReportBuilder({ container, context }) {
     };
 
     const setViewMode = (viewMode) => {
+        if (explicitChartMode && viewMode === "chart" && !hasValidChartSpec) {
+            return;
+        }
         persistState({
             ...state,
             viewMode,
         });
     };
+
+    const saveChartPreset = React.useCallback((chartSpec) => {
+        const normalized = normalizeReportBuilderChartSpec(chartSpec);
+        if (!normalized) {
+            return;
+        }
+        const nextPresets = upsertChartPreset(storedChartPresets, {
+            title: String(normalized.title || "Saved chart").trim() || "Saved chart",
+            settingsHash,
+            chartSpec: normalized,
+            updatedAt: Date.now(),
+        });
+        setStoredChartPresets(nextPresets);
+        persistStoredChartPresets(stateKey, nextPresets);
+    }, [settingsHash, stateKey, storedChartPresets]);
+
+    const applyChartSpec = React.useCallback((nextChartSpec, { savePreset = true } = {}) => {
+        const normalized = normalizeReportBuilderChartSpec(nextChartSpec);
+        const validation = validateReportBuilderChartSpec(config, normalized, chartFields);
+        if (!normalized || !validation.valid) {
+            return false;
+        }
+        persistState({
+            ...state,
+            chartSpec: normalized,
+            viewMode: "chart",
+        });
+        if (savePreset) {
+            saveChartPreset(normalized);
+        }
+        return true;
+    }, [chartFields, config, persistState, saveChartPreset, state]);
+
+    const removeChart = React.useCallback(() => {
+        persistState({
+            ...state,
+            chartSpec: null,
+            viewMode: "table",
+        });
+    }, [persistState, state]);
+
+    const openChartDialog = React.useCallback((seed = null) => {
+        const nextDraft = buildDefaultReportBuilderChartSpec(config, state, seed || {});
+        if (!nextDraft) {
+            return;
+        }
+        setChartDraft(nextDraft);
+        setChartDialogOpen(true);
+    }, [config, state]);
+
+    const applyPreviousChart = React.useCallback(() => {
+        if (!selectedPreviousChartTitle) {
+            return;
+        }
+        const preset = compatiblePreviousChartPresets.find((entry) => entry.title === selectedPreviousChartTitle);
+        if (!preset) {
+            return;
+        }
+        applyChartSpec(preset.chartSpec, { savePreset: false });
+    }, [applyChartSpec, compatiblePreviousChartPresets, selectedPreviousChartTitle]);
+
+    useEffect(() => {
+        if (!selectedPreviousChartTitle) {
+            return;
+        }
+        if (!compatiblePreviousChartPresets.some((entry) => entry.title === selectedPreviousChartTitle)) {
+            setSelectedPreviousChartTitle("");
+        }
+    }, [compatiblePreviousChartPresets, selectedPreviousChartTitle]);
+
+    const chartDraftValidation = useMemo(
+        () => validateReportBuilderChartSpec(config, chartDraft, chartFields),
+        [chartDraft, chartFields, config],
+    );
 
     const toggleFilterPanel = (key) => {
         setFilterPanels((current) => ({
@@ -916,6 +1681,233 @@ export default function ReportBuilder({ container, context }) {
         persistState(removeDynamicFilterRow(state, group, rowId));
     };
 
+    const renderDynamicGroup = (groupId) => {
+        const group = dynamicFilterGroups.find((entry) => entry?.id === groupId);
+        if (!group) {
+            return null;
+        }
+        return (
+            <DynamicFilterGroup
+                key={group.id}
+                group={group}
+                rows={state?.dynamicGroups?.[group.id] || []}
+                onAddRow={() => addRow(group)}
+                onChangeFilter={(rowId, filterId) => changeDynamicFilterType(group, rowId, filterId)}
+                onPick={(rowId, filterDef) => pickDynamicSelection(group, rowId, filterDef)}
+                onAddManualSelection={(rowId, filterDef, rawValue) => addManualDynamicSelection(group, rowId, filterDef, rawValue)}
+                onRemoveSelection={(rowId, index) => removeDynamicSelection(group, rowId, index)}
+                onToggleEnabled={(rowId) => toggleDynamicRowEnabled(group, rowId)}
+                onRemoveRow={(rowId) => removeRow(group, rowId)}
+            />
+        );
+    };
+
+    const renderDynamicSubgroup = (groupId, filterIds, label) => {
+        const group = dynamicFilterGroups.find((entry) => entry?.id === groupId);
+        if (!group) {
+            return null;
+        }
+        const subgroup = {
+            ...group,
+            label,
+            filters: (group.filters || []).filter((entry) => filterIds.includes(String(entry?.id || "").trim())),
+        };
+        if (!subgroup.filters.length) {
+            return null;
+        }
+        return (
+            <DynamicFilterGroup
+                key={`${groupId}_${label}`}
+                group={subgroup}
+                rows={(state?.dynamicGroups?.[groupId] || []).filter((row) => filterIds.includes(String(row?.filterId || "").trim()))}
+                onAddRow={() => addRow(subgroup)}
+                onChangeFilter={(rowId, filterId) => changeDynamicFilterType(subgroup, rowId, filterId)}
+                onPick={(rowId, filterDef) => pickDynamicSelection(subgroup, rowId, filterDef)}
+                onAddManualSelection={(rowId, filterDef, rawValue) => addManualDynamicSelection(subgroup, rowId, filterDef, rawValue)}
+                onRemoveSelection={(rowId, index) => removeDynamicSelection(subgroup, rowId, index)}
+                onToggleEnabled={(rowId) => toggleDynamicRowEnabled(subgroup, rowId)}
+                onRemoveRow={(rowId) => removeRow(subgroup, rowId)}
+            />
+        );
+    };
+
+    const getDirectionalSubgroup = (direction, family) => {
+        const base = dynamicFilterGroups.find((entry) => String(entry?.id || "").trim() === direction);
+        if (!base) {
+            return null;
+        }
+        const filterIds = direction === "include" ? family.includeFilterIds : family.excludeFilterIds;
+        return {
+            ...base,
+            id: direction,
+            filters: (base.filters || []).filter((entry) => filterIds.includes(String(entry?.id || "").trim())),
+        };
+    };
+
+    const persistDirectionalRows = (nextState, subgroup, rows) => ({
+        ...nextState,
+        dynamicGroups: {
+            ...(nextState.dynamicGroups || {}),
+            [subgroup.id]: normalizeDynamicGroupRows(rows, subgroup),
+        },
+    });
+
+    const addFamilyRow = (family) => {
+        const options = buildDynamicFamilyOptions(family, dynamicFilterGroups);
+        const firstOption = options.find((entry) => entry.includeFilter || entry.excludeFilter);
+        if (!firstOption) {
+            return;
+        }
+        const direction = firstOption.includeFilter ? "include" : "exclude";
+        const subgroup = getDirectionalSubgroup(direction, family);
+        if (!subgroup) {
+            return;
+        }
+        persistState(addDynamicFilterRow(state, subgroup));
+    };
+
+    const moveFamilyRow = (family, rowId, fromDirection, toDirection, optionKey, patch = {}) => {
+        const sourceGroup = getDirectionalSubgroup(fromDirection, family);
+        const targetGroup = getDirectionalSubgroup(toDirection, family);
+        if (!sourceGroup || !targetGroup) {
+            return;
+        }
+        const option = buildDynamicFamilyOptions(family, dynamicFilterGroups).find((entry) => entry.key === optionKey);
+        const targetFilter = toDirection === "include" ? option?.includeFilter : option?.excludeFilter;
+        if (!targetFilter) {
+            return;
+        }
+        const sourceRows = normalizeArray(state?.dynamicGroups?.[fromDirection]);
+        const targetRows = normalizeArray(state?.dynamicGroups?.[toDirection]);
+        const currentRow = sourceRows.find((row) => String(row?.id || "").trim() === rowId);
+        if (!currentRow) {
+            return;
+        }
+        const nextSourceRows = sourceRows.filter((row) => String(row?.id || "").trim() !== rowId);
+        const movedRow = {
+            ...currentRow,
+            ...patch,
+            filterId: String(targetFilter.id || "").trim(),
+        };
+        const nextState = persistDirectionalRows(
+            persistDirectionalRows(state, sourceGroup, nextSourceRows),
+            targetGroup,
+            [...targetRows, movedRow],
+        );
+        persistState(nextState);
+    };
+
+    const changeFamilyFilterType = (family, rowId, direction, optionKey) => {
+        const option = buildDynamicFamilyOptions(family, dynamicFilterGroups).find((entry) => entry.key === optionKey);
+        if (!option) {
+            return;
+        }
+        const targetDirection = direction === "include"
+            ? (option.includeFilter ? "include" : option.excludeFilter ? "exclude" : direction)
+            : (option.excludeFilter ? "exclude" : option.includeFilter ? "include" : direction);
+        if (targetDirection !== direction) {
+            moveFamilyRow(family, rowId, direction, targetDirection, optionKey, { selections: [] });
+            return;
+        }
+        const subgroup = getDirectionalSubgroup(direction, family);
+        const targetFilter = direction === "include" ? option.includeFilter : option.excludeFilter;
+        if (!subgroup || !targetFilter) {
+            return;
+        }
+        persistState(updateDynamicFilterRow(state, subgroup, rowId, {
+            filterId: String(targetFilter.id || "").trim(),
+            selections: [],
+        }));
+    };
+
+    const changeFamilyDirection = (family, rowId, currentDirection, optionKey, nextDirection) => {
+        if (currentDirection === nextDirection) {
+            return;
+        }
+        moveFamilyRow(family, rowId, currentDirection, nextDirection, optionKey, { selections: [] });
+    };
+
+    const renderDynamicFamily = (family) => (
+        <section key={family.id} className="forge-report-builder__family-group">
+            <div className="forge-report-builder__family-group-header">
+                <div>
+                    <h4>{family.label}</h4>
+                    {family.description ? <p>{family.description}</p> : null}
+                </div>
+            </div>
+            {config.unifiedFamilyRows ? (
+                <DynamicFamilyGroup
+                    family={family}
+                    rows={buildDynamicFamilyRows(state, family, dynamicFilterGroups)}
+                    options={buildDynamicFamilyOptions(family, dynamicFilterGroups)}
+                    onAddRow={() => addFamilyRow(family)}
+                    onChangeFilter={(rowId, direction, optionKey) => changeFamilyFilterType(family, rowId, direction, optionKey)}
+                    onChangeDirection={(rowId, direction, optionKey, nextDirection) => changeFamilyDirection(family, rowId, direction, optionKey, nextDirection)}
+                    onPick={(rowId, direction, filterDef) => pickDynamicSelection(getDirectionalSubgroup(direction, family), rowId, filterDef)}
+                    onAddManualSelection={(rowId, direction, filterDef, rawValue) => addManualDynamicSelection(getDirectionalSubgroup(direction, family), rowId, filterDef, rawValue)}
+                    onRemoveSelection={(rowId, direction, index) => removeDynamicSelection(getDirectionalSubgroup(direction, family), rowId, index)}
+                    onToggleEnabled={(rowId, direction) => toggleDynamicRowEnabled(getDirectionalSubgroup(direction, family), rowId)}
+                    onRemoveRow={(rowId, direction) => removeRow(getDirectionalSubgroup(direction, family), rowId)}
+                />
+            ) : (
+                <div className="forge-report-builder__family-group-grid">
+                    <div className="forge-report-builder__family-group-column">
+                        {renderDynamicSubgroup("include", family.includeFilterIds, "Include")}
+                    </div>
+                    <div className="forge-report-builder__family-group-column">
+                        {renderDynamicSubgroup("exclude", family.excludeFilterIds, "Exclude")}
+                    </div>
+                </div>
+            )}
+        </section>
+    );
+
+    const addManualDynamicSelection = (group, rowId, filterDef, rawValue) => {
+        const selection = projectManualSelection(filterDef, rawValue);
+        if (!selection) {
+            return false;
+        }
+        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+            if (row.id !== rowId) return row;
+            const currentSelections = Array.isArray(row.selections) ? row.selections : [];
+            const nextSelections = filterDef.multiple === false
+                ? [selection]
+                : [
+                    ...currentSelections.filter((entry) => entry.value !== selection.value),
+                    selection,
+                ];
+            return {
+                ...row,
+                selections: nextSelections,
+            };
+        });
+        persistState({
+            ...state,
+            dynamicGroups: {
+                ...(state.dynamicGroups || {}),
+                [group.id]: rows,
+            },
+        });
+        return true;
+    };
+
+    const toggleDynamicRowEnabled = (group, rowId) => {
+        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+            if (row.id !== rowId) return row;
+            return {
+                ...row,
+                enabled: row?.enabled === false,
+            };
+        });
+        persistState({
+            ...state,
+            dynamicGroups: {
+                ...(state.dynamicGroups || {}),
+                [group.id]: rows,
+            },
+        });
+    };
+
     const pickDynamicSelection = async (group, rowId, filterDef) => {
         const dialogId = filterDef?.dialogId || filterDef?.lookup?.dialogId;
         if (!dialogId) {
@@ -1038,26 +2030,54 @@ export default function ReportBuilder({ container, context }) {
                             <Button
                                 small
                                 intent="primary"
+                                icon="play"
                                 className="forge-report-builder__run-button"
                                 disabled={!canRunReport || loading}
                                 onClick={runReport}
                             >
-                                <Icon icon="flash" size={12} />
                                 Run
                             </Button>
-                            <div className="forge-report-builder__view-toggle">
-                                {viewModes.map((mode) => (
-                                    <button
-                                        key={mode}
-                                        type="button"
-                                        className={state.viewMode === mode ? "is-active" : ""}
-                                        onClick={() => setViewMode(mode)}
-                                    >
-                                        <Icon icon={mode === "table" ? "th" : "timeline-line-chart"} size={12} />
-                                        {mode}
-                                    </button>
-                                ))}
-                            </div>
+                            {explicitChartMode ? (
+                                <>
+                                    {hasValidChartSpec ? (
+                                        <>
+                                            <Button small outlined icon="edit" onClick={() => openChartDialog(state.chartSpec)}>
+                                                Edit Chart
+                                            </Button>
+                                            <Button small outlined intent="danger" icon="trash" onClick={removeChart}>
+                                                Remove Chart
+                                            </Button>
+                                            <div className="forge-report-builder__view-toggle">
+                                                {viewModes.filter((mode) => mode === "table" || mode === "chart").map((mode) => (
+                                                    <button
+                                                        key={mode}
+                                                        type="button"
+                                                        className={state.viewMode === mode ? "is-active" : ""}
+                                                        onClick={() => setViewMode(mode)}
+                                                    >
+                                                        <Icon icon={mode === "table" ? "th" : "timeline-line-chart"} size={12} />
+                                                        {mode}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </>
+                                    ) : null}
+                                </>
+                            ) : (
+                                <div className="forge-report-builder__view-toggle">
+                                    {viewModes.map((mode) => (
+                                        <button
+                                            key={mode}
+                                            type="button"
+                                            className={state.viewMode === mode ? "is-active" : ""}
+                                            onClick={() => setViewMode(mode)}
+                                        >
+                                            <Icon icon={mode === "table" ? "th" : "timeline-line-chart"} size={12} />
+                                            {mode}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="forge-report-builder__measure-sections">
                             {measureSections.map((section) => (
@@ -1100,33 +2120,48 @@ export default function ReportBuilder({ container, context }) {
             <div className="forge-report-builder__body">
                 <aside className="forge-report-builder__left">
                     <section className="forge-report-builder__panel">
-                        <div className="forge-report-builder__dimension-list">
-                            {dimensions.map((dimension) => {
-                                const active = state.selectedDimensions.includes(dimension.id);
-                                return (
-                                    <button
-                                        key={dimension.id}
-                                        type="button"
-                                        className={active ? "forge-report-builder__dimension-item is-active" : "forge-report-builder__dimension-item"}
-                                        onClick={() => toggleDimension(dimension.id)}
-                                    >
-                                        <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>{active ? "✓" : ""}</span>
-                                        <span>{dimension.label || dimension.id}</span>
-                                    </button>
-                                );
-                            })}
+                        <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
+                            <div className="forge-report-builder__panel-title">Breakdowns</div>
+                            <button
+                                type="button"
+                                className="forge-report-builder__panel-toggle"
+                                onClick={() => setDimensionsCollapsed((current) => !current)}
+                                aria-expanded={!dimensionsCollapsed}
+                            >
+                                {dimensionsCollapsed ? "Show" : "Hide"}
+                            </button>
                         </div>
+                        {!dimensionsCollapsed ? (
+                            <div className="forge-report-builder__dimension-list">
+                                {dimensions.map((dimension) => {
+                                    const active = state.selectedDimensions.includes(dimension.id);
+                                    return (
+                                        <button
+                                            key={dimension.id}
+                                            type="button"
+                                            className={active ? "forge-report-builder__dimension-item is-active" : "forge-report-builder__dimension-item"}
+                                            onClick={() => toggleDimension(dimension.id)}
+                                        >
+                                            <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>{active ? "✓" : ""}</span>
+                                            <span>{dimension.label || dimension.id}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : null}
                     </section>
                 </aside>
 
                 <main className="forge-report-builder__center">
-                    <div className="forge-report-builder__result-header">
-                        <h3>{container.title || config.title || "Report Builder"}</h3>
-                    </div>
+                    {config.showResultHeader !== false ? (
+                        <div className="forge-report-builder__result-header">
+                            <h3>{container.title || config.title || "Report Builder"}</h3>
+                        </div>
+                    ) : null}
 
                     <div className="forge-report-builder__result-frame">
                         {loading ? <div className="forge-report-builder__empty">Loading report data…</div> : null}
-                        {error ? <div className="forge-report-builder__empty is-error">{String(error)}</div> : null}
+                        {error ? <div className="forge-report-builder__empty is-error">{renderReportBuilderError(error)}</div> : null}
                         {!loading && !error && !canShowResults ? (
                             <div className="forge-report-builder__empty forge-report-builder__empty--compact">
                                 {canRunReport
@@ -1138,12 +2173,38 @@ export default function ReportBuilder({ container, context }) {
                                         : "Set the required filters to preview results."}
                             </div>
                         ) : null}
-                        {!loading && !error && canShowResults && state.viewMode !== "table" ? (
+                        {!loading && !error && canShowResults && explicitChartMode && (!hasValidChartSpec || hasStaleChartSpec) ? (
+                            <ReportBuilderChartTile
+                                title={hasStaleChartSpec ? "Update the current chart for this table" : "Create a chart from this table"}
+                                description={hasStaleChartSpec
+                                    ? (chartSpecValidation.errors || []).map((entry) => chartErrorMessage(entry)).join(" ")
+                                    : "Choose a default chart, reuse a previous one, or build a new chart from the fields currently visible in the table."}
+                                canCreate={canCreateChart}
+                                onCreate={() => openChartDialog(state.chartSpec)}
+                                defaultChartSpecs={defaultChartSpecs}
+                                onApplyDefault={(chartSpec) => applyChartSpec(chartSpec)}
+                                previousChartPresets={compatiblePreviousChartPresets}
+                                selectedPreviousTitle={selectedPreviousChartTitle}
+                                onSelectPrevious={setSelectedPreviousChartTitle}
+                                onApplyPrevious={applyPreviousChart}
+                                previousDisabled={!selectedPreviousChartTitle}
+                                warning={hasStaleChartSpec}
+                                onRemove={state.chartSpec ? removeChart : null}
+                            />
+                        ) : null}
+                        {!loading && !error && canShowResults && (
+                            (explicitChartMode && hasValidChartSpec && state.viewMode === "chart")
+                            || (!explicitChartMode && state.viewMode !== "table")
+                        ) ? (
                             <div className="forge-report-builder__chart-wrap">
                                 <Chart container={chartContainer} context={builderContext} embedded />
                             </div>
                         ) : null}
-                        {!loading && !error && canShowResults && state.viewMode === "table" ? (
+                        {!loading && !error && canShowResults && (
+                            !explicitChartMode
+                                ? state.viewMode === "table"
+                                : (!hasValidChartSpec || hasStaleChartSpec || state.viewMode === "table")
+                        ) ? (
                             <div className="forge-report-builder__table-wrap">
                                 <table className="forge-report-builder__table">
                                     <thead>
@@ -1200,7 +2261,22 @@ export default function ReportBuilder({ container, context }) {
                     </div>
                     {filterPanels.common ? (
                         <>
-                            {(optionalStaticFilters.length > 0 || dynamicFilterGroups.length > 0) ? (
+                            {notices.length > 0 ? (
+                                <div className="forge-report-builder__notices">
+                                    {notices.map((notice) => (
+                                        <section key={notice.id} className={`forge-report-builder__notice forge-report-builder__notice--${notice.level}`}>
+                                            {notice.title ? <div className="forge-report-builder__notice-title">{notice.title}</div> : null}
+                                            {notice.description ? <div className="forge-report-builder__notice-description">{notice.description}</div> : null}
+                                            <div className="forge-report-builder__notice-items">
+                                                {notice.items.map((item) => (
+                                                    <span key={`${notice.id}_${item}`} className="forge-report-builder__notice-chip">{item}</span>
+                                                ))}
+                                            </div>
+                                        </section>
+                                    ))}
+                                </div>
+                            ) : null}
+                            {showFilterCategoryBar && !familyMode && (optionalStaticFilters.length > 0 || dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).length > 0) ? (
                                 <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
                                     {optionalStaticFilters.map((filter) => {
                                         const filterKey = String(filter.id || filter.field || "").trim();
@@ -1234,7 +2310,7 @@ export default function ReportBuilder({ container, context }) {
                                             </button>
                                         );
                                     })}
-                                    {dynamicFilterGroups.map((group) => {
+                                    {dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).map((group) => {
                                         const active = activeDynamicGroupIds.includes(group.id);
                                         const configuredCount = countConfiguredDynamicSelections(state?.dynamicGroups?.[group.id] || []);
                                         const stateLabel = filterCategoryStateLabel({ active, configuredCount });
@@ -1257,6 +2333,72 @@ export default function ReportBuilder({ container, context }) {
                                                     <Icon icon={filterCategoryIcon(group.id)} size={12} />
                                                 </span>
                                                 <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                                {configuredCount > 0 ? (
+                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                                ) : (
+                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : null}
+                            {showFilterCategoryBar && familyMode ? (
+                                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
+                                    {optionalStaticFilters.map((filter) => {
+                                        const filterKey = String(filter.id || filter.field || "").trim();
+                                        const active = activeOptionalFilterKeys.includes(filterKey);
+                                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                                        const categoryLabel = filter.label || filter.id;
+                                        return (
+                                            <button
+                                                key={filterKey}
+                                                type="button"
+                                                className={[
+                                                    "forge-report-builder__category-chip",
+                                                    active ? "is-active" : "is-inactive",
+                                                    configuredCount > 0 ? "has-configured-state" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                onClick={() => toggleOptionalFilterCategory(filterKey)}
+                                                aria-pressed={active}
+                                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                            >
+                                                <span className="forge-report-builder__category-chip-icon">
+                                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                                </span>
+                                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                                {configuredCount > 0 ? (
+                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                                ) : (
+                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                    {dynamicFilterFamilies.map((family) => {
+                                        const active = activeDynamicFamilyIds.includes(family.id);
+                                        const configuredCount = familyConfiguredCount(family);
+                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                                        return (
+                                            <button
+                                                key={family.id}
+                                                type="button"
+                                                className={[
+                                                    "forge-report-builder__category-chip",
+                                                    active ? "is-active" : "is-inactive",
+                                                    configuredCount > 0 ? "has-configured-state" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                onClick={() => setActiveDynamicFamilyIds((current) => current.includes(family.id) ? current.filter((entry) => entry !== family.id) : [...current, family.id])}
+                                                aria-pressed={active}
+                                                aria-label={filterCategoryTitle(family.label, { active, configuredCount })}
+                                                title={filterCategoryTitle(family.label, { active, configuredCount })}
+                                            >
+                                                <span className="forge-report-builder__category-chip-icon">
+                                                    <Icon icon={filterCategoryIcon(family.id)} size={12} />
+                                                </span>
+                                                <span className="forge-report-builder__category-chip-label">{family.label}</span>
                                                 {configuredCount > 0 ? (
                                                     <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
                                                 ) : (
@@ -1301,28 +2443,53 @@ export default function ReportBuilder({ container, context }) {
                                         </div>
                                     );
                                 })}
-                            {activeDynamicGroupIds.length > 0 ? (
+                            {!familyMode && visibleActiveDynamicGroupIds.length > 0 ? (
                                 <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--dynamic">
-                                    {dynamicFilterGroups
-                                        .filter((group) => activeDynamicGroupIds.includes(group.id))
-                                        .map((group) => (
-                                            <DynamicFilterGroup
-                                                key={group.id}
-                                                group={group}
-                                                rows={state?.dynamicGroups?.[group.id] || []}
-                                                onAddRow={() => addRow(group)}
-                                                onChangeFilter={(rowId, filterId) => changeDynamicFilterType(group, rowId, filterId)}
-                                                onPick={(rowId, filterDef) => pickDynamicSelection(group, rowId, filterDef)}
-                                                onRemoveSelection={(rowId, index) => removeDynamicSelection(group, rowId, index)}
-                                                onRemoveRow={(rowId) => removeRow(group, rowId)}
-                                            />
-                                        ))}
+                                    {dynamicGroupLayout.fullWidthIds.map((groupId) => (
+                                        <div key={`full_${groupId}`} className="forge-report-builder__dynamic-group-full">
+                                            {renderDynamicGroup(groupId)}
+                                        </div>
+                                    ))}
+                                    {dynamicGroupLayout.columnRows.map((row, rowIndex) => (
+                                        <div key={`row_${rowIndex}`} className="forge-report-builder__dynamic-group-row">
+                                            {row.map((groupId) => (
+                                                <div key={groupId} className="forge-report-builder__dynamic-group-column">
+                                                    {renderDynamicGroup(groupId)}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : null}
+                            {familyMode && (showFilterCategoryBar ? activeDynamicFamilyIds.length > 0 : dynamicFilterFamilies.length > 0) ? (
+                                <div className="forge-report-builder__family-grid">
+                                    {dynamicFilterFamilies
+                                        .filter((family) => !showFilterCategoryBar || activeDynamicFamilyIds.includes(family.id))
+                                        .map((family) => renderDynamicFamily(family))}
                                 </div>
                             ) : null}
                         </>
                     ) : null}
                 </section>
             </div>
+            <ReportBuilderChartDialog
+                isOpen={chartDialogOpen}
+                onClose={() => setChartDialogOpen(false)}
+                draft={chartDraft}
+                onChange={(patch) => setChartDraft((current) => normalizeReportBuilderChartSpec({
+                    ...(current || {}),
+                    ...patch,
+                }))}
+                onApply={() => {
+                    if (applyChartSpec(chartDraft)) {
+                        setChartDialogOpen(false);
+                    }
+                }}
+                supportedTypes={supportedChartTypes}
+                dimensions={chartDimensions}
+                measures={chartMeasures}
+                validation={chartDraftValidation}
+            />
         </div>
     );
 }

@@ -11,7 +11,7 @@ import {
     getControlSignal,
     findDialogSignal,
     getInputSignal,
-    findFormSignal,
+    getFormSignal,
     primeWindowSignals,
     removeWindow,
 } from '../core';
@@ -187,13 +187,14 @@ function WindowContentInner({window, metadata, services}) {
     const {windowKey, windowData, windowId, parameters = {}} = window;
     const isHostedWorkspaceSurface = String(window?.presentation || '').trim().toLowerCase() === 'hosted'
         && String(window?.region || '').trim().toLowerCase() === 'chat.top';
+    const shouldFillParent = isHostedWorkspaceSurface || window.isInTab !== false;
     const baseKey = (windowKey || '').split('?')[0];
     const defaultDataSourceRef = metadata?.view?.dataSourceRef || Object.keys(metadata?.dataSource || {})[0];
     const initialWindowFormSeed = useMemo(() => ({
         ...(parameters && typeof parameters === 'object' ? parameters : {}),
         ...resolveInitialWindowFormValues(metadata),
     }), [parameters, metadata]);
-    const windowFormSignal = useMemo(() => findFormSignal(`${windowId}:windowForm`), [windowId]);
+    const windowFormSignal = useMemo(() => getFormSignal(`${windowId}:windowForm`), [windowId]);
 
     const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
     const existingContext = getWindowContext(windowId);
@@ -556,13 +557,13 @@ function WindowContentInner({window, metadata, services}) {
         <div
             data-window-id={windowId}
             style={{
-                height: isHostedWorkspaceSurface ? 'auto' : '100%',
-                minHeight: isHostedWorkspaceSurface ? 'max-content' : 0,
+                height: shouldFillParent ? '100%' : 'auto',
+                minHeight: shouldFillParent ? 0 : 'max-content',
                 minWidth: 0,
                 display: 'flex',
                 flexDirection: 'column',
-                flex: isHostedWorkspaceSurface ? '0 0 auto' : 1,
-                overflow: isHostedWorkspaceSurface ? 'visible' : 'hidden',
+                flex: shouldFillParent ? 1 : '0 0 auto',
+                overflow: shouldFillParent ? 'hidden' : 'visible',
             }}
         >
             {renderDataSources()}
@@ -574,7 +575,7 @@ function WindowContentInner({window, metadata, services}) {
                     removeWindow(windowId);
                 }}
                 isInTab={window.isInTab}
-                fillParent={!isHostedWorkspaceSurface}
+                fillParent={shouldFillParent}
             />
             {window.isInTab === false && !(window.footer && window.footer.hide === true) ? <FloatingFooter /> : null}
         </div>

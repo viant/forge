@@ -2,16 +2,27 @@ import assert from "node:assert/strict";
 
 import {
     applyReportBuilderComputedMeasures,
+    buildDefaultReportBuilderChartSpec,
+    buildExplicitReportBuilderChartContainer,
+    buildReportBuilderChartFields,
     buildReportBuilderDefaultState,
+    buildReportBuilderDefaultChartSpecs,
     buildReportBuilderRequest,
+    buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
     getSelectableReportBuilderMeasures,
+    getReportBuilderSupportedChartTypes,
     getVisibleReportBuilderDimensions,
+    isExplicitReportBuilderChartMode,
+    isReportBuilderChartSpecStale,
     mergeReportBuilderState,
+    normalizeReportBuilderChartSpec,
     projectLookupSelection,
     projectLookupSelections,
+    projectManualSelection,
     resolveReportBuilderReadiness,
     sanitizeReportBuilderState,
+    validateReportBuilderChartSpec,
 } from "./reportBuilderUtils.js";
 
 const config = {
@@ -130,6 +141,45 @@ const relativeDefaults = buildReportBuilderDefaultState({
 assert.match(relativeDefaults.staticFilters.dateRange.start, /^\d{4}-\d{2}-\d{2}$/);
 assert.match(relativeDefaults.staticFilters.dateRange.end, /^\d{4}-\d{2}-\d{2}$/);
 
+const relativeDefaultsLast3 = buildReportBuilderDefaultState({
+    staticFilters: [
+        {
+            id: "dateRange",
+            type: "dateRange",
+            default: { preset: "last3Days" },
+        },
+    ],
+});
+assert.match(relativeDefaultsLast3.staticFilters.dateRange.start, /^\d{4}-\d{2}-\d{2}$/);
+assert.match(relativeDefaultsLast3.staticFilters.dateRange.end, /^\d{4}-\d{2}-\d{2}$/);
+const startLast3 = new Date(relativeDefaultsLast3.staticFilters.dateRange.start);
+const endLast3 = new Date(relativeDefaultsLast3.staticFilters.dateRange.end);
+assert.equal(Math.round((endLast3 - startLast3) / 86400000), 2);
+
+assert.equal(isExplicitReportBuilderChartMode(config), false);
+assert.deepEqual(getReportBuilderSupportedChartTypes(config), ["line", "bar", "area"]);
+
+const explicitChartConfig = {
+    ...config,
+    result: {
+        ...config.result,
+        chartCreationMode: "explicit",
+        chartWizard: {
+            supportedTypes: ["line", "bar", "area"],
+        },
+        defaultChartSpecs: [
+            {
+                title: "Spend by Date",
+                type: "line",
+                xField: "eventDate",
+                yFields: ["totalSpend"],
+                seriesField: "siteType",
+            },
+        ],
+    },
+};
+assert.equal(isExplicitReportBuilderChartMode(explicitChartConfig), true);
+
 const merged = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend", "impressions"],
     primaryMeasure: "impressions",
@@ -169,6 +219,27 @@ assert.equal(request.timeoutMs, 120000);
 assert.deepEqual(request.orderBy, ["totalSpend desc"]);
 assert.equal(canAutoFetchReportBuilder(config, merged), true);
 assert.deepEqual(resolveReportBuilderReadiness(config, merged), { canRun: true, reason: "" });
+
+const disabledDynamicRowState = mergeReportBuilderState(config, {
+    selectedMeasures: ["totalSpend"],
+    staticFilters: {
+        channelIds: [1],
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+    dynamicGroups: {
+        scope: [
+            {
+                id: "row_1",
+                filterId: "orderIds",
+                enabled: false,
+                selections: [{ value: 2667545, label: "Order 2667545" }],
+            },
+        ],
+    },
+});
+const disabledDynamicRowRequest = buildReportBuilderRequest(config, disabledDynamicRowState);
+assert.equal(disabledDynamicRowRequest.filters.orderIds, undefined);
+assert.equal(disabledDynamicRowState.dynamicGroups.scope[0].enabled, false);
 
 const computedOnlyState = mergeReportBuilderState(config, {
     selectedMeasures: ["ctr"],
@@ -221,6 +292,170 @@ const scopeFreeConfig = {
 };
 assert.equal(canAutoFetchReportBuilder(scopeFreeConfig, missingScope), true);
 assert.deepEqual(resolveReportBuilderReadiness(scopeFreeConfig, missingScope), { canRun: true, reason: "" });
+
+const chartFields = buildReportBuilderChartFields(config, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+});
+assert.deepEqual(chartFields, [
+    { key: "eventDate", label: "eventDate", kind: "dimension", format: undefined, align: undefined },
+    { key: "siteType", label: "siteType", kind: "dimension", format: undefined, align: undefined },
+    { key: "totalSpend", label: "totalSpend", kind: "measure", format: undefined, align: "right" },
+    { key: "impressions", label: "impressions", kind: "measure", format: undefined, align: "right" },
+]);
+
+const normalizedChartSpec = normalizeReportBuilderChartSpec({
+    title: "Spend by Date",
+    type: "LINE",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+    seriesField: "siteType",
+});
+assert.deepEqual(normalizedChartSpec, {
+    title: "Spend by Date",
+    type: "line",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+    seriesField: "siteType",
+});
+
+const validChartSpec = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
+assert.deepEqual(validChartSpec, { valid: true, errors: [] });
+
+const invalidChartSpec = validateReportBuilderChartSpec(config, {
+    type: "line",
+    xField: "totalSpend",
+    yFields: ["missingMeasure"],
+    seriesField: "totalSpend",
+}, chartFields);
+assert.deepEqual(invalidChartSpec, {
+    valid: false,
+    errors: [
+        { field: "xField", code: "wrongKind" },
+        { field: "yFields.0", code: "missingField" },
+        { field: "seriesField", code: "wrongKind" },
+        { field: "seriesField", code: "duplicateField" },
+    ],
+});
+
+assert.equal(
+    isReportBuilderChartSpecStale(config, normalizedChartSpec, buildReportBuilderChartFields(config, {
+        selectedDimensions: ["eventDate"],
+        selectedMeasures: ["totalSpend"],
+    })),
+    true,
+);
+
+const defaultChartSpec = buildDefaultReportBuilderChartSpec(config, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "impressions",
+});
+assert.deepEqual(defaultChartSpec, {
+    type: "line",
+    xField: "eventDate",
+    yFields: ["impressions"],
+    seriesField: "siteType",
+});
+
+assert.deepEqual(
+    buildReportBuilderDefaultChartSpecs(explicitChartConfig, {
+        selectedDimensions: ["eventDate", "siteType"],
+        selectedMeasures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+    }),
+    [
+        {
+            title: "Spend by Date",
+            type: "line",
+            xField: "eventDate",
+            yFields: ["totalSpend"],
+            seriesField: "siteType",
+        },
+    ],
+);
+
+const settingsHashA = buildReportBuilderSettingsHash({
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+});
+const settingsHashB = buildReportBuilderSettingsHash({
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+});
+const settingsHashC = buildReportBuilderSettingsHash({
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+});
+assert.equal(settingsHashA, settingsHashB);
+assert.notEqual(settingsHashA, settingsHashC);
+
+const explicitDefaults = buildReportBuilderDefaultState(explicitChartConfig);
+assert.equal(explicitDefaults.viewMode, "table");
+
+const explicitMergedNoChart = mergeReportBuilderState(explicitChartConfig, {
+    viewMode: "chart",
+    chartSpec: null,
+});
+assert.equal(explicitMergedNoChart.viewMode, "table");
+
+const explicitSanitizedMissingField = sanitizeReportBuilderState(explicitChartConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    chartSpec: {
+        type: "line",
+        xField: "eventDate",
+        yFields: ["unknownMetric"],
+        seriesField: "siteType",
+    },
+    viewMode: "chart",
+});
+assert.equal(explicitSanitizedMissingField.chartSpec, null);
+assert.equal(explicitSanitizedMissingField.viewMode, "table");
+
+const explicitContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    config,
+    {
+        selectedDimensions: ["eventDate", "siteType"],
+        selectedMeasures: ["totalSpend", "impressions"],
+    },
+    {
+        type: "bar",
+        xField: "eventDate",
+        yFields: ["totalSpend"],
+        seriesField: "siteType",
+    },
+);
+assert.equal(explicitContainer.chart.type, "bar");
+assert.equal(explicitContainer.chart.xAxis.dataKey, "eventDate");
+assert.equal(explicitContainer.chart.series.nameKey, "siteType");
+assert.equal(explicitContainer.chart.series.valueKey, "totalSpend");
+
+const familyDraftConfig = {
+    dynamicFilterGroups: [
+        {
+            id: "include",
+            filters: [
+                { id: "includePublisherId" },
+                { id: "includeCarrier" },
+            ],
+        },
+    ],
+};
+const familyDraftState = sanitizeReportBuilderState(familyDraftConfig, {
+    dynamicGroups: {
+        include: [
+            { id: "row_a", filterId: "includePublisherId", selections: [] },
+            { id: "row_b", filterId: "includeCarrier", selections: [] },
+            { id: "row_c", filterId: "includeCarrier", selections: [] },
+        ],
+    },
+});
+assert.deepEqual(
+    familyDraftState.dynamicGroups.include.map((row) => row.id),
+    ["row_a", "row_b"],
+);
 
 const singleSelectArrayConfig = {
     ...config,
@@ -367,6 +602,37 @@ assert.deepEqual(projectedMany, [
     },
 ]);
 
+assert.deepEqual(
+    projectManualSelection(
+        {
+            valueSelector: "dealId",
+            labelSelector: "dealName",
+            manualValueType: "int",
+        },
+        "141952",
+    ),
+    {
+        value: 141952,
+        label: "141952",
+        group: "",
+        record: {
+            dealId: 141952,
+            dealName: "141952",
+        },
+    },
+);
+assert.equal(
+    projectManualSelection(
+        {
+            valueSelector: "dealId",
+            labelSelector: "dealName",
+            manualValueType: "int",
+        },
+        "deal-xyz",
+    ),
+    null,
+);
+
 const compactProjected = projectLookupSelection(
     {
         valueSelector: "adOrderId",
@@ -419,11 +685,13 @@ assert.deepEqual(duplicateDraftState.dynamicGroups.scope, [
     {
         id: "row_3",
         filterId: "orderIds",
+        enabled: true,
         selections: [{ value: 2609393, label: "Order 2609393", group: "", record: null }],
     },
     {
         id: "row_1",
         filterId: "orderIds",
+        enabled: true,
         selections: [],
     },
 ]);
@@ -440,8 +708,18 @@ assert.deepEqual(sanitizedDrafts.dynamicGroups.scope, [
     {
         id: "row_1",
         filterId: "orderIds",
+        enabled: true,
         selections: [],
     },
 ]);
+
+const sanitizedDisabledRows = sanitizeReportBuilderState(config, {
+    dynamicGroups: {
+        scope: [
+            { id: "row_1", filterId: "orderIds", enabled: false, selections: [{ value: 8, label: "Eight" }] },
+        ],
+    },
+});
+assert.equal(sanitizedDisabledRows.dynamicGroups.scope[0].enabled, false);
 
 console.log("reportBuilderUtils ✓ request mapping, defaults, and lookup projection");

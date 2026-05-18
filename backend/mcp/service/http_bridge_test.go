@@ -58,7 +58,7 @@ func TestUIRPCHandler_PollWrapsSetFormDataCommandEnvelope(t *testing.T) {
 			"values": map[string]interface{}{
 				"prefill": map[string]interface{}{
 					"advertiserId": 123,
-					"dealId":       "deal-xyz",
+					"dealId":       778899,
 				},
 			},
 		},
@@ -96,8 +96,8 @@ func TestUIRPCHandler_PollWrapsSetFormDataCommandEnvelope(t *testing.T) {
 	if got := prefill["advertiserId"]; got != float64(123) {
 		t.Fatalf("expected advertiserId 123, got %#v", got)
 	}
-	if got := prefill["dealId"]; got != "deal-xyz" {
-		t.Fatalf("expected dealId deal-xyz, got %#v", got)
+	if got := prefill["dealId"]; got != float64(778899) {
+		t.Fatalf("expected dealId 778899, got %#v", got)
 	}
 }
 
@@ -115,7 +115,7 @@ func TestServiceUICommand_QueueRoundTripForSetFormData(t *testing.T) {
 				"values": map[string]interface{}{
 					"prefill": map[string]interface{}{
 						"advertiserId":  123,
-						"dealId":        "deal-xyz",
+						"dealId":        778899,
 						"targetingIncl": "iris:1466062,123",
 					},
 				},

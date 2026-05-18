@@ -608,19 +608,23 @@ type DashboardCondition struct {
 }
 
 type Dashboard struct {
-	VisibleWhen   *DashboardCondition    `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	Summary       *DashboardSummary      `json:"summary,omitempty" yaml:"summary,omitempty"`
-	Compare       *DashboardCompare      `json:"compare,omitempty" yaml:"compare,omitempty"`
-	KPITable      *DashboardKPITable     `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
-	Filters       *DashboardFilters      `json:"filters,omitempty" yaml:"filters,omitempty"`
-	Geo           *DashboardGeoMap       `json:"geo,omitempty" yaml:"geo,omitempty"`
-	Timeline      *DashboardTimeline     `json:"timeline,omitempty" yaml:"timeline,omitempty"`
-	Composition   *DashboardComposition  `json:"composition,omitempty" yaml:"composition,omitempty"`
-	Dimensions    *DashboardDimensions   `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
-	Messages      *DashboardMessages     `json:"messages,omitempty" yaml:"messages,omitempty"`
-	Status        *DashboardStatus       `json:"status,omitempty" yaml:"status,omitempty"`
-	Feed          *DashboardFeed         `json:"feed,omitempty" yaml:"feed,omitempty"`
-	Report        *DashboardReport       `json:"report,omitempty" yaml:"report,omitempty"`
+	VisibleWhen *DashboardCondition   `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	Summary     *DashboardSummary     `json:"summary,omitempty" yaml:"summary,omitempty"`
+	Compare     *DashboardCompare     `json:"compare,omitempty" yaml:"compare,omitempty"`
+	KPITable    *DashboardKPITable    `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
+	Filters     *DashboardFilters     `json:"filters,omitempty" yaml:"filters,omitempty"`
+	Geo         *DashboardGeoMap      `json:"geo,omitempty" yaml:"geo,omitempty"`
+	Timeline    *DashboardTimeline    `json:"timeline,omitempty" yaml:"timeline,omitempty"`
+	Composition *DashboardComposition `json:"composition,omitempty" yaml:"composition,omitempty"`
+	Dimensions  *DashboardDimensions  `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
+	Messages    *DashboardMessages    `json:"messages,omitempty" yaml:"messages,omitempty"`
+	Status      *DashboardStatus      `json:"status,omitempty" yaml:"status,omitempty"`
+	Feed        *DashboardFeed        `json:"feed,omitempty" yaml:"feed,omitempty"`
+	Report      *DashboardReport      `json:"report,omitempty" yaml:"report,omitempty"`
+	// ReportBuilder intentionally remains open-ended so report-builder-specific
+	// metadata can pass through unchanged from YAML/JSON into the Forge
+	// frontend contract, including explicit chart configuration under
+	// reportBuilder.result.
 	ReportBuilder map[string]interface{} `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
 	// ReportOptions controls the dashboard-level report mode. The older
 	// compact alias is Container.report.
@@ -793,8 +797,10 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 // these aliases remain encoded at the container level for backward
 // compatibility and concise hand-written YAML.
 type dashboardCompactAliases struct {
-	VisibleWhen     *DashboardCondition      `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	Report          *DashboardReportOptions  `json:"report,omitempty" yaml:"report,omitempty"`
+	VisibleWhen *DashboardCondition     `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	Report      *DashboardReportOptions `json:"report,omitempty" yaml:"report,omitempty"`
+	// ReportBuilder intentionally remains open-ended so frontend-owned
+	// report-builder metadata can evolve without a backend release gate.
 	ReportBuilder   map[string]interface{}   `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
 	Metrics         []DashboardMetric        `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 	Rows            []DashboardKPIRow        `json:"rows,omitempty" yaml:"rows,omitempty"`
