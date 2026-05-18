@@ -76,6 +76,7 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
         "dashboard.status" -> DashboardPanel(runtime, window, container) { DashboardStatusBlock(container, metrics) }
         "dashboard.messages" -> DashboardPanel(runtime, window, container) { DashboardMessagesBlock(container, metrics, filters, selection) }
         "dashboard.report" -> DashboardPanel(runtime, window, container) { DashboardReportBlock(container, metrics, filters, selection) }
+        "dashboard.reportBuilder" -> DashboardPanel(runtime, window, container) { ReportBuilderRenderer(window, container) }
         "dashboard.feed" -> DashboardPanel(runtime, window, container) { DashboardFeedBlock(window, container, dashboardRoot, filters) }
         "dashboard.detail" -> DashboardPanel(runtime, window, container) {
             container.containers.forEach { child ->

@@ -166,7 +166,85 @@ data class DashboardDef(
     val status: DashboardStatusDef? = null,
     val feed: DashboardFeedDef? = null,
     val report: DashboardReportDef? = null,
+    val reportBuilder: DashboardReportBuilderDef? = null,
     val detail: DashboardDetailDef? = null
+)
+
+@Serializable
+data class DashboardReportBuilderDef(
+    val measures: List<ReportBuilderMeasureDef> = emptyList(),
+    val dimensions: List<ReportBuilderDimensionDef> = emptyList(),
+    val staticFilters: List<ReportBuilderStaticFilterDef> = emptyList(),
+    val result: ReportBuilderResultDef? = null
+)
+
+@Serializable
+data class ReportBuilderMeasureDef(
+    val id: String? = null,
+    val key: String? = null,
+    val label: String? = null,
+    val format: String? = null,
+    @SerialName("default")
+    val defaultValue: Boolean? = null,
+    val color: String? = null,
+    val hidden: Boolean? = null
+)
+
+@Serializable
+data class ReportBuilderDimensionDef(
+    val id: String? = null,
+    val key: String? = null,
+    val label: String? = null,
+    val format: String? = null,
+    @SerialName("default")
+    val defaultValue: Boolean? = null,
+    val chartAxis: Boolean? = null,
+    val hidden: Boolean? = null
+)
+
+@Serializable
+data class ReportBuilderResultDef(
+    val chartCreationMode: String? = null,
+    val defaultMode: String? = null,
+    val viewModes: List<String> = emptyList(),
+    val chartType: String? = null,
+    val chartWizard: ReportBuilderChartWizardDef? = null,
+    val defaultChartSpecs: List<ReportBuilderChartSpecDef> = emptyList()
+)
+
+@Serializable
+data class ReportBuilderChartWizardDef(
+    val supportedTypes: List<String> = emptyList()
+)
+
+@Serializable
+data class ReportBuilderChartSpecDef(
+    val title: String? = null,
+    val type: String? = null,
+    val xField: String? = null,
+    val yFields: List<String> = emptyList(),
+    val seriesField: String? = null
+)
+
+@Serializable
+data class ReportBuilderStaticFilterDef(
+    val id: String? = null,
+    val label: String? = null,
+    val type: String? = null,
+    val required: Boolean? = null,
+    val multiple: Boolean? = null,
+    val options: List<ReportBuilderStaticFilterOptionDef> = emptyList(),
+    @SerialName("default")
+    val defaultValue: JsonElement? = null
+)
+
+@Serializable
+data class ReportBuilderStaticFilterOptionDef(
+    val value: JsonElement? = null,
+    val label: String? = null,
+    val icon: String? = null,
+    @SerialName("default")
+    val defaultValue: Boolean? = null
 )
 
 @Serializable
