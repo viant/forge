@@ -266,6 +266,62 @@ function normalizeChartExtent(value, fallback) {
     return fallback;
 }
 
+function fillMissingTemporalBuckets(chartData = [], xAxisKey = "", seriesDefinitions = [], step = "") {
+    const rows = Array.isArray(chartData) ? chartData : [];
+    const key = String(xAxisKey || "").trim();
+    const interval = String(step || "").trim().toLowerCase();
+    if (rows.length === 0 || key === "" || interval !== "day") {
+        return rows;
+    }
+    const dated = rows
+        .map((row) => {
+            const raw = row?.[key];
+            const parsed = new Date(raw);
+            if (Number.isNaN(parsed.getTime())) {
+                return null;
+            }
+            const normalized = new Date(parsed);
+            normalized.setHours(0, 0, 0, 0);
+            return { row, date: normalized };
+        })
+        .filter(Boolean);
+    if (dated.length === 0) {
+        return rows;
+    }
+    dated.sort((left, right) => left.date - right.date);
+    const byDay = new Map(
+        dated.map((entry) => [entry.date.toISOString(), entry.row]),
+    );
+    const template = dated[0].row || {};
+    const seriesKeys = (Array.isArray(seriesDefinitions) ? seriesDefinitions : [])
+        .map((entry) => String(entry?.value || "").trim())
+        .filter(Boolean);
+    const result = [];
+    const cursor = new Date(dated[0].date);
+    const end = dated[dated.length - 1].date;
+    while (cursor <= end) {
+        const bucketKey = cursor.toISOString();
+        const existing = byDay.get(bucketKey);
+        if (existing) {
+            result.push(existing);
+        } else {
+            const nextRow = {[key]: bucketKey};
+            Object.keys(template).forEach((field) => {
+                if (field === key || seriesKeys.includes(field)) {
+                    return;
+                }
+                nextRow[field] = template[field];
+            });
+            seriesKeys.forEach((seriesKey) => {
+                nextRow[seriesKey] = 0;
+            });
+            result.push(nextRow);
+        }
+        cursor.setDate(cursor.getDate() + 1);
+    }
+    return result;
+}
+
 export function resolveVisibleChartState({ chartData = [], availableDataKeys = [], yAxisLabel = "", loading = false, error = null, previousState = null, sourceKey = "" } = {}) {
     const currentRows = Array.isArray(chartData) ? chartData : [];
     const currentKeys = Array.isArray(availableDataKeys) ? availableDataKeys : [];
@@ -514,8 +570,8 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     };
 
     const chartMargin = embedded
-        ? {top: 24, right: 12, left: 4, bottom: 8}
-        : {top: 10, right: 60, left: 10, bottom: 10};
+        ? {top: 24, right: 12, left: 6, bottom: 34}
+        : {top: 10, right: 60, left: 14, bottom: 42};
     const legendProps = embedded
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
         : {};
@@ -609,19 +665,26 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     return <Bar key={entry.value} {...commonProps} stackId={entry.stackId} />;
                 }
                 if (entry.type === "area") {
-                    return <Area key={entry.value} {...commonProps} type="monotone" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+                    return <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
                 }
-                return <Line key={entry.value} {...commonProps} type="monotone" strokeLinecap="round" strokeLinejoin="round" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+                return <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
             })}
         </>
     );
 
+    const denseChartData = fillMissingTemporalBuckets(
+        chartData,
+        xAxis?.dataKey || "name",
+        selectedSeriesDefinitions,
+        chart?.fillMissingTemporalBuckets,
+    );
+
     const normalizedChartData = (isHorizontalBar
-        ? [...chartData].sort((a, b) => {
+        ? [...denseChartData].sort((a, b) => {
             const primaryKey = selectedSeriesDefinitions[0]?.value;
             return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
         })
-        : chartData
+        : denseChartData
     ).map((row) => ({
         ...row,
         __seriesFormats: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
@@ -826,6 +889,10 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         : undefined;
 
     const canRenderChartSelection = isPieChart ? pieFilteredData.length > 0 : selectedSeriesDefinitions.length > 0;
+    const hasChartRows = isPieChart ? pieFilteredData.length > 0 : normalizedChartData.length > 0;
+    const hasRenderableSeriesValues = isPieChart
+        ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)))
+        : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => Number.isFinite(Number(row?.[entry.value]))));
 
     const resolvedWidth = isHorizontalBar
         ? normalizeChartExtent(width, embedded ? "82%" : "85%")
@@ -978,6 +1045,21 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                         }}
                     >
                         Select at least one series to render the chart.
+                    </div>
+                ) : (!hasChartRows || !hasRenderableSeriesValues) && !loading && !error ? (
+                    <div
+                        style={{
+                            height: "100%",
+                            minHeight: embedded ? 110 : 180,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            textAlign: "center",
+                            color: "#7d8da1",
+                            fontSize: 12,
+                        }}
+                    >
+                        No data for the selected period.
                     </div>
                 ) : chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
                     <ResponsiveContainer width={chartSize.width} height={chartSize.height}>

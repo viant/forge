@@ -54,6 +54,11 @@ function resolveRelativeDateRangeDefault(seed = {}) {
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const start = new Date(end);
     switch (preset) {
+        case "last3days":
+        case "last_3_days":
+        case "3d":
+            start.setDate(end.getDate() - 2);
+            break;
         case "last7days":
         case "last_7_days":
         case "7d":
@@ -117,6 +122,7 @@ function normalizeDynamicRow(row = {}, group = {}, index = 0) {
     return {
         id: rowId || `row_${index + 1}`,
         filterId: String(row.filterId || firstFilterId).trim(),
+        enabled: row?.enabled !== false,
         selections: normalizeArray(row.selections).map((entry) => ({
             value: entry?.value,
             label: entry?.label,
@@ -133,8 +139,18 @@ function rowHasSelections(row = {}) {
 function normalizeDynamicGroupRows(rows = [], group = {}) {
     const normalizedRows = normalizeArray(rows).map((row, index) => normalizeDynamicRow(row, group, index));
     const selectedRows = normalizedRows.filter((row) => rowHasSelections(row));
-    const firstDraftRow = normalizedRows.find((row) => !rowHasSelections(row)) || null;
-    return firstDraftRow ? [...selectedRows, firstDraftRow] : selectedRows;
+    const draftRowsByFilterId = new Map();
+    normalizedRows.forEach((row) => {
+        if (rowHasSelections(row)) {
+            return;
+        }
+        const filterId = String(row?.filterId || "").trim();
+        if (draftRowsByFilterId.has(filterId)) {
+            return;
+        }
+        draftRowsByFilterId.set(filterId, row);
+    });
+    return [...selectedRows, ...draftRowsByFilterId.values()];
 }
 
 function firstResolvedValue(record = null, selectors = []) {
@@ -186,6 +202,31 @@ function isVisibleField(entry = {}) {
     return true;
 }
 
+function normalizeStringArray(values = []) {
+    return normalizeArray(values).map((entry) => String(entry || "").trim()).filter(Boolean);
+}
+
+function supportedChartTypeSet(config = {}) {
+    const supported = normalizeStringArray(
+        config?.result?.chartWizard?.supportedTypes
+        || config?.result?.supportedChartTypes
+        || ["line", "bar", "area"],
+    ).filter((entry) => ["line", "bar", "area"].includes(entry));
+    return new Set(supported.length > 0 ? supported : ["line", "bar", "area"]);
+}
+
+function resolveChartCreationMode(config = {}) {
+    return String(config?.result?.chartCreationMode || "").trim().toLowerCase();
+}
+
+export function isExplicitReportBuilderChartMode(config = {}) {
+    return resolveChartCreationMode(config) === "explicit";
+}
+
+export function getReportBuilderSupportedChartTypes(config = {}) {
+    return Array.from(supportedChartTypeSet(config));
+}
+
 export function getVisibleReportBuilderMeasures(config = {}) {
     return normalizeArray(config.measures).filter((entry) => isVisibleField(entry));
 }
@@ -205,6 +246,69 @@ export function getVisibleReportBuilderDimensions(config = {}) {
     return normalizeArray(config.dimensions).filter((entry) => isVisibleField(entry));
 }
 
+function normalizeChartSpecValue(value) {
+    const normalized = String(value || "").trim();
+    return normalized || null;
+}
+
+export function normalizeReportBuilderChartSpec(chartSpec = {}) {
+    if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
+        return null;
+    }
+    const title = String(chartSpec.title || "").trim();
+    const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
+    const xField = normalizeChartSpecValue(chartSpec.xField);
+    const yFields = normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
+    const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
+    return {
+        ...(title ? { title } : {}),
+        type,
+        xField,
+        yFields: Array.from(new Set(yFields)),
+        ...(seriesField ? { seriesField } : {}),
+    };
+}
+
+function chartFieldIndex(columns = []) {
+    return new Map(
+        normalizeArray(columns)
+            .map((column) => [String(column?.key || "").trim(), column])
+            .filter(([key]) => key),
+    );
+}
+
+function chartConfigUniverse(config = {}) {
+    const fields = [
+        ...getVisibleReportBuilderDimensions(config).map((entry) => entry?.key || entry?.id),
+        ...getSelectableReportBuilderMeasures(config).map((entry) => entry?.key || entry?.id),
+    ];
+    return new Set(normalizeStringArray(fields));
+}
+
+function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
+    const normalized = normalizeReportBuilderChartSpec(chartSpec);
+    if (!normalized) {
+        return null;
+    }
+    if (!supportedChartTypeSet(config).has(normalized.type)) {
+        return null;
+    }
+    const universe = chartConfigUniverse(config);
+    if (!normalized.xField || !universe.has(normalized.xField)) {
+        return null;
+    }
+    if (!Array.isArray(normalized.yFields) || normalized.yFields.length === 0) {
+        return null;
+    }
+    if (normalized.yFields.some((entry) => !universe.has(entry))) {
+        return null;
+    }
+    if (normalized.seriesField && !universe.has(normalized.seriesField)) {
+        return null;
+    }
+    return normalized;
+}
+
 export function resolveReportBuilderMeasure(config = {}, id = "") {
     const targetId = String(id || "").trim();
     if (!targetId) {
@@ -213,6 +317,122 @@ export function resolveReportBuilderMeasure(config = {}, id = "") {
     return getSelectableReportBuilderMeasures(config).find(
         (entry) => String(entry?.id || "").trim() === targetId,
     ) || null;
+}
+
+export function buildReportBuilderChartFields(config = {}, state = {}) {
+    return buildReportBuilderColumns(config, state).map((entry) => ({
+        key: String(entry?.key || "").trim(),
+        label: entry?.label || entry?.key || "",
+        kind: entry?.kind || "",
+        format: entry?.format,
+        align: entry?.align,
+    })).filter((entry) => entry.key && entry.kind);
+}
+
+export function validateReportBuilderChartSpec(config = {}, chartSpec = null, columns = []) {
+    const normalized = normalizeReportBuilderChartSpec(chartSpec);
+    if (!normalized) {
+        return { valid: false, errors: [{ field: "chartSpec", code: "missing" }] };
+    }
+    const supportedTypes = supportedChartTypeSet(config);
+    const errors = [];
+    if (!supportedTypes.has(normalized.type)) {
+        errors.push({ field: "type", code: "unsupportedType" });
+    }
+    const fields = chartFieldIndex(columns);
+    const xField = normalized.xField ? fields.get(normalized.xField) : null;
+    if (!xField) {
+        errors.push({ field: "xField", code: "missingField" });
+    } else if (xField.kind !== "dimension") {
+        errors.push({ field: "xField", code: "wrongKind" });
+    }
+    if (!Array.isArray(normalized.yFields) || normalized.yFields.length === 0) {
+        errors.push({ field: "yFields", code: "empty" });
+    } else {
+        normalized.yFields.forEach((fieldKey, index) => {
+            const field = fields.get(fieldKey);
+            if (!field) {
+                errors.push({ field: `yFields.${index}`, code: "missingField" });
+                return;
+            }
+            if (field.kind !== "measure") {
+                errors.push({ field: `yFields.${index}`, code: "wrongKind" });
+            }
+        });
+    }
+    if (normalized.seriesField) {
+        const seriesField = fields.get(normalized.seriesField);
+        if (!seriesField) {
+            errors.push({ field: "seriesField", code: "missingField" });
+        } else if (seriesField.kind !== "dimension") {
+            errors.push({ field: "seriesField", code: "wrongKind" });
+        }
+        if (normalized.seriesField === normalized.xField) {
+            errors.push({ field: "seriesField", code: "duplicateField" });
+        }
+    }
+    return {
+        valid: errors.length === 0,
+        errors,
+    };
+}
+
+export function isReportBuilderChartSpecStale(config = {}, chartSpec = null, columns = []) {
+    const validation = validateReportBuilderChartSpec(config, chartSpec, columns);
+    return !validation.valid;
+}
+
+export function buildReportBuilderSettingsHash(state = {}) {
+    const signature = JSON.stringify({
+        dimensions: normalizeStringArray(state?.selectedDimensions),
+        measures: normalizeStringArray(state?.selectedMeasures),
+    });
+    let hash = 5381;
+    for (let i = 0; i < signature.length; i += 1) {
+        hash = ((hash << 5) + hash) + signature.charCodeAt(i);
+        hash &= 0xffffffff;
+    }
+    return `rb_${(hash >>> 0).toString(16)}`;
+}
+
+export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed = {}) {
+    const columns = buildReportBuilderChartFields(config, state);
+    const dimensions = columns.filter((entry) => entry.kind === "dimension");
+    const measures = columns.filter((entry) => entry.kind === "measure");
+    if (dimensions.length === 0 || measures.length === 0) {
+        return null;
+    }
+    const primaryMeasure = resolveReportBuilderMeasure(config, state?.primaryMeasure) || resolveReportBuilderMeasure(config, measures[0]?.key) || null;
+    const defaultYField = String(primaryMeasure?.key || primaryMeasure?.id || measures[0]?.key || "").trim();
+    const normalizedSeed = normalizeReportBuilderChartSpec(seed) || {};
+    const title = String(normalizedSeed.title || "").trim();
+    const type = supportedChartTypeSet(config).has(normalizedSeed.type) ? normalizedSeed.type : getReportBuilderSupportedChartTypes(config)[0];
+    const xField = normalizedSeed.xField || dimensions[0]?.key || null;
+    const seededYFields = Array.isArray(normalizedSeed.yFields) && normalizedSeed.yFields.length > 0
+        ? normalizedSeed.yFields
+        : (defaultYField ? [defaultYField] : []);
+    const seriesField = normalizedSeed.seriesField || dimensions.find((entry) => entry.key !== xField)?.key || null;
+    return normalizeReportBuilderChartSpec({
+        ...normalizedSeed,
+        ...(title ? { title } : {}),
+        type,
+        xField,
+        yFields: seededYFields,
+        ...(seriesField ? { seriesField } : {}),
+    });
+}
+
+export function buildReportBuilderDefaultChartSpecs(config = {}, state = {}) {
+    return normalizeArray(config?.result?.defaultChartSpecs).map((entry) => {
+        const built = buildDefaultReportBuilderChartSpec(config, state, entry);
+        if (!built) {
+            return null;
+        }
+        return {
+            ...built,
+            title: String(entry?.title || built.title || "").trim() || "Default chart",
+        };
+    }).filter(Boolean);
 }
 
 function normalizeComputedMeasure(definition = {}) {
@@ -306,11 +526,13 @@ export function buildReportBuilderDefaultState(config = {}) {
         defaultDynamicGroups[key] = seededRows;
     });
 
+    const defaultChartSpec = sanitizeChartSpecAgainstConfig(config, config?.result?.defaultChartSpec || null);
     return {
         selectedMeasures,
         primaryMeasure: String(config?.primaryMeasure || selectedMeasures[0] || "").trim(),
         selectedDimensions: dimensionFallback,
-        viewMode: defaultViewMode,
+        viewMode: isExplicitReportBuilderChartMode(config) && !defaultChartSpec ? "table" : defaultViewMode,
+        chartSpec: defaultChartSpec,
         groupBy: groupByDefault,
         page: 1,
         pageSize: defaultPageSize,
@@ -346,6 +568,7 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
     next.selectedMeasures = normalizeArray(next.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
     next.selectedDimensions = normalizeArray(next.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean);
     next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures[0] || defaults.primaryMeasure || "").trim();
+    next.chartSpec = sanitizeChartSpecAgainstConfig(config, next.chartSpec);
     next.viewMode = String(next.viewMode || defaults.viewMode || "chart").trim() || "chart";
     next.groupBy = String(next.groupBy || defaults.groupBy || "").trim();
     next.page = Math.max(1, Number(next.page || defaults.page || 1) || 1);
@@ -355,6 +578,9 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
 
     if (!next.selectedMeasures.includes(next.primaryMeasure)) {
         next.primaryMeasure = next.selectedMeasures[0] || "";
+    }
+    if (isExplicitReportBuilderChartMode(config) && !next.chartSpec) {
+        next.viewMode = "table";
     }
     return next;
 }
@@ -368,6 +594,10 @@ export function sanitizeReportBuilderState(config = {}, state = {}) {
         dynamicGroups[groupId] = normalizeDynamicGroupRows(next?.dynamicGroups?.[groupId], group);
     });
     next.dynamicGroups = dynamicGroups;
+    next.chartSpec = sanitizeChartSpecAgainstConfig(config, next.chartSpec);
+    if (isExplicitReportBuilderChartMode(config) && !next.chartSpec) {
+        next.viewMode = "table";
+    }
     return next;
 }
 
@@ -446,6 +676,9 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
         if (!groupId) return;
         const rows = normalizeArray(state?.dynamicGroups?.[groupId]);
         rows.forEach((row) => {
+            if (row?.enabled === false) {
+                return;
+            }
             const filterDef = normalizeArray(group.filters).find((entry) => String(entry?.id || "").trim() === String(row.filterId || "").trim());
             if (!filterDef) return;
             if (filterDef.requestMapping === "hook" || filterDef.handledByHook === true) {
@@ -569,6 +802,43 @@ export function projectLookupSelections(filterDef = {}, payload = null) {
         .map((record) => projectLookupSelection(filterDef, record));
 }
 
+function coerceManualSelectionValue(filterDef = {}, rawValue = "") {
+    const normalized = String(rawValue ?? "").trim();
+    if (!normalized) {
+        return { ok: false };
+    }
+    const valueType = String(filterDef?.manualValueType || "string").trim().toLowerCase();
+    switch (valueType) {
+        case "int":
+        case "integer":
+            if (!/^-?\d+$/.test(normalized)) {
+                return { ok: false };
+            }
+            return { ok: true, value: Number(normalized), label: normalized };
+        case "string":
+        default:
+            return { ok: true, value: normalized, label: normalized };
+    }
+}
+
+export function projectManualSelection(filterDef = {}, rawValue = "") {
+    const coerced = coerceManualSelectionValue(filterDef, rawValue);
+    if (!coerced.ok) {
+        return null;
+    }
+    const valueSelector = String(filterDef?.valueSelector || "value").trim() || "value";
+    const labelSelector = String(filterDef?.labelSelector || "label").trim() || "label";
+    return {
+        value: coerced.value,
+        label: coerced.label,
+        group: "",
+        record: {
+            [valueSelector]: coerced.value,
+            [labelSelector]: coerced.label,
+        },
+    };
+}
+
 export function buildReportBuilderColumns(config = {}, state = {}) {
     const measures = getSelectableReportBuilderMeasures(config);
     const dimensions = normalizeArray(config.dimensions);
@@ -595,6 +865,75 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
         }));
 
     return [...selectedDimensions, ...selectedMeasures];
+}
+
+export function buildExplicitReportBuilderChartContainer(container = {}, config = {}, state = {}, chartSpec = null) {
+    const normalized = normalizeReportBuilderChartSpec(chartSpec);
+    if (!normalized) {
+        return container;
+    }
+    const dimensions = getVisibleReportBuilderDimensions(config);
+    const measures = getSelectableReportBuilderMeasures(config);
+    const xField = dimensions.find((entry) => String(entry?.key || entry?.id || "").trim() === normalized.xField) || null;
+    const yMeasures = normalizeStringArray(normalized.yFields)
+        .map((fieldKey) => measures.find((entry) => String(entry?.key || entry?.id || "").trim() === fieldKey))
+        .filter(Boolean);
+    if (!xField || yMeasures.length === 0) {
+        return container;
+    }
+    const palette = config.result?.palette || [];
+    const seriesType = normalized.type || "line";
+    const baseChart = {
+        type: seriesType,
+        xAxis: {
+            dataKey: String(xField?.key || xField?.id || "").trim() || "eventDate",
+            tickFormat: xField?.tickFormat,
+        },
+        yAxis: {
+            format: yMeasures[0]?.format,
+        },
+    };
+    if (normalized.seriesField && yMeasures.length === 1) {
+        const yMeasure = yMeasures[0];
+        return {
+            ...container,
+            dataSourceRef: container.dataSourceRef,
+            collection: container.collection,
+            chart: {
+                ...baseChart,
+                series: {
+                    nameKey: normalized.seriesField,
+                    valueKey: String(yMeasure?.key || yMeasure?.id || "").trim(),
+                    values: [{
+                        value: String(yMeasure?.key || yMeasure?.id || "").trim(),
+                        label: yMeasure?.label || yMeasure?.id,
+                        color: yMeasure?.color || palette[0],
+                        format: yMeasure?.format,
+                        type: seriesType,
+                    }],
+                    palette,
+                },
+            },
+        };
+    }
+    return {
+        ...container,
+        dataSourceRef: container.dataSourceRef,
+        collection: container.collection,
+        chart: {
+            ...baseChart,
+            series: {
+                values: yMeasures.map((measure, index) => ({
+                    value: String(measure?.key || measure?.id || "").trim(),
+                    label: measure?.label || measure?.id,
+                    color: measure?.color || palette[index],
+                    format: measure?.format,
+                    type: seriesType,
+                })),
+                palette,
+            },
+        },
+    };
 }
 
 export function addDynamicFilterRow(state = {}, group = {}) {

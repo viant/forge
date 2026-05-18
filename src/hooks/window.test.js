@@ -107,7 +107,7 @@ handlers.openWindow({
   parameters: {
     prefill: {
       advertiserId: 123,
-      dealId: 'deal-xyz',
+      dealId: 778899,
     },
   },
   context: {
@@ -121,7 +121,7 @@ assert.equal(openedWindow.windowTitle, 'Performance Metrics');
 assert.deepEqual(openedWindow.parameters, {
   prefill: {
     advertiserId: 123,
-    dealId: 'deal-xyz',
+    dealId: 778899,
   },
 });
 console.log('openWindow ✓ preserves explicit prefill parameters for windowForm seeding');

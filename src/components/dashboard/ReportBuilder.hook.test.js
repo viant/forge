@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyReportBuilderStateHook, resolveReportBuilderHookHandler } from "./ReportBuilder.jsx";
+import { applyReportBuilderStateHook, resolveReportBuilderHookHandler, resolveReportBuilderNotices } from "./ReportBuilder.jsx";
 
 describe("resolveReportBuilderHookHandler", () => {
   it("resolves unqualified handlers from the current window namespace", () => {
@@ -63,5 +63,33 @@ describe("resolveReportBuilderHookHandler", () => {
       page: 1,
       seededFromPrefill: 123,
     });
+  });
+
+  it("resolves configured notices from state arrays", () => {
+    expect(resolveReportBuilderNotices(
+      {
+        notices: [
+          {
+            id: "unsupportedForecastFeatures",
+            level: "warning",
+            title: "Unsupported forecast features were skipped",
+            sourcePath: "forecastHandoffMeta.unsupportedFeatureKeys",
+          },
+        ],
+      },
+      {
+        forecastHandoffMeta: {
+          unsupportedFeatureKeys: ["peer39.social.context"],
+        },
+      },
+    )).toEqual([
+      {
+        id: "unsupportedForecastFeatures",
+        level: "warning",
+        title: "Unsupported forecast features were skipped",
+        description: "",
+        items: ["peer39.social.context"],
+      },
+    ]);
   });
 });
