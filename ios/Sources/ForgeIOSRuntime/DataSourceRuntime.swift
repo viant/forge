@@ -44,6 +44,19 @@ public actor DataSourceRuntime {
         inputValues[dataSourceID] = input
     }
 
+    public func setInputParameters(dataSourceID: String, parameters: [String: JSONValue], fetch: Bool = false) {
+        let current = inputValues[dataSourceID] ?? InputState()
+        let query = parameters["input"]?.objectValue?["query"]?.objectValue ?? [:]
+        let mergedFilter = current.filter.merging(query) { _, new in new }
+        inputValues[dataSourceID] = InputState(
+            filter: mergedFilter,
+            parameters: parameters,
+            page: current.page,
+            fetch: fetch || current.fetch,
+            refresh: current.refresh
+        )
+    }
+
     public func control(dataSourceID: String) -> ControlState {
         controlValues[dataSourceID] ?? ControlState()
     }

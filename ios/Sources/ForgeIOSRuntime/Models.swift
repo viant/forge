@@ -250,12 +250,26 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
 }
 
 public struct DataSourceDef: Codable, Sendable {
+    public let service: DataSourceServiceDef?
+    public let selectionMode: String?
+    public let autoSelect: Bool?
+    public let selectors: DataSourceSelectorDef?
+    public let paging: DataSourcePagingDef?
+    public let params: [String: String]
+    public let parameters: [ParameterDef]
     public let uri: String?
     public let method: String?
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
+        case service
+        case selectionMode
+        case autoSelect
+        case selectors
+        case paging
+        case params
+        case parameters
         case uri
         case method
         case target
@@ -263,11 +277,25 @@ public struct DataSourceDef: Codable, Sendable {
     }
 
     public init(
+        service: DataSourceServiceDef? = nil,
+        selectionMode: String? = nil,
+        autoSelect: Bool? = nil,
+        selectors: DataSourceSelectorDef? = nil,
+        paging: DataSourcePagingDef? = nil,
+        params: [String: String] = [:],
+        parameters: [ParameterDef] = [],
         uri: String? = nil,
         method: String? = nil,
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
     ) {
+        self.service = service
+        self.selectionMode = selectionMode
+        self.autoSelect = autoSelect
+        self.selectors = selectors
+        self.paging = paging
+        self.params = params
+        self.parameters = parameters
         self.uri = uri
         self.method = method
         self.target = target
@@ -276,10 +304,48 @@ public struct DataSourceDef: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        service = try container.decodeIfPresent(DataSourceServiceDef.self, forKey: .service)
+        selectionMode = try container.decodeIfPresent(String.self, forKey: .selectionMode)
+        autoSelect = try container.decodeIfPresent(Bool.self, forKey: .autoSelect)
+        selectors = try container.decodeIfPresent(DataSourceSelectorDef.self, forKey: .selectors)
+        paging = try container.decodeIfPresent(DataSourcePagingDef.self, forKey: .paging)
+        params = try container.decodeIfPresent([String: String].self, forKey: .params) ?? [:]
+        parameters = try container.decodeIfPresent([ParameterDef].self, forKey: .parameters) ?? []
         uri = try container.decodeIfPresent(String.self, forKey: .uri)
         method = try container.decodeIfPresent(String.self, forKey: .method)
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
+    }
+}
+
+public struct DataSourceServiceDef: Codable, Sendable {
+    public let endpoint: String?
+    public let uri: String?
+    public let method: String?
+}
+
+public struct DataSourceSelectorDef: Codable, Sendable {
+    public let data: String?
+    public let dataInfo: String?
+    public let metrics: String?
+}
+
+public struct DataSourcePagingDef: Codable, Sendable {
+    public let size: Int?
+    public let enabled: Bool?
+    public let parameters: [String: String]
+    public let dataInfoSelectors: [String: String]
+
+    public init(
+        size: Int? = nil,
+        enabled: Bool? = nil,
+        parameters: [String: String] = [:],
+        dataInfoSelectors: [String: String] = [:]
+    ) {
+        self.size = size
+        self.enabled = enabled
+        self.parameters = parameters
+        self.dataInfoSelectors = dataInfoSelectors
     }
 }
 
@@ -420,17 +486,23 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
     public let measures: [ReportBuilderMeasureDef]
     public let dimensions: [ReportBuilderDimensionDef]
     public let staticFilters: [ReportBuilderStaticFilterDef]
+    public let dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef]
+    public let dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef]
     public let result: ReportBuilderResultDef?
 
     public init(
         measures: [ReportBuilderMeasureDef] = [],
         dimensions: [ReportBuilderDimensionDef] = [],
         staticFilters: [ReportBuilderStaticFilterDef] = [],
+        dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef] = [],
+        dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef] = [],
         result: ReportBuilderResultDef? = nil
     ) {
         self.measures = measures
         self.dimensions = dimensions
         self.staticFilters = staticFilters
+        self.dynamicFilterGroups = dynamicFilterGroups
+        self.dynamicFilterFamilies = dynamicFilterFamilies
         self.result = result
     }
 }
@@ -440,6 +512,7 @@ public struct ReportBuilderMeasureDef: Codable, Sendable, Identifiable {
     public let key: String?
     public let label: String?
     public let format: String?
+    public let paramPath: String?
     public let defaultValue: Bool?
     public let color: String?
     public let hidden: Bool?
@@ -449,6 +522,7 @@ public struct ReportBuilderMeasureDef: Codable, Sendable, Identifiable {
         case key
         case label
         case format
+        case paramPath
         case defaultValue = "default"
         case color
         case hidden
@@ -462,6 +536,7 @@ public struct ReportBuilderDimensionDef: Codable, Sendable, Identifiable {
     public let key: String?
     public let label: String?
     public let format: String?
+    public let paramPath: String?
     public let defaultValue: Bool?
     public let chartAxis: Bool?
     public let hidden: Bool?
@@ -471,6 +546,7 @@ public struct ReportBuilderDimensionDef: Codable, Sendable, Identifiable {
         case key
         case label
         case format
+        case paramPath
         case defaultValue = "default"
         case chartAxis
         case hidden
@@ -510,6 +586,9 @@ public struct ReportBuilderStaticFilterDef: Codable, Sendable, Identifiable {
     public let type: String?
     public let required: Bool?
     public let multiple: Bool?
+    public let paramPath: String?
+    public let startParamPath: String?
+    public let endParamPath: String?
     public let options: [ReportBuilderStaticFilterOptionDef]
     public let defaultValue: JSONValue?
 
@@ -519,6 +598,9 @@ public struct ReportBuilderStaticFilterDef: Codable, Sendable, Identifiable {
         case type
         case required
         case multiple
+        case paramPath
+        case startParamPath
+        case endParamPath
         case options
         case defaultValue = "default"
     }
@@ -540,6 +622,38 @@ public struct ReportBuilderStaticFilterOptionDef: Codable, Sendable, Identifiabl
     }
 
     public var id: String { value?.stringValue ?? label ?? UUID().uuidString }
+}
+
+public struct ReportBuilderDynamicFilterGroupDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let description: String?
+    public let filters: [ReportBuilderDynamicFilterDef]
+
+    public var identityKey: String { id ?? label ?? UUID().uuidString }
+}
+
+public struct ReportBuilderDynamicFilterDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let paramPath: String?
+    public let multiple: Bool?
+    public let manualEntry: Bool?
+    public let manualPlaceholder: String?
+    public let dialogId: String?
+    public let targetingFeatureKey: String?
+
+    public var identityKey: String { id ?? label ?? UUID().uuidString }
+}
+
+public struct ReportBuilderDynamicFilterFamilyDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let description: String?
+    public let includeFilterIds: [String]
+    public let excludeFilterIds: [String]
+
+    public var identityKey: String { id ?? label ?? UUID().uuidString }
 }
 
 public struct ReportBuilderChartWizardDef: Codable, Sendable {

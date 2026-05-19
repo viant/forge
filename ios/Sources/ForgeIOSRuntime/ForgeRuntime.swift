@@ -125,6 +125,37 @@ public actor ForgeRuntime {
         return await dataSourceRuntime.metrics(dataSourceID: dataSourceID)
     }
 
+    public func setDataSourceInputParameters(
+        windowID: String,
+        dataSourceRef: String,
+        parameters: [String: JSONValue],
+        fetch: Bool = false
+    ) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        await dataSourceRuntime.setInputParameters(dataSourceID: dataSourceID, parameters: parameters, fetch: fetch)
+    }
+
+    public func refreshDataSourceCollection(
+        windowID: String,
+        dataSourceRef: String,
+        baseURL: String = "",
+        additionalHeaders: [String: String] = [:]
+    ) async {
+        let signal = await signals.metadata(windowID: windowID)
+        guard let metadata = await signal.peek() else { return }
+        guard let dataSource = metadata.dataSources[dataSourceRef] else { return }
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        let resolvedPath = dataSource.service?.uri ?? dataSource.uri
+        guard let path = resolvedPath, !path.isEmpty else { return }
+        await dataSourceRuntime.fetchCollection(
+            dataSourceID: dataSourceID,
+            baseURL: baseURL,
+            path: path,
+            additionalHeaders: additionalHeaders,
+            session: session
+        )
+    }
+
     // MARK: - Handler registry
 
     public func registerHandler(_ name: String, _ handler: @escaping ForgeHandler) {

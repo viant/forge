@@ -87,7 +87,7 @@ registerStateAdapter('filter', (ctx, item) => {
 registerStateAdapter('input', (ctx, item) => {
     const fieldKey = item.dataField || item.bindingPath || item.id;
     return {
-        get: () => resolveSelector(ctx?.signals?.input?.peek?.() || {}, fieldKey),
+        get: () => resolveSelector(ctx?.signals?.input?.value || {}, fieldKey),
         getOptions: () => [],
         set: (v) => {
             const prev = ctx?.signals?.input?.peek?.() || {};
@@ -101,7 +101,7 @@ registerStateAdapter('input', (ctx, item) => {
 registerStateAdapter('selection', (ctx, item) => {
     const fieldKey = item.dataField || item.bindingPath || item.id;
     return {
-        get: () => resolveSelector(ctx?.signals?.selection?.peek?.() || {}, fieldKey),
+        get: () => resolveSelector(ctx?.signals?.selection?.value || {}, fieldKey),
         getOptions: () => [],
         set: () => {},
     };
@@ -110,7 +110,7 @@ registerStateAdapter('selection', (ctx, item) => {
 registerStateAdapter('metrics', (ctx, item) => {
     const fieldKey = item.dataField || item.bindingPath || item.id;
     return {
-        get: () => resolveSelector(ctx?.signals?.metrics?.peek?.() || {}, fieldKey),
+        get: () => resolveSelector(ctx?.signals?.metrics?.value || {}, fieldKey),
         getOptions: () => [],
         set: () => {},
     };
@@ -119,7 +119,7 @@ registerStateAdapter('metrics', (ctx, item) => {
 registerStateAdapter('windowForm', (ctx, item) => {
     const fieldKey = item.dataField || item.bindingPath || item.id;
     return {
-        get: () => resolveSelector(ctx?.signals?.windowForm?.peek?.() || {}, fieldKey),
+        get: () => resolveSelector(ctx?.signals?.windowForm?.value || {}, fieldKey),
         getOptions: () => [],
         set: (v) => {
             const prev = ctx?.signals?.windowForm?.peek?.() || {};
@@ -138,7 +138,7 @@ registerStateAdapter('collection', (ctx, item) => {
     const aggregate = item.aggregate || item.properties?.aggregate || 'last';
 
     const get = () => {
-        const rows = Array.isArray(ctx?.signals?.collection?.peek?.()) ? ctx.signals.collection.peek() : [];
+        const rows = Array.isArray(ctx?.signals?.collection?.value) ? ctx.signals.collection.value : [];
         const numericValues = rows
             .map((row) => resolveSelector(row, fieldKey))
             .filter((value) => value !== undefined && value !== null && value !== '')

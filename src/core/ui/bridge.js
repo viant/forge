@@ -49,6 +49,34 @@ function safeParseJSON(text) {
   }
 }
 
+function isUnauthorizedError(err) {
+  const status = Number(err?.status || 0);
+  if (status === 401 || status === 403) return true;
+  const message = String(err?.message || '').trim();
+  return message === 'HTTP 401' || message === 'HTTP 403';
+}
+
+function isMissingSessionError(err) {
+  const status = Number(err?.status || 0);
+  if (status === 404) return true;
+  const message = String(err?.message || '').trim();
+  return message === 'HTTP 404';
+}
+
+function currentVisibilityState() {
+  if (typeof document === 'undefined') return 'visible';
+  return document.visibilityState === 'hidden' ? 'hidden' : 'visible';
+}
+
+function currentWindowFocus() {
+  if (typeof document === 'undefined' || typeof document.hasFocus !== 'function') return true;
+  try {
+    return !!document.hasFocus();
+  } catch (_) {
+    return true;
+  }
+}
+
 /**
  * Optional UI bridge for "reverse API" control.
  *
@@ -205,10 +233,15 @@ export function startUIBridgeHTTP(options = {}) {
   let streamAbort = null;
   let detachListeners = null;
   let detachLifecycle = null;
+  let detachOwner = null;
+  let detachAuthRetry = null;
   let readyToPublish = false;
+  let startInFlight = null;
   const inflightRPC = new Set();
   const startupReadyEvent = String(options.startupReadyEvent || '').trim();
   const startupReadyTimeoutMs = Math.max(0, Number(options.startupReadyTimeoutMs || 0) || 0);
+  let visibilityState = currentVisibilityState();
+  let hasWindowFocus = currentWindowFocus();
 
   const registerRPC = (controller) => {
     if (controller) inflightRPC.add(controller);
@@ -246,7 +279,11 @@ export function startUIBridgeHTTP(options = {}) {
       const nextSession = res.headers.get(sessionHeader);
       if (nextSession) sessionId = nextSession;
       if (res.status === 202 || res.status === 204) return null;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        throw err;
+      }
       const text = await res.text();
       if (!text) return null;
       const data = safeParseJSON(text);
@@ -299,6 +336,34 @@ export function startUIBridgeHTTP(options = {}) {
     };
   };
 
+  const isPollingOwner = () => visibilityState === 'visible' && !!hasWindowFocus;
+
+  const bindOwnerListeners = () => {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return () => {};
+    const syncOwnerState = () => {
+      visibilityState = currentVisibilityState();
+      hasWindowFocus = currentWindowFocus();
+    };
+    const onVisibility = () => syncOwnerState();
+    const onFocus = () => {
+      hasWindowFocus = true;
+      visibilityState = currentVisibilityState();
+    };
+    const onBlur = () => {
+      hasWindowFocus = false;
+      visibilityState = currentVisibilityState();
+    };
+    syncOwnerState();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+    };
+  };
+
   const waitForStartupReady = () => {
     if (typeof window === 'undefined' || !startupReadyEvent) {
       return Promise.resolve();
@@ -322,6 +387,33 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const scheduleAuthRetry = () => {
+    if (typeof window === 'undefined' || stopped || detachAuthRetry) return;
+    const onAuthorized = () => {
+      try { detachAuthRetry?.(); } catch (_) {}
+      detachAuthRetry = null;
+      if (stopped) return;
+      void start();
+    };
+    window.addEventListener('agently:authorized', onAuthorized, { once: true });
+    detachAuthRetry = () => {
+      window.removeEventListener('agently:authorized', onAuthorized);
+    };
+  };
+
+  const resetSessionAndRestart = () => {
+    sessionId = null;
+    readyToPublish = false;
+    try { detachListeners?.(); } catch (_) {}
+    detachListeners = null;
+    try { detachLifecycle?.(); } catch (_) {}
+    detachLifecycle = null;
+    if (snapshotTimer) clearInterval(snapshotTimer);
+    snapshotTimer = null;
+    if (stopped) return;
+    void ensureStarted();
+  };
 
   const normalizeCommand = (params) => {
     if (!params || typeof params !== 'object') return null;
@@ -373,6 +465,10 @@ export function startUIBridgeHTTP(options = {}) {
         await sleep(200);
         continue;
       }
+      if (!isPollingOwner()) {
+        await sleep(reconnectDelayMs);
+        continue;
+      }
       try {
         const msg = await rpc('ui.poll', {
           clientId,
@@ -381,7 +477,10 @@ export function startUIBridgeHTTP(options = {}) {
         if (msg) {
           await handleMessage(msg);
         }
-      } catch (_) {
+      } catch (err) {
+        if (isMissingSessionError(err)) {
+          resetSessionAndRestart();
+        }
       } finally {
         streamAbort = null;
       }
@@ -401,18 +500,37 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const start = async () => {
-    await rpc('ui.hello', { clientId, token: options.token || undefined }, 1);
-    await restoreSnapshot();
-    await waitForStartupReady();
-    readyToPublish = true;
-    await publishSnapshot();
-    snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
-    detachListeners = bindImmediateSnapshotListeners();
-    detachLifecycle = bindLifecycleListeners(stop);
-    pollLoop();
+    try {
+      await rpc('ui.hello', { clientId, token: options.token || undefined }, 1);
+      await restoreSnapshot();
+      await waitForStartupReady();
+      readyToPublish = true;
+      await publishSnapshot();
+      snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
+      detachListeners = bindImmediateSnapshotListeners();
+      detachLifecycle = bindLifecycleListeners(stop);
+      detachOwner = bindOwnerListeners();
+      pollLoop();
+    } catch (err) {
+      if (isUnauthorizedError(err)) {
+        readyToPublish = false;
+        scheduleAuthRetry();
+        return;
+      }
+      // eslint-disable-next-line no-console
+      console.warn('[forge][uiBridge] http bridge start failed', err);
+    }
   };
 
-  start();
+  const ensureStarted = () => {
+    if (startInFlight) return startInFlight;
+    startInFlight = start().finally(() => {
+      startInFlight = null;
+    });
+    return startInFlight;
+  };
+
+  void ensureStarted();
 
   function stop() {
     if (stopped) return;
@@ -421,6 +539,10 @@ export function startUIBridgeHTTP(options = {}) {
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}
     detachLifecycle = null;
+    try { detachOwner?.(); } catch (_) {}
+    detachOwner = null;
+    try { detachAuthRetry?.(); } catch (_) {}
+    detachAuthRetry = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
     readyToPublish = false;
     abortInflightRPC();

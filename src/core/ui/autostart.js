@@ -1,7 +1,23 @@
 import { startUIBridge, startUIBridgeHTTP } from './bridge.js';
 
-let stopFn = null;
-let started = false;
+const UI_BRIDGE_STOP_KEY = '__forgeUIBridgeAutoStartStop';
+const UI_BRIDGE_STARTED_KEY = '__forgeUIBridgeAutoStartStarted';
+
+function getGlobalBridgeState() {
+  if (typeof window === 'undefined') {
+    return { started: false, stopFn: null };
+  }
+  return {
+    started: !!window[UI_BRIDGE_STARTED_KEY],
+    stopFn: typeof window[UI_BRIDGE_STOP_KEY] === 'function' ? window[UI_BRIDGE_STOP_KEY] : null,
+  };
+}
+
+function setGlobalBridgeState(started, stopFn) {
+  if (typeof window === 'undefined') return;
+  window[UI_BRIDGE_STARTED_KEY] = !!started;
+  window[UI_BRIDGE_STOP_KEY] = typeof stopFn === 'function' ? stopFn : null;
+}
 
 function readViteEnv(key) {
   try {
@@ -35,8 +51,9 @@ function isBrowser() {
  * - Or set VITE_FORGE_UI_BRIDGE_ENABLED=true with a URL.
  */
 export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token } = {}) {
-  if (started) return stopFn;
   if (!isBrowser()) return null;
+  const state = getGlobalBridgeState();
+  if (state.started) return state.stopFn;
 
   const envEnabled = truthy(readViteEnv('VITE_FORGE_UI_BRIDGE_ENABLED'));
 
@@ -73,7 +90,7 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
       || cfgURL.startsWith('https://')
       || cfgURL.startsWith('/');
     if (isHTTP) {
-      stopFn = startUIBridgeHTTP({
+      const stopFn = startUIBridgeHTTP({
         url: cfgURL,
         token: cfgToken,
         snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
@@ -82,8 +99,10 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
         startupReadyEvent: connectorConfig?.uiBridge?.startupReadyEvent,
         startupReadyTimeoutMs: connectorConfig?.uiBridge?.startupReadyTimeoutMs,
       });
+      setGlobalBridgeState(true, stopFn);
+      return stopFn;
     } else {
-      stopFn = startUIBridge({
+      const stopFn = startUIBridge({
         url: cfgURL,
         token: cfgToken,
         snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
@@ -92,9 +111,9 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
         startupReadyEvent: connectorConfig?.uiBridge?.startupReadyEvent,
         startupReadyTimeoutMs: connectorConfig?.uiBridge?.startupReadyTimeoutMs,
       });
+      setGlobalBridgeState(true, stopFn);
+      return stopFn;
     }
-    started = true;
-    return stopFn;
   } catch (e) {
     // eslint-disable-next-line no-console
     console.warn('[forge][uiBridge] auto-start failed', e);
@@ -103,9 +122,9 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
 }
 
 export function stopAutoUIBridge() {
+  const state = getGlobalBridgeState();
   try {
-    stopFn?.();
+    state.stopFn?.();
   } catch (_) {}
-  stopFn = null;
-  started = false;
+  setGlobalBridgeState(false, null);
 }
