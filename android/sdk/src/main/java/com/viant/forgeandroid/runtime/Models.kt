@@ -175,6 +175,8 @@ data class DashboardReportBuilderDef(
     val measures: List<ReportBuilderMeasureDef> = emptyList(),
     val dimensions: List<ReportBuilderDimensionDef> = emptyList(),
     val staticFilters: List<ReportBuilderStaticFilterDef> = emptyList(),
+    val dynamicFilterGroups: List<ReportBuilderDynamicFilterGroupDef> = emptyList(),
+    val dynamicFilterFamilies: List<ReportBuilderDynamicFilterFamilyDef> = emptyList(),
     val result: ReportBuilderResultDef? = null
 )
 
@@ -184,6 +186,7 @@ data class ReportBuilderMeasureDef(
     val key: String? = null,
     val label: String? = null,
     val format: String? = null,
+    val paramPath: String? = null,
     @SerialName("default")
     val defaultValue: Boolean? = null,
     val color: String? = null,
@@ -196,6 +199,7 @@ data class ReportBuilderDimensionDef(
     val key: String? = null,
     val label: String? = null,
     val format: String? = null,
+    val paramPath: String? = null,
     @SerialName("default")
     val defaultValue: Boolean? = null,
     val chartAxis: Boolean? = null,
@@ -233,6 +237,9 @@ data class ReportBuilderStaticFilterDef(
     val type: String? = null,
     val required: Boolean? = null,
     val multiple: Boolean? = null,
+    val paramPath: String? = null,
+    val startParamPath: String? = null,
+    val endParamPath: String? = null,
     val options: List<ReportBuilderStaticFilterOptionDef> = emptyList(),
     @SerialName("default")
     val defaultValue: JsonElement? = null
@@ -245,6 +252,35 @@ data class ReportBuilderStaticFilterOptionDef(
     val icon: String? = null,
     @SerialName("default")
     val defaultValue: Boolean? = null
+)
+
+@Serializable
+data class ReportBuilderDynamicFilterGroupDef(
+    val id: String? = null,
+    val label: String? = null,
+    val description: String? = null,
+    val filters: List<ReportBuilderDynamicFilterDef> = emptyList()
+)
+
+@Serializable
+data class ReportBuilderDynamicFilterDef(
+    val id: String? = null,
+    val label: String? = null,
+    val paramPath: String? = null,
+    val multiple: Boolean? = null,
+    val manualEntry: Boolean? = null,
+    val manualPlaceholder: String? = null,
+    val dialogId: String? = null,
+    val targetingFeatureKey: String? = null
+)
+
+@Serializable
+data class ReportBuilderDynamicFilterFamilyDef(
+    val id: String? = null,
+    val label: String? = null,
+    val description: String? = null,
+    val includeFilterIds: List<String> = emptyList(),
+    val excludeFilterIds: List<String> = emptyList()
 )
 
 @Serializable

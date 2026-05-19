@@ -4,6 +4,7 @@ import { ensureUIBridgeClientId, publishUIBridgeSnapshotNow, startUIBridgeHTTP }
 
 const originalFetch = globalThis.fetch;
 const originalWindow = globalThis.window;
+const originalDocument = globalThis.document;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -21,6 +22,14 @@ try {
     }
   };
   globalThis.window = windowTarget;
+  let visibilityState = 'visible';
+  let focused = true;
+  globalThis.document = {
+    visibilityState,
+    hasFocus: () => focused,
+    addEventListener: windowTarget.addEventListener.bind(windowTarget),
+    removeEventListener: windowTarget.removeEventListener.bind(windowTarget),
+  };
 
   const seededId = ensureUIBridgeClientId();
   assert.equal(typeof seededId, 'string');
@@ -71,6 +80,53 @@ try {
   assert.equal(snapshotCalls.length, 2);
   assert.deepEqual(snapshotCalls[0].params?.data, snapshotCalls[1].params?.data);
   console.log('bridge auth snapshot retry ✓ resends identical snapshot after auth recovery');
+
+  const authHelloCalls = [];
+  let helloAttempts = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    authHelloCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-auth-retry' });
+    if (body.method === 'ui.hello') {
+      helloAttempts += 1;
+      if (helloAttempts === 1) {
+        return new Response(JSON.stringify({ error: { message: 'unauthorized' } }), { status: 401, headers });
+      }
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { snapshot: { selected: { windowId: 'chat/new', tabId: 'chat/new' }, windows: [] } }
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopUnauthorizedHello = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10_000,
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [],
+      conversationId: 'conv-auth-retry',
+    })
+  });
+
+  await sleep(25);
+  window.dispatchEvent(new Event('agently:authorized'));
+  await sleep(40);
+  stopUnauthorizedHello();
+  assert.deepEqual(authHelloCalls.slice(0, 4), ['ui.hello', 'ui.hello', 'ui.snapshot.get', 'ui.snapshot']);
+  console.log('bridge startup auth retry ✓ retries ui.hello after authorization instead of failing permanently');
 
   const orderedCalls = [];
   let snapshotGetResolved = false;
@@ -243,7 +299,49 @@ try {
   await sleep(25);
   assert.equal(aborted, true);
   console.log('bridge stop abort ✓ cancels in-flight poll requests');
+
+  const ownerCalls = [];
+  visibilityState = 'hidden';
+  focused = false;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    ownerCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-owner' });
+    if (body.method === 'ui.hello') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get' || body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopOwner = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 25,
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [],
+      conversationId: 'conv-owner'
+    })
+  });
+
+  await sleep(80);
+  assert.equal(ownerCalls.includes('ui.poll'), false);
+  visibilityState = 'visible';
+  focused = true;
+  window.dispatchEvent(new Event('focus'));
+  window.dispatchEvent(new Event('visibilitychange'));
+  await sleep(80);
+  stopOwner();
+  assert.equal(ownerCalls.includes('ui.poll'), true);
+  console.log('bridge polling owner ✓ hidden/unfocused tabs skip ui.poll until focus returns');
 } finally {
   globalThis.fetch = originalFetch;
   globalThis.window = originalWindow;
+  globalThis.document = originalDocument;
 }
