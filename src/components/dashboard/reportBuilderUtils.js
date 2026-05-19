@@ -132,25 +132,61 @@ function normalizeDynamicRow(row = {}, group = {}, index = 0) {
     };
 }
 
+function filterDefinitionForRow(group = {}, row = {}) {
+    const filterId = String(row?.filterId || "").trim();
+    return normalizeArray(group?.filters).find((entry) => String(entry?.id || "").trim() === filterId) || null;
+}
+
+function normalizeSelectionForFilter(filterDef = {}, entry = null) {
+    if (!entry || typeof entry !== "object") {
+        return null;
+    }
+    const valueSelector = String(filterDef?.valueSelector || "value").trim() || "value";
+    const labelSelector = String(filterDef?.labelSelector || "label").trim() || "label";
+    const valueType = String(filterDef?.manualValueType || "string").trim().toLowerCase();
+    const record = entry?.record && typeof entry.record === "object" ? entry.record : {};
+    const rawValue = entry?.value ?? record?.[valueSelector];
+    const coerced = coerceManualSelectionValue(filterDef, rawValue);
+    if (!coerced.ok) {
+        return null;
+    }
+    const recordLabel = String(record?.[labelSelector] ?? "").trim();
+    const entryLabel = String(entry?.label ?? "").trim();
+    const label = (
+        recordLabel
+        || ((valueType === "int" || valueType === "integer") ? "" : entryLabel)
+        || String(coerced.label || "").trim()
+    );
+    return {
+        value: coerced.value,
+        label,
+        group: entry?.group || "",
+        record: {
+            ...record,
+            [valueSelector]: coerced.value,
+            [labelSelector]: label,
+        },
+    };
+}
+
 function rowHasSelections(row = {}) {
     return Array.isArray(row?.selections) && row.selections.length > 0;
 }
 
 function normalizeDynamicGroupRows(rows = [], group = {}) {
-    const normalizedRows = normalizeArray(rows).map((row, index) => normalizeDynamicRow(row, group, index));
-    const selectedRows = normalizedRows.filter((row) => rowHasSelections(row));
-    const draftRowsByFilterId = new Map();
-    normalizedRows.forEach((row) => {
-        if (rowHasSelections(row)) {
-            return;
+    return normalizeArray(rows).map((row, index) => {
+        const normalizedRow = normalizeDynamicRow(row, group, index);
+        const filterDef = filterDefinitionForRow(group, normalizedRow);
+        if (!filterDef) {
+            return normalizedRow;
         }
-        const filterId = String(row?.filterId || "").trim();
-        if (draftRowsByFilterId.has(filterId)) {
-            return;
-        }
-        draftRowsByFilterId.set(filterId, row);
+        return {
+            ...normalizedRow,
+            selections: normalizeArray(normalizedRow.selections)
+                .map((entry) => normalizeSelectionForFilter(filterDef, entry))
+                .filter(Boolean),
+        };
     });
-    return [...selectedRows, ...draftRowsByFilterId.values()];
 }
 
 function firstResolvedValue(record = null, selectors = []) {
@@ -225,6 +261,11 @@ export function isExplicitReportBuilderChartMode(config = {}) {
 
 export function getReportBuilderSupportedChartTypes(config = {}) {
     return Array.from(supportedChartTypeSet(config));
+}
+
+export function getReportBuilderResultPanePosition(config = {}) {
+    const position = String(config?.result?.resultPanePosition || "").trim().toLowerCase();
+    return position === "left" ? "left" : "right";
 }
 
 export function getVisibleReportBuilderMeasures(config = {}) {

@@ -19,6 +19,7 @@ import {
     buildReportBuilderRequest,
     buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
+    getReportBuilderResultPanePosition,
     getSelectableReportBuilderMeasures,
     getReportBuilderSupportedChartTypes,
     getVisibleReportBuilderDimensions,
@@ -259,6 +260,14 @@ function renderReportBuilderError(error) {
     } catch (_) {
         return "Unexpected error";
     }
+}
+
+function escapeCsvCell(value) {
+    const text = value == null ? "" : String(value);
+    if (!/[",\n]/.test(text)) {
+        return text;
+    }
+    return `"${text.replace(/"/g, '""')}"`;
 }
 
 function buildChartContainer(container = {}, config = {}, state = {}) {
@@ -558,6 +567,50 @@ function ReportBuilderChartTile({
     );
 }
 
+function ReportBuilderChartQuickActions({
+    canCreate = false,
+    onCreate,
+    quickOptions = [],
+    selectedQuickOption = "",
+    onSelectQuickOption,
+    onApplyQuickOption,
+    quickDisabled = true,
+}) {
+    if (!canCreate && quickOptions.length === 0) {
+        return null;
+    }
+    return (
+        <div className="forge-report-builder__chart-quick-actions">
+            <Button
+                small
+                outlined
+                icon="add"
+                disabled={!canCreate}
+                onClick={onCreate}
+            >
+                Create Chart
+            </Button>
+            {quickOptions.length > 0 ? (
+                <>
+                    <select
+                        className="forge-report-builder-select forge-report-builder-select--compact"
+                        value={selectedQuickOption}
+                        onChange={(event) => onSelectQuickOption(event.target.value)}
+                    >
+                        <option value="">Quick chart…</option>
+                        {quickOptions.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                    </select>
+                    <Button small outlined disabled={quickDisabled} onClick={onApplyQuickOption}>
+                        Apply
+                    </Button>
+                </>
+            ) : null}
+        </div>
+    );
+}
+
 function FilterChip({ label, onRemove }) {
     return (
         <span className="forge-report-builder-filter-chip">
@@ -591,6 +644,21 @@ function normalizeArray(value) {
         return [];
     }
     return [value];
+}
+
+function nextDynamicRowId(rows = []) {
+    let maxIndex = 0;
+    normalizeArray(rows).forEach((row) => {
+        const match = /^row_(\d+)$/.exec(String(row?.id || "").trim());
+        if (!match) {
+            return;
+        }
+        const value = Number(match[1]);
+        if (Number.isFinite(value) && value > maxIndex) {
+            maxIndex = value;
+        }
+    });
+    return `row_${maxIndex + 1}`;
 }
 
 function resolveFilterOptions(filter = {}, collection = []) {
@@ -736,7 +804,7 @@ function DynamicFilterGroup({
                         <div key={row.id} className={[
                             "forge-report-builder-dynamic-row",
                             enabled ? "" : "is-disabled",
-                        ].filter(Boolean).join(" ")}>
+                        ].filter(Boolean).join(" ")} data-report-builder-row-id={row.id}>
                             <div className="forge-report-builder-dynamic-row__controls">
                                 <select
                                     className="forge-report-builder-select"
@@ -941,7 +1009,7 @@ function DynamicFamilyGroup({
                     const canInclude = !!option?.includeFilter;
                     const canExclude = !!option?.excludeFilter;
                     return (
-                        <div key={row.id} className={["forge-report-builder-dynamic-row", enabled ? "" : "is-disabled"].filter(Boolean).join(" ")}>
+                        <div key={row.id} className={["forge-report-builder-dynamic-row", enabled ? "" : "is-disabled"].filter(Boolean).join(" ")} data-report-builder-row-id={row.id}>
                             <div className="forge-report-builder-dynamic-row__controls">
                                 <select
                                     className="forge-report-builder-select"
@@ -1086,6 +1154,13 @@ function resolveDynamicFilterFamilies(config = {}) {
 export default function ReportBuilder({ container, context }) {
     useSignals();
     const config = useMemo(() => getBuilderConfig(container), [container]);
+    const filterPresentation = String(
+        config?.filterPresentation
+        || config?.layout?.filterPresentation
+        || ""
+    ).trim().toLowerCase();
+    const useFilterRail = filterPresentation === "rail-left";
+    const useFilterDrawer = filterPresentation === "drawer-left";
     const builderContext = container?.dataSourceRef && typeof context?.Context === "function"
         ? context.Context(container.dataSourceRef)
         : context;
@@ -1102,6 +1177,11 @@ export default function ReportBuilder({ container, context }) {
     const [chartDraft, setChartDraft] = useState(null);
     const [storedChartPresets, setStoredChartPresets] = useState([]);
     const [selectedPreviousChartTitle, setSelectedPreviousChartTitle] = useState("");
+    const [selectedQuickChartOption, setSelectedQuickChartOption] = useState("");
+    const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
+    const [pendingScrollRowId, setPendingScrollRowId] = useState("");
+    const builderRootRef = useRef(null);
+    const leftRailRef = useRef(null);
 
     const { collection = [], loading, error } = useDataSourceState(builderContext);
     const locale = context?.locale || "en-US";
@@ -1212,6 +1292,29 @@ export default function ReportBuilder({ container, context }) {
         }
     }, [builderContext, config, state]);
 
+    useEffect(() => {
+        if (!pendingScrollRowId) {
+            return;
+        }
+        const root = builderRootRef.current;
+        if (!root) {
+            return;
+        }
+        const target = root.querySelector(`[data-report-builder-row-id="${pendingScrollRowId}"]`);
+        if (!target) {
+            return;
+        }
+        requestAnimationFrame(() => {
+            target.scrollIntoView({ block: "end", inline: "nearest", behavior: "auto" });
+            const rootRect = root.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
+            if (targetRect.bottom > rootRect.bottom) {
+                root.scrollTop += (targetRect.bottom - rootRect.bottom) + 12;
+            }
+            setPendingScrollRowId("");
+        });
+    }, [pendingScrollRowId, state.dynamicGroups]);
+
     const measures = useMemo(() => getSelectableReportBuilderMeasures(config), [config]);
     const measureSections = useMemo(() => resolveMeasureSections(config, measures), [config, measures]);
     const dimensions = useMemo(() => getVisibleReportBuilderDimensions(config), [config]);
@@ -1245,6 +1348,7 @@ export default function ReportBuilder({ container, context }) {
     const chartDimensions = useMemo(() => chartFields.filter((entry) => entry.kind === "dimension"), [chartFields]);
     const chartMeasures = useMemo(() => chartFields.filter((entry) => entry.kind === "measure"), [chartFields]);
     const supportedChartTypes = useMemo(() => getReportBuilderSupportedChartTypes(config), [config]);
+    const resultPanePosition = useMemo(() => getReportBuilderResultPanePosition(config), [config]);
     const defaultChartSpecs = useMemo(() => buildReportBuilderDefaultChartSpecs(config, state), [config, state]);
     const chartSpecValidation = useMemo(
         () => validateReportBuilderChartSpec(config, state.chartSpec, chartFields),
@@ -1305,6 +1409,276 @@ export default function ReportBuilder({ container, context }) {
         const excludeCount = excludeRows.filter((row) => family.excludeFilterIds.includes(String(row?.filterId || "").trim()) && Array.isArray(row.selections) && row.selections.length > 0).length;
         return includeCount + excludeCount;
     }, [state]);
+    const hasFilterDrawerContent = notices.length > 0
+        || requiredStaticFilters.length > 0
+        || optionalStaticFilters.length > 0
+        || dynamicFilterGroups.length > 0
+        || dynamicFilterFamilies.length > 0;
+    const totalActiveFilterCount = activeStaticFilterCount + activeDynamicFilterCount;
+    const renderFilterCategoryControls = () => (
+        <>
+            {showFilterCategoryBar && !familyMode && (optionalStaticFilters.length > 0 || dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).length > 0) ? (
+                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
+                    {optionalStaticFilters.map((filter) => {
+                        const filterKey = String(filter.id || filter.field || "").trim();
+                        const active = activeOptionalFilterKeys.includes(filterKey);
+                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                        const categoryLabel = filter.label || filter.id;
+                        return (
+                            <button
+                                key={filterKey}
+                                type="button"
+                                className={[
+                                    "forge-report-builder__category-chip",
+                                    active ? "is-active" : "is-inactive",
+                                    configuredCount > 0 ? "has-configured-state" : "",
+                                ].filter(Boolean).join(" ")}
+                                onClick={() => toggleOptionalFilterCategory(filterKey)}
+                                aria-pressed={active}
+                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                            >
+                                <span className="forge-report-builder__category-chip-icon">
+                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                </span>
+                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                {configuredCount > 0 ? (
+                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                ) : (
+                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                    {dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).map((group) => {
+                        const active = activeDynamicGroupIds.includes(group.id);
+                        const configuredCount = countConfiguredDynamicSelections(state?.dynamicGroups?.[group.id] || []);
+                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                        const categoryLabel = group.label || group.id;
+                        return (
+                            <button
+                                key={group.id}
+                                type="button"
+                                className={[
+                                    "forge-report-builder__category-chip",
+                                    active ? "is-active" : "is-inactive",
+                                    configuredCount > 0 ? "has-configured-state" : "",
+                                ].filter(Boolean).join(" ")}
+                                onClick={() => toggleDynamicGroupCategory(group.id)}
+                                aria-pressed={active}
+                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                            >
+                                <span className="forge-report-builder__category-chip-icon">
+                                    <Icon icon={filterCategoryIcon(group.id)} size={12} />
+                                </span>
+                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                {configuredCount > 0 ? (
+                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                ) : (
+                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
+            {showFilterCategoryBar && familyMode ? (
+                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
+                    {optionalStaticFilters.map((filter) => {
+                        const filterKey = String(filter.id || filter.field || "").trim();
+                        const active = activeOptionalFilterKeys.includes(filterKey);
+                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                        const categoryLabel = filter.label || filter.id;
+                        return (
+                            <button
+                                key={filterKey}
+                                type="button"
+                                className={[
+                                    "forge-report-builder__category-chip",
+                                    active ? "is-active" : "is-inactive",
+                                    configuredCount > 0 ? "has-configured-state" : "",
+                                ].filter(Boolean).join(" ")}
+                                onClick={() => toggleOptionalFilterCategory(filterKey)}
+                                aria-pressed={active}
+                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                            >
+                                <span className="forge-report-builder__category-chip-icon">
+                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                </span>
+                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                {configuredCount > 0 ? (
+                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                ) : (
+                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                    {dynamicFilterFamilies.map((family) => {
+                        const active = activeDynamicFamilyIds.includes(family.id);
+                        const configuredCount = familyConfiguredCount(family);
+                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                        return (
+                            <button
+                                key={family.id}
+                                type="button"
+                                className={[
+                                    "forge-report-builder__category-chip",
+                                    active ? "is-active" : "is-inactive",
+                                    configuredCount > 0 ? "has-configured-state" : "",
+                                ].filter(Boolean).join(" ")}
+                                onClick={() => setActiveDynamicFamilyIds((current) => current.includes(family.id) ? current.filter((entry) => entry !== family.id) : [...current, family.id])}
+                                aria-pressed={active}
+                                aria-label={filterCategoryTitle(family.label, { active, configuredCount })}
+                                title={filterCategoryTitle(family.label, { active, configuredCount })}
+                            >
+                                <span className="forge-report-builder__category-chip-icon">
+                                    <Icon icon={filterCategoryIcon(family.id)} size={12} />
+                                </span>
+                                <span className="forge-report-builder__category-chip-label">{family.label}</span>
+                                {configuredCount > 0 ? (
+                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                ) : (
+                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            ) : null}
+        </>
+    );
+
+    const renderFilterBody = () => (
+        <>
+            {notices.length > 0 ? (
+                <div className="forge-report-builder__notices">
+                    {notices.map((notice) => (
+                        <section key={notice.id} className={`forge-report-builder__notice forge-report-builder__notice--${notice.level}`}>
+                            {notice.title ? <div className="forge-report-builder__notice-title">{notice.title}</div> : null}
+                            {notice.description ? <div className="forge-report-builder__notice-description">{notice.description}</div> : null}
+                            <div className="forge-report-builder__notice-items">
+                                {notice.items.map((item) => (
+                                    <span key={`${notice.id}_${item}`} className="forge-report-builder__notice-chip">{item}</span>
+                                ))}
+                            </div>
+                        </section>
+                    ))}
+                </div>
+            ) : null}
+            <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--static">
+                {requiredStaticFilters.map((filter) => {
+                    const filterKey = String(filter.id || filter.field || "").trim();
+                    const currentValue = state?.staticFilters?.[filterKey];
+                    return (
+                        <StaticFilterSection
+                            key={filterKey}
+                            filter={filter}
+                            context={builderContext}
+                            value={currentValue}
+                            onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
+                            onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
+                        />
+                    );
+                })}
+            </div>
+            {optionalStaticFilters
+                .filter((filter) => activeOptionalFilterKeys.includes(String(filter.id || filter.field || "").trim()))
+                .map((filter) => {
+                    const filterKey = String(filter.id || filter.field || "").trim();
+                    const currentValue = state?.staticFilters?.[filterKey];
+                    return (
+                        <div key={`row-${filterKey}`} className="forge-report-builder__optional-filter-row">
+                            <StaticFilterSection
+                                key={filterKey}
+                                filter={filter}
+                                context={builderContext}
+                                value={currentValue}
+                                onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
+                                onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
+                            />
+                        </div>
+                    );
+                })}
+            {!familyMode && visibleActiveDynamicGroupIds.length > 0 ? (
+                <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--dynamic">
+                    {dynamicGroupLayout.fullWidthIds.map((groupId) => (
+                        <div key={`full_${groupId}`} className="forge-report-builder__dynamic-group-full">
+                            {renderDynamicGroup(groupId)}
+                        </div>
+                    ))}
+                    {dynamicGroupLayout.columnRows.map((row, rowIndex) => (
+                        <div key={`row_${rowIndex}`} className="forge-report-builder__dynamic-group-row">
+                            {row.map((groupId) => (
+                                <div key={groupId} className="forge-report-builder__dynamic-group-column">
+                                    {renderDynamicGroup(groupId)}
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            ) : null}
+            {familyMode && (showFilterCategoryBar ? activeDynamicFamilyIds.length > 0 : dynamicFilterFamilies.length > 0) ? (
+                <div className="forge-report-builder__family-grid">
+                    {dynamicFilterFamilies
+                        .filter((family) => !showFilterCategoryBar || activeDynamicFamilyIds.includes(family.id))
+                        .map((family) => renderDynamicFamily(family))}
+                </div>
+            ) : null}
+        </>
+    );
+
+    const renderFilterRailControls = () => (
+        <aside className="forge-report-builder__bottom forge-report-builder__bottom--rail" aria-label="Filters">
+            <section className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static" aria-label="Filters">
+                <div className="forge-report-builder__bottom-header">
+                    <div className="forge-report-builder__bottom-label">Filters</div>
+                    <div className="forge-report-builder__bottom-header-actions">
+                        <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => toggleFilterPanel("common")}>
+                            <span>{totalActiveFilterCount} active</span>
+                            <span>{filterPanels.common ? "Hide Body" : "Show Body"}</span>
+                        </button>
+                    </div>
+                </div>
+                {renderFilterCategoryControls()}
+            </section>
+        </aside>
+    );
+
+    const renderFiltersPanel = () => (
+        <aside className={[
+            "forge-report-builder__bottom",
+            useFilterDrawer ? "forge-report-builder__bottom--drawer" : "",
+        ].filter(Boolean).join(" ")} aria-label={useFilterDrawer ? "Filters drawer" : "Filters"}>
+            <section className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static" aria-label="Filters">
+                <div className="forge-report-builder__bottom-header">
+                    <div>
+                        <div className="forge-report-builder__bottom-label">Filters</div>
+                        <div className="forge-report-builder__bottom-description">
+                            Refine scope and targeting without covering the result table.
+                        </div>
+                    </div>
+                    <div className="forge-report-builder__bottom-header-actions">
+                        <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => toggleFilterPanel("common")}>
+                            <span>{totalActiveFilterCount} active</span>
+                            <span>{filterPanels.common ? "Hide Body" : "Show Body"}</span>
+                        </button>
+                        {useFilterDrawer ? (
+                            <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => setFiltersDrawerOpen(false)}>
+                                <span>Close</span>
+                            </button>
+                        ) : null}
+                    </div>
+                </div>
+                {renderFilterCategoryControls()}
+                {!useFilterRail && filterPanels.common ? renderFilterBody() : null}
+            </section>
+        </aside>
+    );
 
     useEffect(() => {
         const nextOptional = optionalStaticFilters
@@ -1386,14 +1760,33 @@ export default function ReportBuilder({ container, context }) {
         builderContext?.handlers?.dataSource?.setInputParameters?.(request);
         builderContext?.handlers?.dataSource?.fetchCollection?.();
     }, [builderContext, config, state]);
+    const downloadCsv = React.useCallback(() => {
+        if (!Array.isArray(selectedColumns) || selectedColumns.length === 0 || !Array.isArray(computedCollection) || computedCollection.length === 0) {
+            return;
+        }
+        const lines = [selectedColumns.map((column) => escapeCsvCell(column.label || column.key)).join(",")];
+        computedCollection.forEach((row) => {
+            lines.push(selectedColumns.map((column) => {
+                const raw = resolveKey(row, column.key);
+                return escapeCsvCell(column.kind === "measure"
+                    ? formatDashboardValue(raw, column.format, locale)
+                    : raw);
+            }).join(","));
+        });
+        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        a.href = url;
+        a.download = `${String(container?.id || "report-builder").trim() || "report-builder"}-${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, [computedCollection, container?.id, locale, selectedColumns]);
     const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
     const canShowResults = canRunReport && hasRows;
     const canCreateChart = chartDimensions.length > 0 && chartMeasures.length > 0 && supportedChartTypes.length > 0;
-    const hasCompletedCurrentRun = canRunReport
-        && !loading
-        && !error
-        && lastManualRunFingerprintRef.current !== ""
-        && lastManualRunFingerprintRef.current === currentRequestFingerprint;
     const compatiblePreviousChartPresets = useMemo(
         () => storedChartPresets.filter((preset) => (
             String(preset?.settingsHash || "").trim() === settingsHash
@@ -1401,6 +1794,26 @@ export default function ReportBuilder({ container, context }) {
         )),
         [chartFields, config, settingsHash, storedChartPresets],
     );
+    const quickChartOptions = useMemo(() => {
+        const defaults = defaultChartSpecs.map((entry, index) => ({
+            value: `default:${index}`,
+            label: `${entry.title} (${entry.type})`,
+            kind: "default",
+            spec: entry,
+        }));
+        const previous = compatiblePreviousChartPresets.map((entry, index) => ({
+            value: `previous:${index}`,
+            label: `${entry.title} (Previous)`,
+            kind: "previous",
+            spec: entry.chartSpec,
+        }));
+        return [...defaults, ...previous];
+    }, [defaultChartSpecs, compatiblePreviousChartPresets]);
+    const hasCompletedCurrentRun = canRunReport
+        && !loading
+        && !error
+        && lastManualRunFingerprintRef.current !== ""
+        && lastManualRunFingerprintRef.current === currentRequestFingerprint;
 
     useEffect(() => {
         setStoredChartPresets(loadStoredChartPresets(stateKey));
@@ -1516,6 +1929,17 @@ export default function ReportBuilder({ container, context }) {
         }
         applyChartSpec(preset.chartSpec, { savePreset: false });
     }, [applyChartSpec, compatiblePreviousChartPresets, selectedPreviousChartTitle]);
+
+    const applyQuickChart = React.useCallback(() => {
+        if (!selectedQuickChartOption) {
+            return;
+        }
+        const next = quickChartOptions.find((entry) => entry.value === selectedQuickChartOption);
+        if (!next?.spec) {
+            return;
+        }
+        applyChartSpec(next.spec);
+    }, [applyChartSpec, quickChartOptions, selectedQuickChartOption]);
 
     useEffect(() => {
         if (!selectedPreviousChartTitle) {
@@ -1650,6 +2074,10 @@ export default function ReportBuilder({ container, context }) {
     };
 
     const addRow = (group) => {
+        const groupId = String(group?.id || "").trim();
+        if (groupId) {
+            setPendingScrollRowId(nextDynamicRowId(state?.dynamicGroups?.[groupId]));
+        }
         persistState(addDynamicFilterRow(state, group));
     };
 
@@ -1763,6 +2191,7 @@ export default function ReportBuilder({ container, context }) {
         if (!subgroup) {
             return;
         }
+        setPendingScrollRowId(nextDynamicRowId(state?.dynamicGroups?.[subgroup.id]));
         persistState(addDynamicFilterRow(state, subgroup));
     };
 
@@ -1951,7 +2380,11 @@ export default function ReportBuilder({ container, context }) {
     };
 
     return (
-        <div className="forge-report-builder">
+        <div className={[
+            "forge-report-builder",
+            useFilterDrawer ? "forge-report-builder--filters-drawer" : "",
+            resultPanePosition === "left" ? "forge-report-builder--result-left" : "",
+        ].filter(Boolean).join(" ")} ref={builderRootRef}>
             <div className="forge-report-builder__top">
                 <div className="forge-report-builder__shelf">
                     <div className="forge-report-builder__topline">
@@ -2037,8 +2470,36 @@ export default function ReportBuilder({ container, context }) {
                             >
                                 Run
                             </Button>
+                            <Button
+                                small
+                                outlined
+                                icon="download"
+                                disabled={!canShowResults}
+                                onClick={downloadCsv}
+                            >
+                                CSV
+                            </Button>
+                            {hasFilterDrawerContent && useFilterDrawer ? (
+                                <Button
+                                    small
+                                    outlined
+                                    icon="filter"
+                                    onClick={() => setFiltersDrawerOpen((current) => !current)}
+                                >
+                                    {filtersDrawerOpen ? `Hide Filters${totalActiveFilterCount > 0 ? ` (${totalActiveFilterCount})` : ""}` : `Filters${totalActiveFilterCount > 0 ? ` (${totalActiveFilterCount})` : ""}`}
+                                </Button>
+                            ) : null}
                             {explicitChartMode ? (
                                 <>
+                                    <ReportBuilderChartQuickActions
+                                        canCreate={canCreateChart}
+                                        onCreate={() => openChartDialog(state.chartSpec)}
+                                        quickOptions={quickChartOptions}
+                                        selectedQuickOption={selectedQuickChartOption}
+                                        onSelectQuickOption={setSelectedQuickChartOption}
+                                        onApplyQuickOption={applyQuickChart}
+                                        quickDisabled={!selectedQuickChartOption}
+                                    />
                                     {hasValidChartSpec ? (
                                         <>
                                             <Button small outlined icon="edit" onClick={() => openChartDialog(state.chartSpec)}>
@@ -2118,7 +2579,7 @@ export default function ReportBuilder({ container, context }) {
             </div>
 
             <div className="forge-report-builder__body">
-                <aside className="forge-report-builder__left">
+                <aside className="forge-report-builder__left" ref={leftRailRef}>
                     <section className="forge-report-builder__panel">
                         <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
                             <div className="forge-report-builder__panel-title">Breakdowns</div>
@@ -2150,6 +2611,8 @@ export default function ReportBuilder({ container, context }) {
                             </div>
                         ) : null}
                     </section>
+                    {useFilterRail ? renderFilterRailControls() : null}
+                    {useFilterDrawer && filtersDrawerOpen ? renderFiltersPanel() : null}
                 </aside>
 
                 <main className="forge-report-builder__center">
@@ -2172,25 +2635,6 @@ export default function ReportBuilder({ container, context }) {
                                         ? "Choose an advertiser, campaign, ad order, or audience to preview results."
                                         : "Set the required filters to preview results."}
                             </div>
-                        ) : null}
-                        {!loading && !error && canShowResults && explicitChartMode && (!hasValidChartSpec || hasStaleChartSpec) ? (
-                            <ReportBuilderChartTile
-                                title={hasStaleChartSpec ? "Update the current chart for this table" : "Create a chart from this table"}
-                                description={hasStaleChartSpec
-                                    ? (chartSpecValidation.errors || []).map((entry) => chartErrorMessage(entry)).join(" ")
-                                    : "Choose a default chart, reuse a previous one, or build a new chart from the fields currently visible in the table."}
-                                canCreate={canCreateChart}
-                                onCreate={() => openChartDialog(state.chartSpec)}
-                                defaultChartSpecs={defaultChartSpecs}
-                                onApplyDefault={(chartSpec) => applyChartSpec(chartSpec)}
-                                previousChartPresets={compatiblePreviousChartPresets}
-                                selectedPreviousTitle={selectedPreviousChartTitle}
-                                onSelectPrevious={setSelectedPreviousChartTitle}
-                                onApplyPrevious={applyPreviousChart}
-                                previousDisabled={!selectedPreviousChartTitle}
-                                warning={hasStaleChartSpec}
-                                onRemove={state.chartSpec ? removeChart : null}
-                            />
                         ) : null}
                         {!loading && !error && canShowResults && (
                             (explicitChartMode && hasValidChartSpec && state.viewMode === "chart")
@@ -2235,6 +2679,13 @@ export default function ReportBuilder({ container, context }) {
                                 </table>
                             </div>
                         ) : null}
+                        {!loading && !error && canShowResults && explicitChartMode && (!hasValidChartSpec || hasStaleChartSpec) ? (
+                            <div className="forge-report-builder__empty forge-report-builder__empty--chart-callout">
+                                {hasStaleChartSpec
+                                    ? (chartSpecValidation.errors || []).map((entry) => chartErrorMessage(entry)).join(" ")
+                                    : "Use Create Chart next to Run to build a chart from the current table."}
+                            </div>
+                        ) : null}
                     </div>
 
                     <div className="forge-report-builder__pagination">
@@ -2248,230 +2699,15 @@ export default function ReportBuilder({ container, context }) {
                             </Button>
                         </div>
                     </div>
+                    {useFilterRail && filterPanels.common ? (
+                        <section className="forge-report-builder__inline-filter-body" aria-label="Active filters">
+                            {renderFilterBody()}
+                        </section>
+                    ) : null}
                 </main>
             </div>
 
-            <div className="forge-report-builder__bottom">
-                <section className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static" aria-label="Filters">
-                    <div className="forge-report-builder__bottom-header">
-                        <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => toggleFilterPanel("common")}>
-                            <span>{activeStaticFilterCount} active</span>
-                            <span>{filterPanels.common ? "Hide" : "Show"}</span>
-                        </button>
-                    </div>
-                    {filterPanels.common ? (
-                        <>
-                            {notices.length > 0 ? (
-                                <div className="forge-report-builder__notices">
-                                    {notices.map((notice) => (
-                                        <section key={notice.id} className={`forge-report-builder__notice forge-report-builder__notice--${notice.level}`}>
-                                            {notice.title ? <div className="forge-report-builder__notice-title">{notice.title}</div> : null}
-                                            {notice.description ? <div className="forge-report-builder__notice-description">{notice.description}</div> : null}
-                                            <div className="forge-report-builder__notice-items">
-                                                {notice.items.map((item) => (
-                                                    <span key={`${notice.id}_${item}`} className="forge-report-builder__notice-chip">{item}</span>
-                                                ))}
-                                            </div>
-                                        </section>
-                                    ))}
-                                </div>
-                            ) : null}
-                            {showFilterCategoryBar && !familyMode && (optionalStaticFilters.length > 0 || dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).length > 0) ? (
-                                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
-                                    {optionalStaticFilters.map((filter) => {
-                                        const filterKey = String(filter.id || filter.field || "").trim();
-                                        const active = activeOptionalFilterKeys.includes(filterKey);
-                                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
-                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                                        const categoryLabel = filter.label || filter.id;
-                                        return (
-                                            <button
-                                                key={filterKey}
-                                                type="button"
-                                                className={[
-                                                    "forge-report-builder__category-chip",
-                                                    active ? "is-active" : "is-inactive",
-                                                    configuredCount > 0 ? "has-configured-state" : "",
-                                                ].filter(Boolean).join(" ")}
-                                                onClick={() => toggleOptionalFilterCategory(filterKey)}
-                                                aria-pressed={active}
-                                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                            >
-                                                <span className="forge-report-builder__category-chip-icon">
-                                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
-                                                </span>
-                                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
-                                                {configuredCount > 0 ? (
-                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                                ) : (
-                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                    {dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).map((group) => {
-                                        const active = activeDynamicGroupIds.includes(group.id);
-                                        const configuredCount = countConfiguredDynamicSelections(state?.dynamicGroups?.[group.id] || []);
-                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                                        const categoryLabel = group.label || group.id;
-                                        return (
-                                            <button
-                                                key={group.id}
-                                                type="button"
-                                                className={[
-                                                    "forge-report-builder__category-chip",
-                                                    active ? "is-active" : "is-inactive",
-                                                    configuredCount > 0 ? "has-configured-state" : "",
-                                                ].filter(Boolean).join(" ")}
-                                                onClick={() => toggleDynamicGroupCategory(group.id)}
-                                                aria-pressed={active}
-                                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                            >
-                                                <span className="forge-report-builder__category-chip-icon">
-                                                    <Icon icon={filterCategoryIcon(group.id)} size={12} />
-                                                </span>
-                                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
-                                                {configuredCount > 0 ? (
-                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                                ) : (
-                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : null}
-                            {showFilterCategoryBar && familyMode ? (
-                                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
-                                    {optionalStaticFilters.map((filter) => {
-                                        const filterKey = String(filter.id || filter.field || "").trim();
-                                        const active = activeOptionalFilterKeys.includes(filterKey);
-                                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
-                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                                        const categoryLabel = filter.label || filter.id;
-                                        return (
-                                            <button
-                                                key={filterKey}
-                                                type="button"
-                                                className={[
-                                                    "forge-report-builder__category-chip",
-                                                    active ? "is-active" : "is-inactive",
-                                                    configuredCount > 0 ? "has-configured-state" : "",
-                                                ].filter(Boolean).join(" ")}
-                                                onClick={() => toggleOptionalFilterCategory(filterKey)}
-                                                aria-pressed={active}
-                                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                            >
-                                                <span className="forge-report-builder__category-chip-icon">
-                                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
-                                                </span>
-                                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
-                                                {configuredCount > 0 ? (
-                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                                ) : (
-                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                    {dynamicFilterFamilies.map((family) => {
-                                        const active = activeDynamicFamilyIds.includes(family.id);
-                                        const configuredCount = familyConfiguredCount(family);
-                                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                                        return (
-                                            <button
-                                                key={family.id}
-                                                type="button"
-                                                className={[
-                                                    "forge-report-builder__category-chip",
-                                                    active ? "is-active" : "is-inactive",
-                                                    configuredCount > 0 ? "has-configured-state" : "",
-                                                ].filter(Boolean).join(" ")}
-                                                onClick={() => setActiveDynamicFamilyIds((current) => current.includes(family.id) ? current.filter((entry) => entry !== family.id) : [...current, family.id])}
-                                                aria-pressed={active}
-                                                aria-label={filterCategoryTitle(family.label, { active, configuredCount })}
-                                                title={filterCategoryTitle(family.label, { active, configuredCount })}
-                                            >
-                                                <span className="forge-report-builder__category-chip-icon">
-                                                    <Icon icon={filterCategoryIcon(family.id)} size={12} />
-                                                </span>
-                                                <span className="forge-report-builder__category-chip-label">{family.label}</span>
-                                                {configuredCount > 0 ? (
-                                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                                ) : (
-                                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ) : null}
-                            <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--static">
-                                {requiredStaticFilters.map((filter) => {
-                                    const filterKey = String(filter.id || filter.field || "").trim();
-                                    const currentValue = state?.staticFilters?.[filterKey];
-                                    return (
-                                        <StaticFilterSection
-                                            key={filterKey}
-                                            filter={filter}
-                                            context={builderContext}
-                                            value={currentValue}
-                                            onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
-                                            onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
-                                        />
-                                    );
-                                })}
-                            </div>
-                            {optionalStaticFilters
-                                .filter((filter) => activeOptionalFilterKeys.includes(String(filter.id || filter.field || "").trim()))
-                                .map((filter) => {
-                                    const filterKey = String(filter.id || filter.field || "").trim();
-                                    const currentValue = state?.staticFilters?.[filterKey];
-                                    return (
-                                        <div key={`row-${filterKey}`} className="forge-report-builder__optional-filter-row">
-                                            <StaticFilterSection
-                                                key={filterKey}
-                                                filter={filter}
-                                                context={builderContext}
-                                                value={currentValue}
-                                                onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
-                                                onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
-                                            />
-                                        </div>
-                                    );
-                                })}
-                            {!familyMode && visibleActiveDynamicGroupIds.length > 0 ? (
-                                <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--dynamic">
-                                    {dynamicGroupLayout.fullWidthIds.map((groupId) => (
-                                        <div key={`full_${groupId}`} className="forge-report-builder__dynamic-group-full">
-                                            {renderDynamicGroup(groupId)}
-                                        </div>
-                                    ))}
-                                    {dynamicGroupLayout.columnRows.map((row, rowIndex) => (
-                                        <div key={`row_${rowIndex}`} className="forge-report-builder__dynamic-group-row">
-                                            {row.map((groupId) => (
-                                                <div key={groupId} className="forge-report-builder__dynamic-group-column">
-                                                    {renderDynamicGroup(groupId)}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : null}
-                            {familyMode && (showFilterCategoryBar ? activeDynamicFamilyIds.length > 0 : dynamicFilterFamilies.length > 0) ? (
-                                <div className="forge-report-builder__family-grid">
-                                    {dynamicFilterFamilies
-                                        .filter((family) => !showFilterCategoryBar || activeDynamicFamilyIds.includes(family.id))
-                                        .map((family) => renderDynamicFamily(family))}
-                                </div>
-                            ) : null}
-                        </>
-                    ) : null}
-                </section>
-            </div>
+            {!useFilterDrawer && !useFilterRail ? renderFiltersPanel() : null}
             <ReportBuilderChartDialog
                 isOpen={chartDialogOpen}
                 onClose={() => setChartDialogOpen(false)}

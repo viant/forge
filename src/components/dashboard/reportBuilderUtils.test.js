@@ -8,6 +8,7 @@ import {
     buildReportBuilderDefaultState,
     buildReportBuilderDefaultChartSpecs,
     buildReportBuilderRequest,
+    getReportBuilderResultPanePosition,
     buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
     getSelectableReportBuilderMeasures,
@@ -86,6 +87,7 @@ const config = {
                     id: "orderIds",
                     paramPath: "filters.orderIds",
                     multiple: true,
+                    manualValueType: "int",
                     valueSelector: "adOrderId",
                     labelSelector: "adOrderName",
                     recordSelectors: ["agencyId", "advertiserId", "campaignId"],
@@ -158,12 +160,14 @@ assert.equal(Math.round((endLast3 - startLast3) / 86400000), 2);
 
 assert.equal(isExplicitReportBuilderChartMode(config), false);
 assert.deepEqual(getReportBuilderSupportedChartTypes(config), ["line", "bar", "area"]);
+assert.equal(getReportBuilderResultPanePosition(config), "right");
 
 const explicitChartConfig = {
     ...config,
     result: {
         ...config.result,
         chartCreationMode: "explicit",
+        resultPanePosition: "left",
         chartWizard: {
             supportedTypes: ["line", "bar", "area"],
         },
@@ -179,6 +183,7 @@ const explicitChartConfig = {
     },
 };
 assert.equal(isExplicitReportBuilderChartMode(explicitChartConfig), true);
+assert.equal(getReportBuilderResultPanePosition(explicitChartConfig), "left");
 
 const merged = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend", "impressions"],
@@ -454,7 +459,7 @@ const familyDraftState = sanitizeReportBuilderState(familyDraftConfig, {
 });
 assert.deepEqual(
     familyDraftState.dynamicGroups.include.map((row) => row.id),
-    ["row_a", "row_b"],
+    ["row_a", "row_b", "row_c"],
 );
 
 const singleSelectArrayConfig = {
@@ -468,6 +473,7 @@ const singleSelectArrayConfig = {
                     paramPath: "filters.orderIds",
                     multiple: false,
                     emitArray: true,
+                    manualValueType: "int",
                     valueSelector: "adOrderId",
                     labelSelector: "adOrderName",
                 },
@@ -676,23 +682,44 @@ const duplicateDraftState = mergeReportBuilderState(config, {
             {
                 id: "row_3",
                 filterId: "orderIds",
-                selections: [{ value: 2609393, label: "Order 2609393" }],
+                selections: [{
+                    value: 2609393,
+                    label: "Order 2609393",
+                    record: {
+                        adOrderId: 2609393,
+                        adOrderName: "Order 2609393",
+                    },
+                }],
             },
         ],
     },
 });
 assert.deepEqual(duplicateDraftState.dynamicGroups.scope, [
     {
-        id: "row_3",
-        filterId: "orderIds",
-        enabled: true,
-        selections: [{ value: 2609393, label: "Order 2609393", group: "", record: null }],
-    },
-    {
         id: "row_1",
         filterId: "orderIds",
         enabled: true,
         selections: [],
+    },
+    {
+        id: "row_2",
+        filterId: "orderIds",
+        enabled: true,
+        selections: [],
+    },
+    {
+        id: "row_3",
+        filterId: "orderIds",
+        enabled: true,
+        selections: [{
+            value: 2609393,
+            label: "Order 2609393",
+            group: "",
+            record: {
+                adOrderId: 2609393,
+                adOrderName: "Order 2609393",
+            },
+        }],
     },
 ]);
 
@@ -711,6 +738,12 @@ assert.deepEqual(sanitizedDrafts.dynamicGroups.scope, [
         enabled: true,
         selections: [],
     },
+    {
+        id: "row_2",
+        filterId: "orderIds",
+        enabled: true,
+        selections: [],
+    },
 ]);
 
 const sanitizedDisabledRows = sanitizeReportBuilderState(config, {
@@ -721,5 +754,43 @@ const sanitizedDisabledRows = sanitizeReportBuilderState(config, {
     },
 });
 assert.equal(sanitizedDisabledRows.dynamicGroups.scope[0].enabled, false);
+
+const sanitizedInvalidManualId = sanitizeReportBuilderState(config, {
+    dynamicGroups: {
+        scope: [
+            { id: "row_bad", filterId: "orderIds", selections: [{ value: "[MaxDepth]", label: "[MaxDepth]" }] },
+            {
+                id: "row_good",
+                filterId: "orderIds",
+                selections: [{
+                    value: "2661308",
+                    label: "Order 2661308",
+                    record: {
+                        adOrderId: 2661308,
+                        adOrderName: "Order 2661308",
+                    },
+                }],
+            },
+        ],
+    },
+});
+assert.deepEqual(sanitizedInvalidManualId.dynamicGroups.scope, [
+    {
+        id: "row_good",
+        filterId: "orderIds",
+        enabled: true,
+        selections: [
+            {
+                value: 2661308,
+                label: "Order 2661308",
+                group: "",
+                record: {
+                    adOrderId: 2661308,
+                    adOrderName: "Order 2661308",
+                },
+            },
+        ],
+    },
+]);
 
 console.log("reportBuilderUtils ✓ request mapping, defaults, and lookup projection");
