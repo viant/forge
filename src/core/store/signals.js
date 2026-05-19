@@ -525,6 +525,7 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         region: win?.region || '',
         workspaceSharePct: win?.workspaceSharePct ?? undefined,
         workspaceMinHeight: win?.workspaceMinHeight ?? undefined,
+        workspaceCollapsed: win?.workspaceCollapsed === true,
         windowData: win?.windowData || '',
         inTab: win?.inTab !== false,
         parameters: win?.parameters || {},
@@ -686,6 +687,9 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         if (options.workspaceMinHeight !== undefined) {
             newWindow.workspaceMinHeight = options.workspaceMinHeight;
         }
+        if (options.workspaceCollapsed !== undefined) {
+            newWindow.workspaceCollapsed = options.workspaceCollapsed === true;
+        }
         if (inTab === false) {
             floatingWindowZIndex += 1;
             newWindow.zIndex = floatingWindowZIndex;
@@ -740,6 +744,9 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         }
         if (options.workspaceMinHeight !== undefined) {
             nextWindow.workspaceMinHeight = options.workspaceMinHeight;
+        }
+        if (options.workspaceCollapsed !== undefined) {
+            nextWindow.workspaceCollapsed = options.workspaceCollapsed === true;
         }
         if (inTab !== false) {
             delete nextWindow.zIndex;

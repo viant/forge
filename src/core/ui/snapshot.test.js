@@ -30,6 +30,7 @@ activeWindows.value = [
     region: 'chat.top',
     workspaceSharePct: 72,
     workspaceMinHeight: 500,
+    workspaceCollapsed: true,
     parentKey: 'root',
     inTab: true,
   },
@@ -81,6 +82,7 @@ assert.equal(snap.windows[0].presentation, 'hosted');
 assert.equal(snap.windows[0].region, 'chat.top');
 assert.equal(snap.windows[0].workspaceSharePct, 72);
 assert.equal(snap.windows[0].workspaceMinHeight, 500);
+assert.equal(snap.windows[0].workspaceCollapsed, true);
 assert.equal(snap.windows[0].parentKey, 'root');
 assert.equal(snap.windows[0].inlineMetadata.namespace, 'Demo');
 assert.equal(snap.windows[0].inlineMetadata.actions.code, '(() => ({ ping: () => true }))()');
@@ -90,5 +92,46 @@ assert.deepEqual(snap.windows[0].metadata.view.tabs, [
   { containerId: 'c1', tabId: 'kpiTab', title: 'KPIs' },
 ]);
 assert.deepEqual(snap.windows[0].metadata.view.controls, []);
+
+resetSignals();
+
+activeWindows.value = [
+  {
+    windowId: 'order_2656980__conv-1',
+    windowKey: 'order',
+    windowTitle: 'Order 2656980',
+    conversationId: 'conv-1',
+    presentation: 'hosted',
+    region: 'chat.top',
+    parentKey: 'chat/new',
+    inTab: true,
+    parameters: { AdOrderId: [2656980] },
+  },
+  {
+    windowId: 'order_2609393__conv-1',
+    windowKey: 'order',
+    windowTitle: 'Order 2609393',
+    conversationId: 'conv-1',
+    presentation: 'hosted',
+    region: 'chat.top',
+    parentKey: 'chat/new',
+    inTab: true,
+    parameters: { AdOrderId: [2609393] },
+  },
+];
+selectedTabId.value = 'order_2609393__conv-1';
+selectedWindowId.value = 'order_2609393__conv-1';
+
+const compareSnap = buildUISnapshot({ includeCollection: false });
+assert.deepEqual(compareSnap.windows[0].compareContext, {
+  orderIds: ['2656980', '2609393'],
+  windowIds: ['order_2656980__conv-1', 'order_2609393__conv-1'],
+  activeOrderId: '2656980',
+});
+assert.deepEqual(compareSnap.windows[1].compareContext, {
+  orderIds: ['2656980', '2609393'],
+  windowIds: ['order_2656980__conv-1', 'order_2609393__conv-1'],
+  activeOrderId: '2609393',
+});
 
 resetSignals();
