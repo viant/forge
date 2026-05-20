@@ -275,6 +275,14 @@
     letter-spacing: 0;
 }
 
+.forge-dashboard-metric-subvalue {
+    margin-top: 4px;
+    color: #6a7a8a;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+
 .forge-dashboard-table-tools {
     display: flex;
     align-items: center;
