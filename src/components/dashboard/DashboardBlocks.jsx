@@ -202,14 +202,21 @@ export function DashboardSummary({container, context}) {
     const summaryEntries = summaryConfig.items || container.items || summaryConfig.metrics || container.metrics || [];
     const metricCards = Array.isArray(summaryEntries)
         ? summaryEntries.map((metric) => {
-            const selector = metric.selector || metric.field || metric.key;
+            const selector = metric.selector || metric.field || metric.key || metric.valueField;
             const rowValue = selector && summaryRow ? resolveKey(summaryRow, selector) : undefined;
             const value = rowValue !== undefined ? rowValue : (selector ? resolveKey(metricsData, selector) : metric.value);
+            const secondarySelector = metric.secondarySelector || metric.secondaryField || metric.secondaryKey || metric.secondaryValueField;
+            const secondaryRowValue = secondarySelector && summaryRow ? resolveKey(summaryRow, secondarySelector) : undefined;
+            const secondaryValue = secondaryRowValue !== undefined
+                ? secondaryRowValue
+                : (secondarySelector ? resolveKey(metricsData, secondarySelector) : metric.secondaryValue);
             return {
                 key: metric.id || selector || metric.label,
                 label: metric.label,
                 value,
                 format: metric.format,
+                secondaryValue,
+                secondaryFormat: metric.secondaryFormat || metric.format,
             };
         })
         : summaryEntries && typeof summaryEntries === 'object'
@@ -242,7 +249,14 @@ export function DashboardSummary({container, context}) {
                                     </span>
                                 </div>
                             ) : (
-                                <div className="forge-dashboard-metric-value">{formatDashboardValue(metric.value, metric.format, locale)}</div>
+                                <div>
+                                    <div className="forge-dashboard-metric-value">{formatDashboardValue(metric.value, metric.format, locale)}</div>
+                                    {metric.secondaryValue !== undefined && metric.secondaryValue !== null && metric.secondaryValue !== '' ? (
+                                        <div className="forge-dashboard-metric-subvalue">
+                                            {formatDashboardValue(metric.secondaryValue, metric.secondaryFormat, locale)}
+                                        </div>
+                                    ) : null}
+                                </div>
                             )}
                         </div>
                     );
