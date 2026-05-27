@@ -6,28 +6,31 @@ import {
 import Container from './Container';
 import {useSignals} from '@preact/signals-react/runtime';
 import {findBusSignal, findViewSignal} from "../core";
+import {isContainerVisible, trackContainerVisibility} from "./visibleWhen.js";
 
 const FormPanel = ({context, container, children}) => {
     useSignals();
     const containers = container.containers || [];
+    containers.forEach((entry) => trackContainerVisibility(entry, context));
+    const visibleContainers = containers.filter((entry) => isContainerVisible(entry, context));
     const windowId = context?.identity?.windowId;
-    const panelId = container?.id || containers[0]?.id || 'root';
+    const panelId = container?.id || visibleContainers[0]?.id || containers[0]?.id || 'root';
     const viewSignal = windowId ? findViewSignal(windowId) : null;
     const viewValue = viewSignal?.value || {};
     const busMessages = windowId ? ((findBusSignal(windowId)?.value) || []) : [];
     const resolveSelectedTabId = () => {
         const viewState = viewValue || {};
         const savedTabId = String(viewState?.tabs?.[panelId] || '').trim();
-        if (savedTabId && containers.some((entry) => String(entry?.id || '').trim() === savedTabId)) {
+        if (savedTabId && visibleContainers.some((entry) => String(entry?.id || '').trim() === savedTabId)) {
             return savedTabId;
         }
         const configured = String(container?.tabs?.selectedTabId || container?.tabs?.defaultSelectedTabId || '').trim();
-        if (configured && containers.some((entry) => String(entry?.id || '').trim() === configured)) {
+        if (configured && visibleContainers.some((entry) => String(entry?.id || '').trim() === configured)) {
             return configured;
         }
-        return containers[0]?.id;
+        return visibleContainers[0]?.id;
     };
-    const selectedTabId = useMemo(resolveSelectedTabId, [viewValue, panelId, container?.tabs?.selectedTabId, container?.tabs?.defaultSelectedTabId, containers]);
+    const selectedTabId = useMemo(resolveSelectedTabId, [viewValue, panelId, container?.tabs?.selectedTabId, container?.tabs?.defaultSelectedTabId, visibleContainers]);
     const handleTabChange = (newTabId) => {
         if (viewSignal) {
             const previous = viewSignal.peek?.() || {};
@@ -50,7 +53,7 @@ const FormPanel = ({context, container, children}) => {
         const last = messages[messages.length - 1];
         const targetPanelId = String(last?.containerId || '').trim();
         if (last?.type === 'selectTab' && last?.tabId && (!targetPanelId || targetPanelId === panelId)) {
-            const target = containers.find(c => c.id === last.tabId);
+            const target = visibleContainers.find(c => c.id === last.tabId);
             if (target) {
                 if (viewSignal) {
                     const previous = viewSignal.peek?.() || {};
@@ -64,11 +67,14 @@ const FormPanel = ({context, container, children}) => {
                 }
             }
         }
-    }, [windowId, viewValue, busMessages, panelId, containers, selectedTabId, viewSignal]);
+    }, [windowId, viewValue, busMessages, panelId, visibleContainers, selectedTabId, viewSignal]);
+    if (visibleContainers.length === 0) {
+        return null;
+    }
     return (
         <div className="form-panel">
-            <Tabs id={`form-tabs-${containers[0]?.id || 'root'}`} className="forge-form-panel-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} renderActiveTabPanelOnly={true}>
-                {containers.map((tab) => (
+            <Tabs id={`form-tabs-${visibleContainers[0]?.id || 'root'}`} className="forge-form-panel-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} renderActiveTabPanelOnly={true}>
+                {visibleContainers.map((tab) => (
                     <Tab
                         key={tab.id}
                         id={tab.id}

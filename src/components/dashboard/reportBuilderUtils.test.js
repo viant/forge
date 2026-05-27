@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     applyReportBuilderComputedMeasures,
     buildDefaultReportBuilderChartSpec,
+    buildReportBuilderColumns,
     buildExplicitReportBuilderChartContainer,
     buildReportBuilderChartFields,
     buildReportBuilderDefaultState,
@@ -303,10 +304,10 @@ const chartFields = buildReportBuilderChartFields(config, {
     selectedMeasures: ["totalSpend", "impressions"],
 });
 assert.deepEqual(chartFields, [
-    { key: "eventDate", label: "eventDate", kind: "dimension", format: undefined, align: undefined },
-    { key: "siteType", label: "siteType", kind: "dimension", format: undefined, align: undefined },
-    { key: "totalSpend", label: "totalSpend", kind: "measure", format: undefined, align: "right" },
-    { key: "impressions", label: "impressions", kind: "measure", format: undefined, align: "right" },
+    { key: "eventDate", aliases: ["eventDate"], label: "eventDate", kind: "dimension", format: undefined, align: undefined },
+    { key: "siteType", aliases: ["siteType"], label: "siteType", kind: "dimension", format: undefined, align: undefined },
+    { key: "totalSpend", aliases: ["totalSpend"], label: "totalSpend", kind: "measure", format: undefined, align: "right" },
+    { key: "impressions", aliases: ["impressions"], label: "impressions", kind: "measure", format: undefined, align: "right" },
 ]);
 
 const normalizedChartSpec = normalizeReportBuilderChartSpec({
@@ -436,6 +437,78 @@ assert.equal(explicitContainer.chart.type, "bar");
 assert.equal(explicitContainer.chart.xAxis.dataKey, "eventDate");
 assert.equal(explicitContainer.chart.series.nameKey, "siteType");
 assert.equal(explicitContainer.chart.series.valueKey, "totalSpend");
+
+const displayConfig = {
+    ...config,
+    dimensions: [
+        { id: "channelId", key: "channelId", displayKey: "channel.channel", paramPath: "dimensions.channelId", default: true },
+        { id: "eventDate", key: "eventDate", paramPath: "dimensions.eventDate", chartAxis: true },
+    ],
+};
+assert.deepEqual(
+    buildReportBuilderColumns(displayConfig, {
+        selectedDimensions: ["channelId", "eventDate"],
+        selectedMeasures: ["totalSpend"],
+    }),
+    [
+        {
+            key: "channelId",
+            sourceKey: "channelId",
+            displayKey: "channel.channel",
+            chartKey: "channel.channel",
+            label: "channelId",
+            kind: "dimension",
+            format: undefined,
+        },
+        {
+            key: "eventDate",
+            sourceKey: "eventDate",
+            displayKey: "eventDate",
+            chartKey: "eventDate",
+            label: "eventDate",
+            kind: "dimension",
+            format: undefined,
+        },
+        {
+            key: "totalSpend",
+            label: "totalSpend",
+            kind: "measure",
+            format: undefined,
+            align: "right",
+        },
+    ],
+);
+assert.deepEqual(
+    buildReportBuilderChartFields(displayConfig, {
+        selectedDimensions: ["channelId", "eventDate"],
+        selectedMeasures: ["totalSpend"],
+    }),
+    [
+        { key: "channel.channel", aliases: ["channelId"], label: "channelId", kind: "dimension", format: undefined, align: undefined },
+        { key: "eventDate", aliases: ["eventDate"], label: "eventDate", kind: "dimension", format: undefined, align: undefined },
+        { key: "totalSpend", aliases: ["totalSpend"], label: "totalSpend", kind: "measure", format: undefined, align: "right" },
+    ],
+);
+const displayChartSpec = buildDefaultReportBuilderChartSpec(displayConfig, {
+    selectedDimensions: ["channelId", "eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+});
+assert.equal(displayChartSpec.xField, "channel.channel");
+const displayContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    displayConfig,
+    {
+        selectedDimensions: ["channelId", "eventDate"],
+        selectedMeasures: ["totalSpend"],
+    },
+    {
+        type: "bar",
+        xField: "channelId",
+        yFields: ["totalSpend"],
+    },
+);
+assert.equal(displayContainer.chart.xAxis.dataKey, "channel.channel");
 
 const familyDraftConfig = {
     dynamicFilterGroups: [

@@ -236,7 +236,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             result.handlers = {
                 // inherit parent handlers (including dialog for dialog contexts)
                 ...result.handlers,
-                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector),
+                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector, dataSource),
                 window: windowHandlers,
                 ...this._globalServices,
             }
@@ -319,7 +319,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
             result.handlers = {
                 ...result.handlers,
-                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector),
+                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector, dataSource),
                 window: windowHandlers,
                 ...this._globalServices,
             };

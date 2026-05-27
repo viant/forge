@@ -30,6 +30,7 @@ import {
     projectManualSelection,
     projectLookupSelections,
     removeDynamicFilterRow,
+    resolveReportBuilderDimensionDisplayKey,
     resolveReportBuilderMeasure,
     resolveReportBuilderReadiness,
     sanitizeReportBuilderState,
@@ -148,6 +149,37 @@ function dimensionById(config = {}, id = "") {
 
 function groupByOption(config = {}, value = "") {
     return (config?.groupBy?.options || []).find((entry) => String(entry?.value || "").trim() === String(value || "").trim()) || null;
+}
+
+export function resolveReportBuilderLookupDescriptor(builderContext, config = {}, state = {}, group = {}, filterDef = {}, rowId = "") {
+    const base = filterDef?.lookup && typeof filterDef.lookup === "object"
+        ? { ...filterDef.lookup }
+        : {};
+    const handlerName = String(base?.hook || config?.hooks?.resolveLookup || "").trim();
+    if (!handlerName || !builderContext?.lookupHandler) {
+        return base;
+    }
+    try {
+        const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
+        const resolved = handler({
+            context: builderContext,
+            config,
+            state,
+            group,
+            filterDef,
+            rowId,
+        });
+        if (!resolved || typeof resolved !== "object" || Array.isArray(resolved)) {
+            return base;
+        }
+        return {
+            ...base,
+            ...resolved,
+        };
+    } catch (error) {
+        console.error("reportBuilder lookup hook failed", error);
+        return base;
+    }
 }
 
 function resolveMeasureSections(config = {}, measures = []) {
@@ -297,7 +329,7 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
     };
 
     const groupedSeries = {
-        nameKey: groupDimension?.key || groupDimension?.id,
+        nameKey: resolveReportBuilderDimensionDisplayKey(groupDimension) || groupDimension?.key || groupDimension?.id,
         valueKey: primaryMeasure?.key || primaryMeasure?.id,
         palette,
     };
@@ -310,7 +342,7 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
         chart: {
             type: config.result?.chartType || "line",
             xAxis: {
-                dataKey: xDimension?.key || xDimension?.id || "eventDate",
+                dataKey: resolveReportBuilderDimensionDisplayKey(xDimension) || "eventDate",
                 tickFormat: xDimension?.tickFormat,
             },
             yAxis: {
@@ -319,6 +351,17 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
             series: !preferDirectSeries && groupDimension ? groupedSeries : directSeries,
         },
     };
+}
+
+function resolveReportBuilderCellValue(row = {}, column = {}) {
+    const displayKey = String(column?.displayKey || "").trim();
+    if (column?.kind === "dimension" && displayKey) {
+        const displayValue = resolveKey(row, displayKey);
+        if (displayValue !== undefined && displayValue !== null && displayValue !== "") {
+            return displayValue;
+        }
+    }
+    return resolveKey(row, column?.key);
 }
 
 const REPORT_BUILDER_CHART_PRESET_PREFIX = "reportBuilder.chartPresets";
@@ -765,6 +808,7 @@ function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) 
 function DynamicFilterGroup({
     group,
     rows,
+    resolveLookup,
     onAddRow,
     onChangeFilter,
     onPick,
@@ -795,8 +839,9 @@ function DynamicFilterGroup({
                 ) : null}
                 {(rows || []).map((row) => {
                     const selectedFilter = filters.find((entry) => String(entry?.id || "").trim() === String(row.filterId || "").trim()) || filters[0] || null;
+                    const lookup = resolveLookup?.(group, selectedFilter, row.id) || null;
                     const placeholder = selectedFilter?.placeholder || selectedFilter?.label || "Select value";
-                    const dialogId = selectedFilter?.dialogId || selectedFilter?.lookup?.dialogId || "";
+                    const dialogId = lookup?.dialogId || selectedFilter?.dialogId || selectedFilter?.lookup?.dialogId || "";
                     const enabled = row?.enabled !== false;
                     const allowManualEntry = selectedFilter?.manualEntry === true;
                     const manualDraft = manualDrafts[row.id] || "";
@@ -822,7 +867,8 @@ function DynamicFilterGroup({
                                         small
                                         icon="search-template"
                                         outlined
-                                        onClick={() => onPick(row.id, selectedFilter)}
+                                        className="forge-report-builder-lookup-button"
+                                        onClick={() => onPick(row.id, selectedFilter, lookup)}
                                     >
                                         {placeholder}
                                     </Button>
@@ -974,6 +1020,7 @@ function DynamicFamilyGroup({
     family,
     rows,
     options,
+    resolveLookup,
     onAddRow,
     onChangeFilter,
     onChangeDirection,
@@ -1001,8 +1048,10 @@ function DynamicFamilyGroup({
                     const option = options.find((entry) => entry.key === row.optionKey) || options[0] || null;
                     const selectedFilter = row.direction === "exclude" ? option?.excludeFilter : option?.includeFilter;
                     const fallbackFilter = selectedFilter || option?.includeFilter || option?.excludeFilter || null;
+                    const groupRef = { id: row.direction };
+                    const lookup = resolveLookup?.(groupRef, fallbackFilter, row.id) || null;
                     const placeholder = fallbackFilter?.placeholder || fallbackFilter?.label || "Select value";
-                    const dialogId = fallbackFilter?.dialogId || fallbackFilter?.lookup?.dialogId || "";
+                    const dialogId = lookup?.dialogId || fallbackFilter?.dialogId || fallbackFilter?.lookup?.dialogId || "";
                     const enabled = row?.enabled !== false;
                     const allowManualEntry = fallbackFilter?.manualEntry === true;
                     const manualDraft = manualDrafts[row.id] || "";
@@ -1039,7 +1088,13 @@ function DynamicFamilyGroup({
                                     </button>
                                 </div>
                                 {dialogId ? (
-                                    <Button small icon="search-template" outlined onClick={() => onPick(row.id, row.direction, fallbackFilter)}>
+                                    <Button
+                                        small
+                                        icon="search-template"
+                                        outlined
+                                        className="forge-report-builder-lookup-button"
+                                        onClick={() => onPick(row.id, row.direction, fallbackFilter, lookup)}
+                                    >
                                         {placeholder}
                                     </Button>
                                 ) : null}
@@ -1200,6 +1255,10 @@ export default function ReportBuilder({ container, context }) {
         }
         builderContext?.handlers?.dataSource?.setWindowFormData?.({ values: payload });
     }, [builderContext, config, stateKey, windowFormSignal]);
+
+    const resolveLookup = React.useCallback((group, filterDef, rowId = "") => (
+        resolveReportBuilderLookupDescriptor(builderContext, config, state, group, filterDef, rowId)
+    ), [builderContext, config, state]);
 
     useEffect(() => {
         if (seededDefaultsRef.current) {
@@ -1767,7 +1826,7 @@ export default function ReportBuilder({ container, context }) {
         const lines = [selectedColumns.map((column) => escapeCsvCell(column.label || column.key)).join(",")];
         computedCollection.forEach((row) => {
             lines.push(selectedColumns.map((column) => {
-                const raw = resolveKey(row, column.key);
+                const raw = resolveReportBuilderCellValue(row, column);
                 return escapeCsvCell(column.kind === "measure"
                     ? formatDashboardValue(raw, column.format, locale)
                     : raw);
@@ -2119,9 +2178,10 @@ export default function ReportBuilder({ container, context }) {
                 key={group.id}
                 group={group}
                 rows={state?.dynamicGroups?.[group.id] || []}
+                resolveLookup={resolveLookup}
                 onAddRow={() => addRow(group)}
                 onChangeFilter={(rowId, filterId) => changeDynamicFilterType(group, rowId, filterId)}
-                onPick={(rowId, filterDef) => pickDynamicSelection(group, rowId, filterDef)}
+                onPick={(rowId, filterDef, lookup) => pickDynamicSelection(group, rowId, filterDef, lookup)}
                 onAddManualSelection={(rowId, filterDef, rawValue) => addManualDynamicSelection(group, rowId, filterDef, rawValue)}
                 onRemoveSelection={(rowId, index) => removeDynamicSelection(group, rowId, index)}
                 onToggleEnabled={(rowId) => toggleDynamicRowEnabled(group, rowId)}
@@ -2148,9 +2208,10 @@ export default function ReportBuilder({ container, context }) {
                 key={`${groupId}_${label}`}
                 group={subgroup}
                 rows={(state?.dynamicGroups?.[groupId] || []).filter((row) => filterIds.includes(String(row?.filterId || "").trim()))}
+                resolveLookup={resolveLookup}
                 onAddRow={() => addRow(subgroup)}
                 onChangeFilter={(rowId, filterId) => changeDynamicFilterType(subgroup, rowId, filterId)}
-                onPick={(rowId, filterDef) => pickDynamicSelection(subgroup, rowId, filterDef)}
+                onPick={(rowId, filterDef, lookup) => pickDynamicSelection(subgroup, rowId, filterDef, lookup)}
                 onAddManualSelection={(rowId, filterDef, rawValue) => addManualDynamicSelection(subgroup, rowId, filterDef, rawValue)}
                 onRemoveSelection={(rowId, index) => removeDynamicSelection(subgroup, rowId, index)}
                 onToggleEnabled={(rowId) => toggleDynamicRowEnabled(subgroup, rowId)}
@@ -2269,10 +2330,11 @@ export default function ReportBuilder({ container, context }) {
                     family={family}
                     rows={buildDynamicFamilyRows(state, family, dynamicFilterGroups)}
                     options={buildDynamicFamilyOptions(family, dynamicFilterGroups)}
+                    resolveLookup={resolveLookup}
                     onAddRow={() => addFamilyRow(family)}
                     onChangeFilter={(rowId, direction, optionKey) => changeFamilyFilterType(family, rowId, direction, optionKey)}
                     onChangeDirection={(rowId, direction, optionKey, nextDirection) => changeFamilyDirection(family, rowId, direction, optionKey, nextDirection)}
-                    onPick={(rowId, direction, filterDef) => pickDynamicSelection(getDirectionalSubgroup(direction, family), rowId, filterDef)}
+                    onPick={(rowId, direction, filterDef, lookup) => pickDynamicSelection(getDirectionalSubgroup(direction, family), rowId, filterDef, lookup)}
                     onAddManualSelection={(rowId, direction, filterDef, rawValue) => addManualDynamicSelection(getDirectionalSubgroup(direction, family), rowId, filterDef, rawValue)}
                     onRemoveSelection={(rowId, direction, index) => removeDynamicSelection(getDirectionalSubgroup(direction, family), rowId, index)}
                     onToggleEnabled={(rowId, direction) => toggleDynamicRowEnabled(getDirectionalSubgroup(direction, family), rowId)}
@@ -2337,16 +2399,18 @@ export default function ReportBuilder({ container, context }) {
         });
     };
 
-    const pickDynamicSelection = async (group, rowId, filterDef) => {
-        const dialogId = filterDef?.dialogId || filterDef?.lookup?.dialogId;
+    const pickDynamicSelection = async (group, rowId, filterDef, lookup = null) => {
+        const descriptor = lookup || resolveLookup(group, filterDef, rowId);
+        const dialogId = descriptor?.dialogId || filterDef?.dialogId || filterDef?.lookup?.dialogId;
         if (!dialogId) {
             return;
         }
         try {
             const payload = await builderContext?.handlers?.window?.openDialog?.({
                 execution: {
-                    args: [dialogId, { awaitResult: true, multiple: filterDef?.multiple !== false }],
+                    args: [dialogId, { awaitResult: true, multiple: descriptor?.multiple ?? (filterDef?.multiple !== false) }],
                 },
+                parameters: descriptor?.parameters && typeof descriptor.parameters === "object" ? descriptor.parameters : undefined,
                 context: builderContext,
             });
             const selections = projectLookupSelections(filterDef, payload);
@@ -2664,7 +2728,7 @@ export default function ReportBuilder({ container, context }) {
                                         {(computedCollection || []).map((row, index) => (
                                             <tr key={index}>
                                                 {selectedColumns.map((column) => {
-                                                    const value = resolveKey(row, column.key);
+                                                    const value = resolveReportBuilderCellValue(row, column);
                                                     return (
                                                         <td key={`${index}_${column.key}`} style={{ textAlign: column.align || "left" }}>
                                                             {column.kind === "measure"

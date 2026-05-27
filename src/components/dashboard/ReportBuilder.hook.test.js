@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { applyReportBuilderStateHook, resolveReportBuilderHookHandler, resolveReportBuilderNotices } from "./ReportBuilder.jsx";
+import {
+  applyReportBuilderStateHook,
+  resolveReportBuilderHookHandler,
+  resolveReportBuilderLookupDescriptor,
+  resolveReportBuilderNotices,
+} from "./ReportBuilder.jsx";
 
 describe("resolveReportBuilderHookHandler", () => {
   it("resolves unqualified handlers from the current window namespace", () => {
@@ -91,5 +96,69 @@ describe("resolveReportBuilderHookHandler", () => {
         items: ["peer39.social.context"],
       },
     ]);
+  });
+
+  it("resolves lookup descriptors from the configured lookup hook and merges local lookup config", () => {
+    const context = {
+      metadata: { namespace: "Forecasting" },
+      lookupHandler(name) {
+        if (name === "Forecasting.stewardForecastingBuilder.resolveLookup") {
+          return ({ filterDef, rowId }) => ({
+            dialogId: "targetingTreePicker",
+            parameters: {
+              Field: "USER_POOL",
+              rowId,
+              featureKey: filterDef.targetingFeatureKey,
+            },
+          });
+        }
+        throw new Error(`missing ${name}`);
+      },
+    };
+
+    expect(resolveReportBuilderLookupDescriptor(
+      context,
+      { hooks: { resolveLookup: "Forecasting.stewardForecastingBuilder.resolveLookup" } },
+      { staticFilters: { channelIds: [1] } },
+      { id: "include" },
+      {
+        id: "includeUserPools",
+        targetingFeatureKey: "user.segment",
+        lookup: { multiple: true },
+      },
+      "row_1",
+    )).toEqual({
+      multiple: true,
+      dialogId: "targetingTreePicker",
+      parameters: {
+        Field: "USER_POOL",
+        rowId: "row_1",
+        featureKey: "user.segment",
+      },
+    });
+  });
+
+  it("does not produce a lookup descriptor when the hook returns null for an unsupported feature", () => {
+    const context = {
+      metadata: { namespace: "Forecasting" },
+      lookupHandler(name) {
+        if (name === "Forecasting.stewardForecastingBuilder.resolveLookup") {
+          return () => null;
+        }
+        throw new Error(`missing ${name}`);
+      },
+    };
+
+    expect(resolveReportBuilderLookupDescriptor(
+      context,
+      { hooks: { resolveLookup: "Forecasting.stewardForecastingBuilder.resolveLookup" } },
+      {},
+      { id: "include" },
+      {
+        id: "includeExternalPmpDeals",
+        targetingFeatureKey: "external.pmp.deal",
+      },
+      "row_external",
+    )).toEqual({});
   });
 });

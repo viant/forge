@@ -6,7 +6,7 @@ import {useControlEvents} from "../hooks";
 import TablePanel from "./TablePanel.jsx";
 import FormPanel from "./FormPanel.jsx";
 import Chart from "./Chart.jsx";
-import {resolveParameterValue, resolveSelector, resolveTemplate} from "../utils/selector.js";
+import {resolveParameterValue, resolveTemplate} from "../utils/selector.js";
 import Splitter from './Splitter';
 
 import {expandRepeatItems} from "../utils/repeat.js";
@@ -22,51 +22,10 @@ import TableToolbar from "./table/basic/Toolbar.jsx";
 import GridLayoutRenderer from './GridLayoutRenderer.jsx';
 import {DashboardBlock} from "./dashboard/DashboardBlocks.jsx";
 import DashboardSurface from "./dashboard/DashboardSurface.jsx";
-import {createDashboardContext, evaluateDashboardCondition, getDashboardVisibleWhen, seedDashboardDefaultFilters} from "./dashboard/dashboardUtils.js";
+import {createDashboardContext, getDashboardVisibleWhen, seedDashboardDefaultFilters} from "./dashboard/dashboardUtils.js";
 import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
 import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
-
-const evaluatePlainVisibleWhen = (visibleWhen, context) => {
-    if (!visibleWhen || !context) return true;
-    const source = String(visibleWhen.source || 'form').toLowerCase();
-    const field = visibleWhen.field || visibleWhen.selector || visibleWhen.key;
-
-    let scope = {};
-    switch (source) {
-        case 'windowform':
-            scope = context.signals?.windowForm?.peek?.() || {};
-            break;
-        case 'filter':
-        case 'filters':
-            scope = context.handlers?.dataSource?.peekFilter?.() || {};
-            break;
-        case 'selection':
-            scope = context.signals?.selection?.peek?.() || {};
-            break;
-        case 'input':
-            scope = context.signals?.input?.peek?.() || {};
-            break;
-        case 'metrics':
-            scope = context.signals?.metrics?.peek?.() || {};
-            break;
-        case 'form':
-        default:
-            scope = context.handlers?.dataSource?.peekFormData?.() || {};
-            break;
-    }
-
-    const actual = field ? resolveSelector(scope, field) : scope;
-    if (visibleWhen.equals !== undefined) {
-        return actual === visibleWhen.equals;
-    }
-    if (Array.isArray(visibleWhen.in)) {
-        return visibleWhen.in.includes(actual);
-    }
-    if (visibleWhen.notEquals !== undefined) {
-        return actual !== visibleWhen.notEquals;
-    }
-    return !!actual;
-};
+import {isContainerVisible, resolveChildContext, trackContainerVisibility} from "./visibleWhen.js";
 
 const wrapContainerChrome = (container, content) => {
     if (!container?.section && !container?.card) {
@@ -127,17 +86,6 @@ const buildGridStyle = (style, columns, layout) => {
     };
 };
 
-const resolveChildContext = (baseContext, dataSourceRef) => {
-    const targetRef = dataSourceRef || baseContext?.identity?.dataSourceRef;
-    if (!targetRef) {
-        return baseContext;
-    }
-    if (baseContext?.signals && baseContext?.identity?.dataSourceRef === targetRef) {
-        return baseContext;
-    }
-    return baseContext.Context(targetRef);
-};
-
 const Container = ({context, container, isActive}) => {
     useSignals();
     const isDashboardBlock = isSemanticDashboardBlock(container);
@@ -163,29 +111,7 @@ const Container = ({context, container, isActive}) => {
     }, [dashboardKey, isDashboardRoot, container]);
     const trackedVisibleWhen = getDashboardVisibleWhen(container);
     if (trackedVisibleWhen && !dashboardKey) {
-        const source = String(trackedVisibleWhen.source || 'form').toLowerCase();
-        switch (source) {
-            case 'windowform':
-                effectiveContext?.signals?.windowForm?.value;
-                break;
-            case 'filter':
-            case 'filters':
-                effectiveContext?.signals?.input?.value?.filter;
-                break;
-            case 'selection':
-                effectiveContext?.signals?.selection?.value;
-                break;
-            case 'input':
-                effectiveContext?.signals?.input?.value;
-                break;
-            case 'metrics':
-                effectiveContext?.signals?.metrics?.value;
-                break;
-            case 'form':
-            default:
-                effectiveContext?.signals?.form?.value;
-                break;
-        }
+        trackContainerVisibility(container, effectiveContext);
     }
 
     const stateTuple = useState(() => (
@@ -415,12 +341,7 @@ const Container = ({context, container, isActive}) => {
 
     const visibleWhen = getDashboardVisibleWhen(container);
     if (visibleWhen) {
-        const visible = effectiveContext?.dashboardKey
-            ? evaluateDashboardCondition(visibleWhen, {
-                context: effectiveContext,
-                dashboardKey: effectiveContext.dashboardKey,
-            })
-            : evaluatePlainVisibleWhen(visibleWhen, effectiveContext);
+        const visible = isContainerVisible(container, effectiveContext);
         if (!visible) return null;
     }
 
