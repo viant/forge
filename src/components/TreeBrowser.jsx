@@ -7,10 +7,10 @@ import { getLogger } from '../utils/logger.js';
 import { formatDataSourceError } from '../utils/dataSourceError.js';
 import './tree-browser.css';
 
-function decorateNodes(nodes = [], expanded = new Set(), depth = 0, onNodeActivate = null, parentPath = []) {
+function decorateNodes(nodes = [], expanded = new Set(), depth = 0, onNodeActivate = null, isNodeSelected = null, parentPath = []) {
     return nodes.map((node, index) => {
         const nodePath = [...parentPath, index];
-        const childNodes = decorateNodes(node.childNodes || [], expanded, depth + 1, onNodeActivate, nodePath);
+        const childNodes = decorateNodes(node.childNodes || [], expanded, depth + 1, onNodeActivate, isNodeSelected, nodePath);
         const hasChildren = childNodes.length > 0;
         const secondary = String(node.secondaryLabel || '').trim();
         const rowClassName = [
@@ -25,6 +25,7 @@ function decorateNodes(nodes = [], expanded = new Set(), depth = 0, onNodeActiva
             isExpanded: expanded.has(node.id),
             hasCaret: hasChildren,
             icon: hasChildren ? (expanded.has(node.id) ? 'folder-open' : 'folder-close') : 'tag',
+            isSelected: typeof isNodeSelected === 'function' ? !!isNodeSelected({ node, nodePath }) : false,
             childNodes,
             label: (
                 <div
@@ -99,8 +100,14 @@ export default function TreeBrowser(props) {
     }, [isActive]);
 
     const decoratedNodes = useMemo(
-        () => decorateNodes(treeNodes, expanded, 0, (node, event) => handleNodeClick(node, node.nodePath || [], event)),
-        [treeNodes, expanded]
+        () => decorateNodes(
+            treeNodes,
+            expanded,
+            0,
+            (node, event) => handleNodeClick(node, node.nodePath || [], event),
+            ({ node, nodePath }) => handlers?.dataSource?.isSelected?.({ row: node?.nodeData, nodePath }),
+        ),
+        [treeNodes, expanded, handlers?.dataSource]
     );
 
     const handleNodeExpand = (nodeData, nodePath, e) => {
@@ -126,7 +133,6 @@ export default function TreeBrowser(props) {
     };
 
     const handleNodeClick = (nodeData, nodePath, e) => {
-        try { log.info('[click]', { id: nodeData?.id, label: nodeData?.label, isLeaf: nodeData?.isLeaf, nodePath }); } catch (_) {}
         if (!nodeData.isLeaf) {
             if (nodeData.isExpanded) {
                 handleNodeCollapse(nodeData);
@@ -148,9 +154,15 @@ export default function TreeBrowser(props) {
             rowIndex: -1,
             nodePath,
         };
-        try { log.info('[select]', selection); } catch (_) {}
 
-        if (events.onNodeSelect?.isDefined?.()) {
+        context?.handlers?.dataSource?.toggleSelection?.({
+            nodePath,
+            node: selection.selected,
+            row: selection.selected,
+            rowIndex: -1,
+        });
+
+        if (events.onNodeSelect?.isDefined?.() && events.onNodeSelect.handlerName?.() !== 'dataSource.toggleSelection') {
             events.onNodeSelect.execute({
                 event: e,
                 node: nodeData,
@@ -178,6 +190,7 @@ export default function TreeBrowser(props) {
         <div className={`forge-tree-browser ${config.className || ''}`} style={config.style || {}}>
             <Tree
                 contents={decoratedNodes}
+                onNodeClick={handleNodeClick}
                 onNodeExpand={handleNodeExpand}
                 onNodeCollapse={handleNodeCollapse}
             />

@@ -88,8 +88,8 @@ function cardinality(config) {
  * A generic hook that given a dataSourceId and the entire dataSources,
  * returns handlers for addNew, update, delete, etc., automatically considering deps.
  */
-export function useDataSourceHandlers(identity, signals, dataSources, connector) {
-    const dataSource = dataSources[identity.dataSourceRef];
+export function useDataSourceHandlers(identity, signals, dataSources, connector, resolvedDataSource = null) {
+    const dataSource = resolvedDataSource || dataSources[identity.dataSourceRef];
     if (!dataSource) {
         throw new Error(`No config found for DS ${identity.dataSourceRef}`);
     }
@@ -301,10 +301,6 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
 
 
     function setSelected(newSelection) {
-        try {
-            const log = getLogger('ds');
-            log.info('[setSelected]', { ds: identity?.dataSourceRef, selectionMode, selfReference: !!dataSource.selfReference, newSelection });
-        } catch (_) {}
         if (dataSource.selfReference) {
             // Tree structure handling
             if (!newSelection || (selectionMode !== 'multi' && !newSelection.nodePath)) {
@@ -348,7 +344,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
         );
 
         // Existing flat data handling
-        if (!newSelection || (selectionMode !== 'multi' && newSelection.rowIndex === -1 && !hasNodeSelection)) {
+        if (!newSelection || (selectionMode !== 'multi' && newSelection.rowIndex === -1 && !hasNodeSelection && !newSelection.selected)) {
             try {
                 const log = getLogger('ds');
                 log.info('[setSelected] clear', { ds: identity?.dataSourceRef, newSelection, hasNodeSelection });
@@ -568,7 +564,13 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector)
             };
         } else if (selectionMode === 'single') {
             const prev = selection.peek() || {selected: null, rowIndex: -1};
-            if (prev.rowIndex === rowIndex) {
+            const prevKey = prev.selected ? getUniqueKeyValue(prev.selected) : null;
+            const nextKey = item ? getUniqueKeyValue(item) : null;
+            const sameImplicitSelection = rowIndex < 0 && prevKey != null && nextKey != null && prevKey === nextKey;
+            if (sameImplicitSelection) {
+                return;
+            }
+            if (prev.rowIndex === rowIndex && rowIndex >= 0) {
                 // De-select
                 setSelected({selected: null, rowIndex: -1});
             } else {

@@ -180,13 +180,18 @@ function normalizeDynamicGroupRows(rows = [], group = {}) {
         if (!filterDef) {
             return normalizedRow;
         }
+        const originalSelections = normalizeArray(normalizedRow.selections);
+        const normalizedSelections = originalSelections
+            .map((entry) => normalizeSelectionForFilter(filterDef, entry))
+            .filter(Boolean);
+        if (originalSelections.length > 0 && normalizedSelections.length === 0) {
+            return null;
+        }
         return {
             ...normalizedRow,
-            selections: normalizeArray(normalizedRow.selections)
-                .map((entry) => normalizeSelectionForFilter(filterDef, entry))
-                .filter(Boolean),
+            selections: normalizedSelections,
         };
-    });
+    }).filter(Boolean);
 }
 
 function firstResolvedValue(record = null, selectors = []) {
@@ -287,6 +292,28 @@ export function getVisibleReportBuilderDimensions(config = {}) {
     return normalizeArray(config.dimensions).filter((entry) => isVisibleField(entry));
 }
 
+function reportBuilderDimensionValueKey(entry = {}) {
+    return String(entry?.key || entry?.id || "").trim();
+}
+
+export function resolveReportBuilderDimensionDisplayKey(entry = {}) {
+    const displayKey = String(entry?.displayKey || entry?.displayPath || "").trim();
+    return displayKey || reportBuilderDimensionValueKey(entry);
+}
+
+export function resolveReportBuilderDimensionByField(config = {}, fieldKey = "") {
+    const target = String(fieldKey || "").trim();
+    if (!target) {
+        return null;
+    }
+    return getVisibleReportBuilderDimensions(config).find((entry) => {
+        const dimensionId = String(entry?.id || "").trim();
+        const valueKey = reportBuilderDimensionValueKey(entry);
+        const displayKey = resolveReportBuilderDimensionDisplayKey(entry);
+        return target === dimensionId || target === valueKey || target === displayKey;
+    }) || null;
+}
+
 function normalizeChartSpecValue(value) {
     const normalized = String(value || "").trim();
     return normalized || null;
@@ -311,16 +338,28 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
 }
 
 function chartFieldIndex(columns = []) {
-    return new Map(
-        normalizeArray(columns)
-            .map((column) => [String(column?.key || "").trim(), column])
-            .filter(([key]) => key),
-    );
+    const result = new Map();
+    normalizeArray(columns).forEach((column) => {
+        const aliases = [
+            String(column?.key || "").trim(),
+            ...normalizeStringArray(column?.aliases),
+        ].filter(Boolean);
+        aliases.forEach((alias) => {
+            if (!result.has(alias)) {
+                result.set(alias, column);
+            }
+        });
+    });
+    return result;
 }
 
 function chartConfigUniverse(config = {}) {
     const fields = [
-        ...getVisibleReportBuilderDimensions(config).map((entry) => entry?.key || entry?.id),
+        ...getVisibleReportBuilderDimensions(config).flatMap((entry) => [
+            String(entry?.id || "").trim(),
+            reportBuilderDimensionValueKey(entry),
+            resolveReportBuilderDimensionDisplayKey(entry),
+        ]),
         ...getSelectableReportBuilderMeasures(config).map((entry) => entry?.key || entry?.id),
     ];
     return new Set(normalizeStringArray(fields));
@@ -362,7 +401,8 @@ export function resolveReportBuilderMeasure(config = {}, id = "") {
 
 export function buildReportBuilderChartFields(config = {}, state = {}) {
     return buildReportBuilderColumns(config, state).map((entry) => ({
-        key: String(entry?.key || "").trim(),
+        key: String(entry?.chartKey || entry?.displayKey || entry?.key || "").trim(),
+        aliases: Array.from(new Set(normalizeStringArray([entry?.key, entry?.sourceKey]))),
         label: entry?.label || entry?.key || "",
         kind: entry?.kind || "",
         format: entry?.format,
@@ -888,7 +928,10 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
         .map((id) => dimensions.find((entry) => String(entry?.id || "").trim() === String(id).trim()))
         .filter(Boolean)
         .map((entry) => ({
-            key: entry.key || entry.id,
+            key: reportBuilderDimensionValueKey(entry),
+            sourceKey: reportBuilderDimensionValueKey(entry),
+            displayKey: resolveReportBuilderDimensionDisplayKey(entry),
+            chartKey: resolveReportBuilderDimensionDisplayKey(entry),
             label: entry.label || entry.id,
             kind: "dimension",
             format: entry.format,
@@ -913,9 +956,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (!normalized) {
         return container;
     }
-    const dimensions = getVisibleReportBuilderDimensions(config);
     const measures = getSelectableReportBuilderMeasures(config);
-    const xField = dimensions.find((entry) => String(entry?.key || entry?.id || "").trim() === normalized.xField) || null;
+    const xField = resolveReportBuilderDimensionByField(config, normalized.xField);
     const yMeasures = normalizeStringArray(normalized.yFields)
         .map((fieldKey) => measures.find((entry) => String(entry?.key || entry?.id || "").trim() === fieldKey))
         .filter(Boolean);
@@ -927,7 +969,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     const baseChart = {
         type: seriesType,
         xAxis: {
-            dataKey: String(xField?.key || xField?.id || "").trim() || "eventDate",
+            dataKey: resolveReportBuilderDimensionDisplayKey(xField) || "eventDate",
             tickFormat: xField?.tickFormat,
         },
         yAxis: {
@@ -936,6 +978,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     };
     if (normalized.seriesField && yMeasures.length === 1) {
         const yMeasure = yMeasures[0];
+        const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
         return {
             ...container,
             dataSourceRef: container.dataSourceRef,
@@ -943,7 +986,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             chart: {
                 ...baseChart,
                 series: {
-                    nameKey: normalized.seriesField,
+                    nameKey: resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField,
                     valueKey: String(yMeasure?.key || yMeasure?.id || "").trim(),
                     values: [{
                         value: String(yMeasure?.key || yMeasure?.id || "").trim(),

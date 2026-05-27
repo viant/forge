@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, shouldPrimeDataSourceFetch } from './WindowContent.jsx';
+import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, shouldPrimeDataSourceFetch } from './WindowContent.jsx';
 
 describe('resolveInitialWindowFormValues', () => {
   it('collects explicit windowForm item values alongside onInit constants', () => {
@@ -80,8 +80,28 @@ describe('resolveRequiredDataSourceRefs', () => {
   });
 });
 
+describe('resolveDefaultDataSourceRef', () => {
+  it('prefers the root content datasource ref over object-key inference', () => {
+    const metadata = {
+      dataSource: {
+        order_performance_period_today: {},
+        recommendation: {},
+      },
+      view: {
+        content: {
+          id: 'recommendationRoot',
+          dataSourceRef: 'recommendation',
+          containers: [],
+        },
+      },
+    };
+
+    expect(resolveDefaultDataSourceRef(metadata)).toBe('recommendation');
+  });
+});
+
 describe('resolveFetcherOwnedDataSourceRefs', () => {
-  it('collects datasource refs owned by explicit container fetchers', () => {
+  it('collects datasource refs owned only by explicit fetchData containers', () => {
     const metadata = {
       view: {
         content: {
@@ -103,7 +123,7 @@ describe('resolveFetcherOwnedDataSourceRefs', () => {
       },
     };
 
-    expect(resolveFetcherOwnedDataSourceRefs(metadata)).toEqual(['meta', 'profile']);
+    expect(resolveFetcherOwnedDataSourceRefs(metadata)).toEqual(['meta']);
   });
 });
 

@@ -4,7 +4,14 @@
     min-height: 0;
     min-width: 0;
     overflow: auto;
-    padding: 4px 2px;
+    padding: 8px 6px;
+    border-radius: 14px;
+    background:
+        linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(241, 245, 249, 0.96) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.9),
+        0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .forge-tree-browser .bp6-tree-root,
@@ -29,12 +36,33 @@
     margin: 2px 0;
     min-height: 34px;
     padding: 6px 8px;
+    border: 1px solid transparent;
+    transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
 .forge-tree-browser .bp6-tree-node-content:hover,
 .forge-tree-browser .bp5-tree-node-content:hover,
 .forge-tree-browser .bp4-tree-node-content:hover {
-    background: rgba(16, 22, 26, 0.06);
+    background: rgba(255, 255, 255, 0.92);
+    border-color: rgba(148, 163, 184, 0.24);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    transform: translateX(1px);
+}
+
+.forge-tree-browser .bp6-tree-node-content.bp6-tree-node-selected,
+.forge-tree-browser .bp5-tree-node-content.bp5-tree-node-selected,
+.forge-tree-browser .bp4-tree-node-content.bp4-tree-node-selected {
+    background: linear-gradient(135deg, rgba(216, 244, 223, 0.94) 0%, rgba(237, 250, 240, 0.98) 100%);
+    border-color: rgba(72, 125, 86, 0.28);
+    box-shadow:
+        0 10px 22px rgba(72, 125, 86, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.forge-tree-browser .bp6-tree-node-content.bp6-tree-node-selected:hover,
+.forge-tree-browser .bp5-tree-node-content.bp5-tree-node-selected:hover,
+.forge-tree-browser .bp4-tree-node-content.bp4-tree-node-selected:hover {
+    background: linear-gradient(135deg, rgba(208, 239, 216, 0.98) 0%, rgba(231, 248, 235, 0.98) 100%);
 }
 
 .forge-tree-browser-row {
@@ -47,13 +75,14 @@
 }
 
 .forge-tree-browser-row.is-root .forge-tree-browser-label {
-    color: #182026;
+    color: #14212b;
     font-size: 14px;
     font-weight: 600;
+    letter-spacing: 0.01em;
 }
 
 .forge-tree-browser-row.is-branch.is-nested .forge-tree-browser-label {
-    color: #394b59;
+    color: #32475a;
     font-size: 13px;
     font-weight: 600;
 }
@@ -75,7 +104,7 @@
 }
 
 .forge-tree-browser-row.is-leaf .forge-tree-browser-label {
-    color: #5f6b7c;
+    color: #526173;
     font-weight: 400;
 }
 
@@ -94,6 +123,12 @@
     color: #5f6b7c;
 }
 
+.forge-tree-browser .bp6-tree-node-caret svg,
+.forge-tree-browser .bp5-tree-node-caret svg,
+.forge-tree-browser .bp4-tree-node-caret svg {
+    fill: #64748b;
+}
+
 .forge-tree-browser-state {
     color: #5f6b7c;
     padding: 16px;
@@ -101,4 +136,145 @@
 
 .forge-tree-browser-error {
     color: #c23030;
+}
+
+.steward-lookup-dialog .bp6-dialog,
+.steward-lookup-dialog .bp5-dialog,
+.steward-lookup-dialog .bp4-dialog {
+    background:
+        linear-gradient(180deg, rgba(246, 252, 247, 0.98) 0%, rgba(236, 247, 239, 0.98) 100%);
+    border: 1px solid rgba(102, 145, 115, 0.22);
+    box-shadow:
+        0 18px 50px rgba(30, 56, 38, 0.18),
+        0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+}
+
+.steward-lookup-dialog .bp6-dialog-header,
+.steward-lookup-dialog .bp5-dialog-header,
+.steward-lookup-dialog .bp4-dialog-header {
+    background: linear-gradient(135deg, rgba(208, 234, 214, 0.96) 0%, rgba(229, 245, 233, 0.92) 100%);
+    border-bottom: 1px solid rgba(102, 145, 115, 0.2);
+}
+
+.steward-lookup-dialog .bp6-heading,
+.steward-lookup-dialog .bp5-heading,
+.steward-lookup-dialog .bp4-heading {
+    color: #21412b;
+    letter-spacing: 0.01em;
+}
+
+.steward-lookup-dialog .bp6-dialog-footer,
+.steward-lookup-dialog .bp5-dialog-footer,
+.steward-lookup-dialog .bp4-dialog-footer {
+    background: #ffffff;
+    border-top: 1px solid rgba(102, 145, 115, 0.18);
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.9) inset;
+}
+
+.steward-lookup-dialog__body {
+    background:
+        radial-gradient(circle at top right, rgba(179, 223, 188, 0.22), transparent 34%),
+        linear-gradient(180deg, rgba(247, 252, 248, 0.94), rgba(238, 247, 240, 0.94));
+}
+
+.steward-lookup-dialog__content {
+    border: 1px solid rgba(102, 145, 115, 0.16);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.steward-lookup-dialog .bp6-input-group .bp6-input,
+.steward-lookup-dialog .bp5-input-group .bp5-input,
+.steward-lookup-dialog .bp4-input-group .bp4-input {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(117, 160, 128, 0.35);
+    color: #23402c;
+}
+
+.steward-lookup-dialog .bp6-input-group .bp6-input:focus,
+.steward-lookup-dialog .bp5-input-group .bp5-input:focus,
+.steward-lookup-dialog .bp4-input-group .bp4-input:focus {
+    box-shadow: 0 0 0 1px rgba(84, 130, 96, 0.35), 0 0 0 3px rgba(186, 225, 194, 0.35);
+}
+
+.steward-lookup-dialog .bp6-button.bp6-intent-primary,
+.steward-lookup-dialog .bp5-button.bp5-intent-primary,
+.steward-lookup-dialog .bp4-button.bp4-intent-primary {
+    background: linear-gradient(180deg, #79bb8c 0%, #5fa476 100%);
+    border-color: #4c8d62;
+    color: #ffffff;
+}
+
+.steward-lookup-dialog .bp6-button.bp6-intent-primary:hover,
+.steward-lookup-dialog .bp5-button.bp5-intent-primary:hover,
+.steward-lookup-dialog .bp4-button.bp4-intent-primary:hover {
+    background: linear-gradient(180deg, #6eb382 0%, #558f68 100%);
+    border-color: #447f58;
+}
+
+.steward-lookup-dialog .bp6-html-table,
+.steward-lookup-dialog .bp5-html-table,
+.steward-lookup-dialog .bp4-html-table,
+.steward-lookup-dialog .bp6-table-quadrant-body,
+.steward-lookup-dialog .bp5-table-quadrant-body,
+.steward-lookup-dialog .bp4-table-quadrant-body {
+    background: rgba(252, 255, 252, 0.94);
+}
+
+.steward-targeting-tree-browser {
+    background:
+        linear-gradient(180deg, rgba(252, 255, 252, 0.86), rgba(242, 249, 244, 0.86));
+    border-radius: 12px;
+}
+
+.steward-targeting-tree-browser .bp6-tree-node-list .bp6-tree-node-list,
+.steward-targeting-tree-browser .bp5-tree-node-list .bp5-tree-node-list,
+.steward-targeting-tree-browser .bp4-tree-node-list .bp4-tree-node-list {
+    border-left-color: rgba(88, 132, 100, 0.22);
+}
+
+.steward-targeting-tree-browser .bp6-tree-node-content,
+.steward-targeting-tree-browser .bp5-tree-node-content,
+.steward-targeting-tree-browser .bp4-tree-node-content {
+    background: rgba(255, 255, 255, 0.58);
+    border: 1px solid transparent;
+    transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.steward-targeting-tree-browser .bp6-tree-node-content:hover,
+.steward-targeting-tree-browser .bp5-tree-node-content:hover,
+.steward-targeting-tree-browser .bp4-tree-node-content:hover {
+    background: rgba(218, 239, 223, 0.85);
+    border-color: rgba(104, 154, 116, 0.26);
+    transform: translateX(1px);
+}
+
+.steward-targeting-tree-browser .bp6-tree-node-caret svg,
+.steward-targeting-tree-browser .bp5-tree-node-caret svg,
+.steward-targeting-tree-browser .bp4-tree-node-caret svg {
+    fill: #5a8667;
+}
+
+.steward-targeting-tree-browser .forge-tree-browser-row.is-root .forge-tree-browser-label {
+    color: #21412b;
+}
+
+.steward-targeting-tree-browser .forge-tree-browser-row.is-branch.is-nested .forge-tree-browser-label {
+    color: #355742;
+}
+
+.steward-targeting-tree-browser .forge-tree-browser-row.is-leaf .forge-tree-browser-label {
+    color: #486353;
+}
+
+.steward-targeting-tree-browser .forge-tree-browser-row.is-root .forge-tree-browser-badge,
+.steward-targeting-tree-browser .forge-tree-browser-row.is-branch .forge-tree-browser-badge {
+    background: rgba(111, 168, 126, 0.16);
+    color: #2c6a3d;
+}
+
+.steward-targeting-tree-browser .forge-tree-browser-row.is-leaf .forge-tree-browser-badge {
+    background: rgba(159, 199, 168, 0.16);
+    color: #476654;
 }

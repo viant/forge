@@ -33,6 +33,7 @@ import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 import { resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { getLogger } from '../utils/logger.js';
+import { runWindowLifecycleHandlers } from './windowLifecycle.js';
 
 function collectInitialWindowFormItemValues(node, initial) {
     if (!node || typeof node !== 'object') return;
@@ -73,6 +74,15 @@ export function resolveInitialWindowFormValues(metadata) {
     }
     collectInitialWindowFormItemValues(metadata?.view?.content || null, initial);
     return initial;
+}
+
+export function resolveDefaultDataSourceRef(metadata) {
+    return String(
+        metadata?.view?.dataSourceRef
+        || metadata?.view?.content?.dataSourceRef
+        || Object.keys(metadata?.dataSource || {})[0]
+        || ''
+    ).trim();
 }
 
 function collectRequiredDataSourceRefs(node, scope, refs) {
@@ -118,7 +128,7 @@ function collectRequiredDataSourceRefs(node, scope, refs) {
 function collectFetcherOwnedDataSourceRefs(node, refs) {
     if (!node || typeof node !== "object") return;
 
-    if ((node.fetchData === true || node.selectFirst === true) && String(node.dataSourceRef || "").trim()) {
+    if (node.fetchData === true && String(node.dataSourceRef || "").trim()) {
         refs.add(String(node.dataSourceRef).trim());
     }
 
@@ -189,7 +199,7 @@ function WindowContentInner({window, metadata, services}) {
         && String(window?.region || '').trim().toLowerCase() === 'chat.top';
     const shouldFillParent = isHostedWorkspaceSurface || window.isInTab !== false;
     const baseKey = (windowKey || '').split('?')[0];
-    const defaultDataSourceRef = metadata?.view?.dataSourceRef || Object.keys(metadata?.dataSource || {})[0];
+    const defaultDataSourceRef = resolveDefaultDataSourceRef(metadata);
     const initialWindowFormSeed = useMemo(() => ({
         ...(parameters && typeof parameters === 'object' ? parameters : {}),
         ...resolveInitialWindowFormValues(metadata),
@@ -240,92 +250,29 @@ function WindowContentInner({window, metadata, services}) {
      * ---------------------------------------------------------- */
 
     useEffect(() => {
-        const windowCfg   = metadata.window || {};
-        const windowOnArr = [
-            ...(Array.isArray(windowCfg.on) ? windowCfg.on : []),
-            ...(Array.isArray(metadata.on) ? metadata.on : []), // fallback top-level
-        ];
-
-        const runHandlers = (eventName) => {
-            const evts = windowOnArr.filter((e) => e.event === eventName);
-            evts.forEach((ev) => {
-                try {
-                    const { handler: handlerId, args = [], parameters = [] } = ev;
-                    if (handlerId === 'dataSource.setWindowFormData') {
-                        const resolvedParameters = resolveParameters(parameters, {
-                            identity: { dataSourceRef: defaultDataSourceRef },
-                            signals: { windowForm: windowFormSignal },
-                            dataSources: metadata?.dataSource || {},
-                            Context() { return this; },
-                            handlers: {
-                                dataSource: {
-                                    peekFormData: () => ({}),
-                                    peekSelection: () => ({ selected: null }),
-                                    peekFilter: () => ({}),
-                                },
-                            },
-                        });
-                        try {
-                            log.debug('[window.onInit]', {
-                                windowId,
-                                windowKey,
-                                handlerId,
-                                parameters,
-                                resolvedParameters,
-                                before: windowFormSignal?.peek?.() || {},
-                            });
-                        } catch (_) {}
-                        windowFormSignal.value = mergeWindowFormValues(windowFormSignal.peek?.() || {}, resolvedParameters || {});
-                        try {
-                            log.debug('[window.onInitApplied]', {
-                                windowId,
-                                windowKey,
-                                handlerId,
-                                after: windowFormSignal?.peek?.() || {},
-                            });
-                        } catch (_) {}
-                        return;
-                    }
-
-                    const handlerContext = context.Context(defaultDataSourceRef);
-                    const fn = handlerContext.lookupHandler(handlerId);
-                    const resolvedParameters = resolveParameters(parameters, handlerContext);
-                    try {
-                        log.debug('[window.onInit]', {
-                            windowId,
-                            windowKey,
-                            handlerId,
-                            parameters,
-                            resolvedParameters,
-                            before: handlerContext?.signals?.windowForm?.peek?.() || {},
-                        });
-                    } catch (_) {}
-                    fn({
-                        execution: { id: handlerId, args, parameters },
-                        args,
-                        parameters: resolvedParameters,
-                        context: handlerContext,
-                    });
-                    try {
-                        log.debug('[window.onInitApplied]', {
-                            windowId,
-                            windowKey,
-                            handlerId,
-                            after: handlerContext?.signals?.windowForm?.peek?.() || {},
-                        });
-                    } catch (_) {}
-                } catch (err) {
-                    console.error(`window.${eventName} handler failed`, ev.handler, err);
-                }
-            });
-        };
-
-        // onInit equivalent
-        runHandlers('onInit');
+        runWindowLifecycleHandlers({
+            eventName: 'onInit',
+            metadata,
+            context,
+            defaultDataSourceRef,
+            windowFormSignal,
+            log,
+            windowId,
+            windowKey,
+        });
 
         // cleanup → onDestroy
         return () => {
-            runHandlers('onDestroy');
+            runWindowLifecycleHandlers({
+                eventName: 'onDestroy',
+                metadata,
+                context,
+                defaultDataSourceRef,
+                windowFormSignal,
+                log,
+                windowId,
+                windowKey,
+            });
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [windowId]);

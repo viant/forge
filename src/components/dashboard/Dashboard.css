@@ -2249,6 +2249,29 @@
     min-width: 160px;
 }
 
+.forge-report-builder-lookup-button.bp6-button,
+.forge-report-builder-lookup-button.bp5-button,
+.forge-report-builder-lookup-button.bp4-button {
+    border-color: #8fc6a0;
+    background: linear-gradient(180deg, #eef8f1 0%, #dff1e5 100%);
+    color: #1f6a3a;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.forge-report-builder-lookup-button.bp6-button:hover,
+.forge-report-builder-lookup-button.bp5-button:hover,
+.forge-report-builder-lookup-button.bp4-button:hover {
+    border-color: #74b589;
+    background: linear-gradient(180deg, #e6f5ea 0%, #d2ebda 100%);
+    color: #19562f;
+}
+
+.forge-report-builder-lookup-button.bp6-button .bp6-icon,
+.forge-report-builder-lookup-button.bp5-button .bp5-icon,
+.forge-report-builder-lookup-button.bp4-button .bp4-icon {
+    color: #2c7a46;
+}
+
 .forge-report-builder-dynamic-row__manual-entry {
     display: flex;
     flex-wrap: wrap;

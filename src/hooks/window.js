@@ -419,6 +419,16 @@ export function useWindowHandlers(windowId) {
     const commitWindow = (props = {}) => {
         let { payload = {} } = props;
 
+        if ((!payload || (Array.isArray(payload) ? payload.length === 0 : Object.keys(payload).length === 0))) {
+            if (props?.selected && typeof props.selected === 'object') {
+                payload = props.selected;
+            } else if (props?.item && typeof props.item === 'object') {
+                payload = props.item;
+            } else if (props?.row && typeof props.row === 'object') {
+                payload = props.row;
+            }
+        }
+
         // If caller did not supply an explicit payload, fall back to using
         // the currently selected record of the active data source (when
         // available).  This mirrors the behaviour of legacy Forge metadata
