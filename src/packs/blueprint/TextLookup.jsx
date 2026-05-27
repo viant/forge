@@ -1,17 +1,15 @@
 import React from 'react';
 import { InputGroup, Button } from '@blueprintjs/core';
 import { applyLookupSelection, openLookup, resolveLookupValue } from '../../utils/lookup.js';
+import { createLookupOpenHandler } from './TextLookupHandlers.js';
 
 export default function TextLookup(props) {
     const { value = '', readOnly, context, item, adapter, ...rest } = props;
 
-    const handleOpen = async () => {
-        try {
-            await openLookup({ item, context, adapter, value });
-        } catch (e) {
-            console.error('lookup failed', e);
-        }
-    };
+    const latest = React.useRef(null);
+    latest.current = { item, context, adapter, value };
+
+    const handleOpen = React.useMemo(() => createLookupOpenHandler(latest, openLookup), []);
 
     const handleBlur = async (event) => {
         try {
@@ -44,6 +42,9 @@ export default function TextLookup(props) {
     const defaultLookupStyle = { backgroundColor: '#f0fff4', borderColor: '#c6f6d5' };
     // Apply a gentle default style for lookups; allow explicit style to override
     const inputStyle = { ...defaultLookupStyle, ...(rest?.style || {}) };
+    const rightElement = React.useMemo(() => (
+        <Button icon="search" minimal onClick={handleOpen} />
+    ), [handleOpen]);
 
     return (
         <InputGroup
@@ -57,7 +58,7 @@ export default function TextLookup(props) {
                 try { adapter.set(v); } catch (_) {}
             }}
             onBlur={handleBlur}
-            rightElement={<Button icon="search" minimal onClick={handleOpen} />}
+            rightElement={rightElement}
         />
     );
 }

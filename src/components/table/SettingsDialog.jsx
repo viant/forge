@@ -170,7 +170,7 @@ const SettingsDialog = ({
             className={Classes.DARK}
         >
             <DialogBody>
-                <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange}>
+                <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} animate={false}>
                     <Tab id="visibility" title="Visibility" panel={renderVisibilityPanel()} />
                     <Tab id="columns" title="Columns" panel={renderColumnsPanel()} />
                 </Tabs>
