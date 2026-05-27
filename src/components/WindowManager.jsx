@@ -133,6 +133,7 @@ const WindowManager = () => {
                 selectedTabId={visibleTabId}
                 onChange={handleTabChange}
                 renderActiveTabPanelOnly
+                animate={false}
                 large
                 className="forge-window-manager-tabs"
             >
