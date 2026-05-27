@@ -160,7 +160,10 @@ const endLast3 = new Date(relativeDefaultsLast3.staticFilters.dateRange.end);
 assert.equal(Math.round((endLast3 - startLast3) / 86400000), 2);
 
 assert.equal(isExplicitReportBuilderChartMode(config), false);
-assert.deepEqual(getReportBuilderSupportedChartTypes(config), ["line", "bar", "area"]);
+assert.deepEqual(
+    getReportBuilderSupportedChartTypes(config),
+    ["line", "bar", "area", "pie", "donut", "horizontal_bar", "funnel_bar"],
+);
 assert.equal(getReportBuilderResultPanePosition(config), "right");
 
 const explicitChartConfig = {
@@ -747,6 +750,97 @@ assert.deepEqual(compactProjected, {
     },
 });
 
+const publisherProjected = projectLookupSelection(
+    {
+        valueSelector: "publisherId",
+        labelSelector: "publisherName",
+        recordSelectors: ["publisherId", "publisherName"],
+    },
+    {
+        id: 48,
+        name: "Publisher 48",
+    },
+);
+assert.deepEqual(publisherProjected, {
+    value: 48,
+    label: "Publisher 48",
+    group: "",
+    record: null,
+});
+
+const metricAliasConfig = {
+    request: {
+        baseParameters: {
+            filters: {},
+        },
+    },
+    staticFilters: [
+        {
+            id: "dateRange",
+            type: "dateRange",
+            startParamPath: "filters.From",
+            endParamPath: "filters.To",
+        },
+    ],
+    dynamicFilterGroups: [
+        {
+            id: "scope",
+            filters: [
+                {
+                    id: "campaignIds",
+                    paramPath: "filters.campaignIds",
+                    multiple: true,
+                    emitArray: true,
+                },
+                {
+                    id: "orderIds",
+                    paramPath: "filters.orderIds",
+                    multiple: true,
+                    emitArray: true,
+                },
+            ],
+        },
+        {
+            id: "inventory",
+            filters: [
+                {
+                    id: "publisherIds",
+                    paramPath: "filters.publisherIds",
+                    multiple: false,
+                    emitArray: true,
+                },
+            ],
+        },
+    ],
+};
+const metricAliasState = {
+    staticFilters: {
+        dateRange: { start: "2026-05-20", end: "2026-05-26" },
+    },
+    dynamicGroups: {
+        scope: [
+            { id: "row_campaign", filterId: "campaignIds", selections: [{ value: 11, label: "Campaign 11" }] },
+            { id: "row_order", filterId: "orderIds", selections: [{ value: 22, label: "Order 22" }] },
+        ],
+        inventory: [
+            { id: "row_publisher", filterId: "publisherIds", selections: [{ value: 48, label: "Publisher 48" }] },
+        ],
+    },
+    selectedMeasures: [],
+    selectedDimensions: [],
+};
+const metricAliasRequest = buildReportBuilderRequest(metricAliasConfig, metricAliasState);
+assert.deepEqual(metricAliasRequest.filters.From, "2026-05-20");
+assert.deepEqual(metricAliasRequest.filters.To, "2026-05-26");
+assert.deepEqual(metricAliasRequest.filters.from, "2026-05-20");
+assert.deepEqual(metricAliasRequest.filters.to, "2026-05-26");
+assert.deepEqual(metricAliasRequest.filters.campaignIds, [11]);
+assert.deepEqual(metricAliasRequest.filters.campaign_id, [11]);
+assert.deepEqual(metricAliasRequest.filters.orderIds, [22]);
+assert.deepEqual(metricAliasRequest.filters.order_id, [22]);
+assert.deepEqual(metricAliasRequest.filters.publisherIds, [48]);
+assert.deepEqual(metricAliasRequest.filters.publisher_id, [48]);
+
 const duplicateDraftState = mergeReportBuilderState(config, {
     dynamicGroups: {
         scope: [
@@ -865,5 +959,451 @@ assert.deepEqual(sanitizedInvalidManualId.dynamicGroups.scope, [
         ],
     },
 ]);
+
+// --- Phase 1: chart family expansion ------------------------------------------------------
+
+const expandedSupportedConfig = {
+    ...config,
+    result: {
+        ...config.result,
+        chartCreationMode: "explicit",
+        chartWizard: {
+            supportedTypes: ["line", "bar", "area", "pie", "donut", "horizontal_bar", "funnel_bar"],
+        },
+    },
+};
+assert.deepEqual(
+    getReportBuilderSupportedChartTypes(expandedSupportedConfig),
+    ["line", "bar", "area", "pie", "donut", "horizontal_bar", "funnel_bar"],
+);
+
+// backward-compatible normalize: legacy spec without seriesOptions stays unchanged
+const legacyNormalize = normalizeReportBuilderChartSpec({
+    title: "Legacy",
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+});
+assert.deepEqual(legacyNormalize, {
+    title: "Legacy",
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+});
+assert.equal("seriesOptions" in legacyNormalize, false);
+
+// normalize preserves seriesOptions when present, dropping empty bits
+const normalizedWithOptions = normalizeReportBuilderChartSpec({
+    title: "Combo",
+    type: "BAR",
+    xField: "eventDate",
+    yFields: ["totalSpend", "impressions"],
+    seriesOptions: {
+        totalSpend: { type: "BAR", axis: "Left", stackId: " primary " },
+        impressions: { type: "line", axis: "right" },
+        unused: { axis: "" },
+    },
+});
+assert.deepEqual(normalizedWithOptions, {
+    title: "Combo",
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend", "impressions"],
+    seriesOptions: {
+        totalSpend: { type: "bar", axis: "left", stackId: "primary" },
+        impressions: { type: "line", axis: "right" },
+    },
+});
+
+const familyFields = buildReportBuilderChartFields(config, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+});
+
+// pie/donut: exactly one measure required, no seriesField
+const piePass = validateReportBuilderChartSpec(config, {
+    type: "pie",
+    xField: "siteType",
+    yFields: ["totalSpend"],
+}, familyFields);
+assert.deepEqual(piePass, { valid: true, errors: [] });
+
+const pieTooManyMeasures = validateReportBuilderChartSpec(config, {
+    type: "pie",
+    xField: "siteType",
+    yFields: ["totalSpend", "impressions"],
+}, familyFields);
+assert.deepEqual(pieTooManyMeasures.errors, [
+    { field: "yFields", code: "tooManyMeasures" },
+]);
+
+const donutWithSeriesField = validateReportBuilderChartSpec(config, {
+    type: "donut",
+    xField: "siteType",
+    yFields: ["totalSpend"],
+    seriesField: "eventDate",
+}, familyFields);
+assert.deepEqual(donutWithSeriesField.errors, [
+    { field: "seriesField", code: "notAllowed" },
+]);
+
+const pieWithSeriesOptions = validateReportBuilderChartSpec(config, {
+    type: "pie",
+    xField: "siteType",
+    yFields: ["totalSpend"],
+    seriesOptions: { totalSpend: { type: "bar" } },
+}, familyFields);
+assert.deepEqual(pieWithSeriesOptions.errors, [
+    { field: "seriesOptions", code: "notAllowed" },
+]);
+
+// split-by-dimension cartesian: seriesField requires exactly one yField
+const splitWithExtraMeasure = validateReportBuilderChartSpec(config, {
+    type: "line",
+    xField: "eventDate",
+    yFields: ["totalSpend", "impressions"],
+    seriesField: "siteType",
+}, familyFields);
+assert.deepEqual(splitWithExtraMeasure.errors, [
+    { field: "seriesField", code: "tooManyMeasures" },
+]);
+
+// multi-measure direct-series with seriesOptions: must validate axis + reject unknown keys
+const comboInvalid = validateReportBuilderChartSpec(config, {
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend", "impressions"],
+    seriesOptions: {
+        totalSpend: { type: "bar", axis: "left", stackId: "primary" },
+        impressions: { type: "line", axis: "center" },
+        clicks: { type: "bar" },
+    },
+}, familyFields);
+assert.deepEqual(comboInvalid.errors, [
+    { field: "seriesOptions.impressions.axis", code: "invalidAxis" },
+    { field: "seriesOptions.clicks", code: "unknownMeasure" },
+]);
+
+const comboInvalidType = validateReportBuilderChartSpec(config, {
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend", "impressions"],
+    seriesOptions: {
+        totalSpend: { type: "scatter" },
+    },
+}, familyFields);
+assert.deepEqual(comboInvalidType.errors, [
+    { field: "seriesOptions.totalSpend.type", code: "invalidType" },
+]);
+
+const comboValid = validateReportBuilderChartSpec(config, {
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend", "impressions"],
+    seriesOptions: {
+        totalSpend: { type: "bar", axis: "left", stackId: "primary" },
+        impressions: { type: "line", axis: "right" },
+    },
+}, familyFields);
+assert.deepEqual(comboValid, { valid: true, errors: [] });
+
+// stack axis conflict
+const stackConflict = validateReportBuilderChartSpec(config, {
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend", "impressions"],
+    seriesOptions: {
+        totalSpend: { axis: "left", stackId: "primary" },
+        impressions: { axis: "right", stackId: "primary" },
+    },
+}, familyFields);
+assert.deepEqual(stackConflict.errors, [
+    { field: "seriesOptions.impressions.stackId", code: "axisConflict" },
+]);
+
+// reject seriesField plus seriesOptions
+const seriesFieldPlusOptions = validateReportBuilderChartSpec(config, {
+    type: "bar",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+    seriesField: "siteType",
+    seriesOptions: { totalSpend: { type: "bar" } },
+}, familyFields);
+assert.deepEqual(seriesFieldPlusOptions.errors, [
+    { field: "seriesOptions", code: "notAllowed" },
+]);
+
+// sanitize prunes stale seriesOptions keys, keeping the rest of the spec valid
+const sanitizedStaleSeriesOptions = sanitizeReportBuilderState(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    chartSpec: {
+        type: "bar",
+        xField: "eventDate",
+        yFields: ["totalSpend", "impressions"],
+        seriesOptions: {
+            totalSpend: { type: "bar", axis: "left", stackId: "primary" },
+            impressions: { type: "line", axis: "right" },
+            removedMeasure: { type: "line" },
+        },
+    },
+    viewMode: "chart",
+});
+assert.deepEqual(sanitizedStaleSeriesOptions.chartSpec.seriesOptions, {
+    totalSpend: { type: "bar", axis: "left", stackId: "primary" },
+    impressions: { type: "line", axis: "right" },
+});
+
+// missing yFields still invalidates the spec entirely
+const sanitizedMissingYWithSeriesOptions = sanitizeReportBuilderState(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    chartSpec: {
+        type: "bar",
+        xField: "eventDate",
+        yFields: ["unknownMeasure"],
+        seriesOptions: { totalSpend: { type: "bar" } },
+    },
+    viewMode: "chart",
+});
+assert.equal(sanitizedMissingYWithSeriesOptions.chartSpec, null);
+
+// sanitize: cartesian + seriesField + multiple yFields -> seriesField cleared, multi-measure chart preserved
+const sanitizedDroppedSeriesField = sanitizeReportBuilderState(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    chartSpec: {
+        type: "bar",
+        xField: "eventDate",
+        yFields: ["totalSpend", "impressions"],
+        seriesField: "siteType",
+    },
+    viewMode: "chart",
+});
+assert.equal(sanitizedDroppedSeriesField.chartSpec.seriesField, undefined);
+assert.deepEqual(sanitizedDroppedSeriesField.chartSpec.yFields, ["totalSpend", "impressions"]);
+
+// sanitize: category family + seriesField -> seriesField dropped
+const sanitizedCategorySeriesField = sanitizeReportBuilderState(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    chartSpec: {
+        type: "donut",
+        xField: "siteType",
+        yFields: ["totalSpend"],
+        seriesField: "eventDate",
+    },
+    viewMode: "chart",
+});
+assert.equal(sanitizedCategorySeriesField.chartSpec.seriesField, undefined);
+assert.equal(sanitizedCategorySeriesField.chartSpec.type, "donut");
+
+// sanitize: seriesField + seriesOptions -> seriesOptions dropped (mutually exclusive)
+const sanitizedFieldOverOptions = sanitizeReportBuilderState(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    chartSpec: {
+        type: "line",
+        xField: "eventDate",
+        yFields: ["totalSpend"],
+        seriesField: "siteType",
+        seriesOptions: { totalSpend: { type: "bar" } },
+    },
+    viewMode: "chart",
+});
+assert.equal(sanitizedFieldOverOptions.chartSpec.seriesField, "siteType");
+assert.equal(sanitizedFieldOverOptions.chartSpec.seriesOptions, undefined);
+
+// default pie-family spec seeding: never produces seriesField, single yField even when multiple measures are selected
+const defaultPieSpec = buildDefaultReportBuilderChartSpec(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "totalSpend",
+}, {
+    type: "pie",
+});
+assert.deepEqual(defaultPieSpec, {
+    type: "pie",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+});
+
+// default donut seeding strips a seeded seriesField
+const defaultDonutSpec = buildDefaultReportBuilderChartSpec(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+}, {
+    type: "donut",
+    seriesField: "siteType",
+});
+assert.equal(defaultDonutSpec.seriesField, undefined);
+assert.equal(defaultDonutSpec.type, "donut");
+
+// round-trip an explicit pie spec through normalize -> sanitize -> container build
+const pieSpec = {
+    type: "pie",
+    xField: "siteType",
+    yFields: ["totalSpend"],
+};
+const sanitizedPie = sanitizeReportBuilderState(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    chartSpec: pieSpec,
+    viewMode: "chart",
+});
+assert.deepEqual(sanitizedPie.chartSpec, {
+    type: "pie",
+    xField: "siteType",
+    yFields: ["totalSpend"],
+});
+const pieContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    expandedSupportedConfig,
+    {
+        selectedDimensions: ["eventDate", "siteType"],
+        selectedMeasures: ["totalSpend"],
+    },
+    sanitizedPie.chartSpec,
+);
+assert.equal(pieContainer.chart.type, "pie");
+assert.equal(pieContainer.chart.series.nameKey, "siteType");
+assert.equal(pieContainer.chart.series.valueKey, "totalSpend");
+assert.equal("xAxis" in pieContainer.chart, false);
+assert.equal("yAxis" in pieContainer.chart, false);
+assert.ok(Array.isArray(pieContainer.chart.series.palette) && pieContainer.chart.series.palette.length > 0);
+
+// donut container shape
+const donutContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    expandedSupportedConfig,
+    {
+        selectedDimensions: ["eventDate", "siteType"],
+        selectedMeasures: ["totalSpend"],
+    },
+    {
+        type: "donut",
+        xField: "siteType",
+        yFields: ["totalSpend"],
+    },
+);
+assert.equal(donutContainer.chart.type, "donut");
+assert.equal(donutContainer.chart.series.nameKey, "siteType");
+assert.equal(donutContainer.chart.series.valueKey, "totalSpend");
+
+// direct multi-measure container picks distinct default colors when no palette configured
+const multiMeasureContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    config,
+    {
+        selectedDimensions: ["eventDate"],
+        selectedMeasures: ["totalSpend", "impressions"],
+    },
+    {
+        type: "bar",
+        xField: "eventDate",
+        yFields: ["totalSpend", "impressions"],
+    },
+);
+assert.equal(multiMeasureContainer.chart.series.values.length, 2);
+const multiMeasureColors = multiMeasureContainer.chart.series.values.map((entry) => entry.color);
+assert.ok(multiMeasureColors[0] && multiMeasureColors[1]);
+assert.notEqual(multiMeasureColors[0], multiMeasureColors[1]);
+
+// direct multi-measure container honors seriesOptions for type/axis/stackId
+const comboContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    config,
+    {
+        selectedDimensions: ["eventDate"],
+        selectedMeasures: ["totalSpend", "impressions"],
+    },
+    {
+        type: "bar",
+        xField: "eventDate",
+        yFields: ["totalSpend", "impressions"],
+        seriesOptions: {
+            totalSpend: { type: "bar", axis: "left", stackId: "primary" },
+            impressions: { type: "line", axis: "right" },
+        },
+    },
+);
+const comboValues = comboContainer.chart.series.values;
+assert.equal(comboValues[0].value, "totalSpend");
+assert.equal(comboValues[0].type, "bar");
+assert.equal(comboValues[0].axis, "left");
+assert.equal(comboValues[0].stackId, "primary");
+assert.equal(comboValues[1].value, "impressions");
+assert.equal(comboValues[1].type, "line");
+assert.equal(comboValues[1].axis, "right");
+assert.equal(comboValues[1].stackId, undefined);
+
+// horizontal bar container: same multi-measure series.values shape
+const horizontalBarContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    expandedSupportedConfig,
+    {
+        selectedDimensions: ["eventDate", "siteType"],
+        selectedMeasures: ["totalSpend", "impressions"],
+    },
+    {
+        type: "horizontal_bar",
+        xField: "siteType",
+        yFields: ["totalSpend", "impressions"],
+    },
+);
+assert.equal(horizontalBarContainer.chart.type, "horizontal_bar");
+assert.equal(horizontalBarContainer.chart.series.values.length, 2);
+assert.equal(horizontalBarContainer.chart.series.values[0].value, "totalSpend");
+assert.equal(horizontalBarContainer.chart.series.values[1].value, "impressions");
+
+const horizontalBarInvalidOptions = validateReportBuilderChartSpec(expandedSupportedConfig, {
+    type: "horizontal_bar",
+    xField: "siteType",
+    yFields: ["totalSpend", "impressions"],
+    seriesOptions: {
+        totalSpend: { axis: "left" },
+        impressions: { type: "line" },
+    },
+}, familyFields);
+assert.deepEqual(horizontalBarInvalidOptions.errors, [
+    { field: "seriesOptions.totalSpend.axis", code: "notAllowed" },
+    { field: "seriesOptions.impressions.type", code: "notAllowed" },
+]);
+
+// split-by-dimension container: still emits nameKey + values[] with a single measure
+const splitContainer = buildExplicitReportBuilderChartContainer(
+    { dataSourceRef: "report_source", collection: [] },
+    config,
+    {
+        selectedDimensions: ["eventDate", "siteType"],
+        selectedMeasures: ["totalSpend"],
+    },
+    {
+        type: "line",
+        xField: "eventDate",
+        yFields: ["totalSpend"],
+        seriesField: "siteType",
+    },
+);
+assert.equal(splitContainer.chart.series.nameKey, "siteType");
+assert.equal(splitContainer.chart.series.valueKey, "totalSpend");
+assert.equal(splitContainer.chart.series.values.length, 1);
+
+// old explicit line spec round-trips without losing fields or gaining seriesOptions
+const legacyExplicitSpec = {
+    type: "line",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+    seriesField: "siteType",
+};
+const sanitizedLegacy = sanitizeReportBuilderState(expandedSupportedConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    chartSpec: legacyExplicitSpec,
+    viewMode: "chart",
+});
+assert.deepEqual(sanitizedLegacy.chartSpec, legacyExplicitSpec);
+assert.equal("seriesOptions" in sanitizedLegacy.chartSpec, false);
 
 console.log("reportBuilderUtils ✓ request mapping, defaults, and lookup projection");

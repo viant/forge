@@ -207,7 +207,7 @@ function resolveMeasureSections(config = {}, measures = []) {
         existing.measures.push(measure);
         grouped.set(sectionId, existing);
     });
-    return Array.from(grouped.values())
+    const sections = Array.from(grouped.values())
         .filter((section) => Array.isArray(section.measures) && section.measures.length > 0)
         .sort((left, right) => {
             if (left.order !== right.order) {
@@ -215,6 +215,17 @@ function resolveMeasureSections(config = {}, measures = []) {
             }
             return String(left.label || left.id).localeCompare(String(right.label || right.id));
         });
+    const sectionIds = sections.map((section) => String(section.id || "").trim().toLowerCase()).filter(Boolean);
+    const shouldFlattenDefaultSections = sectionIds.length > 1 && sectionIds.every((id) => ["core", "computed", "default"].includes(id));
+    if (!shouldFlattenDefaultSections) {
+        return sections;
+    }
+    return [{
+        id: "all",
+        label: "",
+        order: 0,
+        measures: sections.flatMap((section) => section.measures || []),
+    }];
 }
 
 function hasConfiguredFilterValue(filter = {}, value) {
@@ -423,45 +434,386 @@ function upsertChartPreset(presets = [], nextPreset = null) {
     return dedupeChartPresets([nextPreset, ...normalizeArray(presets)]);
 }
 
-function chartErrorMessage(error = {}) {
+const CHART_TYPE_LABELS = {
+    line: "Line",
+    bar: "Bar",
+    area: "Area",
+    pie: "Pie",
+    donut: "Donut",
+    horizontal_bar: "Horizontal bar",
+    funnel_bar: "Funnel",
+};
+const CARTESIAN_CHART_TYPES = new Set(["line", "bar", "area"]);
+const CATEGORY_CHART_TYPES = new Set(["pie", "donut", "horizontal_bar", "funnel_bar"]);
+const SINGLE_MEASURE_CATEGORY_TYPES = new Set(["pie", "donut", "funnel_bar"]);
+const PER_SERIES_TYPE_CHOICES = ["line", "bar", "area"];
+
+function chartTypeLabel(type = "") {
+    const normalized = String(type || "").trim().toLowerCase();
+    return CHART_TYPE_LABELS[normalized] || normalized || "";
+}
+
+function chartFamilyOf(type = "") {
+    const normalized = String(type || "").trim().toLowerCase();
+    if (CARTESIAN_CHART_TYPES.has(normalized)) return "cartesian";
+    if (CATEGORY_CHART_TYPES.has(normalized)) return "category";
+    return null;
+}
+
+function chartFamilyHelperText(type = "") {
+    switch (String(type || "").trim().toLowerCase()) {
+        case "pie":
+        case "donut":
+            return "Pie and donut charts use one category dimension and a single measure to slice.";
+        case "horizontal_bar":
+            return "Horizontal bars compare a category against one or more measures.";
+        case "funnel_bar":
+            return "Funnel charts use one category dimension and a single measure ordered by value.";
+        case "line":
+        case "bar":
+        case "area":
+        default:
+            return "Pick a category for the X-axis, then one or more measures. Add a series dimension to split a single measure by group.";
+    }
+}
+
+function fieldLabelForError(field = "", { dimensions = [], measures = [] } = {}) {
+    const raw = String(field || "").trim();
+    if (!raw) return "Field";
+    if (raw === "xField") return "X-axis";
+    if (raw === "yFields") return "Measures";
+    if (raw === "seriesField") return "Series dimension";
+    if (raw === "seriesOptions") return "Per-measure options";
+    if (raw === "type") return "Chart type";
+    if (raw === "chartSpec") return "Chart";
+    const yMatch = /^yFields\.(\d+)$/.exec(raw);
+    if (yMatch) {
+        return `Measure ${Number(yMatch[1]) + 1}`;
+    }
+    const optMatch = /^seriesOptions\.([^.]+)(?:\.(\w+))?$/.exec(raw);
+    if (optMatch) {
+        const measureKey = optMatch[1];
+        const measure = measures.find((entry) => entry.key === measureKey);
+        const label = measure?.label || measureKey;
+        switch (optMatch[2]) {
+            case "type": return `${label} render type`;
+            case "axis": return `${label} axis`;
+            case "stackId": return `${label} stack group`;
+            default: return label;
+        }
+    }
+    return raw;
+}
+
+function chartErrorMessage(error = {}, context = {}) {
+    const field = String(error?.field || "").trim();
+    const label = fieldLabelForError(field, context);
     switch (String(error?.code || "").trim()) {
         case "missingField":
-            return `${error.field} is no longer available in the current table.`;
+            return `${label} is no longer available in the current table.`;
         case "wrongKind":
-            return `${error.field} has the wrong field type for this chart.`;
+            return `${label} has the wrong field type for this chart.`;
         case "duplicateField":
-            return `${error.field} duplicates another chart field.`;
+            return `${label} duplicates another chart field.`;
         case "unsupportedType":
-            return `This chart type is not supported by the current renderer.`;
+            return "This chart type is not supported by the current renderer.";
         case "empty":
-            return `${error.field} requires at least one selection.`;
+            return `${label} requires at least one selection.`;
+        case "notAllowed":
+            if (field === "seriesField") {
+                return "A series dimension cannot be combined with this chart type or with multiple measures.";
+            }
+            if (field === "seriesOptions") {
+                return "Per-measure options cannot be combined with a series dimension or with this chart type.";
+            }
+            if (field.endsWith(".axis")) {
+                return `${label} isn't supported for this chart type.`;
+            }
+            if (field.endsWith(".stackId")) {
+                return `${label} isn't supported for this measure on the current chart type.`;
+            }
+            if (field.endsWith(".type")) {
+                return `${label} isn't allowed for this chart type.`;
+            }
+            return `${label} isn't allowed for this chart type.`;
+        case "tooManyMeasures":
+            if (field === "seriesField") {
+                return "A series dimension can only be used with a single measure. Remove extra measures to continue.";
+            }
+            return "This chart type supports only one measure. Remove extras to continue.";
+        case "unknownMeasure":
+            return `${label} refers to a measure that is no longer selected.`;
+        case "invalidType":
+            return `${label} isn't a valid render type for this chart family.`;
+        case "invalidAxis":
+            return `${label} must be set to left or right.`;
+        case "invalidStackId":
+            return `${label} must be a plain text value.`;
+        case "axisConflict":
+            return `${label} conflicts with another measure assigned to the opposite axis. Stacked measures must share an axis.`;
         case "missing":
         default:
-            return `Chart settings are incomplete.`;
+            return "Chart settings are incomplete.";
     }
+}
+
+function supportsStackForSeries(chartType = "", perSeriesType = "") {
+    const base = String(chartType || "").trim().toLowerCase();
+    if (base === "horizontal_bar") return true;
+    if (!CARTESIAN_CHART_TYPES.has(base)) return false;
+    const effective = String(perSeriesType || base).trim().toLowerCase();
+    return effective === "bar" || effective === "area";
+}
+
+function sanitizeChartDraftPatch(currentDraft = {}, patch = {}) {
+    const next = { ...(currentDraft || {}), ...(patch || {}) };
+    const nextType = String(next.type || "").trim().toLowerCase();
+    const nextFamily = chartFamilyOf(nextType);
+    let nextY = Array.isArray(next.yFields) ? next.yFields.map((entry) => String(entry || "").trim()).filter(Boolean) : [];
+    nextY = Array.from(new Set(nextY));
+    if (SINGLE_MEASURE_CATEGORY_TYPES.has(nextType)) {
+        nextY = nextY.slice(0, 1);
+    }
+    next.yFields = nextY;
+    if (nextFamily === "category") {
+        next.seriesField = null;
+    } else if (nextY.length > 1) {
+        next.seriesField = null;
+    } else if (next.seriesField && next.seriesField === next.xField) {
+        next.seriesField = null;
+    }
+    const optionsAllowed = (nextFamily === "cartesian" || nextType === "horizontal_bar")
+        && nextY.length > 1
+        && !next.seriesField;
+    if (!optionsAllowed) {
+        next.seriesOptions = null;
+    } else if (next.seriesOptions && typeof next.seriesOptions === "object" && !Array.isArray(next.seriesOptions)) {
+        const ySet = new Set(nextY);
+        const cleaned = {};
+        Object.entries(next.seriesOptions).forEach(([key, value]) => {
+            if (!ySet.has(key)) return;
+            if (!value || typeof value !== "object") return;
+            const trimmed = {};
+            const nextSeriesType = String(value.type || "").trim().toLowerCase();
+            Object.entries(value).forEach(([optionKey, optionValue]) => {
+                if (optionValue === "" || optionValue === null || optionValue === undefined) return;
+                if (optionKey === "stackId" && !supportsStackForSeries(nextType, nextSeriesType)) {
+                    return;
+                }
+                if (optionKey === "axis" && nextFamily !== "cartesian") {
+                    return;
+                }
+                if (optionKey === "type" && nextFamily !== "cartesian") {
+                    return;
+                }
+                trimmed[optionKey] = optionValue;
+            });
+            if (Object.keys(trimmed).length > 0) {
+                cleaned[key] = trimmed;
+            }
+        });
+        next.seriesOptions = Object.keys(cleaned).length > 0 ? cleaned : null;
+    }
+    return next;
 }
 
 function ReportBuilderChartDialog({
     isOpen = false,
     onClose,
     draft,
-    onChange,
+    onDraftChange,
     onApply,
     supportedTypes = [],
     dimensions = [],
     measures = [],
     validation = { valid: false, errors: [] },
 }) {
-    const errorSet = new Set((validation?.errors || []).map((entry) => String(entry?.field || "").trim()));
-    const selectedXField = String(draft?.xField || "").trim();
-    const availableSeriesDimensions = dimensions.filter((entry) => entry.key !== selectedXField);
-    const selectedYField = String(Array.isArray(draft?.yFields) ? draft.yFields[0] || "" : "").trim();
+    const errors = Array.isArray(validation?.errors) ? validation.errors : [];
+    const errorByField = new Map();
+    errors.forEach((entry) => {
+        const field = String(entry?.field || "").trim();
+        if (!field || errorByField.has(field)) return;
+        errorByField.set(field, entry);
+    });
+    const hasYFieldsError = errors.some((entry) => String(entry?.field || "").startsWith("yFields"));
+    const draftType = String(draft?.type || supportedTypes[0] || "line").trim().toLowerCase();
+    const family = chartFamilyOf(draftType);
+    const isSingleMeasureCategory = SINGLE_MEASURE_CATEGORY_TYPES.has(draftType);
+    const xFieldValue = String(draft?.xField || "").trim();
+    const yFieldList = Array.isArray(draft?.yFields)
+        ? draft.yFields.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const seriesFieldValue = String(draft?.seriesField || "").trim();
+    const seriesOptions = draft?.seriesOptions && typeof draft.seriesOptions === "object"
+        ? draft.seriesOptions
+        : {};
+    const seriesFieldAllowed = family === "cartesian";
+    const seriesFieldEnabled = seriesFieldAllowed && yFieldList.length <= 1;
+    const seriesOptionsVisible = (family === "cartesian" || draftType === "horizontal_bar")
+        && yFieldList.length > 1
+        && !seriesFieldValue;
+    const errorContext = { dimensions, measures };
+
+    const applyPatch = (patch) => {
+        const next = sanitizeChartDraftPatch(draft || {}, patch);
+        if (typeof onDraftChange === "function") {
+            onDraftChange(next);
+        }
+    };
+
+    const toggleMeasure = (measureKey) => {
+        const key = String(measureKey || "").trim();
+        if (!key) return;
+        if (isSingleMeasureCategory) {
+            applyPatch({ yFields: [key] });
+            return;
+        }
+        const has = yFieldList.includes(key);
+        const nextYFields = has ? yFieldList.filter((entry) => entry !== key) : [...yFieldList, key];
+        applyPatch({ yFields: nextYFields });
+    };
+
+    const setSeriesOption = (measureKey, optionPatch) => {
+        const key = String(measureKey || "").trim();
+        if (!key) return;
+        const previousOptions = draft?.seriesOptions && typeof draft.seriesOptions === "object" && !Array.isArray(draft.seriesOptions)
+            ? draft.seriesOptions
+            : {};
+        const previousEntry = previousOptions[key] && typeof previousOptions[key] === "object" ? previousOptions[key] : {};
+        const mergedEntry = { ...previousEntry, ...(optionPatch || {}) };
+        Object.keys(mergedEntry).forEach((entryKey) => {
+            const value = mergedEntry[entryKey];
+            if (value === "" || value === null || value === undefined) {
+                delete mergedEntry[entryKey];
+            }
+        });
+        const nextOptions = { ...previousOptions };
+        if (Object.keys(mergedEntry).length === 0) {
+            delete nextOptions[key];
+        } else {
+            nextOptions[key] = mergedEntry;
+        }
+        applyPatch({ seriesOptions: Object.keys(nextOptions).length > 0 ? nextOptions : null });
+    };
+
+    const renderMeasureChips = () => (
+        <div className={[
+            "forge-report-builder__chart-measure-chips",
+            hasYFieldsError ? "is-invalid" : "",
+        ].filter(Boolean).join(" ")}>
+            {measures.length === 0 ? (
+                <div className="forge-report-builder__chart-empty-hint">No measures available in the current table.</div>
+            ) : null}
+            {measures.map((entry) => {
+                const active = yFieldList.includes(entry.key);
+                return (
+                    <button
+                        key={entry.key}
+                        type="button"
+                        className={[
+                            "forge-report-builder__chart-measure-chip",
+                            active ? "is-active" : "",
+                        ].filter(Boolean).join(" ")}
+                        onClick={() => toggleMeasure(entry.key)}
+                        title={entry.label || entry.key}
+                    >
+                        <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>
+                            {active ? "✓" : ""}
+                        </span>
+                        <span>{entry.label || entry.key}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+
+    const renderSeriesOptionsTable = () => {
+        const showRenderAs = family === "cartesian";
+        const showAxis = family === "cartesian";
+        const showStack = family === "cartesian" || draftType === "horizontal_bar";
+        return (
+            <div className="forge-report-builder__chart-series-options">
+                <div className="forge-report-builder__chart-series-options-header">
+                    <span className="forge-report-builder__chart-series-options-title">Per-measure options</span>
+                    <span className="forge-report-builder__chart-series-options-hint">
+                        Customize how each selected measure renders inside this combo chart.
+                    </span>
+                </div>
+                <table className="forge-report-builder__chart-series-options-table">
+                    <thead>
+                        <tr>
+                            <th>Measure</th>
+                            {showRenderAs ? <th>Render as</th> : null}
+                            {showAxis ? <th>Axis</th> : null}
+                            {showStack ? <th>Stack group</th> : null}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {yFieldList.map((measureKey) => {
+                            const measure = measures.find((entry) => entry.key === measureKey);
+                            const option = seriesOptions[measureKey] && typeof seriesOptions[measureKey] === "object"
+                                ? seriesOptions[measureKey]
+                                : {};
+                            const seriesType = String(option.type || "").trim();
+                            const axisValue = String(option.axis || "").trim();
+                            const stackId = typeof option.stackId === "string" ? option.stackId : "";
+                            const stackEnabled = showStack && supportsStackForSeries(draftType, seriesType);
+                            return (
+                                <tr key={measureKey}>
+                                    <td>{measure?.label || measureKey}</td>
+                                    {showRenderAs ? (
+                                        <td>
+                                            <select
+                                                className="forge-report-builder-select forge-report-builder-select--compact"
+                                                value={seriesType}
+                                                onChange={(event) => setSeriesOption(measureKey, { type: event.target.value || null })}
+                                            >
+                                                <option value="">Default ({chartTypeLabel(draftType)})</option>
+                                                {PER_SERIES_TYPE_CHOICES.map((option) => (
+                                                    <option key={option} value={option}>{chartTypeLabel(option)}</option>
+                                                ))}
+                                            </select>
+                                        </td>
+                                    ) : null}
+                                    {showAxis ? (
+                                        <td>
+                                            <select
+                                                className="forge-report-builder-select forge-report-builder-select--compact"
+                                                value={axisValue || "left"}
+                                                onChange={(event) => setSeriesOption(measureKey, { axis: event.target.value })}
+                                            >
+                                                <option value="left">Left</option>
+                                                <option value="right">Right</option>
+                                            </select>
+                                        </td>
+                                    ) : null}
+                                    {showStack ? (
+                                        <td>
+                                            <input
+                                                type="text"
+                                                disabled={!stackEnabled}
+                                                className="forge-report-builder-select forge-report-builder-select--compact"
+                                                value={stackId}
+                                                placeholder={stackEnabled ? "Optional" : "n/a"}
+                                                onChange={(event) => setSeriesOption(measureKey, { stackId: event.target.value })}
+                                            />
+                                        </td>
+                                    ) : null}
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
     return (
         <Dialog
             isOpen={isOpen}
             onClose={onClose}
             title="Create Chart"
-            style={{ width: "min(720px, calc(100vw - 48px))" }}
+            style={{ width: "min(820px, calc(100vw - 48px))" }}
         >
             <div className="forge-report-builder__chart-dialog">
                 <div className="forge-report-builder__chart-dialog-grid">
@@ -471,65 +823,64 @@ function ReportBuilderChartDialog({
                             type="text"
                             className="forge-report-builder-select"
                             value={draft?.title || ""}
-                            onChange={(event) => onChange({ title: event.target.value })}
+                            onChange={(event) => applyPatch({ title: event.target.value })}
                             placeholder="Enter chart title"
                         />
                     </label>
                     <label className="forge-report-builder__chart-field">
                         <span>Chart Type</span>
                         <select
-                            className="forge-report-builder-select"
-                            value={draft?.type || supportedTypes[0] || "line"}
-                            onChange={(event) => onChange({ type: event.target.value })}
+                            className={errorByField.has("type") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draftType}
+                            onChange={(event) => applyPatch({ type: event.target.value })}
                         >
                             {supportedTypes.map((entry) => (
-                                <option key={entry} value={entry}>{entry}</option>
+                                <option key={entry} value={entry}>{chartTypeLabel(entry)}</option>
                             ))}
                         </select>
                     </label>
                     <label className="forge-report-builder__chart-field">
-                        <span>X-axis</span>
+                        <span>{family === "category" ? "Category" : "X-axis"}</span>
                         <select
-                            className={errorSet.has("xField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
-                            value={selectedXField}
-                            onChange={(event) => onChange({ xField: event.target.value })}
+                            className={errorByField.has("xField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={xFieldValue}
+                            onChange={(event) => applyPatch({ xField: event.target.value })}
                         >
+                            <option value="">Select…</option>
                             {dimensions.map((entry) => (
                                 <option key={entry.key} value={entry.key}>{entry.label}</option>
                             ))}
                         </select>
                     </label>
-                    <label className="forge-report-builder__chart-field">
-                        <span>Y-axis</span>
-                        <select
-                            className={(validation?.errors || []).some((entry) => String(entry?.field || "").startsWith("yFields")) ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
-                            value={selectedYField}
-                            onChange={(event) => onChange({ yFields: [event.target.value] })}
-                        >
-                            {measures.map((entry) => (
-                                <option key={entry.key} value={entry.key}>{entry.label}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="forge-report-builder__chart-field">
-                        <span>Series / Color</span>
-                        <select
-                            className={errorSet.has("seriesField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
-                            value={draft?.seriesField || ""}
-                            onChange={(event) => onChange({ seriesField: event.target.value || null })}
-                        >
-                            <option value="">None</option>
-                            {availableSeriesDimensions.map((entry) => (
-                                <option key={entry.key} value={entry.key}>{entry.label}</option>
-                            ))}
-                        </select>
-                    </label>
+                    {seriesFieldAllowed ? (
+                        <label className="forge-report-builder__chart-field">
+                            <span>Series / Color</span>
+                            <select
+                                className={errorByField.has("seriesField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                value={seriesFieldValue}
+                                onChange={(event) => applyPatch({ seriesField: event.target.value || null })}
+                                disabled={!seriesFieldEnabled}
+                                title={seriesFieldEnabled ? "" : "Available only when a single measure is selected."}
+                            >
+                                <option value="">None</option>
+                                {dimensions.filter((entry) => entry.key !== xFieldValue).map((entry) => (
+                                    <option key={entry.key} value={entry.key}>{entry.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                    ) : <span />}
+                    <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                        <span>{isSingleMeasureCategory ? "Measure" : "Measures"}</span>
+                        {renderMeasureChips()}
+                    </div>
                 </div>
-                {validation?.errors?.length > 0 ? (
+                <p className="forge-report-builder__chart-dialog-hint">{chartFamilyHelperText(draftType)}</p>
+                {seriesOptionsVisible ? renderSeriesOptionsTable() : null}
+                {errors.length > 0 ? (
                     <div className="forge-report-builder__chart-errors">
-                        {validation.errors.map((entry, index) => (
+                        {errors.map((entry, index) => (
                             <div key={`${entry.field}_${entry.code}_${index}`} className="forge-report-builder__chart-error">
-                                {chartErrorMessage(entry)}
+                                {chartErrorMessage(entry, errorContext)}
                             </div>
                         ))}
                     </div>
@@ -2746,7 +3097,7 @@ export default function ReportBuilder({ container, context }) {
                         {!loading && !error && canShowResults && explicitChartMode && (!hasValidChartSpec || hasStaleChartSpec) ? (
                             <div className="forge-report-builder__empty forge-report-builder__empty--chart-callout">
                                 {hasStaleChartSpec
-                                    ? (chartSpecValidation.errors || []).map((entry) => chartErrorMessage(entry)).join(" ")
+                                    ? (chartSpecValidation.errors || []).map((entry) => chartErrorMessage(entry, { dimensions: chartDimensions, measures: chartMeasures })).join(" ")
                                     : "Use Create Chart next to Run to build a chart from the current table."}
                             </div>
                         ) : null}
@@ -2776,10 +3127,7 @@ export default function ReportBuilder({ container, context }) {
                 isOpen={chartDialogOpen}
                 onClose={() => setChartDialogOpen(false)}
                 draft={chartDraft}
-                onChange={(patch) => setChartDraft((current) => normalizeReportBuilderChartSpec({
-                    ...(current || {}),
-                    ...patch,
-                }))}
+                onDraftChange={(nextDraft) => setChartDraft(normalizeReportBuilderChartSpec(nextDraft))}
                 onApply={() => {
                     if (applyChartSpec(chartDraft)) {
                         setChartDialogOpen(false);
