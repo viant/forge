@@ -151,7 +151,7 @@ const container = {
         defaultMode: 'table',
         viewModes: ['table', 'chart'],
         chartWizard: {
-          supportedTypes: ['line', 'bar', 'area'],
+          supportedTypes: ['line', 'bar', 'area', 'pie', 'donut', 'horizontal_bar', 'funnel_bar'],
         },
         defaultChartSpecs: [
           {
@@ -161,11 +161,45 @@ const container = {
             yFields: ['avails'],
           },
           {
-            title: 'HH Uniques by Date and Channel',
-            type: 'line',
+            title: 'Avails + HH Uniques by Date',
+            type: 'bar',
             xField: 'eventDate',
-            yFields: ['hhUniqs'],
+            yFields: ['avails', 'hhUniqs'],
+            seriesOptions: {
+              avails: { type: 'bar', axis: 'left', stackId: 'reach' },
+              hhUniqs: { type: 'line', axis: 'right' },
+            },
+          },
+          {
+            title: 'Avails by Date and Channel',
+            type: 'area',
+            xField: 'eventDate',
+            yFields: ['avails'],
             seriesField: 'channelV2',
+          },
+          {
+            title: 'Avails by Channel',
+            type: 'pie',
+            xField: 'channelV2',
+            yFields: ['avails'],
+          },
+          {
+            title: 'HH Uniques by Country',
+            type: 'donut',
+            xField: 'country',
+            yFields: ['hhUniqs'],
+          },
+          {
+            title: 'Avails by Age Group',
+            type: 'horizontal_bar',
+            xField: 'agegroupId',
+            yFields: ['avails', 'hhUniqs'],
+          },
+          {
+            title: 'Avails Funnel by Channel',
+            type: 'funnel_bar',
+            xField: 'channelV2',
+            yFields: ['avails'],
           },
         ],
         pageSize: 50,
@@ -197,7 +231,7 @@ export default function ReportBuilderPreview() {
               </div>
               <h1 style={{ margin: 0, fontSize: '30px', color: '#182026' }}>Explicit Report Builder Chart Demo</h1>
               <p style={{ margin: '10px 0 0', fontSize: '13px', lineHeight: 1.55, color: '#4c6172', maxWidth: '76ch' }}>
-                This local demo seeds a multi-dimension dataset with Date, Channel, Age Group, and Country. Create a chart, remove it, then reapply it from the <strong>Previous</strong> picker to verify selected-dimension and selected-measure hash matching.
+                This local demo seeds a multi-dimension dataset with Date, Channel, Age Group, and Country. Use the expanded chart wizard to create multi-line, multi-color bar, split-series, pie, donut, horizontal bar, and funnel-style charts, then reapply them from <strong>Previous</strong> to verify compatibility rules.
               </p>
             </div>
             <Button

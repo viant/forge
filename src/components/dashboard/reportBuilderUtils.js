@@ -227,6 +227,92 @@ function compactLookupRecord(filterDef = {}, record = {}) {
     return Object.keys(compact).length > 0 ? compact : null;
 }
 
+function selectFirstDefined(record = {}, selectors = []) {
+    for (const selector of selectors) {
+        const key = String(selector || "").trim();
+        if (!key) continue;
+        const value = resolveKey(record, key);
+        if (value !== undefined && value !== null && value !== "") {
+            return value;
+        }
+    }
+    return undefined;
+}
+
+function selectorLeaf(selector = "") {
+    const normalized = String(selector || "").trim();
+    if (!normalized) return "";
+    const parts = normalized.split(".").map((entry) => entry.trim()).filter(Boolean);
+    return parts[parts.length - 1] || normalized;
+}
+
+function lookupValueFallbackSelectors(selector = "") {
+    const leaf = selectorLeaf(selector);
+    const lower = leaf.toLowerCase();
+    const selectors = [selector, leaf];
+    if (lower === "id" || lower.endsWith("id")) {
+        selectors.push("id", "value");
+    }
+    return Array.from(new Set(selectors.filter(Boolean)));
+}
+
+function lookupLabelFallbackSelectors(selector = "", valueSelector = "") {
+    const leaf = selectorLeaf(selector);
+    const lower = leaf.toLowerCase();
+    const selectors = [selector, leaf];
+    if (lower === "label" || lower.endsWith("label")) {
+        selectors.push("label", "name", "displayName", "displayPath");
+    } else if (lower === "name" || lower.endsWith("name")) {
+        selectors.push("name", "label", "displayName", "displayPath");
+    } else {
+        selectors.push("label", "name", "displayName", "displayPath");
+    }
+    const valueLeaf = selectorLeaf(valueSelector);
+    if (valueLeaf && valueLeaf !== leaf) {
+        selectors.push(valueLeaf);
+    }
+    return Array.from(new Set(selectors.filter(Boolean)));
+}
+
+function camelToSnake(value = "") {
+    return String(value || "")
+        .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+        .replace(/[-\s]+/g, "_")
+        .toLowerCase();
+}
+
+function buildFilterAliases(filters = {}) {
+    const source = filters && typeof filters === "object" && !Array.isArray(filters) ? filters : {};
+    const aliases = {};
+    Object.entries(source).forEach(([key, value]) => {
+        const trimmed = String(key || "").trim();
+        if (!trimmed) return;
+        const lower = trimmed.toLowerCase();
+        const candidates = new Set([camelToSnake(trimmed)]);
+        if (/Ids$/.test(trimmed)) {
+            candidates.add(`${camelToSnake(trimmed.slice(0, -3))}_id`);
+        } else if (/Id$/.test(trimmed)) {
+            candidates.add(`${camelToSnake(trimmed.slice(0, -2))}_id`);
+        }
+        if (lower === "from" || lower === "to") {
+            candidates.add(lower);
+        }
+        if (lower.endsWith("incl")) {
+            candidates.add(camelToSnake(trimmed));
+        }
+        if (lower.endsWith("excl")) {
+            candidates.add(camelToSnake(trimmed));
+        }
+        candidates.forEach((alias) => {
+            if (!alias || alias === trimmed || Object.prototype.hasOwnProperty.call(source, alias) || Object.prototype.hasOwnProperty.call(aliases, alias)) {
+                return;
+            }
+            aliases[alias] = clone(value);
+        });
+    });
+    return aliases;
+}
+
 function isVisibleField(entry = {}) {
     if (!entry || typeof entry !== "object") {
         return false;
@@ -247,13 +333,56 @@ function normalizeStringArray(values = []) {
     return normalizeArray(values).map((entry) => String(entry || "").trim()).filter(Boolean);
 }
 
+const CARTESIAN_CHART_TYPES = ["line", "bar", "area"];
+const CATEGORY_CHART_TYPES = ["pie", "donut", "horizontal_bar", "funnel_bar"];
+const SINGLE_MEASURE_CATEGORY_TYPES = new Set(["pie", "donut", "funnel_bar"]);
+const ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES];
+const DEFAULT_CHART_PALETTE = [
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
+    "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
+    "#bcbd22", "#17becf",
+];
+
+function chartFamilyForType(type = "") {
+    const normalized = String(type || "").trim().toLowerCase();
+    if (CARTESIAN_CHART_TYPES.includes(normalized)) return "cartesian";
+    if (CATEGORY_CHART_TYPES.includes(normalized)) return "category";
+    return null;
+}
+
+function chartFamilyAllowsSeriesOptions(type = "") {
+    const normalized = String(type || "").trim().toLowerCase();
+    if (chartFamilyForType(normalized) === "cartesian") return true;
+    return normalized === "horizontal_bar";
+}
+
+function isValidPerSeriesType(chartType = "", perSeriesType = "") {
+    const family = chartFamilyForType(chartType);
+    const normalized = String(perSeriesType || "").trim().toLowerCase();
+    if (!normalized) return true;
+    if (family === "cartesian") {
+        return CARTESIAN_CHART_TYPES.includes(normalized);
+    }
+    return false;
+}
+
+function supportsStackIdForSeries(chartType = "", perSeriesType = "") {
+    const family = chartFamilyForType(chartType);
+    const baseType = String(chartType || "").trim().toLowerCase();
+    const effectiveType = String(perSeriesType || baseType).trim().toLowerCase();
+    if (family === "cartesian") {
+        return effectiveType === "bar" || effectiveType === "area";
+    }
+    return baseType === "horizontal_bar";
+}
+
 function supportedChartTypeSet(config = {}) {
     const supported = normalizeStringArray(
         config?.result?.chartWizard?.supportedTypes
         || config?.result?.supportedChartTypes
-        || ["line", "bar", "area"],
-    ).filter((entry) => ["line", "bar", "area"].includes(entry));
-    return new Set(supported.length > 0 ? supported : ["line", "bar", "area"]);
+        || ALL_SUPPORTED_CHART_TYPES,
+    ).filter((entry) => ALL_SUPPORTED_CHART_TYPES.includes(entry));
+    return new Set(supported.length > 0 ? supported : ALL_SUPPORTED_CHART_TYPES);
 }
 
 function resolveChartCreationMode(config = {}) {
@@ -319,6 +448,41 @@ function normalizeChartSpecValue(value) {
     return normalized || null;
 }
 
+function normalizeChartSeriesOption(option) {
+    if (!option || typeof option !== "object" || Array.isArray(option)) {
+        return null;
+    }
+    const result = {};
+    const type = String(option.type || "").trim().toLowerCase();
+    if (type) result.type = type;
+    const axis = String(option.axis || "").trim().toLowerCase();
+    if (axis) result.axis = axis;
+    const rawStackId = option.stackId;
+    if (rawStackId !== undefined && rawStackId !== null && rawStackId !== "") {
+        if (typeof rawStackId === "string") {
+            const trimmed = rawStackId.trim();
+            if (trimmed) result.stackId = trimmed;
+        } else {
+            result.stackId = rawStackId;
+        }
+    }
+    return Object.keys(result).length > 0 ? result : null;
+}
+
+function normalizeChartSeriesOptions(input) {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return null;
+    }
+    const result = {};
+    Object.entries(input).forEach(([key, option]) => {
+        const trimmed = String(key || "").trim();
+        if (!trimmed) return;
+        const normalized = normalizeChartSeriesOption(option);
+        if (normalized) result[trimmed] = normalized;
+    });
+    return Object.keys(result).length > 0 ? result : null;
+}
+
 export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
         return null;
@@ -328,12 +492,14 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const xField = normalizeChartSpecValue(chartSpec.xField);
     const yFields = normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
+    const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     return {
         ...(title ? { title } : {}),
         type,
         xField,
         yFields: Array.from(new Set(yFields)),
         ...(seriesField ? { seriesField } : {}),
+        ...(seriesOptions ? { seriesOptions } : {}),
     };
 }
 
@@ -383,9 +549,64 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
     if (normalized.yFields.some((entry) => !universe.has(entry))) {
         return null;
     }
-    if (normalized.seriesField && !universe.has(normalized.seriesField)) {
+
+    const family = chartFamilyForType(normalized.type);
+
+    if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type) && normalized.yFields.length > 1) {
         return null;
     }
+
+    if (normalized.seriesField) {
+        if (!universe.has(normalized.seriesField)) {
+            return null;
+        }
+        if (family === "category") {
+            delete normalized.seriesField;
+        } else if (family === "cartesian" && normalized.yFields.length > 1) {
+            delete normalized.seriesField;
+        } else if (normalized.seriesField === normalized.xField) {
+            delete normalized.seriesField;
+        }
+    }
+
+    if (normalized.seriesOptions) {
+        if (normalized.seriesField) {
+            delete normalized.seriesOptions;
+        } else if (!chartFamilyAllowsSeriesOptions(normalized.type)) {
+            delete normalized.seriesOptions;
+        } else {
+            const ySet = new Set(normalized.yFields);
+            const cleaned = {};
+            const stackAxis = new Map();
+            Object.entries(normalized.seriesOptions).forEach(([key, option]) => {
+                if (!ySet.has(key)) return;
+                const next = {};
+                if (option.type && isValidPerSeriesType(normalized.type, option.type)) {
+                    next.type = option.type;
+                }
+                if (family === "cartesian" && (option.axis === "left" || option.axis === "right")) {
+                    next.axis = option.axis;
+                }
+                if (typeof option.stackId === "string" && option.stackId && supportsStackIdForSeries(normalized.type, next.type || option.type)) {
+                    const axis = next.axis || "left";
+                    const prior = stackAxis.get(option.stackId);
+                    if (prior && prior !== axis) {
+                        // drop stackId from this entry to resolve axis conflict
+                    } else {
+                        next.stackId = option.stackId;
+                        if (!prior) stackAxis.set(option.stackId, axis);
+                    }
+                }
+                if (Object.keys(next).length > 0) cleaned[key] = next;
+            });
+            if (Object.keys(cleaned).length > 0) {
+                normalized.seriesOptions = cleaned;
+            } else {
+                delete normalized.seriesOptions;
+            }
+        }
+    }
+
     return normalized;
 }
 
@@ -441,6 +662,9 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
             }
         });
     }
+
+    const family = chartFamilyForType(normalized.type);
+
     if (normalized.seriesField) {
         const seriesField = fields.get(normalized.seriesField);
         if (!seriesField) {
@@ -451,7 +675,71 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
         if (normalized.seriesField === normalized.xField) {
             errors.push({ field: "seriesField", code: "duplicateField" });
         }
+        if (family === "category") {
+            errors.push({ field: "seriesField", code: "notAllowed" });
+        } else if (family === "cartesian") {
+            if (Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
+                errors.push({ field: "seriesField", code: "tooManyMeasures" });
+            }
+            if (normalized.seriesOptions) {
+                errors.push({ field: "seriesOptions", code: "notAllowed" });
+            }
+        }
     }
+
+    if (family === "category") {
+        if (SINGLE_MEASURE_CATEGORY_TYPES.has(normalized.type)
+            && Array.isArray(normalized.yFields)
+            && normalized.yFields.length > 1) {
+            errors.push({ field: "yFields", code: "tooManyMeasures" });
+        }
+        if (normalized.seriesOptions && !chartFamilyAllowsSeriesOptions(normalized.type)) {
+            errors.push({ field: "seriesOptions", code: "notAllowed" });
+        }
+    }
+
+    const canValidateSeriesOptionsEntries = !!normalized.seriesOptions
+        && typeof normalized.seriesOptions === "object"
+        && !(normalized.seriesField && family === "cartesian")
+        && !(!chartFamilyAllowsSeriesOptions(normalized.type));
+
+    if (canValidateSeriesOptionsEntries) {
+        const ySet = new Set(Array.isArray(normalized.yFields) ? normalized.yFields : []);
+        const stackAxis = new Map();
+        Object.entries(normalized.seriesOptions).forEach(([key, option]) => {
+            if (!ySet.has(key)) {
+                errors.push({ field: `seriesOptions.${key}`, code: "unknownMeasure" });
+                return;
+            }
+            if (option.type && !isValidPerSeriesType(normalized.type, option.type)) {
+                errors.push({
+                    field: `seriesOptions.${key}.type`,
+                    code: family === "cartesian" ? "invalidType" : "notAllowed",
+                });
+            }
+            if (option.axis && family !== "cartesian") {
+                errors.push({ field: `seriesOptions.${key}.axis`, code: "notAllowed" });
+            } else if (option.axis && !["left", "right"].includes(option.axis)) {
+                errors.push({ field: `seriesOptions.${key}.axis`, code: "invalidAxis" });
+            }
+            if (option.stackId !== undefined && typeof option.stackId !== "string") {
+                errors.push({ field: `seriesOptions.${key}.stackId`, code: "invalidStackId" });
+            } else if (typeof option.stackId === "string" && option.stackId && !supportsStackIdForSeries(normalized.type, option.type)) {
+                errors.push({ field: `seriesOptions.${key}.stackId`, code: "notAllowed" });
+            }
+            if (typeof option.stackId === "string" && option.stackId
+                && family === "cartesian") {
+                const stackKey = option.stackId;
+                const axis = option.axis || "left";
+                if (stackAxis.has(stackKey) && stackAxis.get(stackKey) !== axis) {
+                    errors.push({ field: `seriesOptions.${key}.stackId`, code: "axisConflict" });
+                } else if (!stackAxis.has(stackKey)) {
+                    stackAxis.set(stackKey, axis);
+                }
+            }
+        });
+    }
+
     return {
         valid: errors.length === 0,
         errors,
@@ -489,17 +777,25 @@ export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed
     const title = String(normalizedSeed.title || "").trim();
     const type = supportedChartTypeSet(config).has(normalizedSeed.type) ? normalizedSeed.type : getReportBuilderSupportedChartTypes(config)[0];
     const xField = normalizedSeed.xField || dimensions[0]?.key || null;
+    const family = chartFamilyForType(type);
     const seededYFields = Array.isArray(normalizedSeed.yFields) && normalizedSeed.yFields.length > 0
         ? normalizedSeed.yFields
         : (defaultYField ? [defaultYField] : []);
-    const seriesField = normalizedSeed.seriesField || dimensions.find((entry) => entry.key !== xField)?.key || null;
+    const yFields = SINGLE_MEASURE_CATEGORY_TYPES.has(type) ? seededYFields.slice(0, 1) : seededYFields;
+    const allowSeriesField = family === "cartesian" && yFields.length === 1;
+    const seriesField = allowSeriesField
+        ? (normalizedSeed.seriesField || dimensions.find((entry) => entry.key !== xField)?.key || null)
+        : null;
+    const allowSeriesOptions = chartFamilyAllowsSeriesOptions(type) && !seriesField;
+    const seriesOptions = allowSeriesOptions ? normalizedSeed.seriesOptions : null;
     return normalizeReportBuilderChartSpec({
         ...normalizedSeed,
         ...(title ? { title } : {}),
         type,
         xField,
-        yFields: seededYFields,
-        ...(seriesField ? { seriesField } : {}),
+        yFields,
+        ...(seriesField ? { seriesField } : { seriesField: null }),
+        ...(seriesOptions ? { seriesOptions } : { seriesOptions: null }),
     });
 }
 
@@ -789,6 +1085,13 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
         setNestedValue(request, paramPath, values);
     });
 
+    if (request.filters && typeof request.filters === "object" && !Array.isArray(request.filters)) {
+        request.filters = {
+            ...request.filters,
+            ...buildFilterAliases(request.filters),
+        };
+    }
+
     const pageSize = Math.max(1, Number(state.pageSize || resultConfig.pageSize || requestConfig.limit || 50) || 50);
     const page = Math.max(1, Number(state.page || 1) || 1);
     request.limit = pageSize;
@@ -863,8 +1166,8 @@ export function projectLookupSelection(filterDef = {}, record = {}) {
     const valueSelector = String(filterDef.valueSelector || filterDef.valueField || filterDef.field || "id").trim();
     const labelSelector = String(filterDef.labelSelector || filterDef.previewSelector || filterDef.labelField || valueSelector).trim();
     const groupSelector = String(filterDef.groupSelector || "").trim();
-    const value = resolveKey(record, valueSelector);
-    const label = resolveKey(record, labelSelector);
+    const value = selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector));
+    const label = selectFirstDefined(record, lookupLabelFallbackSelectors(labelSelector, valueSelector));
     const group = groupSelector ? resolveKey(record, groupSelector) : "";
     return {
         value,
@@ -964,19 +1267,43 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (!xField || yMeasures.length === 0) {
         return container;
     }
-    const palette = config.result?.palette || [];
+    const configuredPalette = config.result?.palette;
+    const palette = Array.isArray(configuredPalette) && configuredPalette.length > 0
+        ? configuredPalette
+        : DEFAULT_CHART_PALETTE;
     const seriesType = normalized.type || "line";
+    const family = chartFamilyForType(seriesType);
+    const xDisplayKey = resolveReportBuilderDimensionDisplayKey(xField);
+
+    if (seriesType === "pie" || seriesType === "donut") {
+        const yMeasure = yMeasures[0];
+        return {
+            ...container,
+            dataSourceRef: container.dataSourceRef,
+            collection: container.collection,
+            chart: {
+                type: seriesType,
+                series: {
+                    nameKey: xDisplayKey || normalized.xField,
+                    valueKey: String(yMeasure?.key || yMeasure?.id || "").trim(),
+                    palette,
+                },
+            },
+        };
+    }
+
     const baseChart = {
         type: seriesType,
         xAxis: {
-            dataKey: resolveReportBuilderDimensionDisplayKey(xField) || "eventDate",
+            dataKey: xDisplayKey || "eventDate",
             tickFormat: xField?.tickFormat,
         },
         yAxis: {
             format: yMeasures[0]?.format,
         },
     };
-    if (normalized.seriesField && yMeasures.length === 1) {
+
+    if (family === "cartesian" && normalized.seriesField && yMeasures.length === 1) {
         const yMeasure = yMeasures[0];
         const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
         return {
@@ -1000,6 +1327,25 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             },
         };
     }
+
+    const seriesOptions = normalized.seriesOptions && typeof normalized.seriesOptions === "object"
+        ? normalized.seriesOptions
+        : {};
+    const values = yMeasures.map((measure, index) => {
+        const measureKey = String(measure?.key || measure?.id || "").trim();
+        const option = seriesOptions[measureKey] || {};
+        const entry = {
+            value: measureKey,
+            label: measure?.label || measure?.id,
+            color: measure?.color || palette[index % palette.length],
+            format: measure?.format,
+            type: option.type || seriesType,
+        };
+        if (option.axis) entry.axis = option.axis;
+        if (option.stackId) entry.stackId = option.stackId;
+        return entry;
+    });
+
     return {
         ...container,
         dataSourceRef: container.dataSourceRef,
@@ -1007,13 +1353,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         chart: {
             ...baseChart,
             series: {
-                values: yMeasures.map((measure, index) => ({
-                    value: String(measure?.key || measure?.id || "").trim(),
-                    label: measure?.label || measure?.id,
-                    color: measure?.color || palette[index],
-                    format: measure?.format,
-                    type: seriesType,
-                })),
+                values,
                 palette,
             },
         },
