@@ -4,7 +4,7 @@ import { signal } from '@preact/signals-react';
 
 import ReportBuilder from '../../components/dashboard/ReportBuilder.jsx';
 
-const RAW_ROWS = [
+const BASE_ROWS = [
   { eventDate: '2026-05-01', channelV2: 'Display', agegroupId: '18-24', country: 'US', avails: 18000, hhUniqs: 7400 },
   { eventDate: '2026-05-01', channelV2: 'Display', agegroupId: '25-34', country: 'US', avails: 22400, hhUniqs: 9100 },
   { eventDate: '2026-05-01', channelV2: 'CTV', agegroupId: '18-24', country: 'US', avails: 14200, hhUniqs: 6100 },
@@ -22,6 +22,19 @@ const RAW_ROWS = [
   { eventDate: '2026-05-04', channelV2: 'CTV', agegroupId: '18-24', country: 'CA', avails: 14500, hhUniqs: 6000 },
   { eventDate: '2026-05-04', channelV2: 'CTV', agegroupId: '25-34', country: 'CA', avails: 20300, hhUniqs: 8500 },
 ];
+
+const RAW_ROWS = BASE_ROWS.map((row, index) => ({
+  ...row,
+  siteType: row.channelV2 === 'CTV' ? 'Streaming' : 'Publisher Site',
+  publisher: row.country === 'US' ? 'Acme Media' : 'North Star Media',
+  advertiser: row.country === 'US' ? 'Northwind Health' : 'Maple Retail',
+  campaign: row.agegroupId === '18-24' ? 'Prospect Sprint' : 'Family Reach',
+  adOrder: row.channelV2 === 'CTV' ? 'Connected TV Burst' : 'Display Always-On',
+  audience: row.agegroupId === '18-24' ? 'Young Adults' : 'Established Adults',
+  deal: row.channelV2 === 'CTV' ? 'Premium OTT Deal' : 'Open Exchange',
+  deviceType: index % 2 === 0 ? 'Mobile' : 'CTV',
+  region: row.country === 'US' ? 'NA' : 'CA',
+}));
 
 function aggregateRows(rows, request = {}) {
   const dimensions = Object.entries(request.dimensions || {})
@@ -125,6 +138,7 @@ const container = {
   dataSourceRef: 'demoReportSource',
   dashboard: {
     reportBuilder: {
+      filterPresentation: 'rail-left',
       measures: [
         { id: 'avails', key: 'avails', label: 'Avails', format: 'compactNumber', default: true, color: '#2f6de1' },
         { id: 'hhUniqs', key: 'hhUniqs', label: 'HH Uniques', format: 'compactNumber', default: true, color: '#13a36f' },
@@ -134,6 +148,15 @@ const container = {
         { id: 'channelV2', key: 'channelV2', label: 'Channel', default: true },
         { id: 'agegroupId', key: 'agegroupId', label: 'Age Group', default: true },
         { id: 'country', key: 'country', label: 'Country' },
+        { id: 'siteType', key: 'siteType', label: 'Site Type' },
+        { id: 'publisher', key: 'publisher', label: 'Publisher' },
+        { id: 'advertiser', key: 'advertiser', label: 'Advertiser' },
+        { id: 'campaign', key: 'campaign', label: 'Campaign' },
+        { id: 'adOrder', key: 'adOrder', label: 'Ad Order' },
+        { id: 'audience', key: 'audience', label: 'Audience' },
+        { id: 'deal', key: 'deal', label: 'Deal' },
+        { id: 'deviceType', key: 'deviceType', label: 'Device Type' },
+        { id: 'region', key: 'region', label: 'Region' },
       ],
       staticFilters: [
         {
@@ -144,6 +167,80 @@ const container = {
           default: { start: '2026-05-01', end: '2026-05-04' },
           startParamPath: 'filters.from',
           endParamPath: 'filters.to',
+        },
+        {
+          id: 'channelsFilter',
+          label: 'Channels',
+          multiple: true,
+          options: [
+            { label: 'Display', value: 'Display' },
+            { label: 'CTV', value: 'CTV' },
+          ],
+        },
+        {
+          id: 'scopeFilter',
+          label: 'Scope',
+          multiple: true,
+          options: [
+            { label: 'National', value: 'national' },
+            { label: 'Regional', value: 'regional' },
+            { label: 'Local', value: 'local' },
+          ],
+        },
+        {
+          id: 'inventoryFilter',
+          label: 'Inventory',
+          multiple: true,
+          options: [
+            { label: 'Premium', value: 'premium' },
+            { label: 'Open Exchange', value: 'open' },
+          ],
+        },
+        {
+          id: 'targetingFilter',
+          label: 'Targeting',
+          multiple: true,
+          options: [
+            { label: 'Contextual', value: 'contextual' },
+            { label: 'Audience', value: 'audience' },
+            { label: 'Geo', value: 'geo' },
+          ],
+        },
+        {
+          id: 'publisherFilter',
+          label: 'Publisher',
+          multiple: true,
+          options: [
+            { label: 'Acme Media', value: 'Acme Media' },
+            { label: 'North Star Media', value: 'North Star Media' },
+          ],
+        },
+        {
+          id: 'advertiserFilter',
+          label: 'Advertiser',
+          multiple: true,
+          options: [
+            { label: 'Northwind Health', value: 'Northwind Health' },
+            { label: 'Maple Retail', value: 'Maple Retail' },
+          ],
+        },
+        {
+          id: 'campaignFilter',
+          label: 'Campaign',
+          multiple: true,
+          options: [
+            { label: 'Prospect Sprint', value: 'Prospect Sprint' },
+            { label: 'Family Reach', value: 'Family Reach' },
+          ],
+        },
+        {
+          id: 'deviceFilter',
+          label: 'Device',
+          multiple: true,
+          options: [
+            { label: 'Mobile', value: 'Mobile' },
+            { label: 'CTV', value: 'CTV' },
+          ],
         },
       ],
       result: {

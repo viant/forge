@@ -313,6 +313,22 @@ function buildFilterAliases(filters = {}) {
     return aliases;
 }
 
+export function applyReportBuilderFilterAliases(request = {}) {
+    if (!request || typeof request !== "object" || Array.isArray(request)) {
+        return request;
+    }
+    if (!request.filters || typeof request.filters !== "object" || Array.isArray(request.filters)) {
+        return request;
+    }
+    return {
+        ...request,
+        filters: {
+            ...request.filters,
+            ...buildFilterAliases(request.filters),
+        },
+    };
+}
+
 function isVisibleField(entry = {}) {
     if (!entry || typeof entry !== "object") {
         return false;
@@ -989,7 +1005,7 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     const groupByOptions = normalizeArray(config?.groupBy?.options);
     const orderFields = normalizeArray(resultConfig.orderFields || config.orderFields);
 
-    const request = clone(requestConfig.baseParameters || {});
+    let request = clone(requestConfig.baseParameters || {});
 
     normalizeArray(state.selectedMeasures).forEach((id) => {
         const match = measures.find((item) => String(item?.id || "").trim() === String(id).trim());
@@ -1085,12 +1101,7 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
         setNestedValue(request, paramPath, values);
     });
 
-    if (request.filters && typeof request.filters === "object" && !Array.isArray(request.filters)) {
-        request.filters = {
-            ...request.filters,
-            ...buildFilterAliases(request.filters),
-        };
-    }
+    request = applyReportBuilderFilterAliases(request);
 
     const pageSize = Math.max(1, Number(state.pageSize || resultConfig.pageSize || requestConfig.limit || 50) || 50);
     const page = Math.max(1, Number(state.page || 1) || 1);

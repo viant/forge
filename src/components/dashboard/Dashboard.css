@@ -1097,6 +1097,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
+    align-self: start;
     min-width: 0;
     min-height: 0;
     max-height: 100%;
@@ -1105,6 +1106,11 @@
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     padding-right: 4px;
+}
+
+.forge-report-builder__left > * {
+    min-width: 0;
+    flex: 0 0 auto;
 }
 
 .forge-report-builder__shelf,
@@ -1294,6 +1300,7 @@
 
 .forge-report-builder__center {
     grid-area: center;
+    align-self: start;
     border: 1px solid #d9e2ea;
     background: linear-gradient(180deg, #ffffff 0%, #f8fbfe 100%);
     border-radius: 20px;
@@ -1833,6 +1840,17 @@
     display: flex;
     flex-direction: column;
     gap: 5px;
+    min-width: 0;
+}
+
+.forge-report-builder__dimension-scroll {
+    max-height: clamp(260px, 44vh, 620px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-right: 4px;
+    margin-right: -4px;
 }
 
 .forge-report-builder__dimension-item {
@@ -1848,12 +1866,21 @@
     text-align: left;
     font-size: 9px;
     font-weight: 600;
+    width: 100%;
+    min-width: 0;
 }
 
 .forge-report-builder__dimension-item.is-active {
     border-color: #2f6de1;
     background: #eef4ff;
     color: #133c7a;
+}
+
+.forge-report-builder__dimension-item span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .forge-report-builder-select {
@@ -1906,7 +1933,7 @@
     flex-direction: column;
     gap: 8px;
     min-height: 0;
-    overflow: visible;
+    overflow: hidden;
     padding: 14px;
     border: 1px solid #d8e2eb;
     border-radius: 20px;
@@ -2023,6 +2050,18 @@
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 6px;
+    align-content: flex-start;
+    min-width: 0;
+}
+
+.forge-report-builder__filter-category-scroll {
+    max-height: clamp(92px, 20vh, 220px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding-right: 4px;
+    margin-right: -4px;
 }
 
 .forge-report-builder__bottom-label {
@@ -2072,6 +2111,8 @@
     font-weight: 700;
     cursor: pointer;
     transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .forge-report-builder__bottom-toggle {
@@ -2140,6 +2181,10 @@
 
 .forge-report-builder__category-chip-label {
     white-space: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1 1 auto;
 }
 
 .forge-report-builder__category-chip-count,
@@ -2515,6 +2560,14 @@
 
     .forge-report-builder__left {
         order: 2;
+    }
+
+    .forge-report-builder__dimension-scroll {
+        max-height: clamp(220px, 36vh, 420px);
+    }
+
+    .forge-report-builder__filter-category-scroll {
+        max-height: clamp(92px, 18vh, 180px);
     }
 
     .forge-report-builder__center {

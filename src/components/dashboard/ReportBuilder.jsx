@@ -16,6 +16,7 @@ import {
     buildReportBuilderColumns,
     buildReportBuilderDefaultChartSpecs,
     buildReportBuilderDefaultState,
+    applyReportBuilderFilterAliases,
     buildReportBuilderRequest,
     buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
@@ -90,7 +91,7 @@ export function resolveReportBuilderHookHandler(builderContext, handlerName = ""
 function applyRequestHook(builderContext, config = {}, state = {}, request = {}) {
     const handlerName = String(config?.hooks?.buildRequest || "").trim();
     if (!handlerName || !builderContext?.lookupHandler) {
-        return request;
+        return applyReportBuilderFilterAliases(request);
     }
     try {
         const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
@@ -100,10 +101,10 @@ function applyRequestHook(builderContext, config = {}, state = {}, request = {})
             state,
             config,
         });
-        return (result && typeof result === "object") ? result : request;
+        return applyReportBuilderFilterAliases((result && typeof result === "object") ? result : request);
     } catch (error) {
         console.error("reportBuilder request hook failed", error);
-        return request;
+        return applyReportBuilderFilterAliases(request);
     }
 }
 
@@ -1828,136 +1829,140 @@ export default function ReportBuilder({ container, context }) {
     const renderFilterCategoryControls = () => (
         <>
             {showFilterCategoryBar && !familyMode && (optionalStaticFilters.length > 0 || dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).length > 0) ? (
-                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
-                    {optionalStaticFilters.map((filter) => {
-                        const filterKey = String(filter.id || filter.field || "").trim();
-                        const active = activeOptionalFilterKeys.includes(filterKey);
-                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
-                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                        const categoryLabel = filter.label || filter.id;
-                        return (
-                            <button
-                                key={filterKey}
-                                type="button"
-                                className={[
-                                    "forge-report-builder__category-chip",
-                                    active ? "is-active" : "is-inactive",
-                                    configuredCount > 0 ? "has-configured-state" : "",
-                                ].filter(Boolean).join(" ")}
-                                onClick={() => toggleOptionalFilterCategory(filterKey)}
-                                aria-pressed={active}
-                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                            >
-                                <span className="forge-report-builder__category-chip-icon">
-                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
-                                </span>
-                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
-                                {configuredCount > 0 ? (
-                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                ) : (
-                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                )}
-                            </button>
-                        );
-                    })}
-                    {dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).map((group) => {
-                        const active = activeDynamicGroupIds.includes(group.id);
-                        const configuredCount = countConfiguredDynamicSelections(state?.dynamicGroups?.[group.id] || []);
-                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                        const categoryLabel = group.label || group.id;
-                        return (
-                            <button
-                                key={group.id}
-                                type="button"
-                                className={[
-                                    "forge-report-builder__category-chip",
-                                    active ? "is-active" : "is-inactive",
-                                    configuredCount > 0 ? "has-configured-state" : "",
-                                ].filter(Boolean).join(" ")}
-                                onClick={() => toggleDynamicGroupCategory(group.id)}
-                                aria-pressed={active}
-                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                            >
-                                <span className="forge-report-builder__category-chip-icon">
-                                    <Icon icon={filterCategoryIcon(group.id)} size={12} />
-                                </span>
-                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
-                                {configuredCount > 0 ? (
-                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                ) : (
-                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                )}
-                            </button>
-                        );
-                    })}
+                <div className="forge-report-builder__filter-category-scroll">
+                    <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
+                        {optionalStaticFilters.map((filter) => {
+                            const filterKey = String(filter.id || filter.field || "").trim();
+                            const active = activeOptionalFilterKeys.includes(filterKey);
+                            const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                            const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                            const categoryLabel = filter.label || filter.id;
+                            return (
+                                <button
+                                    key={filterKey}
+                                    type="button"
+                                    className={[
+                                        "forge-report-builder__category-chip",
+                                        active ? "is-active" : "is-inactive",
+                                        configuredCount > 0 ? "has-configured-state" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    onClick={() => toggleOptionalFilterCategory(filterKey)}
+                                    aria-pressed={active}
+                                    aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                    title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                >
+                                    <span className="forge-report-builder__category-chip-icon">
+                                        <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                    </span>
+                                    <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                    {configuredCount > 0 ? (
+                                        <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                    ) : (
+                                        <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                        {dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).map((group) => {
+                            const active = activeDynamicGroupIds.includes(group.id);
+                            const configuredCount = countConfiguredDynamicSelections(state?.dynamicGroups?.[group.id] || []);
+                            const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                            const categoryLabel = group.label || group.id;
+                            return (
+                                <button
+                                    key={group.id}
+                                    type="button"
+                                    className={[
+                                        "forge-report-builder__category-chip",
+                                        active ? "is-active" : "is-inactive",
+                                        configuredCount > 0 ? "has-configured-state" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    onClick={() => toggleDynamicGroupCategory(group.id)}
+                                    aria-pressed={active}
+                                    aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                    title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                >
+                                    <span className="forge-report-builder__category-chip-icon">
+                                        <Icon icon={filterCategoryIcon(group.id)} size={12} />
+                                    </span>
+                                    <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                    {configuredCount > 0 ? (
+                                        <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                    ) : (
+                                        <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             ) : null}
             {showFilterCategoryBar && familyMode ? (
-                <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
-                    {optionalStaticFilters.map((filter) => {
-                        const filterKey = String(filter.id || filter.field || "").trim();
-                        const active = activeOptionalFilterKeys.includes(filterKey);
-                        const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
-                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                        const categoryLabel = filter.label || filter.id;
-                        return (
-                            <button
-                                key={filterKey}
-                                type="button"
-                                className={[
-                                    "forge-report-builder__category-chip",
-                                    active ? "is-active" : "is-inactive",
-                                    configuredCount > 0 ? "has-configured-state" : "",
-                                ].filter(Boolean).join(" ")}
-                                onClick={() => toggleOptionalFilterCategory(filterKey)}
-                                aria-pressed={active}
-                                aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                            >
-                                <span className="forge-report-builder__category-chip-icon">
-                                    <Icon icon={filterCategoryIcon(filterKey)} size={12} />
-                                </span>
-                                <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
-                                {configuredCount > 0 ? (
-                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                ) : (
-                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                )}
-                            </button>
-                        );
-                    })}
-                    {dynamicFilterFamilies.map((family) => {
-                        const active = activeDynamicFamilyIds.includes(family.id);
-                        const configuredCount = familyConfiguredCount(family);
-                        const stateLabel = filterCategoryStateLabel({ active, configuredCount });
-                        return (
-                            <button
-                                key={family.id}
-                                type="button"
-                                className={[
-                                    "forge-report-builder__category-chip",
-                                    active ? "is-active" : "is-inactive",
-                                    configuredCount > 0 ? "has-configured-state" : "",
-                                ].filter(Boolean).join(" ")}
-                                onClick={() => setActiveDynamicFamilyIds((current) => current.includes(family.id) ? current.filter((entry) => entry !== family.id) : [...current, family.id])}
-                                aria-pressed={active}
-                                aria-label={filterCategoryTitle(family.label, { active, configuredCount })}
-                                title={filterCategoryTitle(family.label, { active, configuredCount })}
-                            >
-                                <span className="forge-report-builder__category-chip-icon">
-                                    <Icon icon={filterCategoryIcon(family.id)} size={12} />
-                                </span>
-                                <span className="forge-report-builder__category-chip-label">{family.label}</span>
-                                {configuredCount > 0 ? (
-                                    <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
-                                ) : (
-                                    <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
-                                )}
-                            </button>
-                        );
-                    })}
+                <div className="forge-report-builder__filter-category-scroll">
+                    <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
+                        {optionalStaticFilters.map((filter) => {
+                            const filterKey = String(filter.id || filter.field || "").trim();
+                            const active = activeOptionalFilterKeys.includes(filterKey);
+                            const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                            const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                            const categoryLabel = filter.label || filter.id;
+                            return (
+                                <button
+                                    key={filterKey}
+                                    type="button"
+                                    className={[
+                                        "forge-report-builder__category-chip",
+                                        active ? "is-active" : "is-inactive",
+                                        configuredCount > 0 ? "has-configured-state" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    onClick={() => toggleOptionalFilterCategory(filterKey)}
+                                    aria-pressed={active}
+                                    aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                    title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                >
+                                    <span className="forge-report-builder__category-chip-icon">
+                                        <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                    </span>
+                                    <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
+                                    {configuredCount > 0 ? (
+                                        <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                    ) : (
+                                        <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                        {dynamicFilterFamilies.map((family) => {
+                            const active = activeDynamicFamilyIds.includes(family.id);
+                            const configuredCount = familyConfiguredCount(family);
+                            const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                            return (
+                                <button
+                                    key={family.id}
+                                    type="button"
+                                    className={[
+                                        "forge-report-builder__category-chip",
+                                        active ? "is-active" : "is-inactive",
+                                        configuredCount > 0 ? "has-configured-state" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    onClick={() => setActiveDynamicFamilyIds((current) => current.includes(family.id) ? current.filter((entry) => entry !== family.id) : [...current, family.id])}
+                                    aria-pressed={active}
+                                    aria-label={filterCategoryTitle(family.label, { active, configuredCount })}
+                                    title={filterCategoryTitle(family.label, { active, configuredCount })}
+                                >
+                                    <span className="forge-report-builder__category-chip-icon">
+                                        <Icon icon={filterCategoryIcon(family.id)} size={12} />
+                                    </span>
+                                    <span className="forge-report-builder__category-chip-label">{family.label}</span>
+                                    {configuredCount > 0 ? (
+                                        <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                                    ) : (
+                                        <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             ) : null}
         </>
@@ -3008,21 +3013,24 @@ export default function ReportBuilder({ container, context }) {
                             </button>
                         </div>
                         {!dimensionsCollapsed ? (
-                            <div className="forge-report-builder__dimension-list">
-                                {dimensions.map((dimension) => {
-                                    const active = state.selectedDimensions.includes(dimension.id);
-                                    return (
-                                        <button
-                                            key={dimension.id}
-                                            type="button"
-                                            className={active ? "forge-report-builder__dimension-item is-active" : "forge-report-builder__dimension-item"}
-                                            onClick={() => toggleDimension(dimension.id)}
-                                        >
-                                            <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>{active ? "✓" : ""}</span>
-                                            <span>{dimension.label || dimension.id}</span>
-                                        </button>
-                                    );
-                                })}
+                            <div className="forge-report-builder__dimension-scroll">
+                                <div className="forge-report-builder__dimension-list">
+                                    {dimensions.map((dimension) => {
+                                        const active = state.selectedDimensions.includes(dimension.id);
+                                        return (
+                                            <button
+                                                key={dimension.id}
+                                                type="button"
+                                                className={active ? "forge-report-builder__dimension-item is-active" : "forge-report-builder__dimension-item"}
+                                                onClick={() => toggleDimension(dimension.id)}
+                                                title={dimension.label || dimension.id}
+                                            >
+                                                <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>{active ? "✓" : ""}</span>
+                                                <span>{dimension.label || dimension.id}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         ) : null}
                     </section>
