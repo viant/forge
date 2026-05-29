@@ -149,6 +149,7 @@ export default function GridLayoutRenderer({
     const labels = layout?.labels || {};
     const labelMode = (labels.mode || 'left');
     const controlGap = labels?.controlGap !== undefined ? Number(labels.controlGap) : 8;
+    const labelStyle = { fontWeight: 700, color: '#1f2937', ...(labels.style || labels.labelStyle || {}) };
     const sourceEntries = entries || items || [];
 
     const { placements, rowCount } = useMemo(() => placeItems(sourceEntries, columns), [sourceEntries, columns]);
@@ -185,11 +186,11 @@ export default function GridLayoutRenderer({
                 const labelNode = hasLabel ? (
                     <div
                         key={`${item.id || item.name}-label`}
-                        style={{ display: 'flex', alignItems: (labels.align || (labelMode === 'left' ? 'baseline' : 'center')), ...css.label }}
+                        style={{ display: 'flex', alignItems: (labels.align || (labelMode === 'left' ? 'baseline' : 'center')), ...labelStyle, ...css.label }}
                     >
                         <ControlRenderer
                             key={`${item.id || item.name}-label-w`}
-                            item={{ id: `${item.id || item.name}-label`, widget: 'label', wrapper: 'none', scope: 'noop', properties: { value: item.label, style: { margin: 0 } } }}
+                            item={{ id: `${item.id || item.name}-label`, widget: 'label', wrapper: 'none', scope: 'noop', properties: { value: item.label, style: { margin: 0, ...labelStyle } } }}
                             context={subCtx}
                             container={container}
                         />

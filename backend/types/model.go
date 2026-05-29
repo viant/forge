@@ -243,9 +243,14 @@ type Divider struct {
 // Labels config controls label rendering strategy for grid layouts.
 // When omitted, front-end defaults apply (currently "left" in grid mode).
 type Labels struct {
-	Mode   string `json:"mode,omitempty" yaml:"mode,omitempty"`     // "left" | "top" | "none"
-	Width  string `json:"width,omitempty" yaml:"width,omitempty"`   // only used for Mode "left"
-	Height string `json:"height,omitempty" yaml:"height,omitempty"` // only used for Mode "top"
+	Mode       string                 `json:"mode,omitempty" yaml:"mode,omitempty"`             // "left" | "top" | "none"
+	Width      string                 `json:"width,omitempty" yaml:"width,omitempty"`           // only used for Mode "left"
+	Height     string                 `json:"height,omitempty" yaml:"height,omitempty"`         // only used for Mode "top"
+	Align      string                 `json:"align,omitempty" yaml:"align,omitempty"`           // optional label/control alignment
+	ControlGap int                    `json:"controlGap,omitempty" yaml:"controlGap,omitempty"` // gap between label and control in Mode "left"
+	RowHeight  string                 `json:"rowHeight,omitempty" yaml:"rowHeight,omitempty"`   // grid auto-row height
+	Style      map[string]interface{} `json:"style,omitempty" yaml:"style,omitempty"`           // label cell/widget style
+	LabelStyle map[string]interface{} `json:"labelStyle,omitempty" yaml:"labelStyle,omitempty"` // alias for Style
 }
 
 type Progress struct {

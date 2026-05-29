@@ -1573,7 +1573,9 @@ export default function ReportBuilder({ container, context }) {
         : context;
     const stateKey = useMemo(() => getBuilderStateKey(container), [container]);
     const windowFormSignal = builderContext?.signals?.windowForm;
-    const persistedState = resolveKey(windowFormSignal?.value || {}, stateKey);
+    const windowFormValue = windowFormSignal?.value || {};
+    const persistedState = resolveKey(windowFormValue || {}, stateKey);
+    const currentPrefillSignature = prefillSignature(windowFormValue);
     const state = useMemo(() => mergeReportBuilderState(config, persistedState), [config, persistedState]);
     const requestFingerprintRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
@@ -1629,7 +1631,7 @@ export default function ReportBuilder({ container, context }) {
                 builderContext,
                 config,
                 defaults,
-                windowFormSignal?.peek?.() || {},
+                windowFormValue,
             ),
         );
         const payload = setSelector({}, stateKey, initialized);
@@ -1638,7 +1640,7 @@ export default function ReportBuilder({ container, context }) {
         } else {
             builderContext?.handlers?.dataSource?.setWindowFormData?.({ values: payload });
         }
-    }, [builderContext, config, stateKey, windowFormSignal]);
+    }, [builderContext, config, stateKey, windowFormSignal, windowFormValue]);
 
     useEffect(() => {
         const currentPersisted = resolveKey(windowFormSignal?.peek?.() || {}, stateKey);
@@ -1654,8 +1656,7 @@ export default function ReportBuilder({ container, context }) {
     }, [persistState, state, stateKey, windowFormSignal]);
 
     useEffect(() => {
-        const signature = prefillSignature(windowFormSignal?.peek?.() || {});
-        if (!signature || appliedPrefillSignatureRef.current === signature) {
+        if (!currentPrefillSignature || appliedPrefillSignatureRef.current === currentPrefillSignature) {
             return;
         }
         const next = mergeReportBuilderState(
@@ -1664,15 +1665,15 @@ export default function ReportBuilder({ container, context }) {
                 builderContext,
                 config,
                 state,
-                windowFormSignal?.peek?.() || {},
+                windowFormValue,
             ),
         );
-        appliedPrefillSignatureRef.current = signature;
+        appliedPrefillSignatureRef.current = currentPrefillSignature;
         if (JSON.stringify(next) === JSON.stringify(state)) {
             return;
         }
         persistState(next);
-    }, [builderContext, config, persistState, state, windowFormSignal]);
+    }, [builderContext, config, currentPrefillSignature, persistState, state, windowFormValue]);
 
     useEffect(() => {
         const request = applyRequestHook(
