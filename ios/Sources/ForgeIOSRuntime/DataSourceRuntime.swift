@@ -94,9 +94,11 @@ public actor DataSourceRuntime {
         let current = selectionValues[dataSourceID] ?? SelectionState()
         if current.selected == row {
             selectionValues[dataSourceID] = SelectionState()
+            formValues[dataSourceID] = [:]
         } else {
             selectionValues[dataSourceID] = SelectionState(
                 selected: row, rowIndex: rowIndex)
+            formValues[dataSourceID] = row
         }
     }
 

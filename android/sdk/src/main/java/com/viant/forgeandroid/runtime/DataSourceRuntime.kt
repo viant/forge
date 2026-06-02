@@ -5,6 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -93,7 +95,7 @@ class DataSourceRuntime(
         }
     }
 
-    private fun fetchCollection(ctx: DataSourceContext) {
+    private suspend fun fetchCollection(ctx: DataSourceContext) {
         val service = ctx.dataSource.service ?: return
         val endpoint = service.endpoint
         val uri = buildRequestUri(ctx) ?: return
@@ -102,7 +104,10 @@ class DataSourceRuntime(
 
         try {
             val response = restClient.get(endpoint, uri) { JsonUtil.parseObject(it) }
-            val data = normalizeCollection(response, ctx.dataSource.selectors?.data)
+            val data = applyCollectionHook(
+                ctx,
+                normalizeCollection(response, ctx.dataSource.selectors?.data)
+            )
             val dataInfo = normalizeMap(selectValue(response, ctx.dataSource.selectors?.dataInfo))
             ctx.collection.set(data)
             if (ctx.dataSource.autoSelect != false && data.isNotEmpty() && ctx.peekSelection().selected == null) {
@@ -121,6 +126,33 @@ class DataSourceRuntime(
             trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")))
             ctx.control.set(ctx.control.peek().copy(loading = false, error = e.message))
             ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
+        }
+    }
+
+    private suspend fun applyCollectionHook(
+        ctx: DataSourceContext,
+        rows: List<Map<String, Any?>>
+    ): List<Map<String, Any?>> {
+        val code = ctx.window.metadata.peek()?.actions?.code?.trim().orEmpty()
+        if (code.isBlank()) {
+            return rows
+        }
+        val result = ActionHookRuntime.invoke(
+            code = code,
+            functionName = "prepareCollection",
+            props = JsonObject(
+                mapOf(
+                    "collection" to JsonArray(rows.map(JsonUtil::anyToElement))
+                )
+            )
+        ) ?: return rows
+        return when (result) {
+            is JsonArray -> result.mapNotNull { element ->
+                JsonUtil.elementToAny(element) as? Map<*, *>
+            }.map { row ->
+                row.entries.associate { it.key.toString() to it.value }
+            }
+            else -> rows
         }
     }
 

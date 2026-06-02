@@ -55,6 +55,21 @@ public struct TableRenderer: View {
             return
         }
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        guard rows.isEmpty else {
+            return
+        }
+        // Hosted mobile windows can be presented immediately after bridge open,
+        // before the async datasource refresh has populated local collection
+        // state. Retry a few times so the first visible render can pick up the
+        // incoming rows without requiring a second manual open.
+        for _ in 0..<5 {
+            try? await Task.sleep(for: .milliseconds(200))
+            let refreshedRows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
+            if !refreshedRows.isEmpty {
+                rows = refreshedRows
+                break
+            }
+        }
     }
 
     private var presentationMode: TablePresentationMode {

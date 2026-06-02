@@ -3,6 +3,40 @@ import XCTest
 @testable import ForgeIOSUI
 
 final class ForgeIOSTests: XCTestCase {
+    func testActionHookRuntimeInvokesPureCollectionHook() throws {
+        let code = """
+        (() => ({
+          prepareCollection: (props = {}) => {
+            const collection = props.collection || [];
+            return collection.map((row) => ({
+              ...row,
+              applyStatus: String(row.apply_status ?? "").trim().toUpperCase()
+            }));
+          }
+        }))()
+        """
+
+        let result = try ActionHookRuntime.invoke(
+            code: code,
+            functionName: "prepareCollection",
+            props: .object([
+                "collection": .array([
+                    .object([
+                        "apply_status": .string("approved"),
+                        "id": .number(2)
+                    ])
+                ])
+            ])
+        )
+
+        guard case .array(let rows)? = result,
+              case .object(let first)? = rows.first else {
+            return XCTFail("Expected transformed collection array")
+        }
+        XCTAssertEqual(first["applyStatus"], .string("APPROVED"))
+        XCTAssertEqual(first["id"], .number(2))
+    }
+
     func testSchemaBasedFormDecodesSchemaAndAliasDataSourceRef() throws {
         let payload = """
         {
@@ -104,6 +138,9 @@ final class ForgeIOSTests: XCTestCase {
     func testMetadataResolverFiltersTargetedContainersAndAppliesOverrides() {
         let payload = """
         {
+          "actions": {
+            "code": "(() => ({ ping: () => true }))()"
+          },
           "view": {
             "content": {
               "containers": [
@@ -140,6 +177,34 @@ final class ForgeIOSTests: XCTestCase {
 
         XCTAssertEqual(containers.map(\.id), ["shared", "iosOnly"])
         XCTAssertEqual(containers.last?.title, "Tablet Title")
+        XCTAssertEqual(resolved.actions?.code, "(() => ({ ping: () => true }))()")
+    }
+
+    func testWindowMetadataDecodesActionsCodeAndDatasourceAlias() throws {
+        let payload = """
+        {
+          "namespace": "Recommendation",
+          "actions": {
+            "code": "(() => ({ prepareCollection: () => [] }))()"
+          },
+          "dataSource": {
+            "recommendation": {
+              "selectionMode": "single"
+            }
+          },
+          "view": {
+            "content": {
+              "containers": []
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(metadata.namespace, "Recommendation")
+        XCTAssertEqual(metadata.actions?.code, "(() => ({ prepareCollection: () => [] }))()")
+        XCTAssertEqual(metadata.dataSources["recommendation"]?.selectionMode, "single")
     }
 
     func testTableRendererUsesCompactCardsForPhoneAndRegularGridForTablet() {

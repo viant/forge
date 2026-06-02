@@ -12,12 +12,41 @@ class WindowRuntime(
 
     fun windows(): StateFlow<List<WindowState>> = windowList.flow
 
-    fun openWindow(windowKey: String, title: String, inTab: Boolean, parameters: Map<String, Any?>, inline: WindowMetadata? = null): WindowState {
-        val windowId = windowKey + if (parameters.isNotEmpty()) "_${parameters.hashCode()}" else ""
+    fun openWindow(
+        windowKey: String,
+        title: String,
+        inTab: Boolean,
+        parameters: Map<String, Any?>,
+        inline: WindowMetadata? = null,
+        windowIdOverride: String? = null,
+        conversationId: String? = null,
+        presentation: String? = null,
+        region: String? = null,
+        workspaceSharePct: Int? = null,
+        workspaceMinHeight: Int? = null,
+        parentKey: String? = null,
+        isModal: Boolean = false
+    ): WindowState {
+        val windowId = windowIdOverride?.takeIf { it.isNotBlank() }
+            ?: windowKey + if (parameters.isNotEmpty()) "_${parameters.hashCode()}" else ""
         val existing = windowList.peek().find { it.windowId == windowId }
         if (existing != null) return existing
 
-        val state = WindowState(windowId, windowKey, title, inTab, parameters, inline)
+        val state = WindowState(
+            windowId = windowId,
+            windowKey = windowKey,
+            windowTitle = title,
+            inTab = inTab,
+            parameters = parameters,
+            inlineMetadata = inline,
+            isModal = isModal,
+            conversationId = conversationId,
+            presentation = presentation,
+            region = region,
+            workspaceSharePct = workspaceSharePct,
+            workspaceMinHeight = workspaceMinHeight,
+            parentKey = parentKey
+        )
         windowList.set(windowList.peek() + state)
         return state
     }
