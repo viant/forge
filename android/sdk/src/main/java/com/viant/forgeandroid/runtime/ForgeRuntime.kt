@@ -38,8 +38,34 @@ class ForgeRuntime(
         handlers.register(name, handler)
     }
 
-    fun openWindow(windowKey: String, title: String = windowKey, inTab: Boolean = true, parameters: Map<String, Any?> = emptyMap()): WindowState {
-        val state = windowRuntime.openWindow(windowKey, title, inTab, parameters)
+    fun openWindow(
+        windowKey: String,
+        title: String = windowKey,
+        inTab: Boolean = true,
+        parameters: Map<String, Any?> = emptyMap(),
+        windowIdOverride: String? = null,
+        conversationId: String? = null,
+        presentation: String? = null,
+        region: String? = null,
+        workspaceSharePct: Int? = null,
+        workspaceMinHeight: Int? = null,
+        parentKey: String? = null,
+        isModal: Boolean = false
+    ): WindowState {
+        val state = windowRuntime.openWindow(
+            windowKey = windowKey,
+            title = title,
+            inTab = inTab,
+            parameters = parameters,
+            windowIdOverride = windowIdOverride,
+            conversationId = conversationId,
+            presentation = presentation,
+            region = region,
+            workspaceSharePct = workspaceSharePct,
+            workspaceMinHeight = workspaceMinHeight,
+            parentKey = parentKey,
+            isModal = isModal
+        )
         loadWindowMetadata(state)
         return state
     }
@@ -58,6 +84,10 @@ class ForgeRuntime(
     fun metadataSignal(windowId: String): Signal<WindowMetadata?> = signals.metadata(windowId)
 
     fun windowContext(windowId: String): WindowContext = windowRuntime.context(windowId, metadataSignal(windowId))
+
+    fun refreshDataSourceCollection(windowID: String, dataSourceRef: String) {
+        windowContext(windowID).contextOrNull(dataSourceRef)?.fetchCollection()
+    }
 
     fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap()) {
         execEngine.execute(execution, context, args)

@@ -723,7 +723,13 @@ data class WindowState(
     val inTab: Boolean = true,
     val parameters: Map<String, Any?> = emptyMap(),
     val inlineMetadata: WindowMetadata? = null,
-    val isModal: Boolean = false
+    val isModal: Boolean = false,
+    val conversationId: String? = null,
+    val presentation: String? = null,
+    val region: String? = null,
+    val workspaceSharePct: Int? = null,
+    val workspaceMinHeight: Int? = null,
+    val parentKey: String? = null
 )
 
 data class SelectionState(

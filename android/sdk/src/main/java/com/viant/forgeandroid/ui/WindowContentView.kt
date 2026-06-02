@@ -21,6 +21,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -45,16 +46,29 @@ fun WindowContentView(
     val view = metadata?.view
     val containers = view?.content?.containers ?: emptyList()
     val context = runtime.windowContext(windowId)
+    val defaultDataSourceContext = remember(windowId, metadata) {
+        val dataSourceRef = containers.firstOrNull { !it.dataSourceRef.isNullOrBlank() }?.dataSourceRef
+            ?: metadata?.dataSources?.keys?.firstOrNull()
+        dataSourceRef?.takeIf { it.isNotBlank() }?.let(context::contextOrNull)
+    }
 
     LaunchedEffect(windowId, metadata) {
-        metadata?.on?.filter { it.event == "onInit" }?.forEach { runtime.execute(it, null, mapOf("windowId" to windowId)) }
-        metadata?.window?.on?.filter { it.event == "onInit" }?.forEach { runtime.execute(it, null, mapOf("windowId" to windowId)) }
+        metadata?.on?.filter { it.event == "onInit" }?.forEach {
+            runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
+        }
+        metadata?.window?.on?.filter { it.event == "onInit" }?.forEach {
+            runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
+        }
     }
 
     DisposableEffect(windowId, metadata) {
         onDispose {
-            metadata?.on?.filter { it.event == "onDestroy" }?.forEach { runtime.execute(it, null, mapOf("windowId" to windowId)) }
-            metadata?.window?.on?.filter { it.event == "onDestroy" }?.forEach { runtime.execute(it, null, mapOf("windowId" to windowId)) }
+            metadata?.on?.filter { it.event == "onDestroy" }?.forEach {
+                runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
+            }
+            metadata?.window?.on?.filter { it.event == "onDestroy" }?.forEach {
+                runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
+            }
         }
     }
 

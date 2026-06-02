@@ -35,19 +35,37 @@ public struct ContainerRenderer: View {
         if container.kind == "dashboard" || container.kind?.starts(with: "dashboard.") == true {
             DashboardRenderer(runtime: runtime, window: window, container: container)
         } else if container.schemaBasedForm != nil {
-            SchemaBasedFormRenderer(container: container)
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                SchemaBasedFormRenderer(container: container)
+            }
         } else if let table = container.table {
-            TableRenderer(runtime: runtime, window: window, container: container, table: table)
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                TableRenderer(runtime: runtime, window: window, container: container, table: table)
+            }
         } else if let chart = container.chart {
-            ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
+            }
         } else if container.tabs != nil, !container.containers.isEmpty {
             TabsRenderer(runtime: runtime, window: window, container: container)
         } else if let editor = container.editor {
-            EditorRenderer(runtime: runtime, window: window, editor: editor)
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                EditorRenderer(runtime: runtime, window: window, editor: editor)
+            }
         } else if container.kind == "chat" {
-            ChatRenderer(runtime: runtime, window: window, container: container)
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                ChatRenderer(runtime: runtime, window: window, container: container)
+            }
         } else if !container.items.isEmpty {
-            MenuListRenderer(runtime: runtime, window: window, items: container.items)
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                MenuListRenderer(runtime: runtime, window: window, container: container, items: container.items)
+            }
         } else if !container.containers.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock

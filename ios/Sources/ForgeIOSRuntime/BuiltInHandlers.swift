@@ -139,8 +139,7 @@ extension ForgeRuntime {
             guard let runtime else { return nil }
             if let dsRef = args.context?.dataSourceRef, !dsRef.isEmpty,
                let windowID = args.context?.windowID {
-                let dsID = WindowIdentity(windowID: windowID).dataSourceID(ref: dsRef)
-                await runtime.dataSourceRuntime.triggerFetch(dataSourceID: dsID)
+                await runtime.refreshDataSourceCollection(windowID: windowID, dataSourceRef: dsRef)
             }
             return nil
         }

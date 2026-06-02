@@ -1,17 +1,85 @@
 import Foundation
 
 public actor ForgeRuntime {
+    public struct DataSourceFetchRequest: Sendable {
+        public let windowID: String
+        public let dataSourceRef: String
+        public let dataSource: DataSourceDef
+        public let input: InputState
+
+        public init(windowID: String, dataSourceRef: String, dataSource: DataSourceDef, input: InputState) {
+            self.windowID = windowID
+            self.dataSourceRef = dataSourceRef
+            self.dataSource = dataSource
+            self.input = input
+        }
+    }
+
+    public struct DataSourceFetchResult: Sendable {
+        public let rows: [[String: JSONValue]]
+        public let metrics: [String: JSONValue]
+        public let form: [String: JSONValue]?
+        public let selection: [String: JSONValue]?
+        public let rowIndex: Int?
+
+        public init(
+            rows: [[String: JSONValue]] = [],
+            metrics: [String: JSONValue] = [:],
+            form: [String: JSONValue]? = nil,
+            selection: [String: JSONValue]? = nil,
+            rowIndex: Int? = nil
+        ) {
+            self.rows = rows
+            self.metrics = metrics
+            self.form = form
+            self.selection = selection
+            self.rowIndex = rowIndex
+        }
+    }
+
     public struct WindowState: Sendable, Identifiable {
         public let id: String
         public let key: String
         public let title: String
         public let metadata: WindowMetadata?
+        public let inTab: Bool
+        public let parameters: [String: JSONValue]
+        public let conversationID: String?
+        public let presentation: String?
+        public let region: String?
+        public let workspaceSharePct: Int?
+        public let workspaceMinHeight: Int?
+        public let parentKey: String?
+        public let isModal: Bool
 
-        public init(id: String = UUID().uuidString, key: String, title: String, metadata: WindowMetadata?) {
+        public init(
+            id: String = UUID().uuidString,
+            key: String,
+            title: String,
+            metadata: WindowMetadata?,
+            inTab: Bool = true,
+            parameters: [String: JSONValue] = [:],
+            conversationID: String? = nil,
+            presentation: String? = nil,
+            region: String? = nil,
+            workspaceSharePct: Int? = nil,
+            workspaceMinHeight: Int? = nil,
+            parentKey: String? = nil,
+            isModal: Bool = false
+        ) {
             self.id = id
             self.key = key
             self.title = title
             self.metadata = metadata
+            self.inTab = inTab
+            self.parameters = parameters
+            self.conversationID = conversationID
+            self.presentation = presentation
+            self.region = region
+            self.workspaceSharePct = workspaceSharePct
+            self.workspaceMinHeight = workspaceMinHeight
+            self.parentKey = parentKey
+            self.isModal = isModal
         }
     }
 
@@ -20,7 +88,9 @@ public actor ForgeRuntime {
     let signals: SignalRegistry
     let dataSourceRuntime: DataSourceRuntime
     private var windowMetadataEndpoint: URL?
+    private var defaultDataSourceBaseURL: URL?
     private let session: URLSession
+    private var dataSourceLoader: (@Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?)?
 
     var handlers: [String: ForgeHandler] = [:]
     private var pendingDialogs: [String: PendingDialog] = [:]
@@ -36,6 +106,7 @@ public actor ForgeRuntime {
         self.signals = SignalRegistry()
         self.dataSourceRuntime = DataSourceRuntime()
         self.session = session
+        self.defaultDataSourceBaseURL = windowMetadataBaseURL
         self.windowMetadataEndpoint = Self.makeWindowMetadataEndpoint(
             baseURL: windowMetadataBaseURL,
             path: windowMetadataBasePath
@@ -57,8 +128,38 @@ public actor ForgeRuntime {
     }
 
     @discardableResult
-    public func openWindow(key: String, title: String) async -> WindowState {
-        let state = WindowState(key: key, title: title, metadata: nil)
+    public func openWindow(
+        key: String,
+        title: String,
+        id: String? = nil,
+        inTab: Bool = true,
+        parameters: [String: JSONValue] = [:],
+        conversationID: String? = nil,
+        presentation: String? = nil,
+        region: String? = nil,
+        workspaceSharePct: Int? = nil,
+        workspaceMinHeight: Int? = nil,
+        parentKey: String? = nil,
+        isModal: Bool = false
+    ) async -> WindowState {
+        let state = WindowState(
+            id: id ?? UUID().uuidString,
+            key: key,
+            title: title,
+            metadata: nil,
+            inTab: inTab,
+            parameters: parameters,
+            conversationID: conversationID,
+            presentation: presentation,
+            region: region,
+            workspaceSharePct: workspaceSharePct,
+            workspaceMinHeight: workspaceMinHeight,
+            parentKey: parentKey,
+            isModal: isModal
+        )
+        if let existing = windows.first(where: { $0.id == state.id }) {
+            return existing
+        }
         windows.append(state)
         await loadWindowMetadata(for: state)
         return windows.first(where: { $0.id == state.id }) ?? state
@@ -74,13 +175,35 @@ public actor ForgeRuntime {
     }
 
     public func windowContext(id: String) -> WindowContext {
-        let parameters = windows.first(where: { $0.id == id })?.metadata?.namespace
-            .map { ["namespace": $0] } ?? [:]
+        let parameters = (windows.first(where: { $0.id == id })?.parameters ?? [:]).reduce(into: [String: String]()) { result, entry in
+            switch entry.value {
+            case .string(let value):
+                result[entry.key] = value
+            case .number(let value):
+                result[entry.key] = String(value)
+            case .bool(let value):
+                result[entry.key] = value ? "true" : "false"
+            default:
+                break
+            }
+        }
         return WindowContext(windowID: id, parameters: parameters)
     }
 
+    public func windowMetadata(id: String) async -> WindowMetadata? {
+        let signal = await signals.metadata(windowID: id)
+        return await signal.peek()
+    }
+
     public func configureWindowMetadata(baseURL: URL?, path: String = "/v1/api/forge/window") {
+        defaultDataSourceBaseURL = baseURL
         windowMetadataEndpoint = Self.makeWindowMetadataEndpoint(baseURL: baseURL, path: path)
+    }
+
+    public func registerDataSourceLoader(
+        _ loader: @escaping @Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?
+    ) {
+        dataSourceLoader = loader
     }
 
     // MARK: - Form values
@@ -108,6 +231,24 @@ public actor ForgeRuntime {
     public func setDataSourceCollection(windowID: String, dataSourceRef: String, rows: [[String: JSONValue]]) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: rows)
+    }
+
+    public func setDataSourceForm(windowID: String, dataSourceRef: String, values: [String: JSONValue]) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: values)
+    }
+
+    public func setDataSourceSelection(
+        windowID: String,
+        dataSourceRef: String,
+        selected: [String: JSONValue]?,
+        rowIndex: Int = -1
+    ) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        await dataSourceRuntime.setSelection(
+            dataSourceID: dataSourceID,
+            selection: SelectionState(selected: selected, rowIndex: rowIndex)
+        )
     }
 
     public func dataSourceCollection(windowID: String, dataSourceRef: String) async -> [[String: JSONValue]] {
@@ -145,11 +286,45 @@ public actor ForgeRuntime {
         guard let metadata = await signal.peek() else { return }
         guard let dataSource = metadata.dataSources[dataSourceRef] else { return }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+
+        if let dataSourceLoader,
+           let result = try? await dataSourceLoader(
+               DataSourceFetchRequest(
+                   windowID: windowID,
+                   dataSourceRef: dataSourceRef,
+                   dataSource: dataSource,
+                   input: input
+               )
+           ) {
+            let hookedRows = applyCollectionHook(metadata: metadata, rows: result.rows)
+            await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
+            await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
+            if let form = result.form {
+                await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: form)
+            }
+            if let selection = result.selection {
+                await dataSourceRuntime.setSelection(
+                    dataSourceID: dataSourceID,
+                    selection: SelectionState(selected: selection, rowIndex: result.rowIndex ?? -1)
+                )
+            }
+            return
+        }
+
         let resolvedPath = dataSource.service?.uri ?? dataSource.uri
         guard let path = resolvedPath, !path.isEmpty else { return }
+        let resolvedBaseURL: String
+        if !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            resolvedBaseURL = baseURL
+        } else if let defaultDataSourceBaseURL {
+            resolvedBaseURL = defaultDataSourceBaseURL.absoluteString
+        } else {
+            return
+        }
         await dataSourceRuntime.fetchCollection(
             dataSourceID: dataSourceID,
-            baseURL: baseURL,
+            baseURL: resolvedBaseURL,
             path: path,
             additionalHeaders: additionalHeaders,
             session: session
@@ -245,13 +420,28 @@ public actor ForgeRuntime {
         }
         do {
             let (data, _) = try await session.data(from: endpoint)
-            let decoded = try JSONDecoder().decode(WindowMetadata.self, from: data)
-            let resolved = MetadataResolver.resolve(decoded, for: targetContext)
+            let resolved = try Self.decodeWindowMetadata(from: data, targetContext: targetContext)
             if let index = windows.firstIndex(where: { $0.id == state.id }) {
-                windows[index] = WindowState(id: state.id, key: state.key, title: state.title, metadata: resolved)
+                let existing = windows[index]
+                windows[index] = WindowState(
+                    id: existing.id,
+                    key: existing.key,
+                    title: existing.title,
+                    metadata: resolved,
+                    inTab: existing.inTab,
+                    parameters: existing.parameters,
+                    conversationID: existing.conversationID,
+                    presentation: existing.presentation,
+                    region: existing.region,
+                    workspaceSharePct: existing.workspaceSharePct,
+                    workspaceMinHeight: existing.workspaceMinHeight,
+                    parentKey: existing.parentKey,
+                    isModal: existing.isModal
+                )
             }
             await signal.set(resolved)
         } catch {
+            print("ForgeRuntime metadata load failed for \(state.key): \(error)")
             await signal.set(nil)
         }
     }
@@ -266,4 +456,54 @@ public actor ForgeRuntime {
         let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return trimmedPath.isEmpty ? baseURL : baseURL.appendingPathComponent(trimmedPath)
     }
+
+    private static func decodeWindowMetadata(
+        from data: Data,
+        targetContext: ForgeTargetContext
+    ) throws -> WindowMetadata {
+        let decoder = JSONDecoder()
+        if let direct = try? decoder.decode(WindowMetadata.self, from: data),
+           isMeaningfulWindowMetadata(direct) {
+            return MetadataResolver.resolve(direct, for: targetContext)
+        }
+        let wrapped = try decoder.decode(WindowMetadataEnvelope.self, from: data)
+        guard let metadata = wrapped.data else {
+            throw URLError(.cannotDecodeContentData)
+        }
+        return MetadataResolver.resolve(metadata, for: targetContext)
+    }
+
+    private static func isMeaningfulWindowMetadata(_ metadata: WindowMetadata) -> Bool {
+        metadata.namespace != nil
+            || metadata.view != nil
+            || !metadata.dataSources.isEmpty
+    }
+
+    private func applyCollectionHook(
+        metadata: WindowMetadata,
+        rows: [[String: JSONValue]]
+    ) -> [[String: JSONValue]] {
+        guard let code = metadata.actions?.code?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !code.isEmpty else {
+            return rows
+        }
+        let props: JSONValue = .object([
+            "collection": .array(rows.map { .object($0) })
+        ])
+        guard let result = try? ActionHookRuntime.invoke(
+            code: code,
+            functionName: "prepareCollection",
+            props: props
+        ) else {
+            return rows
+        }
+        guard case .array(let transformedRows) = result else {
+            return rows
+        }
+        return transformedRows.compactMap(\.objectValue)
+    }
+}
+
+private struct WindowMetadataEnvelope: Decodable {
+    let data: WindowMetadata?
 }
