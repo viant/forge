@@ -8,6 +8,7 @@ public struct ChartRenderer: View {
     private let container: ContainerDef
     private let chart: ChartDef
     @State private var rows: [[String: JSONValue]] = []
+    @State private var chartWindowForm: [String: JSONValue] = [:]
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, chart: ChartDef) {
         self.runtime = runtime
@@ -39,6 +40,12 @@ public struct ChartRenderer: View {
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
         .task(id: chartTaskKey) {
             await loadRows()
+        }
+        .task(id: rowSubscriptionKey) {
+            await observeRows()
+        }
+        .task(id: window?.windowID ?? "") {
+            await observeWindowForm()
         }
     }
 
@@ -98,19 +105,85 @@ public struct ChartRenderer: View {
         [
             window?.windowID ?? "",
             container.id ?? "",
-            container.dataSourceRef ?? "",
+            resolvedDataSourceRef,
             chart.type ?? chart.kind ?? "",
             chart.xKey ?? "",
             chart.valueKey ?? ""
         ].joined(separator: ":")
     }
 
+    private var rowSubscriptionKey: String {
+        [window?.windowID ?? "", resolvedDataSourceRef, "rows"].joined(separator: ":")
+    }
+
     private func loadRows() async {
-        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+        guard let runtime, let window else {
             rows = []
             return
         }
-        rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        guard !resolvedDataSourceRef.isEmpty else {
+            rows = []
+            return
+        }
+        rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        guard rows.isEmpty else {
+            return
+        }
+        let shouldFetch = container.fetchData != false
+        guard shouldFetch else {
+            return
+        }
+        await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+    }
+
+    private func observeRows() async {
+        guard let runtime, let window, !resolvedDataSourceRef.isEmpty else {
+            return
+        }
+        let stream = await runtime.dataSourceCollectionUpdates(
+            windowID: window.windowID,
+            dataSourceRef: resolvedDataSourceRef
+        )
+        for await next in stream {
+            await MainActor.run {
+                rows = next
+            }
+        }
+    }
+
+    private func observeWindowForm() async {
+        guard let runtime, let window else {
+            return
+        }
+        chartWindowForm = await runtime.windowFormJSONValue(windowID: window.windowID)
+        let stream = await runtime.windowFormUpdates(windowID: window.windowID)
+        for await next in stream {
+            await MainActor.run {
+                chartWindowForm = next
+            }
+        }
+    }
+
+    private var resolvedDataSourceRef: String {
+        if let direct = container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines), !direct.isEmpty {
+            return direct
+        }
+        let selector = chart.dataSourceRefSelector?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let source = chart.dataSourceRefSource?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "windowform"
+        guard !selector.isEmpty, !chart.dataSourceRefs.isEmpty else {
+            return chart.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        }
+        let key: String? = switch source {
+        case "windowform":
+            SelectorUtil.resolve(chartWindowForm, selector: selector) as? String
+        default:
+            nil
+        }
+        if let key, let mapped = chart.dataSourceRefs[key] {
+            return mapped
+        }
+        return chart.dataSourceRefs.values.first ?? ""
     }
 
     private var pieData: [PieDatum] {

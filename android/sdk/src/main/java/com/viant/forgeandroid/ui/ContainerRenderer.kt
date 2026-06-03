@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.WindowContext
 
 @Composable
@@ -24,6 +25,8 @@ fun ContainerRenderer(
     container: ContainerDef,
     selectionModeOverride: String? = null
 ) {
+    val windowFormSignal = window.windowFormSignal()
+    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val kind = container.kind?.trim().orEmpty()
     if (kind == "dashboard" || kind.startsWith("dashboard.")) {
         DashboardRenderer(runtime, window, container)
@@ -76,6 +79,8 @@ fun ContainerRenderer(
             }
         }
 
+        val chartDataSourceRef = resolveChartDataSourceRef(windowForm, container)
+
         if (container.table != null && container.dataSourceRef != null) {
             WithContainerDataSource(
                 window = window,
@@ -109,13 +114,18 @@ fun ContainerRenderer(
             }
         }
 
-        if (container.chart != null && container.dataSourceRef != null) {
+        if (container.chart != null && chartDataSourceRef != null) {
             WithContainerDataSource(
                 window = window,
-                dataSourceRef = container.dataSourceRef,
+                dataSourceRef = chartDataSourceRef,
                 fetchData = container.fetchData
             ) { dsContext ->
-                ChartRenderer(dsContext, container.chart)
+                Column {
+                    if (container.items.isNotEmpty()) {
+                        FormRenderer(runtime, dsContext, container.items)
+                    }
+                    ChartRenderer(dsContext, container.chart)
+                }
             }
         }
 
@@ -181,9 +191,10 @@ private fun WithContainerDataSource(
 ) {
     val dsContext = dataSourceRef?.let(window::contextOrNull) ?: return
     val rows by dsContext.collection.flow.collectAsState(initial = emptyList())
+    val shouldFetch = fetchData != false && dsContext.dataSource.autoFetch != false
 
-    LaunchedEffect(fetchData, dsContext) {
-        if (fetchData == true) {
+    LaunchedEffect(shouldFetch, dsContext) {
+        if (shouldFetch) {
             dsContext.fetchCollection()
         }
     }
@@ -193,4 +204,23 @@ private fun WithContainerDataSource(
         }
     }
     content(dsContext)
+}
+
+private fun resolveChartDataSourceRef(
+    windowForm: Map<String, Any?>,
+    container: ContainerDef
+): String? {
+    container.dataSourceRef?.takeIf { it.isNotBlank() }?.let { return it }
+    val chart = container.chart ?: return null
+    if (chart.dataSourceRefs.isEmpty()) {
+        return null
+    }
+    val source = chart.dataSourceRefSource?.trim().orEmpty().ifBlank { "windowForm" }
+    val selector = chart.dataSourceRefSelector?.trim().orEmpty()
+    val key = when (source.lowercase()) {
+        "windowform" -> SelectorUtil.resolve(windowForm, selector)?.toString()
+        else -> null
+    }?.trim().orEmpty()
+    return chart.dataSourceRefs[key]
+        ?: chart.dataSourceRefs.values.firstOrNull()
 }
