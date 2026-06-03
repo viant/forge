@@ -1,8 +1,7 @@
 package com.viant.forgeandroid.runtime
 
 internal fun ForgeRuntime.windowFormValue(windowId: String): Map<String, Any?> {
-    val dsId = WindowIdentity(windowId).windowFormId()
-    return signals.form(dsId).peek()
+    return windowContext(windowId).peekWindowForm()
 }
 
 internal fun ForgeRuntime.setWindowFormValue(
@@ -11,7 +10,7 @@ internal fun ForgeRuntime.setWindowFormValue(
     replace: Boolean = false
 ) {
     val dsId = WindowIdentity(windowId).windowFormId()
-    val signal = signals.form(dsId)
+    val signal = windowContext(windowId).signals.form(dsId)
     if (replace) {
         signal.set(values)
         return
@@ -38,8 +37,9 @@ private fun resolveInitialWindowFormValues(metadata: WindowMetadata): Map<String
                 .filter { it.input == "const" }
                 .forEach { parameter ->
                     val name = parameter.name?.trim().orEmpty()
-                    if (name.isBlank()) return@forEach
-                    initial[name] = parameter.location
+                    if (name.isNotBlank()) {
+                        initial[name] = parameter.location
+                    }
                 }
         }
     metadata.view?.content?.containers.orEmpty().forEach { container ->

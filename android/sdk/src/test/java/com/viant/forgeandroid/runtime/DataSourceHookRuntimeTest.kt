@@ -1,5 +1,7 @@
 package com.viant.forgeandroid.runtime
 
+import com.dokar.quickjs.QuickJs
+import com.dokar.quickjs.evaluate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -10,6 +12,7 @@ import kotlinx.serialization.json.JsonObject
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -18,8 +21,21 @@ import kotlin.test.assertTrue
 class DataSourceHookRuntimeTest {
     private val server = MockWebServer()
 
+    @BeforeTest
+    fun installJvmEvaluator() {
+        ActionHookRuntime.testScriptEvaluator = { script ->
+            val quickJs = QuickJs.create(Dispatchers.Default)
+            try {
+                quickJs.evaluate<String>(script)
+            } finally {
+                quickJs.close()
+            }
+        }
+    }
+
     @AfterTest
     fun tearDown() {
+        ActionHookRuntime.testScriptEvaluator = null
         server.shutdown()
     }
 

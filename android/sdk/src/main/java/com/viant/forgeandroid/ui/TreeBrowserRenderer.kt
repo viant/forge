@@ -264,9 +264,11 @@ private fun buildTreeBrowserNodes(
         }
 
         var currentMap = rootMap
-        normalizedParts.forEachIndexed { partIndex, rawPart ->
+        for ((partIndex, rawPart) in normalizedParts.withIndex()) {
             val part = rawPart.trim()
-            if (part.isEmpty()) return@forEachIndexed
+            if (part.isEmpty()) {
+                continue
+            }
             val isLeaf = partIndex == normalizedParts.lastIndex
             val pathParts = normalizedParts.take(partIndex + 1).map { it.trim() }.filter { it.isNotEmpty() }
             val entry = currentMap.getOrPut(part) {

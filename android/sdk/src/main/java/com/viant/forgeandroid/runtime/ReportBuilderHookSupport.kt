@@ -61,7 +61,10 @@ internal fun lookupReportBuilderDescriptor(
                 mapOf(
                     "state" to JsonUtil.anyToElement(hookState),
                     "group" to JsonUtil.anyToElement(mapOf("id" to groupId)),
-                    "filterDef" to JsonUtil.json.encodeToJsonElement(filter)
+                    "filterDef" to JsonUtil.json.encodeToJsonElement(
+                        ReportBuilderDynamicFilterDef.serializer(),
+                        filter
+                    )
                 )
             )
         )

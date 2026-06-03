@@ -27,20 +27,29 @@ function normalizeTargetSpec(spec) {
         };
     }
     if (Array.isArray(spec)) {
-        return {
+        const normalized = {
             platforms: spec.filter((item) => typeof item === 'string'),
             excludePlatforms: [],
             formFactors: [],
             capabilities: []
         };
+        return hasTargetCriteria(normalized) ? normalized : null;
     }
     if (!isPlainObject(spec)) return null;
-    return {
+    const normalized = {
         platforms: Array.isArray(spec.platforms) ? spec.platforms.filter((item) => typeof item === 'string') : [],
         excludePlatforms: Array.isArray(spec.excludePlatforms) ? spec.excludePlatforms.filter((item) => typeof item === 'string') : [],
         formFactors: Array.isArray(spec.formFactors) ? spec.formFactors.filter((item) => typeof item === 'string') : [],
         capabilities: Array.isArray(spec.capabilities) ? spec.capabilities.filter((item) => typeof item === 'string') : []
     };
+    return hasTargetCriteria(normalized) ? normalized : null;
+}
+
+function hasTargetCriteria(normalized) {
+    return normalized.platforms.length > 0 ||
+        normalized.excludePlatforms.length > 0 ||
+        normalized.formFactors.length > 0 ||
+        normalized.capabilities.length > 0;
 }
 
 function matchesTarget(spec, targetContext = {}) {
@@ -151,8 +160,16 @@ function resolveValue(node, targetContext = {}) {
         working = deepMerge(working, override);
     }
 
-    delete working.target;
-    delete working.targetOverrides;
+    if (normalizeTargetSpec(working.target)) {
+        delete working.target;
+    }
+    if (
+        isPlainObject(working.targetOverrides) &&
+        Object.keys(working.targetOverrides).length > 0 &&
+        Object.values(working.targetOverrides).every((value) => isPlainObject(value))
+    ) {
+        delete working.targetOverrides;
+    }
 
     const result = {};
     for (const [key, value] of Object.entries(working)) {

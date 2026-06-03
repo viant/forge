@@ -1,9 +1,12 @@
 package com.viant.forgeandroid.runtime
 
+import com.dokar.quickjs.QuickJs
+import com.dokar.quickjs.evaluate
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -16,6 +19,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 
 class ActionHookRuntimeTest {
+    @BeforeTest
+    fun installJvmEvaluator() {
+        ActionHookRuntime.testScriptEvaluator = { script ->
+            val quickJs = QuickJs.create(Dispatchers.Default)
+            try {
+                quickJs.evaluate<String>(script)
+            } finally {
+                quickJs.close()
+            }
+        }
+    }
+
+    @AfterTest
+    fun clearJvmEvaluator() {
+        ActionHookRuntime.testScriptEvaluator = null
+    }
+
     @Test
     fun invokeRunsPureCollectionHook() = runBlocking {
         val code = """
@@ -130,6 +150,25 @@ class ActionHookRuntimeTest {
         val metadata = runtime.metadataSignal(state.windowId).peek()
 
         assertEquals("recommendationRoot", metadata?.view?.content?.containers?.firstOrNull()?.id)
+    }
+
+    @Test
+    fun metadataResolverPreservesDatasourceNamedTarget() {
+        val metadata = WindowMetadata(
+            dataSources = mapOf(
+                "target" to DataSourceDef(),
+                "dialogSource" to DataSourceDef(selectionMode = "multi")
+            )
+        )
+
+        val resolved = MetadataResolver.resolve(
+            JsonUtil.json.encodeToJsonElement(WindowMetadata.serializer(), metadata),
+            ForgeTargetContext(platform = "android")
+        )
+        val decoded = JsonUtil.json.decodeFromJsonElement(WindowMetadata.serializer(), resolved!!)
+
+        assertTrue(decoded.dataSources.containsKey("target"))
+        assertEquals("multi", decoded.dataSources["dialogSource"]?.selectionMode)
     }
 
     @Test
