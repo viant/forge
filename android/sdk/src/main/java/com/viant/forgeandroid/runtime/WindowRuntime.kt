@@ -90,6 +90,10 @@ class WindowContext(
     fun peekWindowForm(): Map<String, Any?> {
         return signals.form(identity.windowFormId()).peek()
     }
+
+    fun windowFormSignal(): Signal<Map<String, Any?>> {
+        return signals.form(identity.windowFormId())
+    }
 }
 
 data class WindowIdentity(val windowId: String) {

@@ -365,6 +365,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
     public let table: TableDef?
     public let treeBrowser: TreeBrowserDef?
     public let editor: EditorDef?
+    public let fetchData: Bool?
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
 
@@ -409,6 +410,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case table
         case treeBrowser
         case editor
+        case fetchData
         case target
         case targetOverrides
     }
@@ -442,6 +444,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         table: TableDef? = nil,
         treeBrowser: TreeBrowserDef? = nil,
         editor: EditorDef? = nil,
+        fetchData: Bool? = nil,
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
     ) {
@@ -473,6 +476,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         self.table = table
         self.treeBrowser = treeBrowser
         self.editor = editor
+        self.fetchData = fetchData
         self.target = target
         self.targetOverrides = targetOverrides
     }
@@ -508,6 +512,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         table = try container.decodeIfPresent(TableDef.self, forKey: .table)
         treeBrowser = try container.decodeIfPresent(TreeBrowserDef.self, forKey: .treeBrowser)
         editor = try container.decodeIfPresent(EditorDef.self, forKey: .editor)
+        fetchData = try container.decodeIfPresent(Bool.self, forKey: .fetchData)
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
     }
@@ -542,6 +547,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(table, forKey: .table)
         try container.encodeIfPresent(treeBrowser, forKey: .treeBrowser)
         try container.encodeIfPresent(editor, forKey: .editor)
+        try container.encodeIfPresent(fetchData, forKey: .fetchData)
         try container.encodeIfPresent(target, forKey: .target)
         try container.encode(targetOverrides, forKey: .targetOverrides)
     }
@@ -598,6 +604,7 @@ public struct DataSourceDef: Codable, Sendable {
     public let service: DataSourceServiceDef?
     public let selectionMode: String?
     public let autoSelect: Bool?
+    public let autoFetch: Bool?
     public let selectors: DataSourceSelectorDef?
     public let paging: DataSourcePagingDef?
     public let params: [String: String]
@@ -611,6 +618,7 @@ public struct DataSourceDef: Codable, Sendable {
         case service
         case selectionMode
         case autoSelect
+        case autoFetch
         case selectors
         case paging
         case params
@@ -625,6 +633,7 @@ public struct DataSourceDef: Codable, Sendable {
         service: DataSourceServiceDef? = nil,
         selectionMode: String? = nil,
         autoSelect: Bool? = nil,
+        autoFetch: Bool? = nil,
         selectors: DataSourceSelectorDef? = nil,
         paging: DataSourcePagingDef? = nil,
         params: [String: String] = [:],
@@ -637,6 +646,7 @@ public struct DataSourceDef: Codable, Sendable {
         self.service = service
         self.selectionMode = selectionMode
         self.autoSelect = autoSelect
+        self.autoFetch = autoFetch
         self.selectors = selectors
         self.paging = paging
         self.params = params
@@ -652,6 +662,7 @@ public struct DataSourceDef: Codable, Sendable {
         service = try container.decodeIfPresent(DataSourceServiceDef.self, forKey: .service)
         selectionMode = try container.decodeIfPresent(String.self, forKey: .selectionMode)
         autoSelect = try container.decodeIfPresent(Bool.self, forKey: .autoSelect)
+        autoFetch = try container.decodeIfPresent(Bool.self, forKey: .autoFetch)
         selectors = try container.decodeIfPresent(DataSourceSelectorDef.self, forKey: .selectors)
         paging = try container.decodeIfPresent(DataSourcePagingDef.self, forKey: .paging)
         params = try container.decodeIfPresent([String: String].self, forKey: .params) ?? [:]
@@ -1457,6 +1468,10 @@ public struct ItemDef: Codable, Sendable, Identifiable {
     public let type: String?
     public let field: String?
     public let multiple: Bool?
+    public let dataSourceRef: String?
+    public let dataSourceRefSource: String?
+    public let dataSourceRefSelector: String?
+    public let dataSourceRefs: [String: String]
     public let dataField: String?
     public let bindingPath: String?
     public let scope: String?
@@ -1484,6 +1499,10 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         case type
         case field
         case multiple
+        case dataSourceRef
+        case dataSourceRefSource
+        case dataSourceRefSelector
+        case dataSourceRefs
         case dataField
         case bindingPath
         case scope
@@ -1512,6 +1531,10 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         type: String? = nil,
         field: String? = nil,
         multiple: Bool? = nil,
+        dataSourceRef: String? = nil,
+        dataSourceRefSource: String? = nil,
+        dataSourceRefSelector: String? = nil,
+        dataSourceRefs: [String: String] = [:],
         dataField: String? = nil,
         bindingPath: String? = nil,
         scope: String? = nil,
@@ -1538,6 +1561,10 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         self.type = type
         self.field = field
         self.multiple = multiple
+        self.dataSourceRef = dataSourceRef
+        self.dataSourceRefSource = dataSourceRefSource
+        self.dataSourceRefSelector = dataSourceRefSelector
+        self.dataSourceRefs = dataSourceRefs
         self.dataField = dataField
         self.bindingPath = bindingPath
         self.scope = scope
@@ -1567,6 +1594,10 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         type = try container.decodeIfPresent(String.self, forKey: .type)
         field = try container.decodeIfPresent(String.self, forKey: .field)
         multiple = try container.decodeIfPresent(Bool.self, forKey: .multiple)
+        dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
+        dataSourceRefSource = try container.decodeIfPresent(String.self, forKey: .dataSourceRefSource)
+        dataSourceRefSelector = try container.decodeIfPresent(String.self, forKey: .dataSourceRefSelector)
+        dataSourceRefs = try container.decodeIfPresent([String: String].self, forKey: .dataSourceRefs) ?? [:]
         dataField = try container.decodeIfPresent(String.self, forKey: .dataField)
         bindingPath = try container.decodeIfPresent(String.self, forKey: .bindingPath)
         scope = try container.decodeIfPresent(String.self, forKey: .scope)
@@ -1609,6 +1640,10 @@ public struct ChartDef: Codable, Sendable {
     public let kind: String?
     public let title: String?
     public let type: String?
+    public let dataSourceRef: String?
+    public let dataSourceRefSource: String?
+    public let dataSourceRefSelector: String?
+    public let dataSourceRefs: [String: String]
     public let xKey: String?
     public let valueKey: String?
     public let nameKey: String?
@@ -1618,6 +1653,10 @@ public struct ChartDef: Codable, Sendable {
         case kind
         case title
         case type
+        case dataSourceRef
+        case dataSourceRefSource
+        case dataSourceRefSelector
+        case dataSourceRefs
         case xKey
         case valueKey
         case nameKey
@@ -1629,6 +1668,10 @@ public struct ChartDef: Codable, Sendable {
         kind: String? = nil,
         title: String? = nil,
         type: String? = nil,
+        dataSourceRef: String? = nil,
+        dataSourceRefSource: String? = nil,
+        dataSourceRefSelector: String? = nil,
+        dataSourceRefs: [String: String] = [:],
         xKey: String? = nil,
         valueKey: String? = nil,
         nameKey: String? = nil,
@@ -1637,6 +1680,10 @@ public struct ChartDef: Codable, Sendable {
         self.kind = kind
         self.title = title
         self.type = type
+        self.dataSourceRef = dataSourceRef
+        self.dataSourceRefSource = dataSourceRefSource
+        self.dataSourceRefSelector = dataSourceRefSelector
+        self.dataSourceRefs = dataSourceRefs
         self.xKey = xKey
         self.valueKey = valueKey
         self.nameKey = nameKey
@@ -1648,6 +1695,10 @@ public struct ChartDef: Codable, Sendable {
         kind = try container.decodeIfPresent(String.self, forKey: .kind)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         type = try container.decodeIfPresent(String.self, forKey: .type)
+        dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
+        dataSourceRefSource = try container.decodeIfPresent(String.self, forKey: .dataSourceRefSource)
+        dataSourceRefSelector = try container.decodeIfPresent(String.self, forKey: .dataSourceRefSelector)
+        dataSourceRefs = try container.decodeIfPresent([String: String].self, forKey: .dataSourceRefs) ?? [:]
 
         let nestedXAxis = try container.decodeIfPresent(JSONValue.self, forKey: .xAxis)?.objectValue
         xKey = Self.nonEmpty(try container.decodeIfPresent(String.self, forKey: .xKey))
@@ -1669,6 +1720,10 @@ public struct ChartDef: Codable, Sendable {
         try container.encodeIfPresent(kind, forKey: .kind)
         try container.encodeIfPresent(title, forKey: .title)
         try container.encodeIfPresent(type, forKey: .type)
+        try container.encodeIfPresent(dataSourceRef, forKey: .dataSourceRef)
+        try container.encodeIfPresent(dataSourceRefSource, forKey: .dataSourceRefSource)
+        try container.encodeIfPresent(dataSourceRefSelector, forKey: .dataSourceRefSelector)
+        try container.encode(dataSourceRefs, forKey: .dataSourceRefs)
         try container.encodeIfPresent(xKey, forKey: .xKey)
         try container.encodeIfPresent(valueKey, forKey: .valueKey)
         try container.encodeIfPresent(nameKey, forKey: .nameKey)

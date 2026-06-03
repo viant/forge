@@ -6,7 +6,10 @@ public struct MenuListRenderer: View {
     private let window: WindowContext?
     private let container: ContainerDef
     private let items: [ItemDef]
-    @State private var formValues: [String: JSONValue] = [:]
+
+    @State private var windowFormValues: [String: JSONValue] = [:]
+    @State private var formValuesByDataSource: [String: [String: JSONValue]] = [:]
+    @State private var metricsValuesByDataSource: [String: [String: JSONValue]] = [:]
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, items: [ItemDef]) {
         self.runtime = runtime
@@ -21,22 +24,49 @@ public struct MenuListRenderer: View {
                 renderedItem(item)
             }
         }
-        .task(id: taskKey) {
-            await loadFormValues()
+        .task(id: dataTaskKey) {
+            await loadValues()
+        }
+        .task(id: dataSubscriptionKey) {
+            await observeDataSources()
+        }
+        .task(id: window?.windowID ?? "") {
+            await observeWindowForm()
         }
     }
 
-    private var taskKey: String {
+    private var dataTaskKey: String {
         [
             window?.windowID ?? "",
             container.id ?? "",
-            container.dataSourceRef ?? "",
+            windowFormSignature,
+            relevantDataSourceRefs.joined(separator: "|"),
             items.map { $0.id ?? $0.label ?? "" }.joined(separator: "|")
+        ].joined(separator: ":")
+    }
+
+    private var dataSubscriptionKey: String {
+        [
+            window?.windowID ?? "",
+            windowFormSignature,
+            relevantDataSourceRefs.joined(separator: "|"),
+            "data"
         ].joined(separator: ":")
     }
 
     private var visibleItems: [ItemDef] {
         items.filter(isVisible(_:))
+    }
+
+    private var relevantDataSourceRefs: [String] {
+        orderedUnique(
+            items.compactMap(resolveItemDataSourceRef(_:))
+                .filter { !$0.isEmpty }
+        )
+    }
+
+    private var windowFormSignature: String {
+        windowFormValues.signature
     }
 
     @ViewBuilder
@@ -53,9 +83,8 @@ public struct MenuListRenderer: View {
 
     @ViewBuilder
     private func labelItem(_ item: ItemDef) -> some View {
-        let key = item.field ?? item.dataField ?? item.bindingPath ?? item.id
         let title = item.label ?? item.title ?? item.id ?? "Item"
-        let value = key.flatMap { formValues[$0] }?.displayString ?? "—"
+        let value = resolvedItemDisplayValue(item) ?? item.value?.displayString ?? "—"
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.semibold))
@@ -71,8 +100,10 @@ public struct MenuListRenderer: View {
 
     @ViewBuilder
     private func markdownItem(_ item: ItemDef) -> some View {
-        let key = item.field ?? item.dataField ?? item.bindingPath ?? item.id
-        let markdown = key.flatMap { formValues[$0] }?.displayString ?? ""
+        let markdown = resolvedItemDisplayValue(item)
+            ?? item.value?.displayString
+            ?? item.properties["value"]?.displayString
+            ?? ""
         if markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.secondary.opacity(0.08))
@@ -93,7 +124,10 @@ public struct MenuListRenderer: View {
             Task {
                 _ = await runtime.execute(
                     execution,
-                    context: ExecutionContext(windowID: window.windowID, dataSourceRef: container.dataSourceRef ?? "")
+                    context: ExecutionContext(
+                        windowID: window.windowID,
+                        dataSourceRef: resolveItemDataSourceRef(item) ?? container.dataSourceRef ?? ""
+                    )
                 )
             }
         }
@@ -101,12 +135,142 @@ public struct MenuListRenderer: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func loadFormValues() async {
-        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
-            formValues = [:]
+    private func observeWindowForm() async {
+        guard let runtime, let window else {
             return
         }
-        formValues = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        windowFormValues = await runtime.windowFormJSONValue(windowID: window.windowID)
+        let stream = await runtime.windowFormUpdates(windowID: window.windowID)
+        for await next in stream {
+            await MainActor.run {
+                windowFormValues = next
+            }
+        }
+    }
+
+    private func loadValues() async {
+        guard let runtime, let window else {
+            await MainActor.run {
+                windowFormValues = [:]
+                formValuesByDataSource = [:]
+                metricsValuesByDataSource = [:]
+            }
+            return
+        }
+
+        let currentWindowForm = await runtime.windowFormJSONValue(windowID: window.windowID)
+        await MainActor.run {
+            windowFormValues = currentWindowForm
+        }
+
+        var nextForms: [String: [String: JSONValue]] = [:]
+        var nextMetrics: [String: [String: JSONValue]] = [:]
+        for ref in relevantDataSourceRefs {
+            var form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
+            var metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+            if container.fetchData != false && form.isEmpty && metrics.isEmpty {
+                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
+                metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+            }
+            nextForms[ref] = form
+            nextMetrics[ref] = metrics
+        }
+
+        await MainActor.run {
+            formValuesByDataSource = nextForms
+            metricsValuesByDataSource = nextMetrics
+        }
+    }
+
+    private func observeDataSources() async {
+        guard let runtime, let window, !relevantDataSourceRefs.isEmpty else {
+            return
+        }
+        await withTaskGroup(of: Void.self) { group in
+            for ref in relevantDataSourceRefs {
+                group.addTask {
+                    let stream = await runtime.dataSourceFormUpdates(windowID: window.windowID, dataSourceRef: ref)
+                    for await next in stream {
+                        await MainActor.run {
+                            formValuesByDataSource[ref] = next
+                        }
+                    }
+                }
+                group.addTask {
+                    let stream = await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: ref)
+                    for await next in stream {
+                        await MainActor.run {
+                            metricsValuesByDataSource[ref] = next
+                        }
+                    }
+                }
+            }
+            await group.waitForAll()
+        }
+    }
+
+    private func resolveItemDataSourceRef(_ item: ItemDef) -> String? {
+        let directRef = item.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        if let directRef {
+            return directRef
+        }
+        guard !item.dataSourceRefs.isEmpty else {
+            return container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        }
+        let source = item.dataSourceRefSource?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "windowform"
+        let selector = item.dataSourceRefSelector?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !selector.isEmpty else {
+            return item.dataSourceRefs.values.first?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                ?? container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        }
+        let key: String?
+        switch source {
+        case "windowform":
+            key = SelectorUtil.resolve(windowFormValues, selector: selector) as? String
+        case "form":
+            if let containerRef = container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+                key = SelectorUtil.resolve(formValuesByDataSource[containerRef], selector: selector) as? String
+            } else {
+                key = nil
+            }
+        case "metrics":
+            if let containerRef = container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+                key = SelectorUtil.resolve(metricsValuesByDataSource[containerRef], selector: selector) as? String
+            } else {
+                key = nil
+            }
+        default:
+            key = nil
+        }
+        if let key = key?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+           let mapped = item.dataSourceRefs[key]?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+            return mapped
+        }
+        return item.dataSourceRefs.values.first?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            ?? container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
+    private func resolvedItemValue(_ item: ItemDef) -> JSONValue? {
+        let key = (item.field ?? item.dataField ?? item.bindingPath ?? item.id ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else {
+            return item.value
+        }
+        switch item.scope?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "metrics":
+            guard let ref = resolveItemDataSourceRef(item) else { return nil }
+            return jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: key))
+        case "windowform":
+            return jsonValue(from: SelectorUtil.resolve(windowFormValues, selector: key))
+        default:
+            guard let ref = resolveItemDataSourceRef(item) else { return nil }
+            return jsonValue(from: SelectorUtil.resolve(formValuesByDataSource[ref], selector: key))
+        }
+    }
+
+    private func resolvedItemDisplayValue(_ item: ItemDef) -> String? {
+        resolvedItemValue(item)?.displayString
     }
 
     private func isVisible(_ item: ItemDef) -> Bool {
@@ -115,14 +279,80 @@ public struct MenuListRenderer: View {
         }
         let source = visibleWhen.source?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         let field = visibleWhen.field?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if source == "form", !field.isEmpty {
-            let value = formValues[field]
-            if let equals = visibleWhen.equals?.displayString {
-                return value?.displayString == equals
-            }
-            return value != nil && value?.displayString != "—"
+        guard !field.isEmpty else {
+            return true
         }
-        return true
+        let candidate: JSONValue?
+        switch source {
+        case "windowform":
+            candidate = jsonValue(from: SelectorUtil.resolve(windowFormValues, selector: field))
+        case "metrics":
+            if let ref = resolveItemDataSourceRef(item) {
+                candidate = jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: field))
+            } else {
+                candidate = nil
+            }
+        default:
+            if let ref = resolveItemDataSourceRef(item) {
+                candidate = jsonValue(from: SelectorUtil.resolve(formValuesByDataSource[ref], selector: field))
+            } else {
+                candidate = nil
+            }
+        }
+        if let equals = visibleWhen.equals?.displayString {
+            return candidate?.displayString == equals
+        }
+        return candidate != nil && candidate?.displayString != "—"
+    }
+
+    private func orderedUnique(_ refs: [String]) -> [String] {
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for ref in refs where seen.insert(ref).inserted {
+            ordered.append(ref)
+        }
+        return ordered
+    }
+}
+
+private func jsonValue(from value: Any?) -> JSONValue? {
+    guard let value else {
+        return .null
+    }
+    switch value {
+    case let value as JSONValue:
+        return value
+    case let value as String:
+        return .string(value)
+    case let value as Bool:
+        return .bool(value)
+    case let value as Int:
+        return .number(Double(value))
+    case let value as Int64:
+        return .number(Double(value))
+    case let value as Double:
+        return .number(value)
+    case let value as Float:
+        return .number(Double(value))
+    case let value as NSNumber:
+        return .number(value.doubleValue)
+    case let value as [String: JSONValue]:
+        return .object(value)
+    case let value as [String: Any]:
+        var object: [String: JSONValue] = [:]
+        for (key, child) in value {
+            guard let json = jsonValue(from: child) else { return nil }
+            object[key] = json
+        }
+        return .object(object)
+    case let value as [JSONValue]:
+        return .array(value)
+    case let value as [Any]:
+        let array = value.compactMap(jsonValue(from:))
+        guard array.count == value.count else { return nil }
+        return .array(array)
+    default:
+        return nil
     }
 }
 
@@ -141,10 +371,33 @@ private extension JSONValue {
         case .array(let value):
             return value.map(\.displayString).joined(separator: ", ")
         case .object(let value):
-            return value.map { "\($0.key): \($0.value.displayString)" }.joined(separator: ", ")
+            return value.keys.sorted().map { "\($0): \(value[$0]?.displayString ?? "—")" }.joined(separator: ", ")
         case .null:
             return "—"
         }
+    }
+
+    var signature: String {
+        switch self {
+        case .string(let value):
+            return "s:\(value)"
+        case .number(let value):
+            return "n:\(value)"
+        case .bool(let value):
+            return "b:\(value)"
+        case .array(let values):
+            return "a:[\(values.map(\.signature).joined(separator: ","))]"
+        case .object(let values):
+            return "o:{\(values.keys.sorted().map { "\($0)=\(values[$0]?.signature ?? "null")" }.joined(separator: ","))}"
+        case .null:
+            return "null"
+        }
+    }
+}
+
+private extension Dictionary where Key == String, Value == JSONValue {
+    var signature: String {
+        keys.sorted().map { "\($0)=\(self[$0]?.signature ?? "null")" }.joined(separator: "|")
     }
 }
 
@@ -163,5 +416,11 @@ private extension JSONPrimitive {
         case .null:
             return "—"
         }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

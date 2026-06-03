@@ -47,6 +47,9 @@ public struct ContainerRenderer: View {
         } else if let chart = container.chart {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
+                if !container.items.isEmpty {
+                    MenuListRenderer(runtime: runtime, window: window, container: container, items: container.items)
+                }
                 ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
             }
         } else if let treeBrowser = container.treeBrowser {
