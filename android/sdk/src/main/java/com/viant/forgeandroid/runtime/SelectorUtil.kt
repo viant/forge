@@ -6,8 +6,14 @@ object SelectorUtil {
         val parts = path.split('.')
         var current: Any? = obj
         for (part in parts) {
-            if (current !is Map<*, *>) return null
-            current = current[part]
+            current = when (current) {
+                is Map<*, *> -> current[part]
+                is List<*> -> {
+                    val list = current
+                    part.toIntOrNull()?.takeIf { it in list.indices }?.let { list[it] }
+                }
+                else -> null
+            } ?: return null
         }
         return current
     }
