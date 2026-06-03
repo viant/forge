@@ -60,11 +60,45 @@ export function createDataConnector(dataSource, runtime = {}) {
         }
     }
 
-    function makeRequestError(resp, prefix = 'Request error') {
-        const error = new Error(`${prefix}: ${resp.status} ${resp.statusText}`);
+    function summarizeErrorPayload(raw) {
+        const text = String(raw || '').trim();
+        if (!text) {
+            return '';
+        }
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed && typeof parsed === 'object') {
+                for (const key of ['message', 'error', 'detail']) {
+                    const value = String(parsed?.[key] || '').trim();
+                    if (value) {
+                        return value;
+                    }
+                }
+            }
+        } catch (_) {
+            // Fall back to the raw response text when the payload is not JSON.
+        }
+        return text;
+    }
+
+    async function makeRequestError(resp, prefix = 'Request error') {
+        let detail = '';
+        try {
+            detail = summarizeErrorPayload(await resp.clone().text());
+        } catch (_) {
+            // Best-effort only; preserve the status-based error when the body
+            // cannot be read.
+        }
+        const message = detail
+            ? `${prefix}: ${resp.status} ${resp.statusText}: ${detail}`
+            : `${prefix}: ${resp.status} ${resp.statusText}`;
+        const error = new Error(message);
         error.status = resp.status;
         error.statusText = resp.statusText;
         error.isUnauthorized = resp.status === 401 || resp.status === 403;
+        if (detail) {
+            error.detail = detail;
+        }
         return error;
     }
 
@@ -186,7 +220,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             // Execute fetch request
             const resp = await fetch(finalUrl, request);
             if (!resp.ok) {
-                const err = makeRequestError(resp, 'GET request failed');
+                const err = await makeRequestError(resp, 'GET request failed');
                 notifyUnauthorized(err);
                 throw err;
             }
@@ -264,7 +298,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             const performRequest = (async () => {
                 const resp = await fetch(finalUrl, request);
                 if (!resp.ok) {
-                    const err = makeRequestError(resp, 'GET error');
+                    const err = await makeRequestError(resp, 'GET error');
                     notifyUnauthorized(err);
                     throw err;
                 }
@@ -308,7 +342,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 body: JSON.stringify(body),
             });
             if (!resp.ok) {
-                const err = makeRequestError(resp, 'POST error');
+                const err = await makeRequestError(resp, 'POST error');
                 notifyUnauthorized(err);
                 throw err;
             }
@@ -337,7 +371,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 body: JSON.stringify(body),
             });
             if (!resp.ok) {
-                const err = makeRequestError(resp, 'PATCH error');
+                const err = await makeRequestError(resp, 'PATCH error');
                 notifyUnauthorized(err);
                 throw err;
             }
