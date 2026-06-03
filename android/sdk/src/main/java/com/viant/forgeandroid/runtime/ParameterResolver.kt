@@ -58,6 +58,7 @@ class ParameterResolver {
             "form" -> ctx.peekForm()[key]
             "selection" -> ctx.peekSelection().selected?.get(key)
             "filter" -> ctx.peekFilter()[key]
+            "windowForm" -> SelectorUtil.resolve(context.window.peekWindowForm(), key)
             else -> null
         }
     }
@@ -93,10 +94,21 @@ class ParameterResolver {
         return when (p.input) {
             "selection" -> context.peekSelection().selected?.get(p.location ?: "")
             "form" -> context.peekForm()[p.location ?: ""]
+            "windowForm" -> SelectorUtil.resolve(context.window.peekWindowForm(), p.location ?: "")
             "metadata" -> context.window.metadata.peek()?.let { it } // full metadata if needed
             "const" -> p.location
             else -> null
         }
+    }
+
+    fun resolveFlat(params: List<ParameterDef>, context: DataSourceContext): Map<String, Any?> {
+        val resolved = linkedMapOf<String, Any?>()
+        params.forEach { parameter ->
+            val name = parameter.name ?: return@forEach
+            val value = readLegacy(context, parameter) ?: return@forEach
+            resolved[name] = value
+        }
+        return resolved
     }
 }
 

@@ -17,7 +17,9 @@ extension ForgeRuntime {
                 ?? args.context?.windowID ?? ""
             guard !windowID.isEmpty else { return nil }
             let dialogKey = "\(windowID)Dialog\(dialogID)"
+            let inbound = await buildInboundParameters(runtime: runtime, args: args, windowID: windowID)
             let outbound = await runtime.resolveOutbound(args.execution.parameters)
+            let selectionMode = args.args["multiple"]?.boolValue == true ? "multi" : (args.args["multiple"]?.boolValue == false ? "single" : nil)
             if let ctx = args.context, !outbound.isEmpty {
                 await runtime.registerPendingDialog(dialogKey, PendingDialog(
                     callerWindowID: ctx.windowID,
@@ -25,8 +27,12 @@ extension ForgeRuntime {
                     outbound: outbound
                 ))
             }
-            await runtime.openDialog(windowID: windowID, dialogID: dialogID,
-                                  parameters: [:])
+            await runtime.openDialog(
+                windowID: windowID,
+                dialogID: dialogID,
+                parameters: inbound,
+                selectionMode: selectionMode
+            )
             return nil
         }
 
@@ -35,7 +41,10 @@ extension ForgeRuntime {
             guard let runtime else { return nil }
             guard let windowKey = args.execution.args.first else { return nil }
             let title = args.execution.args.dropFirst().first ?? windowKey
-            let state = await runtime.openWindow(key: windowKey, title: title)
+            let windowID = args.args["windowId"]?.stringValue
+                ?? args.context?.windowID ?? ""
+            let inbound = await buildInboundParameters(runtime: runtime, args: args, windowID: windowID)
+            let state = await runtime.openWindow(key: windowKey, title: title, parameters: inbound)
             let outbound = await runtime.resolveOutbound(args.execution.parameters)
             if let ctx = args.context, !outbound.isEmpty {
                 await runtime.registerPendingWindow(state.id, PendingWindow(
@@ -70,12 +79,20 @@ extension ForgeRuntime {
             } else {
                 let dsRef = args.context?.dataSourceRef ?? ""
                 let dsID = WindowIdentity(windowID: windowID).dataSourceID(ref: dsRef)
+                let selection = await runtime.dataSourceRuntime.selection(dataSourceID: dsID)
                 let form = await runtime.dataSourceRuntime.form(dataSourceID: dsID)
-                if !form.isEmpty {
+                if !selection.selection.isEmpty {
+                    var selectionPayload: [String: JSONValue] = [
+                        "selection": .array(selection.selection.map(JSONValue.object))
+                    ]
+                    if let selected = selection.selected ?? selection.selection.last {
+                        selectionPayload["selected"] = .object(selected)
+                    }
+                    payload = selectionPayload
+                } else if !form.isEmpty {
                     payload = form
                 } else {
-                    payload = await runtime.dataSourceRuntime.selection(
-                        dataSourceID: dsID).selected ?? [:]
+                    payload = selection.selected ?? [:]
                 }
             }
             if let pending = await runtime.pendingWindow(windowID) {
@@ -105,12 +122,20 @@ extension ForgeRuntime {
             } else {
                 let dsRef = args.context?.dataSourceRef ?? ""
                 let dsID = WindowIdentity(windowID: windowID).dataSourceID(ref: dsRef)
+                let selection = await runtime.dataSourceRuntime.selection(dataSourceID: dsID)
                 let form = await runtime.dataSourceRuntime.form(dataSourceID: dsID)
-                if !form.isEmpty {
+                if !selection.selection.isEmpty {
+                    var selectionPayload: [String: JSONValue] = [
+                        "selection": .array(selection.selection.map(JSONValue.object))
+                    ]
+                    if let selected = selection.selected ?? selection.selection.last {
+                        selectionPayload["selected"] = .object(selected)
+                    }
+                    payload = selectionPayload
+                } else if !form.isEmpty {
                     payload = form
                 } else {
-                    payload = await runtime.dataSourceRuntime.selection(
-                        dataSourceID: dsID).selected ?? [:]
+                    payload = selection.selected ?? [:]
                 }
             }
             if let pending = await runtime.pendingDialog(dialogKey) {
@@ -118,6 +143,7 @@ extension ForgeRuntime {
                                          callerWindowID: pending.callerWindowID,
                                          callerDSRef: pending.callerDataSourceRef)
             }
+            await runtime.resolvePendingDialogResult(windowID: windowID, dialogID: dialogID, payload: payload)
             await runtime.closeDialog(windowID: windowID, dialogID: dialogID)
             return nil
         }
@@ -141,6 +167,23 @@ extension ForgeRuntime {
                let windowID = args.context?.windowID {
                 await runtime.refreshDataSourceCollection(windowID: windowID, dataSourceRef: dsRef)
             }
+            return nil
+        }
+
+        // 7A. dataSource.setWindowFormData
+        handlers["dataSource.setWindowFormData"] = { [weak runtime] args in
+            guard let runtime else { return nil }
+            let windowID = args.args["windowId"]?.stringValue
+                ?? args.context?.windowID ?? ""
+            guard !windowID.isEmpty else { return nil }
+            let payload: [String: JSONValue]
+            if let direct = args.args["payload"]?.objectValue, !direct.isEmpty {
+                payload = direct
+            } else {
+                payload = await buildInboundParameters(runtime: runtime, args: args, windowID: windowID)
+            }
+            guard !payload.isEmpty else { return nil }
+            await runtime.setWindowFormValue(windowID: windowID, values: payload)
             return nil
         }
 
@@ -208,12 +251,49 @@ extension ForgeRuntime {
             }
             guard let row = args.args["row"]?.objectValue else { return nil }
             let rowIndex = args.args["rowIndex"]?.intValue ?? -1
-            let dsID = WindowIdentity(windowID: ctx.windowID)
-                .dataSourceID(ref: ctx.dataSourceRef)
-            await runtime.dataSourceRuntime.toggleSelection(
-                dataSourceID: dsID, row: row, rowIndex: rowIndex)
+            await runtime.toggleDataSourceSelection(
+                windowID: ctx.windowID,
+                dataSourceRef: ctx.dataSourceRef,
+                row: row,
+                rowIndex: rowIndex
+            )
             return nil
         }
         return handlers
+    }
+
+    private static func buildInboundParameters(
+        runtime: ForgeRuntime,
+        args: ExecutionArgs,
+        windowID: String
+    ) async -> [String: JSONValue] {
+        guard !args.execution.parameters.isEmpty else { return [:] }
+        let metadata = await runtime.windowMetadata(id: windowID)
+        let windowForm = await runtime.windowFormJSONValue(windowID: windowID)
+        var snapshots: [String: ParameterResolver.DataSourceSnapshot] = [:]
+        var dataSourceRefs = Set(metadata?.dataSources.keys.map { $0 } ?? [])
+        if let dataSourceRef = args.context?.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines),
+           !dataSourceRef.isEmpty {
+            dataSourceRefs.insert(dataSourceRef)
+        }
+        for ref in dataSourceRefs {
+            let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: ref)
+            let form = await runtime.dataSourceRuntime.form(dataSourceID: dataSourceID)
+            let selection = await runtime.dataSourceRuntime.selection(dataSourceID: dataSourceID)
+            let input = await runtime.dataSourceRuntime.input(dataSourceID: dataSourceID)
+            snapshots[ref] = ParameterResolver.DataSourceSnapshot(
+                selectionMode: metadata?.dataSources[ref]?.selectionMode,
+                form: form,
+                selection: selection,
+                input: input
+            )
+        }
+        let context = ParameterResolver.ResolutionContext(
+            identityDataSourceRef: args.context?.dataSourceRef ?? "",
+            dataSources: snapshots,
+            windowForm: windowForm,
+            metadata: metadata
+        )
+        return ParameterResolver.resolve(parameters: args.execution.parameters, context: context)
     }
 }

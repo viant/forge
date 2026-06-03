@@ -76,7 +76,7 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
         "dashboard.status" -> DashboardPanel(runtime, window, container) { DashboardStatusBlock(container, metrics) }
         "dashboard.messages" -> DashboardPanel(runtime, window, container) { DashboardMessagesBlock(container, metrics, filters, selection) }
         "dashboard.report" -> DashboardPanel(runtime, window, container) { DashboardReportBlock(container, metrics, filters, selection) }
-        "dashboard.reportBuilder" -> DashboardPanel(runtime, window, container) { ReportBuilderRenderer(window, container) }
+        "dashboard.reportBuilder" -> DashboardPanel(runtime, window, container) { ReportBuilderRenderer(runtime, window, container) }
         "dashboard.feed" -> DashboardPanel(runtime, window, container) { DashboardFeedBlock(window, container, dashboardRoot, filters) }
         "dashboard.detail" -> DashboardPanel(runtime, window, container) {
             container.containers.forEach { child ->
@@ -801,14 +801,24 @@ private fun dashboardFilterValueEquals(filterValue: Any?, rowValue: Any?): Boole
     return filterValue.toString().equals(rowValue.toString(), ignoreCase = true)
 }
 
-private fun formatDashboardValue(value: Any?, format: String?): String {
+internal fun formatDashboardValue(value: Any?, format: String?): String {
     if (value == null) {
         return "n/a"
     }
     val locale = Locale.US
     return when (format?.lowercase()) {
-        "currency" -> (value as? Number)?.let { NumberFormat.getCurrencyInstance(locale).format(it.toDouble()) } ?: value.toString()
-        "percent" -> (value as? Number)?.let { "${NumberFormat.getNumberInstance(locale).apply { maximumFractionDigits = 1 }.format(it.toDouble())}%" } ?: value.toString()
+        "currency" -> (value as? Number)?.let {
+            NumberFormat.getCurrencyInstance(locale).apply {
+                minimumFractionDigits = 0
+                maximumFractionDigits = 0
+            }.format(it.toDouble())
+        } ?: value.toString()
+        "percent" -> (value as? Number)?.let {
+            "${NumberFormat.getNumberInstance(locale).apply { minimumFractionDigits = 1; maximumFractionDigits = 1 }.format(it.toDouble())}%"
+        } ?: value.toString()
+        "percentfraction" -> (value as? Number)?.let {
+            "${NumberFormat.getNumberInstance(locale).apply { minimumFractionDigits = 1; maximumFractionDigits = 1 }.format(it.toDouble() * 100)}%"
+        } ?: value.toString()
         "integer" -> (value as? Number)?.let { NumberFormat.getIntegerInstance(locale).format(it.toLong()) } ?: value.toString()
         "compactnumber" -> (value as? Number)?.let { formatCompactNumber(it.toDouble(), locale) } ?: value.toString()
         "number" -> (value as? Number)?.let { NumberFormat.getNumberInstance(locale).format(it.toDouble()) } ?: value.toString()

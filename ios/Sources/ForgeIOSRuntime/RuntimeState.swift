@@ -52,15 +52,18 @@ public struct ControlState: Sendable, Equatable {
 
 public struct DialogState: Sendable, Equatable {
     public let open: Bool
+    public let selectionMode: String?
     public let props: [String: JSONValue]
     public let args: [String: JSONValue]
 
     public init(
         open: Bool = false,
+        selectionMode: String? = nil,
         props: [String: JSONValue] = [:],
         args: [String: JSONValue] = [:]
     ) {
         self.open = open
+        self.selectionMode = selectionMode
         self.props = props
         self.args = args
     }

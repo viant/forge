@@ -37,6 +37,89 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(first["id"], .number(2))
     }
 
+    func testRefreshDataSourceCollectionAppliesPrepareCollectionHook() async {
+        let runtime = ForgeRuntime()
+        let metadata = WindowMetadata(
+            dataSources: [
+                "list": DataSourceDef()
+            ],
+            actions: ActionsDef(code: """
+            (() => ({
+              prepareCollection: ({ collection = [] }) => collection.map((row) => ({
+                ...row,
+                applyStatus: String(row.apply_status ?? "").toUpperCase()
+              }))
+            }))()
+            """)
+        )
+        let window = await runtime.openWindowInline(key: "w1", title: "W1", metadata: metadata)
+        await runtime.registerDataSourceLoader { request in
+            XCTAssertEqual(request.windowID, window.id)
+            XCTAssertEqual(request.dataSourceRef, "list")
+            return ForgeRuntime.DataSourceFetchResult(
+                rows: [[
+                    "id": .number(7),
+                    "apply_status": .string("approved")
+                ]],
+                metrics: ["totalCount": .number(1)]
+            )
+        }
+
+        await runtime.refreshDataSourceCollection(windowID: window.id, dataSourceRef: "list")
+
+        let rows = await runtime.dataSourceCollection(windowID: window.id, dataSourceRef: "list")
+        let metrics = await runtime.dataSourceMetrics(windowID: window.id, dataSourceRef: "list")
+        XCTAssertEqual(rows.first?["applyStatus"], .string("APPROVED"))
+        XCTAssertEqual(rows.first?["id"], .number(7))
+        XCTAssertEqual(metrics["totalCount"], .number(1))
+    }
+
+    func testSetDataSourceSelectionAppliesPrepareSelectionHookAndSyncsForm() async {
+        let runtime = ForgeRuntime()
+        let metadata = WindowMetadata(
+            dataSources: [
+                "list": DataSourceDef()
+            ],
+            actions: ActionsDef(code: """
+            (() => ({
+              prepareSelection: ({ selected = {}, rowIndex = -1 }) => ({
+                ...selected,
+                normalizedId: String(selected.id ?? ""),
+                selectedRowIndex: rowIndex
+              })
+            }))()
+            """)
+        )
+        let window = await runtime.openWindowInline(key: "w1", title: "W1", metadata: metadata)
+
+        await runtime.setDataSourceSelection(
+            windowID: window.id,
+            dataSourceRef: "list",
+            selected: ["id": .number(42)],
+            rowIndex: 3
+        )
+
+        let dsID = WindowIdentity(windowID: window.id).dataSourceID(ref: "list")
+        let selection = await runtime.dataSourceRuntime.selection(dataSourceID: dsID)
+        let form = await runtime.dataSourceRuntime.form(dataSourceID: dsID)
+        XCTAssertEqual(selection.selected?["normalizedId"], .string("42"))
+        XCTAssertEqual(selection.selected?["selectedRowIndex"], .number(3))
+        XCTAssertEqual(form["normalizedId"], .string("42"))
+        XCTAssertEqual(form["selectedRowIndex"], .number(3))
+
+        await runtime.toggleDataSourceSelection(
+            windowID: window.id,
+            dataSourceRef: "list",
+            row: ["id": .number(42)],
+            rowIndex: 3
+        )
+
+        let clearedSelection = await runtime.dataSourceRuntime.selection(dataSourceID: dsID)
+        let clearedForm = await runtime.dataSourceRuntime.form(dataSourceID: dsID)
+        XCTAssertNil(clearedSelection.selected)
+        XCTAssertTrue(clearedForm.isEmpty)
+    }
+
     func testSchemaBasedFormDecodesSchemaAndAliasDataSourceRef() throws {
         let payload = """
         {
@@ -526,6 +609,30 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(signalValue?.view?.content?.containers.first?.title, "Approval Editor")
     }
 
+    func testOpenWindowUsesRegisteredMetadataLoader() async throws {
+        let runtime = ForgeRuntime()
+        await runtime.registerWindowMetadataLoader { key in
+            XCTAssertEqual(key, "recommendation/review")
+            return WindowMetadata(
+                view: ViewDef(
+                    content: ContentDef(
+                        containers: [
+                            ContainerDef(id: "recommendationRoot", title: "Recommendation Review")
+                        ]
+                    )
+                )
+            )
+        }
+
+        let state = await runtime.openWindow(key: "recommendation/review", title: "Recommendation Review")
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let signal = await runtime.signals.metadata(windowID: state.id)
+        let metadata = await signal.peek()
+        XCTAssertEqual(metadata?.view?.content?.containers.first?.id, "recommendationRoot")
+        XCTAssertEqual(metadata?.view?.content?.containers.first?.title, "Recommendation Review")
+    }
+
     func testBuiltInHandlerToggleSelectionSelectsThenDeselects() async throws {
         let runtime = ForgeRuntime()
         let meta = WindowMetadata(view: ViewDef(content: ContentDef()))
@@ -627,6 +734,563 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(rows.count, 2)
         XCTAssertEqual(rows[0]["id"], .string("1"))
         _ = json // suppress unused warning
+    }
+
+    func testChartDefDecodesStructuredSeriesObject() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "containers": [
+                {
+                  "id": "chart-window",
+                  "containers": [
+                    {
+                      "id": "spend-trend",
+                      "dataSourceRef": "series_data",
+                      "chart": {
+                        "type": "bar",
+                        "xAxis": {
+                          "dataKey": "day"
+                        },
+                        "series": {
+                          "nameKey": "label",
+                          "valueKey": "spend",
+                          "values": [
+                            { "value": "spend", "name": "Spend" }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let chart = try XCTUnwrap(metadata.view?.content?.containers.first?.containers.first?.chart)
+
+        XCTAssertEqual(chart.type, "bar")
+        XCTAssertEqual(chart.xKey, "day")
+        XCTAssertEqual(chart.valueKey, "spend")
+        XCTAssertEqual(chart.nameKey, "label")
+        XCTAssertEqual(chart.series, ["spend"])
+    }
+
+    func testWindowMetadataWrapsTopLevelDashboardReportBuilderContainer() throws {
+        let payload = """
+        {
+          "kind": "dashboard.reportBuilder",
+          "id": "forecastingCubeBuilder",
+          "title": "Forecasting",
+          "dataSourceRef": "forecasting_cube_report",
+          "reportBuilder": {
+            "showResultHeader": false
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let root = try XCTUnwrap(metadata.view?.content?.containers.first)
+
+        XCTAssertEqual(root.kind, "dashboard.reportBuilder")
+        XCTAssertEqual(root.id, "forecastingCubeBuilder")
+        XCTAssertEqual(root.title, "Forecasting")
+        XCTAssertEqual(root.dataSourceRef, "forecasting_cube_report")
+        XCTAssertEqual(root.dashboard?.reportBuilder?.showResultHeader, false)
+    }
+
+    func testWindowMetadataWrapsSingleContainerInsideViewContent() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "forecastingCubeBuilder",
+              "title": "Forecasting",
+              "dataSourceRef": "forecasting_cube_report",
+              "reportBuilder": {
+                "showResultHeader": false
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let root = try XCTUnwrap(metadata.view?.content?.containers.first)
+
+        XCTAssertEqual(root.kind, "dashboard.reportBuilder")
+        XCTAssertEqual(root.id, "forecastingCubeBuilder")
+        XCTAssertEqual(root.title, "Forecasting")
+        XCTAssertEqual(root.dataSourceRef, "forecasting_cube_report")
+        XCTAssertEqual(root.dashboard?.reportBuilder?.showResultHeader, false)
+    }
+
+    func testWindowMetadataDecodesMetricReportBuilderWithoutDynamicFilterFamilies() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "metricsCubeBuilder",
+              "dataSourceRef": "metrics_ad_cube_report",
+              "reportBuilder": {
+                "measures": [
+                  { "id": "totalSpend", "key": "totalSpend", "label": "Spend", "default": true }
+                ],
+                "dimensions": [
+                  { "id": "eventDate", "key": "eventDate", "label": "Date", "default": true }
+                ],
+                "staticFilters": [
+                  { "id": "channelIds", "label": "Channels", "options": [] }
+                ],
+                "dynamicFilterGroups": [
+                  {
+                    "id": "scope",
+                    "label": "Scope",
+                    "filters": [
+                      { "id": "advertiserIds", "label": "Advertiser", "paramPath": "filters.advertiserId" }
+                    ]
+                  }
+                ],
+                "result": {
+                  "defaultMode": "table",
+                  "viewModes": ["table", "chart"]
+                }
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let root = try XCTUnwrap(metadata.view?.content?.containers.first)
+        let reportBuilder = try XCTUnwrap(root.dashboard?.reportBuilder)
+
+        XCTAssertEqual(root.kind, "dashboard.reportBuilder")
+        XCTAssertEqual(root.id, "metricsCubeBuilder")
+        XCTAssertEqual(root.dataSourceRef, "metrics_ad_cube_report")
+        XCTAssertEqual(reportBuilder.measures.count, 1)
+        XCTAssertEqual(reportBuilder.dimensions.count, 1)
+        XCTAssertEqual(reportBuilder.staticFilters.count, 1)
+        XCTAssertEqual(reportBuilder.dynamicFilterGroups.count, 1)
+        XCTAssertTrue(reportBuilder.dynamicFilterFamilies.isEmpty)
+        XCTAssertEqual(reportBuilder.result?.defaultMode, "table")
+    }
+
+    func testWindowMetadataDecodesDynamicFilterAdvancedFields() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "metricsCubeBuilder",
+              "dataSourceRef": "metrics_ad_cube_report",
+              "reportBuilder": {
+                "measures": [],
+                "dimensions": [],
+                "dynamicFilterGroups": [
+                  {
+                    "id": "scope",
+                    "label": "Scope",
+                    "filters": [
+                      {
+                        "id": "advertiserIds",
+                        "label": "Advertiser",
+                        "paramPath": "filters.advertiserIds",
+                        "multiple": false,
+                        "emitArray": true,
+                        "manualEntry": true,
+                        "manualValueType": "int",
+                        "manualPlaceholder": "Enter advertiser id",
+                        "dialogId": "advertiserPicker",
+                        "valueSelector": "advertiserId",
+                        "labelSelector": "advertiserName",
+                        "groupSelector": "agencyName",
+                        "recordSelectors": ["agencyId", "advertiserId", "advertiserName"],
+                        "requestMapping": "hook"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let filter = try XCTUnwrap(
+            metadata.view?.content?.containers.first?.dashboard?.reportBuilder?.dynamicFilterGroups.first?.filters.first
+        )
+
+        XCTAssertEqual(filter.id, "advertiserIds")
+        XCTAssertEqual(filter.paramPath, "filters.advertiserIds")
+        XCTAssertEqual(filter.emitArray, true)
+        XCTAssertEqual(filter.manualValueType, "int")
+        XCTAssertEqual(filter.dialogId, "advertiserPicker")
+        XCTAssertEqual(filter.valueSelector, "advertiserId")
+        XCTAssertEqual(filter.labelSelector, "advertiserName")
+        XCTAssertEqual(filter.groupSelector, "agencyName")
+        XCTAssertEqual(filter.recordSelectors ?? [], ["agencyId", "advertiserId", "advertiserName"])
+        XCTAssertEqual(filter.requestMapping, "hook")
+    }
+
+    func testOpenWindowSeedsWindowFormFromParametersAndMetadataDefaults() async throws {
+        let runtime = ForgeRuntime()
+        await runtime.registerWindowMetadataLoader { key in
+            XCTAssertEqual(key, "metrics/report")
+            return WindowMetadata(
+                view: ViewDef(
+                    content: ContentDef(
+                        containers: [
+                            ContainerDef(
+                                id: "metricsCubeBuilder",
+                                stateKey: "reportBuilder.metrics",
+                                items: [
+                                    ItemDef(
+                                        id: "granularity",
+                                        scope: "windowForm",
+                                        value: .string("day")
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ),
+                on: [
+                    EventExecutionDef(
+                        event: "onInit",
+                        handler: "dataSource.setWindowFormData",
+                        parameters: [
+                            ParameterDef(
+                                name: "periodView",
+                                input: "const",
+                                location: .string("today")
+                            )
+                        ]
+                    )
+                ]
+            )
+        }
+
+        let state = await runtime.openWindow(
+            key: "metrics/report",
+            title: "Metrics Report",
+            parameters: [
+                "prefill": .object([
+                    "advertiserId": .number(7)
+                ])
+            ]
+        )
+
+        let windowForm = await runtime.windowFormJSONValue(windowID: state.id)
+        XCTAssertEqual(windowForm["granularity"], .string("day"))
+        XCTAssertEqual(windowForm["periodView"], .string("today"))
+        XCTAssertEqual(windowForm["prefill"]?.objectValue?["advertiserId"], .number(7))
+    }
+
+    func testParameterResolverResolvesWindowFormSelectors() {
+        let context = ParameterResolver.ResolutionContext(
+            identityDataSourceRef: "default",
+            dataSources: [:],
+            windowForm: [
+                "AdOrderId": .array([.number(2637048)]),
+                "granularity": .string("hour"),
+                "periodView": .string("today")
+            ],
+            metadata: nil
+        )
+
+        let resolved = ParameterResolver.resolve(
+            parameters: [
+                ParameterDef(name: "order_id", input: "windowForm", location: .string("AdOrderId.0")),
+                ParameterDef(name: "granularity", input: "windowForm", location: .string("granularity"))
+            ],
+            context: context
+        )
+
+        XCTAssertEqual(resolved["order_id"], .number(2637048))
+        XCTAssertEqual(resolved["granularity"], .string("hour"))
+    }
+
+    func testParameterResolverResolvesCrossDataSourceSelection() {
+        let context = ParameterResolver.ResolutionContext(
+            identityDataSourceRef: "runs",
+            dataSources: [
+                "runs": ParameterResolver.DataSourceSnapshot(
+                    selectionMode: "single",
+                    selection: SelectionState(selected: ["id": .string("run-1")])
+                ),
+                "schedules": ParameterResolver.DataSourceSnapshot(
+                    selectionMode: "single",
+                    selection: SelectionState(selected: ["id": .string("sched-1")])
+                )
+            ],
+            windowForm: [:],
+            metadata: nil
+        )
+
+        let resolved = ParameterResolver.resolve(
+            parameters: [
+                ParameterDef(name: "scheduleId", input: "selection", location: .string("schedules.id")),
+                ParameterDef(name: "requireScheduleId", input: "const", location: .string("true"))
+            ],
+            context: context
+        )
+
+        XCTAssertEqual(resolved["scheduleId"], .string("sched-1"))
+        XCTAssertEqual(resolved["requireScheduleId"], .string("true"))
+    }
+
+    func testWindowMetadataDecodesDialogs() throws {
+        let payload = """
+        {
+          "dialogs": [
+            {
+              "id": "advertiserPicker",
+              "title": "Pick advertiser",
+              "content": {
+                "id": "advertiserTable",
+                "dataSourceRef": "advertisers",
+                "table": {
+                  "columns": ["id", "name"]
+                }
+              },
+              "actions": [
+                {
+                  "id": "cancel",
+                  "label": "Cancel"
+                },
+                {
+                  "id": "select",
+                  "label": "Select",
+                  "on": [
+                    { "action": "dialog.commit" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let dialog = try XCTUnwrap(metadata.dialogs.first)
+
+        XCTAssertEqual(dialog.id, "advertiserPicker")
+        XCTAssertEqual(dialog.title, "Pick advertiser")
+        XCTAssertEqual(dialog.content?.dataSourceRef, "advertisers")
+        XCTAssertEqual(dialog.actions.count, 2)
+        XCTAssertEqual(dialog.actions.last?.on.first?.action, "dialog.commit")
+    }
+
+    func testWindowMetadataDecodesTreeBrowserDialogContent() throws {
+        let payload = """
+        {
+          "dialogs": [
+            {
+              "id": "targetingTreePicker",
+              "title": "Select Targeting Option",
+              "dataSourceRef": "targeting_tree_lookup",
+              "content": {
+                "id": "targetingTreePickerContent",
+                "dataSourceRef": "targeting_tree_lookup",
+                "treeBrowser": {
+                  "dataSourceRef": "targeting_tree_lookup",
+                  "pathField": "path",
+                  "valueField": "value",
+                  "subtitleField": "value",
+                  "lazyExpand": false
+                }
+              }
+            }
+          ]
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let dialog = try XCTUnwrap(metadata.dialogs.first)
+        let treeBrowser = try XCTUnwrap(dialog.content?.treeBrowser)
+
+        XCTAssertEqual(dialog.id, "targetingTreePicker")
+        XCTAssertEqual(treeBrowser.dataSourceRef, "targeting_tree_lookup")
+        XCTAssertEqual(treeBrowser.pathField, "path")
+        XCTAssertEqual(treeBrowser.valueField, "value")
+        XCTAssertEqual(treeBrowser.subtitleField, "value")
+        XCTAssertEqual(treeBrowser.lazyExpand, false)
+    }
+
+    func testBuiltInOpenDialogResolvesInboundParameters() async throws {
+        let runtime = ForgeRuntime()
+        let metadata = WindowMetadata(
+            dialogs: [
+                DialogDef(
+                    id: "pick",
+                    title: "Pick",
+                    content: ContainerDef(id: "dialog-root", dataSourceRef: "dialogSource")
+                )
+            ],
+            dataSources: [
+                "runs": DataSourceDef(selectionMode: "single"),
+                "schedules": DataSourceDef(selectionMode: "single"),
+                "dialogSource": DataSourceDef()
+            ]
+        )
+        let state = await runtime.openWindowInline(key: "w1", title: "W1", metadata: metadata)
+        await runtime.setWindowFormValue(
+            windowID: state.id,
+            values: [
+                "granularity": .string("hour")
+            ],
+            replace: true
+        )
+        await runtime.setDataSourceSelection(
+            windowID: state.id,
+            dataSourceRef: "schedules",
+            selected: ["id": .string("sched-1")]
+        )
+
+        let execution = ExecutionDef(
+            action: "window.openDialog",
+            args: ["pick"],
+            parameters: [
+                ParameterDef(name: "scheduleId", input: "selection", location: .string("schedules.id")),
+                ParameterDef(name: "granularity", input: "windowForm", location: .string("granularity"))
+            ]
+        )
+
+        _ = await runtime.execute(
+            execution,
+            context: ExecutionContext(windowID: state.id, dataSourceRef: "runs")
+        )
+
+        let dialogState = await runtime.dialogState(windowID: state.id, dialogID: "pick")
+        XCTAssertTrue(dialogState.open)
+        XCTAssertEqual(dialogState.args["scheduleId"], .string("sched-1"))
+        XCTAssertEqual(dialogState.args["granularity"], .string("hour"))
+    }
+
+    func testOpenDialogAwaitResultResolvesCommittedSelection() async throws {
+        let runtime = ForgeRuntime()
+        let metadata = WindowMetadata(
+            dialogs: [
+                DialogDef(
+                    id: "pick",
+                    title: "Pick",
+                    content: ContainerDef(id: "dialog-root", dataSourceRef: "dialogSource")
+                )
+            ],
+            dataSources: [
+                "dialogSource": DataSourceDef(selectionMode: "single")
+            ]
+        )
+        let state = await runtime.openWindowInline(key: "w1", title: "W1", metadata: metadata)
+
+        let resultTask = Task {
+            await runtime.openDialogAwaitResult(
+                windowID: state.id,
+                dialogID: "pick",
+                parameters: ["granularity": .string("hour")],
+                selectionMode: "single"
+            )
+        }
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        await runtime.setDataSourceSelection(
+            windowID: state.id,
+            dataSourceRef: "dialogSource",
+            selected: [
+                "id": .string("adv-1"),
+                "name": .string("Advertiser One")
+            ]
+        )
+        _ = await runtime.execute(
+            ExecutionDef(action: "dialog.commit", args: []),
+            context: ExecutionContext(windowID: state.id, dataSourceRef: "dialogSource"),
+            args: [
+                "dialogId": .string("pick"),
+                "windowId": .string(state.id)
+            ]
+        )
+
+        let result = await resultTask.value
+        XCTAssertEqual(result?["id"], .string("adv-1"))
+        XCTAssertEqual(result?["name"], .string("Advertiser One"))
+    }
+
+    func testOpenDialogAwaitResultResolvesCommittedMultiSelection() async throws {
+        let runtime = ForgeRuntime()
+        let metadata = WindowMetadata(
+            dialogs: [
+                DialogDef(
+                    id: "pick",
+                    title: "Pick",
+                    content: ContainerDef(
+                        id: "dialog-root",
+                        dataSourceRef: "dialogSource",
+                        treeBrowser: TreeBrowserDef(
+                            dataSourceRef: "dialogSource",
+                            pathField: "path",
+                            valueField: "value"
+                        )
+                    )
+                )
+            ],
+            dataSources: [
+                "dialogSource": DataSourceDef(selectionMode: "multi")
+            ]
+        )
+        let state = await runtime.openWindowInline(key: "w1", title: "W1", metadata: metadata)
+
+        let resultTask = Task {
+            await runtime.openDialogAwaitResult(
+                windowID: state.id,
+                dialogID: "pick",
+                parameters: [:],
+                selectionMode: "multi"
+            )
+        }
+
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        await runtime.setDataSourceSelectionState(
+            windowID: state.id,
+            dataSourceRef: "dialogSource",
+            selection: SelectionState(
+                selected: [
+                    "value": .string("seg-2"),
+                    "label": .string("Segment 2")
+                ],
+                selection: [
+                    [
+                        "value": .string("seg-1"),
+                        "label": .string("Segment 1")
+                    ],
+                    [
+                        "value": .string("seg-2"),
+                        "label": .string("Segment 2")
+                    ]
+                ],
+                rowIndex: -1
+            )
+        )
+        _ = await runtime.execute(
+            ExecutionDef(action: "dialog.commit", args: []),
+            context: ExecutionContext(windowID: state.id, dataSourceRef: "dialogSource"),
+            args: [
+                "dialogId": .string("pick"),
+                "windowId": .string(state.id)
+            ]
+        )
+
+        let result = await resultTask.value
+        XCTAssertEqual(result?["selected"]?.objectValue?["value"], .string("seg-2"))
+        XCTAssertEqual(result?["selection"]?.arrayValue?.count, 2)
+        XCTAssertEqual(result?["selection"]?.arrayValue?.first?.objectValue?["value"], .string("seg-1"))
     }
 
     private func makeMockSession(responseBody: String, statusCode: Int = 200) -> URLSession {

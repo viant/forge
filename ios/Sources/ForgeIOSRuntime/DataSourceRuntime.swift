@@ -89,19 +89,6 @@ public actor DataSourceRuntime {
             page: input.page, fetch: true, refresh: input.refresh)
     }
 
-    public func toggleSelection(dataSourceID: String, row: [String: JSONValue],
-                                rowIndex: Int) {
-        let current = selectionValues[dataSourceID] ?? SelectionState()
-        if current.selected == row {
-            selectionValues[dataSourceID] = SelectionState()
-            formValues[dataSourceID] = [:]
-        } else {
-            selectionValues[dataSourceID] = SelectionState(
-                selected: row, rowIndex: rowIndex)
-            formValues[dataSourceID] = row
-        }
-    }
-
     // MARK: - REST collection fetch
 
     /// Fetch a collection from a REST endpoint and normalize the response.

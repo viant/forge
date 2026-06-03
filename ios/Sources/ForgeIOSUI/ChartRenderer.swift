@@ -18,7 +18,7 @@ public struct ChartRenderer: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let title = chart.title ?? container.title {
+            if let title = resolvedChartTitle {
                 Text(title).font(.headline)
             }
             if rows.isEmpty {
@@ -40,6 +40,22 @@ public struct ChartRenderer: View {
         .task(id: chartTaskKey) {
             await loadRows()
         }
+    }
+
+    private var resolvedChartTitle: String? {
+        let chartTitle = chart.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let containerTitle = container.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let chartTitle, !chartTitle.isEmpty {
+            if let containerTitle, !containerTitle.isEmpty,
+               chartTitle.compare(containerTitle, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+                return nil
+            }
+            return chartTitle
+        }
+        if let containerTitle, !containerTitle.isEmpty {
+            return nil
+        }
+        return nil
     }
 
     @ViewBuilder
