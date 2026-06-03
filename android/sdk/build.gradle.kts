@@ -48,14 +48,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
-
+    implementation("androidx.javascriptengine:javascriptengine:1.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("io.github.dokar3:quickjs-kt:1.0.0-alpha13")
     testImplementation(kotlin("test"))
     testImplementation("io.github.dokar3:quickjs-kt-jvm:1.0.0-alpha13")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")

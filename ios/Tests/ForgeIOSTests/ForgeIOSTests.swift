@@ -290,6 +290,23 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(metadata.dataSources["recommendation"]?.selectionMode, "single")
     }
 
+    func testMetadataResolverPreservesDatasourceNamedTarget() {
+        let metadata = WindowMetadata(
+            dataSources: [
+                "target": DataSourceDef(),
+                "dialogSource": DataSourceDef(selectionMode: "multi")
+            ]
+        )
+
+        let resolved = MetadataResolver.resolve(
+            metadata,
+            for: ForgeTargetContext(platform: "ios", formFactor: "phone")
+        )
+
+        XCTAssertNotNil(resolved.dataSources["target"])
+        XCTAssertEqual(resolved.dataSources["dialogSource"]?.selectionMode, "multi")
+    }
+
     func testTableRendererUsesCompactCardsForPhoneAndRegularGridForTablet() {
         XCTAssertEqual(
             TableRenderer.resolvePresentationMode(

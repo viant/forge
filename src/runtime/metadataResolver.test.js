@@ -60,3 +60,18 @@ assert.equal(resolvedAndroid.view.content.containers.length, 3);
 assert.equal(resolvedAndroid.view.content.containers[1].id, 'androidOnly');
 assert.equal(resolvedAndroid.view.content.containers[2].chat.showMic, true);
 assert.equal(resolvedAndroid.view.content.containers[2].chat.showUpload, false);
+
+const metadataWithTargetDatasource = {
+    dataSource: {
+        target: {},
+        dialogSource: { selectionMode: 'multi' }
+    }
+};
+
+const resolvedTargetDatasource = resolveMetadataForTarget(metadataWithTargetDatasource, {
+    platform: 'android',
+    formFactor: 'phone'
+});
+
+assert.ok(resolvedTargetDatasource.dataSource.target);
+assert.equal(resolvedTargetDatasource.dataSource.dialogSource.selectionMode, 'multi');

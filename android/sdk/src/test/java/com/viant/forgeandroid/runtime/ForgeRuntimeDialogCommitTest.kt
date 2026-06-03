@@ -38,6 +38,7 @@ class ForgeRuntimeDialogCommitTest {
         )
 
         val dialogContext = runtime.windowContext(state.windowId).context("dialogSource")
+        val targetContext = runtime.windowContext(state.windowId).context("target")
         dialogContext.setForm(mapOf("value" to "web"))
         dialogContext.setSelection(
             SelectionState(
@@ -59,7 +60,7 @@ class ForgeRuntimeDialogCommitTest {
         )
 
         runtime.execute(
-            ExecutionDef(action = "dialog.commit"),
+            ExecutionDef(handler = "dialog.commit"),
             dialogContext,
             mapOf(
                 "dialogId" to "pick",
@@ -67,7 +68,7 @@ class ForgeRuntimeDialogCommitTest {
             )
         )
 
-        val targetForm = runtime.windowContext(state.windowId).context("target").peekForm()
+        val targetForm = targetContext.peekForm()
         val selections = targetForm["allSelections"] as? List<*>
 
         assertEquals("web", targetForm["selectedValue"])

@@ -134,7 +134,7 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                                 TextButton(
                                     onClick = {
                                         runtime.execute(
-                                            ExecutionDef(action = "dialog.commit"),
+                                            ExecutionDef(handler = "dialog.commit"),
                                             dsContext,
                                             mapOf("dialogId" to dialogId, "windowId" to window.windowId)
                                         )

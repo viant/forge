@@ -41,7 +41,7 @@ object MetadataResolver {
 
         val result = linkedMapOf<String, JsonElement>()
         working.forEach { (key, value) ->
-            if (key == "target" || key == "targetOverrides") {
+            if (shouldStripTargetingKey(key, value)) {
                 return@forEach
             }
             val resolved = resolveValue(value, targetContext)
@@ -108,18 +108,40 @@ object MetadataResolver {
                 val text = raw.contentOrNull?.trim().orEmpty()
                 if (text.isBlank()) null else NormalizedTarget(platforms = listOf(text))
             }
-            is JsonArray -> {
-                NormalizedTarget(platforms = raw.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim() }.filter { it.isNotBlank() })
-            }
-            is JsonObject -> {
+            is JsonArray -> normalizedTargetOrNull(
+                NormalizedTarget(
+                    platforms = raw.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim() }.filter { it.isNotBlank() }
+                )
+            )
+            is JsonObject -> normalizedTargetOrNull(
                 NormalizedTarget(
                     platforms = stringList(raw["platforms"]),
                     excludePlatforms = stringList(raw["excludePlatforms"]),
                     formFactors = stringList(raw["formFactors"]),
                     capabilities = stringList(raw["capabilities"])
                 )
-            }
+            )
             else -> null
+        }
+    }
+
+    private fun normalizedTargetOrNull(target: NormalizedTarget): NormalizedTarget? {
+        if (
+            target.platforms.isEmpty() &&
+            target.excludePlatforms.isEmpty() &&
+            target.formFactors.isEmpty() &&
+            target.capabilities.isEmpty()
+        ) {
+            return null
+        }
+        return target
+    }
+
+    private fun shouldStripTargetingKey(key: String, value: JsonElement): Boolean {
+        return when (key) {
+            "target" -> normalizeTarget(value) != null
+            "targetOverrides" -> value is JsonObject && value.isNotEmpty() && value.values.all { it is JsonObject }
+            else -> false
         }
     }
 

@@ -94,6 +94,9 @@ internal data class StoredReportBuilderState(
     val chartSpec: ReportBuilderChartSpecDef? = null,
     val viewMode: String = "table",
     val staticFilters: Map<String, StoredStaticFilterValue> = emptyMap(),
+    val dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>> = emptyMap(),
+    val dynamicFilterDrafts: Map<String, String> = emptyMap(),
+    // Legacy fields kept only so previously persisted state can still decode.
     val dynamicFilterValues: Map<String, String> = emptyMap(),
     val dynamicFilterSelections: Map<String, List<ReportBuilderDynamicSelectionState>> = emptyMap(),
     val activeDynamicFilterKeys: List<String> = emptyList()
@@ -105,6 +108,14 @@ internal data class ReportBuilderDynamicSelectionState(
     val label: String,
     val group: String = "",
     val record: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+internal data class ReportBuilderDynamicRowState(
+    val id: String,
+    val filterId: String,
+    val enabled: Boolean = true,
+    val selections: List<ReportBuilderDynamicSelectionState> = emptyList()
 )
 
 @Serializable
@@ -153,13 +164,11 @@ fun ReportBuilderRenderer(
     var viewMode by remember(config) { mutableStateOf(if (config.result?.chartCreationMode == "explicit") "table" else (config.result?.defaultMode ?: "chart")) }
     var previousMenuExpanded by remember { mutableStateOf(false) }
     var staticFilters by remember(config) { mutableStateOf(defaultStaticFilters(config.staticFilters)) }
-    var dynamicFilterValues by remember(config) { mutableStateOf(emptyMap<String, String>()) }
-    var dynamicFilterSelections by remember(config) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicSelectionState>>()) }
+    var dynamicGroups by remember(config) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicRowState>>()) }
     var dynamicFilterDrafts by remember(config) { mutableStateOf(emptyMap<String, String>()) }
-    var activeDynamicFilterKeys by remember(config) { mutableStateOf(defaultDynamicFilterKeys()) }
     val coroutineScope = rememberCoroutineScope()
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
-    val hookState = remember(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicFilterValues, dynamicFilterSelections, activeDynamicFilterKeys) {
+    val hookState = remember(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
         currentReportBuilderHookState(
             config = config,
             selectedMeasures = selectedMeasures,
@@ -167,23 +176,19 @@ fun ReportBuilderRenderer(
             chartSpec = chartSpec,
             viewMode = viewMode,
             staticFilters = staticFilters,
-            dynamicFilterValues = dynamicFilterValues,
-            dynamicFilterSelections = dynamicFilterSelections,
-            activeDynamicFilterKeys = activeDynamicFilterKeys
+            dynamicGroups = dynamicGroups
         )
     }
-    val requestPayload = remember(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicFilterValues, dynamicFilterSelections, activeDynamicFilterKeys) {
+    val requestPayload = remember(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups) {
         buildReportBuilderRequestPayload(
             config = config,
             selectedMeasures = selectedMeasures,
             selectedDimensions = selectedDimensions,
             staticFilters = staticFilters,
-            dynamicFilterValues = dynamicFilterValues,
-            dynamicFilterSelections = dynamicFilterSelections,
-            activeDynamicFilterKeys = activeDynamicFilterKeys,
+            dynamicGroups = dynamicGroups,
             hookState = hookState,
             hookInvoker = { functionName, props ->
-                invokeReportBuilderHook(
+                invokeReportBuilderWindowHook(
                     window = window,
                     functionName = functionName,
                     props = props
@@ -223,9 +228,8 @@ fun ReportBuilderRenderer(
                 chartSpec = state.chartSpec
                 viewMode = state.viewMode
                 staticFilters = state.staticFilters.mapValues { it.value.toRuntimeValue() }
-                dynamicFilterValues = state.dynamicFilterValues
-                dynamicFilterSelections = state.dynamicFilterSelections
-                activeDynamicFilterKeys = state.activeDynamicFilterKeys
+                dynamicGroups = migratedDynamicGroups(config, state)
+                dynamicFilterDrafts = state.dynamicFilterDrafts
             }
             restoredStoredState = true
         }
@@ -236,7 +240,7 @@ fun ReportBuilderRenderer(
             context.setInputParameters(requestPayload, fetch = true)
         }
     }
-    LaunchedEffect(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicFilterValues, dynamicFilterSelections, activeDynamicFilterKeys) {
+    LaunchedEffect(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
         persistStoredStateToWindowForm(
             runtime = runtime,
             windowId = window.windowId,
@@ -256,9 +260,11 @@ fun ReportBuilderRenderer(
                         else -> StoredStaticFilterValue.ListValue(emptyList())
                     }
                 },
-                dynamicFilterValues = dynamicFilterValues,
-                dynamicFilterSelections = dynamicFilterSelections,
-                activeDynamicFilterKeys = activeDynamicFilterKeys
+                dynamicGroups = dynamicGroups,
+                dynamicFilterDrafts = dynamicFilterDrafts,
+                dynamicFilterValues = legacyDynamicFilterValues(dynamicGroups),
+                dynamicFilterSelections = legacyDynamicFilterSelections(dynamicGroups),
+                activeDynamicFilterKeys = legacyActiveDynamicFilterKeys(dynamicGroups)
             )
         )
     }
@@ -305,11 +311,10 @@ fun ReportBuilderRenderer(
             DynamicFilterBridgeSection(
                 groups = config.dynamicFilterGroups,
                 families = config.dynamicFilterFamilies,
-                activeKeys = activeDynamicFilterKeys,
-                selections = dynamicFilterSelections,
+                rowsByGroupId = dynamicGroups,
                 drafts = dynamicFilterDrafts,
                 isLookupAvailable = { groupId, filter ->
-                    lookupDescriptor(
+                    lookupDescriptorForWindow(
                         window = window,
                         config = config,
                         hookState = hookState,
@@ -317,43 +322,68 @@ fun ReportBuilderRenderer(
                         filter = filter
                     ) != null
                 },
-                onAddFilter = { _, key ->
-                    activeDynamicFilterKeys = (activeDynamicFilterKeys + key).distinct()
+                onAddRow = { groupId, filterId ->
+                    val row = ReportBuilderDynamicRowState(
+                        id = java.util.UUID.randomUUID().toString(),
+                        filterId = filterId,
+                        enabled = true
+                    )
+                    dynamicGroups = dynamicGroups.toMutableMap().apply {
+                        put(groupId, this[groupId].orEmpty() + row)
+                    }
                 },
-                onRemoveFilter = { key ->
-                    activeDynamicFilterKeys = activeDynamicFilterKeys.filterNot { it == key }
-                    dynamicFilterValues = dynamicFilterValues.toMutableMap().apply { remove(key) }
-                    dynamicFilterSelections = dynamicFilterSelections.toMutableMap().apply { remove(key) }
-                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(key) }
+                onChangeFilter = { groupId, rowId, filterId ->
+                    dynamicGroups = dynamicGroups.toMutableMap().apply {
+                        put(groupId, this[groupId].orEmpty().map { row ->
+                            if (row.id == rowId) row.copy(filterId = filterId, selections = emptyList()) else row
+                        })
+                    }
+                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
                 },
-                onDraftChange = { key, value ->
-                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(key, value) }
+                onToggleEnabled = { groupId, rowId ->
+                    dynamicGroups = dynamicGroups.toMutableMap().apply {
+                        put(groupId, this[groupId].orEmpty().map { row ->
+                            if (row.id == rowId) row.copy(enabled = !row.enabled) else row
+                        })
+                    }
                 },
-                onAddManualSelection = { filter, key ->
-                    val selection = projectManualDynamicSelection(filter, dynamicFilterDrafts[key].orEmpty())
+                onRemoveRow = { groupId, rowId ->
+                    dynamicGroups = dynamicGroups.toMutableMap().apply {
+                        put(groupId, this[groupId].orEmpty().filterNot { it.id == rowId })
+                    }
+                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
+                },
+                onDraftChange = { rowId, value ->
+                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(rowId, value) }
+                },
+                onAddManualSelection = { groupId, rowId, filter ->
+                    val selection = projectManualDynamicSelection(filter, dynamicFilterDrafts[rowId].orEmpty())
                     if (selection != null) {
-                        val nextSelections = (dynamicFilterSelections[key].orEmpty() + listOf(selection))
-                            .distinctBy { dynamicSelectionValueKey(it.value) }
-                        dynamicFilterSelections = dynamicFilterSelections.toMutableMap().apply { put(key, nextSelections) }
-                        dynamicFilterValues = dynamicFilterValues.toMutableMap().apply {
-                            put(key, nextSelections.joinToString(",") { dynamicSelectionValueText(it.value) })
+                        dynamicGroups = dynamicGroups.toMutableMap().apply {
+                            put(groupId, this[groupId].orEmpty().map { row ->
+                                if (row.id == rowId) {
+                                    row.copy(
+                                        selections = (row.selections + selection)
+                                            .distinctBy { dynamicSelectionValueKey(it.value) }
+                                    )
+                                } else {
+                                    row
+                                }
+                            })
                         }
-                        dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(key, "") }
+                        dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(rowId, "") }
                     }
                 },
-                onRemoveSelection = { key, selection ->
-                    val nextSelections = dynamicFilterSelections[key].orEmpty()
-                        .filterNot { it == selection }
-                    dynamicFilterSelections = dynamicFilterSelections.toMutableMap().apply {
-                        if (nextSelections.isEmpty()) remove(key) else put(key, nextSelections)
-                    }
-                    dynamicFilterValues = dynamicFilterValues.toMutableMap().apply {
-                        if (nextSelections.isEmpty()) remove(key) else put(key, nextSelections.joinToString(",") { dynamicSelectionValueText(it.value) })
+                onRemoveSelection = { groupId, rowId, selection ->
+                    dynamicGroups = dynamicGroups.toMutableMap().apply {
+                        put(groupId, this[groupId].orEmpty().map { row ->
+                            if (row.id == rowId) row.copy(selections = row.selections.filterNot { it == selection }) else row
+                        })
                     }
                 },
-                onPickSelection = { groupId, filter, key ->
+                onPickSelection = { groupId, rowId, filter ->
                     coroutineScope.launch {
-                        val descriptor = lookupDescriptor(
+                        val descriptor = lookupDescriptorForWindow(
                             window = window,
                             config = config,
                             hookState = hookState,
@@ -368,15 +398,21 @@ fun ReportBuilderRenderer(
                         ) ?: return@launch
                         val projected = projectLookupSelections(filter, payload)
                         if (projected.isEmpty()) return@launch
-                        val nextSelections = if (filter.multiple == false) {
-                            listOf(projected.first())
-                        } else {
-                            (dynamicFilterSelections[key].orEmpty() + projected)
-                                .distinctBy { dynamicSelectionValueKey(it.value) }
-                        }
-                        dynamicFilterSelections = dynamicFilterSelections.toMutableMap().apply { put(key, nextSelections) }
-                        dynamicFilterValues = dynamicFilterValues.toMutableMap().apply {
-                            put(key, nextSelections.joinToString(",") { dynamicSelectionValueText(it.value) })
+                        dynamicGroups = dynamicGroups.toMutableMap().apply {
+                            put(groupId, this[groupId].orEmpty().map { row ->
+                                if (row.id == rowId) {
+                                    row.copy(
+                                        selections = if (filter.multiple == false) {
+                                            listOf(projected.first())
+                                        } else {
+                                            (row.selections + projected)
+                                                .distinctBy { dynamicSelectionValueKey(it.value) }
+                                        }
+                                    )
+                                } else {
+                                    row
+                                }
+                            })
                         }
                     }
                 }
@@ -426,16 +462,17 @@ fun ReportBuilderRenderer(
 private fun DynamicFilterBridgeSection(
     groups: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef>,
     families: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterFamilyDef>,
-    activeKeys: List<String>,
-    selections: Map<String, List<ReportBuilderDynamicSelectionState>>,
+    rowsByGroupId: Map<String, List<ReportBuilderDynamicRowState>>,
     drafts: Map<String, String>,
     isLookupAvailable: (String, ReportBuilderDynamicFilterDef) -> Boolean,
-    onAddFilter: (String, String) -> Unit,
-    onRemoveFilter: (String) -> Unit,
+    onAddRow: (String, String) -> Unit,
+    onChangeFilter: (String, String, String) -> Unit,
+    onToggleEnabled: (String, String) -> Unit,
+    onRemoveRow: (String, String) -> Unit,
     onDraftChange: (String, String) -> Unit,
-    onAddManualSelection: (ReportBuilderDynamicFilterDef, String) -> Unit,
-    onRemoveSelection: (String, ReportBuilderDynamicSelectionState) -> Unit,
-    onPickSelection: (String, ReportBuilderDynamicFilterDef, String) -> Unit
+    onAddManualSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit,
+    onRemoveSelection: (String, String, ReportBuilderDynamicSelectionState) -> Unit,
+    onPickSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit
 ) {
     if (groups.isEmpty() && families.isEmpty()) return
     Card(
@@ -457,12 +494,13 @@ private fun DynamicFilterBridgeSection(
                     DynamicFilterFamilyCard(
                         family = family,
                         groups = groups,
-                        activeKeys = activeKeys,
-                        selections = selections,
+                        rowsByGroupId = rowsByGroupId,
                         drafts = drafts,
                         isLookupAvailable = isLookupAvailable,
-                        onAddFilter = onAddFilter,
-                        onRemoveFilter = onRemoveFilter,
+                        onAddRow = onAddRow,
+                        onChangeFilter = onChangeFilter,
+                        onToggleEnabled = onToggleEnabled,
+                        onRemoveRow = onRemoveRow,
                         onDraftChange = onDraftChange,
                         onAddManualSelection = onAddManualSelection,
                         onRemoveSelection = onRemoveSelection,
@@ -475,12 +513,13 @@ private fun DynamicFilterBridgeSection(
                         title = group.label ?: group.id ?: "Group",
                         groupId = group.id ?: "",
                         filters = group.filters,
-                        activeKeys = activeKeys,
-                        selections = selections,
+                        rowsByGroupId = rowsByGroupId,
                         drafts = drafts,
                         isLookupAvailable = isLookupAvailable,
-                        onAddFilter = onAddFilter,
-                        onRemoveFilter = onRemoveFilter,
+                        onAddRow = onAddRow,
+                        onChangeFilter = onChangeFilter,
+                        onToggleEnabled = onToggleEnabled,
+                        onRemoveRow = onRemoveRow,
                         onDraftChange = onDraftChange,
                         onAddManualSelection = onAddManualSelection,
                         onRemoveSelection = onRemoveSelection,
@@ -496,16 +535,17 @@ private fun DynamicFilterBridgeSection(
 private fun DynamicFilterFamilyCard(
     family: com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterFamilyDef,
     groups: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef>,
-    activeKeys: List<String>,
-    selections: Map<String, List<ReportBuilderDynamicSelectionState>>,
+    rowsByGroupId: Map<String, List<ReportBuilderDynamicRowState>>,
     drafts: Map<String, String>,
     isLookupAvailable: (String, ReportBuilderDynamicFilterDef) -> Boolean,
-    onAddFilter: (String, String) -> Unit,
-    onRemoveFilter: (String) -> Unit,
+    onAddRow: (String, String) -> Unit,
+    onChangeFilter: (String, String, String) -> Unit,
+    onToggleEnabled: (String, String) -> Unit,
+    onRemoveRow: (String, String) -> Unit,
     onDraftChange: (String, String) -> Unit,
-    onAddManualSelection: (ReportBuilderDynamicFilterDef, String) -> Unit,
-    onRemoveSelection: (String, ReportBuilderDynamicSelectionState) -> Unit,
-    onPickSelection: (String, ReportBuilderDynamicFilterDef, String) -> Unit
+    onAddManualSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit,
+    onRemoveSelection: (String, String, ReportBuilderDynamicSelectionState) -> Unit,
+    onPickSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit
 ) {
     val includeFilters = groups.flatMap { it.filters }.filter { family.includeFilterIds.contains(it.id) }
     val excludeFilters = groups.flatMap { it.filters }.filter { family.excludeFilterIds.contains(it.id) }
@@ -522,10 +562,10 @@ private fun DynamicFilterFamilyCard(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6A7280))
             }
             if (includeFilters.isNotEmpty()) {
-                DynamicFilterGroupFields("Include", "include", includeFilters, activeKeys, selections, drafts, isLookupAvailable, onAddFilter, onRemoveFilter, onDraftChange, onAddManualSelection, onRemoveSelection, onPickSelection)
+                DynamicFilterGroupFields("Include", "include", includeFilters, rowsByGroupId, drafts, isLookupAvailable, onAddRow, onChangeFilter, onToggleEnabled, onRemoveRow, onDraftChange, onAddManualSelection, onRemoveSelection, onPickSelection)
             }
             if (excludeFilters.isNotEmpty()) {
-                DynamicFilterGroupFields("Exclude", "exclude", excludeFilters, activeKeys, selections, drafts, isLookupAvailable, onAddFilter, onRemoveFilter, onDraftChange, onAddManualSelection, onRemoveSelection, onPickSelection)
+                DynamicFilterGroupFields("Exclude", "exclude", excludeFilters, rowsByGroupId, drafts, isLookupAvailable, onAddRow, onChangeFilter, onToggleEnabled, onRemoveRow, onDraftChange, onAddManualSelection, onRemoveSelection, onPickSelection)
             }
         }
     }
@@ -536,69 +576,80 @@ private fun DynamicFilterGroupFields(
     title: String,
     groupId: String,
     filters: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterDef>,
-    activeKeys: List<String>,
-    selections: Map<String, List<ReportBuilderDynamicSelectionState>>,
+    rowsByGroupId: Map<String, List<ReportBuilderDynamicRowState>>,
     drafts: Map<String, String>,
     isLookupAvailable: (String, ReportBuilderDynamicFilterDef) -> Boolean,
-    onAddFilter: (String, String) -> Unit,
-    onRemoveFilter: (String) -> Unit,
+    onAddRow: (String, String) -> Unit,
+    onChangeFilter: (String, String, String) -> Unit,
+    onToggleEnabled: (String, String) -> Unit,
+    onRemoveRow: (String, String) -> Unit,
     onDraftChange: (String, String) -> Unit,
-    onAddManualSelection: (ReportBuilderDynamicFilterDef, String) -> Unit,
-    onRemoveSelection: (String, ReportBuilderDynamicSelectionState) -> Unit,
-    onPickSelection: (String, ReportBuilderDynamicFilterDef, String) -> Unit
+    onAddManualSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit,
+    onRemoveSelection: (String, String, ReportBuilderDynamicSelectionState) -> Unit,
+    onPickSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit
 ) {
-    var menuExpanded by remember(title, filters) { mutableStateOf(false) }
-    val activeFilters = filters.filter { activeKeys.contains(it.id) }
-    val availableFilters = filters.filterNot { activeKeys.contains(it.id) }
+    val rows = (rowsByGroupId[groupId] ?: emptyList()).filter { row ->
+        filters.any { it.id == row.filterId }
+    }
+    val defaultFilterId = filters.firstOrNull()?.id.orEmpty()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(title, style = MaterialTheme.typography.labelMedium, color = Color(0xFF607080), modifier = Modifier.weight(1f))
-            if (availableFilters.isNotEmpty()) {
-                Box {
-                    OutlinedButton(onClick = { menuExpanded = !menuExpanded }) {
-                        Icon(Icons.Filled.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add line")
-                    }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        availableFilters.forEach { filter ->
-                            DropdownMenuItem(
-                                text = { Text(filter.label ?: filter.id ?: "Filter") },
-                                onClick = {
-                                    menuExpanded = false
-                                    filter.id?.let { onAddFilter(groupId, it) }
-                                }
-                            )
-                        }
-                    }
+            if (defaultFilterId.isNotBlank()) {
+                OutlinedButton(onClick = { onAddRow(groupId, defaultFilterId) }) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Add line")
                 }
             }
         }
-        activeFilters.forEach { filter ->
-            val filterKey = filter.id ?: return@forEach
-            val chips = selections[filterKey].orEmpty()
+        rows.forEach { row ->
+            val filter = filters.firstOrNull { it.id == row.filterId } ?: return@forEach
+            val rowId = row.id
+            val chips = row.selections
+            var rowMenuExpanded by remember(rowId, filters) { mutableStateOf(false) }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { rowMenuExpanded = true }) {
+                            Text(filter.label ?: filter.id ?: "Filter")
+                            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(expanded = rowMenuExpanded, onDismissRequest = { rowMenuExpanded = false }) {
+                            filters.forEach { candidate ->
+                                DropdownMenuItem(
+                                    text = { Text(candidate.label ?: candidate.id ?: "Filter") },
+                                    onClick = {
+                                        rowMenuExpanded = false
+                                        candidate.id?.let { onChangeFilter(groupId, rowId, it) }
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = { onToggleEnabled(groupId, rowId) }) {
+                        Text(if (row.enabled) "On" else "Off")
+                    }
                     OutlinedTextField(
-                        value = drafts[filterKey].orEmpty(),
-                        onValueChange = { next -> onDraftChange(filterKey, next) },
+                        value = drafts[rowId].orEmpty(),
+                        onValueChange = { next -> onDraftChange(rowId, next) },
                         modifier = Modifier.weight(1f),
-                        label = { Text(filter.label ?: filterKey) },
-                        placeholder = { Text(filter.manualPlaceholder ?: "Comma-separated values") }
+                        label = { Text(filter.label ?: rowId) },
+                        placeholder = { Text(filter.manualPlaceholder ?: "Enter value") }
                     )
                     Button(
                         onClick = {
-                            onAddManualSelection(filter, filterKey)
+                            onAddManualSelection(groupId, rowId, filter)
                         }
                     ) {
                         Text("Add")
                     }
                     if (isLookupAvailable(groupId, filter)) {
-                        OutlinedButton(onClick = { onPickSelection(groupId, filter, filterKey) }) {
+                        OutlinedButton(onClick = { onPickSelection(groupId, rowId, filter) }) {
                             Text("Pick")
                         }
                     }
-                    OutlinedButton(onClick = { onRemoveFilter(filterKey) }) {
+                    OutlinedButton(onClick = { onRemoveRow(groupId, rowId) }) {
                         Icon(Icons.Filled.Delete, contentDescription = null)
                     }
                 }
@@ -610,7 +661,7 @@ private fun DynamicFilterGroupFields(
                         chips.forEach { chip ->
                             AssistChip(
                                 onClick = {
-                                    onRemoveSelection(filterKey, chip)
+                                    onRemoveSelection(groupId, rowId, chip)
                                 },
                                 label = { Text(chip.label.ifBlank { dynamicSelectionValueText(chip.value) }) },
                                 trailingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
@@ -983,14 +1034,12 @@ private fun buildChartRows(rows: List<AggregatedRow>, chartSpec: ReportBuilderCh
     return grouped.values.map { it.toMap() }
 }
 
-private fun buildReportBuilderRequestPayload(
+internal fun buildReportBuilderRequestPayload(
     config: com.viant.forgeandroid.runtime.DashboardReportBuilderDef,
     selectedMeasures: List<String>,
     selectedDimensions: List<String>,
     staticFilters: Map<String, Any?>,
-    dynamicFilterValues: Map<String, String>,
-    dynamicFilterSelections: Map<String, List<ReportBuilderDynamicSelectionState>>,
-    activeDynamicFilterKeys: List<String>,
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>,
     hookState: Map<String, Any?>,
     hookInvoker: (String, JsonObject) -> Map<String, Any?>?
 ): Map<String, Any?> {
@@ -1024,30 +1073,21 @@ private fun buildReportBuilderRequestPayload(
         }
     }
     config.dynamicFilterGroups.forEach { group ->
+        val rows = dynamicGroups[group.id].orEmpty()
         group.filters.forEach filterLoop@ { filter ->
             val filterKey = filter.id ?: return@filterLoop
             val requestMapping = (filter.requestMapping ?: "").trim().lowercase()
             if (requestMapping == "hook") return@filterLoop
-            val selectionValues = dynamicFilterSelections[filterKey]
-                ?.map { dynamicSelectionRequestValue(filter, it.value) }
-                ?.filterNotNull()
-                .orEmpty()
-            val mapped: Any? = if (selectionValues.isNotEmpty()) {
-                if (filter.multiple == true || filter.emitArray == true) {
-                    selectionValues
-                } else {
-                    selectionValues.first()
+            val values = rows
+                .filter { it.filterId == filterKey && it.enabled }
+                .flatMap { row ->
+                    row.selections.mapNotNull { dynamicSelectionRequestValue(filter, it.value) }
                 }
+            if (values.isEmpty()) return@filterLoop
+            val mapped: Any? = if (filter.multiple == true || filter.emitArray == true) {
+                values
             } else {
-                val raw = dynamicFilterValues[filterKey]?.trim().orEmpty()
-                if (raw.isEmpty()) return@filterLoop
-                val parts = raw.split(",").map { it.trim() }.mapNotNull { normalizeDynamicFilterValue(filter, it) }
-                if (parts.isEmpty()) return@filterLoop
-                if (filter.multiple == true || filter.emitArray == true) {
-                    parts.map { coerceDynamicFilterRequestValue(filter, it) }
-                } else {
-                    coerceDynamicFilterRequestValue(filter, parts.first())
-                }
+                values.first()
             }
             setNestedValue(request, filter.paramPath ?: "filters.$filterKey", mapped)
         }
@@ -1063,7 +1103,10 @@ private fun buildReportBuilderRequestPayload(
             mapOf(
                 "request" to JsonUtil.anyToElement(baseRequest),
                 "state" to JsonUtil.anyToElement(hookState),
-                "config" to Json.encodeToJsonElement(config)
+                "config" to JsonUtil.json.encodeToJsonElement(
+                    com.viant.forgeandroid.runtime.DashboardReportBuilderDef.serializer(),
+                    config
+                )
             )
         )
     ) ?: return baseRequest
@@ -1141,9 +1184,7 @@ private fun currentReportBuilderHookState(
     chartSpec: ReportBuilderChartSpecDef?,
     viewMode: String,
     staticFilters: Map<String, Any?>,
-    dynamicFilterValues: Map<String, String>,
-    dynamicFilterSelections: Map<String, List<ReportBuilderDynamicSelectionState>>,
-    activeDynamicFilterKeys: List<String>
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
 ): Map<String, Any?> {
     return linkedMapOf(
         "selectedMeasures" to selectedMeasures,
@@ -1151,36 +1192,22 @@ private fun currentReportBuilderHookState(
         "chartSpec" to chartSpec,
         "viewMode" to viewMode,
         "staticFilters" to staticFilters,
-        "dynamicFilterValues" to dynamicFilterValues,
-        "activeDynamicFilterKeys" to activeDynamicFilterKeys,
-        "dynamicGroups" to synthesizeDynamicGroups(config, activeDynamicFilterKeys, dynamicFilterSelections, dynamicFilterValues)
+        "dynamicFilterValues" to legacyDynamicFilterValues(dynamicGroups),
+        "activeDynamicFilterKeys" to legacyActiveDynamicFilterKeys(dynamicGroups),
+        "dynamicGroups" to synthesizeDynamicGroups(dynamicGroups)
     )
 }
 
 private fun synthesizeDynamicGroups(
-    config: com.viant.forgeandroid.runtime.DashboardReportBuilderDef,
-    activeDynamicFilterKeys: List<String>,
-    dynamicFilterSelections: Map<String, List<ReportBuilderDynamicSelectionState>>,
-    dynamicFilterValues: Map<String, String>
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
 ): Map<String, Any?> {
-    val activeKeySet = activeDynamicFilterKeys.toSet()
-    return config.dynamicFilterGroups.associate { group ->
-        val rows = group.filters.mapNotNull { filter ->
-            val filterKey = filter.id ?: return@mapNotNull null
-            if (!activeKeySet.contains(filterKey)) return@mapNotNull null
-            val selections = dynamicFilterSelections[filterKey].orEmpty().ifEmpty {
-                dynamicFilterValues[filterKey]
-                    ?.split(",")
-                    ?.map { it.trim() }
-                    ?.filter { it.isNotEmpty() }
-                    ?.mapNotNull { raw -> projectManualDynamicSelection(filter, raw) }
-                    .orEmpty()
-            }
+    return dynamicGroups.mapValues { (_, rows) ->
+        rows.map { row ->
             linkedMapOf(
-                "id" to filterKey,
-                "filterId" to filterKey,
-                "enabled" to true,
-                "selections" to selections.map { selection ->
+                "id" to row.id,
+                "filterId" to row.filterId,
+                "enabled" to row.enabled,
+                "selections" to row.selections.map { selection ->
                     linkedMapOf(
                         "value" to JsonUtil.elementToAny(selection.value),
                         "label" to selection.label,
@@ -1190,11 +1217,74 @@ private fun synthesizeDynamicGroups(
                 }
             )
         }
-        group.id.orEmpty() to rows
     }
 }
 
-private fun invokeReportBuilderHook(
+internal fun migratedDynamicGroups(
+    config: com.viant.forgeandroid.runtime.DashboardReportBuilderDef,
+    state: StoredReportBuilderState
+): Map<String, List<ReportBuilderDynamicRowState>> {
+    if (state.dynamicGroups.isNotEmpty()) {
+        return state.dynamicGroups
+    }
+    val filterToGroup = config.dynamicFilterGroups.flatMap { group ->
+        group.filters.mapNotNull { filter -> filter.id?.let { id -> id to (group.id ?: "") } }
+    }.toMap()
+    val activeKeys = state.activeDynamicFilterKeys.toSet()
+    val result = linkedMapOf<String, MutableList<ReportBuilderDynamicRowState>>()
+    activeKeys.forEach { filterKey ->
+        val groupId = filterToGroup[filterKey].orEmpty()
+        if (groupId.isBlank()) return@forEach
+        val filter = config.dynamicFilterGroups
+            .firstOrNull { it.id == groupId }
+            ?.filters
+            ?.firstOrNull { it.id == filterKey }
+            ?: return@forEach
+        val selections = state.dynamicFilterSelections[filterKey].orEmpty().ifEmpty {
+            state.dynamicFilterValues[filterKey]
+                ?.split(",")
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?.mapNotNull { raw -> projectManualDynamicSelection(filter, raw) }
+                .orEmpty()
+        }
+        result.getOrPut(groupId) { mutableListOf() }.add(
+            ReportBuilderDynamicRowState(
+                id = filterKey,
+                filterId = filterKey,
+                enabled = true,
+                selections = selections
+            )
+        )
+    }
+    return result
+}
+
+internal fun legacyDynamicFilterValues(
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
+): Map<String, String> {
+    val result = linkedMapOf<String, String>()
+    dynamicGroups.values.flatten().forEach { row ->
+        result[row.filterId] = row.selections.joinToString(",") { dynamicSelectionValueText(it.value) }
+    }
+    return result
+}
+
+internal fun legacyDynamicFilterSelections(
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
+): Map<String, List<ReportBuilderDynamicSelectionState>> {
+    val result = linkedMapOf<String, List<ReportBuilderDynamicSelectionState>>()
+    dynamicGroups.values.flatten().forEach { row ->
+        result[row.filterId] = row.selections
+    }
+    return result
+}
+
+internal fun legacyActiveDynamicFilterKeys(
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
+): List<String> = dynamicGroups.values.flatten().map { it.filterId }.distinct()
+
+private fun invokeReportBuilderWindowHook(
     window: com.viant.forgeandroid.runtime.WindowContext,
     functionName: String,
     props: JsonObject
@@ -1202,7 +1292,7 @@ private fun invokeReportBuilderHook(
     return invokeReportBuilderHook(window.metadata.peek(), functionName, props)
 }
 
-private fun lookupDescriptor(
+private fun lookupDescriptorForWindow(
     window: com.viant.forgeandroid.runtime.WindowContext,
     config: com.viant.forgeandroid.runtime.DashboardReportBuilderDef,
     hookState: Map<String, Any?>,
@@ -1378,7 +1468,13 @@ internal fun persistStoredStateToWindowForm(
     state: StoredReportBuilderState
 ) {
     val payload = linkedMapOf<String, Any?>()
-    setNestedValue(payload, stateKey, JsonUtil.elementToAny(Json.encodeToJsonElement(state)))
+    setNestedValue(
+        payload,
+        stateKey,
+        JsonUtil.elementToAny(
+            JsonUtil.json.encodeToJsonElement(StoredReportBuilderState.serializer(), state)
+        )
+    )
     runtime.setWindowFormValue(windowId, payload)
 }
 

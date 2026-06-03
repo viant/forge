@@ -101,4 +101,48 @@ class WindowFormRuntimeTest {
         val windowForm = runtime.windowFormValue(state.windowId)
         assertEquals("day", windowForm["granularity"])
     }
+
+    @Test
+    fun dataSourceSetWindowFormDataResolvesWindowFormParameters() {
+        val runtime = ForgeRuntime(
+            endpoints = emptyMap(),
+            scope = CoroutineScope(Dispatchers.Unconfined)
+        )
+        val state = runtime.openWindowInline(
+            windowKey = "metrics",
+            title = "Metrics",
+            metadata = WindowMetadata(
+                dataSources = mapOf(
+                    "runs" to DataSourceDef()
+                )
+            )
+        )
+
+        runtime.setWindowFormValue(
+            state.windowId,
+            mapOf(
+                "prefill" to mapOf(
+                    "orderId" to 2637048,
+                    "granularity" to "hour"
+                )
+            ),
+            replace = true
+        )
+
+        val context = runtime.windowContext(state.windowId).context("runs")
+        runtime.execute(
+            ExecutionDef(
+                handler = "dataSource.setWindowFormData",
+                parameters = listOf(
+                    ParameterDef(name = "selectedOrderId", input = "windowForm", location = "prefill.orderId"),
+                    ParameterDef(name = "selectedGranularity", input = "windowForm", location = "prefill.granularity")
+                )
+            ),
+            context
+        )
+
+        val windowForm = runtime.windowFormValue(state.windowId)
+        assertEquals(2637048, windowForm["selectedOrderId"])
+        assertEquals("hour", windowForm["selectedGranularity"])
+    }
 }

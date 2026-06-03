@@ -43,7 +43,7 @@ public enum MetadataResolver {
 
         var result: [String: JSONValue] = [:]
         for (key, value) in working {
-            if key == "target" || key == "targetOverrides" {
+            if shouldStripTargetingKey(key, value) {
                 continue
             }
             if let resolved = resolveValue(value, for: targetContext) {
@@ -116,16 +116,49 @@ public enum MetadataResolver {
             let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
             return trimmed.isEmpty ? nil : NormalizedTarget(platforms: [trimmed])
         case .array(let values):
-            return NormalizedTarget(platforms: stringList(.array(values)))
+            return normalizedTargetOrNil(NormalizedTarget(platforms: stringList(.array(values))))
         case .object(let object):
-            return NormalizedTarget(
-                platforms: stringList(object["platforms"]),
-                excludePlatforms: stringList(object["excludePlatforms"]),
-                formFactors: stringList(object["formFactors"]),
-                capabilities: stringList(object["capabilities"])
+            return normalizedTargetOrNil(
+                NormalizedTarget(
+                    platforms: stringList(object["platforms"]),
+                    excludePlatforms: stringList(object["excludePlatforms"]),
+                    formFactors: stringList(object["formFactors"]),
+                    capabilities: stringList(object["capabilities"])
+                )
             )
         default:
             return nil
+        }
+    }
+
+    private static func normalizedTargetOrNil(_ target: NormalizedTarget) -> NormalizedTarget? {
+        guard
+            !target.platforms.isEmpty ||
+            !target.excludePlatforms.isEmpty ||
+            !target.formFactors.isEmpty ||
+            !target.capabilities.isEmpty
+        else {
+            return nil
+        }
+        return target
+    }
+
+    private static func shouldStripTargetingKey(_ key: String, _ value: JSONValue) -> Bool {
+        switch key {
+        case "target":
+            return normalizeTarget(value) != nil
+        case "targetOverrides":
+            guard case .object(let object) = value else {
+                return false
+            }
+            return !object.isEmpty && object.values.allSatisfy {
+                if case .object = $0 {
+                    return true
+                }
+                return false
+            }
+        default:
+            return false
         }
     }
 
