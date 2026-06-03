@@ -279,11 +279,13 @@ class DataSourceRuntime(
     }
 
     private fun resolveParameterValue(ctx: DataSourceContext, parameter: ParameterDef): Any? {
-        return when ((parameter.from ?: "").lowercase()) {
+        val source = ((parameter.from ?: "").ifBlank { parameter.input ?: "" }).lowercase()
+        return when (source) {
             "const" -> parameter.location
             "form" -> parameter.location?.let { ctx.peekForm()[it] }
             "filter", "input.query", "query" -> parameter.location?.let { ctx.peekFilter()[it] }
             "selection" -> parameter.location?.let { SelectorUtil.resolve(ctx.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
+            "windowform" -> parameter.location?.let { SelectorUtil.resolve(ctx.window.peekWindowForm(), it) }
             else -> parameter.location?.let { ctx.peekFilter()[it] } ?: parameter.location
         }
     }

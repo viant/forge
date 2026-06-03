@@ -6,12 +6,20 @@ public actor ForgeRuntime {
         public let dataSourceRef: String
         public let dataSource: DataSourceDef
         public let input: InputState
+        public let resolvedInputs: [String: JSONValue]
 
-        public init(windowID: String, dataSourceRef: String, dataSource: DataSourceDef, input: InputState) {
+        public init(
+            windowID: String,
+            dataSourceRef: String,
+            dataSource: DataSourceDef,
+            input: InputState,
+            resolvedInputs: [String: JSONValue] = [:]
+        ) {
             self.windowID = windowID
             self.dataSourceRef = dataSourceRef
             self.dataSource = dataSource
             self.input = input
+            self.resolvedInputs = resolvedInputs
         }
     }
 
@@ -380,7 +388,23 @@ public actor ForgeRuntime {
                         windowID: windowID,
                         dataSourceRef: dataSourceRef,
                         dataSource: dataSource,
-                        input: input
+                        input: input,
+                        resolvedInputs: ParameterResolver.resolve(
+                            parameters: dataSource.parameters,
+                            context: ParameterResolver.ResolutionContext(
+                                identityDataSourceRef: dataSourceRef,
+                                dataSources: [
+                                    dataSourceRef: ParameterResolver.DataSourceSnapshot(
+                                        selectionMode: dataSource.selectionMode,
+                                        form: await dataSourceRuntime.form(dataSourceID: dataSourceID),
+                                        selection: await dataSourceRuntime.selection(dataSourceID: dataSourceID),
+                                        input: input
+                                    )
+                                ],
+                                windowForm: await windowFormJSONValue(windowID: windowID),
+                                metadata: metadata
+                            )
+                        )
                     )
                 ) {
                     let hookedRows = applyCollectionHook(metadata: metadata, rows: result.rows)

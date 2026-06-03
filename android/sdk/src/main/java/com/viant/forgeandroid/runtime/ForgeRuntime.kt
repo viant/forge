@@ -18,7 +18,8 @@ class ForgeRuntime(
         val windowId: String,
         val dataSourceRef: String,
         val dataSource: DataSourceDef,
-        val input: InputState
+        val input: InputState,
+        val resolvedInputs: Map<String, Any?> = emptyMap()
     )
 
     data class DataSourceFetchResult(
@@ -61,7 +62,8 @@ class ForgeRuntime(
                     windowId = context.window.windowId,
                     dataSourceRef = context.dataSourceRef,
                     dataSource = context.dataSource,
-                    input = context.input.peek()
+                    input = context.input.peek(),
+                    resolvedInputs = parameterResolver.resolveFlat(context.dataSource.parameters, context)
                 )
             )?.let {
                 DataSourceRuntime.LoaderResult(
@@ -134,6 +136,14 @@ class ForgeRuntime(
 
     fun windowContext(windowId: String): WindowContext = windowRuntime.context(windowId, metadataSignal(windowId))
 
+    fun setWindowFormValues(
+        windowId: String,
+        values: Map<String, Any?>,
+        replace: Boolean = false
+    ) {
+        setWindowFormValue(windowId, values, replace)
+    }
+
     fun refreshDataSourceCollection(windowID: String, dataSourceRef: String) {
         windowContext(windowID).contextOrNull(dataSourceRef)?.fetchCollection()
     }
@@ -162,7 +172,8 @@ class ForgeRuntime(
                 val meta = restClient.get("appAPI", "${windowMetadataBaseUri.trimEnd('/')}/${window.windowKey}") { body ->
                     val parsed = json.parseToJsonElement(body)
                     val resolved = MetadataResolver.resolve(parsed, targetContext) ?: parsed
-                    json.decodeFromJsonElement<WindowMetadata>(resolved)
+                    val normalized = normalizeWindowMetadataJson(resolved)
+                    json.decodeFromJsonElement<WindowMetadata>(normalized)
                 }
                 signals.metadata(window.windowId).set(meta)
                 reconcileWindowForm(window.windowId, meta, window.parameters)
@@ -176,7 +187,7 @@ class ForgeRuntime(
     private fun resolveMetadata(metadata: WindowMetadata): WindowMetadata {
         val parsed = json.parseToJsonElement(json.encodeToString(metadata))
         val resolved = MetadataResolver.resolve(parsed, targetContext) ?: parsed
-        return json.decodeFromJsonElement(resolved)
+        return json.decodeFromJsonElement(normalizeWindowMetadataJson(resolved))
     }
 
     internal fun openDialog(

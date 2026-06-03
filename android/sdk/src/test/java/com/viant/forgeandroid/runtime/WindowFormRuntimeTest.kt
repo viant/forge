@@ -145,4 +145,51 @@ class WindowFormRuntimeTest {
         assertEquals(2637048, windowForm["selectedOrderId"])
         assertEquals("hour", windowForm["selectedGranularity"])
     }
+
+    @Test
+    fun parameterResolverResolvesWindowFormInputsForDatasourceParameters() {
+        val signals = SignalRegistry()
+        val metadata = Signal<WindowMetadata?>(null).also {
+            it.set(
+                WindowMetadata(
+                    dataSources = mapOf(
+                        "order_performance_period_today" to DataSourceDef(
+                            parameters = listOf(
+                                ParameterDef(name = "order_id", input = "windowForm", location = "AdOrderId.0"),
+                                ParameterDef(name = "period", input = "const", location = "today"),
+                                ParameterDef(name = "granularity", input = "windowForm", location = "granularity")
+                            )
+                        )
+                    )
+                )
+            )
+        }
+        val runtime = DataSourceRuntime(
+            signals = signals,
+            restClient = RestClient(EndpointRegistry(emptyMap())),
+            scope = CoroutineScope(Dispatchers.Unconfined)
+        )
+        val window = WindowContext(
+            windowId = "orderWindow",
+            metadata = metadata,
+            signals = signals,
+            dataSourceRuntime = runtime
+        )
+        val context = runtime.attach(window, "order_performance_period_today")
+        signals.form(WindowIdentity("orderWindow").windowFormId()).set(
+            mapOf(
+                "AdOrderId" to listOf(2673453),
+                "granularity" to "day"
+            )
+        )
+
+        val resolved = ParameterResolver().resolveFlat(
+            context.dataSource.parameters,
+            context
+        )
+
+        assertEquals("2673453", resolved["order_id"]?.toString())
+        assertEquals("today", resolved["period"])
+        assertEquals("day", resolved["granularity"])
+    }
 }

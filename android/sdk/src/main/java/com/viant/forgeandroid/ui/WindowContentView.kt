@@ -32,7 +32,9 @@ fun WindowContentView(
     runtime: ForgeRuntime,
     windowId: String,
     windowKey: String,
+    modifier: Modifier = Modifier,
     scrollEnabled: Boolean = true,
+    showWindowHeader: Boolean = true,
     canGoBack: Boolean = false,
     onBack: (() -> Unit)? = null
 ) {
@@ -73,8 +75,8 @@ fun WindowContentView(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        if (canGoBack || windowKey != "chat") {
+    Column(modifier = modifier.fillMaxSize()) {
+        if (showWindowHeader && (canGoBack || windowKey != "chat")) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

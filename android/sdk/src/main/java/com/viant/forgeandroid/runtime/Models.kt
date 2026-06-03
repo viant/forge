@@ -498,8 +498,8 @@ data class ChartDef(
     val xAxis: ChartAxisDef? = null,
     val yAxis: ChartAxisDef? = null,
     val series: ChartSeriesDef? = null,
-    val width: Int? = null,
-    val height: Int? = null,
+    val width: JsonElement? = null,
+    val height: JsonElement? = null,
     val type: String? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
