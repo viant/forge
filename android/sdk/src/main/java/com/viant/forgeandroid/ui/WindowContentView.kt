@@ -32,6 +32,7 @@ fun WindowContentView(
     runtime: ForgeRuntime,
     windowId: String,
     windowKey: String,
+    scrollEnabled: Boolean = true,
     canGoBack: Boolean = false,
     onBack: (() -> Unit)? = null
 ) {
@@ -96,14 +97,27 @@ fun WindowContentView(
             }
             HorizontalDivider()
         }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = true)
-                .verticalScroll(rememberScrollState())
-        ) {
-            containers.forEach { container ->
-                ContainerRenderer(runtime, context, container)
+        if (scrollEnabled) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = true)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                containers.forEach { container ->
+                    ContainerRenderer(runtime, context, container)
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .padding(bottom = 8.dp)
+            ) {
+                containers.forEach { container ->
+                    ContainerRenderer(runtime, context, container)
+                }
             }
         }
     }

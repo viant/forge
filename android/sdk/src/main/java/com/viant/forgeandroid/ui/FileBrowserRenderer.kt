@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.FileBrowserDef
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import kotlinx.coroutines.launch
 
 @Composable
 fun FileBrowserRenderer(runtime: ForgeRuntime, context: DataSourceContext, config: FileBrowserDef) {
@@ -38,6 +40,7 @@ fun FileBrowserRenderer(runtime: ForgeRuntime, context: DataSourceContext, confi
     val input by context.input.flow.collectAsState(initial = com.viant.forgeandroid.runtime.InputState())
     val selectedUri = rowLocation(selection.selected)
     val currentUri = input.filter["uri"]?.toString().orEmpty()
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         context.fetchCollection()
@@ -81,14 +84,16 @@ fun FileBrowserRenderer(runtime: ForgeRuntime, context: DataSourceContext, confi
                         if (!actionable) {
                             return@FileBrowserRow
                         }
-                        if (isFolder) {
-                            context.toggleSelection(row, index)
-                            context.setFilter(mapOf("uri" to uri))
-                        } else {
-                            context.toggleSelection(row, index)
-                        }
-                        config.on.forEach { exec ->
-                            runtime.execute(exec, context, mapOf("row" to row, "rowIndex" to index, "uri" to uri))
+                        coroutineScope.launch {
+                            if (isFolder) {
+                                context.toggleSelection(row, index)
+                                context.setFilter(mapOf("uri" to uri))
+                            } else {
+                                context.toggleSelection(row, index)
+                            }
+                            config.on.forEach { exec ->
+                                runtime.execute(exec, context, mapOf("row" to row, "rowIndex" to index, "uri" to uri))
+                            }
                         }
                     }
                 )

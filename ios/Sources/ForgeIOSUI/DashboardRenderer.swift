@@ -161,8 +161,8 @@ public struct DashboardRenderer: View {
                             .foregroundStyle(.secondary)
                         Text(DashboardRuntime.formatDashboardValue(value, format: metric.format))
                             .font(.headline.weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
                     .padding(.horizontal, 12)
@@ -377,7 +377,14 @@ public struct DashboardRenderer: View {
 
     @ViewBuilder
     private func messagesBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
-        let messages = container.dashboard?.messages?.items ?? []
+        let messages = container.dashboard?.messages?.items ?? container.items.map {
+            DashboardMessageDef(
+                severity: $0.severity,
+                title: $0.title ?? $0.label,
+                body: $0.body,
+                visibleWhen: $0.visibleWhen
+            )
+        }
         let visibleMessages = messages.filter {
             DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics)
         }

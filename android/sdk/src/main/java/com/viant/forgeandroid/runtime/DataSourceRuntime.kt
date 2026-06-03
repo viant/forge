@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -15,11 +16,24 @@ class DataSourceRuntime(
     private val restClient: RestClient,
     private val scope: CoroutineScope
 ) {
+    data class LoaderResult(
+        val rows: List<Map<String, Any?>> = emptyList(),
+        val metrics: Map<String, Any?> = emptyMap(),
+        val form: Map<String, Any?>? = null,
+        val selection: Map<String, Any?>? = null,
+        val rowIndex: Int? = null
+    )
+
     private val jobs = mutableMapOf<String, Job>()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
+    private var collectionLoader: (suspend (DataSourceContext) -> LoaderResult?)? = null
 
     fun setExecutor(executor: (ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit) {
         this.executor = executor
+    }
+
+    fun setCollectionLoader(loader: suspend (DataSourceContext) -> LoaderResult?) {
+        collectionLoader = loader
     }
 
     fun attach(window: WindowContext, dataSourceRef: String): DataSourceContext {
@@ -40,7 +54,8 @@ class DataSourceRuntime(
             input = signals.input(dsId),
             control = signals.control(dsId),
             metrics = signals.metrics(dsId),
-            eventDispatcher = { execution, args -> executor?.invoke(execution, this, args) }
+            eventDispatcher = { execution, args -> executor?.invoke(execution, this, args) },
+            selectionHook = { row, rowIndex -> applySelectionHook(this, row, rowIndex) }
         )
         applyInitialParameters(ctx)
 
@@ -73,7 +88,8 @@ class DataSourceRuntime(
             input = signals.input(dsId),
             control = signals.control(dsId),
             metrics = signals.metrics(dsId),
-            eventDispatcher = { execution, args -> executor?.invoke(execution, this, args) }
+            eventDispatcher = { execution, args -> executor?.invoke(execution, this, args) },
+            selectionHook = { row, rowIndex -> applySelectionHook(this, row, rowIndex) }
         )
         applyInitialParameters(ctx)
 
@@ -96,13 +112,46 @@ class DataSourceRuntime(
     }
 
     private suspend fun fetchCollection(ctx: DataSourceContext) {
-        val service = ctx.dataSource.service ?: return
-        val endpoint = service.endpoint
-        val uri = buildRequestUri(ctx) ?: return
-
         ctx.control.set(ctx.control.peek().copy(loading = true, error = null))
 
         try {
+            val loaderResult = collectionLoader?.invoke(ctx)
+            if (loaderResult != null) {
+                val data = applyCollectionHook(ctx, loaderResult.rows)
+                ctx.collection.set(data)
+                if (loaderResult.form != null) {
+                    ctx.form.set(loaderResult.form)
+                }
+                if (loaderResult.selection != null) {
+                    val preparedSelection = applySelectionHook(
+                        ctx,
+                        loaderResult.selection,
+                        loaderResult.rowIndex ?: -1
+                    )
+                    ctx.selection.set(
+                        SelectionState(
+                            selected = preparedSelection,
+                            rowIndex = loaderResult.rowIndex ?: -1
+                        )
+                    )
+                    if (loaderResult.form == null) {
+                        ctx.form.set(preparedSelection)
+                    }
+                } else if (ctx.dataSource.autoSelect != false && data.isNotEmpty() && ctx.peekSelection().selected == null) {
+                    ctx.toggleSelection(data.first(), 0)
+                }
+                ctx.metrics.set(loaderResult.metrics)
+                trigger(ctx, "onFetch", mapOf("collection" to data))
+                trigger(ctx, "onSuccess", mapOf("collection" to data))
+                ctx.control.set(ctx.control.peek().copy(loading = false, error = null))
+                ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
+                return
+            }
+
+            val service = ctx.dataSource.service ?: return
+            val endpoint = service.endpoint
+            val uri = buildRequestUri(ctx) ?: return
+
             val response = restClient.get(endpoint, uri) { JsonUtil.parseObject(it) }
             val data = applyCollectionHook(
                 ctx,
@@ -154,6 +203,31 @@ class DataSourceRuntime(
             }
             else -> rows
         }
+    }
+
+    private suspend fun applySelectionHook(
+        ctx: DataSourceContext,
+        row: Map<String, Any?>,
+        rowIndex: Int
+    ): Map<String, Any?> {
+        val code = ctx.window.metadata.peek()?.actions?.code?.trim().orEmpty()
+        if (code.isBlank()) {
+            return row
+        }
+        val result = ActionHookRuntime.invoke(
+            code = code,
+            functionName = "prepareSelection",
+            props = JsonObject(
+                mapOf(
+                    "selected" to JsonUtil.anyToElement(row),
+                    "rowIndex" to JsonPrimitive(rowIndex)
+                )
+            )
+        ) ?: return row
+        return (JsonUtil.elementToAny(result) as? Map<*, *>)
+            ?.entries
+            ?.associate { it.key.toString() to it.value }
+            ?: row
     }
 
     private fun buildRequestUri(ctx: DataSourceContext): String? {
@@ -296,11 +370,28 @@ class DataSourceRuntime(
         }
 
         val formSeed = payload
-            .filterKeys { it != "input" && it != "page" }
+            .filterKeys { it != "input" && it != "page" && it != "selection" && it != "selected" }
             .filterValues { it !is Map<*, *> || it.keys.none { key -> key in setOf("query", "path", "headers", "body") } }
         if (formSeed.isNotEmpty() && ctx.peekForm().isEmpty()) {
             ctx.setForm(formSeed)
         }
+
+        applyInitialSelection(ctx, payload)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun applyInitialSelection(ctx: DataSourceContext, payload: Map<String, Any?>) {
+        if (ctx.peekSelection().selected != null) {
+            return
+        }
+        val seed = (payload["selection"] as? Map<String, Any?>)
+            ?: (payload["selected"] as? Map<String, Any?>)
+            ?: return
+        if (seed.isEmpty()) {
+            return
+        }
+        val rowIndex = (payload["rowIndex"] as? Number)?.toInt() ?: -1
+        scope.launch { ctx.toggleSelection(seed, rowIndex) }
     }
 }
 
@@ -314,7 +405,8 @@ class DataSourceContext(
     val input: Signal<InputState>,
     val control: Signal<ControlState>,
     val metrics: Signal<Map<String, Any?>>,
-    private val eventDispatcher: DataSourceContext.(ExecutionDef, Map<String, Any?>) -> Unit = { _, _ -> }
+    private val eventDispatcher: DataSourceContext.(ExecutionDef, Map<String, Any?>) -> Unit = { _, _ -> },
+    private val selectionHook: suspend DataSourceContext.(Map<String, Any?>, Int) -> Map<String, Any?> = { row, _ -> row }
 ) {
     fun peekForm(): Map<String, Any?> = form.peek()
     fun setForm(values: Map<String, Any?>) = form.set(values)
@@ -323,8 +415,8 @@ class DataSourceContext(
     fun peekSelection(): SelectionState = selection.peek()
     fun setSelection(state: SelectionState) = selection.set(state)
 
-    fun resetSelection() {
-        val mode = dataSource.selectionMode ?: "single"
+    fun resetSelection(selectionModeOverride: String? = null) {
+        val mode = selectionModeOverride?.takeIf { it.isNotBlank() } ?: dataSource.selectionMode ?: "single"
         if (mode == "multi") {
             selection.set(SelectionState(selection = emptyList()))
         } else {
@@ -364,22 +456,31 @@ class DataSourceContext(
         input.set(input.peek().copy(fetch = true))
     }
 
-    fun toggleSelection(row: Map<String, Any?>, rowIndex: Int) {
-        val mode = dataSource.selectionMode ?: "single"
+    suspend fun toggleSelection(row: Map<String, Any?>, rowIndex: Int, selectionModeOverride: String? = null) {
+        val preparedRow = selectionHook(row, rowIndex)
+        val mode = selectionModeOverride?.takeIf { it.isNotBlank() } ?: dataSource.selectionMode ?: "single"
         if (mode == "multi") {
             val current = selection.peek().selection.toMutableList()
-            val exists = current.contains(row)
-            if (exists) current.remove(row) else current.add(row)
-            selection.set(selection.peek().copy(selection = current))
+            val exists = current.contains(preparedRow)
+            if (exists) current.remove(preparedRow) else current.add(preparedRow)
+            selection.set(selection.peek().copy(selected = current.lastOrNull(), selection = current))
         } else {
             val current = selection.peek()
-            if (current.rowIndex == rowIndex) {
-                resetSelection()
+            if (current.rowIndex == rowIndex || current.selected == preparedRow) {
+                resetSelection(selectionModeOverride)
                 form.set(emptyMap())
             } else {
-                selection.set(SelectionState(selected = row, rowIndex = rowIndex))
-                form.set(row)
-                trigger("onSelection", mapOf("row" to row, "rowIndex" to rowIndex, "selected" to row))
+                selection.set(SelectionState(selected = preparedRow, rowIndex = rowIndex))
+                form.set(preparedRow)
+                trigger(
+                    "onSelection",
+                    mapOf(
+                        "row" to preparedRow,
+                        "rowIndex" to rowIndex,
+                        "selected" to preparedRow,
+                        "sourceRow" to row
+                    )
+                )
             }
         }
     }

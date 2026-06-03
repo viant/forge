@@ -39,7 +39,7 @@ public enum ActionHookRuntime {
         if let capturedError {
             throw capturedError
         }
-        let fn = module.forProperty(functionName)
+        let fn = resolvePropertyPath(functionName, on: module)
         guard let fn, !fn.isUndefined else {
             throw ActionHookRuntimeError.missingFunction(functionName)
         }
@@ -52,6 +52,29 @@ public enum ActionHookRuntime {
             return nil
         }
         return try jsonValue(from: result)
+    }
+
+    private static func resolvePropertyPath(_ path: String, on root: JSValue) -> JSValue? {
+        let direct = root.forProperty(path)
+        if let direct, !direct.isUndefined {
+            return direct
+        }
+        let segments = path
+            .split(separator: ".")
+            .map(String.init)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !segments.isEmpty else {
+            return root.forProperty(path)
+        }
+        var current: JSValue? = root
+        for segment in segments {
+            current = current?.forProperty(segment)
+            if current?.isUndefined != false {
+                return current
+            }
+        }
+        return current
     }
 
     private static func foundationValue(from value: JSONValue) -> Any {

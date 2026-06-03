@@ -24,7 +24,10 @@ object ActionHookRuntime {
                 const __forge_module = ($code);
                 const __forge_props = $propsJson;
                 const __forge_fn_name = $fnNameJson;
-                const __forge_fn = __forge_module[__forge_fn_name];
+                const __forge_fn = String(__forge_fn_name || "")
+                  .split(".")
+                  .filter(Boolean)
+                  .reduce((current, key) => current == null ? undefined : current[key], __forge_module);
                 const __forge_result = typeof __forge_fn === "function"
                   ? __forge_fn(__forge_props)
                   : null;

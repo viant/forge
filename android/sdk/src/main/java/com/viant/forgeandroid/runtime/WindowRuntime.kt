@@ -86,8 +86,13 @@ class WindowContext(
     fun dialogSignal(dialogId: String): Signal<DialogState> {
         return signals.dialog("${windowId}Dialog$dialogId")
     }
+
+    fun peekWindowForm(): Map<String, Any?> {
+        return signals.form(identity.windowFormId()).peek()
+    }
 }
 
 data class WindowIdentity(val windowId: String) {
     fun dataSourceId(ref: String): String = "${windowId}DS$ref"
+    fun windowFormId(): String = "${windowId}:windowForm"
 }

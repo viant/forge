@@ -32,14 +32,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.TableDef
+import kotlinx.coroutines.launch
 
 @Composable
 fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: TableDef) {
@@ -47,6 +51,7 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
     val selection by context.selection.flow.collectAsState(initial = com.viant.forgeandroid.runtime.SelectionState())
     val metrics by context.metrics.flow.collectAsState(initial = emptyMap())
     val input by context.input.flow.collectAsState(initial = com.viant.forgeandroid.runtime.InputState())
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         context.fetchCollection()
@@ -62,7 +67,9 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     itemsIndexed(rows) { index, row ->
                         val isSelected = selection.rowIndex == index
-                        MobileTableCard(runtime, context, table, row, index, isSelected)
+                        MobileTableCard(runtime, context, table, row, index, isSelected) {
+                            coroutineScope.launch { context.toggleSelection(row, index) }
+                        }
                     }
                 }
             } else {
@@ -76,7 +83,9 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         itemsIndexed(rows) { index, row ->
                             val isSelected = selection.rowIndex == index
-                            DesktopTableRow(runtime, context, table, row, index, isSelected)
+                            DesktopTableRow(runtime, context, table, row, index, isSelected) {
+                                coroutineScope.launch { context.toggleSelection(row, index) }
+                            }
                         }
                     }
                 }
@@ -116,12 +125,14 @@ private fun MobileTableCard(
     table: TableDef,
     row: Map<String, Any?>,
     index: Int,
-    isSelected: Boolean
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit
 ) {
+    val uriHandler = LocalUriHandler.current
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { context.toggleSelection(row, index) },
+            .clickable(onClick = onToggleSelection),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) Color(0xFFF4F7FF) else Color.White
         ),
@@ -131,12 +142,16 @@ private fun MobileTableCard(
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             displayColumns(table).forEachIndexed { fieldIndex, col ->
                 val key = col.id ?: col.name ?: return@forEachIndexed
-                val value = row[key]?.toString().orEmpty()
+                val value = formatTableValue(row[key], col.format)
+                val linkUrl = resolveLinkUrl(row, col)
                 if (fieldIndex == 0) {
                     Text(
                         text = value.ifBlank { col.label ?: key },
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (linkUrl != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                        textDecoration = if (linkUrl != null) TextDecoration.Underline else null,
+                        modifier = if (linkUrl != null) Modifier.clickable { uriHandler.openUri(linkUrl) } else Modifier
                     )
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -147,7 +162,10 @@ private fun MobileTableCard(
                         )
                         Text(
                             text = value.ifBlank { "-" },
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (linkUrl != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                            textDecoration = if (linkUrl != null) TextDecoration.Underline else null,
+                            modifier = if (linkUrl != null) Modifier.clickable { uriHandler.openUri(linkUrl) } else Modifier
                         )
                     }
                 }
@@ -196,8 +214,10 @@ private fun DesktopTableRow(
     table: TableDef,
     row: Map<String, Any?>,
     index: Int,
-    isSelected: Boolean
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit
 ) {
+    val uriHandler = LocalUriHandler.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -205,7 +225,7 @@ private fun DesktopTableRow(
                 if (isSelected) Color(0xFFE8EEF9) else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
-            .clickable { context.toggleSelection(row, index) }
+            .clickable(onClick = onToggleSelection)
             .padding(horizontal = 10.dp, vertical = 12.dp)
     ) {
         table.columns.forEach { col ->
@@ -230,8 +250,8 @@ private fun DesktopTableRow(
                 }
                 else -> {
                     val key = col.id ?: col.name ?: ""
-                    val value = row[key]?.toString() ?: ""
-                    ValueColumnCell(value = value)
+                    val value = formatTableValue(row[key], col.format)
+                    ValueColumnCell(value = value, linkUrl = resolveLinkUrl(row, col), onOpenLink = uriHandler::openUri)
                 }
             }
         }
@@ -280,14 +300,22 @@ private fun RowScope.HeaderColumnCell(text: String, weight: Float = 1f) {
 }
 
 @Composable
-private fun RowScope.ValueColumnCell(value: String, weight: Float = 1f) {
+private fun RowScope.ValueColumnCell(
+    value: String,
+    linkUrl: String? = null,
+    onOpenLink: ((String) -> Unit)? = null,
+    weight: Float = 1f
+) {
     Text(
         text = value.ifBlank { "-" },
         style = MaterialTheme.typography.bodyMedium,
+        color = if (linkUrl != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+        textDecoration = if (linkUrl != null) TextDecoration.Underline else null,
         modifier = Modifier
             .weight(weight)
             .widthIn(min = 140.dp)
             .padding(end = 12.dp)
+            .then(if (linkUrl != null && onOpenLink != null) Modifier.clickable { onOpenLink(linkUrl) } else Modifier)
     )
 }
 
@@ -317,6 +345,24 @@ private fun executeRowAction(
         column.on.firstOrNull { it.event == event }
     } ?: return
     runtime.execute(execution, context, mapOf("row" to row, "rowIndex" to rowIndex))
+}
+
+private fun formatTableValue(value: Any?, format: String?): String {
+    if (value == null) {
+        return ""
+    }
+    return formatDashboardValue(value, format)
+}
+
+private fun resolveLinkUrl(row: Map<String, Any?>, column: ColumnDef): String? {
+    if (column.type?.trim()?.lowercase() != "link") {
+        return null
+    }
+    val hrefField = column.link?.href?.trim().orEmpty()
+    if (hrefField.isEmpty()) {
+        return null
+    }
+    return row[hrefField]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 @Composable

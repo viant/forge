@@ -91,9 +91,11 @@ public actor ForgeRuntime {
     private var defaultDataSourceBaseURL: URL?
     private let session: URLSession
     private var dataSourceLoader: (@Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?)?
+    private var windowMetadataLoader: (@Sendable (String) async throws -> WindowMetadata?)?
 
     var handlers: [String: ForgeHandler] = [:]
     private var pendingDialogs: [String: PendingDialog] = [:]
+    private var pendingDialogResults: [String: CheckedContinuation<[String: JSONValue]?, Never>] = [:]
     private var pendingWindows: [String: PendingWindow] = [:]
 
     public init(
@@ -123,6 +125,7 @@ public actor ForgeRuntime {
         Task {
             let signal = await signals.metadata(windowID: state.id)
             await signal.set(resolved)
+            await reconcileWindowForm(windowID: state.id, metadata: resolved, parameters: [:])
         }
         return state
     }
@@ -206,6 +209,12 @@ public actor ForgeRuntime {
         dataSourceLoader = loader
     }
 
+    public func registerWindowMetadataLoader(
+        _ loader: @escaping @Sendable (String) async throws -> WindowMetadata?
+    ) {
+        windowMetadataLoader = loader
+    }
+
     // MARK: - Form values
 
     public func setFormValue(windowID: String, dataSourceRef: String, values: [String: String]) async {
@@ -231,11 +240,15 @@ public actor ForgeRuntime {
     public func setDataSourceCollection(windowID: String, dataSourceRef: String, rows: [[String: JSONValue]]) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: rows)
+        let signal = await signals.collection(dataSourceID: dataSourceID)
+        await signal.set(rows)
     }
 
     public func setDataSourceForm(windowID: String, dataSourceRef: String, values: [String: JSONValue]) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: values)
+        let signal = await signals.form(dataSourceID: dataSourceID)
+        await signal.set(values)
     }
 
     public func setDataSourceSelection(
@@ -244,11 +257,76 @@ public actor ForgeRuntime {
         selected: [String: JSONValue]?,
         rowIndex: Int = -1
     ) async {
+        let selectionState: SelectionState
+        if let selected {
+            let metadataSignal = await signals.metadata(windowID: windowID)
+            let metadata = await metadataSignal.peek()
+            let preparedSelection = applySelectionHook(
+                metadata: metadata,
+                row: selected,
+                rowIndex: rowIndex
+            )
+            selectionState = SelectionState(selected: preparedSelection, rowIndex: rowIndex)
+        } else {
+            selectionState = SelectionState(rowIndex: rowIndex)
+        }
+        await setDataSourceSelectionState(
+            windowID: windowID,
+            dataSourceRef: dataSourceRef,
+            selection: selectionState
+        )
+    }
+
+    public func setDataSourceSelectionState(
+        windowID: String,
+        dataSourceRef: String,
+        selection: SelectionState
+    ) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        let selected = selection.selected
+            ?? selection.selection.last
+        let form = selected ?? [:]
         await dataSourceRuntime.setSelection(
             dataSourceID: dataSourceID,
-            selection: SelectionState(selected: selected, rowIndex: rowIndex)
+            selection: selection
         )
+        await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: form)
+        let selectionSignal = await signals.selection(dataSourceID: dataSourceID)
+        await selectionSignal.set(selection)
+        let formSignal = await signals.form(dataSourceID: dataSourceID)
+        await formSignal.set(form)
+    }
+
+    public func toggleDataSourceSelection(
+        windowID: String,
+        dataSourceRef: String,
+        row: [String: JSONValue],
+        rowIndex: Int = -1
+    ) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        let metadataSignal = await signals.metadata(windowID: windowID)
+        let metadata = await metadataSignal.peek()
+        let preparedSelection = applySelectionHook(
+            metadata: metadata,
+            row: row,
+            rowIndex: rowIndex
+        )
+        let current = await dataSourceRuntime.selection(dataSourceID: dataSourceID)
+        if current.selected == preparedSelection {
+            await setDataSourceSelection(
+                windowID: windowID,
+                dataSourceRef: dataSourceRef,
+                selected: nil,
+                rowIndex: -1
+            )
+        } else {
+            await setDataSourceSelection(
+                windowID: windowID,
+                dataSourceRef: dataSourceRef,
+                selected: row,
+                rowIndex: rowIndex
+            )
+        }
     }
 
     public func dataSourceCollection(windowID: String, dataSourceRef: String) async -> [[String: JSONValue]] {
@@ -259,6 +337,8 @@ public actor ForgeRuntime {
     public func setDataSourceMetrics(windowID: String, dataSourceRef: String, values: [String: JSONValue]) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: values)
+        let signal = await signals.metrics(dataSourceID: dataSourceID)
+        await signal.set(values)
     }
 
     public func dataSourceMetrics(windowID: String, dataSourceRef: String) async -> [String: JSONValue] {
@@ -274,6 +354,8 @@ public actor ForgeRuntime {
     ) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setInputParameters(dataSourceID: dataSourceID, parameters: parameters, fetch: fetch)
+        let signal = await signals.input(dataSourceID: dataSourceID)
+        await signal.set(await dataSourceRuntime.input(dataSourceID: dataSourceID))
     }
 
     public func refreshDataSourceCollection(
@@ -284,32 +366,67 @@ public actor ForgeRuntime {
     ) async {
         let signal = await signals.metadata(windowID: windowID)
         guard let metadata = await signal.peek() else { return }
-        guard let dataSource = metadata.dataSources[dataSourceRef] else { return }
+        guard let dataSource = metadata.dataSources[dataSourceRef] else {
+            print("ForgeRuntime datasource missing from metadata for \(dataSourceRef) on window \(windowID)")
+            return
+        }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
 
-        if let dataSourceLoader,
-           let result = try? await dataSourceLoader(
-               DataSourceFetchRequest(
-                   windowID: windowID,
-                   dataSourceRef: dataSourceRef,
-                   dataSource: dataSource,
-                   input: input
-               )
-           ) {
-            let hookedRows = applyCollectionHook(metadata: metadata, rows: result.rows)
-            await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
-            await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
-            if let form = result.form {
-                await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: form)
-            }
-            if let selection = result.selection {
-                await dataSourceRuntime.setSelection(
+        if let dataSourceLoader {
+            do {
+                if let result = try await dataSourceLoader(
+                    DataSourceFetchRequest(
+                        windowID: windowID,
+                        dataSourceRef: dataSourceRef,
+                        dataSource: dataSource,
+                        input: input
+                    )
+                ) {
+                    let hookedRows = applyCollectionHook(metadata: metadata, rows: result.rows)
+                    await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
+                    await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
+                    await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: ControlState())
+                    let collectionSignal = await signals.collection(dataSourceID: dataSourceID)
+                    await collectionSignal.set(hookedRows)
+                    let metricsSignal = await signals.metrics(dataSourceID: dataSourceID)
+                    await metricsSignal.set(result.metrics)
+                    let controlSignal = await signals.control(dataSourceID: dataSourceID)
+                    await controlSignal.set(ControlState())
+                    if let form = result.form {
+                        await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: form)
+                        let formSignal = await signals.form(dataSourceID: dataSourceID)
+                        await formSignal.set(form)
+                    }
+                    if let selection = result.selection {
+                        let preparedSelection = applySelectionHook(
+                            metadata: metadata,
+                            row: selection,
+                            rowIndex: result.rowIndex ?? -1
+                        )
+                        await dataSourceRuntime.setSelection(
+                            dataSourceID: dataSourceID,
+                            selection: SelectionState(selected: preparedSelection, rowIndex: result.rowIndex ?? -1)
+                        )
+                        let selectionSignal = await signals.selection(dataSourceID: dataSourceID)
+                        await selectionSignal.set(SelectionState(selected: preparedSelection, rowIndex: result.rowIndex ?? -1))
+                        if result.form == nil {
+                            await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: preparedSelection)
+                            let formSignal = await signals.form(dataSourceID: dataSourceID)
+                            await formSignal.set(preparedSelection)
+                        }
+                    }
+                    return
+                }
+            } catch {
+                print("ForgeRuntime datasource load failed for \(dataSourceRef): \(error)")
+                await dataSourceRuntime.setControl(
                     dataSourceID: dataSourceID,
-                    selection: SelectionState(selected: selection, rowIndex: result.rowIndex ?? -1)
+                    control: ControlState(error: error.localizedDescription)
                 )
+                let controlSignal = await signals.control(dataSourceID: dataSourceID)
+                await controlSignal.set(ControlState(error: error.localizedDescription))
             }
-            return
         }
 
         let resolvedPath = dataSource.service?.uri ?? dataSource.uri
@@ -329,6 +446,16 @@ public actor ForgeRuntime {
             additionalHeaders: additionalHeaders,
             session: session
         )
+        let collectionSignal = await signals.collection(dataSourceID: dataSourceID)
+        await collectionSignal.set(await dataSourceRuntime.collection(dataSourceID: dataSourceID))
+        let metricsSignal = await signals.metrics(dataSourceID: dataSourceID)
+        await metricsSignal.set(await dataSourceRuntime.metrics(dataSourceID: dataSourceID))
+        let formSignal = await signals.form(dataSourceID: dataSourceID)
+        await formSignal.set(await dataSourceRuntime.form(dataSourceID: dataSourceID))
+        let selectionSignal = await signals.selection(dataSourceID: dataSourceID)
+        await selectionSignal.set(await dataSourceRuntime.selection(dataSourceID: dataSourceID))
+        let controlSignal = await signals.control(dataSourceID: dataSourceID)
+        await controlSignal.set(await dataSourceRuntime.control(dataSourceID: dataSourceID))
     }
 
     // MARK: - Handler registry
@@ -361,6 +488,17 @@ public actor ForgeRuntime {
 
     func pendingDialog(_ key: String) -> PendingDialog? { pendingDialogs[key] }
 
+    func registerPendingDialogResult(
+        _ key: String,
+        _ continuation: CheckedContinuation<[String: JSONValue]?, Never>
+    ) {
+        pendingDialogResults[key] = continuation
+    }
+
+    func resolvePendingDialogResult(_ key: String, payload: [String: JSONValue]?) {
+        pendingDialogResults.removeValue(forKey: key)?.resume(returning: payload)
+    }
+
     func registerPendingWindow(_ id: String, _ pending: PendingWindow) {
         pendingWindows[id] = pending
     }
@@ -373,20 +511,22 @@ public actor ForgeRuntime {
 
     // MARK: - Dialog lifecycle
 
-    func openDialog(windowID: String, dialogID: String, parameters: [String: JSONValue]) {
-        Task {
-            let sig = await signals.dialog(dialogID: "\(windowID)Dialog\(dialogID)")
-            await sig.set(DialogState(open: true, props: parameters))
-        }
+    func openDialog(
+        windowID: String,
+        dialogID: String,
+        parameters: [String: JSONValue],
+        selectionMode: String? = nil
+    ) async {
+        let sig = await signals.dialog(dialogID: "\(windowID)Dialog\(dialogID)")
+        await sig.set(DialogState(open: true, selectionMode: selectionMode, props: parameters, args: parameters))
     }
 
-    func closeDialog(windowID: String, dialogID: String) {
+    func closeDialog(windowID: String, dialogID: String) async {
         let key = "\(windowID)Dialog\(dialogID)"
-        Task {
-            let sig = await signals.dialog(dialogID: key)
-            await sig.set(DialogState(open: false))
-        }
+        let sig = await signals.dialog(dialogID: key)
+        await sig.set(DialogState(open: false))
         pendingDialogs.removeValue(forKey: key)
+        resolvePendingDialogResult(windowID: windowID, dialogID: dialogID, payload: nil)
     }
 
     // MARK: - Outbound parameter application
@@ -414,6 +554,35 @@ public actor ForgeRuntime {
         if await signal.peek() != nil {
             return
         }
+        if let windowMetadataLoader {
+            do {
+                if let resolved = try await windowMetadataLoader(state.key) {
+                    if let index = windows.firstIndex(where: { $0.id == state.id }) {
+                        let existing = windows[index]
+                        windows[index] = WindowState(
+                            id: existing.id,
+                            key: existing.key,
+                            title: existing.title,
+                            metadata: resolved,
+                            inTab: existing.inTab,
+                            parameters: existing.parameters,
+                            conversationID: existing.conversationID,
+                            presentation: existing.presentation,
+                            region: existing.region,
+                            workspaceSharePct: existing.workspaceSharePct,
+                            workspaceMinHeight: existing.workspaceMinHeight,
+                            parentKey: existing.parentKey,
+                            isModal: existing.isModal
+                        )
+                    }
+                    await signal.set(resolved)
+                    await reconcileWindowForm(windowID: state.id, metadata: resolved, parameters: state.parameters)
+                    return
+                }
+            } catch {
+                print("ForgeRuntime metadata loader failed for \(state.key): \(error)")
+            }
+        }
         guard let endpoint = metadataURL(for: state.key) else {
             await signal.set(nil)
             return
@@ -440,6 +609,7 @@ public actor ForgeRuntime {
                 )
             }
             await signal.set(resolved)
+            await reconcileWindowForm(windowID: state.id, metadata: resolved, parameters: state.parameters)
         } catch {
             print("ForgeRuntime metadata load failed for \(state.key): \(error)")
             await signal.set(nil)
@@ -501,6 +671,29 @@ public actor ForgeRuntime {
             return rows
         }
         return transformedRows.compactMap(\.objectValue)
+    }
+
+    private func applySelectionHook(
+        metadata: WindowMetadata?,
+        row: [String: JSONValue],
+        rowIndex: Int
+    ) -> [String: JSONValue] {
+        guard let code = metadata?.actions?.code?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !code.isEmpty else {
+            return row
+        }
+        let props: JSONValue = .object([
+            "selected": .object(row),
+            "rowIndex": .number(Double(rowIndex))
+        ])
+        guard let result = try? ActionHookRuntime.invoke(
+            code: code,
+            functionName: "prepareSelection",
+            props: props
+        ) else {
+            return row
+        }
+        return result.objectValue ?? row
     }
 }
 

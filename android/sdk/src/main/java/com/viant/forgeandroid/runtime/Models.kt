@@ -1,13 +1,17 @@
 package com.viant.forgeandroid.runtime
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNames
 
 @Serializable
 data class WindowMetadata(
     val namespace: String? = null,
     val view: ViewDef? = null,
+    @OptIn(ExperimentalSerializationApi::class)
+    @JsonNames("dataSource", "dataSources")
     @SerialName("dataSource")
     val dataSources: Map<String, DataSourceDef> = emptyMap(),
     val dialogs: List<DialogDef> = emptyList(),
@@ -74,6 +78,7 @@ data class ContainerDef(
     val limit: Int? = null,
     val orderBy: String? = null,
     val table: TableDef? = null,
+    val treeBrowser: TreeBrowserDef? = null,
     val fileBrowser: FileBrowserDef? = null,
     val chart: ChartDef? = null,
     val editor: EditorDef? = null,
@@ -85,6 +90,7 @@ data class ContainerDef(
     val chat: ChatDef? = null,
     val schemaBasedForm: SchemaBasedFormDef? = null,
     val dashboard: DashboardDef? = null,
+    val stateKey: String? = null,
     val actions: List<ActionDef> = emptyList(),
     val on: List<ExecutionDef> = emptyList(),
     val selectFirst: Boolean? = null,
@@ -172,12 +178,20 @@ data class DashboardDef(
 
 @Serializable
 data class DashboardReportBuilderDef(
+    val hooks: ReportBuilderHooksDef? = null,
     val measures: List<ReportBuilderMeasureDef> = emptyList(),
     val dimensions: List<ReportBuilderDimensionDef> = emptyList(),
     val staticFilters: List<ReportBuilderStaticFilterDef> = emptyList(),
     val dynamicFilterGroups: List<ReportBuilderDynamicFilterGroupDef> = emptyList(),
     val dynamicFilterFamilies: List<ReportBuilderDynamicFilterFamilyDef> = emptyList(),
     val result: ReportBuilderResultDef? = null
+)
+
+@Serializable
+data class ReportBuilderHooksDef(
+    val initializeState: String? = null,
+    val buildRequest: String? = null,
+    val resolveLookup: String? = null
 )
 
 @Serializable
@@ -268,9 +282,16 @@ data class ReportBuilderDynamicFilterDef(
     val label: String? = null,
     val paramPath: String? = null,
     val multiple: Boolean? = null,
+    val emitArray: Boolean? = null,
     val manualEntry: Boolean? = null,
+    val manualValueType: String? = null,
     val manualPlaceholder: String? = null,
     val dialogId: String? = null,
+    val valueSelector: String? = null,
+    val labelSelector: String? = null,
+    val groupSelector: String? = null,
+    val recordSelectors: List<String> = emptyList(),
+    val requestMapping: String? = null,
     val targetingFeatureKey: String? = null
 )
 
@@ -455,6 +476,24 @@ data class TableDef(
 )
 
 @Serializable
+data class TreeBrowserDef(
+    val title: String? = null,
+    val dataSourceRef: String? = null,
+    val pathField: String? = null,
+    val labelField: String? = null,
+    val valueField: String? = null,
+    val subtitleField: String? = null,
+    val childrenField: String? = null,
+    val separator: String? = null,
+    val lazyExpand: Boolean? = null,
+    val className: String? = null,
+    val style: Map<String, String> = emptyMap(),
+    val on: List<ExecutionDef> = emptyList(),
+    val target: JsonElement? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
 data class ChartDef(
     val xAxis: ChartAxisDef? = null,
     val yAxis: ChartAxisDef? = null,
@@ -549,11 +588,18 @@ data class ColumnDef(
     val name: String? = null,
     val label: String? = null,
     val type: String? = null,
+    val format: String? = null,
+    val link: LinkDef? = null,
     val width: Int? = null,
     val icon: String? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class LinkDef(
+    val href: String? = null
 )
 
 @Serializable
@@ -575,6 +621,7 @@ data class ItemDef(
     val dataField: String? = null,
     val bindingPath: String? = null,
     val scope: String? = null,
+    val value: JsonElement? = null,
     val visibleWhen: DashboardConditionDef? = null,
     val options: List<OptionDef> = emptyList(),
     val properties: Map<String, JsonElement> = emptyMap(),
@@ -594,9 +641,12 @@ data class OptionDef(
 data class DialogDef(
     val id: String? = null,
     val title: String? = null,
+    val dataSourceRef: String? = null,
+    val selectionMode: String? = null,
     val content: ContainerDef? = null,
     val on: List<ExecutionDef> = emptyList(),
     val actions: List<ActionDef> = emptyList(),
+    val properties: Map<String, JsonElement> = emptyMap(),
     val style: Map<String, String> = emptyMap(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
@@ -754,6 +804,7 @@ data class ControlState(
 
 data class DialogState(
     val open: Boolean = false,
+    val selectionMode: String? = null,
     val props: Map<String, Any?> = emptyMap(),
     val args: Map<String, Any?> = emptyMap()
 )

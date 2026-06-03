@@ -155,6 +155,8 @@ public enum DashboardRuntime {
                 let formatter = NumberFormatter()
                 formatter.locale = locale
                 formatter.numberStyle = .currency
+                formatter.minimumFractionDigits = 0
+                formatter.maximumFractionDigits = 0
                 return formatter.string(from: NSNumber(value: number)) ?? String(describing: value)
             }
         case "percent":
@@ -162,8 +164,19 @@ public enum DashboardRuntime {
                 let formatter = NumberFormatter()
                 formatter.locale = locale
                 formatter.numberStyle = .decimal
+                formatter.minimumFractionDigits = 1
                 formatter.maximumFractionDigits = 1
                 return "\(formatter.string(from: NSNumber(value: number)) ?? String(number))%"
+            }
+        case "percentfraction":
+            if let number = numericValue(value) {
+                let formatter = NumberFormatter()
+                formatter.locale = locale
+                formatter.numberStyle = .decimal
+                formatter.minimumFractionDigits = 1
+                formatter.maximumFractionDigits = 1
+                let scaled = number * 100
+                return "\(formatter.string(from: NSNumber(value: scaled)) ?? String(scaled))%"
             }
         case "integer":
             if let number = numericValue(value) {

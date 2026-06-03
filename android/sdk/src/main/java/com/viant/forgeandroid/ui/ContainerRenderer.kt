@@ -18,7 +18,12 @@ import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.WindowContext
 
 @Composable
-fun ContainerRenderer(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef) {
+fun ContainerRenderer(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    container: ContainerDef,
+    selectionModeOverride: String? = null
+) {
     val kind = container.kind?.trim().orEmpty()
     if (kind == "dashboard" || kind.startsWith("dashboard.")) {
         DashboardRenderer(runtime, window, container)
@@ -79,6 +84,18 @@ fun ContainerRenderer(runtime: ForgeRuntime, window: WindowContext, container: C
                 selectFirst = container.selectFirst
             ) { dsContext ->
                 TableRenderer(runtime, dsContext, container.table)
+            }
+        }
+
+        val treeBrowser = container.treeBrowser
+        if (treeBrowser != null) {
+            val dsRef = treeBrowser.dataSourceRef ?: container.dataSourceRef
+            WithContainerDataSource(
+                window = window,
+                dataSourceRef = dsRef,
+                fetchData = container.fetchData
+            ) { dsContext ->
+                TreeBrowserRenderer(dsContext, treeBrowser, selectionModeOverride)
             }
         }
 
@@ -149,7 +166,7 @@ fun ContainerRenderer(runtime: ForgeRuntime, window: WindowContext, container: C
         }
 
         container.containers.forEach { nested ->
-            ContainerRenderer(runtime, window, nested)
+            ContainerRenderer(runtime, window, nested, selectionModeOverride)
         }
     }
 }

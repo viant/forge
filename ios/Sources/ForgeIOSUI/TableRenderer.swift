@@ -3,6 +3,7 @@ import ForgeIOSRuntime
 
 public struct TableRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.forgeEmbeddedNonScrolling) private var forgeEmbeddedNonScrolling
 
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
@@ -20,7 +21,7 @@ public struct TableRenderer: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let title = table.title {
+            if let title = resolvedTableTitle {
                 Text(title).font(.headline)
             }
             if let toolbar = table.toolbar, !toolbar.items.isEmpty {
@@ -37,6 +38,22 @@ public struct TableRenderer: View {
         .task(id: tableTaskKey) {
             await loadRows()
         }
+        .task(id: subscriptionTaskKey) {
+            await observeRows()
+        }
+    }
+
+    private var resolvedTableTitle: String? {
+        let tableTitle = table.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let containerTitle = container.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let tableTitle, !tableTitle.isEmpty else {
+            return nil
+        }
+        if let containerTitle, !containerTitle.isEmpty,
+           tableTitle.compare(containerTitle, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame {
+            return nil
+        }
+        return tableTitle
     }
 
     private var tableTaskKey: String {
@@ -47,6 +64,10 @@ public struct TableRenderer: View {
             table.title ?? "",
             table.columns.map(\.identityKey).joined(separator: "|")
         ].joined(separator: ":")
+    }
+
+    private var subscriptionTaskKey: String {
+        [window?.windowID ?? "", container.dataSourceRef ?? ""].joined(separator: ":")
     }
 
     private func loadRows() async {
@@ -68,6 +89,21 @@ public struct TableRenderer: View {
             if !refreshedRows.isEmpty {
                 rows = refreshedRows
                 break
+            }
+        }
+    }
+
+    private func observeRows() async {
+        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+            return
+        }
+        let stream = await runtime.dataSourceCollectionUpdates(
+            windowID: window.windowID,
+            dataSourceRef: dataSourceRef
+        )
+        for await next in stream {
+            await MainActor.run {
+                rows = next
             }
         }
     }
@@ -111,28 +147,35 @@ public struct TableRenderer: View {
     }
 
     private var compactCardTable: some View {
-        LazyVStack(alignment: .leading, spacing: 12) {
-            ForEach(rows.indices, id: \.self) { index in
-                compactRowCard(row: rows[index], rowIndex: index)
+        Group {
+            if forgeEmbeddedNonScrolling {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(rows.indices, id: \.self) { index in
+                        compactRowCard(row: rows[index], rowIndex: index)
+                    }
+                }
+            } else {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(rows.indices, id: \.self) { index in
+                        compactRowCard(row: rows[index], rowIndex: index)
+                    }
+                }
             }
         }
     }
 
+    @ViewBuilder
     private func compactRowCard(row: [String: JSONValue], rowIndex: Int) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let content = VStack(alignment: .leading, spacing: 10) {
             if let primary = displayColumns.first {
-                Text(displayValue(row[columnKey(primary)], fallback: primary.displayLabel))
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                valueLabel(row: row, column: primary, fallback: primary.displayLabel, font: .headline, color: .primary)
             }
             ForEach(Array(displayColumns.dropFirst()), id: \.identityKey) { column in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(column.displayLabel)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text(displayValue(row[columnKey(column)]))
-                        .font(.body)
-                        .foregroundStyle(.primary)
+                    valueLabel(row: row, column: column, font: .body, color: .primary)
                 }
             }
             if !actionColumns.isEmpty {
@@ -149,8 +192,22 @@ public struct TableRenderer: View {
                 .stroke(selectedRowIndex == rowIndex ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.14), lineWidth: selectedRowIndex == rowIndex ? 1.5 : 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: 16))
-        .onTapGesture {
-            handleRowSelection(row: row, rowIndex: rowIndex)
+        .accessibilityElement(children: actionColumns.isEmpty ? .combine : .contain)
+        .accessibilityLabel(rowAccessibilityLabel(row: row))
+        .accessibilityAddTraits(actionColumns.isEmpty ? .isButton : [])
+
+        if actionColumns.isEmpty {
+            Button {
+                handleRowSelection(row: row, rowIndex: rowIndex)
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+        } else {
+            content
+                .onTapGesture {
+                    handleRowSelection(row: row, rowIndex: rowIndex)
+                }
         }
     }
 
@@ -193,12 +250,11 @@ public struct TableRenderer: View {
         .background(Color.secondary.opacity(0.06))
     }
 
+    @ViewBuilder
     private func dataRow(row: [String: JSONValue], index: Int) -> some View {
-        HStack(alignment: .top, spacing: 0) {
+        let content = HStack(alignment: .top, spacing: 0) {
             ForEach(displayColumns, id: \.identityKey) { column in
-                Text(displayValue(row[columnKey(column)]))
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
+                valueLabel(row: row, column: column, font: .footnote, color: .primary)
                     .frame(width: Self.columnWidth(for: column), alignment: .leading)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 12)
@@ -214,8 +270,22 @@ public struct TableRenderer: View {
         }
         .background(selectedRowIndex == index ? Color.accentColor.opacity(0.08) : (index.isMultiple(of: 2) ? Color.clear : Color.secondary.opacity(0.035)))
         .contentShape(Rectangle())
-        .onTapGesture {
-            handleRowSelection(row: row, rowIndex: index)
+        .accessibilityElement(children: actionColumns.isEmpty ? .combine : .contain)
+        .accessibilityLabel(rowAccessibilityLabel(row: row))
+        .accessibilityAddTraits(actionColumns.isEmpty ? .isButton : [])
+
+        if actionColumns.isEmpty {
+            Button {
+                handleRowSelection(row: row, rowIndex: index)
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+        } else {
+            content
+                .onTapGesture {
+                    handleRowSelection(row: row, rowIndex: index)
+                }
         }
     }
 
@@ -321,8 +391,20 @@ public struct TableRenderer: View {
         return "Action"
     }
 
-    private func displayValue(_ value: JSONValue?, fallback: String? = nil) -> String {
+    private func rowAccessibilityLabel(row: [String: JSONValue]) -> String {
+        displayColumns.prefix(3).map { column in
+            let label = column.displayLabel
+            let value = displayValue(row[columnKey(column)], column: column)
+            return "\(label) \(value)"
+        }.joined(separator: ", ")
+    }
+
+    private func displayValue(_ value: JSONValue?, column: ColumnDef? = nil, fallback: String? = nil) -> String {
         if let value {
+            if let format = column?.format?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !format.isEmpty {
+                return DashboardRuntime.formatDashboardValue(value.anyValueValue, format: format)
+            }
             return value.displayString
         }
         if let fallback, !fallback.isEmpty {
@@ -330,6 +412,34 @@ public struct TableRenderer: View {
         }
         return "—"
     }
+
+    @ViewBuilder
+    private func valueLabel(row: [String: JSONValue], column: ColumnDef, fallback: String? = nil, font: Font, color: Color) -> some View {
+        let text = displayValue(row[columnKey(column)], column: column, fallback: fallback)
+        if let destination = linkDestination(for: column, row: row) {
+            Link(text, destination: destination)
+                .font(font)
+                .foregroundStyle(.tint)
+        } else {
+            Text(text)
+                .font(font)
+                .foregroundStyle(color)
+        }
+    }
+
+    private func linkDestination(for column: ColumnDef, row: [String: JSONValue]) -> URL? {
+        guard column.type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "link" else {
+            return nil
+        }
+        guard let hrefField = column.link?.href?.trimmingCharacters(in: .whitespacesAndNewlines), !hrefField.isEmpty else {
+            return nil
+        }
+        guard let hrefValue = row[hrefField]?.displayString.trimmingCharacters(in: .whitespacesAndNewlines), !hrefValue.isEmpty else {
+            return nil
+        }
+        return URL(string: hrefValue)
+    }
+
 }
 
 extension TableRenderer {
@@ -374,6 +484,23 @@ private extension ColumnDef {
 }
 
 private extension JSONValue {
+    var anyValueValue: Any? {
+        switch self {
+        case .string(let value):
+            return value
+        case .number(let value):
+            return value
+        case .bool(let value):
+            return value
+        case .array(let value):
+            return value.map(\.anyValueValue)
+        case .object(let value):
+            return value.mapValues(\.anyValueValue)
+        case .null:
+            return nil
+        }
+    }
+
     var displayString: String {
         switch self {
         case .string(let value):

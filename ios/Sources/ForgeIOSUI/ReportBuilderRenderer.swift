@@ -16,6 +16,11 @@ public struct ReportBuilderRenderer: View {
     @State private var selectedPreviousTitle: String = ""
     @State private var storedPresets: [StoredReportBuilderChartPreset] = []
     @State private var staticFilters: [String: ReportBuilderStaticFilterValue] = [:]
+    @State private var dynamicGroups: [String: [ReportBuilderDynamicRowState]] = [:]
+    @State private var dynamicFilterDrafts: [String: String] = [:]
+    @State private var availableDialogIDs: Set<String> = []
+    @State private var windowActionsCode: String? = nil
+    @State private var windowNamespace: String = ""
     @State private var restoredStoredState = false
     @State private var requestBridgeGeneration = 0
 
@@ -31,21 +36,24 @@ public struct ReportBuilderRenderer: View {
         .task(id: taskKey) {
             await loadRows()
         }
-        .onAppear {
-            handleOnAppear()
+        .task(id: hydrationTaskKey) {
+            await hydrateInitialStateIfNeeded()
         }
-        .onChange(of: selectedMeasures) { persistStoredState() }
-        .onChange(of: selectedDimensions) { persistStoredState() }
-        .onChange(of: staticFilters) { persistStoredState() }
-        .onChange(of: chartSpec?.id ?? "") { persistStoredState() }
-        .onChange(of: viewMode) { persistStoredState() }
-        .onChange(of: selectedMeasures) { requestBridgeGeneration += 1 }
-        .onChange(of: selectedDimensions) { requestBridgeGeneration += 1 }
-        .onChange(of: staticFilters) { requestBridgeGeneration += 1 }
+        .onChange(of: persistenceSignature) {
+            guard restoredStoredState else { return }
+            Task {
+                await persistStoredState()
+            }
+        }
+        .onChange(of: requestSignature) {
+            guard restoredStoredState else { return }
+            requestBridgeGeneration += 1
+        }
         .onChange(of: settingsHash) {
             refreshStoredPresets()
         }
         .task(id: requestBridgeGeneration) {
+            guard restoredStoredState else { return }
             await bridgeRequestToDataSource()
         }
     }
@@ -64,6 +72,10 @@ public struct ReportBuilderRenderer: View {
 
     private var taskKey: String {
         [window?.windowID ?? "", container.id ?? "", container.dataSourceRef ?? ""].joined(separator: ":")
+    }
+
+    private var hydrationTaskKey: String {
+        [window?.windowID ?? "", builderStateKey ?? "", container.dataSourceRef ?? ""].joined(separator: ":")
     }
 
     private var explicitChartMode: Bool {
@@ -90,6 +102,65 @@ public struct ReportBuilderRenderer: View {
         Self.buildSettingsHash(dimensions: selectedDimensions, measures: selectedMeasures)
     }
 
+    private var persistenceSignature: String {
+        [
+            selectedMeasures.joined(separator: "|"),
+            selectedDimensions.joined(separator: "|"),
+            staticFiltersSignature,
+            dynamicGroupsSignature,
+            dictionarySignature(dynamicFilterDrafts),
+            chartSpecSignature,
+            viewMode
+        ].joined(separator: "::")
+    }
+
+    private var requestSignature: String {
+        [
+            selectedMeasures.joined(separator: "|"),
+            selectedDimensions.joined(separator: "|"),
+            staticFiltersSignature,
+            dynamicGroupsSignature
+        ].joined(separator: "::")
+    }
+
+    private var chartSpecSignature: String {
+        guard let chartSpec else { return "" }
+        return [
+            chartSpec.title ?? "",
+            chartSpec.type ?? "",
+            chartSpec.xField ?? "",
+            chartSpec.yFields.joined(separator: "|"),
+            chartSpec.seriesField ?? ""
+        ].joined(separator: "|")
+    }
+
+    private var staticFiltersSignature: String {
+        staticFilters
+            .keys
+            .sorted()
+            .map { key in
+                let value = staticFilters[key]
+                return "\(key)=\(Self.staticFilterSignature(value))"
+            }
+            .joined(separator: "|")
+    }
+
+    private var dynamicGroupsSignature: String {
+        dynamicGroups
+            .keys
+            .sorted()
+            .map { key in
+                let rows = (dynamicGroups[key] ?? []).map { row in
+                    let selections = row.selections.map { selection in
+                        "\(selection.value.jsonSignature)|\(selection.label)|\(selection.group)"
+                    }.joined(separator: ",")
+                    return "\(row.id)|\(row.filterId)|\(row.enabled)|\(selections)"
+                }.joined(separator: ";")
+                return "\(key)=\(rows)"
+            }
+            .joined(separator: "::")
+    }
+
     private var aggregatedRows: [[String: JSONValue]] {
         Self.aggregateRows(rows: filteredRows, dimensions: selectedDimensions, measures: selectedMeasures)
     }
@@ -99,12 +170,14 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var requestPayload: [String: JSONValue] {
-        Self.buildRequestPayload(
+        let base = Self.buildRequestPayload(
             config: config,
             selectedMeasures: selectedMeasures,
             selectedDimensions: selectedDimensions,
-            staticFilters: staticFilters
+            staticFilters: staticFilters,
+            dynamicGroups: dynamicGroups
         )
+        return applyBuildRequestHook(base)
     }
 
     private var measuresSection: AnyView {
@@ -123,7 +196,88 @@ public struct ReportBuilderRenderer: View {
         AnyView(
             ReportBuilderDynamicFiltersView(
                 groups: config.dynamicFilterGroups,
-                families: config.dynamicFilterFamilies
+                families: config.dynamicFilterFamilies,
+                rowsByGroupID: dynamicGroups,
+                drafts: dynamicFilterDrafts,
+                isLookupAvailable: { groupID, filter in
+                    lookupDescriptor(for: groupID, rowID: nil, filter: filter) != nil
+                },
+                onAddRow: { groupID, filterID in
+                    dynamicGroups[groupID, default: []].append(
+                        ReportBuilderDynamicRowState(
+                            filterId: filterID,
+                            enabled: true,
+                            selections: []
+                        )
+                    )
+                },
+                onChangeFilter: { groupID, rowID, filterID in
+                    dynamicGroups[groupID] = dynamicGroups[groupID, default: []].map { row in
+                        guard row.id == rowID else { return row }
+                        return ReportBuilderDynamicRowState(
+                            id: row.id,
+                            filterId: filterID,
+                            enabled: row.enabled,
+                            selections: []
+                        )
+                    }
+                },
+                onToggleEnabled: { groupID, rowID in
+                    dynamicGroups[groupID] = dynamicGroups[groupID, default: []].map { row in
+                        guard row.id == rowID else { return row }
+                        return ReportBuilderDynamicRowState(
+                            id: row.id,
+                            filterId: row.filterId,
+                            enabled: !row.enabled,
+                            selections: row.selections
+                        )
+                    }
+                },
+                onRemoveRow: { groupID, rowID in
+                    dynamicGroups[groupID] = dynamicGroups[groupID, default: []].filter { $0.id != rowID }
+                    dynamicFilterDrafts[rowID] = nil
+                },
+                onDraftChange: { rowID, value in
+                    dynamicFilterDrafts[rowID] = value
+                },
+                onAddManualSelection: { groupID, rowID, filter, rawValue in
+                    guard let selection = Self.projectManualSelection(filter: filter, rawValue: rawValue) else {
+                        return false
+                    }
+                    dynamicGroups[groupID] = dynamicGroups[groupID, default: []].map { row in
+                        guard row.id == rowID else { return row }
+                        let nextSelections = filter.multiple == true || filter.emitArray == true
+                            ? Self.upsertDynamicSelections(row.selections, incoming: [selection])
+                            : [selection]
+                        return ReportBuilderDynamicRowState(
+                            id: row.id,
+                            filterId: row.filterId,
+                            enabled: row.enabled,
+                            selections: nextSelections
+                        )
+                    }
+                    dynamicFilterDrafts[rowID] = ""
+                    return true
+                },
+                onRemoveSelection: { groupID, rowID, selectionIndex in
+                    dynamicGroups[groupID] = dynamicGroups[groupID, default: []].map { row in
+                        guard row.id == rowID else { return row }
+                        let nextSelections = row.selections.enumerated()
+                            .filter { $0.offset != selectionIndex }
+                            .map(\.element)
+                        return ReportBuilderDynamicRowState(
+                            id: row.id,
+                            filterId: row.filterId,
+                            enabled: row.enabled,
+                            selections: nextSelections
+                        )
+                    }
+                },
+                onPickSelection: { groupID, rowID, filter in
+                    Task {
+                        await pickLookupSelection(groupID: groupID, rowID: rowID, filter: filter)
+                    }
+                }
             )
         )
     }
@@ -396,11 +550,23 @@ public struct ReportBuilderRenderer: View {
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
     }
 
-    private func handleOnAppear() {
-        if !restoredStoredState {
-            restoreStoredState()
+    @MainActor
+    private func hydrateInitialStateIfNeeded() async {
+        guard !restoredStoredState else { return }
+        defer {
+            refreshStoredPresets()
             restoredStoredState = true
+            requestBridgeGeneration += 1
         }
+
+        await refreshAvailableDialogs()
+
+        if let restored = await loadPersistedState() {
+            apply(restored: restored)
+            await applyInitializeStateHookIfNeeded()
+            return
+        }
+
         if selectedMeasures.isEmpty { selectedMeasures = defaultMeasureKeys() }
         if selectedDimensions.isEmpty { selectedDimensions = defaultDimensionKeys() }
         if staticFilters.isEmpty { staticFilters = defaultStaticFilters() }
@@ -409,7 +575,130 @@ public struct ReportBuilderRenderer: View {
         } else {
             viewMode = config.result?.defaultMode ?? "table"
         }
-        refreshStoredPresets()
+        await applyInitializeStateHookIfNeeded()
+    }
+
+    @MainActor
+    private func refreshAvailableDialogs() async {
+        guard let runtime, let window else {
+            availableDialogIDs = []
+            windowActionsCode = nil
+            windowNamespace = ""
+            return
+        }
+        let metadata = await runtime.windowMetadata(id: window.windowID)
+        availableDialogIDs = Set(metadata?.dialogs.compactMap { $0.id?.trimmingCharacters(in: .whitespacesAndNewlines) } ?? [])
+        windowActionsCode = metadata?.actions?.code
+        windowNamespace = metadata?.namespace?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
+    @MainActor
+    private func applyInitializeStateHookIfNeeded() async {
+        guard let hookName = config.hooks?.initializeState?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !hookName.isEmpty,
+              let runtime,
+              let window else {
+            return
+        }
+        let formValue = await runtime.windowFormJSONValue(windowID: window.windowID)
+        guard let stateValue = Self.jsonValue(from: currentStoredState()) else { return }
+        let props = Self.objectValue([
+            "state": stateValue,
+            "windowForm": .object(formValue),
+            "config": Self.jsonValue(from: config)
+        ])
+        guard let result = invokeHook(functionName: hookName, props: props),
+              let data = try? JSONEncoder().encode(result),
+              let next = try? JSONDecoder().decode(StoredReportBuilderState.self, from: data) else {
+            return
+        }
+        apply(restored: next)
+    }
+
+    private func applyBuildRequestHook(_ request: [String: JSONValue]) -> [String: JSONValue] {
+        guard let hookName = config.hooks?.buildRequest?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !hookName.isEmpty,
+              let requestValue = Self.jsonValue(from: request) else {
+            return request
+        }
+        let props = Self.objectValue([
+            "request": requestValue,
+            "state": Self.jsonValue(from: currentStoredState()),
+            "config": Self.jsonValue(from: config)
+        ])
+        return invokeHook(functionName: hookName, props: props)?.objectValue ?? request
+    }
+
+    private func lookupDescriptor(
+        for groupID: String,
+        rowID: String?,
+        filter: ReportBuilderDynamicFilterDef
+    ) -> ReportBuilderLookupDescriptor? {
+        let directDialogID = filter.dialogId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let baseDialogID = directDialogID.isEmpty ? nil : directDialogID
+        var descriptor = ReportBuilderLookupDescriptor(
+            dialogID: baseDialogID,
+            parameters: [:],
+            selectionMode: filter.multiple == false ? "single" : "multi"
+        )
+
+        if let hookName = config.hooks?.resolveLookup?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !hookName.isEmpty {
+            let props = Self.objectValue([
+                "state": Self.jsonValue(from: currentStoredState()),
+                "group": .object(["id": .string(groupID)]),
+                "filterDef": Self.jsonValue(from: filter),
+                "rowId": rowID.map(JSONValue.string)
+            ])
+            if let result = invokeHook(functionName: hookName, props: props)?.objectValue {
+                if let dialogID = result["dialogId"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !dialogID.isEmpty {
+                    descriptor.dialogID = dialogID
+                }
+                if let parameters = result["parameters"]?.objectValue, !parameters.isEmpty {
+                    descriptor.parameters = parameters
+                }
+                if let multiple = result["multiple"]?.boolValue {
+                    descriptor.selectionMode = multiple ? "multi" : "single"
+                }
+            }
+        }
+
+        guard let dialogID = descriptor.dialogID, availableDialogIDs.contains(dialogID) else {
+            return nil
+        }
+        return descriptor
+    }
+
+    private func invokeHook(functionName: String, props: JSONValue) -> JSONValue? {
+        guard let code = windowActionsCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !code.isEmpty else {
+            return nil
+        }
+        for candidate in resolveHookFunctionCandidates(functionName) {
+            if let result = try? ActionHookRuntime.invoke(
+                code: code,
+                functionName: candidate,
+                props: props
+            ) {
+                return result
+            }
+        }
+        return nil
+    }
+
+    private func resolveHookFunctionCandidates(_ functionName: String) -> [String] {
+        let trimmed = functionName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        var candidates = [trimmed]
+        if !windowNamespace.isEmpty {
+            let prefix = windowNamespace + "."
+            if trimmed.hasPrefix(prefix) {
+                candidates.append(String(trimmed.dropFirst(prefix.count)))
+            } else {
+                candidates.append(prefix + trimmed)
+            }
+        }
+        return Array(NSOrderedSet(array: candidates)) as? [String] ?? candidates
     }
 
     private func bridgeRequestToDataSource() async {
@@ -428,6 +717,47 @@ public struct ReportBuilderRenderer: View {
             dataSourceRef: resolvedDataSourceRef
         )
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+    }
+
+    @MainActor
+    private func pickLookupSelection(
+        groupID: String,
+        rowID: String,
+        filter: ReportBuilderDynamicFilterDef
+    ) async {
+        guard let runtime, let window else { return }
+        guard let descriptor = lookupDescriptor(for: groupID, rowID: rowID, filter: filter) else { return }
+        guard let dialogID = descriptor.dialogID else { return }
+        let selectionMode = descriptor.selectionMode
+        let opened = await runtime.presentDialog(
+            windowID: window.windowID,
+            dialogID: dialogID,
+            parameters: descriptor.parameters,
+            selectionMode: selectionMode
+        )
+        guard opened else {
+            return
+        }
+        guard let payload = await runtime.awaitDialogResult(
+            windowID: window.windowID,
+            dialogID: dialogID
+        ) else {
+            return
+        }
+        let selections = Self.projectLookupSelections(filter: filter, payload: payload)
+        guard !selections.isEmpty else { return }
+        dynamicGroups[groupID] = dynamicGroups[groupID, default: []].map { row in
+            guard row.id == rowID else { return row }
+            let nextSelections = filter.multiple == false
+                ? [selections[0]]
+                : Self.upsertDynamicSelections(row.selections, incoming: selections)
+            return ReportBuilderDynamicRowState(
+                id: row.id,
+                filterId: row.filterId,
+                enabled: row.enabled,
+                selections: nextSelections
+            )
+        }
     }
 
     private func defaultMeasureKeys() -> [String] {
@@ -524,30 +854,50 @@ public struct ReportBuilderRenderer: View {
         UserDefaults.standard.set(data, forKey: key)
     }
 
-    private func restoreStoredState() {
-        guard let key = stateStorageKey else { return }
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let state = try? JSONDecoder().decode(StoredReportBuilderState.self, from: data) else {
-            return
+    private func currentStoredState() -> StoredReportBuilderState {
+        StoredReportBuilderState(
+            selectedMeasures: selectedMeasures,
+            selectedDimensions: selectedDimensions,
+            chartSpec: chartSpec,
+            viewMode: viewMode,
+            staticFilters: staticFilters.mapValues { StoredStaticFilterValue(runtimeValue: $0) },
+            dynamicGroups: dynamicGroups,
+            dynamicFilterDrafts: dynamicFilterDrafts
+        )
+    }
+
+    private func loadPersistedState() async -> StoredReportBuilderState? {
+        guard let runtime, let window, let stateKey = builderStateKey else {
+            return nil
         }
+        let windowForm = await runtime.windowFormJSONValue(windowID: window.windowID)
+        guard let storedValue = Self.resolveNestedValue(windowForm, path: stateKey) else {
+            return nil
+        }
+        guard let data = try? JSONEncoder().encode(storedValue),
+              let state = try? JSONDecoder().decode(StoredReportBuilderState.self, from: data) else {
+            return nil
+        }
+        return state
+    }
+
+    private func persistStoredState() async {
+        guard let runtime, let window, let stateKey = builderStateKey else { return }
+        guard let encoded = Self.jsonValue(from: currentStoredState()) else { return }
+        var payload: [String: JSONValue] = [:]
+        Self.setNestedValue(&payload, path: stateKey, value: encoded)
+        await runtime.setWindowFormValue(windowID: window.windowID, values: payload)
+    }
+
+    @MainActor
+    private func apply(restored state: StoredReportBuilderState) {
         selectedMeasures = state.selectedMeasures
         selectedDimensions = state.selectedDimensions
         chartSpec = state.chartSpec
         viewMode = state.viewMode
         staticFilters = Dictionary(uniqueKeysWithValues: state.staticFilters.map { ($0.key, $0.value.runtimeValue) })
-    }
-
-    private func persistStoredState() {
-        guard let key = stateStorageKey else { return }
-        let state = StoredReportBuilderState(
-            selectedMeasures: selectedMeasures,
-            selectedDimensions: selectedDimensions,
-            chartSpec: chartSpec,
-            viewMode: viewMode,
-            staticFilters: staticFilters.mapValues { StoredStaticFilterValue(runtimeValue: $0) }
-        )
-        let data = try? JSONEncoder().encode(state)
-        UserDefaults.standard.set(data, forKey: key)
+        dynamicGroups = state.dynamicGroups
+        dynamicFilterDrafts = state.dynamicFilterDrafts
     }
 
     private var storageKey: String? {
@@ -555,9 +905,10 @@ public struct ReportBuilderRenderer: View {
         return "reportBuilder.chartPresets.\(id)"
     }
 
-    private var stateStorageKey: String? {
-        guard let id = container.id, !id.isEmpty else { return nil }
-        return "reportBuilder.state.\(id)"
+    private var builderStateKey: String? {
+        let key = (container.stateKey ?? container.id ?? "reportBuilder")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return key.isEmpty ? nil : key
     }
 
     private static func toggle(_ current: [String], key: String) -> [String] {
@@ -568,6 +919,32 @@ public struct ReportBuilderRenderer: View {
         let signature = dimensions.joined(separator: "|") + "::" + measures.joined(separator: "|")
         let hash = signature.utf8.reduce(5381) { (($0 << 5) &+ $0) &+ Int($1) }
         return "rb_\(String(hash, radix: 16))"
+    }
+
+    private func dictionarySignature(_ values: [String: String]) -> String {
+        values
+            .keys
+            .sorted()
+            .map { "\($0)=\(values[$0] ?? "")" }
+            .joined(separator: "|")
+    }
+
+    private static func objectValue(_ pairs: [String: JSONValue?]) -> JSONValue {
+        .object(pairs.reduce(into: [String: JSONValue]()) { result, entry in
+            if let value = entry.value {
+                result[entry.key] = value
+            }
+        })
+    }
+
+    private static func staticFilterSignature(_ value: ReportBuilderStaticFilterValue?) -> String {
+        guard let value else { return "" }
+        switch value {
+        case .list(let values):
+            return values.joined(separator: ",")
+        case .dateRange(let start, let end):
+            return "\(start)|\(end)"
+        }
     }
 
     private static func normalize(_ spec: ReportBuilderChartSpecDef) -> ReportBuilderChartSpecDef {
@@ -604,7 +981,8 @@ public struct ReportBuilderRenderer: View {
         config: DashboardReportBuilderDef,
         selectedMeasures: [String],
         selectedDimensions: [String],
-        staticFilters: [String: ReportBuilderStaticFilterValue]
+        staticFilters: [String: ReportBuilderStaticFilterValue],
+        dynamicGroups: [String: [ReportBuilderDynamicRowState]]
     ) -> [String: JSONValue] {
         var request: [String: JSONValue] = [:]
         for key in selectedMeasures {
@@ -634,7 +1012,291 @@ public struct ReportBuilderRenderer: View {
                 }
             }
         }
+        var dynamicAggregates: [String: [JSONValue]] = [:]
+        for group in config.dynamicFilterGroups {
+            let rows = dynamicGroups[group.identityKey] ?? []
+            for row in rows where row.enabled {
+                guard let filter = group.filters.first(where: { $0.identityKey == row.filterId }) else {
+                    continue
+                }
+                let requestMapping = (filter.requestMapping ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if requestMapping == "hook" {
+                    continue
+                }
+                let paramPath = filter.paramPath ?? "filters.\(filter.identityKey)"
+                let values = row.selections.map(\.value)
+                if values.isEmpty {
+                    continue
+                }
+                let emitArray = filter.emitArray == true
+                if filter.multiple == true || emitArray {
+                    dynamicAggregates[paramPath, default: []].append(contentsOf: values)
+                } else if let first = values.first {
+                    setNestedValue(&request, path: paramPath, value: first)
+                }
+            }
+        }
+        for (path, values) in dynamicAggregates {
+            setNestedValue(&request, path: path, value: .array(uniqueDynamicValues(values)))
+        }
         return request.isEmpty ? [:] : ["input": .object(["query": .object(request)])]
+    }
+
+    private static func coerceDynamicFilterValue(
+        filter: ReportBuilderDynamicFilterDef,
+        rawValue: String
+    ) -> JSONValue? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let valueType = (filter.manualValueType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch valueType {
+        case "int", "integer":
+            guard let value = Int(trimmed) else { return nil }
+            return .number(Double(value))
+        default:
+            return .string(trimmed)
+        }
+    }
+
+    private static func projectManualSelection(
+        filter: ReportBuilderDynamicFilterDef,
+        rawValue: String
+    ) -> ReportBuilderDynamicSelectionState? {
+        guard let value = coerceDynamicFilterValue(filter: filter, rawValue: rawValue) else {
+            return nil
+        }
+        let label = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let valueSelector = (filter.valueSelector ?? "value").trimmingCharacters(in: .whitespacesAndNewlines)
+        let labelSelector = (filter.labelSelector ?? "label").trimmingCharacters(in: .whitespacesAndNewlines)
+        return ReportBuilderDynamicSelectionState(
+            value: value,
+            label: label,
+            group: "",
+            record: [
+                valueSelector.isEmpty ? "value" : valueSelector: value,
+                labelSelector.isEmpty ? "label" : labelSelector: .string(label)
+            ]
+        )
+    }
+
+    private static func projectLookupSelections(
+        filter: ReportBuilderDynamicFilterDef,
+        payload: [String: JSONValue]
+    ) -> [ReportBuilderDynamicSelectionState] {
+        let records: [[String: JSONValue]]
+        if let array = payload["selection"]?.arrayValue {
+            records = array.compactMap(\.objectValue)
+        } else if let selected = payload["selected"]?.objectValue {
+            records = [selected]
+        } else {
+            records = [payload]
+        }
+
+        return records.compactMap { record in
+            let valueSelector = (filter.valueSelector ?? "value").trimmingCharacters(in: .whitespacesAndNewlines)
+            let labelSelector = (filter.labelSelector ?? "label").trimmingCharacters(in: .whitespacesAndNewlines)
+            let groupSelector = (filter.groupSelector ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let rawValue = resolveRecordValue(record, selectors: lookupValueFallbackSelectors(valueSelector))
+            guard let value = coerceSelectionValue(filter: filter, rawValue: rawValue) else {
+                return nil
+            }
+
+            let labelValue = resolveRecordValue(record, selectors: lookupLabelFallbackSelectors(labelSelector, valueSelector))
+            let label = labelValue?.stringValue
+                ?? labelValue?.intValue.map(String.init)
+                ?? value.stringValue
+                ?? value.intValue.map(String.init)
+                ?? ""
+            let group = resolveRecordValue(record, selectors: [groupSelector])?.stringValue ?? ""
+            let recordSelectors = filter.recordSelectors ?? []
+            let compactRecord = compactLookupRecord(
+                filter: filter,
+                record: record,
+                selectors: [valueSelector, labelSelector, groupSelector] + recordSelectors
+            )
+
+            return ReportBuilderDynamicSelectionState(
+                value: value,
+                label: label,
+                group: group,
+                record: compactRecord
+            )
+        }
+    }
+
+    private static func upsertDynamicSelections(
+        _ current: [ReportBuilderDynamicSelectionState],
+        incoming: [ReportBuilderDynamicSelectionState]
+    ) -> [ReportBuilderDynamicSelectionState] {
+        var result = current
+        for selection in incoming {
+            result.removeAll { $0.value == selection.value }
+            result.append(selection)
+        }
+        return result
+    }
+
+    private static func uniqueDynamicValues(_ values: [JSONValue]) -> [JSONValue] {
+        var seen = Set<String>()
+        var result: [JSONValue] = []
+        for value in values {
+            if seen.insert(value.jsonSignature).inserted {
+                result.append(value)
+            }
+        }
+        return result
+    }
+
+    private static func compactLookupRecord(
+        filter: ReportBuilderDynamicFilterDef,
+        record: [String: JSONValue],
+        selectors: [String]
+    ) -> [String: JSONValue]? {
+        var compact: [String: JSONValue] = [:]
+        for selector in selectors.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }).filter({ !$0.isEmpty }) {
+            if let value = resolveRecordValue(record, selectors: [selector]) {
+                compact[selector] = value
+            }
+        }
+        return compact.isEmpty ? nil : compact
+    }
+
+    private static func lookupValueFallbackSelectors(_ selector: String) -> [String] {
+        let trimmed = selector.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return ["value", "id"]
+        }
+        return [trimmed, selectorLeaf(trimmed), "value", "id"]
+    }
+
+    private static func lookupLabelFallbackSelectors(_ selector: String, _ valueSelector: String) -> [String] {
+        let trimmed = selector.trimmingCharacters(in: .whitespacesAndNewlines)
+        let valueLeaf = selectorLeaf(valueSelector)
+        var selectors: [String] = []
+        if !trimmed.isEmpty {
+            selectors.append(trimmed)
+            selectors.append(selectorLeaf(trimmed))
+        }
+        selectors.append("label")
+        selectors.append("name")
+        if !valueLeaf.isEmpty {
+            selectors.append(valueLeaf)
+        }
+        return selectors
+    }
+
+    private static func selectorLeaf(_ selector: String) -> String {
+        selector
+            .split(separator: ".")
+            .last
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? ""
+    }
+
+    private static func resolveRecordValue(
+        _ record: [String: JSONValue],
+        selectors: [String]
+    ) -> JSONValue? {
+        for selector in selectors.map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) }).filter({ !$0.isEmpty }) {
+            if let value = resolveJSONSelector(record, selector: selector) {
+                return value
+            }
+        }
+        return nil
+    }
+
+    private static func resolveJSONSelector(
+        _ record: [String: JSONValue],
+        selector: String
+    ) -> JSONValue? {
+        guard let resolved = SelectorUtil.resolve(record.mapValues(jsonAnyValue), selector: selector) else {
+            return nil
+        }
+        return jsonValueFromAny(resolved)
+    }
+
+    private static func coerceSelectionValue(
+        filter: ReportBuilderDynamicFilterDef,
+        rawValue: JSONValue?
+    ) -> JSONValue? {
+        guard let rawValue else { return nil }
+        let valueType = (filter.manualValueType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch valueType {
+        case "int", "integer":
+            if let intValue = rawValue.intValue {
+                return .number(Double(intValue))
+            }
+            if let stringValue = rawValue.stringValue, let intValue = Int(stringValue.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                return .number(Double(intValue))
+            }
+            return nil
+        default:
+            if let stringValue = rawValue.stringValue {
+                return .string(stringValue)
+            }
+            if let intValue = rawValue.intValue {
+                return .number(Double(intValue))
+            }
+            return rawValue
+        }
+    }
+
+    private static func jsonAnyValue(_ value: JSONValue) -> Any? {
+        switch value {
+        case .string(let string):
+            return string
+        case .number(let number):
+            return number
+        case .bool(let bool):
+            return bool
+        case .array(let values):
+            return values.map(jsonAnyValue)
+        case .object(let values):
+            return values.mapValues(jsonAnyValue)
+        case .null:
+            return nil
+        }
+    }
+
+    private static func jsonValueFromAny(_ value: Any?) -> JSONValue? {
+        guard let value else {
+            return .null
+        }
+        switch value {
+        case let value as JSONValue:
+            return value
+        case let value as String:
+            return .string(value)
+        case let value as Bool:
+            return .bool(value)
+        case let value as Int:
+            return .number(Double(value))
+        case let value as Int64:
+            return .number(Double(value))
+        case let value as Double:
+            return .number(value)
+        case let value as Float:
+            return .number(Double(value))
+        case let value as NSNumber:
+            return .number(value.doubleValue)
+        case let value as [String: JSONValue]:
+            return .object(value)
+        case let value as [String: Any]:
+            var object: [String: JSONValue] = [:]
+            for (key, child) in value {
+                guard let jsonValue = jsonValueFromAny(child) else { return nil }
+                object[key] = jsonValue
+            }
+            return .object(object)
+        case let value as [Any]:
+            let values = value.compactMap(jsonValueFromAny)
+            guard values.count == value.count else { return nil }
+            return .array(values)
+        default:
+            return nil
+        }
     }
 
     private static func setNestedValue(_ target: inout [String: JSONValue], path: String, value: JSONValue) {
@@ -652,6 +1314,27 @@ public struct ReportBuilderRenderer: View {
         let remaining = parts.dropFirst().joined(separator: ".")
         setNestedValue(&child, path: remaining, value: value)
         target[first] = .object(child)
+    }
+
+    private static func resolveNestedValue(_ values: [String: JSONValue], path: String) -> JSONValue? {
+        let parts = path
+            .split(separator: ".")
+            .map(String.init)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard let first = parts.first else { return nil }
+        guard let value = values[first] else { return nil }
+        if parts.count == 1 {
+            return value
+        }
+        guard let object = value.objectValue else { return nil }
+        let remaining = parts.dropFirst().joined(separator: ".")
+        return resolveNestedValue(object, path: remaining)
+    }
+
+    private static func jsonValue<T: Encodable>(from value: T) -> JSONValue? {
+        guard let data = try? JSONEncoder().encode(value) else { return nil }
+        return try? JSONDecoder().decode(JSONValue.self, from: data)
     }
 
     private static func chartPoints(from rows: [[String: JSONValue]], spec: ReportBuilderChartSpecDef) -> [ChartPoint] {
@@ -749,6 +1432,59 @@ private struct StoredReportBuilderState: Codable, Sendable {
     let chartSpec: ReportBuilderChartSpecDef?
     let viewMode: String
     let staticFilters: [String: StoredStaticFilterValue]
+    let dynamicGroups: [String: [ReportBuilderDynamicRowState]]
+    let dynamicFilterDrafts: [String: String]
+}
+
+struct ReportBuilderDynamicRowState: Codable, Sendable, Identifiable, Equatable {
+    let id: String
+    let filterId: String
+    let enabled: Bool
+    let selections: [ReportBuilderDynamicSelectionState]
+
+    init(
+        id: String = UUID().uuidString,
+        filterId: String,
+        enabled: Bool = true,
+        selections: [ReportBuilderDynamicSelectionState] = []
+    ) {
+        self.id = id
+        self.filterId = filterId
+        self.enabled = enabled
+        self.selections = selections
+    }
+}
+
+struct ReportBuilderDynamicSelectionState: Codable, Sendable, Equatable {
+    let value: JSONValue
+    let label: String
+    let group: String
+    let record: [String: JSONValue]?
+}
+
+private struct ReportBuilderLookupDescriptor {
+    var dialogID: String?
+    var parameters: [String: JSONValue]
+    var selectionMode: String
+}
+
+private extension JSONValue {
+    var jsonSignature: String {
+        switch self {
+        case .string(let value):
+            return "s:\(value)"
+        case .number(let value):
+            return "n:\(value)"
+        case .bool(let value):
+            return "b:\(value)"
+        case .null:
+            return "null"
+        case .array(let values):
+            return "a:[\(values.map(\.jsonSignature).joined(separator: ","))]"
+        case .object(let values):
+            return "o:{\(values.keys.sorted().map { "\($0)=\(values[$0]?.jsonSignature ?? "null")" }.joined(separator: ","))}"
+        }
+    }
 }
 
 private enum StoredStaticFilterValue: Codable, Sendable {

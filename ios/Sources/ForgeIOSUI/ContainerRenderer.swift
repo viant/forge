@@ -49,6 +49,11 @@ public struct ContainerRenderer: View {
                 titleBlock
                 ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
             }
+        } else if let treeBrowser = container.treeBrowser {
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                TreeBrowserRenderer(runtime: runtime, window: window, container: container, treeBrowser: treeBrowser)
+            }
         } else if container.tabs != nil, !container.containers.isEmpty {
             TabsRenderer(runtime: runtime, window: window, container: container)
         } else if let editor = container.editor {

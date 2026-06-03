@@ -1,25 +1,58 @@
 import SwiftUI
 import ForgeIOSRuntime
 
+private struct ForgeEmbeddedNonScrollingKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var forgeEmbeddedNonScrolling: Bool {
+        get { self[ForgeEmbeddedNonScrollingKey.self] }
+        set { self[ForgeEmbeddedNonScrollingKey.self] = newValue }
+    }
+}
+
 public struct WindowContentView: View {
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let metadata: WindowMetadata
+    private let scrollEnabled: Bool
+    private let contentPadding: CGFloat
 
-    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, metadata: WindowMetadata) {
+    public init(
+        runtime: ForgeRuntime? = nil,
+        window: WindowContext? = nil,
+        metadata: WindowMetadata,
+        scrollEnabled: Bool = true,
+        contentPadding: CGFloat = 16
+    ) {
         self.runtime = runtime
         self.window = window
         self.metadata = metadata
+        self.scrollEnabled = scrollEnabled
+        self.contentPadding = contentPadding
     }
 
     public var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
-                ForEach(metadata.view?.content?.containers ?? []) { container in
-                    ContainerRenderer(runtime: runtime, window: window, container: container)
+        ZStack {
+            Group {
+                if scrollEnabled {
+                    ScrollView {
+                        lazyContentStack
+                    }
+                } else {
+                    eagerContentStack
                 }
             }
-            .padding()
+
+            if let runtime, let window, !metadata.dialogs.isEmpty {
+                WindowDialogLayer(
+                    runtime: runtime,
+                    window: window,
+                    dialogs: metadata.dialogs,
+                    defaultDataSourceRef: defaultDataSourceRef()
+                )
+            }
         }
         .task(id: onInitTaskKey) {
             await runWindowLifecycle(event: "onInit")
@@ -29,6 +62,26 @@ public struct WindowContentView: View {
                 await runWindowLifecycle(event: "onDestroy")
             }
         }
+    }
+
+    private var lazyContentStack: some View {
+        LazyVStack(alignment: .leading, spacing: 12) {
+            ForEach(metadata.view?.content?.containers ?? []) { container in
+                ContainerRenderer(runtime: runtime, window: window, container: container)
+            }
+        }
+        .padding(contentPadding)
+        .environment(\.forgeEmbeddedNonScrolling, false)
+    }
+
+    private var eagerContentStack: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(metadata.view?.content?.containers ?? []) { container in
+                ContainerRenderer(runtime: runtime, window: window, container: container)
+            }
+        }
+        .padding(contentPadding)
+        .environment(\.forgeEmbeddedNonScrolling, true)
     }
 
     private var onInitTaskKey: String {

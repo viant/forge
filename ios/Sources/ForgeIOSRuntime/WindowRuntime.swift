@@ -10,6 +10,10 @@ public struct WindowIdentity: Sendable {
     public func dataSourceID(ref: String) -> String {
         "\(windowID)DS\(ref)"
     }
+
+    public func windowFormID() -> String {
+        "\(windowID):windowForm"
+    }
 }
 
 public struct WindowContext: Sendable {
