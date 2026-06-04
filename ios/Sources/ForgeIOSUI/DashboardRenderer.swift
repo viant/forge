@@ -172,7 +172,7 @@ public struct DashboardRenderer: View {
                             .font(summaryValueFont(for: displayValue).weight(.semibold))
                             .foregroundStyle(cardTone.text)
                             .lineLimit(3)
-                            .minimumScaleFactor(0.72)
+                            .minimumScaleFactor(0.62)
                             .allowsTightening(true)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -598,10 +598,10 @@ public struct DashboardRenderer: View {
             .map(\.count)
             .max() ?? normalized.count
         if longestToken >= 18 || normalized.count >= 30 {
-            return isCompactPresentation ? .body : .headline
+            return isCompactPresentation ? .footnote : .subheadline
         }
         if longestToken >= 12 || normalized.count >= 20 {
-            return isCompactPresentation ? .subheadline : .title3
+            return isCompactPresentation ? .callout : .headline
         }
         return isCompactPresentation ? .headline : .title3
     }
