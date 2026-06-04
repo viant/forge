@@ -315,7 +315,19 @@ public struct MenuListRenderer: View {
                     for await next in stream {
                         await MainActor.run {
                             formValuesByDataSource[ref] = next
+                        }
+                    }
+                }
+                group.addTask {
+                    let stream = await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: ref)
+                    for await next in stream {
+                        await MainActor.run {
+                            metricsValuesByDataSource[ref] = next
+                        }
+                    }
+                }
             }
+            await group.waitForAll()
         }
     }
 
@@ -334,18 +346,6 @@ public struct MenuListRenderer: View {
                 continue
             }
             await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
-        }
-    }
-                group.addTask {
-                    let stream = await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: ref)
-                    for await next in stream {
-                        await MainActor.run {
-                            metricsValuesByDataSource[ref] = next
-                        }
-                    }
-                }
-            }
-            await group.waitForAll()
         }
     }
 
