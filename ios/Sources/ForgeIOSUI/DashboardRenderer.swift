@@ -587,8 +587,7 @@ public struct DashboardRenderer: View {
         if let tone = metric.tone?.trimmingCharacters(in: .whitespacesAndNewlines), !tone.isEmpty {
             return toneStyle(tone)
         }
-        let fallbackTones = ["info", "success", "neutral", "warning", "danger", "accent"]
-        return toneStyle(fallbackTones[index % fallbackTones.count])
+        return toneStyle("neutral")
     }
 
     private func summaryValueFont(for text: String) -> Font {

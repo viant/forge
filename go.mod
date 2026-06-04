@@ -9,7 +9,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.18.0
 	github.com/viant/afs v1.30.0
-	github.com/viant/jsonrpc v0.17.0
+	github.com/viant/jsonrpc v0.21.0
 	github.com/viant/mcp v0.10.0
 	github.com/viant/mcp-protocol v0.10.0
 	gopkg.in/yaml.v3 v3.0.1

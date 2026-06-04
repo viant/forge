@@ -860,9 +860,6 @@ private fun interpolateDashboardTemplate(
     filters: Map<String, Any?>,
     selection: DashboardSelectionState
 ): String {
-    val curlyRegex = Regex("\\$\\{\\s*([^}]+)\\s*}")
-    val mustacheRegex = Regex("\\{\\{\\s*([^}]+)\\s*}}")
-
     fun resolveKey(key: String): String {
         val value = when {
             key.startsWith("filters.") -> SelectorUtil.resolve(filters, key.removePrefix("filters."))
@@ -881,11 +878,29 @@ private fun interpolateDashboardTemplate(
         return value?.toString() ?: ""
     }
 
-    return mustacheRegex.replace(
-        curlyRegex.replace(template) { match -> resolveKey(match.groupValues[1].trim()) }
-    ) { match ->
-        resolveKey(match.groupValues[1].trim())
+    val out = StringBuilder(template.length)
+    var index = 0
+    while (index < template.length) {
+        if (template.startsWith("\${", index)) {
+            val close = template.indexOf('}', startIndex = index + 2)
+            if (close >= 0) {
+                out.append(resolveKey(template.substring(index + 2, close).trim()))
+                index = close + 1
+                continue
+            }
+        }
+        if (template.startsWith("{{", index)) {
+            val close = template.indexOf("}}", startIndex = index + 2)
+            if (close >= 0) {
+                out.append(resolveKey(template.substring(index + 2, close).trim()))
+                index = close + 2
+                continue
+            }
+        }
+        out.append(template[index])
+        index += 1
     }
+    return out.toString()
 }
 
 private fun toneColor(value: Any?, warningAbove: Double?, dangerAbove: Double?): DashboardToneColors {
@@ -939,8 +954,7 @@ private fun summaryMetricTone(metric: com.viant.forgeandroid.runtime.DashboardMe
     if (explicit.isNotEmpty()) {
         return severityTone(explicit)
     }
-    val fallback = listOf("info", "success", "neutral", "warning", "danger", "accent")
-    return severityTone(fallback[index % fallback.size])
+    return severityTone("neutral")
 }
 
 @Composable

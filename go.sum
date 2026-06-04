@@ -919,6 +919,8 @@ github.com/viant/gosh v0.2.4/go.mod h1:KytU8mypZIFjjnIgrZAIFMpb0rGQWZmpCeg7kvsNb
 github.com/viant/jsonrpc v0.16.2 h1:rEcPcIt6L8m/brOAjEgXvm9yqAifqWWgqfXX00rn/f4=
 github.com/viant/jsonrpc v0.16.2/go.mod h1:b214Lo4zBwLqbu6Tf2bRlgQkFfPMBW5ap4qS+I3zcJ8=
 github.com/viant/jsonrpc v0.17.0/go.mod h1:b214Lo4zBwLqbu6Tf2bRlgQkFfPMBW5ap4qS+I3zcJ8=
+github.com/viant/jsonrpc v0.21.0 h1:7j4IesnVUo5wopMHX/r1WC3eca8jdELNZuGG5zFYNbE=
+github.com/viant/jsonrpc v0.21.0/go.mod h1:b214Lo4zBwLqbu6Tf2bRlgQkFfPMBW5ap4qS+I3zcJ8=
 github.com/viant/mcp v0.8.2 h1:4xpC4e0bMOd2R24zBGBc3Qki0B1+Jr0UYbRY7FQS/Bo=
 github.com/viant/mcp v0.8.2/go.mod h1:ck5tVUSdmIq4fLJavloBeDEZ+tjtah1zAq6KUeng3lw=
 github.com/viant/mcp v0.10.0/go.mod h1:D0dn8qhU0i3mpBDZ3qczDU4ETAqSS67eMPGnIN7khzw=
