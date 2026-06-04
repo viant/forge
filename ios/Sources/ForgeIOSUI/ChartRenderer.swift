@@ -179,7 +179,7 @@ public struct ChartRenderer: View {
     }
 
     private var windowFormSignature: String {
-        chartWindowForm.signature
+        chartWindowFormSignature(chartWindowForm)
     }
 
     private var windowFormRefreshKey: String {
@@ -371,6 +371,30 @@ private func chartDataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) ->
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return source == "windowform"
+    }
+}
+
+private func chartWindowFormSignature(_ values: [String: JSONValue]) -> String {
+    values.keys.sorted().map { "\($0)=\(chartJSONValueSignature(values[$0]))" }.joined(separator: "|")
+}
+
+private func chartJSONValueSignature(_ value: JSONValue?) -> String {
+    guard let value else {
+        return "null"
+    }
+    switch value {
+    case .string(let string):
+        return "s:\(string)"
+    case .number(let number):
+        return "n:\(number)"
+    case .bool(let flag):
+        return "b:\(flag)"
+    case .array(let values):
+        return "a:[\(values.map { chartJSONValueSignature($0) }.joined(separator: ","))]"
+    case .object(let object):
+        return "o:{\(object.keys.sorted().map { "\($0)=\(chartJSONValueSignature(object[$0]))" }.joined(separator: ","))}"
+    case .null:
+        return "null"
     }
 }
 
