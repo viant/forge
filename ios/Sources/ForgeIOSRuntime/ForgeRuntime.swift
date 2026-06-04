@@ -168,11 +168,13 @@ public actor ForgeRuntime {
             parentKey: parentKey,
             isModal: isModal
         )
-        if let existing = windows.first(where: { $0.id == state.id }) {
-            return existing
+        if let existingIndex = windows.firstIndex(where: { $0.id == state.id }) {
+            windows[existingIndex] = state
+            await loadWindowMetadata(for: state, forceReload: true)
+            return windows[existingIndex]
         }
         windows.append(state)
-        await loadWindowMetadata(for: state)
+        await loadWindowMetadata(for: state, forceReload: true)
         return windows.first(where: { $0.id == state.id }) ?? state
     }
 
@@ -573,10 +575,13 @@ public actor ForgeRuntime {
         parameters.filter { $0.direction == "out" || $0.direction == "inout" }
     }
 
-    private func loadWindowMetadata(for state: WindowState) async {
+    private func loadWindowMetadata(for state: WindowState, forceReload: Bool = false) async {
         let signal = await signals.metadata(windowID: state.id)
-        if await signal.peek() != nil {
+        if !forceReload, await signal.peek() != nil {
             return
+        }
+        if forceReload {
+            await signal.set(nil)
         }
         if let windowMetadataLoader {
             do {

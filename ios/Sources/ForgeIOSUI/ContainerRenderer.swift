@@ -2,6 +2,8 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct ContainerRenderer: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -75,15 +77,54 @@ public struct ContainerRenderer: View {
                 MenuListRenderer(runtime: runtime, window: window, container: container, items: container.items)
             }
         } else if !container.containers.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: resolvedSpacing(from: container.layout?.gap, fallback: 12)) {
                 titleBlock
-                ForEach(container.containers) { child in
-                    ContainerRenderer(runtime: runtime, window: window, container: child)
+                if container.layout?.kind?.lowercased() == "grid" {
+                    LazyVGrid(columns: nestedGridColumns, spacing: resolvedSpacing(from: container.layout?.rowGap ?? container.layout?.gap, fallback: 12)) {
+                        ForEach(container.containers) { child in
+                            ContainerRenderer(runtime: runtime, window: window, container: child)
+                        }
+                    }
+                } else if container.layout?.kind?.lowercased() == "split",
+                          container.layout?.orientation?.lowercased() == "horizontal",
+                          horizontalSizeClass == .regular {
+                    HStack(alignment: .top, spacing: resolvedSpacing(from: container.layout?.gap, fallback: 12)) {
+                        ForEach(container.containers) { child in
+                            ContainerRenderer(runtime: runtime, window: window, container: child)
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                    }
+                } else {
+                    ForEach(container.containers) { child in
+                        ContainerRenderer(runtime: runtime, window: window, container: child)
+                    }
                 }
             }
         } else {
             PlaceholderContainerView(container: container)
         }
+    }
+
+    private var nestedGridColumns: [GridItem] {
+        let layoutColumns = container.layout?.columns ?? 0
+        if layoutColumns >= 12 && horizontalSizeClass == .regular {
+            return [GridItem(.adaptive(minimum: 220), spacing: 12, alignment: .top)]
+        }
+        let count = max(1, min(layoutColumns, horizontalSizeClass == .regular ? 4 : 2))
+        return Array(repeating: GridItem(.flexible(), spacing: 12, alignment: .top), count: count)
+    }
+
+    private func resolvedSpacing(from raw: String?, fallback: CGFloat) -> CGFloat {
+        guard let raw else {
+            return fallback
+        }
+        let numeric = raw
+            .replacingOccurrences(of: "px", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let value = Double(numeric) {
+            return CGFloat(value)
+        }
+        return fallback
     }
 }
 

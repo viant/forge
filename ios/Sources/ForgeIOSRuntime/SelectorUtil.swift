@@ -29,6 +29,19 @@ public enum SelectorUtil {
         if let primitive = value as? JSONPrimitive {
             return primitive.anyValue
         }
+        if let jsonValue = value as? JSONValue {
+            switch jsonValue {
+            case .object(let object):
+                return object[key]?.anyValue
+            case .array(let array):
+                if let index = Int(key), array.indices.contains(index) {
+                    return array[index].anyValue
+                }
+                return nil
+            default:
+                return jsonValue.anyValue
+            }
+        }
         if let object = value as? [String: Any] {
             return object[key]
         }

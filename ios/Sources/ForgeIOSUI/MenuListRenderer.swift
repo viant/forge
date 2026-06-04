@@ -2,6 +2,8 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct MenuListRenderer: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -20,8 +22,16 @@ public struct MenuListRenderer: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ForEach(visibleItems) { item in
-                renderedItem(item)
+            if shouldUseSummaryGrid {
+                LazyVGrid(columns: summaryColumns, spacing: 12) {
+                    ForEach(visibleItems) { item in
+                        summaryCard(item)
+                    }
+                }
+            } else {
+                ForEach(visibleItems) { item in
+                    renderedItem(item)
+                }
             }
         }
         .task(id: dataTaskKey) {
@@ -71,13 +81,17 @@ public struct MenuListRenderer: View {
 
     @ViewBuilder
     private func renderedItem(_ item: ItemDef) -> some View {
-        switch (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "markdown":
-            markdownItem(item)
-        case "button":
-            buttonItem(item)
-        default:
-            labelItem(item)
+        if shouldRenderOptionGroup(item) {
+            optionGroupItem(item)
+        } else {
+            switch (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "markdown":
+                markdownItem(item)
+            case "button":
+                buttonItem(item)
+            default:
+                labelItem(item)
+            }
         }
     }
 
@@ -94,8 +108,12 @@ public struct MenuListRenderer: View {
                 .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(14)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
     }
 
     @ViewBuilder
@@ -114,6 +132,97 @@ public struct MenuListRenderer: View {
                 .padding()
                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
         }
+    }
+
+    @ViewBuilder
+    private func summaryCard(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.title ?? item.id ?? "Item"
+        let value = resolvedItemDisplayValue(item) ?? item.value?.displayString ?? "—"
+        let showsSingleLineValue = shouldUseCompactSummaryStyle(title: title, value: value)
+        VStack(alignment: .leading, spacing: 8) {
+            if showsSingleLineValue {
+                Text(value == "—" ? title : value)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                if value != "—", normalizedSummaryTitle(title) != normalizedSummaryTitle(value) {
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            } else {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Text(value)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: showsSingleLineValue ? 56 : 80, alignment: .topLeading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, showsSingleLineValue ? 12 : 14)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func optionGroupItem(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.title ?? item.id ?? "Control"
+        let selectedValue = resolvedItemDisplayValue(item)
+            ?? item.value?.displayString
+            ?? item.options.first(where: { $0.default == true })?.value
+            ?? item.options.first?.value
+            ?? ""
+
+        VStack(alignment: .leading, spacing: 10) {
+            if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            LazyVGrid(columns: optionColumns(for: item), alignment: .leading, spacing: 8) {
+                ForEach(item.options, id: \.value) { option in
+                    let optionValue = option.value ?? ""
+                    let optionLabel = option.label ?? optionValue
+                    let isSelected = optionValue == selectedValue
+                    Button {
+                        applyOptionSelection(optionValue, for: item)
+                    } label: {
+                        Text(optionLabel)
+                            .font(.subheadline.weight(isSelected ? .semibold : .medium))
+                            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule()
+                                    .fill(isSelected ? Color.accentColor.opacity(0.14) : Color(.systemBackground))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(isSelected ? Color.accentColor.opacity(0.22) : Color.black.opacity(0.05), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
     }
 
     @ViewBuilder
@@ -166,12 +275,12 @@ public struct MenuListRenderer: View {
         var nextForms: [String: [String: JSONValue]] = [:]
         var nextMetrics: [String: [String: JSONValue]] = [:]
         for ref in relevantDataSourceRefs {
-            var form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
-            var metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+            let form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
+            let metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
             if container.fetchData != false && form.isEmpty && metrics.isEmpty {
-                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
-                form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
-                metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+                Task {
+                    await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                }
             }
             nextForms[ref] = form
             nextMetrics[ref] = metrics
@@ -312,6 +421,69 @@ public struct MenuListRenderer: View {
             ordered.append(ref)
         }
         return ordered
+    }
+
+    private var shouldUseSummaryGrid: Bool {
+        visibleItems.count >= 2 && visibleItems.allSatisfy { item in
+            let type = (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return (type.isEmpty || type == "label") && item.options.isEmpty
+        }
+    }
+
+    private var summaryColumns: [GridItem] {
+        let minimumWidth: CGFloat = horizontalSizeClass == .regular ? 132 : 150
+        return [GridItem(.adaptive(minimum: minimumWidth), spacing: 12, alignment: .top)]
+    }
+
+    private func optionColumns(for item: ItemDef) -> [GridItem] {
+        let type = (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if type == "buttongroup" || type == "button_group" || type == "button-group" {
+            return [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 92 : 110), spacing: 8, alignment: .top)]
+        }
+        return [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 112 : 132), spacing: 8, alignment: .top)]
+    }
+
+    private func shouldRenderOptionGroup(_ item: ItemDef) -> Bool {
+        guard !item.options.isEmpty else {
+            return false
+        }
+        let type = (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let scope = (item.scope ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return scope == "windowform" || type == "buttongroup" || type == "button_group" || type == "button-group" || type == "radio"
+    }
+
+    private func applyOptionSelection(_ value: String, for item: ItemDef) {
+        guard let runtime, let window else {
+            return
+        }
+        let key = (item.bindingPath ?? item.dataField ?? item.field ?? item.id ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else {
+            return
+        }
+        let scope = (item.scope ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard scope == "windowform" else {
+            return
+        }
+        Task {
+            await runtime.setWindowFormValue(
+                windowID: window.windowID,
+                values: [key: .string(value)]
+            )
+        }
+    }
+
+    private func shouldUseCompactSummaryStyle(title: String, value: String) -> Bool {
+        let normalizedTitle = normalizedSummaryTitle(title)
+        let normalizedValue = normalizedSummaryTitle(value)
+        if normalizedValue == "—" {
+            return normalizedTitle.count <= 16
+        }
+        return normalizedTitle.count <= 18 && normalizedValue.count <= 16
+    }
+
+    private func normalizedSummaryTitle(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }
 

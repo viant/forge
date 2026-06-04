@@ -3,6 +3,8 @@ import Charts
 import ForgeIOSRuntime
 
 public struct ChartRenderer: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -20,24 +22,41 @@ public struct ChartRenderer: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = resolvedChartTitle {
-                Text(title).font(.headline)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary.opacity(0.9))
             }
             if rows.isEmpty {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.secondary.opacity(0.08))
-                    .frame(height: 160)
+                    .fill(Color(.systemBackground))
+                    .frame(height: compactChartHeight)
                     .overlay(
-                        Text(chart.type ?? chart.kind ?? "chart")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        VStack(spacing: 10) {
+                            Image(systemName: "chart.xyaxis.line")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.secondary.opacity(0.7))
+                            Text("Loading chart")
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     )
             } else {
                 chartBody
-                    .frame(height: 180)
+                    .frame(height: compactChartHeight)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
             }
         }
-        .padding()
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .padding(12)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
         .task(id: chartTaskKey) {
             await loadRows()
         }
@@ -116,6 +135,10 @@ public struct ChartRenderer: View {
         [window?.windowID ?? "", resolvedDataSourceRef, "rows"].joined(separator: ":")
     }
 
+    private var compactChartHeight: CGFloat {
+        horizontalSizeClass == .regular ? 176 : 220
+    }
+
     private func loadRows() async {
         guard let runtime, let window else {
             rows = []
@@ -133,8 +156,9 @@ public struct ChartRenderer: View {
         guard shouldFetch else {
             return
         }
-        await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
-        rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        Task {
+            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        }
     }
 
     private func observeRows() async {
@@ -174,11 +198,12 @@ public struct ChartRenderer: View {
         guard !selector.isEmpty, !chart.dataSourceRefs.isEmpty else {
             return chart.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         }
-        let key: String? = switch source {
+        let key: String?
+        switch source {
         case "windowform":
-            SelectorUtil.resolve(chartWindowForm, selector: selector) as? String
+            key = SelectorUtil.resolve(chartWindowForm, selector: selector) as? String
         default:
-            nil
+            key = nil
         }
         if let key, let mapped = chart.dataSourceRefs[key] {
             return mapped

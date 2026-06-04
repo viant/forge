@@ -1,11 +1,14 @@
 package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,10 +25,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import kotlinx.coroutines.launch
 
 @Composable
 fun WindowContentView(
@@ -54,6 +59,7 @@ fun WindowContentView(
             ?: metadata?.dataSources?.keys?.firstOrNull()
         dataSourceRef?.takeIf { it.isNotBlank() }?.let(context::contextOrNull)
     }
+    val inheritedDataSourceRef = defaultDataSourceContext?.dataSourceRef
 
     LaunchedEffect(windowId, metadata) {
         metadata?.on?.filter { it.event == "onInit" }?.forEach {
@@ -100,14 +106,63 @@ fun WindowContentView(
             HorizontalDivider()
         }
         if (scrollEnabled) {
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = true)
-                    .verticalScroll(rememberScrollState())
             ) {
-                containers.forEach { container ->
-                    ContainerRenderer(runtime, context, container)
+                val contentLayout = view?.content?.layout
+                val useSplit = contentLayout?.kind?.equals("split", ignoreCase = true) == true &&
+                    contentLayout.orientation?.equals("horizontal", ignoreCase = true) == true &&
+                    containers.size >= 2 &&
+                    maxWidth >= 720.dp
+                if (useSplit) {
+                    val spacing = 16.dp
+                    val fractions = splitFractions(containers.size)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing)
+                    ) {
+                        containers.forEachIndexed { index, container ->
+                            val paneScrollState = remember(windowId, container.id) { ScrollState(0) }
+                            val scope = rememberCoroutineScope()
+                            LaunchedEffect(windowId, container.id) {
+                                scope.launch { paneScrollState.scrollTo(0) }
+                            }
+                            Column(
+                                modifier = Modifier
+                                    .weight(fractions.getOrElse(index) { 1f / containers.size.toFloat() })
+                                    .fillMaxHeight()
+                                    .verticalScroll(paneScrollState)
+                            ) {
+                                ContainerRenderer(
+                                    runtime,
+                                    context,
+                                    container,
+                                    selectionModeOverride = null,
+                                    inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        containers.forEach { container ->
+                            ContainerRenderer(
+                                runtime,
+                                context,
+                                container,
+                                inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
+                            )
+                        }
+                    }
                 }
             }
         } else {
@@ -118,11 +173,23 @@ fun WindowContentView(
                     .padding(bottom = 8.dp)
             ) {
                 containers.forEach { container ->
-                    ContainerRenderer(runtime, context, container)
+                    ContainerRenderer(
+                        runtime,
+                        context,
+                        container,
+                        inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
+                    )
                 }
             }
         }
     }
 
     DialogRenderer(runtime, context, metadata?.dialogs.orEmpty())
+}
+
+private fun splitFractions(count: Int): List<Float> {
+    if (count <= 0) return emptyList()
+    if (count == 2) return listOf(0.56f, 0.44f)
+    val even = 1f / count.toFloat()
+    return List(count) { even }
 }

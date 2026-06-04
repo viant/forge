@@ -1035,6 +1035,31 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(resolved["granularity"], .string("hour"))
     }
 
+    func testSelectorUtilResolvesNestedJSONValueObjectsAndArrays() {
+        let metrics: [String: JSONValue] = [
+            "periodSummary": .object([
+                "lastDayPacingIndex": .number(12)
+            ]),
+            "lifetimeSummary": .object([
+                "lifetimePacingIndex": .number(0)
+            ]),
+            "AdOrderId": .array([.number(2673453)])
+        ]
+
+        XCTAssertEqual(
+            SelectorUtil.resolve(metrics, selector: "periodSummary.lastDayPacingIndex") as? Double,
+            12
+        )
+        XCTAssertEqual(
+            SelectorUtil.resolve(metrics, selector: "lifetimeSummary.lifetimePacingIndex") as? Double,
+            0
+        )
+        XCTAssertEqual(
+            SelectorUtil.resolve(metrics, selector: "AdOrderId.0") as? Double,
+            2673453
+        )
+    }
+
     func testParameterResolverResolvesCrossDataSourceSelection() {
         let context = ParameterResolver.ResolutionContext(
             identityDataSourceRef: "runs",

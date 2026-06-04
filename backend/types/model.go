@@ -1080,6 +1080,7 @@ type Tabs struct {
 	Large                    bool   `json:"large" yaml:"large"`
 	RenderActiveTabPanelOnly bool   `json:"renderActiveTabPanelOnly" yaml:"renderActiveTabPanelOnly"`
 	SelectedTabId            string `json:"selectedTabId" yaml:"selectedTabId"`
+	Style                    string `json:"style" yaml:"style"`
 	Vertical                 bool   `json:"vertical" yaml:"vertical"`
 }
 

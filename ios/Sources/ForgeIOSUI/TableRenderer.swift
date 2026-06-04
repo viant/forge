@@ -22,7 +22,9 @@ public struct TableRenderer: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = resolvedTableTitle {
-                Text(title).font(.headline)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary.opacity(0.9))
             }
             if let toolbar = table.toolbar, !toolbar.items.isEmpty {
                 tableToolbar(toolbar)
@@ -33,8 +35,12 @@ public struct TableRenderer: View {
                 contentTable
             }
         }
-        .padding()
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+        .padding(10)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
         .task(id: tableTaskKey) {
             await loadRows()
         }
@@ -168,14 +174,25 @@ public struct TableRenderer: View {
     private func compactRowCard(row: [String: JSONValue], rowIndex: Int) -> some View {
         let content = VStack(alignment: .leading, spacing: 10) {
             if let primary = displayColumns.first {
-                valueLabel(row: row, column: primary, fallback: primary.displayLabel, font: .headline, color: .primary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(primary.displayLabel)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    valueLabel(row: row, column: primary, fallback: primary.displayLabel, font: .headline, color: .primary)
+                }
             }
             ForEach(Array(displayColumns.dropFirst()), id: \.identityKey) { column in
-                VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text(column.displayLabel)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
                     valueLabel(row: row, column: column, font: .body, color: .primary)
+                        .multilineTextAlignment(.trailing)
+                }
+                if column.identityKey != displayColumns.last?.identityKey {
+                    Divider()
+                        .overlay(Color.black.opacity(0.04))
                 }
             }
             if !actionColumns.isEmpty {
@@ -185,11 +202,12 @@ public struct TableRenderer: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(selectedRowIndex == rowIndex ? Color.accentColor.opacity(0.35) : Color.secondary.opacity(0.14), lineWidth: selectedRowIndex == rowIndex ? 1.5 : 1)
+                .stroke(selectedRowIndex == rowIndex ? Color.accentColor.opacity(0.30) : Color.black.opacity(0.06), lineWidth: selectedRowIndex == rowIndex ? 1.5 : 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: actionColumns.isEmpty ? .combine : .contain)
@@ -216,13 +234,20 @@ public struct TableRenderer: View {
             VStack(alignment: .leading, spacing: 0) {
                 headerRow
                 Divider()
+                    .overlay(Color.black.opacity(0.05))
                 ForEach(rows.indices, id: \.self) { index in
                     dataRow(row: rows[index], index: index)
                     if index != rows.indices.last {
                         Divider()
+                            .overlay(Color.black.opacity(0.05))
                     }
                 }
             }
+            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
         }
     }
 
@@ -230,34 +255,34 @@ public struct TableRenderer: View {
         HStack(alignment: .top, spacing: 0) {
             ForEach(displayColumns, id: \.identityKey) { column in
                 Text(column.displayLabel)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .frame(width: Self.columnWidth(for: column), alignment: .leading)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 8)
             }
             if !actionColumns.isEmpty {
                 Text("Actions")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .frame(width: 160, alignment: .trailing)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 8)
             }
         }
-        .background(Color.secondary.opacity(0.06))
+        .background(Color(.secondarySystemBackground))
     }
 
     @ViewBuilder
     private func dataRow(row: [String: JSONValue], index: Int) -> some View {
         let content = HStack(alignment: .top, spacing: 0) {
             ForEach(displayColumns, id: \.identityKey) { column in
-                valueLabel(row: row, column: column, font: .footnote, color: .primary)
+                valueLabel(row: row, column: column, font: .subheadline, color: .primary)
                     .frame(width: Self.columnWidth(for: column), alignment: .leading)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 10)
             }
             if !actionColumns.isEmpty {
                 HStack(spacing: 6) {
@@ -268,7 +293,11 @@ public struct TableRenderer: View {
                 .padding(.vertical, 8)
             }
         }
-        .background(selectedRowIndex == index ? Color.accentColor.opacity(0.08) : (index.isMultiple(of: 2) ? Color.clear : Color.secondary.opacity(0.035)))
+        .background(
+            selectedRowIndex == index
+                ? Color.accentColor.opacity(0.08)
+                : (index.isMultiple(of: 2) ? Color.clear : Color.black.opacity(0.014))
+        )
         .contentShape(Rectangle())
         .accessibilityElement(children: actionColumns.isEmpty ? .combine : .contain)
         .accessibilityLabel(rowAccessibilityLabel(row: row))
@@ -420,10 +449,12 @@ public struct TableRenderer: View {
             Link(text, destination: destination)
                 .font(font)
                 .foregroundStyle(.tint)
+                .lineLimit(2)
         } else {
             Text(text)
                 .font(font)
                 .foregroundStyle(color)
+                .lineLimit(2)
         }
     }
 

@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -74,17 +75,26 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                 }
             } else {
                 val horizontalScroll = rememberScrollState()
-                Column(
+                Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(horizontalScroll)
+                        .fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE7ECF3)),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
                 ) {
-                    DesktopTableHeader(table)
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        itemsIndexed(rows) { index, row ->
-                            val isSelected = selection.rowIndex == index
-                            DesktopTableRow(runtime, context, table, row, index, isSelected) {
-                                coroutineScope.launch { context.toggleSelection(row, index) }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(horizontalScroll)
+                    ) {
+                        DesktopTableHeader(table)
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                            itemsIndexed(rows) { index, row ->
+                                val isSelected = selection.rowIndex == index
+                                DesktopTableRow(runtime, context, table, row, index, isSelected) {
+                                    coroutineScope.launch { context.toggleSelection(row, index) }
+                                }
                             }
                         }
                     }
@@ -106,8 +116,8 @@ private fun DesktopTableHeader(table: TableDef) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF6F8FB), shape = RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 10.dp)
+            .background(Color(0xFFF8FAFC), shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))
+            .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
         displayColumns(table).forEach { col ->
             HeaderColumnCell(text = col.label ?: col.name ?: col.id.orEmpty())
@@ -222,21 +232,19 @@ private fun DesktopTableRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (isSelected) Color(0xFFE8EEF9) else Color.Transparent,
-                shape = RoundedCornerShape(12.dp)
+                if (isSelected) Color(0xFFF4F7FF) else if (index.isEven()) Color.White else Color(0xFFFBFCFE)
             )
             .clickable(onClick = onToggleSelection)
-            .padding(horizontal = 10.dp, vertical = 12.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         table.columns.forEach { col ->
             when (col.type) {
                 "button" -> {
-                    Button(
+                    AssistChip(
                         onClick = { executeRowAction(runtime, context, col, row, index) },
-                        modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(col.label ?: col.icon ?: col.id ?: "...")
-                    }
+                        label = { Text(col.label ?: col.icon ?: col.id ?: "Action") },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFF2F5FA))
+                    )
                 }
                 "icon" -> {
                     IconButton(
@@ -263,12 +271,12 @@ private fun DesktopTableRow(
                 horizontalArrangement = Arrangement.End
             ) {
                 buttonColumns(table).forEach { col ->
-                    Button(
+                    AssistChip(
                         onClick = { executeRowAction(runtime, context, col, row, index) },
+                        label = { Text(col.label ?: col.icon ?: col.id ?: "Action") },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFF2F5FA)),
                         modifier = Modifier.padding(end = 8.dp)
-                    ) {
-                        Text(col.label ?: col.icon ?: col.id ?: "Action")
-                    }
+                    )
                 }
                 iconColumns(table).forEach { col ->
                     IconButton(
@@ -294,7 +302,7 @@ private fun RowScope.HeaderColumnCell(text: String, weight: Float = 1f) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier
             .weight(weight)
-            .widthIn(min = 140.dp)
+            .widthIn(min = 128.dp)
             .padding(end = 12.dp)
     )
 }
@@ -313,11 +321,13 @@ private fun RowScope.ValueColumnCell(
         textDecoration = if (linkUrl != null) TextDecoration.Underline else null,
         modifier = Modifier
             .weight(weight)
-            .widthIn(min = 140.dp)
+            .widthIn(min = 128.dp)
             .padding(end = 12.dp)
             .then(if (linkUrl != null && onOpenLink != null) Modifier.clickable { onOpenLink(linkUrl) } else Modifier)
     )
 }
+
+private fun Int.isEven(): Boolean = this % 2 == 0
 
 private fun displayColumns(table: TableDef): List<ColumnDef> {
     return table.columns.filter { col -> col.type != "button" && col.type != "icon" }

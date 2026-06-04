@@ -5,12 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,48 +60,60 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
     val type = (chart.type ?: "line").trim().lowercase()
     var selection by remember(prepared, type) { mutableStateOf<ChartSelection?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(16.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        chart.yAxis?.label?.takeIf { it.isNotBlank() }?.let {
-            Text(text = it, style = MaterialTheme.typography.titleSmall)
-        }
-        if (prepared.points.isEmpty() || prepared.series.isEmpty()) {
-            Text("No chart data", style = MaterialTheme.typography.bodyMedium, color = ChartMutedText)
-            return@Column
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val regularWidth = maxWidth >= 720.dp
+        val panelPadding = if (regularWidth) 10.dp else 12.dp
+        val chartHeight = when {
+            type == "pie" || type == "donut" -> if (regularWidth) 196.dp else 220.dp
+            regularWidth -> 184.dp
+            else -> 220.dp
         }
 
-        selection?.let { selected ->
-            ChartTooltip(selected)
-        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(16.dp))
+                .padding(panelPadding),
+            verticalArrangement = Arrangement.spacedBy(if (regularWidth) 10.dp else 12.dp)
+        ) {
+            chart.yAxis?.label?.takeIf { it.isNotBlank() }?.let {
+                Text(text = it, style = MaterialTheme.typography.titleSmall)
+            }
+            if (prepared.points.isEmpty() || prepared.series.isEmpty()) {
+                Text("No chart data", style = MaterialTheme.typography.bodyMedium, color = ChartMutedText)
+                return@Column
+            }
 
-        when {
-            type == "bar" || type == "stacked_bar" -> {
-                StackedBarChart(
-                    prepared = prepared,
-                    selection = selection,
-                    onSelect = { selection = it }
-                )
+            selection?.let { selected ->
+                ChartTooltip(selected)
             }
-            type == "pie" || type == "donut" -> {
-                PieChart(
-                    slices = buildPieSlices(prepared),
-                    donut = type == "donut",
-                    selection = selection,
-                    onSelect = { selection = it }
-                )
-            }
-            else -> {
-                MultiSeriesCartesianChart(
-                    prepared = prepared,
-                    type = type,
-                    selection = selection,
-                    onSelect = { selection = it }
-                )
+
+            when {
+                type == "bar" || type == "stacked_bar" -> {
+                    StackedBarChart(
+                        prepared = prepared,
+                        selection = selection,
+                        onSelect = { selection = it }
+                    )
+                }
+                type == "pie" || type == "donut" -> {
+                    PieChart(
+                        slices = buildPieSlices(prepared),
+                        donut = type == "donut",
+                        selection = selection,
+                        onSelect = { selection = it },
+                        chartHeight = chartHeight
+                    )
+                }
+                else -> {
+                    MultiSeriesCartesianChart(
+                        prepared = prepared,
+                        type = type,
+                        selection = selection,
+                        onSelect = { selection = it },
+                        chartHeight = chartHeight
+                    )
+                }
             }
         }
     }
@@ -188,13 +203,14 @@ private fun MultiSeriesCartesianChart(
     prepared: PreparedChartData,
     type: String,
     selection: ChartSelection?,
-    onSelect: (ChartSelection?) -> Unit
+    onSelect: (ChartSelection?) -> Unit,
+    chartHeight: androidx.compose.ui.unit.Dp
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp)
+                .height(chartHeight)
                 .background(ChartCanvasColor, RoundedCornerShape(14.dp))
                 .padding(12.dp)
                 .pointerInput(prepared, type) {
@@ -284,13 +300,14 @@ private fun PieChart(
     slices: List<PieSlice>,
     donut: Boolean,
     selection: ChartSelection?,
-    onSelect: (ChartSelection?) -> Unit
+    onSelect: (ChartSelection?) -> Unit,
+    chartHeight: androidx.compose.ui.unit.Dp
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(220.dp)
+                .height(chartHeight)
                 .background(ChartCanvasColor, RoundedCornerShape(14.dp))
                 .padding(12.dp)
                 .pointerInput(slices, donut) {
