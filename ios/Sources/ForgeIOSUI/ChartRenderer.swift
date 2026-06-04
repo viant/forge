@@ -11,6 +11,7 @@ public struct ChartRenderer: View {
     private let chart: ChartDef
     @State private var rows: [[String: JSONValue]] = []
     @State private var chartWindowForm: [String: JSONValue] = [:]
+    @State private var selectedSeriesKeys: Set<String> = []
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, chart: ChartDef) {
         self.runtime = runtime
@@ -26,7 +27,14 @@ public struct ChartRenderer: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary.opacity(0.9))
             }
-            if rows.isEmpty {
+            if supportsSeriesSelection {
+                chartSeriesSelector
+            }
+            if supportsSeriesSelection && filteredSeriesKeys.isEmpty {
+                Text("Select at least one measure")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if rows.isEmpty {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(.systemBackground))
                     .frame(height: compactChartHeight)
@@ -57,6 +65,11 @@ public struct ChartRenderer: View {
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
+        .onAppear {
+            if selectedSeriesKeys.isEmpty {
+                selectedSeriesKeys = Set(seriesKeys)
+            }
+        }
         .task(id: chartTaskKey) {
             await loadRows()
         }
@@ -65,6 +78,9 @@ public struct ChartRenderer: View {
         }
         .task(id: window?.windowID ?? "") {
             await observeWindowForm()
+        }
+        .task(id: windowFormRefreshKey) {
+            await refreshWindowFormDrivenDataSource()
         }
     }
 
@@ -86,7 +102,8 @@ public struct ChartRenderer: View {
 
     @ViewBuilder
     private var chartBody: some View {
-        let type = (chart.type ?? chart.kind ?? "bar").lowercased()
+        let type = normalizedChartType
+        let singleCategory = Set(chartSeriesData.map(\.category)).count <= 1
         if type == "pie" {
             Chart(pieData) { item in
                 SectorMark(
@@ -97,19 +114,41 @@ public struct ChartRenderer: View {
             }
             .chartLegend(position: .bottom)
         } else {
-            Chart(barData) { item in
-                if type == "line" {
-                    LineMark(
-                        x: .value("Category", item.category),
-                        y: .value("Value", item.value)
-                    )
-                } else {
+            Chart(chartSeriesData) { item in
+                switch type {
+                case "line", "composed", "area":
+                    if singleCategory {
+                        BarMark(
+                            x: .value("Category", item.category),
+                            y: .value("Value", item.value)
+                        )
+                        .foregroundStyle(by: .value("Series", item.series))
+                        .position(by: .value("Series", item.series))
+                    } else {
+                        LineMark(
+                            x: .value("Category", item.category),
+                            y: .value("Value", item.value),
+                            series: .value("Series", item.series)
+                        )
+                        .foregroundStyle(by: .value("Series", item.series))
+                    }
+                case "bar", "stacked_bar":
                     BarMark(
                         x: .value("Category", item.category),
                         y: .value("Value", item.value)
                     )
+                    .foregroundStyle(by: .value("Series", item.series))
+                    .position(by: .value("Series", item.series))
+                default:
+                    LineMark(
+                        x: .value("Category", item.category),
+                        y: .value("Value", item.value),
+                        series: .value("Series", item.series)
+                    )
+                    .foregroundStyle(by: .value("Series", item.series))
                 }
             }
+            .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
             .chartXAxis {
                 AxisMarks(values: .automatic) { value in
                     AxisGridLine()
@@ -137,6 +176,74 @@ public struct ChartRenderer: View {
 
     private var compactChartHeight: CGFloat {
         horizontalSizeClass == .regular ? 176 : 220
+    }
+
+    private var windowFormSignature: String {
+        chartWindowForm.signature
+    }
+
+    private var windowFormRefreshKey: String {
+        [
+            window?.windowID ?? "",
+            resolvedDataSourceRef,
+            windowFormSignature,
+            "windowFormRefresh"
+        ].joined(separator: ":")
+    }
+
+    private var normalizedChartType: String {
+        (chart.type ?? chart.kind ?? "bar").lowercased()
+    }
+
+    private var seriesKeys: [String] {
+        chart.series.isEmpty ? [chart.valueKey ?? "value"] : chart.series
+    }
+
+    private var supportsSeriesSelection: Bool {
+        let type = (chart.type ?? chart.kind ?? "bar").lowercased()
+        return seriesKeys.count > 1 && type != "pie" && type != "donut"
+    }
+
+    private var filteredSeriesKeys: [String] {
+        supportsSeriesSelection ? seriesKeys.filter { selectedSeriesKeys.contains($0) } : seriesKeys
+    }
+
+    private var seriesColors: [Color] {
+        let palette = [Color.blue, Color.green, Color.orange, Color.purple, Color.pink]
+        return seriesKeys.enumerated().map { index, _ in palette[index % palette.count] }
+    }
+
+    @ViewBuilder
+    private var chartSeriesSelector: some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 120), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            ForEach(Array(seriesKeys.enumerated()), id: \.element) { index, key in
+                let checked = selectedSeriesKeys.contains(key)
+                Button {
+                    if checked {
+                        selectedSeriesKeys.remove(key)
+                    } else {
+                        selectedSeriesKeys.insert(key)
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: checked ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(checked ? Color.accentColor : Color.secondary)
+                        Circle()
+                            .fill(seriesColors[index])
+                            .frame(width: 8, height: 8)
+                        Text(titleizedSeriesKey(key))
+                            .font(.footnote)
+                            .foregroundStyle(checked ? .primary : .secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private func loadRows() async {
@@ -189,6 +296,25 @@ public struct ChartRenderer: View {
         }
     }
 
+    private func refreshWindowFormDrivenDataSource() async {
+        guard let runtime, let window else {
+            return
+        }
+        guard container.fetchData != false else {
+            return
+        }
+        guard !resolvedDataSourceRef.isEmpty else {
+            return
+        }
+        guard let metadata = await runtime.windowMetadata(id: window.windowID) else {
+            return
+        }
+        guard chartDataSourceDependsOnWindowForm(metadata.dataSources[resolvedDataSourceRef]) else {
+            return
+        }
+        await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+    }
+
     private var resolvedDataSourceRef: String {
         if let direct = container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines), !direct.isEmpty {
             return direct
@@ -213,7 +339,7 @@ public struct ChartRenderer: View {
 
     private var pieData: [PieDatum] {
         let nameKey = chart.nameKey ?? chart.xKey ?? chart.series.first ?? "label"
-        let valueKey = chart.valueKey ?? chart.series.first ?? "value"
+        let valueKey = filteredSeriesKeys.first ?? chart.valueKey ?? chart.series.first ?? "value"
         return rows.compactMap { row in
             guard let label = row[nameKey]?.displayStringValue,
                   let value = row[valueKey]?.doubleValueValue else {
@@ -223,9 +349,9 @@ public struct ChartRenderer: View {
         }
     }
 
-    private var barData: [SeriesDatum] {
+    private var chartSeriesData: [SeriesDatum] {
         let categoryKey = chart.xKey ?? chart.nameKey ?? chart.series.first ?? "label"
-        let valueKeys = chart.series.isEmpty ? [chart.valueKey ?? "value"] : chart.series
+        let valueKeys = filteredSeriesKeys
         return rows.flatMap { row in
             let category = row[categoryKey]?.displayStringValue ?? "—"
             return valueKeys.compactMap { key -> SeriesDatum? in
@@ -233,6 +359,18 @@ public struct ChartRenderer: View {
                 return SeriesDatum(category: category, series: key, value: value)
             }
         }
+    }
+}
+
+private func chartDataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) -> Bool {
+    guard let dataSource else {
+        return false
+    }
+    return dataSource.parameters.contains { parameter in
+        let source = (parameter.input ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return source == "windowform"
     }
 }
 
@@ -247,6 +385,17 @@ private struct SeriesDatum: Identifiable {
     let category: String
     let series: String
     let value: Double
+}
+
+private func titleizedSeriesKey(_ key: String) -> String {
+    let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+        return key
+    }
+    let spaced = trimmed
+        .replacingOccurrences(of: "_", with: " ")
+        .replacingOccurrences(of: "-", with: " ")
+    return spaced.prefix(1).uppercased() + spaced.dropFirst()
 }
 
 private extension JSONValue {

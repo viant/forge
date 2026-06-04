@@ -7,11 +7,18 @@ public struct ContainerRenderer: View {
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
+    private let suppressTitle: Bool
 
-    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
+    public init(
+        runtime: ForgeRuntime? = nil,
+        window: WindowContext? = nil,
+        container: ContainerDef,
+        suppressTitle: Bool = false
+    ) {
         self.runtime = runtime
         self.window = window
         self.container = container
+        self.suppressTitle = suppressTitle
     }
 
     public var body: some View {
@@ -20,7 +27,7 @@ public struct ContainerRenderer: View {
 
     @ViewBuilder
     private var titleBlock: some View {
-        if container.title != nil || container.subtitle != nil {
+        if !suppressTitle, container.title != nil || container.subtitle != nil {
             VStack(alignment: .leading, spacing: 4) {
                 if let title = container.title, !title.isEmpty {
                     Text(title).font(.headline)

@@ -3,6 +3,8 @@ package com.viant.forgeandroid.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,6 +53,32 @@ fun FormRenderer(runtime: ForgeRuntime, context: DataSourceContext, items: List<
             visibleItems.forEach { item ->
                 FormItemRenderer(runtime = runtime, context = context, item = item)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SegmentedOptionRow(
+    modifier: Modifier = Modifier,
+    options: List<Pair<String, String>>,
+    selectedValue: String? = null,
+    selectedValues: Set<String> = emptySet(),
+    onSelect: ((String) -> Unit)? = null,
+    onToggle: ((String) -> Unit)? = null
+) {
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        options.forEach { (value, label) ->
+            val selected = if (onToggle != null) selectedValues.contains(value) else selectedValue == value
+            FilterChip(
+                selected = selected,
+                onClick = { onToggle?.invoke(value) ?: onSelect?.invoke(value) },
+                label = { Text(label, style = MaterialTheme.typography.bodySmall) }
+            )
         }
     }
 }
@@ -132,24 +160,18 @@ private fun FormItemRenderer(
                     if (item.appearance?.trim()?.equals("segmented", ignoreCase = true) == true &&
                         item.options.isNotEmpty()
                     ) {
-                        Row(
+                        SegmentedOptionRow(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(vertical = 4.dp)
-                        ) {
-                            item.options.forEach { option ->
-                                val optVal = option.value ?: ""
-                                FilterChip(
-                                    selected = value == optVal,
-                                    onClick = {
-                                        setScopedItemValue(runtime, dataSourceContext, item, key, optVal)
-                                    },
-                                    label = { Text(option.label ?: optVal) },
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
+                                .padding(vertical = 2.dp),
+                            options = item.options.map { option ->
+                                option.value.orEmpty() to (option.label ?: option.value.orEmpty())
+                            },
+                            selectedValue = value,
+                            onSelect = { optVal ->
+                                setScopedItemValue(runtime, dataSourceContext, item, key, optVal)
                             }
-                        }
+                        )
                     } else {
                         Column(modifier = Modifier.padding(4.dp)) {
                             Text(item.label ?: key)
@@ -170,32 +192,26 @@ private fun FormItemRenderer(
                     }
                     Column(modifier = Modifier.padding(4.dp)) {
                         Text(item.label ?: key)
-                        Row(
+                        SegmentedOptionRow(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
-                                .padding(top = 6.dp)
-                        ) {
-                            item.options.forEach { option ->
-                                val optVal = option.value ?: ""
+                                .padding(top = 4.dp),
+                            options = item.options.map { option ->
+                                option.value.orEmpty() to (option.label ?: option.value.orEmpty())
+                            },
+                            selectedValues = selectedValues.toSet(),
+                            onToggle = { optVal ->
                                 val selected = selectedValues.contains(optVal)
-                                FilterChip(
-                                    selected = selected,
-                                    onClick = {
-                                        val next = selectedValues.toMutableList().apply {
-                                            if (selected) {
-                                                removeAll { it == optVal }
-                                            } else {
-                                                add(optVal)
-                                            }
-                                        }
-                                        setScopedItemValue(runtime, dataSourceContext, item, key, next)
-                                    },
-                                    label = { Text(option.label ?: optVal) },
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
+                                val next = selectedValues.toMutableList().apply {
+                                    if (selected) {
+                                        removeAll { it == optVal }
+                                    } else {
+                                        add(optVal)
+                                    }
+                                }
+                                setScopedItemValue(runtime, dataSourceContext, item, key, next)
                             }
-                        }
+                        )
                     }
                 }
                 "object", "schema" -> {
