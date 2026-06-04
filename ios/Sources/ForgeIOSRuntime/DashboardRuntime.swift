@@ -127,21 +127,15 @@ public enum DashboardRuntime {
         filters: [String: Any] = [:],
         selection: DashboardSelectionState = DashboardSelectionState()
     ) -> String {
-        let patterns = [#"\$\{\s*([^}]+)\s*\}"#, #"\{\{\s*([^}]+)\s*\}\}"#]
-        return patterns.reduce(template) { (partial: String, pattern: String) -> String in
-            partial.replacingMatches(
-                of: pattern,
-                with: { selector in
-                    let value = resolveDashboardValue(
-                        source: nil,
-                        selector: selector,
-                        metrics: metrics,
-                        filters: filters,
-                        selection: selection
-                    )
-                    return unwrapOptional(value).map { String(describing: $0) } ?? ""
-                }
+        interpolateDashboardPlaceholders(template) { selector in
+            let value = resolveDashboardValue(
+                source: nil,
+                selector: selector,
+                metrics: metrics,
+                filters: filters,
+                selection: selection
             )
+            return unwrapOptional(value).map { String(describing: $0) } ?? ""
         }
     }
 
@@ -315,6 +309,35 @@ public enum DashboardRuntime {
         guard mirror.displayStyle == .optional else { return value }
         return mirror.children.first?.value
     }
+}
+
+private func interpolateDashboardPlaceholders(
+    _ template: String,
+    resolver: (String) -> String
+) -> String {
+    var result = ""
+    var index = template.startIndex
+    while index < template.endIndex {
+        if template[index...].hasPrefix("${"),
+           let close = template[index...].firstIndex(of: "}") {
+            let selectorStart = template.index(index, offsetBy: 2)
+            let selector = template[selectorStart..<close].trimmingCharacters(in: .whitespacesAndNewlines)
+            result += resolver(selector)
+            index = template.index(after: close)
+            continue
+        }
+        if template[index...].hasPrefix("{{"),
+           let close = template[index...].range(of: "}}")?.lowerBound {
+            let selectorStart = template.index(index, offsetBy: 2)
+            let selector = template[selectorStart..<close].trimmingCharacters(in: .whitespacesAndNewlines)
+            result += resolver(selector)
+            index = template.index(close, offsetBy: 2)
+            continue
+        }
+        result.append(template[index])
+        index = template.index(after: index)
+    }
+    return result
 }
 
 private extension String {
