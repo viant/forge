@@ -335,7 +335,8 @@ data class DashboardMetricDef(
     val id: String? = null,
     val label: String? = null,
     val selector: String? = null,
-    val format: String? = null
+    val format: String? = null,
+    val tone: String? = null
 )
 
 @Serializable

@@ -25,7 +25,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.DashboardFilterItemDef
 import com.viant.forgeandroid.runtime.DashboardReportSectionDef
@@ -205,23 +207,28 @@ private fun DashboardSummaryBlock(container: ContainerDef, metrics: Map<String, 
         verticalSpacing = 10.dp
     ) { metric ->
             val value = SelectorUtil.resolve(metrics, metric.selector)
+            val displayValue = formatDashboardValue(value, metric.format)
+            val tone = summaryMetricTone(metric, summaryMetrics.indexOf(metric))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(14.dp))
-                    .border(1.dp, Color(0xFFE7ECF3), RoundedCornerShape(14.dp))
+                    .background(tone.background, RoundedCornerShape(14.dp))
+                    .border(1.dp, tone.border, RoundedCornerShape(14.dp))
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = metric.label ?: metric.selector ?: "Metric",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = tone.text.copy(alpha = 0.82f)
                 )
                 Text(
-                    text = formatDashboardValue(value, metric.format),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    text = displayValue,
+                    style = summaryMetricValueStyle(displayValue),
+                    fontWeight = FontWeight.SemiBold,
+                    color = tone.text,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
     }
@@ -919,9 +926,33 @@ private fun toneColor(
 
 private fun severityTone(severity: String?): DashboardToneColors {
     return when (severity?.lowercase()) {
-        "danger", "error" -> DashboardToneColors(Color(0xFFFDECEC), Color(0xFFF5B5B5), Color(0xFF9F1C1C))
-        "warning" -> DashboardToneColors(Color(0xFFFFF7E6), Color(0xFFF7D794), Color(0xFF92400E))
-        "success" -> DashboardToneColors(Color(0xFFEEF9F1), Color(0xFFA7E0B8), Color(0xFF166534))
-        else -> DashboardToneColors(Color(0xFFF3F6FA), Color(0xFFD7E0EA), Color(0xFF334155))
+        "danger", "error" -> DashboardToneColors(Color(0xFFFDEDED), Color(0xFFF0BBBB), Color(0xFF99293A))
+        "warning", "caution" -> DashboardToneColors(Color(0xFFFFF8E3), Color(0xFFF2D98B), Color(0xFF92620C))
+        "success", "good" -> DashboardToneColors(Color(0xFFEEF9EF), Color(0xFFB6E2BE), Color(0xFF1E6E37))
+        "info", "setup", "restriction", "accent" -> DashboardToneColors(Color(0xFFF0EEFF), Color(0xFFC8C4F5), Color(0xFF5147A6))
+        else -> DashboardToneColors(Color(0xFFF2F4F7), Color(0xFFD8DEE6), Color(0xFF475467))
+    }
+}
+
+private fun summaryMetricTone(metric: com.viant.forgeandroid.runtime.DashboardMetricDef, index: Int): DashboardToneColors {
+    val explicit = metric.tone?.trim().orEmpty()
+    if (explicit.isNotEmpty()) {
+        return severityTone(explicit)
+    }
+    val fallback = listOf("info", "success", "neutral", "warning", "danger", "accent")
+    return severityTone(fallback[index % fallback.size])
+}
+
+@Composable
+private fun summaryMetricValueStyle(text: String): androidx.compose.ui.text.TextStyle {
+    val normalized = text.trim()
+    val longestToken = normalized
+        .split(' ', '_', '-', '/')
+        .maxOfOrNull { it.length }
+        ?: normalized.length
+    return when {
+        longestToken >= 18 || normalized.length >= 30 -> MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp)
+        longestToken >= 12 || normalized.length >= 20 -> MaterialTheme.typography.titleSmall
+        else -> MaterialTheme.typography.titleMedium
     }
 }

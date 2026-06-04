@@ -1,7 +1,9 @@
 package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +33,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ChartDef
@@ -167,21 +169,40 @@ private fun ChartSeriesSelector(
         modifier = Modifier.fillMaxWidth()
     ) {
         series.forEach { entry ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Checkbox(
-                    checked = selectedKeys.contains(entry.key),
-                    onCheckedChange = { onToggle(entry.key) }
-                )
-                Box(
-                    modifier = Modifier
-                        .background(entry.color, RoundedCornerShape(999.dp))
-                        .padding(horizontal = 5.dp, vertical = 5.dp)
-                )
-                Text(
-                    text = entry.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (selectedKeys.contains(entry.key)) MaterialTheme.colorScheme.onSurface else ChartMutedText
-                )
+            val selected = selectedKeys.contains(entry.key)
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = if (selected) entry.color.copy(alpha = 0.12f) else Color.White,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = if (selected) entry.color.copy(alpha = 0.45f) else Color(0xFFD8DEE8)
+                ),
+                modifier = Modifier.clickable { onToggle(entry.key) }
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                ) {
+                    if (selected) {
+                        Text(
+                            text = "✓",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = entry.color,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(entry.color, RoundedCornerShape(999.dp))
+                            .padding(horizontal = 5.dp, vertical = 5.dp)
+                    )
+                    Text(
+                        text = entry.label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (selected) MaterialTheme.colorScheme.onSurface else ChartMutedText,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                }
             }
         }
     }
