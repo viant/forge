@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct DashboardRenderer: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -108,8 +109,8 @@ public struct DashboardRenderer: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8))
+        .padding(.horizontal, horizontalSizeClass == .regular ? 8 : 12)
+        .padding(.vertical, horizontalSizeClass == .regular ? 6 : 8))
     }
 
     @ViewBuilder
@@ -131,10 +132,15 @@ public struct DashboardRenderer: View {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(.horizontal, horizontalSizeClass == .regular ? 12 : 14)
+        .padding(.vertical, horizontalSizeClass == .regular ? 12 : 14)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.thinMaterial)
+            RoundedRectangle(cornerRadius: horizontalSizeClass == .regular ? 18 : 16)
+                .fill(Color(.systemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: horizontalSizeClass == .regular ? 18 : 16)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
         )
     }
 
@@ -145,7 +151,7 @@ public struct DashboardRenderer: View {
             unsupportedBlock("dashboard summary has no metrics")
         } else {
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 160), spacing: 10, alignment: .top)],
+                columns: [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 156 : 160), spacing: 10, alignment: .top)],
                 alignment: .leading,
                 spacing: 10
             ) {
@@ -160,16 +166,20 @@ public struct DashboardRenderer: View {
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
                         Text(DashboardRuntime.formatDashboardValue(value, format: metric.format))
-                            .font(.headline.weight(.semibold))
-                            .lineLimit(3)
+                            .font(.title3.weight(.semibold))
+                            .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 60 : 72, alignment: .leading)
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, horizontalSizeClass == .regular ? 10 : 11)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.secondary.opacity(0.08))
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(.secondarySystemBackground))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.black.opacity(0.05), lineWidth: 1)
                     )
                 }
             }

@@ -1,7 +1,10 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
@@ -10,6 +13,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +21,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
@@ -27,9 +33,64 @@ import kotlinx.serialization.json.contentOrNull
 
 @Composable
 fun FormRenderer(runtime: ForgeRuntime, context: DataSourceContext, items: List<ItemDef>) {
-    Column(modifier = Modifier.padding(8.dp)) {
-        items.forEach { item ->
-            FormItemRenderer(runtime = runtime, context = context, item = item)
+    val visibleItems = items.filter(::shouldRenderItem)
+    if (visibleItems.isEmpty()) return
+
+    if (visibleItems.size >= 2 && visibleItems.all(::isSummaryLabelItem)) {
+        StaticGrid(
+            items = visibleItems,
+            minCellWidth = 180.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) { item ->
+            SummaryItemCard(context = context, item = item)
+        }
+    } else {
+        Column(modifier = Modifier.padding(8.dp)) {
+            visibleItems.forEach { item ->
+                FormItemRenderer(runtime = runtime, context = context, item = item)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun <T> StaticGrid(
+    items: List<T>,
+    minCellWidth: Dp,
+    modifier: Modifier = Modifier,
+    horizontalSpacing: Dp = 12.dp,
+    verticalSpacing: Dp = 12.dp,
+    content: @Composable (T) -> Unit
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val maxWidthValue = maxWidth
+        val columns = if (maxWidthValue <= minCellWidth) {
+            1
+        } else {
+            (((maxWidthValue + horizontalSpacing) / (minCellWidth + horizontalSpacing)).toInt()).coerceAtLeast(1)
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(verticalSpacing)
+        ) {
+            items.chunked(columns).forEach { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(horizontalSpacing)
+                ) {
+                    rowItems.forEach { item ->
+                        Column(modifier = Modifier.weight(1f)) {
+                            content(item)
+                        }
+                    }
+                    repeat(columns - rowItems.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
         }
     }
 }
@@ -55,7 +116,7 @@ private fun FormItemRenderer(
     val key = item.dataField ?: item.bindingPath ?: item.id ?: return
     val value = resolveItemValue(item, key, form, metrics, windowForm)
     when (item.type) {
-                "label" -> Text(text = "${item.label ?: key}: $value")
+                "label" -> LabelItemCard(label = item.label ?: key, value = value)
                 "markdown" -> {
                     val markdown = value.ifBlank {
                         (item.properties["value"] as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -68,12 +129,35 @@ private fun FormItemRenderer(
                     )
                 }
                 "radio" -> {
-                    Column(modifier = Modifier.padding(4.dp)) {
-                        Text(item.label ?: key)
-                        item.options.forEach { option ->
-                            val optVal = option.value ?: ""
-                            RowRadio(option.label ?: optVal, value == optVal) {
-                                setScopedItemValue(runtime, dataSourceContext, item, key, optVal)
+                    if (item.appearance?.trim()?.equals("segmented", ignoreCase = true) == true &&
+                        item.options.isNotEmpty()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(vertical = 4.dp)
+                        ) {
+                            item.options.forEach { option ->
+                                val optVal = option.value ?: ""
+                                FilterChip(
+                                    selected = value == optVal,
+                                    onClick = {
+                                        setScopedItemValue(runtime, dataSourceContext, item, key, optVal)
+                                    },
+                                    label = { Text(option.label ?: optVal) },
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Column(modifier = Modifier.padding(4.dp)) {
+                            Text(item.label ?: key)
+                            item.options.forEach { option ->
+                                val optVal = option.value ?: ""
+                                RowRadio(option.label ?: optVal, value == optVal) {
+                                    setScopedItemValue(runtime, dataSourceContext, item, key, optVal)
+                                }
                             }
                         }
                     }
@@ -153,7 +237,55 @@ private fun FormItemRenderer(
             }
 }
 
-private fun resolveItemDataSourceContext(
+@Composable
+private fun SummaryItemCard(
+    context: DataSourceContext,
+    item: ItemDef
+) {
+    val dataSourceContext = resolveItemDataSourceContext(context, item)
+    val form by dataSourceContext.form.flow.collectAsState(initial = emptyMap())
+    val metrics by dataSourceContext.metrics.flow.collectAsState(initial = emptyMap())
+    val windowFormSignal = dataSourceContext.window.windowFormSignal()
+    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val key = item.dataField ?: item.bindingPath ?: item.id ?: return
+    val value = resolveItemValue(item, key, form, metrics, windowForm)
+    LabelItemCard(label = item.label ?: key, value = value, emphasized = true)
+}
+
+@Composable
+private fun LabelItemCard(
+    label: String,
+    value: String,
+    emphasized: Boolean = false
+) {
+    Surface(
+        tonalElevation = 1.dp,
+        shadowElevation = if (emphasized) 1.dp else 0.dp,
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = value.ifBlank { "—" },
+                style = if (emphasized) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+    }
+}
+
+internal fun resolveItemDataSourceContext(
     context: DataSourceContext,
     item: ItemDef
 ): DataSourceContext {
@@ -173,7 +305,7 @@ private fun resolveItemDataSourceContext(
     return if (ref == context.dataSourceRef) context else context.window.context(ref)
 }
 
-private fun resolveItemRawValue(
+internal fun resolveItemRawValue(
     item: ItemDef,
     key: String,
     form: Map<String, Any?>,
@@ -187,7 +319,7 @@ private fun resolveItemRawValue(
     }
 }
 
-private fun resolveItemValue(
+internal fun resolveItemValue(
     item: ItemDef,
     key: String,
     form: Map<String, Any?>,
@@ -197,7 +329,7 @@ private fun resolveItemValue(
     return resolveItemRawValue(item, key, form, metrics, windowForm)?.toString().orEmpty()
 }
 
-private fun setScopedItemValue(
+internal fun setScopedItemValue(
     runtime: ForgeRuntime,
     context: DataSourceContext,
     item: ItemDef,
@@ -208,6 +340,15 @@ private fun setScopedItemValue(
         "windowform" -> runtime.setWindowFormValues(context.window.windowId, mapOf(key to value))
         else -> context.setFormField(key, value)
     }
+}
+
+internal fun shouldRenderItem(item: ItemDef): Boolean {
+    return !(item.id ?: item.label ?: item.dataField ?: item.bindingPath).isNullOrBlank()
+}
+
+internal fun isSummaryLabelItem(item: ItemDef): Boolean {
+    val type = item.type?.trim()?.lowercase().orEmpty()
+    return type.isEmpty() || type == "label"
 }
 
 @Composable

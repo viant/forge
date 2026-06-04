@@ -115,7 +115,7 @@ class ForgeRuntime(
             parentKey = parentKey,
             isModal = isModal
         )
-        loadWindowMetadata(state)
+        loadWindowMetadata(state, forceReload = true)
         return state
     }
 
@@ -152,17 +152,20 @@ class ForgeRuntime(
         execEngine.execute(execution, context, args)
     }
 
-    private fun loadWindowMetadata(window: WindowState) {
+    private fun loadWindowMetadata(window: WindowState, forceReload: Boolean = false) {
         scope.launch(Dispatchers.IO) {
             if (window.inlineMetadata != null) {
                 signals.metadata(window.windowId).set(window.inlineMetadata)
                 reconcileWindowForm(window.windowId, window.inlineMetadata, window.parameters)
                 return@launch
             }
-            if (signals.metadata(window.windowId).peek() != null) {
+            if (!forceReload && signals.metadata(window.windowId).peek() != null) {
                 return@launch
             }
             try {
+                if (forceReload) {
+                    signals.metadata(window.windowId).set(null)
+                }
                 val loaded = windowMetadataLoader?.invoke(window.windowKey)
                 if (loaded != null) {
                     signals.metadata(window.windowId).set(loaded)

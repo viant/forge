@@ -13,6 +13,9 @@ extension EnvironmentValues {
 }
 
 public struct WindowContentView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var availableWidth: CGFloat = 0
+
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let metadata: WindowMetadata
@@ -38,7 +41,7 @@ public struct WindowContentView: View {
             Group {
                 if scrollEnabled {
                     ScrollView {
-                        lazyContentStack
+                        eagerContentStack
                     }
                 } else {
                     eagerContentStack
@@ -57,6 +60,18 @@ public struct WindowContentView: View {
         .task(id: onInitTaskKey) {
             await runWindowLifecycle(event: "onInit")
         }
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: WindowContentWidthPreferenceKey.self, value: proxy.size.width)
+            }
+        )
+        .onPreferenceChange(WindowContentWidthPreferenceKey.self) { width in
+            guard width > 0 else {
+                return
+            }
+            availableWidth = width
+        }
         .onDisappear {
             Task {
                 await runWindowLifecycle(event: "onDestroy")
@@ -65,23 +80,63 @@ public struct WindowContentView: View {
     }
 
     private var lazyContentStack: some View {
-        LazyVStack(alignment: .leading, spacing: 12) {
-            ForEach(metadata.view?.content?.containers ?? []) { container in
-                ContainerRenderer(runtime: runtime, window: window, container: container)
-            }
-        }
+        renderedContainers(lazy: true)
         .padding(contentPadding)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: WindowContentHeightPreferenceKey.self, value: proxy.size.height)
+            }
+        )
         .environment(\.forgeEmbeddedNonScrolling, false)
     }
 
     private var eagerContentStack: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(metadata.view?.content?.containers ?? []) { container in
-                ContainerRenderer(runtime: runtime, window: window, container: container)
+        renderedContainers(lazy: false)
+        .padding(contentPadding)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: WindowContentHeightPreferenceKey.self, value: proxy.size.height)
+            }
+        )
+        .environment(\.forgeEmbeddedNonScrolling, true)
+    }
+
+    @ViewBuilder
+    private func renderedContainers(lazy: Bool) -> some View {
+        let containers = metadata.view?.content?.containers ?? []
+        let layout = metadata.view?.content?.layout
+        if layout?.kind?.lowercased() == "split", containers.count >= 2, horizontalSizeClass == .regular {
+            let spacing: CGFloat = 16
+            let totalWidth = max(availableWidth - contentPadding * 2, 0)
+            let fractions = splitFractions(count: containers.count)
+            HStack(alignment: .top, spacing: spacing) {
+                ForEach(Array(containers.enumerated()), id: \.element.id) { index, container in
+                    ContainerRenderer(runtime: runtime, window: window, container: container)
+                        .frame(
+                            width: max((totalWidth - spacing * CGFloat(max(containers.count - 1, 0))) * fractions[index], 220),
+                            alignment: .topLeading
+                        )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        } else {
+            let stackSpacing = resolvedSpacing(from: layout?.gap, fallback: 12)
+            if lazy {
+                LazyVStack(alignment: .leading, spacing: stackSpacing) {
+                    ForEach(containers) { container in
+                        ContainerRenderer(runtime: runtime, window: window, container: container)
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: stackSpacing) {
+                    ForEach(containers) { container in
+                        ContainerRenderer(runtime: runtime, window: window, container: container)
+                    }
+                }
             }
         }
-        .padding(contentPadding)
-        .environment(\.forgeEmbeddedNonScrolling, true)
     }
 
     private var onInitTaskKey: String {
@@ -103,5 +158,45 @@ public struct WindowContentView: View {
             return containerRef
         }
         return metadata.dataSources.keys.sorted().first ?? ""
+    }
+
+    private func resolvedSpacing(from raw: String?, fallback: CGFloat) -> CGFloat {
+        guard let raw else {
+            return fallback
+        }
+        let numeric = raw
+            .replacingOccurrences(of: "px", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let value = Double(numeric) {
+            return CGFloat(value)
+        }
+        return fallback
+    }
+
+    private func splitFractions(count: Int) -> [CGFloat] {
+        guard count > 0 else {
+            return []
+        }
+        if count == 2 {
+            return [0.62, 0.38]
+        }
+        let even = 1 / CGFloat(count)
+        return Array(repeating: even, count: count)
+    }
+}
+
+private struct WindowContentWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+public struct WindowContentHeightPreferenceKey: PreferenceKey {
+    public static var defaultValue: CGFloat = 0
+
+    public static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

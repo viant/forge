@@ -49,6 +49,8 @@ data class ViewDef(
 
 @Serializable
 data class ContentDef(
+    val id: String? = null,
+    val layout: LayoutDef? = null,
     val containers: List<ContainerDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
@@ -62,6 +64,8 @@ data class ContainerDef(
     val kind: String? = null,
     val role: String? = null,
     val dataSourceRef: String? = null,
+    val card: CardDef? = null,
+    val section: SectionDef? = null,
     val toolbar: ToolbarDef? = null,
     val filterBindings: Map<String, String> = emptyMap(),
     val columnSpan: Int? = null,
@@ -100,6 +104,18 @@ data class ContainerDef(
 )
 
 @Serializable
+data class CardDef(
+    val elevation: Int? = null,
+    val className: String? = null,
+    val style: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class SectionDef(
+    val properties: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
 data class SchemaBasedFormDef(
     val id: String? = null,
     val dataBinding: String? = null,
@@ -125,6 +141,9 @@ data class FormFieldDef(
 
 @Serializable
 data class TabsDef(
+    val defaultSelectedTabId: String? = null,
+    val selectedTabId: String? = null,
+    val style: String? = null,
     val vertical: Boolean? = null
 )
 
@@ -134,7 +153,9 @@ data class LayoutDef(
     val orientation: String? = null,
     val rows: Int? = null,
     val columns: Int? = null,
-    val labelPosition: String? = null
+    val labelPosition: String? = null,
+    val gap: String? = null,
+    val rowGap: String? = null
 )
 
 @Serializable
@@ -609,6 +630,7 @@ data class LinkDef(
 data class ItemDef(
     val id: String? = null,
     val label: String? = null,
+    val appearance: String? = null,
     val title: String? = null,
     val body: String? = null,
     val severity: String? = null,

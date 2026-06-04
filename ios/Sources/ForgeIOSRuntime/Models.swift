@@ -288,21 +288,29 @@ public struct ViewDef: Codable, Sendable {
 }
 
 public struct ContentDef: Codable, Sendable {
+    public let id: String?
+    public let layout: LayoutDef?
     public let containers: [ContainerDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
+        case id
+        case layout
         case containers
         case target
         case targetOverrides
     }
 
     public init(
+        id: String? = nil,
+        layout: LayoutDef? = nil,
         containers: [ContainerDef] = [],
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
     ) {
+        self.id = id
+        self.layout = layout
         self.containers = containers
         self.target = target
         self.targetOverrides = targetOverrides
@@ -311,6 +319,8 @@ public struct ContentDef: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let decodedContainers = try container.decodeIfPresent([ContainerDef].self, forKey: .containers) ?? []
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        layout = try container.decodeIfPresent(LayoutDef.self, forKey: .layout)
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
         if !decodedContainers.isEmpty {
@@ -342,6 +352,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
     public let subtitle: String?
     public let kind: String?
     public let dataSourceRef: String?
+    public let columnSpan: Int?
+    public let rowSpan: Int?
     public let filterBindings: [String: String]
     public let visibleWhen: DashboardConditionDef?
     public let metrics: [DashboardMetricDef]
@@ -356,6 +368,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
     public let orderBy: String?
     public let containers: [ContainerDef]
     public let selectFirst: Bool?
+    public let layout: LayoutDef?
     public let stateKey: String?
     public let schemaBasedForm: SchemaBasedFormDef?
     public let dashboard: DashboardDef?
@@ -375,6 +388,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case subtitle
         case kind
         case dataSourceRef
+        case columnSpan
+        case rowSpan
         case filterBindings
         case visibleWhen
         case metrics
@@ -389,6 +404,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case orderBy
         case containers
         case selectFirst
+        case layout
         case stateKey
         case schemaBasedForm
         case dashboard
@@ -421,6 +437,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         subtitle: String? = nil,
         kind: String? = nil,
         dataSourceRef: String? = nil,
+        columnSpan: Int? = nil,
+        rowSpan: Int? = nil,
         filterBindings: [String: String] = [:],
         visibleWhen: DashboardConditionDef? = nil,
         metrics: [DashboardMetricDef] = [],
@@ -435,6 +453,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         orderBy: String? = nil,
         containers: [ContainerDef] = [],
         selectFirst: Bool? = nil,
+        layout: LayoutDef? = nil,
         stateKey: String? = nil,
         schemaBasedForm: SchemaBasedFormDef? = nil,
         dashboard: DashboardDef? = nil,
@@ -453,6 +472,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         self.subtitle = subtitle
         self.kind = kind
         self.dataSourceRef = dataSourceRef
+        self.columnSpan = columnSpan
+        self.rowSpan = rowSpan
         self.filterBindings = filterBindings
         self.visibleWhen = visibleWhen
         self.metrics = metrics
@@ -467,6 +488,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         self.orderBy = orderBy
         self.containers = containers
         self.selectFirst = selectFirst
+        self.layout = layout
         self.stateKey = stateKey
         self.schemaBasedForm = schemaBasedForm
         self.dashboard = dashboard
@@ -488,6 +510,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
         kind = try container.decodeIfPresent(String.self, forKey: .kind)
         dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
+        columnSpan = try container.decodeIfPresent(Int.self, forKey: .columnSpan)
+        rowSpan = try container.decodeIfPresent(Int.self, forKey: .rowSpan)
         filterBindings = try container.decodeIfPresent([String: String].self, forKey: .filterBindings) ?? [:]
         visibleWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .visibleWhen)
         metrics = try container.decodeIfPresent([DashboardMetricDef].self, forKey: .metrics) ?? []
@@ -502,6 +526,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         orderBy = try container.decodeIfPresent(String.self, forKey: .orderBy)
         containers = try container.decodeIfPresent([ContainerDef].self, forKey: .containers) ?? []
         selectFirst = try container.decodeIfPresent(Bool.self, forKey: .selectFirst)
+        layout = try container.decodeIfPresent(LayoutDef.self, forKey: .layout)
         stateKey = try container.decodeIfPresent(String.self, forKey: .stateKey)
         schemaBasedForm = try container.decodeIfPresent(SchemaBasedFormDef.self, forKey: .schemaBasedForm)
         dashboard = try container.decodeIfPresent(DashboardDef.self, forKey: .dashboard)
@@ -524,6 +549,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(subtitle, forKey: .subtitle)
         try container.encodeIfPresent(kind, forKey: .kind)
         try container.encodeIfPresent(dataSourceRef, forKey: .dataSourceRef)
+        try container.encodeIfPresent(columnSpan, forKey: .columnSpan)
+        try container.encodeIfPresent(rowSpan, forKey: .rowSpan)
         try container.encode(filterBindings, forKey: .filterBindings)
         try container.encodeIfPresent(visibleWhen, forKey: .visibleWhen)
         try container.encode(metrics, forKey: .metrics)
@@ -538,6 +565,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(orderBy, forKey: .orderBy)
         try container.encode(containers, forKey: .containers)
         try container.encodeIfPresent(selectFirst, forKey: .selectFirst)
+        try container.encodeIfPresent(layout, forKey: .layout)
         try container.encodeIfPresent(stateKey, forKey: .stateKey)
         try container.encodeIfPresent(schemaBasedForm, forKey: .schemaBasedForm)
         try container.encodeIfPresent(dashboard, forKey: .dashboard)
@@ -1449,7 +1477,47 @@ public struct DashboardConditionDef: Codable, Sendable {
 }
 
 public struct TabsDef: Codable, Sendable {
+    public let defaultSelectedTabId: String?
+    public let selectedTabId: String?
+    public let style: String?
     public let vertical: Bool?
+
+    public init(
+        defaultSelectedTabId: String? = nil,
+        selectedTabId: String? = nil,
+        style: String? = nil,
+        vertical: Bool? = nil
+    ) {
+        self.defaultSelectedTabId = defaultSelectedTabId
+        self.selectedTabId = selectedTabId
+        self.style = style
+        self.vertical = vertical
+    }
+}
+
+public struct LayoutDef: Codable, Sendable {
+    public let kind: String?
+    public let orientation: String?
+    public let rows: Int?
+    public let columns: Int?
+    public let gap: String?
+    public let rowGap: String?
+
+    public init(
+        kind: String? = nil,
+        orientation: String? = nil,
+        rows: Int? = nil,
+        columns: Int? = nil,
+        gap: String? = nil,
+        rowGap: String? = nil
+    ) {
+        self.kind = kind
+        self.orientation = orientation
+        self.rows = rows
+        self.columns = columns
+        self.gap = gap
+        self.rowGap = rowGap
+    }
 }
 
 public struct ItemDef: Codable, Sendable, Identifiable {

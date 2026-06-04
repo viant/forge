@@ -30,7 +30,24 @@ class WindowRuntime(
         val windowId = windowIdOverride?.takeIf { it.isNotBlank() }
             ?: windowKey + if (parameters.isNotEmpty()) "_${parameters.hashCode()}" else ""
         val existing = windowList.peek().find { it.windowId == windowId }
-        if (existing != null) return existing
+        if (existing != null) {
+            val updated = existing.copy(
+                windowTitle = title,
+                inTab = inTab,
+                parameters = parameters,
+                inlineMetadata = inline,
+                isModal = isModal,
+                conversationId = conversationId,
+                presentation = presentation,
+                region = region,
+                workspaceSharePct = workspaceSharePct,
+                workspaceMinHeight = workspaceMinHeight,
+                parentKey = parentKey
+            )
+            windowList.set(windowList.peek().map { if (it.windowId == windowId) updated else it })
+            windowContexts.remove(windowId)
+            return updated
+        }
 
         val state = WindowState(
             windowId = windowId,

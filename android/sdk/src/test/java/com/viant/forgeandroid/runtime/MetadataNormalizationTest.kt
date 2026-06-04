@@ -116,4 +116,80 @@ class MetadataNormalizationTest {
         assertEquals("100%", chart.width?.jsonPrimitive?.content)
         assertEquals("420", chart.height?.jsonPrimitive?.content)
     }
+
+    @Test
+    fun `normalizeWindowMetadataJson preserves top level split content layout`() {
+        val raw = json.parseToJsonElement(
+            """
+            {
+              "namespace": "Order Summary",
+              "view": {
+                "content": {
+                  "id": "orderRoot",
+                  "layout": {
+                    "kind": "split",
+                    "orientation": "horizontal",
+                    "columns": 2
+                  },
+                  "containers": [
+                    { "id": "analysisPane", "title": "Order Metrics" },
+                    { "id": "summaryRail", "title": "Budget/Pacing" }
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        val normalized = normalizeWindowMetadataJson(raw)
+        val decoded = json.decodeFromJsonElement(WindowMetadata.serializer(), normalized)
+
+        assertEquals("orderRoot", decoded.view?.content?.id)
+        assertEquals("split", decoded.view?.content?.layout?.kind)
+        assertEquals("horizontal", decoded.view?.content?.layout?.orientation)
+        assertEquals(2, decoded.view?.content?.layout?.columns)
+        assertEquals(listOf("analysisPane", "summaryRail"), decoded.view?.content?.containers?.map { it.id })
+    }
+
+    @Test
+    fun `normalizeWindowMetadataJson decodes nested grid layout and column spans`() {
+        val raw = json.parseToJsonElement(
+            """
+            {
+              "namespace": "Order Summary",
+              "view": {
+                "content": {
+                  "containers": [
+                    {
+                      "id": "summaryRail",
+                      "layout": {
+                        "kind": "grid",
+                        "columns": 41,
+                        "gap": "12px",
+                        "rowGap": "12px"
+                      },
+                      "containers": [
+                        { "id": "budgetSummary", "title": "Budget/Pacing", "columnSpan": 14 },
+                        { "id": "deliverySummary", "title": "Delivery", "columnSpan": 14 },
+                        { "id": "householdSummary", "title": "Household", "columnSpan": 13 }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        val normalized = normalizeWindowMetadataJson(raw)
+        val decoded = json.decodeFromJsonElement(WindowMetadata.serializer(), normalized)
+        val summaryRail = decoded.view?.content?.containers?.firstOrNull()
+
+        assertNotNull(summaryRail)
+        assertEquals("grid", summaryRail.layout?.kind)
+        assertEquals(41, summaryRail.layout?.columns)
+        assertEquals("12px", summaryRail.layout?.gap)
+        assertEquals("12px", summaryRail.layout?.rowGap)
+        assertEquals(listOf(14, 14, 13), summaryRail.containers.map { it.columnSpan })
+    }
 }

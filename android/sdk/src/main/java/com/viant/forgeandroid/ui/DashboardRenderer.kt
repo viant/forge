@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -102,7 +103,7 @@ private fun DashboardRoot(runtime: ForgeRuntime, window: WindowContext, containe
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         container.title?.let {
@@ -130,16 +131,17 @@ private fun DashboardPanel(runtime: ForgeRuntime, window: WindowContext, contain
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, Color(0xFFE7ECF3)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (!container.title.isNullOrBlank() || !container.subtitle.isNullOrBlank()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -195,40 +197,33 @@ private fun DashboardActions(runtime: ForgeRuntime, window: WindowContext, conta
 @Composable
 private fun DashboardSummaryBlock(container: ContainerDef, metrics: Map<String, Any?>) {
     val summaryMetrics = container.dashboard?.summary?.metrics ?: container.metrics
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        summaryMetrics.forEach { metric ->
+    StaticGrid(
+        items = summaryMetrics,
+        minCellWidth = 180.dp,
+        modifier = Modifier.fillMaxWidth(),
+        horizontalSpacing = 10.dp,
+        verticalSpacing = 10.dp
+    ) { metric ->
             val value = SelectorUtil.resolve(metrics, metric.selector)
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF7F9FC), RoundedCornerShape(12.dp))
+                    .background(Color.White, RoundedCornerShape(14.dp))
+                    .border(1.dp, Color(0xFFE7ECF3), RoundedCornerShape(14.dp))
                     .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = metric.label ?: metric.selector ?: "Metric",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    metric.selector?.takeIf { it.isNotBlank() }?.let {
-                        Text(
-                            text = it,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+                Text(
+                    text = metric.label ?: metric.selector ?: "Metric",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Text(
                     text = formatDashboardValue(value, metric.format),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
             }
-        }
     }
 }
 
@@ -366,8 +361,9 @@ private fun DashboardKPITableBlock(container: ContainerDef, metrics: Map<String,
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF7F9FC), RoundedCornerShape(12.dp))
-                    .padding(12.dp),
+                    .background(Color.White, RoundedCornerShape(14.dp))
+                    .border(1.dp, Color(0xFFE7ECF3), RoundedCornerShape(14.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(
