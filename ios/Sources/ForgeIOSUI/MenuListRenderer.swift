@@ -43,9 +43,6 @@ public struct MenuListRenderer: View {
         .task(id: window?.windowID ?? "") {
             await observeWindowForm()
         }
-        .task(id: windowFormRefreshKey) {
-            await refreshWindowFormDrivenDataSources()
-        }
     }
 
     private var dataTaskKey: String {
@@ -80,15 +77,6 @@ public struct MenuListRenderer: View {
 
     private var windowFormSignature: String {
         windowFormValues.signature
-    }
-
-    private var windowFormRefreshKey: String {
-        [
-            window?.windowID ?? "",
-            windowFormSignature,
-            relevantDataSourceRefs.joined(separator: "|"),
-            "windowFormRefresh"
-        ].joined(separator: ":")
     }
 
     @ViewBuilder
@@ -266,6 +254,9 @@ public struct MenuListRenderer: View {
             await MainActor.run {
                 windowFormValues = next
             }
+            Task(priority: .userInitiated) {
+                await refreshWindowFormDrivenDataSources(windowFormValues: next)
+            }
         }
     }
 
@@ -331,7 +322,7 @@ public struct MenuListRenderer: View {
         }
     }
 
-    private func refreshWindowFormDrivenDataSources() async {
+    private func refreshWindowFormDrivenDataSources(windowFormValues: [String: JSONValue]) async {
         guard let runtime, let window else {
             return
         }
@@ -341,15 +332,31 @@ public struct MenuListRenderer: View {
         guard let metadata = await runtime.windowMetadata(id: window.windowID) else {
             return
         }
-        for ref in relevantDataSourceRefs {
+        for ref in relevantDataSourceRefs(for: windowFormValues) {
             guard dataSourceDependsOnWindowForm(metadata.dataSources[ref]) else {
                 continue
             }
-            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+            Task(priority: .userInitiated) {
+                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+            }
         }
     }
 
+    private func relevantDataSourceRefs(for windowFormValues: [String: JSONValue]) -> [String] {
+        orderedUnique(
+            items.compactMap { resolveItemDataSourceRef($0, windowFormValues: windowFormValues) }
+                .filter { !$0.isEmpty }
+        )
+    }
+
     private func resolveItemDataSourceRef(_ item: ItemDef) -> String? {
+        resolveItemDataSourceRef(item, windowFormValues: windowFormValues)
+    }
+
+    private func resolveItemDataSourceRef(
+        _ item: ItemDef,
+        windowFormValues: [String: JSONValue]
+    ) -> String? {
         let directRef = item.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         if let directRef {
             return directRef

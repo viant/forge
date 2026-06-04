@@ -79,9 +79,6 @@ public struct ChartRenderer: View {
         .task(id: window?.windowID ?? "") {
             await observeWindowForm()
         }
-        .task(id: windowFormRefreshKey) {
-            await refreshWindowFormDrivenDataSource()
-        }
     }
 
     private var resolvedChartTitle: String? {
@@ -176,19 +173,6 @@ public struct ChartRenderer: View {
 
     private var compactChartHeight: CGFloat {
         horizontalSizeClass == .regular ? 176 : 220
-    }
-
-    private var windowFormSignature: String {
-        chartWindowFormSignature(chartWindowForm)
-    }
-
-    private var windowFormRefreshKey: String {
-        [
-            window?.windowID ?? "",
-            resolvedDataSourceRef,
-            windowFormSignature,
-            "windowFormRefresh"
-        ].joined(separator: ":")
     }
 
     private var normalizedChartType: String {
@@ -293,16 +277,20 @@ public struct ChartRenderer: View {
             await MainActor.run {
                 chartWindowForm = next
             }
+            Task(priority: .userInitiated) {
+                await refreshWindowFormDrivenDataSource(windowFormValues: next)
+            }
         }
     }
 
-    private func refreshWindowFormDrivenDataSource() async {
+    private func refreshWindowFormDrivenDataSource(windowFormValues: [String: JSONValue]) async {
         guard let runtime, let window else {
             return
         }
         guard container.fetchData != false else {
             return
         }
+        let resolvedDataSourceRef = resolvedDataSourceRef(for: windowFormValues)
         guard !resolvedDataSourceRef.isEmpty else {
             return
         }
@@ -312,10 +300,16 @@ public struct ChartRenderer: View {
         guard chartDataSourceDependsOnWindowForm(metadata.dataSources[resolvedDataSourceRef]) else {
             return
         }
-        await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        Task(priority: .userInitiated) {
+            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        }
     }
 
     private var resolvedDataSourceRef: String {
+        resolvedDataSourceRef(for: chartWindowForm)
+    }
+
+    private func resolvedDataSourceRef(for windowFormValues: [String: JSONValue]) -> String {
         if let direct = container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines), !direct.isEmpty {
             return direct
         }
@@ -327,7 +321,7 @@ public struct ChartRenderer: View {
         let key: String?
         switch source {
         case "windowform":
-            key = SelectorUtil.resolve(chartWindowForm, selector: selector) as? String
+            key = SelectorUtil.resolve(windowFormValues, selector: selector) as? String
         default:
             key = nil
         }
