@@ -12,15 +12,19 @@ extension ForgeRuntime {
         replace: Bool = false
     ) async {
         let dataSourceID = WindowIdentity(windowID: windowID).windowFormID()
+        let signal = await signals.form(dataSourceID: dataSourceID)
         if replace {
             await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: values)
+            await signal.set(values)
             return
         }
         let current = await dataSourceRuntime.form(dataSourceID: dataSourceID)
+        let merged = mergeWindowFormValues(base: current, override: values)
         await dataSourceRuntime.setForm(
             dataSourceID: dataSourceID,
-            values: mergeWindowFormValues(base: current, override: values)
+            values: merged
         )
+        await signal.set(merged)
     }
 
     func reconcileWindowForm(
