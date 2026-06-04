@@ -951,8 +951,8 @@ private fun summaryMetricValueStyle(text: String): androidx.compose.ui.text.Text
         .maxOfOrNull { it.length }
         ?: normalized.length
     return when {
-        longestToken >= 18 || normalized.length >= 30 -> MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp)
-        longestToken >= 12 || normalized.length >= 20 -> MaterialTheme.typography.titleSmall
+        longestToken >= 18 || normalized.length >= 30 -> MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp)
+        longestToken >= 12 || normalized.length >= 20 -> MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp)
         else -> MaterialTheme.typography.titleMedium
     }
 }
