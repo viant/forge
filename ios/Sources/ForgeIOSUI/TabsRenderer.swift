@@ -80,7 +80,12 @@ public struct TabsRenderer: View {
             }
 
             if let child = selectedContainer {
-                ContainerRenderer(runtime: runtime, window: window, container: child)
+                ContainerRenderer(
+                    runtime: runtime,
+                    window: window,
+                    container: child,
+                    suppressTitle: usesMenuStyle
+                )
             }
         }
         .onAppear {

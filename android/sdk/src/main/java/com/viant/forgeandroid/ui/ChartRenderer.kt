@@ -3,6 +3,7 @@ package com.viant.forgeandroid.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -59,6 +60,16 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
     val prepared = prepareChartData(rows, chart)
     val type = (chart.type ?: "line").trim().lowercase()
     var selection by remember(prepared, type) { mutableStateOf<ChartSelection?>(null) }
+    val supportsSeriesSelection = prepared.series.size > 1 && type != "pie" && type != "donut"
+    val selectionKey = remember(prepared.series) { prepared.series.joinToString("|") { it.key } }
+    var selectedSeriesKeys by remember(selectionKey) {
+        mutableStateOf(prepared.series.map { it.key }.toSet())
+    }
+    val activePrepared = if (supportsSeriesSelection) {
+        filterPreparedChartData(prepared, selectedSeriesKeys)
+    } else {
+        prepared
+    }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val regularWidth = maxWidth >= 720.dp
@@ -79,7 +90,26 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
             chart.yAxis?.label?.takeIf { it.isNotBlank() }?.let {
                 Text(text = it, style = MaterialTheme.typography.titleSmall)
             }
-            if (prepared.points.isEmpty() || prepared.series.isEmpty()) {
+            if (supportsSeriesSelection) {
+                ChartSeriesSelector(
+                    series = prepared.series,
+                    selectedKeys = selectedSeriesKeys,
+                    onToggle = { key ->
+                        val next = selectedSeriesKeys.toMutableSet().apply {
+                            if (!add(key)) remove(key)
+                        }
+                        selectedSeriesKeys = next
+                        if (selection?.seriesKey == key && key !in next) {
+                            selection = null
+                        }
+                    }
+                )
+            }
+            if (activePrepared.series.isEmpty()) {
+                Text("Select at least one measure", style = MaterialTheme.typography.bodyMedium, color = ChartMutedText)
+                return@Column
+            }
+            if (activePrepared.points.isEmpty()) {
                 Text("No chart data", style = MaterialTheme.typography.bodyMedium, color = ChartMutedText)
                 return@Column
             }
@@ -91,14 +121,14 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
             when {
                 type == "bar" || type == "stacked_bar" -> {
                     StackedBarChart(
-                        prepared = prepared,
+                        prepared = activePrepared,
                         selection = selection,
                         onSelect = { selection = it }
                     )
                 }
                 type == "pie" || type == "donut" -> {
                     PieChart(
-                        slices = buildPieSlices(prepared),
+                        slices = buildPieSlices(activePrepared),
                         donut = type == "donut",
                         selection = selection,
                         onSelect = { selection = it },
@@ -107,7 +137,7 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
                 }
                 else -> {
                     MultiSeriesCartesianChart(
-                        prepared = prepared,
+                        prepared = activePrepared,
                         type = type,
                         selection = selection,
                         onSelect = { selection = it },
@@ -122,6 +152,39 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
 @Composable
 internal fun FenceChartRenderer(spec: FenceChartSpec) {
     ChartRenderer(spec.rows, spec.chart)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChartSeriesSelector(
+    series: List<ChartSeriesDisplay>,
+    selectedKeys: Set<String>,
+    onToggle: (String) -> Unit
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        series.forEach { entry ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Checkbox(
+                    checked = selectedKeys.contains(entry.key),
+                    onCheckedChange = { onToggle(entry.key) }
+                )
+                Box(
+                    modifier = Modifier
+                        .background(entry.color, RoundedCornerShape(999.dp))
+                        .padding(horizontal = 5.dp, vertical = 5.dp)
+                )
+                Text(
+                    text = entry.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selectedKeys.contains(entry.key)) MaterialTheme.colorScheme.onSurface else ChartMutedText
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -174,7 +237,7 @@ private fun StackedBarChart(
                                     hit
                                 } ?: point.values.maxByOrNull { it.value }
                                 onSelect(chosen?.let {
-                                    ChartSelection(point.label, it.label, formatChartValue(it.value), it.color)
+                                    ChartSelection(point.label, it.label, it.key, formatChartValue(it.value), it.color)
                                 })
                             }
                         },
@@ -195,7 +258,9 @@ private fun StackedBarChart(
             }
         }
     }
-    ChartLegend(prepared.series)
+    if (prepared.series.size <= 1) {
+        ChartLegend(prepared.series)
+    }
 }
 
 @Composable
@@ -279,7 +344,9 @@ private fun MultiSeriesCartesianChart(
                 )
             }
         }
-        ChartLegend(prepared.series)
+        if (prepared.series.size <= 1) {
+            ChartLegend(prepared.series)
+        }
     }
 }
 
@@ -415,6 +482,7 @@ internal data class PreparedChartData(
 internal data class ChartSelection(
     val label: String,
     val seriesLabel: String,
+    val seriesKey: String,
     val valueLabel: String,
     val color: Color
 ) {
@@ -463,6 +531,28 @@ internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
     }.filter { it.value > 0 }
 }
 
+private fun filterPreparedChartData(
+    prepared: PreparedChartData,
+    selectedSeriesKeys: Set<String>
+): PreparedChartData {
+    val filteredSeries = prepared.series.filter { selectedSeriesKeys.contains(it.key) }
+    if (filteredSeries.isEmpty()) {
+        return prepared.copy(points = emptyList(), series = emptyList(), maxValue = 1.0)
+    }
+    val filteredPoints = prepared.points.mapNotNull { point ->
+        val filteredValues = point.values.filter { selectedSeriesKeys.contains(it.key) }
+        if (filteredValues.isEmpty()) null else point.copy(values = filteredValues)
+    }
+    val maxValue = filteredPoints.maxOfOrNull { point ->
+        point.values.maxOfOrNull { it.value } ?: 0.0
+    }?.coerceAtLeast(1.0) ?: 1.0
+    return PreparedChartData(
+        points = filteredPoints,
+        series = filteredSeries,
+        maxValue = maxValue
+    )
+}
+
 private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> {
     val rawSeries = chart.series
     val palette = if (rawSeries?.palette.isNullOrEmpty()) DefaultChartPalette else rawSeries?.palette.orEmpty()
@@ -504,6 +594,7 @@ internal fun findCartesianSelection(
     return ChartSelection(
         label = chosen.first.label,
         seriesLabel = chosen.second.label,
+        seriesKey = chosen.second.key,
         valueLabel = formatChartValue(chosen.second.value),
         color = chosen.second.color
     )
@@ -532,7 +623,7 @@ internal fun findPieSelection(
     slices.forEach { slice ->
         val sweep = ((slice.value / total) * 360.0).toFloat()
         if (angle in startAngle..(startAngle + sweep)) {
-            return ChartSelection(slice.label, slice.seriesLabel, slice.valueLabel, slice.color)
+            return ChartSelection(slice.label, slice.seriesLabel, slice.seriesLabel, slice.valueLabel, slice.color)
         }
         startAngle += sweep
     }

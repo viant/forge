@@ -71,7 +71,12 @@ fun TabsRenderer(runtime: ForgeRuntime, window: WindowContext, container: Contai
                     }
                 }
             }
-            ContainerRenderer(runtime, window, currentContainer)
+            ContainerRenderer(
+                runtime,
+                window,
+                currentContainer,
+                suppressTitle = true
+            )
         }
         return
     }

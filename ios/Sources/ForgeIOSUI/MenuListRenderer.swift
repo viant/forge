@@ -43,6 +43,9 @@ public struct MenuListRenderer: View {
         .task(id: window?.windowID ?? "") {
             await observeWindowForm()
         }
+        .task(id: windowFormRefreshKey) {
+            await refreshWindowFormDrivenDataSources()
+        }
     }
 
     private var dataTaskKey: String {
@@ -77,6 +80,15 @@ public struct MenuListRenderer: View {
 
     private var windowFormSignature: String {
         windowFormValues.signature
+    }
+
+    private var windowFormRefreshKey: String {
+        [
+            window?.windowID ?? "",
+            windowFormSignature,
+            relevantDataSourceRefs.joined(separator: "|"),
+            "windowFormRefresh"
+        ].joined(separator: ":")
     }
 
     @ViewBuilder
@@ -186,10 +198,10 @@ public struct MenuListRenderer: View {
         VStack(alignment: .leading, spacing: 10) {
             if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(title)
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: optionColumns(for: item), alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: optionColumns(for: item), alignment: .leading, spacing: 6) {
                 ForEach(item.options, id: \.value) { option in
                     let optionValue = option.value ?? ""
                     let optionLabel = option.label ?? optionValue
@@ -198,11 +210,11 @@ public struct MenuListRenderer: View {
                         applyOptionSelection(optionValue, for: item)
                     } label: {
                         Text(optionLabel)
-                            .font(.subheadline.weight(isSelected ? .semibold : .medium))
+                            .font(.footnote.weight(isSelected ? .semibold : .medium))
                             .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
                             .frame(maxWidth: .infinity)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
                             .background(
                                 Capsule()
                                     .fill(isSelected ? Color.accentColor.opacity(0.14) : Color(.systemBackground))
@@ -217,7 +229,7 @@ public struct MenuListRenderer: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .padding(10)
         .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
@@ -303,9 +315,27 @@ public struct MenuListRenderer: View {
                     for await next in stream {
                         await MainActor.run {
                             formValuesByDataSource[ref] = next
-                        }
-                    }
-                }
+            }
+        }
+    }
+
+    private func refreshWindowFormDrivenDataSources() async {
+        guard let runtime, let window else {
+            return
+        }
+        guard container.fetchData != false else {
+            return
+        }
+        guard let metadata = await runtime.windowMetadata(id: window.windowID) else {
+            return
+        }
+        for ref in relevantDataSourceRefs {
+            guard dataSourceDependsOnWindowForm(metadata.dataSources[ref]) else {
+                continue
+            }
+            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+        }
+    }
                 group.addTask {
                     let stream = await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: ref)
                     for await next in stream {
@@ -438,9 +468,9 @@ public struct MenuListRenderer: View {
     private func optionColumns(for item: ItemDef) -> [GridItem] {
         let type = (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if type == "buttongroup" || type == "button_group" || type == "button-group" {
-            return [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 92 : 110), spacing: 8, alignment: .top)]
+            return [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 78 : 96), spacing: 6, alignment: .top)]
         }
-        return [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 112 : 132), spacing: 8, alignment: .top)]
+        return [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 86 : 104), spacing: 6, alignment: .top)]
     }
 
     private func shouldRenderOptionGroup(_ item: ItemDef) -> Bool {
@@ -484,6 +514,18 @@ public struct MenuListRenderer: View {
 
     private func normalizedSummaryTitle(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
+private func dataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) -> Bool {
+    guard let dataSource else {
+        return false
+    }
+    return dataSource.parameters.contains { parameter in
+        let source = (parameter.input ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return source == "windowform"
     }
 }
 

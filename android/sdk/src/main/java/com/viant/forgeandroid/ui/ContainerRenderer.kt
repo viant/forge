@@ -39,6 +39,7 @@ fun ContainerRenderer(
     container: ContainerDef,
     selectionModeOverride: String? = null,
     inheritedDataSourceRef: String? = null,
+    suppressTitle: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val windowFormSignal = window.windowFormSignal()
@@ -88,20 +89,22 @@ fun ContainerRenderer(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
         }
     ) {
-        container.title?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-        }
-        container.subtitle?.takeIf { it.isNotBlank() }?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+        if (!suppressTitle) {
+            container.title?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            container.subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
         }
 
         if (container.toolbar != null && effectiveDataSourceRef.isNotBlank()) {
