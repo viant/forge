@@ -1166,17 +1166,20 @@ public struct DashboardMetricDef: Codable, Sendable {
     public let label: String?
     public let selector: String?
     public let format: String?
+    public let tone: String?
 
     public init(
         id: String? = nil,
         label: String? = nil,
         selector: String? = nil,
-        format: String? = nil
+        format: String? = nil,
+        tone: String? = nil
     ) {
         self.id = id
         self.label = label
         self.selector = selector
         self.format = format
+        self.tone = tone
     }
 }
 

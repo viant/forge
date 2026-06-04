@@ -4,6 +4,7 @@ import ForgeIOSRuntime
 
 public struct ChartRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.forgePresentationDensity) private var presentationDensity
 
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
@@ -24,7 +25,7 @@ public struct ChartRenderer: View {
         VStack(alignment: .leading, spacing: 8) {
             if let title = resolvedChartTitle {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font((isCompactPresentation ? Font.footnote : .subheadline).weight(.semibold))
                     .foregroundStyle(.primary.opacity(0.9))
             }
             if supportsSeriesSelection {
@@ -59,10 +60,10 @@ public struct ChartRenderer: View {
                     .padding(.vertical, 2)
             }
         }
-        .padding(12)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 18))
+        .padding(isCompactPresentation ? 10 : 12)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : 18))
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
+            RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : 18)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
         .onAppear {
@@ -172,7 +173,10 @@ public struct ChartRenderer: View {
     }
 
     private var compactChartHeight: CGFloat {
-        horizontalSizeClass == .regular ? 176 : 220
+        if isCompactPresentation {
+            return horizontalSizeClass == .regular ? 156 : 188
+        }
+        return horizontalSizeClass == .regular ? 176 : 220
     }
 
     private var normalizedChartType: String {
@@ -200,7 +204,7 @@ public struct ChartRenderer: View {
     @ViewBuilder
     private var chartSeriesSelector: some View {
         LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 120), spacing: 8)],
+            columns: [GridItem(.adaptive(minimum: isCompactPresentation ? 104 : 120), spacing: 8)],
             alignment: .leading,
             spacing: 8
         ) {
@@ -220,7 +224,7 @@ public struct ChartRenderer: View {
                             .fill(seriesColors[index])
                             .frame(width: 8, height: 8)
                         Text(titleizedSeriesKey(key))
-                            .font(.footnote)
+                            .font(isCompactPresentation ? .caption : .footnote)
                             .foregroundStyle(checked ? .primary : .secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -228,6 +232,10 @@ public struct ChartRenderer: View {
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    private var isCompactPresentation: Bool {
+        presentationDensity == .compact
     }
 
     private func loadRows() async {
@@ -321,7 +329,7 @@ public struct ChartRenderer: View {
         let key: String?
         switch source {
         case "windowform":
-            key = SelectorUtil.resolve(windowFormValues, selector: selector) as? String
+            key = chartSelectorStringValue(from: SelectorUtil.resolve(windowFormValues, selector: selector))
         default:
             key = nil
         }
@@ -368,27 +376,14 @@ private func chartDataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) ->
     }
 }
 
-private func chartWindowFormSignature(_ values: [String: JSONValue]) -> String {
-    values.keys.sorted().map { "\($0)=\(chartJSONValueSignature(values[$0]))" }.joined(separator: "|")
-}
-
-private func chartJSONValueSignature(_ value: JSONValue?) -> String {
-    guard let value else {
-        return "null"
-    }
+private func chartSelectorStringValue(from value: Any?) -> String? {
     switch value {
-    case .string(let string):
-        return "s:\(string)"
-    case .number(let number):
-        return "n:\(number)"
-    case .bool(let flag):
-        return "b:\(flag)"
-    case .array(let values):
-        return "a:[\(values.map { chartJSONValueSignature($0) }.joined(separator: ","))]"
-    case .object(let object):
-        return "o:{\(object.keys.sorted().map { "\($0)=\(chartJSONValueSignature(object[$0]))" }.joined(separator: ","))}"
-    case .null:
-        return "null"
+    case let string as String:
+        return string
+    case let json as JSONValue:
+        return json.displayStringValue
+    default:
+        return nil
     }
 }
 

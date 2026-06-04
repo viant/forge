@@ -5,10 +5,24 @@ private struct ForgeEmbeddedNonScrollingKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+public enum ForgePresentationDensity {
+    case standard
+    case compact
+}
+
+private struct ForgePresentationDensityKey: EnvironmentKey {
+    static let defaultValue = ForgePresentationDensity.standard
+}
+
 extension EnvironmentValues {
     var forgeEmbeddedNonScrolling: Bool {
         get { self[ForgeEmbeddedNonScrollingKey.self] }
         set { self[ForgeEmbeddedNonScrollingKey.self] = newValue }
+    }
+
+    public var forgePresentationDensity: ForgePresentationDensity {
+        get { self[ForgePresentationDensityKey.self] }
+        set { self[ForgePresentationDensityKey.self] = newValue }
     }
 }
 

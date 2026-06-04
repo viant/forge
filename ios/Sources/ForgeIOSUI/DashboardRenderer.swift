@@ -3,6 +3,7 @@ import ForgeIOSRuntime
 
 public struct DashboardRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.forgePresentationDensity) private var presentationDensity
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -94,11 +95,11 @@ public struct DashboardRenderer: View {
         AnyView(VStack(alignment: .leading, spacing: 12) {
             if let title = container.title, !title.isEmpty {
                 Text(title)
-                    .font(.title3.weight(.semibold))
+                    .font((isCompactPresentation ? Font.headline : .title3).weight(.semibold))
             }
             if let subtitle = container.subtitle, !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(.subheadline)
+                    .font(isCompactPresentation ? .footnote : .subheadline)
                     .foregroundStyle(.secondary)
             }
             ForEach(container.containers) { child in
@@ -109,8 +110,8 @@ public struct DashboardRenderer: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, horizontalSizeClass == .regular ? 8 : 12)
-        .padding(.vertical, horizontalSizeClass == .regular ? 6 : 8))
+        .padding(.horizontal, isCompactPresentation ? 4 : (horizontalSizeClass == .regular ? 8 : 12))
+        .padding(.vertical, isCompactPresentation ? 4 : (horizontalSizeClass == .regular ? 6 : 8)))
     }
 
     @ViewBuilder
@@ -120,11 +121,11 @@ public struct DashboardRenderer: View {
                 VStack(alignment: .leading, spacing: 4) {
                     if let title = container.title, !title.isEmpty {
                         Text(title)
-                            .font(.headline)
+                            .font(isCompactPresentation ? .subheadline.weight(.semibold) : .headline)
                     }
                     if let subtitle = container.subtitle, !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.subheadline)
+                            .font(isCompactPresentation ? .footnote : .subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -132,14 +133,14 @@ public struct DashboardRenderer: View {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, horizontalSizeClass == .regular ? 12 : 14)
-        .padding(.vertical, horizontalSizeClass == .regular ? 12 : 14)
+        .padding(.horizontal, isCompactPresentation ? 10 : (horizontalSizeClass == .regular ? 12 : 14))
+        .padding(.vertical, isCompactPresentation ? 10 : (horizontalSizeClass == .regular ? 12 : 14))
         .background(
-            RoundedRectangle(cornerRadius: horizontalSizeClass == .regular ? 18 : 16)
+            RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : (horizontalSizeClass == .regular ? 18 : 16))
                 .fill(Color(.systemBackground))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: horizontalSizeClass == .regular ? 18 : 16)
+            RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : (horizontalSizeClass == .regular ? 18 : 16))
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
         )
     }
@@ -151,7 +152,7 @@ public struct DashboardRenderer: View {
             unsupportedBlock("dashboard summary has no metrics")
         } else {
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 156 : 160), spacing: 10, alignment: .top)],
+                columns: [GridItem(.adaptive(minimum: isCompactPresentation ? 136 : (horizontalSizeClass == .regular ? 156 : 160)), spacing: 10, alignment: .top)],
                 alignment: .leading,
                 spacing: 10
             ) {
@@ -161,29 +162,38 @@ public struct DashboardRenderer: View {
                         selector: metric.selector,
                         metrics: metrics
                     )
+                    let displayValue = DashboardRuntime.formatDashboardValue(value, format: metric.format)
+                    let cardTone = summaryCardTone(for: metric, index: summaryMetrics.firstIndex(where: { $0.id == metric.id && $0.selector == metric.selector && $0.label == metric.label }) ?? 0)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(metric.label ?? metric.selector ?? "Metric")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Text(DashboardRuntime.formatDashboardValue(value, format: metric.format))
-                            .font(.title3.weight(.semibold))
-                            .lineLimit(2)
+                            .font((isCompactPresentation ? Font.caption2 : .caption).weight(.medium))
+                            .foregroundStyle(cardTone.text.opacity(0.8))
+                        Text(displayValue)
+                            .font(summaryValueFont(for: displayValue).weight(.semibold))
+                            .foregroundStyle(cardTone.text)
+                            .lineLimit(3)
+                            .minimumScaleFactor(0.72)
+                            .allowsTightening(true)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 60 : 72, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, horizontalSizeClass == .regular ? 10 : 11)
+                    .frame(maxWidth: .infinity, minHeight: isCompactPresentation ? 52 : (horizontalSizeClass == .regular ? 60 : 72), alignment: .leading)
+                    .padding(.horizontal, isCompactPresentation ? 10 : 12)
+                    .padding(.vertical, isCompactPresentation ? 9 : (horizontalSizeClass == .regular ? 10 : 11))
                     .background(
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(Color(.secondarySystemBackground))
+                            .fill(cardTone.background)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                            .stroke(cardTone.border, lineWidth: 1)
                     )
                 }
             }
         }
+    }
+
+    private var isCompactPresentation: Bool {
+        presentationDensity == .compact
     }
 
     @ViewBuilder
@@ -562,22 +572,73 @@ public struct DashboardRenderer: View {
     }
 
     private func toneColor(_ tone: String?) -> Color {
-        switch tone?.lowercased() {
-        case "success":
-            return .green
-        case "warning":
-            return .orange
-        case "danger", "error":
-            return .red
-        case "info":
-            return .blue
-        default:
-            return .secondary
-        }
+        toneStyle(tone).text
     }
 
     private func toneBackground(_ tone: String?) -> Color {
-        toneColor(tone).opacity(0.12)
+        toneStyle(tone).background
+    }
+
+    private func toneBorder(_ tone: String?) -> Color {
+        toneStyle(tone).border
+    }
+
+    private func summaryCardTone(for metric: DashboardMetricDef, index: Int) -> DashboardCardTone {
+        if let tone = metric.tone?.trimmingCharacters(in: .whitespacesAndNewlines), !tone.isEmpty {
+            return toneStyle(tone)
+        }
+        let fallbackTones = ["info", "success", "neutral", "warning", "danger", "accent"]
+        return toneStyle(fallbackTones[index % fallbackTones.count])
+    }
+
+    private func summaryValueFont(for text: String) -> Font {
+        let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let longestToken = normalized
+            .split(whereSeparator: { $0 == " " || $0 == "_" || $0 == "-" || $0 == "/" })
+            .map(\.count)
+            .max() ?? normalized.count
+        if longestToken >= 18 || normalized.count >= 30 {
+            return isCompactPresentation ? .body : .headline
+        }
+        if longestToken >= 12 || normalized.count >= 20 {
+            return isCompactPresentation ? .subheadline : .title3
+        }
+        return isCompactPresentation ? .headline : .title3
+    }
+
+    private func toneStyle(_ tone: String?) -> DashboardCardTone {
+        switch tone?.lowercased() {
+        case "success", "good":
+            return DashboardCardTone(
+                background: Color(red: 0.93, green: 0.98, blue: 0.94),
+                border: Color(red: 0.72, green: 0.89, blue: 0.76),
+                text: Color(red: 0.10, green: 0.39, blue: 0.18)
+            )
+        case "warning", "caution":
+            return DashboardCardTone(
+                background: Color(red: 1.00, green: 0.97, blue: 0.89),
+                border: Color(red: 0.96, green: 0.86, blue: 0.55),
+                text: Color(red: 0.57, green: 0.38, blue: 0.03)
+            )
+        case "danger", "error":
+            return DashboardCardTone(
+                background: Color(red: 0.99, green: 0.93, blue: 0.93),
+                border: Color(red: 0.94, green: 0.73, blue: 0.73),
+                text: Color(red: 0.60, green: 0.16, blue: 0.20)
+            )
+        case "info", "setup", "restriction", "accent":
+            return DashboardCardTone(
+                background: Color(red: 0.94, green: 0.94, blue: 1.00),
+                border: Color(red: 0.78, green: 0.79, blue: 0.96),
+                text: Color(red: 0.29, green: 0.27, blue: 0.65)
+            )
+        default:
+            return DashboardCardTone(
+                background: Color(red: 0.95, green: 0.96, blue: 0.98),
+                border: Color(red: 0.84, green: 0.87, blue: 0.91),
+                text: Color(red: 0.29, green: 0.33, blue: 0.39)
+            )
+        }
     }
 
     private func numericValue(_ value: Any?) -> Double {
@@ -603,6 +664,12 @@ public struct DashboardRenderer: View {
     private func isBlank(_ value: String?) -> Bool {
         value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
     }
+}
+
+private struct DashboardCardTone {
+    let background: Color
+    let border: Color
+    let text: Color
 }
 
 private extension JSONValue {

@@ -373,16 +373,16 @@ public struct MenuListRenderer: View {
         let key: String?
         switch source {
         case "windowform":
-            key = SelectorUtil.resolve(windowFormValues, selector: selector) as? String
+            key = selectorStringValue(from: SelectorUtil.resolve(windowFormValues, selector: selector))
         case "form":
             if let containerRef = container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
-                key = SelectorUtil.resolve(formValuesByDataSource[containerRef], selector: selector) as? String
+                key = selectorStringValue(from: SelectorUtil.resolve(formValuesByDataSource[containerRef], selector: selector))
             } else {
                 key = nil
             }
         case "metrics":
             if let containerRef = container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
-                key = SelectorUtil.resolve(metricsValuesByDataSource[containerRef], selector: selector) as? String
+                key = selectorStringValue(from: SelectorUtil.resolve(metricsValuesByDataSource[containerRef], selector: selector))
             } else {
                 key = nil
             }
@@ -533,6 +533,17 @@ private func dataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) -> Bool
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return source == "windowform"
+    }
+}
+
+private func selectorStringValue(from value: Any?) -> String? {
+    switch value {
+    case let string as String:
+        return string
+    case let json as JSONValue:
+        return json.displayString
+    default:
+        return nil
     }
 }
 
