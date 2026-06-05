@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, shouldPrimeDataSourceFetch } from './WindowContent.jsx';
+import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, shouldPrimeDataSourceFetch } from './WindowContent.jsx';
 
 describe('resolveInitialWindowFormValues', () => {
   it('collects explicit windowForm item values alongside onInit constants', () => {
@@ -97,6 +97,33 @@ describe('resolveDefaultDataSourceRef', () => {
     };
 
     expect(resolveDefaultDataSourceRef(metadata)).toBe('recommendation');
+  });
+});
+
+describe('resolveWindowMetadataForTarget', () => {
+  it('applies targetOverrides before window metadata is stored', () => {
+    const metadata = {
+      view: {
+        content: {
+          containers: [{ id: 'base' }],
+          targetOverrides: {
+            web: {
+              containers: [{ id: 'webGrid' }],
+            },
+            mobile: {
+              containers: [{ id: 'mobileTabs' }],
+            },
+          },
+        },
+      },
+    };
+
+    expect(resolveWindowMetadataForTarget(metadata, { platform: 'web', formFactor: 'desktop' }).view.content.containers).toEqual([
+      { id: 'webGrid' },
+    ]);
+    expect(resolveWindowMetadataForTarget(metadata, { platform: 'ios', formFactor: 'tablet' }).view.content.containers).toEqual([
+      { id: 'mobileTabs' },
+    ]);
   });
 });
 

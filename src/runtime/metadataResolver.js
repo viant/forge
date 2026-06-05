@@ -108,20 +108,7 @@ function deepMerge(base, override) {
 
 function applicableOverrides(targetOverrides, targetContext = {}) {
     if (!isPlainObject(targetOverrides)) return [];
-    const platform = String(targetContext.platform || '').trim();
-    const formFactor = String(targetContext.formFactor || '').trim();
-    const keys = [];
-    if (platform) {
-        keys.push(platform);
-        if (formFactor) {
-            keys.push(`${platform}:${formFactor}`);
-            keys.push(`${platform}.${formFactor}`);
-        }
-    }
-    if (formFactor) {
-        keys.push(`formFactor:${formFactor}`);
-        keys.push(formFactor);
-    }
+    const keys = targetOverrideKeys(targetContext);
     const seen = new Set();
     const result = [];
     for (const key of keys) {
@@ -133,6 +120,42 @@ function applicableOverrides(targetOverrides, targetContext = {}) {
         }
     }
     return result;
+}
+
+function targetOverrideKeys(targetContext = {}) {
+    const platform = String(targetContext.platform || '').trim();
+    const formFactor = String(targetContext.formFactor || '').trim();
+    const surface = String(targetContext.surface || '').trim();
+    const mobilePlatforms = new Set(['android', 'ios']);
+    const mobileFormFactors = new Set(['phone', 'tablet']);
+    const isMobile = mobilePlatforms.has(platform) || mobileFormFactors.has(formFactor);
+    const keys = [];
+
+    if (surface) {
+        keys.push(`surface:${surface}`);
+        keys.push(surface);
+    }
+    if (isMobile) {
+        keys.push('mobile');
+    }
+    if (formFactor) {
+        keys.push(`formFactor:${formFactor}`);
+        keys.push(formFactor);
+    }
+    if (platform) {
+        keys.push(platform);
+    }
+    if (isMobile && formFactor) {
+        keys.push(`mobile.${formFactor}`);
+        keys.push(`mobile:${formFactor}`);
+        keys.push(`mobile/${formFactor}`);
+    }
+    if (platform && formFactor) {
+        keys.push(`${platform}.${formFactor}`);
+        keys.push(`${platform}/${formFactor}`);
+        keys.push(`${platform}:${formFactor}`);
+    }
+    return keys;
 }
 
 function resolveValue(node, targetContext = {}) {
@@ -194,6 +217,7 @@ export function __private__() {
         matchesTarget,
         deepMerge,
         applicableOverrides,
+        targetOverrideKeys,
         resolveValue
     };
 }

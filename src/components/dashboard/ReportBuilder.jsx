@@ -37,6 +37,7 @@ import {
     resolveReportBuilderMeasure,
     resolveReportBuilderReadiness,
     sanitizeReportBuilderState,
+    shouldAutoCollapseReportBuilderFilters,
     updateDynamicFilterRow,
     validateReportBuilderChartSpec,
 } from "./reportBuilderUtils.js";
@@ -1628,6 +1629,7 @@ export default function ReportBuilder({ container, context }) {
     const state = useMemo(() => mergeReportBuilderState(config, persistedState), [config, persistedState]);
     const requestFingerprintRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
+    const lastAutoCollapsedRunSequenceRef = useRef(0);
     const seededDefaultsRef = useRef(false);
     const appliedPrefillSignatureRef = useRef("");
     const hydrationFingerprintRef = useRef("");
@@ -1638,6 +1640,7 @@ export default function ReportBuilder({ container, context }) {
     const [selectedPreviousChartTitle, setSelectedPreviousChartTitle] = useState("");
     const [selectedQuickChartOption, setSelectedQuickChartOption] = useState("");
     const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
+    const [manualRunSequence, setManualRunSequence] = useState(0);
     const [pendingScrollRowId, setPendingScrollRowId] = useState("");
     const builderRootRef = useRef(null);
     const leftRailRef = useRef(null);
@@ -2255,6 +2258,7 @@ export default function ReportBuilder({ container, context }) {
         const fingerprint = JSON.stringify(request);
         requestFingerprintRef.current = fingerprint;
         lastManualRunFingerprintRef.current = fingerprint;
+        setManualRunSequence((current) => current + 1);
         const inputSignal = builderContext?.signals?.input;
         if (inputSignal) {
             const previous = inputSignal.peek?.() || {};
@@ -2322,6 +2326,22 @@ export default function ReportBuilder({ container, context }) {
         && !error
         && lastManualRunFingerprintRef.current !== ""
         && lastManualRunFingerprintRef.current === currentRequestFingerprint;
+
+    useEffect(() => {
+        if (!shouldAutoCollapseReportBuilderFilters({
+            canShowResults,
+            hasCompletedCurrentRun,
+            manualRunSequence,
+            collapsedRunSequence: lastAutoCollapsedRunSequenceRef.current,
+        })) {
+            return;
+        }
+        lastAutoCollapsedRunSequenceRef.current = manualRunSequence;
+        setFilterPanels((current) => (
+            current.common ? { ...current, common: false } : current
+        ));
+        setFiltersDrawerOpen(false);
+    }, [canShowResults, hasCompletedCurrentRun, manualRunSequence]);
 
     useEffect(() => {
         setStoredChartPresets(loadStoredChartPresets(stateKey));

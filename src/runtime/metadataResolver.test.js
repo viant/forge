@@ -75,3 +75,60 @@ const resolvedTargetDatasource = resolveMetadataForTarget(metadataWithTargetData
 
 assert.ok(resolvedTargetDatasource.dataSource.target);
 assert.equal(resolvedTargetDatasource.dataSource.dialogSource.selectionMode, 'multi');
+
+const broadOverrideMetadata = {
+    view: {
+        content: {
+            layout: { kind: 'base' },
+            containers: [{ id: 'base' }],
+            targetOverrides: {
+                mobile: {
+                    layout: { kind: 'mobile' },
+                    containers: [{ id: 'mobileTabs' }]
+                },
+                phone: {
+                    layout: { density: 'phone' }
+                },
+                android: {
+                    layout: { platform: 'android' }
+                },
+                'android:phone': {
+                    layout: { kind: 'androidPhone' },
+                    containers: [{ id: 'androidPhoneTabs' }]
+                },
+                web: {
+                    layout: { kind: 'web' },
+                    containers: [{ id: 'webGrid' }]
+                }
+            }
+        }
+    }
+};
+
+const resolvedAndroidPhone = resolveMetadataForTarget(broadOverrideMetadata, {
+    platform: 'android',
+    formFactor: 'phone'
+});
+
+assert.equal(resolvedAndroidPhone.view.content.layout.kind, 'androidPhone');
+assert.equal(resolvedAndroidPhone.view.content.layout.density, 'phone');
+assert.equal(resolvedAndroidPhone.view.content.layout.platform, 'android');
+assert.equal(resolvedAndroidPhone.view.content.containers.length, 1);
+assert.equal(resolvedAndroidPhone.view.content.containers[0].id, 'androidPhoneTabs');
+assert.equal(typeof resolvedAndroidPhone.view.content.targetOverrides, 'undefined');
+
+const resolvedIosTablet = resolveMetadataForTarget(broadOverrideMetadata, {
+    platform: 'ios',
+    formFactor: 'tablet'
+});
+
+assert.equal(resolvedIosTablet.view.content.layout.kind, 'mobile');
+assert.equal(resolvedIosTablet.view.content.containers[0].id, 'mobileTabs');
+
+const resolvedWebWindow = resolveMetadataForTarget(broadOverrideMetadata, {
+    platform: 'web',
+    formFactor: 'desktop'
+});
+
+assert.equal(resolvedWebWindow.view.content.layout.kind, 'web');
+assert.equal(resolvedWebWindow.view.content.containers[0].id, 'webGrid');

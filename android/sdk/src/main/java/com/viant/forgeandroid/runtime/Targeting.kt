@@ -10,6 +10,7 @@ import kotlinx.serialization.json.contentOrNull
 data class ForgeTargetContext(
     val platform: String,
     val formFactor: String? = null,
+    val surface: String? = null,
     val capabilities: Set<String> = emptySet()
 )
 
@@ -54,18 +55,7 @@ object MetadataResolver {
 
     private fun applicableOverrides(raw: JsonElement?, targetContext: ForgeTargetContext): List<JsonObject> {
         val obj = raw as? JsonObject ?: return emptyList()
-        val keys = mutableListOf<String>()
-        if (targetContext.platform.isNotBlank()) {
-            keys += targetContext.platform
-            if (!targetContext.formFactor.isNullOrBlank()) {
-                keys += "${targetContext.platform}:${targetContext.formFactor}"
-                keys += "${targetContext.platform}.${targetContext.formFactor}"
-            }
-        }
-        if (!targetContext.formFactor.isNullOrBlank()) {
-            keys += "formFactor:${targetContext.formFactor}"
-            keys += targetContext.formFactor
-        }
+        val keys = targetOverrideKeys(targetContext)
         val result = mutableListOf<JsonObject>()
         val seen = mutableSetOf<String>()
         for (key in keys) {
@@ -74,6 +64,41 @@ object MetadataResolver {
             result += candidate
         }
         return result
+    }
+
+    private fun targetOverrideKeys(targetContext: ForgeTargetContext): List<String> {
+        val platform = targetContext.platform.trim()
+        val formFactor = targetContext.formFactor?.trim().orEmpty()
+        val surface = targetContext.surface?.trim().orEmpty()
+        val mobilePlatforms = setOf("android", "ios")
+        val mobileFormFactors = setOf("phone", "tablet")
+        val isMobile = platform in mobilePlatforms || formFactor in mobileFormFactors
+        val keys = mutableListOf<String>()
+        if (surface.isNotBlank()) {
+            keys += "surface:$surface"
+            keys += surface
+        }
+        if (isMobile) {
+            keys += "mobile"
+        }
+        if (formFactor.isNotBlank()) {
+            keys += "formFactor:$formFactor"
+            keys += formFactor
+        }
+        if (platform.isNotBlank()) {
+            keys += platform
+        }
+        if (isMobile && formFactor.isNotBlank()) {
+            keys += "mobile.$formFactor"
+            keys += "mobile:$formFactor"
+            keys += "mobile/$formFactor"
+        }
+        if (platform.isNotBlank() && formFactor.isNotBlank()) {
+            keys += "$platform.$formFactor"
+            keys += "$platform/$formFactor"
+            keys += "$platform:$formFactor"
+        }
+        return keys
     }
 
     private fun matchesTarget(raw: JsonElement?, targetContext: ForgeTargetContext): Boolean {

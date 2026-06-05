@@ -9,17 +9,21 @@ extension ForgeRuntime {
     public func setWindowFormValue(
         windowID: String,
         values: [String: JSONValue],
-        replace: Bool = false
+        replace: Bool = false,
+        bumpPrefillRevision: Bool = true
     ) async {
         let dataSourceID = WindowIdentity(windowID: windowID).windowFormID()
         let signal = await signals.form(dataSourceID: dataSourceID)
+        let current = await dataSourceRuntime.form(dataSourceID: dataSourceID)
+        let nextValues = bumpPrefillRevision
+            ? valuesWithPrefillRevision(values, current: current)
+            : values
         if replace {
-            await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: values)
-            await signal.set(values)
+            await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: nextValues)
+            await signal.set(nextValues)
             return
         }
-        let current = await dataSourceRuntime.form(dataSourceID: dataSourceID)
-        let merged = mergeWindowFormValues(base: current, override: values)
+        let merged = mergeWindowFormValues(base: current, override: nextValues)
         await dataSourceRuntime.setForm(
             dataSourceID: dataSourceID,
             values: merged
@@ -36,7 +40,39 @@ extension ForgeRuntime {
         let seeded = mergeWindowFormValues(base: parameters, override: initialValues)
         let current = await windowFormJSONValue(windowID: windowID)
         let reconciled = mergeWindowFormValues(base: seeded, override: current)
-        await setWindowFormValue(windowID: windowID, values: reconciled, replace: true)
+        await setWindowFormValue(
+            windowID: windowID,
+            values: reconciled,
+            replace: true,
+            bumpPrefillRevision: false
+        )
+    }
+}
+
+private func valuesWithPrefillRevision(
+    _ values: [String: JSONValue],
+    current: [String: JSONValue]
+) -> [String: JSONValue] {
+    guard values["prefill"] != nil else {
+        return values
+    }
+    var next = values
+    let currentMeta = current["__forge"]?.objectValue ?? [:]
+    let incomingMeta = values["__forge"]?.objectValue ?? [:]
+    var meta = mergeWindowFormValues(base: currentMeta, override: incomingMeta)
+    meta["prefillRevision"] = .number(Double(prefillRevision(from: currentMeta) + 1))
+    next["__forge"] = .object(meta)
+    return next
+}
+
+private func prefillRevision(from values: [String: JSONValue]) -> Int {
+    switch values["prefillRevision"] {
+    case .number(let value):
+        return Int(value)
+    case .string(let value):
+        return Int(value.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+    default:
+        return 0
     }
 }
 

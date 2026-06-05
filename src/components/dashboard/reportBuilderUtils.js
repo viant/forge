@@ -42,6 +42,21 @@ function normalizeArray(values = []) {
     return isPresent(values) ? [values] : [];
 }
 
+export function shouldAutoCollapseReportBuilderFilters({
+    canShowResults = false,
+    hasCompletedCurrentRun = false,
+    manualRunSequence = 0,
+    collapsedRunSequence = 0,
+} = {}) {
+    const runSequence = Number(manualRunSequence || 0);
+    const lastCollapsed = Number(collapsedRunSequence || 0);
+    return !!canShowResults
+        && !!hasCompletedCurrentRun
+        && Number.isFinite(runSequence)
+        && runSequence > 0
+        && runSequence !== lastCollapsed;
+}
+
 function formatDateISO(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");

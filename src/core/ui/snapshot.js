@@ -280,6 +280,25 @@ function buildCompareContextMap(windows = []) {
   return result;
 }
 
+function deriveSnapshotConversationId(windows = [], selectedId = '') {
+  const selectedWindowIdValue = String(selectedId || '').trim();
+  const selectedWindow = windows.find((win) => String(win?.windowId || '').trim() === selectedWindowIdValue);
+  const selectedConversationId = String(selectedWindow?.conversationId || '').trim();
+  if (selectedConversationId) return selectedConversationId;
+
+  const hostedWindow = windows.find((win) =>
+    String(win?.conversationId || '').trim()
+    && String(win?.presentation || '').trim().toLowerCase() === 'hosted'
+    && String(win?.region || '').trim().toLowerCase() === 'chat.top'
+  );
+  const hostedConversationId = String(hostedWindow?.conversationId || '').trim();
+  if (hostedConversationId) return hostedConversationId;
+
+  const firstConversationWindow = windows.find((win) => String(win?.conversationId || '').trim());
+  const firstConversationId = String(firstConversationWindow?.conversationId || '').trim();
+  return firstConversationId || null;
+}
+
 /**
  * Build a JSON-safe snapshot of the current Forge UI state.
  *
@@ -289,6 +308,8 @@ function buildCompareContextMap(windows = []) {
 export function buildUISnapshot(options = {}) {
   const windows = activeWindows.peek() || [];
   const compareContextByWindowId = buildCompareContextMap(windows);
+  const selectedWindowIdValue = selectedWindowId.peek() || null;
+  const selectedTabIdValue = selectedTabId.peek() || null;
   let focused = null;
   try {
     enableFocusTracking();
@@ -297,9 +318,10 @@ export function buildUISnapshot(options = {}) {
 
   const snapshot = {
     ts: Date.now(),
+    conversationId: deriveSnapshotConversationId(windows, selectedWindowIdValue),
     selected: {
-      windowId: selectedWindowId.peek() || null,
-      tabId: selectedTabId.peek() || null,
+      windowId: selectedWindowIdValue,
+      tabId: selectedTabIdValue,
     },
     focusedControl: focused || null,
     windows: windows.map((w) => {

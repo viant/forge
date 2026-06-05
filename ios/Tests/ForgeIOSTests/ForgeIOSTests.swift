@@ -240,8 +240,20 @@ final class ForgeIOSTests: XCTestCase {
                   "id": "iosOnly",
                   "title": "Base",
                   "targetOverrides": {
-                    "ios:tablet": {
+                    "surface:app": {
+                      "title": "App Title"
+                    },
+                    "mobile": {
+                      "title": "Mobile Title"
+                    },
+                    "tablet": {
                       "title": "Tablet Title"
+                    },
+                    "ios": {
+                      "title": "iOS Title"
+                    },
+                    "ios:tablet": {
+                      "title": "Exact Tablet Title"
                     }
                   }
                 }
@@ -254,12 +266,12 @@ final class ForgeIOSTests: XCTestCase {
         let metadata = try! JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
         let resolved = MetadataResolver.resolve(
             metadata,
-            for: ForgeTargetContext(platform: "ios", formFactor: "tablet")
+            for: ForgeTargetContext(platform: "ios", formFactor: "tablet", surface: "app")
         )
         let containers = resolved.view?.content?.containers ?? []
 
         XCTAssertEqual(containers.map(\.id), ["shared", "iosOnly"])
-        XCTAssertEqual(containers.last?.title, "Tablet Title")
+        XCTAssertEqual(containers.last?.title, "Exact Tablet Title")
         XCTAssertEqual(resolved.actions?.code, "(() => ({ ping: () => true }))()")
     }
 
@@ -1262,6 +1274,36 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(windowForm["granularity"], .string("day"))
         XCTAssertEqual(windowForm["periodView"], .string("today"))
         XCTAssertEqual(windowForm["prefill"]?.objectValue?["accountId"], .number(7))
+    }
+
+    func testSetWindowFormValueBumpsGenericPrefillRevision() async throws {
+        let runtime = ForgeRuntime()
+        let state = await runtime.openWindow(
+            key: "metrics/report",
+            title: "Metrics Report"
+        )
+
+        await runtime.setWindowFormValue(
+            windowID: state.id,
+            values: [
+                "prefill": .object([
+                    "accountId": .number(7)
+                ])
+            ]
+        )
+        let first = await runtime.windowFormJSONValue(windowID: state.id)
+        await runtime.setWindowFormValue(
+            windowID: state.id,
+            values: [
+                "prefill": .object([
+                    "accountId": .number(7)
+                ])
+            ]
+        )
+        let second = await runtime.windowFormJSONValue(windowID: state.id)
+
+        XCTAssertEqual(first["__forge"]?.objectValue?["prefillRevision"], .number(1))
+        XCTAssertEqual(second["__forge"]?.objectValue?["prefillRevision"], .number(2))
     }
 
     func testParameterResolverResolvesWindowFormSelectors() {

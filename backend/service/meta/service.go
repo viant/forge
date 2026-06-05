@@ -3,12 +3,12 @@ package meta
 import (
 	"context"
 	"fmt"
-	"path"
 	"github.com/viant/afs"
 	"github.com/viant/afs/file"
 	"github.com/viant/afs/storage"
 	"github.com/viant/afs/url"
 	"gopkg.in/yaml.v3"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -102,7 +102,7 @@ func (l *Service) resolveImports(ctx context.Context, node *yaml.Node, baseDir s
 	case yaml.DocumentNode:
 		// Recursively resolve imports in document content.
 		for _, contentNode := range node.Content {
-			if err := l.resolveImports(ctx, contentNode, baseDir, target); err != nil {
+			if err := l.processNode(ctx, contentNode, baseDir, target); err != nil {
 				return err
 			}
 		}
@@ -226,13 +226,8 @@ func branchCandidates(basePath string, target *TargetContext) []string {
 		return []string{basePath}
 	}
 	var result []string
-	platform := strings.TrimSpace(target.Platform)
-	formFactor := strings.TrimSpace(target.FormFactor)
-	if platform != "" && formFactor != "" {
-		result = append(result, url.Join(baseDir, platform, formFactor, leaf))
-	}
-	if platform != "" {
-		result = append(result, url.Join(baseDir, platform, leaf))
+	for _, branch := range branchPathCandidates(target) {
+		result = append(result, url.Join(baseDir, branch, leaf))
 	}
 	result = append(result, url.Join(baseDir, "shared", leaf))
 	result = append(result, basePath)
@@ -243,52 +238,72 @@ func importCandidates(baseDir, importPath string, target *TargetContext) []strin
 	if target == nil {
 		return []string{joinMetaPath(baseDir, importPath)}
 	}
-	rootDir, branchLevel := branchRoot(baseDir, target)
+	rootDir, inBranch := branchRoot(baseDir, target)
 	logicalBase := baseDir
-	if branchLevel > 0 {
+	if inBranch {
 		logicalBase = rootDir
 	}
 	logicalPath := joinMetaPath(logicalBase, importPath)
 	candidates := []string{logicalPath}
-	relativeImport := strings.TrimPrefix(logicalPath, strings.TrimSuffix(rootDir, "/"))
-	relativeImport = strings.TrimPrefix(relativeImport, "/")
-	switch branchLevel {
-	case 2:
-		if platform := strings.TrimSpace(target.Platform); platform != "" {
-			if formFactor := strings.TrimSpace(target.FormFactor); formFactor != "" {
-				candidates = append(candidates, joinMetaPath(rootDir, path.Join(platform, formFactor, relativeImport)))
-			}
-			candidates = append(candidates, joinMetaPath(rootDir, path.Join(platform, relativeImport)))
+	if inBranch {
+		for _, branch := range branchPathCandidates(target) {
+			candidates = append(candidates, joinMetaPath(rootDir, path.Join(branch, importPath)))
 		}
-		candidates = append(candidates, joinMetaPath(rootDir, path.Join("shared", relativeImport)))
-	case 1:
-		if platform := strings.TrimSpace(target.Platform); platform != "" {
-			candidates = append(candidates, joinMetaPath(rootDir, path.Join(platform, relativeImport)))
-		}
-		candidates = append(candidates, joinMetaPath(rootDir, path.Join("shared", relativeImport)))
+		candidates = append(candidates, joinMetaPath(rootDir, path.Join("shared", importPath)))
 	}
 	return uniqueStrings(candidates)
 }
 
-func branchRoot(baseDir string, target *TargetContext) (string, int) {
+func branchRoot(baseDir string, target *TargetContext) (string, bool) {
+	if target == nil {
+		return baseDir, false
+	}
+	for _, branch := range append(branchPathCandidates(target), "shared") {
+		suffix := "/" + strings.Trim(branch, "/")
+		if strings.HasSuffix(baseDir, suffix) {
+			return strings.TrimSuffix(baseDir, suffix), true
+		}
+	}
+	return baseDir, false
+}
+
+func branchPathCandidates(target *TargetContext) []string {
+	if target == nil {
+		return nil
+	}
 	platform := strings.TrimSpace(target.Platform)
 	formFactor := strings.TrimSpace(target.FormFactor)
+	surface := strings.TrimSpace(target.Surface)
+	isMobile := isMobileTarget(platform, formFactor, surface)
+	var result []string
 	if platform != "" && formFactor != "" {
-		suffix := "/" + platform + "/" + formFactor
-		if strings.HasSuffix(baseDir, suffix) {
-			return strings.TrimSuffix(baseDir, suffix), 2
-		}
+		result = append(result, path.Join(platform, formFactor), platform+"."+formFactor)
 	}
 	if platform != "" {
-		suffix := "/" + platform
-		if strings.HasSuffix(baseDir, suffix) {
-			return strings.TrimSuffix(baseDir, suffix), 1
-		}
+		result = append(result, platform)
 	}
-	if strings.HasSuffix(baseDir, "/shared") {
-		return strings.TrimSuffix(baseDir, "/shared"), 1
+	if isMobile && formFactor != "" {
+		result = append(result, path.Join("mobile", formFactor), "mobile."+formFactor)
 	}
-	return baseDir, 0
+	if isMobile {
+		result = append(result, "mobile")
+	}
+	if formFactor != "" {
+		result = append(result, formFactor)
+	}
+	return uniqueStrings(result)
+}
+
+func isMobileTarget(platform, formFactor, surface string) bool {
+	switch platform {
+	case "android", "ios":
+		return true
+	}
+	switch formFactor {
+	case "phone", "tablet":
+		return true
+	}
+	return surface == "app" && platform != "web"
 }
 
 func uniqueStrings(values []string) []string {

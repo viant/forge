@@ -27,9 +27,9 @@ func TestResolveWindowBase_TargetBranchOrder(t *testing.T) {
 	ctx := context.Background()
 
 	testCases := []struct {
-		name      string
-		target    *TargetContext
-		expected  string
+		name     string
+		target   *TargetContext
+		expected string
 	}{
 		{name: "exact branch", target: &TargetContext{Platform: "ios", FormFactor: "tablet"}, expected: "schedule/ios/tablet/main"},
 		{name: "platform branch", target: &TargetContext{Platform: "web", FormFactor: "desktop"}, expected: "schedule/web/main"},
@@ -42,6 +42,40 @@ func TestResolveWindowBase_TargetBranchOrder(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			got, err := service.ResolveWindowBase(ctx, "schedule/main", testCase.target)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != testCase.expected {
+				t.Fatalf("expected %q, got %q", testCase.expected, got)
+			}
+		})
+	}
+}
+
+func TestResolveWindowBase_BroadTargetBranches(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "window", "order")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "main.yaml"), "namespace: shared\nview:\n  content: {}\n")
+	mustWriteMetaFile(t, filepath.Join(base, "mobile", "main.yaml"), "namespace: mobile\nview:\n  content: {}\n")
+	mustWriteMetaFile(t, filepath.Join(base, "mobile", "phone", "main.yaml"), "namespace: mobile-phone\nview:\n  content: {}\n")
+	mustWriteMetaFile(t, filepath.Join(base, "web", "main.yaml"), "namespace: web\nview:\n  content: {}\n")
+
+	service := New(afs.New(), filepath.Join(root, "window"))
+	ctx := context.Background()
+
+	testCases := []struct {
+		name     string
+		target   *TargetContext
+		expected string
+	}{
+		{name: "web platform branch", target: &TargetContext{Platform: "web", FormFactor: "desktop", Surface: "browser"}, expected: "order/web/main"},
+		{name: "mobile form factor branch", target: &TargetContext{Platform: "ios", FormFactor: "phone", Surface: "app"}, expected: "order/mobile/phone/main"},
+		{name: "mobile platform family branch", target: &TargetContext{Platform: "android", FormFactor: "tablet", Surface: "app"}, expected: "order/mobile/main"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := service.ResolveWindowBase(ctx, "order/main", testCase.target)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -81,6 +115,28 @@ func TestLoadWithTarget_ImportFallbacksToShared(t *testing.T) {
 	}
 	if table["id"] != "shared-table" {
 		t.Fatalf("expected shared fallback import, got %#v", table)
+	}
+}
+
+func TestLoadWithTarget_RootImport(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "window", "order")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "main.yaml"), "namespace: imported\nview:\n  content: {}\n")
+	mustWriteMetaFile(t, filepath.Join(base, "web", "main.yaml"), "$import(shared/main.yaml)\n")
+
+	service := New(afs.New(), filepath.Join(root, "window"))
+	ctx := context.Background()
+	var decoded windowFixture
+
+	if err := service.LoadWithTarget(ctx, "order/web/main.yaml", &decoded, &TargetContext{
+		Platform:   "web",
+		FormFactor: "desktop",
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if decoded.Namespace != "imported" {
+		t.Fatalf("expected namespace imported, got %q", decoded.Namespace)
 	}
 }
 

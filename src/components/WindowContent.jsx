@@ -85,6 +85,22 @@ export function resolveDefaultDataSourceRef(metadata) {
     ).trim();
 }
 
+function normalizeTargetKey(targetContext = {}) {
+    const capabilities = Array.isArray(targetContext?.capabilities)
+        ? targetContext.capabilities.map((item) => String(item || '').trim()).filter(Boolean).sort()
+        : [];
+    return JSON.stringify({
+        platform: String(targetContext?.platform || '').trim(),
+        formFactor: String(targetContext?.formFactor || '').trim(),
+        surface: String(targetContext?.surface || '').trim(),
+        capabilities,
+    });
+}
+
+export function resolveWindowMetadataForTarget(metadata, targetContext = {}) {
+    return resolveMetadataForTarget(metadata, targetContext) || metadata;
+}
+
 function collectRequiredDataSourceRefs(node, scope, refs) {
     if (!node || typeof node !== 'object') return;
 
@@ -581,7 +597,9 @@ export default function WindowContent({window, isInTab = false}) {
         }
         const existingMetadata = metadataSignalHandle.peek?.();
         const existingWindowKey = String(existingMetadata?.__windowKey || '').trim();
-        if (existingMetadata && existingWindowKey === baseKey) {
+        const targetKey = normalizeTargetKey(targetContext);
+        const existingTargetKey = String(existingMetadata?.__targetKey || '').trim();
+        if (existingMetadata && existingWindowKey === baseKey && existingTargetKey === targetKey) {
             setFetchError(null);
             setLoading(false);
             return () => { cancelled = true; };
@@ -593,8 +611,9 @@ export default function WindowContent({window, isInTab = false}) {
         // Dynamic windows can supply inline metadata (skip remote fetch).
         if (window && window.inlineMetadata) {
             try {
-                injectActions(window.inlineMetadata);
-                metadataSignalHandle.value = { ...window.inlineMetadata, __windowKey: baseKey };
+                const resolvedMetadata = resolveWindowMetadataForTarget(window.inlineMetadata, targetContext);
+                injectActions(resolvedMetadata);
+                metadataSignalHandle.value = { ...resolvedMetadata, __windowKey: baseKey, __targetKey: targetKey };
             } catch (e) {
                 console.error('Error applying inline metadata', e);
             } finally {
@@ -607,8 +626,9 @@ export default function WindowContent({window, isInTab = false}) {
             .then((resp) => {
                 if (cancelled) return;
                 setFetchError(null);
-                injectActions(resp.data);
-                metadataSignalHandle.value = { ...resp.data, __windowKey: baseKey };
+                const resolvedMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
+                injectActions(resolvedMetadata);
+                metadataSignalHandle.value = { ...resolvedMetadata, __windowKey: baseKey, __targetKey: targetKey };
             })
             .catch((err) => {
                 if (!cancelled) {
@@ -624,7 +644,7 @@ export default function WindowContent({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle]);
+    }, [windowId, baseKey, metadataSignalHandle, targetContext]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;
