@@ -873,6 +873,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
     public let staticFilters: [ReportBuilderStaticFilterDef]
     public let dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef]
     public let dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef]
+    public let unifiedFamilyRows: Bool
     public let result: ReportBuilderResultDef?
 
     enum CodingKeys: String, CodingKey {
@@ -882,6 +883,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         case staticFilters
         case dynamicFilterGroups
         case dynamicFilterFamilies
+        case unifiedFamilyRows
         case result
     }
 
@@ -892,6 +894,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         staticFilters: [ReportBuilderStaticFilterDef] = [],
         dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef] = [],
         dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef] = [],
+        unifiedFamilyRows: Bool = false,
         result: ReportBuilderResultDef? = nil
     ) {
         self.hooks = hooks
@@ -900,6 +903,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         self.staticFilters = staticFilters
         self.dynamicFilterGroups = dynamicFilterGroups
         self.dynamicFilterFamilies = dynamicFilterFamilies
+        self.unifiedFamilyRows = unifiedFamilyRows
         self.result = result
     }
 
@@ -911,6 +915,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         staticFilters = try container.decodeIfPresent([ReportBuilderStaticFilterDef].self, forKey: .staticFilters) ?? []
         dynamicFilterGroups = try container.decodeIfPresent([ReportBuilderDynamicFilterGroupDef].self, forKey: .dynamicFilterGroups) ?? []
         dynamicFilterFamilies = try container.decodeIfPresent([ReportBuilderDynamicFilterFamilyDef].self, forKey: .dynamicFilterFamilies) ?? []
+        unifiedFamilyRows = try container.decodeIfPresent(Bool.self, forKey: .unifiedFamilyRows) ?? false
         result = try container.decodeIfPresent(ReportBuilderResultDef.self, forKey: .result)
     }
 }

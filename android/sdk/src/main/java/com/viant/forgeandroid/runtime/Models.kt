@@ -205,6 +205,7 @@ data class DashboardReportBuilderDef(
     val staticFilters: List<ReportBuilderStaticFilterDef> = emptyList(),
     val dynamicFilterGroups: List<ReportBuilderDynamicFilterGroupDef> = emptyList(),
     val dynamicFilterFamilies: List<ReportBuilderDynamicFilterFamilyDef> = emptyList(),
+    val unifiedFamilyRows: Boolean = false,
     val result: ReportBuilderResultDef? = null
 )
 

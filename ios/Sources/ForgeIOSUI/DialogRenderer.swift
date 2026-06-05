@@ -23,19 +23,53 @@ extension EnvironmentValues {
 
 public struct DialogRenderer<Content: View>: View {
     private let title: String
+    private let style: [String: String]
     private let content: Content
 
-    public init(title: String, @ViewBuilder content: () -> Content) {
+    public init(title: String, style: [String: String] = [:], @ViewBuilder content: () -> Content) {
         self.title = title
+        self.style = style
         self.content = content()
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title).font(.headline)
-            content
+        if let headerBackgroundColor {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(headerTextColor ?? .white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+                    .background(headerBackgroundColor)
+                content
+                    .padding(16)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(title).font(.headline)
+                content
+            }
+            .padding()
         }
-        .padding()
+    }
+
+    private var headerBackgroundColor: Color? {
+        color(for: ["headerBackgroundColor", "headerBackground", "titleBackgroundColor"])
+    }
+
+    private var headerTextColor: Color? {
+        color(for: ["headerTextColor", "headerColor", "titleColor"])
+    }
+
+    private func color(for keys: [String]) -> Color? {
+        for key in keys {
+            if let value = style[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+               let color = Color(forgeHex: value) {
+                return color
+            }
+        }
+        return nil
     }
 }
 
@@ -150,7 +184,7 @@ private struct WindowDialogHost: View {
                         .ignoresSafeArea()
 
                     VStack {
-                        DialogRenderer(title: dialog.title ?? dialogID) {
+                        DialogRenderer(title: dialog.title ?? dialogID, style: dialog.style) {
                             VStack(alignment: .leading, spacing: 12) {
                                 if !quickFilterSpecs.isEmpty {
                                     quickFilterBar
@@ -503,6 +537,42 @@ private final class DialogDataObserver: ObservableObject {
 private struct DialogQuickFilterSpec: Equatable {
     let field: String
     let placeholder: String
+}
+
+private extension Color {
+    init?(forgeHex rawValue: String) {
+        var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("#") {
+            value.removeFirst()
+        }
+        guard value.count == 6 || value.count == 8,
+              let integer = UInt64(value, radix: 16) else {
+            return nil
+        }
+
+        let red: UInt64
+        let green: UInt64
+        let blue: UInt64
+        let alpha: UInt64
+        if value.count == 8 {
+            alpha = (integer >> 24) & 0xff
+            red = (integer >> 16) & 0xff
+            green = (integer >> 8) & 0xff
+            blue = integer & 0xff
+        } else {
+            alpha = 0xff
+            red = (integer >> 16) & 0xff
+            green = (integer >> 8) & 0xff
+            blue = integer & 0xff
+        }
+
+        self.init(
+            red: Double(red) / 255.0,
+            green: Double(green) / 255.0,
+            blue: Double(blue) / 255.0,
+            opacity: Double(alpha) / 255.0
+        )
+    }
 }
 
 private extension WindowDialogHost {

@@ -1,12 +1,17 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -18,6 +23,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.DialogDef
 import com.viant.forgeandroid.runtime.DialogState
@@ -62,9 +69,9 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                 }
                 LaunchedEffect(dialogId, state.args) {
                     if (dsContext != null && state.args.isNotEmpty()) {
-                        val scoped = dialogDataSourceRef?.let {
-                            JsonUtil.asStringMap(state.args[it]).takeIf { value -> value.isNotEmpty() }
-                        } ?: state.args
+                        val scoped = JsonUtil.asStringMap(state.args[dialogDataSourceRef])
+                            .takeIf { value -> value.isNotEmpty() }
+                            ?: state.args
                         dsContext.setInputParameters(scoped, fetch = true)
                     }
                 }
@@ -75,7 +82,12 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                 }
                 AlertDialog(
                     onDismissRequest = { runtime.closeDialogPublic(window.windowId, dialogId) },
-                    title = { Text(dialog.title ?: dialogId) },
+                    title = {
+                        DialogTitle(
+                            title = dialog.title ?: dialogId,
+                            style = dialog.style
+                        )
+                    },
                     text = {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             if (quickFilters.isNotEmpty()) {
@@ -177,6 +189,68 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun DialogTitle(title: String, style: Map<String, String>) {
+    val headerBackground = dialogStyleColor(
+        style,
+        "headerBackgroundColor",
+        "headerBackground",
+        "titleBackgroundColor"
+    )
+    val headerText = dialogStyleColor(
+        style,
+        "headerTextColor",
+        "headerColor",
+        "titleColor"
+    ) ?: if (headerBackground != null) Color.White else MaterialTheme.colorScheme.onSurface
+
+    if (headerBackground == null) {
+        Text(title)
+        return
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(headerBackground, RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = title,
+            color = headerText,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+private fun dialogStyleColor(style: Map<String, String>, vararg keys: String): Color? {
+    keys.forEach { key ->
+        style[key]?.trim()?.takeIf { it.isNotEmpty() }?.let { raw ->
+            parseHexColor(raw)?.let { return it }
+        }
+    }
+    return null
+}
+
+private fun parseHexColor(raw: String): Color? {
+    val value = raw.trim().removePrefix("#")
+    if (value.length != 6 && value.length != 8) return null
+    val parsed = value.toLongOrNull(16) ?: return null
+    return if (value.length == 8) {
+        val alpha = ((parsed shr 24) and 0xff).toInt()
+        val red = ((parsed shr 16) and 0xff).toInt()
+        val green = ((parsed shr 8) and 0xff).toInt()
+        val blue = (parsed and 0xff).toInt()
+        Color(red, green, blue, alpha)
+    } else {
+        val red = ((parsed shr 16) and 0xff).toInt()
+        val green = ((parsed shr 8) and 0xff).toInt()
+        val blue = (parsed and 0xff).toInt()
+        Color(red, green, blue)
     }
 }
 

@@ -2,6 +2,7 @@ package com.viant.forgeandroid.ui
 
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -33,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -131,6 +136,19 @@ private data class AggregatedRow(
     val values: Map<String, Any?>
 )
 
+private data class DynamicFamilyOption(
+    val key: String,
+    val label: String,
+    val includeFilter: ReportBuilderDynamicFilterDef? = null,
+    val excludeFilter: ReportBuilderDynamicFilterDef? = null
+)
+
+private data class DynamicFamilyRow(
+    val row: ReportBuilderDynamicRowState,
+    val direction: String,
+    val optionKey: String
+)
+
 @Composable
 fun ReportBuilderRenderer(
     runtime: ForgeRuntime,
@@ -170,7 +188,6 @@ fun ReportBuilderRenderer(
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
     val hookState = remember(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
         currentReportBuilderHookState(
-            config = config,
             selectedMeasures = selectedMeasures,
             selectedDimensions = selectedDimensions,
             chartSpec = chartSpec,
@@ -319,6 +336,7 @@ fun ReportBuilderRenderer(
             DynamicFilterBridgeSection(
                 groups = config.dynamicFilterGroups,
                 families = config.dynamicFilterFamilies,
+                unifiedFamilyRows = config.unifiedFamilyRows,
                 rowsByGroupId = dynamicGroups,
                 drafts = dynamicFilterDrafts,
                 isLookupAvailable = { groupId, filter ->
@@ -360,6 +378,24 @@ fun ReportBuilderRenderer(
                         put(groupId, this[groupId].orEmpty().filterNot { it.id == rowId })
                     }
                     dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
+                },
+                onMoveRow = { fromGroupId, rowId, toGroupId, filterId, resetSelections ->
+                    val row = dynamicGroups[fromGroupId].orEmpty().firstOrNull { it.id == rowId }
+                    if (row != null) {
+                        dynamicGroups = dynamicGroups.toMutableMap().apply {
+                            put(fromGroupId, this[fromGroupId].orEmpty().filterNot { it.id == rowId })
+                            put(
+                                toGroupId,
+                                this[toGroupId].orEmpty() + row.copy(
+                                    filterId = filterId,
+                                    selections = if (resetSelections) emptyList() else row.selections
+                                )
+                            )
+                        }
+                        if (resetSelections) {
+                            dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
+                        }
+                    }
                 },
                 onDraftChange = { rowId, value ->
                     dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(rowId, value) }
@@ -470,6 +506,7 @@ fun ReportBuilderRenderer(
 private fun DynamicFilterBridgeSection(
     groups: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef>,
     families: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterFamilyDef>,
+    unifiedFamilyRows: Boolean,
     rowsByGroupId: Map<String, List<ReportBuilderDynamicRowState>>,
     drafts: Map<String, String>,
     isLookupAvailable: (String, ReportBuilderDynamicFilterDef) -> Boolean,
@@ -477,6 +514,7 @@ private fun DynamicFilterBridgeSection(
     onChangeFilter: (String, String, String) -> Unit,
     onToggleEnabled: (String, String) -> Unit,
     onRemoveRow: (String, String) -> Unit,
+    onMoveRow: (String, String, String, String, Boolean) -> Unit,
     onDraftChange: (String, String) -> Unit,
     onAddManualSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit,
     onRemoveSelection: (String, String, ReportBuilderDynamicSelectionState) -> Unit,
@@ -502,6 +540,7 @@ private fun DynamicFilterBridgeSection(
                     DynamicFilterFamilyCard(
                         family = family,
                         groups = groups,
+                        unifiedFamilyRows = unifiedFamilyRows,
                         rowsByGroupId = rowsByGroupId,
                         drafts = drafts,
                         isLookupAvailable = isLookupAvailable,
@@ -509,6 +548,7 @@ private fun DynamicFilterBridgeSection(
                         onChangeFilter = onChangeFilter,
                         onToggleEnabled = onToggleEnabled,
                         onRemoveRow = onRemoveRow,
+                        onMoveRow = onMoveRow,
                         onDraftChange = onDraftChange,
                         onAddManualSelection = onAddManualSelection,
                         onRemoveSelection = onRemoveSelection,
@@ -543,6 +583,7 @@ private fun DynamicFilterBridgeSection(
 private fun DynamicFilterFamilyCard(
     family: com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterFamilyDef,
     groups: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef>,
+    unifiedFamilyRows: Boolean,
     rowsByGroupId: Map<String, List<ReportBuilderDynamicRowState>>,
     drafts: Map<String, String>,
     isLookupAvailable: (String, ReportBuilderDynamicFilterDef) -> Boolean,
@@ -550,11 +591,31 @@ private fun DynamicFilterFamilyCard(
     onChangeFilter: (String, String, String) -> Unit,
     onToggleEnabled: (String, String) -> Unit,
     onRemoveRow: (String, String) -> Unit,
+    onMoveRow: (String, String, String, String, Boolean) -> Unit,
     onDraftChange: (String, String) -> Unit,
     onAddManualSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit,
     onRemoveSelection: (String, String, ReportBuilderDynamicSelectionState) -> Unit,
     onPickSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit
 ) {
+    if (unifiedFamilyRows) {
+        DynamicFilterUnifiedFamilyCard(
+            family = family,
+            groups = groups,
+            rowsByGroupId = rowsByGroupId,
+            drafts = drafts,
+            isLookupAvailable = isLookupAvailable,
+            onAddRow = onAddRow,
+            onChangeFilter = onChangeFilter,
+            onToggleEnabled = onToggleEnabled,
+            onRemoveRow = onRemoveRow,
+            onMoveRow = onMoveRow,
+            onDraftChange = onDraftChange,
+            onAddManualSelection = onAddManualSelection,
+            onRemoveSelection = onRemoveSelection,
+            onPickSelection = onPickSelection
+        )
+        return
+    }
     val includeFilters = groups.flatMap { it.filters }.filter { family.includeFilterIds.contains(it.id) }
     val excludeFilters = groups.flatMap { it.filters }.filter { family.excludeFilterIds.contains(it.id) }
     Card(
@@ -577,6 +638,306 @@ private fun DynamicFilterFamilyCard(
             }
         }
     }
+}
+
+@Composable
+private fun DynamicFilterUnifiedFamilyCard(
+    family: com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterFamilyDef,
+    groups: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef>,
+    rowsByGroupId: Map<String, List<ReportBuilderDynamicRowState>>,
+    drafts: Map<String, String>,
+    isLookupAvailable: (String, ReportBuilderDynamicFilterDef) -> Boolean,
+    onAddRow: (String, String) -> Unit,
+    onChangeFilter: (String, String, String) -> Unit,
+    onToggleEnabled: (String, String) -> Unit,
+    onRemoveRow: (String, String) -> Unit,
+    onMoveRow: (String, String, String, String, Boolean) -> Unit,
+    onDraftChange: (String, String) -> Unit,
+    onAddManualSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit,
+    onRemoveSelection: (String, String, ReportBuilderDynamicSelectionState) -> Unit,
+    onPickSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit
+) {
+    val options = remember(family, groups) { dynamicFamilyOptions(family, groups) }
+    val rows = remember(family, rowsByGroupId, options) { dynamicFamilyRows(family, rowsByGroupId, options) }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(family.label ?: family.id ?: "Family", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    family.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6A7280))
+                    }
+                }
+                val firstOption = options.firstOrNull()
+                val firstFilter = firstOption?.includeFilter ?: firstOption?.excludeFilter
+                if (firstOption != null && firstFilter?.id?.isNotBlank() == true) {
+                    OutlinedButton(
+                        onClick = {
+                            onAddRow(
+                                if (firstOption.includeFilter == null) "exclude" else "include",
+                                firstFilter.id.orEmpty()
+                            )
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFFF6F9FF),
+                            contentColor = Color(0xFF263F72)
+                        )
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Add line")
+                    }
+                }
+            }
+            rows.forEach { item ->
+                DynamicFilterUnifiedFamilyRow(
+                    item = item,
+                    options = options,
+                    drafts = drafts,
+                    isLookupAvailable = isLookupAvailable,
+                    onChangeFilter = onChangeFilter,
+                    onToggleEnabled = onToggleEnabled,
+                    onRemoveRow = onRemoveRow,
+                    onMoveRow = onMoveRow,
+                    onDraftChange = onDraftChange,
+                    onAddManualSelection = onAddManualSelection,
+                    onRemoveSelection = onRemoveSelection,
+                    onPickSelection = onPickSelection
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DynamicFilterUnifiedFamilyRow(
+    item: DynamicFamilyRow,
+    options: List<DynamicFamilyOption>,
+    drafts: Map<String, String>,
+    isLookupAvailable: (String, ReportBuilderDynamicFilterDef) -> Boolean,
+    onChangeFilter: (String, String, String) -> Unit,
+    onToggleEnabled: (String, String) -> Unit,
+    onRemoveRow: (String, String) -> Unit,
+    onMoveRow: (String, String, String, String, Boolean) -> Unit,
+    onDraftChange: (String, String) -> Unit,
+    onAddManualSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit,
+    onRemoveSelection: (String, String, ReportBuilderDynamicSelectionState) -> Unit,
+    onPickSelection: (String, String, ReportBuilderDynamicFilterDef) -> Unit
+) {
+    val option = options.firstOrNull { it.key == item.optionKey } ?: options.firstOrNull() ?: return
+    val filter = if (item.direction == "exclude") {
+        option.excludeFilter ?: option.includeFilter
+    } else {
+        option.includeFilter ?: option.excludeFilter
+    } ?: return
+    var optionMenuExpanded by remember(item.row.id, options) { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(12.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box {
+                OutlinedButton(
+                    onClick = { optionMenuExpanded = true },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFFF6F9FF),
+                        contentColor = Color(0xFF30404D)
+                    )
+                ) {
+                    Text(option.label)
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+                }
+                DropdownMenu(expanded = optionMenuExpanded, onDismissRequest = { optionMenuExpanded = false }) {
+                    options.forEach { candidate ->
+                        DropdownMenuItem(
+                            text = { Text(candidate.label) },
+                            onClick = {
+                                optionMenuExpanded = false
+                                changeDynamicFamilyOption(
+                                    row = item.row,
+                                    currentDirection = item.direction,
+                                    option = candidate,
+                                    onChangeFilter = onChangeFilter,
+                                    onMoveRow = onMoveRow
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                DynamicFamilyDirectionChip(
+                    label = "Include",
+                    selected = item.direction == "include",
+                    enabled = option.includeFilter != null,
+                    onClick = {
+                        moveDynamicFamilyRow(
+                            row = item.row,
+                            currentDirection = item.direction,
+                            nextDirection = "include",
+                            option = option,
+                            resetSelections = false,
+                            onMoveRow = onMoveRow
+                        )
+                    }
+                )
+                DynamicFamilyDirectionChip(
+                    label = "Exclude",
+                    selected = item.direction == "exclude",
+                    enabled = option.excludeFilter != null,
+                    onClick = {
+                        moveDynamicFamilyRow(
+                            row = item.row,
+                            currentDirection = item.direction,
+                            nextDirection = "exclude",
+                            option = option,
+                            resetSelections = false,
+                            onMoveRow = onMoveRow
+                        )
+                    }
+                )
+            }
+        }
+        LookupSelectionControl(
+            selections = item.row.selections,
+            draft = drafts[item.row.id].orEmpty(),
+            placeholder = filter.manualPlaceholder ?: filter.label ?: "Enter value",
+            manualEntry = filter.manualEntry == true,
+            lookupAvailable = isLookupAvailable(item.direction, filter),
+            enabled = item.row.enabled,
+            onDraftChange = { next -> onDraftChange(item.row.id, next) },
+            onCommitManual = { onAddManualSelection(item.direction, item.row.id, filter) },
+            onPick = { onPickSelection(item.direction, item.row.id, filter) },
+            onRemoveSelection = { selection -> onRemoveSelection(item.direction, item.row.id, selection) }
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { onToggleEnabled(item.direction, item.row.id) }) {
+                Text(if (item.row.enabled) "On" else "Off")
+            }
+            OutlinedButton(onClick = { onRemoveRow(item.direction, item.row.id) }) {
+                Icon(Icons.Filled.Delete, contentDescription = null)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DynamicFamilyDirectionChip(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    FilterChip(
+        selected = selected,
+        enabled = enabled,
+        onClick = onClick,
+        label = { Text(label) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = Color(0xFF2F6DE1),
+            selectedLabelColor = Color.White
+        )
+    )
+}
+
+private fun dynamicFamilyOptions(
+    family: com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterFamilyDef,
+    groups: List<com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef>
+): List<DynamicFamilyOption> {
+    val includeById = groups.firstOrNull { it.id == "include" }?.filters.orEmpty().associateBy { it.id.orEmpty() }
+    val excludeById = groups.firstOrNull { it.id == "exclude" }?.filters.orEmpty().associateBy { it.id.orEmpty() }
+    val options = linkedMapOf<String, DynamicFamilyOption>()
+
+    fun register(direction: String, filterId: String, index: Int) {
+        val filter = if (direction == "include") includeById[filterId] else excludeById[filterId]
+        if (filter == null) return
+        val key = filter.targetingFeatureKey?.trim()?.takeIf { it.isNotBlank() } ?: "pair:$index"
+        val existing = options[key] ?: DynamicFamilyOption(
+            key = key,
+            label = filter.label ?: key
+        )
+        options[key] = if (direction == "include") {
+            existing.copy(includeFilter = filter)
+        } else {
+            existing.copy(excludeFilter = filter)
+        }
+    }
+
+    family.includeFilterIds.forEachIndexed { index, filterId -> register("include", filterId, index) }
+    family.excludeFilterIds.forEachIndexed { index, filterId -> register("exclude", filterId, index) }
+    return options.values.toList()
+}
+
+private fun dynamicFamilyRows(
+    family: com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterFamilyDef,
+    rowsByGroupId: Map<String, List<ReportBuilderDynamicRowState>>,
+    options: List<DynamicFamilyOption>
+): List<DynamicFamilyRow> {
+    val includeIds = family.includeFilterIds.toSet()
+    val excludeIds = family.excludeFilterIds.toSet()
+    val includeRows = rowsByGroupId["include"].orEmpty()
+        .filter { includeIds.contains(it.filterId) }
+        .map { row ->
+            DynamicFamilyRow(
+                row = row,
+                direction = "include",
+                optionKey = options.firstOrNull { it.includeFilter?.id == row.filterId }?.key.orEmpty()
+            )
+        }
+    val excludeRows = rowsByGroupId["exclude"].orEmpty()
+        .filter { excludeIds.contains(it.filterId) }
+        .map { row ->
+            DynamicFamilyRow(
+                row = row,
+                direction = "exclude",
+                optionKey = options.firstOrNull { it.excludeFilter?.id == row.filterId }?.key.orEmpty()
+            )
+        }
+    return includeRows + excludeRows
+}
+
+private fun changeDynamicFamilyOption(
+    row: ReportBuilderDynamicRowState,
+    currentDirection: String,
+    option: DynamicFamilyOption,
+    onChangeFilter: (String, String, String) -> Unit,
+    onMoveRow: (String, String, String, String, Boolean) -> Unit
+) {
+    val targetDirection = if (currentDirection == "include") {
+        if (option.includeFilter != null) "include" else "exclude"
+    } else {
+        if (option.excludeFilter != null) "exclude" else "include"
+    }
+    val targetFilter = if (targetDirection == "include") option.includeFilter else option.excludeFilter
+    val filterId = targetFilter?.id?.takeIf { it.isNotBlank() } ?: return
+    if (targetDirection == currentDirection) {
+        onChangeFilter(currentDirection, row.id, filterId)
+    } else {
+        onMoveRow(currentDirection, row.id, targetDirection, filterId, true)
+    }
+}
+
+private fun moveDynamicFamilyRow(
+    row: ReportBuilderDynamicRowState,
+    currentDirection: String,
+    nextDirection: String,
+    option: DynamicFamilyOption,
+    resetSelections: Boolean,
+    onMoveRow: (String, String, String, String, Boolean) -> Unit
+) {
+    if (currentDirection == nextDirection) return
+    val targetFilter = if (nextDirection == "include") option.includeFilter else option.excludeFilter
+    val filterId = targetFilter?.id?.takeIf { it.isNotBlank() } ?: return
+    onMoveRow(currentDirection, row.id, nextDirection, filterId, resetSelections)
 }
 
 @Composable
@@ -704,13 +1065,26 @@ private fun LookupSelectionControl(
                         placeholder = { Text(placeholder) },
                         singleLine = true,
                         enabled = enabled,
-                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color(0xFFEEF8F1),
+                            unfocusedContainerColor = Color(0xFFEEF8F1),
+                            disabledContainerColor = Color(0xFFE8F0EA),
+                            focusedBorderColor = Color(0xFFCFE0F0),
+                            unfocusedBorderColor = Color(0xFFCFE0F0)
+                        )
                     )
                 } else {
                     OutlinedButton(
                         onClick = onPick,
                         enabled = enabled && lookupAvailable,
-                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFFEEF8F1),
+                            contentColor = Color(0xFF1F3B2B),
+                            disabledContainerColor = Color(0xFFE8F0EA),
+                            disabledContentColor = Color(0xFF6A8273)
+                        )
                     ) {
                         Text(placeholder)
                     }
@@ -721,7 +1095,13 @@ private fun LookupSelectionControl(
                     },
                     enabled = enabled && (lookupAvailable || draft.isNotBlank()),
                     modifier = Modifier.height(56.dp).width(44.dp),
-                    shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 28.dp, bottomEnd = 28.dp)
+                    shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 28.dp, bottomEnd = 28.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF187A4F),
+                        contentColor = Color.White,
+                        disabledContainerColor = Color(0xFF8FB7A0),
+                        disabledContentColor = Color.White
+                    )
                 ) {
                     Icon(if (lookupAvailable) Icons.Filled.ArrowDropDown else Icons.Filled.Add, contentDescription = null)
                 }
@@ -750,23 +1130,19 @@ private fun StaticFilterSection(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedTextField(
+                        DateRangeInput(
                             value = current["start"]?.toString().orEmpty(),
                             onValueChange = { next ->
                                 onChange(key, mapOf("start" to next, "end" to current["end"]?.toString().orEmpty()))
                             },
-                            modifier = Modifier.width(136.dp),
-                            label = { Text("Start") },
-                            singleLine = true
+                            placeholder = "Start"
                         )
-                        OutlinedTextField(
+                        DateRangeInput(
                             value = current["end"]?.toString().orEmpty(),
                             onValueChange = { next ->
                                 onChange(key, mapOf("start" to current["start"]?.toString().orEmpty(), "end" to next))
                             },
-                            modifier = Modifier.width(136.dp),
-                            label = { Text("End") },
-                            singleLine = true
+                            placeholder = "End"
                         )
                     }
                 } else {
@@ -909,6 +1285,41 @@ private fun BreakdownSection(
             }
         }
     }
+}
+
+@Composable
+private fun DateRangeInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String
+) {
+    val shape = RoundedCornerShape(10.dp)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = Color(0xFF1F3B2B),
+            fontWeight = FontWeight.Medium
+        ),
+        modifier = Modifier
+            .width(124.dp)
+            .background(Color(0xFFEEF8F1), shape)
+            .border(1.dp, Color(0xFFC7E0D0), shape)
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        decorationBox = { innerTextField ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF6A8273)
+                    )
+                }
+                innerTextField()
+            }
+        }
+    )
 }
 
 @Composable
@@ -1298,7 +1709,6 @@ private fun projectManualDynamicSelection(
 }
 
 private fun currentReportBuilderHookState(
-    config: com.viant.forgeandroid.runtime.DashboardReportBuilderDef,
     selectedMeasures: List<String>,
     selectedDimensions: List<String>,
     chartSpec: ReportBuilderChartSpecDef?,

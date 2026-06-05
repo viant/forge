@@ -29,6 +29,8 @@ id: reportBuilder
 title: Report Builder
 dataSourceRef: report_source
 reportBuilder:
+  unifiedFamilyRows: true
+
   measures:
     - id: metricA
       key: metricA
@@ -94,9 +96,8 @@ reportBuilder:
         end: "2026-04-30"
 
   dynamicFilterGroups:
-    - id: entities
-      label: Entities
-      description: Add one lookup-backed scope line at a time.
+    - id: include
+      label: Include
       filters:
         - id: entityId
           label: Entity
@@ -112,6 +113,29 @@ reportBuilder:
           multiple: true
           valueSelector: groupId
           labelSelector: groupName
+    - id: exclude
+      label: Exclude
+      filters:
+        - id: excludeEntityId
+          label: Entity
+          dialogId: entityPicker
+          paramPath: filters.excludeEntityIds
+          multiple: true
+          valueSelector: entityId
+          labelSelector: entityName
+        - id: excludeGroupIds
+          label: Group
+          dialogId: groupPicker
+          paramPath: filters.excludeGroupIds
+          multiple: true
+          valueSelector: groupId
+          labelSelector: groupName
+
+  dynamicFilterFamilies:
+    - id: entities
+      label: Entities
+      includeFilterIds: [entityId, groupIds]
+      excludeFilterIds: [excludeEntityId, excludeGroupIds]
 
   result:
     chartCreationMode: explicit
@@ -163,9 +187,14 @@ reportBuilder:
 - datasource-backed option lists support both flat and tree-shaped collections
   through `optionChildKeys`
 - dynamic filters are grouped by category and added one line at a time
+- `unifiedFamilyRows: true` renders configured `dynamicFilterFamilies` as one
+  family card with per-row include/exclude direction, instead of split group
+  sections
 - each dynamic line can open an existing Forge dialog chosen by the host app
 - dynamic and static filter option sources can be flat or tree-backed
 - dynamic lines can use `dialogId` directly or a nested `lookup.dialogId`
+- dialogs can opt into a styled mobile header with `style.headerBackgroundColor`
+  and `style.headerTextColor` hex values
 - ordering is limited to predefined config entries rather than arbitrary
   user-entered column names
 - pagination is explicit through `limit` / `offset` request values
