@@ -57,6 +57,7 @@ import com.viant.forgeandroid.runtime.ChartDef
 import com.viant.forgeandroid.runtime.ChartSeriesDef
 import com.viant.forgeandroid.runtime.ChartValueOption
 import com.viant.forgeandroid.runtime.ContainerDef
+import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.JsonUtil
@@ -68,6 +69,7 @@ import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef
 import com.viant.forgeandroid.runtime.ReportBuilderMeasureDef
 import com.viant.forgeandroid.runtime.ReportBuilderStaticFilterDef
 import com.viant.forgeandroid.runtime.SelectorUtil
+import com.viant.forgeandroid.runtime.WindowMetadata
 import com.viant.forgeandroid.runtime.invokeReportBuilderHook
 import com.viant.forgeandroid.runtime.lookupReportBuilderDescriptor
 import com.viant.forgeandroid.runtime.setWindowFormValue
@@ -125,6 +127,16 @@ internal data class ReportBuilderDynamicRowState(
     val selections: List<ReportBuilderDynamicSelectionState> = emptyList()
 )
 
+internal data class ReportBuilderStateValues(
+    val selectedMeasures: List<String>,
+    val selectedDimensions: List<String>,
+    val chartSpec: ReportBuilderChartSpecDef?,
+    val viewMode: String,
+    val staticFilters: Map<String, Any?>,
+    val dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>,
+    val dynamicFilterDrafts: Map<String, String> = emptyMap()
+)
+
 @Serializable
 internal sealed class StoredStaticFilterValue {
     @Serializable
@@ -175,6 +187,8 @@ fun ReportBuilderRenderer(
     LaunchedEffect(dataSourceRef) {
         context.fetchCollection()
     }
+    val windowFormSignal = window.windowFormSignal()
+    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
 
     val visibleMeasures = remember(config) { config.measures.filter { it.hidden != true } }
     val visibleDimensions = remember(config) { config.dimensions.filter { it.hidden != true } }
@@ -186,17 +200,32 @@ fun ReportBuilderRenderer(
     var staticFilters by remember(config) { mutableStateOf(defaultStaticFilters(config.staticFilters)) }
     var dynamicGroups by remember(config) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicRowState>>()) }
     var dynamicFilterDrafts by remember(config) { mutableStateOf(emptyMap<String, String>()) }
+    var restoredStoredState by remember(config, window.windowId) { mutableStateOf(false) }
+    var appliedPrefillSignature by remember(config, window.windowId) { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
-    val hookState = remember(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
-        currentReportBuilderHookState(
+    val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
+        ReportBuilderStateValues(
             selectedMeasures = selectedMeasures,
             selectedDimensions = selectedDimensions,
             chartSpec = chartSpec,
             viewMode = viewMode,
             staticFilters = staticFilters,
-            dynamicGroups = dynamicGroups
+            dynamicGroups = dynamicGroups,
+            dynamicFilterDrafts = dynamicFilterDrafts
         )
+    }
+    fun applyStateValues(values: ReportBuilderStateValues) {
+        selectedMeasures = values.selectedMeasures
+        selectedDimensions = values.selectedDimensions
+        chartSpec = values.chartSpec
+        viewMode = values.viewMode
+        staticFilters = values.staticFilters
+        dynamicGroups = values.dynamicGroups
+        dynamicFilterDrafts = values.dynamicFilterDrafts
+    }
+    val hookState = remember(config, stateValues) {
+        currentReportBuilderHookState(stateValues)
     }
     var requestPayload by remember { mutableStateOf<Map<String, Any?>>(emptyMap()) }
     var lookupDescriptors by remember(config) { mutableStateOf<Map<String, ReportBuilderLookupDescriptor>>(emptyMap()) }
@@ -231,7 +260,7 @@ fun ReportBuilderRenderer(
     var storedPresets by remember(settingsHash, container.id) {
         mutableStateOf(loadStoredPresets(preferences, container.id ?: "reportBuilder").filter { it.settingsHash == settingsHash })
     }
-    var restoredStoredState by remember { mutableStateOf(false) }
+    val currentPrefillSignature = remember(windowForm) { reportBuilderPrefillSignature(windowForm) }
 
     val filteredRows = remember(rows, staticFilters, config.staticFilters) {
         applyStaticFilters(rows, config.staticFilters, staticFilters)
@@ -248,18 +277,49 @@ fun ReportBuilderRenderer(
         buildChartDef(aggregatedRows, currentChartSpec)
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(config, window.windowId, builderStateKey) {
         if (!restoredStoredState) {
-            loadStoredStateFromWindowForm(runtime, window.windowId, builderStateKey)?.let { state ->
-                selectedMeasures = state.selectedMeasures
-                selectedDimensions = state.selectedDimensions
-                chartSpec = state.chartSpec
-                viewMode = state.viewMode
-                staticFilters = state.staticFilters.mapValues { it.value.toRuntimeValue() }
-                dynamicGroups = migratedDynamicGroups(config, state)
-                dynamicFilterDrafts = state.dynamicFilterDrafts
+            val restored = loadStoredStateFromWindowForm(runtime, window.windowId, builderStateKey)
+            val initialValues = restored?.toReportBuilderStateValues(config) ?: stateValues
+            val initialized = withContext(Dispatchers.Default) {
+                applyReportBuilderInitializeStateHook(
+                    metadata = window.metadata.peek(),
+                    config = config,
+                    values = initialValues,
+                    windowForm = windowForm
+                )
+            }
+            applyStateValues(initialized)
+            if (currentPrefillSignature.isNotBlank()) {
+                appliedPrefillSignature = currentPrefillSignature
+            }
+            if (restored == null || initialized != initialValues) {
+                persistStoredStateToWindowForm(
+                    runtime = runtime,
+                    windowId = window.windowId,
+                    stateKey = builderStateKey,
+                    state = initialized.toStoredReportBuilderState()
+                )
             }
             restoredStoredState = true
+        }
+    }
+
+    LaunchedEffect(currentPrefillSignature, restoredStoredState) {
+        if (!restoredStoredState || currentPrefillSignature.isBlank() || appliedPrefillSignature == currentPrefillSignature) {
+            return@LaunchedEffect
+        }
+        val next = withContext(Dispatchers.Default) {
+            applyReportBuilderInitializeStateHook(
+                metadata = window.metadata.peek(),
+                config = config,
+                values = stateValues,
+                windowForm = windowForm
+            )
+        }
+        appliedPrefillSignature = currentPrefillSignature
+        if (next != stateValues) {
+            applyStateValues(next)
         }
     }
 
@@ -269,31 +329,14 @@ fun ReportBuilderRenderer(
         }
     }
     LaunchedEffect(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
+        if (!restoredStoredState) {
+            return@LaunchedEffect
+        }
         persistStoredStateToWindowForm(
             runtime = runtime,
             windowId = window.windowId,
             stateKey = builderStateKey,
-            state = StoredReportBuilderState(
-                selectedMeasures = selectedMeasures,
-                selectedDimensions = selectedDimensions,
-                chartSpec = chartSpec,
-                viewMode = viewMode,
-                staticFilters = staticFilters.mapValues { runtime ->
-                    when (val value = runtime.value) {
-                        is List<*> -> StoredStaticFilterValue.ListValue(value.map { it.toString() })
-                        is Map<*, *> -> StoredStaticFilterValue.DateRangeValue(
-                            start = value["start"]?.toString().orEmpty(),
-                            end = value["end"]?.toString().orEmpty()
-                        )
-                        else -> StoredStaticFilterValue.ListValue(emptyList())
-                    }
-                },
-                dynamicGroups = dynamicGroups,
-                dynamicFilterDrafts = dynamicFilterDrafts,
-                dynamicFilterValues = legacyDynamicFilterValues(dynamicGroups),
-                dynamicFilterSelections = legacyDynamicFilterSelections(dynamicGroups),
-                activeDynamicFilterKeys = legacyActiveDynamicFilterKeys(dynamicGroups)
-            )
+            state = stateValues.toStoredReportBuilderState()
         )
     }
 
@@ -1717,23 +1760,164 @@ private fun projectManualDynamicSelection(
     )
 }
 
-private fun currentReportBuilderHookState(
-    selectedMeasures: List<String>,
-    selectedDimensions: List<String>,
-    chartSpec: ReportBuilderChartSpecDef?,
-    viewMode: String,
-    staticFilters: Map<String, Any?>,
-    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
-): Map<String, Any?> {
+internal fun applyReportBuilderInitializeStateHook(
+    metadata: WindowMetadata?,
+    config: DashboardReportBuilderDef,
+    values: ReportBuilderStateValues,
+    windowForm: Map<String, Any?>
+): ReportBuilderStateValues {
+    val hookName = config.hooks?.initializeState?.trim().orEmpty()
+    if (hookName.isBlank()) {
+        return values
+    }
+    val result = invokeReportBuilderHook(
+        metadata = metadata,
+        functionName = hookName,
+        props = JsonObject(
+            mapOf(
+                "state" to JsonUtil.anyToElement(currentReportBuilderHookState(values)),
+                "config" to JsonUtil.json.encodeToJsonElement(DashboardReportBuilderDef.serializer(), config),
+                "windowForm" to JsonUtil.anyToElement(windowForm)
+            )
+        )
+    ) ?: return values
+    return reportBuilderStateValuesFromHookResult(result, values)
+}
+
+internal fun reportBuilderPrefillSignature(windowForm: Map<String, Any?>): String {
+    val prefill = JsonUtil.asStringMap(windowForm["prefill"]).takeIf { it.isNotEmpty() } ?: return ""
+    val meta = JsonUtil.asStringMap(windowForm["__forge"])
+    val revision = when (val raw = meta["prefillRevision"]) {
+        is Number -> raw.toLong()
+        is String -> raw.trim().toLongOrNull() ?: 0L
+        else -> 0L
+    }
+    return JsonUtil.json.encodeToString(
+        JsonElement.serializer(),
+        JsonUtil.anyToElement(
+            linkedMapOf(
+                "revision" to revision,
+                "prefill" to prefill
+            )
+        )
+    )
+}
+
+private fun currentReportBuilderHookState(values: ReportBuilderStateValues): Map<String, Any?> {
     return linkedMapOf(
-        "selectedMeasures" to selectedMeasures,
-        "selectedDimensions" to selectedDimensions,
-        "chartSpec" to chartSpec,
-        "viewMode" to viewMode,
-        "staticFilters" to staticFilters,
-        "dynamicFilterValues" to legacyDynamicFilterValues(dynamicGroups),
-        "activeDynamicFilterKeys" to legacyActiveDynamicFilterKeys(dynamicGroups),
-        "dynamicGroups" to synthesizeDynamicGroups(dynamicGroups)
+        "selectedMeasures" to values.selectedMeasures,
+        "selectedDimensions" to values.selectedDimensions,
+        "chartSpec" to values.chartSpec?.let {
+            JsonUtil.elementToAny(JsonUtil.json.encodeToJsonElement(ReportBuilderChartSpecDef.serializer(), it))
+        },
+        "viewMode" to values.viewMode,
+        "staticFilters" to values.staticFilters,
+        "dynamicFilterValues" to legacyDynamicFilterValues(values.dynamicGroups),
+        "activeDynamicFilterKeys" to legacyActiveDynamicFilterKeys(values.dynamicGroups),
+        "dynamicGroups" to synthesizeDynamicGroups(values.dynamicGroups)
+    )
+}
+
+private fun reportBuilderStateValuesFromHookResult(
+    result: Map<String, Any?>,
+    fallback: ReportBuilderStateValues
+): ReportBuilderStateValues {
+    val dynamicGroups = if (result.containsKey("dynamicGroups")) {
+        decodeDynamicGroups(result["dynamicGroups"], fallback.dynamicGroups)
+    } else {
+        fallback.dynamicGroups
+    }
+    return fallback.copy(
+        selectedMeasures = result.stringListOrNull("selectedMeasures") ?: fallback.selectedMeasures,
+        selectedDimensions = result.stringListOrNull("selectedDimensions") ?: fallback.selectedDimensions,
+        chartSpec = if (result.containsKey("chartSpec")) {
+            decodeChartSpec(result["chartSpec"]) ?: fallback.chartSpec
+        } else {
+            fallback.chartSpec
+        },
+        viewMode = result["viewMode"]?.toString()?.takeIf { it.isNotBlank() } ?: fallback.viewMode,
+        staticFilters = if (result.containsKey("staticFilters")) {
+            JsonUtil.asStringMap(result["staticFilters"])
+        } else {
+            fallback.staticFilters
+        },
+        dynamicGroups = dynamicGroups,
+        dynamicFilterDrafts = if (result.containsKey("dynamicFilterDrafts")) {
+            JsonUtil.asStringMap(result["dynamicFilterDrafts"]).mapValues { (_, value) -> value?.toString().orEmpty() }
+        } else {
+            fallback.dynamicFilterDrafts
+        }
+    )
+}
+
+private fun Map<String, Any?>.stringListOrNull(key: String): List<String>? {
+    if (!containsKey(key)) {
+        return null
+    }
+    return when (val value = this[key]) {
+        is List<*> -> value.mapNotNull { it?.toString()?.takeIf { entry -> entry.isNotBlank() } }
+        else -> emptyList()
+    }
+}
+
+private fun decodeChartSpec(value: Any?): ReportBuilderChartSpecDef? {
+    if (value == null) {
+        return null
+    }
+    return runCatching {
+        JsonUtil.json.decodeFromJsonElement(
+            ReportBuilderChartSpecDef.serializer(),
+            JsonUtil.anyToElement(value)
+        )
+    }.getOrNull()
+}
+
+private fun decodeDynamicGroups(
+    value: Any?,
+    fallback: Map<String, List<ReportBuilderDynamicRowState>>
+): Map<String, List<ReportBuilderDynamicRowState>> {
+    return runCatching {
+        JsonUtil.json.decodeFromJsonElement<Map<String, List<ReportBuilderDynamicRowState>>>(
+            JsonUtil.anyToElement(value ?: emptyMap<String, Any?>())
+        )
+    }.getOrDefault(fallback)
+}
+
+private fun StoredReportBuilderState.toReportBuilderStateValues(
+    config: DashboardReportBuilderDef
+): ReportBuilderStateValues {
+    return ReportBuilderStateValues(
+        selectedMeasures = selectedMeasures,
+        selectedDimensions = selectedDimensions,
+        chartSpec = chartSpec,
+        viewMode = viewMode,
+        staticFilters = staticFilters.mapValues { it.value.toRuntimeValue() },
+        dynamicGroups = migratedDynamicGroups(config, this),
+        dynamicFilterDrafts = dynamicFilterDrafts
+    )
+}
+
+private fun ReportBuilderStateValues.toStoredReportBuilderState(): StoredReportBuilderState {
+    return StoredReportBuilderState(
+        selectedMeasures = selectedMeasures,
+        selectedDimensions = selectedDimensions,
+        chartSpec = chartSpec,
+        viewMode = viewMode,
+        staticFilters = staticFilters.mapValues { (_, value) ->
+            when (value) {
+                is List<*> -> StoredStaticFilterValue.ListValue(value.map { it.toString() })
+                is Map<*, *> -> StoredStaticFilterValue.DateRangeValue(
+                    start = value["start"]?.toString().orEmpty(),
+                    end = value["end"]?.toString().orEmpty()
+                )
+                else -> StoredStaticFilterValue.ListValue(emptyList())
+            }
+        },
+        dynamicGroups = dynamicGroups,
+        dynamicFilterDrafts = dynamicFilterDrafts,
+        dynamicFilterValues = legacyDynamicFilterValues(dynamicGroups),
+        dynamicFilterSelections = legacyDynamicFilterSelections(dynamicGroups),
+        activeDynamicFilterKeys = legacyActiveDynamicFilterKeys(dynamicGroups)
     )
 }
 
