@@ -14,12 +14,12 @@ class MetadataNormalizationTest {
         val raw = json.parseToJsonElement(
             """
             {
-              "namespace": "Forecasting",
+              "namespace": "Analytics",
               "view": {
                 "content": {
                   "id": "reportBuilderRoot",
                   "kind": "dashboard.reportBuilder",
-                  "title": "Forecasting builder"
+                  "title": "Analytics builder"
                 }
               }
             }
@@ -32,27 +32,27 @@ class MetadataNormalizationTest {
         assertNotNull(decoded.view)
         assertEquals(1, decoded.view?.content?.containers?.size)
         assertEquals("dashboard.reportBuilder", decoded.view?.content?.containers?.first()?.kind)
-        assertEquals("Forecasting builder", decoded.view?.content?.containers?.first()?.title)
+        assertEquals("Analytics builder", decoded.view?.content?.containers?.first()?.title)
     }
 
     @Test
-    fun `normalizeWindowMetadataJson preserves forecasting report builder shape`() {
+    fun `normalizeWindowMetadataJson preserves analytics report builder shape`() {
         val raw = json.parseToJsonElement(
             """
             {
-              "namespace": "Forecasting",
+              "namespace": "Analytics",
               "dataSource": {
-                "forecasting_cube_report": {
-                  "service": { "endpoint": "agentlyAPI", "uri": "/v1/api/datasources/forecasting_cube_report/fetch", "method": "POST" }
+                "analytics_cube_report": {
+                  "service": { "endpoint": "workspaceAPI", "uri": "/v1/api/datasources/analytics_cube_report/fetch", "method": "POST" }
                 }
               },
               "view": {
                 "content": {
                   "id": "reportBuilderRoot",
                   "kind": "dashboard.reportBuilder",
-                  "title": "Forecasting",
-                  "subtitle": "Build a normalized forecasting stack and review live inventory outputs.",
-                  "dataSourceRef": "forecasting_cube_report",
+                  "title": "Analytics",
+                  "subtitle": "Build a normalized analytics stack and review live inventory outputs.",
+                  "dataSourceRef": "analytics_cube_report",
                   "dashboard": {
                     "reportBuilder": {
                       "measures": [],
@@ -72,10 +72,10 @@ class MetadataNormalizationTest {
         val decoded = json.decodeFromJsonElement(WindowMetadata.serializer(), normalized)
 
         assertEquals(1, decoded.view?.content?.containers?.size)
-        assertEquals("forecasting_cube_report", decoded.view?.content?.containers?.first()?.dataSourceRef)
+        assertEquals("analytics_cube_report", decoded.view?.content?.containers?.first()?.dataSourceRef)
         assertEquals(true, decoded.view?.content?.containers?.first()?.dashboard?.reportBuilder != null)
         assertEquals(true, decoded.view?.content?.containers?.first()?.dashboard?.reportBuilder?.unifiedFamilyRows)
-        assertEquals(true, decoded.dataSources.containsKey("forecasting_cube_report"))
+        assertEquals(true, decoded.dataSources.containsKey("analytics_cube_report"))
     }
 
     @Test
@@ -83,12 +83,12 @@ class MetadataNormalizationTest {
         val raw = json.parseToJsonElement(
             """
             {
-              "namespace": "Order Summary",
+              "namespace": "Chart Overview",
               "view": {
                 "content": {
                   "containers": [
                     {
-                      "id": "orderMetrics",
+                      "id": "trendChart",
                       "kind": "chart",
                       "chart": {
                         "type": "line",
@@ -97,8 +97,8 @@ class MetadataNormalizationTest {
                         "xAxis": { "dataKey": "date" },
                         "series": {
                           "values": [
-                            { "name": "Spend", "value": "spend" },
-                            { "name": "Delivery", "value": "delivery" }
+                            { "name": "Primary", "value": "primary" },
+                            { "name": "Secondary", "value": "secondary" }
                           ]
                         }
                       }
@@ -124,18 +124,18 @@ class MetadataNormalizationTest {
         val raw = json.parseToJsonElement(
             """
             {
-              "namespace": "Order Summary",
+              "namespace": "Workspace Overview",
               "view": {
                 "content": {
-                  "id": "orderRoot",
+                  "id": "workspaceRoot",
                   "layout": {
                     "kind": "split",
                     "orientation": "horizontal",
                     "columns": 2
                   },
                   "containers": [
-                    { "id": "analysisPane", "title": "Order Metrics" },
-                    { "id": "summaryRail", "title": "Budget/Pacing" }
+                    { "id": "primaryPane", "title": "Primary Metrics" },
+                    { "id": "detailPane", "title": "Details" }
                   ]
                 }
               }
@@ -146,11 +146,11 @@ class MetadataNormalizationTest {
         val normalized = normalizeWindowMetadataJson(raw)
         val decoded = json.decodeFromJsonElement(WindowMetadata.serializer(), normalized)
 
-        assertEquals("orderRoot", decoded.view?.content?.id)
+        assertEquals("workspaceRoot", decoded.view?.content?.id)
         assertEquals("split", decoded.view?.content?.layout?.kind)
         assertEquals("horizontal", decoded.view?.content?.layout?.orientation)
         assertEquals(2, decoded.view?.content?.layout?.columns)
-        assertEquals(listOf("analysisPane", "summaryRail"), decoded.view?.content?.containers?.map { it.id })
+        assertEquals(listOf("primaryPane", "detailPane"), decoded.view?.content?.containers?.map { it.id })
     }
 
     @Test
@@ -158,12 +158,12 @@ class MetadataNormalizationTest {
         val raw = json.parseToJsonElement(
             """
             {
-              "namespace": "Order Summary",
+              "namespace": "Workspace Overview",
               "view": {
                 "content": {
                   "containers": [
                     {
-                      "id": "summaryRail",
+                      "id": "detailPane",
                       "layout": {
                         "kind": "grid",
                         "columns": 41,
@@ -171,9 +171,9 @@ class MetadataNormalizationTest {
                         "rowGap": "12px"
                       },
                       "containers": [
-                        { "id": "budgetSummary", "title": "Budget/Pacing", "columnSpan": 14 },
-                        { "id": "deliverySummary", "title": "Delivery", "columnSpan": 14 },
-                        { "id": "householdSummary", "title": "Household", "columnSpan": 13 }
+                        { "id": "statusSummary", "title": "Status", "columnSpan": 14 },
+                        { "id": "activitySummary", "title": "Activity", "columnSpan": 14 },
+                        { "id": "coverageSummary", "title": "Coverage", "columnSpan": 13 }
                       ]
                     }
                   ]
@@ -185,13 +185,13 @@ class MetadataNormalizationTest {
 
         val normalized = normalizeWindowMetadataJson(raw)
         val decoded = json.decodeFromJsonElement(WindowMetadata.serializer(), normalized)
-        val summaryRail = decoded.view?.content?.containers?.firstOrNull()
+        val detailPane = decoded.view?.content?.containers?.firstOrNull()
 
-        assertNotNull(summaryRail)
-        assertEquals("grid", summaryRail.layout?.kind)
-        assertEquals(41, summaryRail.layout?.columns)
-        assertEquals("12px", summaryRail.layout?.gap)
-        assertEquals("12px", summaryRail.layout?.rowGap)
-        assertEquals(listOf(14, 14, 13), summaryRail.containers.map { it.columnSpan })
+        assertNotNull(detailPane)
+        assertEquals("grid", detailPane.layout?.kind)
+        assertEquals(41, detailPane.layout?.columns)
+        assertEquals("12px", detailPane.layout?.gap)
+        assertEquals("12px", detailPane.layout?.rowGap)
+        assertEquals(listOf(14, 14, 13), detailPane.containers.map { it.columnSpan })
     }
 }

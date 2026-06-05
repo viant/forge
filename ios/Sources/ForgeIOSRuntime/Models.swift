@@ -874,6 +874,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
     public let dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef]
     public let dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef]
     public let unifiedFamilyRows: Bool
+    public let showResultHeader: Bool?
     public let result: ReportBuilderResultDef?
 
     enum CodingKeys: String, CodingKey {
@@ -884,6 +885,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         case dynamicFilterGroups
         case dynamicFilterFamilies
         case unifiedFamilyRows
+        case showResultHeader
         case result
     }
 
@@ -895,6 +897,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef] = [],
         dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef] = [],
         unifiedFamilyRows: Bool = false,
+        showResultHeader: Bool? = nil,
         result: ReportBuilderResultDef? = nil
     ) {
         self.hooks = hooks
@@ -904,6 +907,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         self.dynamicFilterGroups = dynamicFilterGroups
         self.dynamicFilterFamilies = dynamicFilterFamilies
         self.unifiedFamilyRows = unifiedFamilyRows
+        self.showResultHeader = showResultHeader
         self.result = result
     }
 
@@ -916,6 +920,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         dynamicFilterGroups = try container.decodeIfPresent([ReportBuilderDynamicFilterGroupDef].self, forKey: .dynamicFilterGroups) ?? []
         dynamicFilterFamilies = try container.decodeIfPresent([ReportBuilderDynamicFilterFamilyDef].self, forKey: .dynamicFilterFamilies) ?? []
         unifiedFamilyRows = try container.decodeIfPresent(Bool.self, forKey: .unifiedFamilyRows) ?? false
+        showResultHeader = try container.decodeIfPresent(Bool.self, forKey: .showResultHeader)
         result = try container.decodeIfPresent(ReportBuilderResultDef.self, forKey: .result)
     }
 }
@@ -992,6 +997,15 @@ public struct ReportBuilderResultDef: Codable, Sendable {
     public let chartWizard: ReportBuilderChartWizardDef?
     public let defaultChartSpecs: [ReportBuilderChartSpecDef]
 
+    enum CodingKeys: String, CodingKey {
+        case chartCreationMode
+        case defaultMode
+        case viewModes
+        case chartType
+        case chartWizard
+        case defaultChartSpecs
+    }
+
     public init(
         chartCreationMode: String? = nil,
         defaultMode: String? = nil,
@@ -1006,6 +1020,16 @@ public struct ReportBuilderResultDef: Codable, Sendable {
         self.chartType = chartType
         self.chartWizard = chartWizard
         self.defaultChartSpecs = defaultChartSpecs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        chartCreationMode = try container.decodeIfPresent(String.self, forKey: .chartCreationMode)
+        defaultMode = try container.decodeIfPresent(String.self, forKey: .defaultMode)
+        viewModes = try container.decodeIfPresent([String].self, forKey: .viewModes) ?? []
+        chartType = try container.decodeIfPresent(String.self, forKey: .chartType)
+        chartWizard = try container.decodeIfPresent(ReportBuilderChartWizardDef.self, forKey: .chartWizard)
+        defaultChartSpecs = try container.decodeIfPresent([ReportBuilderChartSpecDef].self, forKey: .defaultChartSpecs) ?? []
     }
 }
 
@@ -1097,6 +1121,33 @@ public struct ReportBuilderDynamicFilterGroupDef: Codable, Sendable, Identifiabl
     public let description: String?
     public let filters: [ReportBuilderDynamicFilterDef]
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case description
+        case filters
+    }
+
+    public init(
+        id: String? = nil,
+        label: String? = nil,
+        description: String? = nil,
+        filters: [ReportBuilderDynamicFilterDef] = []
+    ) {
+        self.id = id
+        self.label = label
+        self.description = description
+        self.filters = filters
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        filters = try container.decodeIfPresent([ReportBuilderDynamicFilterDef].self, forKey: .filters) ?? []
+    }
+
     public var identityKey: String { id ?? label ?? UUID().uuidString }
 }
 
@@ -1127,11 +1178,55 @@ public struct ReportBuilderDynamicFilterFamilyDef: Codable, Sendable, Identifiab
     public let includeFilterIds: [String]
     public let excludeFilterIds: [String]
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case description
+        case includeFilterIds
+        case excludeFilterIds
+    }
+
+    public init(
+        id: String? = nil,
+        label: String? = nil,
+        description: String? = nil,
+        includeFilterIds: [String] = [],
+        excludeFilterIds: [String] = []
+    ) {
+        self.id = id
+        self.label = label
+        self.description = description
+        self.includeFilterIds = includeFilterIds
+        self.excludeFilterIds = excludeFilterIds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        includeFilterIds = try container.decodeIfPresent([String].self, forKey: .includeFilterIds) ?? []
+        excludeFilterIds = try container.decodeIfPresent([String].self, forKey: .excludeFilterIds) ?? []
+    }
+
     public var identityKey: String { id ?? label ?? UUID().uuidString }
 }
 
 public struct ReportBuilderChartWizardDef: Codable, Sendable {
     public let supportedTypes: [String]
+
+    public init(supportedTypes: [String] = []) {
+        self.supportedTypes = supportedTypes
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case supportedTypes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        supportedTypes = try container.decodeIfPresent([String].self, forKey: .supportedTypes) ?? []
+    }
 }
 
 public struct ReportBuilderChartSpecDef: Codable, Sendable, Identifiable {
@@ -1140,6 +1235,14 @@ public struct ReportBuilderChartSpecDef: Codable, Sendable, Identifiable {
     public let xField: String?
     public let yFields: [String]
     public let seriesField: String?
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case type
+        case xField
+        case yFields
+        case seriesField
+    }
 
     public init(
         title: String? = nil,
@@ -1153,6 +1256,15 @@ public struct ReportBuilderChartSpecDef: Codable, Sendable, Identifiable {
         self.xField = xField
         self.yFields = yFields
         self.seriesField = seriesField
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        type = try container.decodeIfPresent(String.self, forKey: .type)
+        xField = try container.decodeIfPresent(String.self, forKey: .xField)
+        yFields = try container.decodeIfPresent([String].self, forKey: .yFields) ?? []
+        seriesField = try container.decodeIfPresent(String.self, forKey: .seriesField)
     }
 
     public var id: String { title ?? xField ?? UUID().uuidString }
@@ -1724,6 +1836,7 @@ public struct ChartDef: Codable, Sendable {
     public let valueKey: String?
     public let nameKey: String?
     public let series: [String]
+    public let seriesDef: ChartSeriesDef?
 
     enum CodingKeys: String, CodingKey {
         case kind
@@ -1751,7 +1864,8 @@ public struct ChartDef: Codable, Sendable {
         xKey: String? = nil,
         valueKey: String? = nil,
         nameKey: String? = nil,
-        series: [String] = []
+        series: [String] = [],
+        seriesDef: ChartSeriesDef? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -1763,7 +1877,8 @@ public struct ChartDef: Codable, Sendable {
         self.xKey = xKey
         self.valueKey = valueKey
         self.nameKey = nameKey
-        self.series = series
+        self.seriesDef = seriesDef
+        self.series = series.isEmpty ? seriesDef?.valueKeys ?? [] : series
     }
 
     public init(from decoder: Decoder) throws {
@@ -1789,6 +1904,7 @@ public struct ChartDef: Codable, Sendable {
         valueKey = legacyValueKey ?? normalizedSeries.valueKey ?? normalizedSeries.values.first
         nameKey = legacyNameKey ?? normalizedSeries.nameKey
         series = normalizedSeries.values
+        seriesDef = normalizedSeries.definition
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1803,23 +1919,40 @@ public struct ChartDef: Codable, Sendable {
         try container.encodeIfPresent(xKey, forKey: .xKey)
         try container.encodeIfPresent(valueKey, forKey: .valueKey)
         try container.encodeIfPresent(nameKey, forKey: .nameKey)
-        try container.encode(series, forKey: .series)
+        if let seriesDef {
+            try container.encode(seriesDef, forKey: .series)
+        } else {
+            try container.encode(series, forKey: .series)
+        }
     }
 
-    private static func normalizeSeries(from value: JSONValue?) -> (values: [String], valueKey: String?, nameKey: String?) {
+    private static func normalizeSeries(from value: JSONValue?) -> (
+        values: [String],
+        valueKey: String?,
+        nameKey: String?,
+        definition: ChartSeriesDef?
+    ) {
         switch value {
         case .array(let items):
             let values = items.compactMap(seriesKey(from:))
-            return (values, values.first, nil)
+            return (values, values.first, nil, nil)
         case .object(let object):
             let nameKey = nonEmpty(object["nameKey"]?.stringValue) ?? nonEmpty(object["key"]?.stringValue)
             let valueKey = nonEmpty(object["valueKey"]?.stringValue) ?? nonEmpty(object["value"]?.stringValue)
-            let values = object["values"]?.arrayValue?.compactMap(seriesKey(from:))
-                ?? valueKey.map { [$0] }
+            let palette = object["palette"]?.arrayValue?.compactMap { nonEmpty($0.stringValue) } ?? []
+            let options = object["values"]?.arrayValue?.compactMap(chartValueOption(from:))
+                ?? valueKey.map { [ChartValueOption(value: $0)] }
                 ?? []
-            return (values, valueKey ?? values.first, nameKey)
+            let values = options.compactMap(\.value)
+            let definition = ChartSeriesDef(
+                nameKey: nameKey,
+                valueKey: valueKey,
+                palette: palette,
+                values: options
+            )
+            return (values, valueKey ?? values.first, nameKey, definition)
         default:
-            return ([], nil, nil)
+            return ([], nil, nil, nil)
         }
     }
 
@@ -1836,12 +1969,61 @@ public struct ChartDef: Codable, Sendable {
             ?? nonEmpty(object["name"]?.stringValue)
     }
 
+    private static func chartValueOption(from value: JSONValue) -> ChartValueOption? {
+        if let raw = nonEmpty(value.stringValue) {
+            return ChartValueOption(value: raw)
+        }
+        guard let object = value.objectValue else {
+            return nil
+        }
+        guard let key = seriesKey(from: value) else {
+            return nil
+        }
+        return ChartValueOption(
+            name: nonEmpty(object["name"]?.stringValue) ?? nonEmpty(object["label"]?.stringValue),
+            value: key
+        )
+    }
+
     private static func nonEmpty(_ value: String?) -> String? {
         guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines),
               !trimmed.isEmpty else {
             return nil
         }
         return trimmed
+    }
+}
+
+public struct ChartSeriesDef: Codable, Sendable, Equatable {
+    public let nameKey: String?
+    public let valueKey: String?
+    public let palette: [String]
+    public let values: [ChartValueOption]
+
+    public var valueKeys: [String] {
+        values.compactMap(\.value)
+    }
+
+    public init(
+        nameKey: String? = nil,
+        valueKey: String? = nil,
+        palette: [String] = [],
+        values: [ChartValueOption] = []
+    ) {
+        self.nameKey = nameKey
+        self.valueKey = valueKey
+        self.palette = palette
+        self.values = values
+    }
+}
+
+public struct ChartValueOption: Codable, Sendable, Equatable {
+    public let name: String?
+    public let value: String?
+
+    public init(name: String? = nil, value: String? = nil) {
+        self.name = name
+        self.value = value
     }
 }
 

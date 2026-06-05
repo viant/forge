@@ -80,8 +80,8 @@ class ActionHookRuntimeTest {
     fun invokeResolvesNestedFunctionPath() = runBlocking {
         val code = """
             (() => ({
-              Forecasting: {
-                stewardForecastingBuilder: {
+              Analytics: {
+                reportBuilderHooks: {
                   resolveLookup: (props = {}) => ({
                     dialogId: "targetingTreePicker",
                     multiple: props.filterDef?.multiple === true
@@ -93,7 +93,7 @@ class ActionHookRuntimeTest {
 
         val result = ActionHookRuntime.invoke(
             code = code,
-            functionName = "Forecasting.stewardForecastingBuilder.resolveLookup",
+            functionName = "Analytics.reportBuilderHooks.resolveLookup",
             props = buildJsonObject {
                 put(
                     "filterDef",
@@ -117,7 +117,7 @@ class ActionHookRuntimeTest {
             """
             {
               "dataSources": {
-                "recommendation": {
+                "report": {
                   "selectionMode": "single"
                 }
               }
@@ -125,7 +125,7 @@ class ActionHookRuntimeTest {
             """.trimIndent()
         )
 
-        assertEquals("single", metadata.dataSources["recommendation"]?.selectionMode)
+        assertEquals("single", metadata.dataSources["report"]?.selectionMode)
     }
 
     @Test
@@ -135,21 +135,21 @@ class ActionHookRuntimeTest {
             scope = CoroutineScope(Dispatchers.Unconfined)
         )
         runtime.registerWindowMetadataLoader { key ->
-            assertEquals("recommendationList", key)
+            assertEquals("reportWindow", key)
             WindowMetadata(
                 view = ViewDef(
                     content = ContentDef(
-                        containers = listOf(ContainerDef(id = "recommendationRoot"))
+                        containers = listOf(ContainerDef(id = "reportRoot"))
                     )
                 )
             )
         }
 
-        val state = runtime.openWindow("recommendationList", "Recommendation Review")
+        val state = runtime.openWindow("reportWindow", "Report Review")
         delay(50)
         val metadata = runtime.metadataSignal(state.windowId).peek()
 
-        assertEquals("recommendationRoot", metadata?.view?.content?.containers?.firstOrNull()?.id)
+        assertEquals("reportRoot", metadata?.view?.content?.containers?.firstOrNull()?.id)
     }
 
     @Test
@@ -185,9 +185,9 @@ class ActionHookRuntimeTest {
                       "dashboard": {
                         "reportBuilder": {
                           "hooks": {
-                            "initializeState": "Forecasting.stewardForecastingBuilder.initializeState",
-                            "buildRequest": "Forecasting.stewardForecastingBuilder.buildRequest",
-                            "resolveLookup": "Forecasting.stewardForecastingBuilder.resolveLookup"
+                            "initializeState": "Analytics.reportBuilderHooks.initializeState",
+                            "buildRequest": "Analytics.reportBuilderHooks.buildRequest",
+                            "resolveLookup": "Analytics.reportBuilderHooks.resolveLookup"
                           }
                         }
                       }
@@ -200,23 +200,23 @@ class ActionHookRuntimeTest {
         )
 
         val hooks = metadata.view?.content?.containers?.firstOrNull()?.dashboard?.reportBuilder?.hooks
-        assertEquals("Forecasting.stewardForecastingBuilder.initializeState", hooks?.initializeState)
-        assertEquals("Forecasting.stewardForecastingBuilder.buildRequest", hooks?.buildRequest)
-        assertEquals("Forecasting.stewardForecastingBuilder.resolveLookup", hooks?.resolveLookup)
+        assertEquals("Analytics.reportBuilderHooks.initializeState", hooks?.initializeState)
+        assertEquals("Analytics.reportBuilderHooks.buildRequest", hooks?.buildRequest)
+        assertEquals("Analytics.reportBuilderHooks.resolveLookup", hooks?.resolveLookup)
     }
 
     @Test
     fun lookupReportBuilderDescriptorUsesHookAndNamespace() {
         val metadata = WindowMetadata(
-            namespace = "Forecasting",
+            namespace = "Analytics",
             dialogs = listOf(
                 DialogDef(id = "targetingTreePicker", title = "Select Targeting Option")
             ),
             actions = ActionsDef(
                 code = """
                     (() => ({
-                      Forecasting: {
-                        stewardForecastingBuilder: {
+                      Analytics: {
+                        reportBuilderHooks: {
                           resolveLookup: (props = {}) => ({
                             dialogId: "targetingTreePicker",
                             parameters: {
@@ -232,7 +232,7 @@ class ActionHookRuntimeTest {
         )
         val config = DashboardReportBuilderDef(
             hooks = ReportBuilderHooksDef(
-                resolveLookup = "stewardForecastingBuilder.resolveLookup"
+                resolveLookup = "reportBuilderHooks.resolveLookup"
             )
         )
         val filter = ReportBuilderDynamicFilterDef(

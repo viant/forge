@@ -30,7 +30,6 @@ fun ForgeRoot(runtime: ForgeRuntime) {
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Hide window tabs for the iOS-style chat UI parity.
         val selected = windows.firstOrNull { it.windowId == selectedWindowId }
         if (selected == null) {
             Text("No windows", modifier = Modifier.padding(16.dp))

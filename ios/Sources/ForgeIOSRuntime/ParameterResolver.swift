@@ -243,11 +243,11 @@ public enum ParameterResolver {
         return try? JSONDecoder().decode(JSONValue.self, from: data)
     }
 
-    private static func jsonObjectAny(_ value: [String: JSONValue]) -> [String: Any?] {
+    private static func jsonObjectAny(_ value: [String: JSONValue]) -> [String: Any] {
         value.mapValues(anyValue)
     }
 
-    private static func anyValue(_ value: JSONValue) -> Any? {
+    private static func anyValue(_ value: JSONValue) -> Any {
         switch value {
         case .string(let string):
             return string
@@ -260,7 +260,7 @@ public enum ParameterResolver {
         case .object(let object):
             return object.mapValues(anyValue)
         case .null:
-            return nil
+            return NSNull()
         }
     }
 
@@ -285,6 +285,8 @@ public enum ParameterResolver {
             return .number(Double(value))
         case let value as NSNumber:
             return .number(value.doubleValue)
+        case _ as NSNull:
+            return .null
         case let value as [String: JSONValue]:
             return .object(value)
         case let value as [String: Any]:

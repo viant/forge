@@ -47,7 +47,7 @@ class WindowFormRuntimeTest {
             state.windowId,
             mapOf(
                 "prefill" to mapOf(
-                    "advertiserId" to 7
+                    "accountId" to 7
                 )
             ),
             replace = true
@@ -56,15 +56,15 @@ class WindowFormRuntimeTest {
             state.windowId,
             mapOf(
                 "prefill" to mapOf(
-                    "campaignId" to 9
+                    "segmentId" to 9
                 )
             )
         )
 
         val windowForm = runtime.windowFormValue(state.windowId)
         val prefill = JsonUtil.asStringMap(windowForm["prefill"])
-        assertEquals(7, prefill["advertiserId"])
-        assertEquals(9, prefill["campaignId"])
+        assertEquals(7, prefill["accountId"])
+        assertEquals(9, prefill["segmentId"])
     }
 
     @Test
@@ -122,7 +122,7 @@ class WindowFormRuntimeTest {
             state.windowId,
             mapOf(
                 "prefill" to mapOf(
-                    "orderId" to 2637048,
+                    "recordId" to 2637048,
                     "granularity" to "hour"
                 )
             ),
@@ -134,7 +134,7 @@ class WindowFormRuntimeTest {
             ExecutionDef(
                 handler = "dataSource.setWindowFormData",
                 parameters = listOf(
-                    ParameterDef(name = "selectedOrderId", input = "windowForm", location = "prefill.orderId"),
+                    ParameterDef(name = "selectedRecordId", input = "windowForm", location = "prefill.recordId"),
                     ParameterDef(name = "selectedGranularity", input = "windowForm", location = "prefill.granularity")
                 )
             ),
@@ -142,7 +142,7 @@ class WindowFormRuntimeTest {
         )
 
         val windowForm = runtime.windowFormValue(state.windowId)
-        assertEquals(2637048, windowForm["selectedOrderId"])
+        assertEquals(2637048, windowForm["selectedRecordId"])
         assertEquals("hour", windowForm["selectedGranularity"])
     }
 
@@ -153,9 +153,9 @@ class WindowFormRuntimeTest {
             it.set(
                 WindowMetadata(
                     dataSources = mapOf(
-                        "order_performance_period_today" to DataSourceDef(
+                        "record_performance_period_today" to DataSourceDef(
                             parameters = listOf(
-                                ParameterDef(name = "order_id", input = "windowForm", location = "AdOrderId.0"),
+                                ParameterDef(name = "record_id", input = "windowForm", location = "recordId.0"),
                                 ParameterDef(name = "period", input = "const", location = "today"),
                                 ParameterDef(name = "granularity", input = "windowForm", location = "granularity")
                             )
@@ -170,15 +170,15 @@ class WindowFormRuntimeTest {
             scope = CoroutineScope(Dispatchers.Unconfined)
         )
         val window = WindowContext(
-            windowId = "orderWindow",
+            windowId = "recordWindow",
             metadata = metadata,
             signals = signals,
             dataSourceRuntime = runtime
         )
-        val context = runtime.attach(window, "order_performance_period_today")
-        signals.form(WindowIdentity("orderWindow").windowFormId()).set(
+        val context = runtime.attach(window, "record_performance_period_today")
+        signals.form(WindowIdentity("recordWindow").windowFormId()).set(
             mapOf(
-                "AdOrderId" to listOf(2673453),
+                "recordId" to listOf(2673453),
                 "granularity" to "day"
             )
         )
@@ -188,7 +188,7 @@ class WindowFormRuntimeTest {
             context
         )
 
-        assertEquals("2673453", resolved["order_id"]?.toString())
+        assertEquals("2673453", resolved["record_id"]?.toString())
         assertEquals("today", resolved["period"])
         assertEquals("day", resolved["granularity"])
     }

@@ -32,7 +32,7 @@ class DashboardModelsTest {
                           "kind": "dashboard.summary",
                           "columnSpan": 12,
                           "metrics": [
-                            { "id": "spend", "label": "Spend", "selector": "totals.spend", "format": "currency" }
+                            { "id": "value", "label": "Value", "selector": "totals.value", "format": "number" }
                           ]
                         },
                         {
@@ -61,12 +61,12 @@ class DashboardModelsTest {
                           "kind": "dashboard.compare",
                           "items": [
                             {
-                              "id": "spendChange",
-                              "label": "Spend",
-                              "current": "summary.total_spend",
-                              "previous": "summary.previous_total_spend",
-                              "format": "currency",
-                              "deltaFormat": "currencyDelta"
+                              "id": "valueChange",
+                              "label": "Value",
+                              "current": "summary.total_value",
+                              "previous": "summary.previous_total_value",
+                              "format": "number",
+                              "deltaFormat": "numberDelta"
                             }
                           ]
                         },
@@ -75,11 +75,11 @@ class DashboardModelsTest {
                           "kind": "dashboard.kpiTable",
                           "rows": [
                             {
-                              "id": "spend",
-                              "label": "Total Spend",
-                              "value": "summary.total_spend",
-                              "format": "currency",
-                              "context": "Financial",
+                              "id": "value",
+                              "label": "Total Value",
+                              "value": "summary.total_value",
+                              "format": "number",
+                              "context": "Operational",
                               "contextTone": "info"
                             }
                           ]
@@ -91,7 +91,7 @@ class DashboardModelsTest {
                             {
                               "title": "Notes",
                               "body": ["Hello"],
-                              "visibleWhen": { "selector": "quality.zero_spend_rate", "gt": 40 }
+                              "visibleWhen": { "selector": "quality.zero_value_rate", "gt": 40 }
                             }
                           ]
                         },
@@ -112,10 +112,10 @@ class DashboardModelsTest {
                           "dashboard": {
                             "dimensions": {
                               "dimension": { "key": "country", "label": "Country" },
-                              "metric": { "key": "summary.total_spend", "label": "Spend", "format": "currency" },
+                              "metric": { "key": "summary.total_value", "label": "Value", "format": "number" },
                               "viewModes": ["table"],
                               "limit": 5,
-                              "orderBy": "summary.total_spend desc"
+                              "orderBy": "summary.total_value desc"
                             }
                           }
                         },
@@ -128,7 +128,7 @@ class DashboardModelsTest {
                                 {
                                   "severity": "warning",
                                   "title": "Watchlist",
-                                  "body": "Spend is trending up"
+                                  "body": "Value is trending up"
                                 }
                               ]
                             }
@@ -177,7 +177,7 @@ class DashboardModelsTest {
         val summary = root?.containers?.firstOrNull { it.id == "summary" }
         assertEquals("dashboard.summary", summary?.kind)
         assertEquals(12, summary?.columnSpan)
-        assertEquals("Spend", summary?.metrics?.firstOrNull()?.label)
+        assertEquals("Value", summary?.metrics?.firstOrNull()?.label)
 
         val filters = root?.containers?.firstOrNull { it.id == "filters" }
         assertEquals("dashboard.filters", filters?.kind)
@@ -189,11 +189,11 @@ class DashboardModelsTest {
 
         val compare = root?.containers?.firstOrNull { it.id == "compare" }
         assertEquals("dashboard.compare", compare?.kind)
-        assertEquals("summary.total_spend", compare?.items?.firstOrNull()?.current)
+        assertEquals("summary.total_value", compare?.items?.firstOrNull()?.current)
 
         val kpiTable = root?.containers?.firstOrNull { it.id == "kpiTable" }
         assertEquals("dashboard.kpiTable", kpiTable?.kind)
-        assertEquals("summary.total_spend", kpiTable?.rows?.firstOrNull()?.value)
+        assertEquals("summary.total_value", kpiTable?.rows?.firstOrNull()?.value)
 
         val report = root?.containers?.firstOrNull { it.id == "report" }
         assertEquals("dashboard.report", report?.kind)

@@ -68,7 +68,7 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
         mutableStateOf(prepared.series.map { it.key }.toSet())
     }
     val activePrepared = if (supportsSeriesSelection) {
-        filterPreparedChartData(prepared, selectedSeriesKeys)
+        filterPreparedChartData(prepared, selectedSeriesKeys, type)
     } else {
         prepared
     }
@@ -270,7 +270,7 @@ private fun StackedBarChart(
                                 .fillMaxWidth((value.value / prepared.maxValue).toFloat().coerceIn(0f, 1f))
                                 .height(10.dp)
                                 .background(
-                                    if (selection?.matches(point.label, value.label) == true) value.color.copy(alpha = 0.82f) else value.color,
+                                    if (selection?.matches(point.label, value.key) == true) value.color.copy(alpha = 0.82f) else value.color,
                                     RoundedCornerShape(999.dp)
                                 )
                         )
@@ -338,7 +338,7 @@ private fun MultiSeriesCartesianChart(
                             areaPath.lineTo(x, y)
                         }
                     }
-                    val selected = selection?.matches(point.label, series.label) == true
+                    val selected = selection?.matches(point.label, series.key) == true
                     drawCircle(
                         color = if (selected) series.color.copy(alpha = 0.82f) else series.color,
                         radius = if (selected) 5.dp.toPx() else 4.dp.toPx(),
@@ -412,7 +412,7 @@ private fun PieChart(
             slices.forEach { slice ->
                 val sweep = ((slice.value / total) * 360.0).toFloat()
                 drawArc(
-                    color = if (selection?.matches(slice.label, slice.seriesLabel) == true) slice.color.copy(alpha = 0.82f) else slice.color,
+                    color = if (selection?.matches(slice.label, slice.seriesKey) == true) slice.color.copy(alpha = 0.82f) else slice.color,
                     startAngle = startAngle,
                     sweepAngle = sweep,
                     useCenter = !donut,
@@ -488,6 +488,7 @@ internal data class ChartPoint(
 
 internal data class PieSlice(
     val label: String,
+    val seriesKey: String,
     val seriesLabel: String,
     val value: Double,
     val valueLabel: String,
@@ -507,16 +508,17 @@ internal data class ChartSelection(
     val valueLabel: String,
     val color: Color
 ) {
-    fun matches(pointLabel: String, pointSeriesLabel: String): Boolean {
-        return label == pointLabel && seriesLabel == pointSeriesLabel
+    fun matches(pointLabel: String, pointSeriesKey: String): Boolean {
+        return label == pointLabel && seriesKey == pointSeriesKey
     }
 }
 
 internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): PreparedChartData {
-    val xKey = chart.xAxis?.dataKey.orEmpty()
     val seriesDefs = resolveSeriesDefinitions(chart)
+    val labelKey = chart.series?.nameKey?.takeIf { it.isNotBlank() }
+        ?: chart.xAxis?.dataKey.orEmpty()
     val points = rows.mapIndexedNotNull { index, row ->
-        val label = row[xKey]?.toString()?.takeIf { it.isNotBlank() } ?: "Item ${index + 1}"
+        val label = row[labelKey]?.toString()?.takeIf { it.isNotBlank() } ?: "Item ${index + 1}"
         val values = seriesDefs.mapNotNull { series ->
             val value = (row[series.key] as? Number)?.toDouble()
                 ?: row[series.key]?.toString()?.toDoubleOrNull()
@@ -543,6 +545,7 @@ internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
         point.values.map { value ->
             PieSlice(
                 label = if (prepared.series.size > 1) "${point.label} · ${value.label}" else point.label,
+                seriesKey = value.key,
                 seriesLabel = value.label,
                 value = value.value,
                 valueLabel = formatChartValue(value.value),
@@ -552,9 +555,10 @@ internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
     }.filter { it.value > 0 }
 }
 
-private fun filterPreparedChartData(
+internal fun filterPreparedChartData(
     prepared: PreparedChartData,
-    selectedSeriesKeys: Set<String>
+    selectedSeriesKeys: Set<String>,
+    chartType: String
 ): PreparedChartData {
     val filteredSeries = prepared.series.filter { selectedSeriesKeys.contains(it.key) }
     if (filteredSeries.isEmpty()) {
@@ -564,8 +568,12 @@ private fun filterPreparedChartData(
         val filteredValues = point.values.filter { selectedSeriesKeys.contains(it.key) }
         if (filteredValues.isEmpty()) null else point.copy(values = filteredValues)
     }
-    val maxValue = filteredPoints.maxOfOrNull { point ->
-        point.values.maxOfOrNull { it.value } ?: 0.0
+    val normalizedType = chartType.trim().lowercase()
+    val maxValue = when (normalizedType) {
+        "bar", "stacked_bar" -> filteredPoints.maxOfOrNull { it.total }
+        else -> filteredPoints.maxOfOrNull { point ->
+            point.values.maxOfOrNull { it.value } ?: 0.0
+        }
     }?.coerceAtLeast(1.0) ?: 1.0
     return PreparedChartData(
         points = filteredPoints,
@@ -644,7 +652,7 @@ internal fun findPieSelection(
     slices.forEach { slice ->
         val sweep = ((slice.value / total) * 360.0).toFloat()
         if (angle in startAngle..(startAngle + sweep)) {
-            return ChartSelection(slice.label, slice.seriesLabel, slice.seriesLabel, slice.valueLabel, slice.color)
+            return ChartSelection(slice.label, slice.seriesLabel, slice.seriesKey, slice.valueLabel, slice.color)
         }
         startAngle += sweep
     }

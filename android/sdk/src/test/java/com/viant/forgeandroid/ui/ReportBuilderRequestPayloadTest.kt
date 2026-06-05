@@ -99,7 +99,7 @@ class ReportBuilderRequestPayloadTest {
     fun buildReportBuilderRequestPayloadAppliesBuildRequestHook() {
         val config = DashboardReportBuilderDef(
             hooks = com.viant.forgeandroid.runtime.ReportBuilderHooksDef(
-                buildRequest = "Forecasting.stewardForecastingBuilder.buildRequest"
+                buildRequest = "Analytics.reportBuilderHooks.buildRequest"
             )
         )
 
@@ -111,7 +111,7 @@ class ReportBuilderRequestPayloadTest {
             dynamicGroups = emptyMap(),
             hookState = mapOf("viewMode" to "table"),
             hookInvoker = { functionName, props ->
-                assertEquals("Forecasting.stewardForecastingBuilder.buildRequest", functionName)
+                assertEquals("Analytics.reportBuilderHooks.buildRequest", functionName)
                 val state = props["state"] as? JsonObject
                 assertTrue(state != null)
                 mapOf("input" to mapOf("query" to mapOf("hooked" to true)))

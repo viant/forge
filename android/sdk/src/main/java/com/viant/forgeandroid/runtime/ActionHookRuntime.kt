@@ -3,6 +3,8 @@ package com.viant.forgeandroid.runtime
 import android.content.Context
 import androidx.javascriptengine.JavaScriptSandbox
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -11,6 +13,7 @@ import kotlinx.serialization.json.JsonObject
 
 object ActionHookRuntime {
     private val json = Json { ignoreUnknownKeys = true }
+    private val sandboxMutex = Mutex()
 
     @Volatile
     private var applicationContext: Context? = null
@@ -51,20 +54,22 @@ object ActionHookRuntime {
         }
     }
 
-    private suspend fun evaluateWithSandbox(script: String): String = withContext(Dispatchers.Default) {
-        check(JavaScriptSandbox.isSupported()) {
-            "Android JavaScriptSandbox is not supported on this device."
-        }
-        val context = checkNotNull(applicationContext) {
-            "ActionHookRuntime is not initialized with an Android application context."
-        }
-        val sandbox = JavaScriptSandbox.createConnectedInstanceAsync(context).get()
-        val isolate = sandbox.createIsolate()
-        try {
-            isolate.evaluateJavaScriptAsync(script).get()
-        } finally {
-            isolate.close()
-            sandbox.close()
+    private suspend fun evaluateWithSandbox(script: String): String = sandboxMutex.withLock {
+        withContext(Dispatchers.Default) {
+            check(JavaScriptSandbox.isSupported()) {
+                "Android JavaScriptSandbox is not supported on this device."
+            }
+            val context = checkNotNull(applicationContext) {
+                "ActionHookRuntime is not initialized with an Android application context."
+            }
+            val sandbox = JavaScriptSandbox.createConnectedInstanceAsync(context).get()
+            val isolate = sandbox.createIsolate()
+            try {
+                isolate.evaluateJavaScriptAsync(script).get()
+            } finally {
+                isolate.close()
+                sandbox.close()
+            }
         }
     }
 }

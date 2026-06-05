@@ -41,6 +41,63 @@ class ChartRendererTest {
     }
 
     @Test
+    fun `prepareChartData uses structured series nameKey for point labels`() {
+        val chart = ChartDef(
+            type = "bar",
+            series = ChartSeriesDef(
+                nameKey = "label",
+                values = listOf(
+                    ChartValueOption(name = "Activity", value = "activity")
+                )
+            )
+        )
+
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("label" to "January", "activity" to 10),
+                mapOf("label" to "February", "activity" to 14)
+            ),
+            chart = chart
+        )
+
+        assertEquals(listOf("January", "February"), prepared.points.map { it.label })
+    }
+
+    @Test
+    fun `prepareChartData keeps duplicate labels distinct by series key`() {
+        val chart = ChartDef(
+            type = "bar",
+            xAxis = ChartAxisDef(dataKey = "month"),
+            series = ChartSeriesDef(
+                values = listOf(
+                    ChartValueOption(name = "Activity", value = "primaryActivity"),
+                    ChartValueOption(name = "Activity", value = "secondaryActivity")
+                )
+            )
+        )
+
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("month" to "Jan", "primaryActivity" to 10, "secondaryActivity" to 14)
+            ),
+            chart = chart
+        )
+        val selection = ChartSelection(
+            label = "Jan",
+            seriesLabel = "Activity",
+            seriesKey = "secondaryActivity",
+            valueLabel = "14",
+            color = parseColorForTest("#16A34A")
+        )
+
+        assertEquals(listOf("primaryActivity", "secondaryActivity"), prepared.series.map { it.key })
+        assertEquals(listOf("Activity", "Activity"), prepared.series.map { it.label })
+        assertEquals(listOf("primaryActivity", "secondaryActivity"), prepared.points.single().values.map { it.key })
+        assertTrue(selection.matches("Jan", "secondaryActivity"))
+        assertEquals(false, selection.matches("Jan", "primaryActivity"))
+    }
+
+    @Test
     fun `prepareChartData uses stacked totals for bar charts`() {
         val chart = ChartDef(
             type = "bar",
@@ -63,6 +120,38 @@ class ChartRendererTest {
 
         assertEquals(10.0, prepared.maxValue)
         assertEquals(10.0, prepared.points.first().total)
+    }
+
+    @Test
+    fun `filterPreparedChartData keeps stacked totals for selected bar series`() {
+        val chart = ChartDef(
+            type = "bar",
+            xAxis = ChartAxisDef(dataKey = "name"),
+            series = ChartSeriesDef(
+                values = listOf(
+                    ChartValueOption(name = "Approved", value = "approved"),
+                    ChartValueOption(name = "Pending", value = "pending"),
+                    ChartValueOption(name = "Rejected", value = "rejected")
+                )
+            )
+        )
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("name" to "A", "approved" to 6, "pending" to 4, "rejected" to 2),
+                mapOf("name" to "B", "approved" to 5, "pending" to 3, "rejected" to 9)
+            ),
+            chart = chart
+        )
+
+        val filtered = filterPreparedChartData(
+            prepared = prepared,
+            selectedSeriesKeys = setOf("approved", "pending"),
+            chartType = "bar"
+        )
+
+        assertEquals(10.0, filtered.maxValue)
+        assertEquals(10.0, filtered.points.first().total)
+        assertEquals(listOf("approved", "pending"), filtered.series.map { it.key })
     }
 
     @Test

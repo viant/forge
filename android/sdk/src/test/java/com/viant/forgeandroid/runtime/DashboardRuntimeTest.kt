@@ -179,13 +179,13 @@ class DashboardRuntimeTest {
 
         val result = method.invoke(
             null,
-            "Spend {{ summary.total_spend }} in ${'$'}{filters.region} for ${'$'}{selection.entityKey}",
-            mapOf("summary" to mapOf("total_spend" to 42)),
+            "Value {{ summary.total_value }} in ${'$'}{filters.region} for ${'$'}{selection.entityKey}",
+            mapOf("summary" to mapOf("total_value" to 42)),
             mapOf("region" to "NA"),
             DashboardSelectionState(entityKey = "US")
         ) as String
 
-        assertEquals("Spend 42 in NA for US", result)
+        assertEquals("Value 42 in NA for US", result)
     }
 
     @Test

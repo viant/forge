@@ -80,7 +80,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.time.LocalDate
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val REPORT_BUILDER_PRESET_STORAGE = "forge_report_builder_presets"
 
@@ -196,22 +198,31 @@ fun ReportBuilderRenderer(
             dynamicGroups = dynamicGroups
         )
     }
-    val requestPayload = remember(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups) {
-        buildReportBuilderRequestPayload(
-            config = config,
-            selectedMeasures = selectedMeasures,
-            selectedDimensions = selectedDimensions,
-            staticFilters = staticFilters,
-            dynamicGroups = dynamicGroups,
-            hookState = hookState,
-            hookInvoker = { functionName, props ->
-                invokeReportBuilderWindowHook(
-                    window = window,
-                    functionName = functionName,
-                    props = props
-                )
-            }
-        )
+    var requestPayload by remember { mutableStateOf<Map<String, Any?>>(emptyMap()) }
+    var lookupDescriptors by remember(config) { mutableStateOf<Map<String, ReportBuilderLookupDescriptor>>(emptyMap()) }
+    LaunchedEffect(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, hookState) {
+        requestPayload = withContext(Dispatchers.Default) {
+            buildReportBuilderRequestPayload(
+                config = config,
+                selectedMeasures = selectedMeasures,
+                selectedDimensions = selectedDimensions,
+                staticFilters = staticFilters,
+                dynamicGroups = dynamicGroups,
+                hookState = hookState,
+                hookInvoker = { functionName, props ->
+                    invokeReportBuilderWindowHook(
+                        window = window,
+                        functionName = functionName,
+                        props = props
+                    )
+                }
+            )
+        }
+    }
+    LaunchedEffect(config, hookState) {
+        lookupDescriptors = withContext(Dispatchers.Default) {
+            buildLookupDescriptorsForWindow(window, config, hookState)
+        }
     }
     val preferences = LocalContext.current.getSharedPreferences(REPORT_BUILDER_PRESET_STORAGE, Context.MODE_PRIVATE)
     val builderStateKey = remember(container.stateKey, container.id) {
@@ -340,13 +351,7 @@ fun ReportBuilderRenderer(
                 rowsByGroupId = dynamicGroups,
                 drafts = dynamicFilterDrafts,
                 isLookupAvailable = { groupId, filter ->
-                    lookupDescriptorForWindow(
-                        window = window,
-                        config = config,
-                        hookState = hookState,
-                        groupId = groupId,
-                        filter = filter
-                    ) != null
+                    lookupDescriptors[reportBuilderLookupDescriptorKey(groupId, filter)] != null
                 },
                 onAddRow = { groupId, filterId ->
                     val row = ReportBuilderDynamicRowState(
@@ -427,13 +432,17 @@ fun ReportBuilderRenderer(
                 },
                 onPickSelection = { groupId, rowId, filter ->
                     coroutineScope.launch {
-                        val descriptor = lookupDescriptorForWindow(
-                            window = window,
-                            config = config,
-                            hookState = hookState,
-                            groupId = groupId,
-                            filter = filter
-                        ) ?: return@launch
+                        val descriptor = lookupDescriptors[reportBuilderLookupDescriptorKey(groupId, filter)]
+                            ?: withContext(Dispatchers.Default) {
+                                lookupDescriptorForWindow(
+                                    window = window,
+                                    config = config,
+                                    hookState = hookState,
+                                    groupId = groupId,
+                                    filter = filter
+                                )
+                            }
+                            ?: return@launch
                         val payload = runtime.openDialogAwaitResult(
                             windowId = window.windowId,
                             dialogId = descriptor.dialogId,
@@ -1830,6 +1839,41 @@ private fun lookupDescriptorForWindow(
     filter: ReportBuilderDynamicFilterDef
 ): ReportBuilderLookupDescriptor? {
     return lookupReportBuilderDescriptor(window.metadata.peek(), config, hookState, groupId, filter)
+}
+
+private fun buildLookupDescriptorsForWindow(
+    window: com.viant.forgeandroid.runtime.WindowContext,
+    config: com.viant.forgeandroid.runtime.DashboardReportBuilderDef,
+    hookState: Map<String, Any?>
+): Map<String, ReportBuilderLookupDescriptor> {
+    val descriptors = linkedMapOf<String, ReportBuilderLookupDescriptor>()
+    config.dynamicFilterGroups.forEach { group ->
+        val groupId = group.id ?: return@forEach
+        group.filters.forEach filterLoop@ { filter ->
+            val key = reportBuilderLookupDescriptorKey(groupId, filter)
+            if (key.isBlank()) {
+                return@filterLoop
+            }
+            lookupDescriptorForWindow(
+                window = window,
+                config = config,
+                hookState = hookState,
+                groupId = groupId,
+                filter = filter
+            )?.let { descriptor ->
+                descriptors[key] = descriptor
+            }
+        }
+    }
+    return descriptors
+}
+
+private fun reportBuilderLookupDescriptorKey(
+    groupId: String,
+    filter: ReportBuilderDynamicFilterDef
+): String {
+    val filterKey = filter.id ?: filter.dialogId ?: filter.label ?: return ""
+    return "${groupId.trim()}|${filterKey.trim()}"
 }
 
 private fun projectLookupSelections(
