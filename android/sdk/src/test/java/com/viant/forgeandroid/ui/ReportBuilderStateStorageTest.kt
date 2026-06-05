@@ -19,8 +19,8 @@ class ReportBuilderStateStorageTest {
             scope = CoroutineScope(Dispatchers.Unconfined)
         )
         val state = runtime.openWindowInline(
-            windowKey = "forecasting",
-            title = "Forecasting",
+            windowKey = "analytics",
+            title = "Analytics",
             metadata = WindowMetadata()
         )
         val stored = StoredReportBuilderState(
@@ -54,9 +54,9 @@ class ReportBuilderStateStorageTest {
             activeDynamicFilterKeys = listOf("includeSiteType")
         )
 
-        persistStoredStateToWindowForm(runtime, state.windowId, "reportBuilder.forecasting", stored)
+        persistStoredStateToWindowForm(runtime, state.windowId, "reportBuilder.analytics", stored)
 
-        val loaded = loadStoredStateFromWindowForm(runtime, state.windowId, "reportBuilder.forecasting")
+        val loaded = loadStoredStateFromWindowForm(runtime, state.windowId, "reportBuilder.analytics")
         assertNotNull(loaded)
         assertEquals(listOf("avails"), loaded.selectedMeasures)
         assertEquals("Website", loaded.dynamicFilterValues["includeSiteType"])

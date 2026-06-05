@@ -24,12 +24,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.WindowMetadata
 import kotlinx.coroutines.launch
 
 @Composable
@@ -44,45 +46,72 @@ fun WindowContentView(
     onBack: (() -> Unit)? = null
 ) {
     val metadataSignal = runtime.metadataSignal(windowId)
-    val metadata by metadataSignal.flow.collectAsState(initial = null)
+    val metadata by metadataSignal.flow.collectAsState(initial = metadataSignal.peek())
 
-    if (metadata == null) {
-        Text("Loading $windowKey...", modifier = Modifier.padding(16.dp))
-        return
+    key(windowId, metadata != null) {
+        val resolvedMetadata = metadata
+        if (resolvedMetadata == null) {
+            Text("Loading $windowKey...", modifier = Modifier.padding(16.dp))
+        } else {
+            WindowContentBody(
+                runtime = runtime,
+                windowId = windowId,
+                windowKey = windowKey,
+                metadata = resolvedMetadata,
+                modifier = modifier,
+                scrollEnabled = scrollEnabled,
+                showWindowHeader = showWindowHeader,
+                canGoBack = canGoBack,
+                onBack = onBack
+            )
+        }
     }
+}
 
-    val view = metadata?.view
+@Composable
+private fun WindowContentBody(
+    runtime: ForgeRuntime,
+    windowId: String,
+    windowKey: String,
+    metadata: WindowMetadata,
+    modifier: Modifier = Modifier,
+    scrollEnabled: Boolean = true,
+    showWindowHeader: Boolean = true,
+    canGoBack: Boolean = false,
+    onBack: (() -> Unit)? = null
+) {
+    val view = metadata.view
     val containers = view?.content?.containers ?: emptyList()
     val context = runtime.windowContext(windowId)
     val defaultDataSourceContext = remember(windowId, metadata) {
         val dataSourceRef = containers.firstOrNull { !it.dataSourceRef.isNullOrBlank() }?.dataSourceRef
-            ?: metadata?.dataSources?.keys?.firstOrNull()
+            ?: metadata.dataSources.keys.firstOrNull()
         dataSourceRef?.takeIf { it.isNotBlank() }?.let(context::contextOrNull)
     }
     val inheritedDataSourceRef = defaultDataSourceContext?.dataSourceRef
 
     LaunchedEffect(windowId, metadata) {
-        metadata?.on?.filter { it.event == "onInit" }?.forEach {
+        metadata.on.filter { it.event == "onInit" }.forEach {
             runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
         }
-        metadata?.window?.on?.filter { it.event == "onInit" }?.forEach {
+        metadata.window?.on?.filter { it.event == "onInit" }?.forEach {
             runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
         }
     }
 
     DisposableEffect(windowId, metadata) {
         onDispose {
-            metadata?.on?.filter { it.event == "onDestroy" }?.forEach {
+            metadata.on.filter { it.event == "onDestroy" }.forEach {
                 runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
             }
-            metadata?.window?.on?.filter { it.event == "onDestroy" }?.forEach {
+            metadata.window?.on?.filter { it.event == "onDestroy" }?.forEach {
                 runtime.execute(it, defaultDataSourceContext, mapOf("windowId" to windowId))
             }
         }
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        if (showWindowHeader && (canGoBack || windowKey != "chat")) {
+        if (showWindowHeader) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -97,7 +126,7 @@ fun WindowContentView(
                     )
                 }
                 Text(
-                    text = metadata?.namespace ?: windowKey,
+                    text = metadata.namespace ?: windowKey,
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(start = 4.dp, top = 10.dp)
@@ -184,7 +213,7 @@ fun WindowContentView(
         }
     }
 
-    DialogRenderer(runtime, context, metadata?.dialogs.orEmpty())
+    DialogRenderer(runtime, context, metadata.dialogs)
 }
 
 private fun splitFractions(count: Int): List<Float> {

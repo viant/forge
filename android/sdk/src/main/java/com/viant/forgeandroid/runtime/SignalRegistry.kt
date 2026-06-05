@@ -1,16 +1,18 @@
 package com.viant.forgeandroid.runtime
 
+import java.util.concurrent.ConcurrentHashMap
+
 class SignalRegistry {
-    private val metadataSignals = mutableMapOf<String, Signal<WindowMetadata?>>()
-    private val collectionSignals = mutableMapOf<String, Signal<List<Map<String, Any?>>>>()
-    private val formSignals = mutableMapOf<String, Signal<Map<String, Any?>>>()
-    private val selectionSignals = mutableMapOf<String, Signal<SelectionState>>()
-    private val inputSignals = mutableMapOf<String, Signal<InputState>>()
-    private val controlSignals = mutableMapOf<String, Signal<ControlState>>()
-    private val metricsSignals = mutableMapOf<String, Signal<Map<String, Any?>>>()
-    private val dialogSignals = mutableMapOf<String, Signal<DialogState>>()
-    private val dashboardFilterSignals = mutableMapOf<String, Signal<Map<String, Any?>>>()
-    private val dashboardSelectionSignals = mutableMapOf<String, Signal<DashboardSelectionState>>()
+    private val metadataSignals = ConcurrentHashMap<String, Signal<WindowMetadata?>>()
+    private val collectionSignals = ConcurrentHashMap<String, Signal<List<Map<String, Any?>>>>()
+    private val formSignals = ConcurrentHashMap<String, Signal<Map<String, Any?>>>()
+    private val selectionSignals = ConcurrentHashMap<String, Signal<SelectionState>>()
+    private val inputSignals = ConcurrentHashMap<String, Signal<InputState>>()
+    private val controlSignals = ConcurrentHashMap<String, Signal<ControlState>>()
+    private val metricsSignals = ConcurrentHashMap<String, Signal<Map<String, Any?>>>()
+    private val dialogSignals = ConcurrentHashMap<String, Signal<DialogState>>()
+    private val dashboardFilterSignals = ConcurrentHashMap<String, Signal<Map<String, Any?>>>()
+    private val dashboardSelectionSignals = ConcurrentHashMap<String, Signal<DashboardSelectionState>>()
 
     fun metadata(windowId: String): Signal<WindowMetadata?> =
         metadataSignals.getOrPut(windowId) { Signal(null) }

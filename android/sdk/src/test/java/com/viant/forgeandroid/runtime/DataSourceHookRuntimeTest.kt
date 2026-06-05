@@ -76,10 +76,10 @@ class DataSourceHookRuntimeTest {
                 """.trimIndent()
             ),
             dataSources = mapOf(
-                "recommendation" to DataSourceDef(
+                "report" to DataSourceDef(
                     service = ServiceDef(
                         endpoint = "appAPI",
-                        uri = "/recommendation"
+                        uri = "/report"
                     )
                 )
             )
@@ -92,7 +92,7 @@ class DataSourceHookRuntimeTest {
             signals = signals,
             dataSourceRuntime = runtime
         )
-        val ctx = runtime.attach(window, "recommendation")
+        val ctx = runtime.attach(window, "report")
 
         ctx.fetchCollection()
         delay(150)
@@ -120,7 +120,7 @@ class DataSourceHookRuntimeTest {
                 """.trimIndent()
             ),
             dataSources = mapOf(
-                "recommendation" to DataSourceDef()
+                "report" to DataSourceDef()
             )
         )
         val metadataSignal = signals.metadata("W1")
@@ -131,7 +131,7 @@ class DataSourceHookRuntimeTest {
             signals = signals,
             dataSourceRuntime = runtime
         )
-        val ctx = runtime.attach(window, "recommendation")
+        val ctx = runtime.attach(window, "report")
         val row = mapOf<String, Any?>("id" to 42L)
 
         ctx.toggleSelection(row, 3)
@@ -182,10 +182,10 @@ class DataSourceHookRuntimeTest {
                 """.trimIndent()
             ),
             dataSources = mapOf(
-                "recommendation" to DataSourceDef(
+                "report" to DataSourceDef(
                     service = ServiceDef(
                         endpoint = "appAPI",
-                        uri = "/recommendation"
+                        uri = "/report"
                     )
                 )
             )
@@ -198,7 +198,7 @@ class DataSourceHookRuntimeTest {
             signals = signals,
             dataSourceRuntime = runtime
         )
-        val ctx = runtime.attach(window, "recommendation")
+        val ctx = runtime.attach(window, "report")
 
         ctx.fetchCollection()
         withTimeout(5000) {
@@ -229,7 +229,7 @@ class DataSourceHookRuntimeTest {
                 """.trimIndent()
             ),
             dataSources = mapOf(
-                "recommendation" to DataSourceDef()
+                "report" to DataSourceDef()
             )
         )
         val metadataSignal = signals.metadata("W1")
@@ -245,7 +245,7 @@ class DataSourceHookRuntimeTest {
             )
         )
 
-        val ctx = runtime.attach(window, "recommendation")
+        val ctx = runtime.attach(window, "report")
         withTimeout(5000) {
             ctx.selection.flow.first { it.selected != null }
         }
@@ -262,7 +262,7 @@ class DataSourceHookRuntimeTest {
         val restClient = RestClient(EndpointRegistry(emptyMap()))
         val runtime = DataSourceRuntime(signals, restClient, CoroutineScope(Dispatchers.Unconfined))
         runtime.setCollectionLoader { ctx ->
-            if (ctx.dataSourceRef != "recommendation") {
+            if (ctx.dataSourceRef != "report") {
                 return@setCollectionLoader null
             }
             DataSourceRuntime.LoaderResult(
@@ -274,7 +274,7 @@ class DataSourceHookRuntimeTest {
         }
         val metadata = WindowMetadata(
             dataSources = mapOf(
-                "recommendation" to DataSourceDef()
+                "report" to DataSourceDef()
             )
         )
         val metadataSignal = signals.metadata("W1")
@@ -285,7 +285,7 @@ class DataSourceHookRuntimeTest {
             signals = signals,
             dataSourceRuntime = runtime
         )
-        val ctx = runtime.attach(window, "recommendation")
+        val ctx = runtime.attach(window, "report")
 
         ctx.fetchCollection()
         delay(150)

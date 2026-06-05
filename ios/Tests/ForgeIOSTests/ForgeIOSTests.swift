@@ -266,12 +266,12 @@ final class ForgeIOSTests: XCTestCase {
     func testWindowMetadataDecodesActionsCodeAndDatasourceAlias() throws {
         let payload = """
         {
-          "namespace": "Recommendation",
+          "namespace": "Report",
           "actions": {
             "code": "(() => ({ prepareCollection: () => [] }))()"
           },
           "dataSource": {
-            "recommendation": {
+            "report": {
               "selectionMode": "single"
             }
           },
@@ -285,9 +285,9 @@ final class ForgeIOSTests: XCTestCase {
 
         let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
 
-        XCTAssertEqual(metadata.namespace, "Recommendation")
+        XCTAssertEqual(metadata.namespace, "Report")
         XCTAssertEqual(metadata.actions?.code, "(() => ({ prepareCollection: () => [] }))()")
-        XCTAssertEqual(metadata.dataSources["recommendation"]?.selectionMode, "single")
+        XCTAssertEqual(metadata.dataSources["report"]?.selectionMode, "single")
     }
 
     func testMetadataResolverPreservesDatasourceNamedTarget() {
@@ -336,7 +336,7 @@ final class ForgeIOSTests: XCTestCase {
         {
           "title": "Orders",
           "columns": [
-            "campaign",
+            "segment",
             {
               "id": "budget",
               "label": "Budget"
@@ -357,8 +357,8 @@ final class ForgeIOSTests: XCTestCase {
 
         XCTAssertEqual(table.title, "Orders")
         XCTAssertEqual(table.columns.count, 3)
-        XCTAssertEqual(table.columns[0].id, "campaign")
-        XCTAssertEqual(table.columns[0].label, "campaign")
+        XCTAssertEqual(table.columns[0].id, "segment")
+        XCTAssertEqual(table.columns[0].label, "segment")
         XCTAssertEqual(table.columns[1].id, "budget")
         XCTAssertEqual(table.columns[1].label, "Budget")
         XCTAssertEqual(table.columns[2].type, "button")
@@ -424,6 +424,141 @@ final class ForgeIOSTests: XCTestCase {
             .pie([
                 MermaidPieSlice(label: "Alpha", value: 1316.86),
                 MermaidPieSlice(label: "Beta", value: 842.10)
+            ])
+        )
+    }
+
+    func testParseMermaidDiagramParsesSequenceDiagrams() {
+        let source = """
+        sequenceDiagram
+          participant U as User
+          participant A as Agent
+          U->>A: Ask for status
+          A-->>U: Return dashboard
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .sequence(
+                actors: ["User", "Agent"],
+                messages: [
+                    MermaidSequenceMessage(from: "User", to: "Agent", text: "Ask for status"),
+                    MermaidSequenceMessage(from: "Agent", to: "User", text: "Return dashboard")
+                ]
+            )
+        )
+    }
+
+    func testParseMermaidDiagramParsesClassDiagrams() {
+        let source = """
+        classDiagram
+          class Workspace
+          Workspace : +open()
+          Workspace -- Window : owns
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .classDiagram(
+                classes: [
+                    MermaidClass(name: "Workspace", members: ["+open()"]),
+                    MermaidClass(name: "Window", members: [])
+                ],
+                relations: [
+                    MermaidRelation(from: "Workspace", to: "Window", label: "owns")
+                ]
+            )
+        )
+    }
+
+    func testParseMermaidDiagramParsesStateDiagrams() {
+        let source = """
+        stateDiagram-v2
+          [*] --> Draft
+          Draft --> Running : submit
+          Running --> Complete : finish
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .state(
+                states: ["Start/End", "Draft", "Running", "Complete"],
+                transitions: [
+                    MermaidRelation(from: "Start/End", to: "Draft", label: nil),
+                    MermaidRelation(from: "Draft", to: "Running", label: "submit"),
+                    MermaidRelation(from: "Running", to: "Complete", label: "finish")
+                ]
+            )
+        )
+    }
+
+    func testParseMermaidDiagramParsesEntityRelationshipDiagrams() {
+        let source = """
+        erDiagram
+          USER ||--o{ SESSION : owns
+          SESSION }o--|| WORKSPACE : selects
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .entityRelationship(
+                entities: ["USER", "SESSION", "WORKSPACE"],
+                relations: [
+                    MermaidRelation(from: "USER", to: "SESSION", label: "owns"),
+                    MermaidRelation(from: "SESSION", to: "WORKSPACE", label: "selects")
+                ]
+            )
+        )
+    }
+
+    func testParseMermaidDiagramParsesTimelineDiagrams() {
+        let source = """
+        timeline
+          title Release
+          2026-06-01 : API parity
+          2026-06-02 : Mobile proof
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .timeline([
+                MermaidTimelineEvent(time: "2026-06-01", label: "API parity"),
+                MermaidTimelineEvent(time: "2026-06-02", label: "Mobile proof")
+            ])
+        )
+    }
+
+    func testParseMermaidDiagramParsesGanttDiagrams() {
+        let source = """
+        gantt
+          title Migration
+          dateFormat YYYY-MM-DD
+          section Runtime
+          Parser parity :done, 2026-06-01, 2026-06-03
+        """
+
+        let diagram = parseMermaidDiagram(source)
+
+        XCTAssertEqual(
+            diagram,
+            .gantt([
+                MermaidGanttTask(
+                    section: "Runtime",
+                    name: "Parser parity",
+                    start: "2026-06-01",
+                    end: "2026-06-03",
+                    tags: ["done"]
+                )
             ])
         )
     }
@@ -603,7 +738,7 @@ final class ForgeIOSTests: XCTestCase {
           "view": {
             "content": {
               "containers": [
-                { "id": "approvalEditor", "title": "Approval Editor" }
+                { "id": "workspaceEditor", "title": "Workspace Editor" }
               ]
             }
           }
@@ -615,39 +750,39 @@ final class ForgeIOSTests: XCTestCase {
             session: session
         )
 
-        let state = await runtime.openWindow(key: "chat/new/dialog/approval_editor", title: "Approval")
+        let state = await runtime.openWindow(key: "workspace/dialog/editor", title: "Editor")
         try await Task.sleep(nanoseconds: 150_000_000)
 
         let window = await runtime.windows.first(where: { $0.id == state.id })
         let metadataSignal = await runtime.signals.metadata(windowID: state.id)
         let signalValue = await metadataSignal.peek()
 
-        XCTAssertEqual(window?.metadata?.view?.content?.containers.first?.id, "approvalEditor")
-        XCTAssertEqual(signalValue?.view?.content?.containers.first?.title, "Approval Editor")
+        XCTAssertEqual(window?.metadata?.view?.content?.containers.first?.id, "workspaceEditor")
+        XCTAssertEqual(signalValue?.view?.content?.containers.first?.title, "Workspace Editor")
     }
 
     func testOpenWindowUsesRegisteredMetadataLoader() async throws {
         let runtime = ForgeRuntime()
         await runtime.registerWindowMetadataLoader { key in
-            XCTAssertEqual(key, "recommendation/review")
+            XCTAssertEqual(key, "report/review")
             return WindowMetadata(
                 view: ViewDef(
                     content: ContentDef(
                         containers: [
-                            ContainerDef(id: "recommendationRoot", title: "Recommendation Review")
+                            ContainerDef(id: "reportRoot", title: "Report Review")
                         ]
                     )
                 )
             )
         }
 
-        let state = await runtime.openWindow(key: "recommendation/review", title: "Recommendation Review")
+        let state = await runtime.openWindow(key: "report/review", title: "Report Review")
         try await Task.sleep(nanoseconds: 100_000_000)
 
         let signal = await runtime.signals.metadata(windowID: state.id)
         let metadata = await signal.peek()
-        XCTAssertEqual(metadata?.view?.content?.containers.first?.id, "recommendationRoot")
-        XCTAssertEqual(metadata?.view?.content?.containers.first?.title, "Recommendation Review")
+        XCTAssertEqual(metadata?.view?.content?.containers.first?.id, "reportRoot")
+        XCTAssertEqual(metadata?.view?.content?.containers.first?.title, "Report Review")
     }
 
     func testBuiltInHandlerToggleSelectionSelectsThenDeselects() async throws {
@@ -773,6 +908,7 @@ final class ForgeIOSTests: XCTestCase {
                         "series": {
                           "nameKey": "label",
                           "valueKey": "spend",
+                          "palette": ["#137CBD"],
                           "values": [
                             { "value": "spend", "name": "Spend" }
                           ]
@@ -795,15 +931,89 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(chart.valueKey, "spend")
         XCTAssertEqual(chart.nameKey, "label")
         XCTAssertEqual(chart.series, ["spend"])
+        XCTAssertEqual(chart.seriesDef?.palette, ["#137CBD"])
+        XCTAssertEqual(chart.seriesDef?.values.first?.value, "spend")
+        XCTAssertEqual(chart.seriesDef?.values.first?.name, "Spend")
+    }
+
+    func testChartDefKeepsDuplicateSeriesLabelsByDistinctKeys() throws {
+        let payload = """
+        {
+          "series": {
+            "values": [
+              { "value": "grossSpend", "name": "Spend" },
+              { "value": "netSpend", "name": "Spend" }
+            ]
+          }
+        }
+        """
+
+        let chart = try JSONDecoder().decode(ChartDef.self, from: Data(payload.utf8))
+
+        XCTAssertEqual(chart.series, ["grossSpend", "netSpend"])
+        XCTAssertEqual(chart.seriesDef?.values.map(\.name), ["Spend", "Spend"])
+        XCTAssertEqual(chart.seriesDef?.values.map(\.value), ["grossSpend", "netSpend"])
+    }
+
+    func testChartDefRoundTripsSeriesArrayAsArray() throws {
+        let payload = """
+        {
+          "series": ["spend", "impressions"]
+        }
+        """
+
+        let chart = try JSONDecoder().decode(ChartDef.self, from: Data(payload.utf8))
+        let encoded = try JSONEncoder().encode(chart)
+        let object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        let series = try XCTUnwrap(object["series"] as? [String])
+
+        XCTAssertEqual(chart.series, ["spend", "impressions"])
+        XCTAssertNil(chart.seriesDef)
+        XCTAssertEqual(series, ["spend", "impressions"])
+    }
+
+    func testChartSeriesSelectionReconcilesWhenAvailableSeriesChange() {
+        let initial = reconciledChartSeriesSelection(
+            current: [],
+            available: ["spend", "impressions"]
+        )
+        XCTAssertEqual(initial, Set(["spend", "impressions"]))
+
+        let retained = reconciledChartSeriesSelection(
+            current: ["spend", "stale"],
+            available: ["spend", "clicks"]
+        )
+        XCTAssertEqual(retained, Set(["spend"]))
+
+        let reset = reconciledChartSeriesSelection(
+            current: ["stale"],
+            available: ["spend", "clicks"]
+        )
+        XCTAssertEqual(reset, Set(["spend", "clicks"]))
+    }
+
+    func testChartSeriesToggleCanDeselectAndReselectMeasures() {
+        let allSelected: Set<String> = ["spend", "impressions"]
+
+        let spendOnly = toggledChartSeriesSelection(current: allSelected, key: "impressions")
+        XCTAssertEqual(spendOnly, Set(["spend"]))
+
+        let noneSelected = toggledChartSeriesSelection(current: spendOnly, key: "spend")
+        XCTAssertEqual(noneSelected, Set<String>())
+
+        let reselected = toggledChartSeriesSelection(current: noneSelected, key: "spend")
+        XCTAssertEqual(reselected, Set(["spend"]))
     }
 
     func testWindowMetadataWrapsTopLevelDashboardReportBuilderContainer() throws {
         let payload = """
         {
           "kind": "dashboard.reportBuilder",
-          "id": "forecastingCubeBuilder",
-          "title": "Forecasting",
-          "dataSourceRef": "forecasting_cube_report",
+          "id": "analyticsCubeBuilder",
+          "title": "Analytics",
+          "dataSourceRef": "analytics_cube_report",
           "reportBuilder": {
             "unifiedFamilyRows": true,
             "showResultHeader": false
@@ -815,9 +1025,9 @@ final class ForgeIOSTests: XCTestCase {
         let root = try XCTUnwrap(metadata.view?.content?.containers.first)
 
         XCTAssertEqual(root.kind, "dashboard.reportBuilder")
-        XCTAssertEqual(root.id, "forecastingCubeBuilder")
-        XCTAssertEqual(root.title, "Forecasting")
-        XCTAssertEqual(root.dataSourceRef, "forecasting_cube_report")
+        XCTAssertEqual(root.id, "analyticsCubeBuilder")
+        XCTAssertEqual(root.title, "Analytics")
+        XCTAssertEqual(root.dataSourceRef, "analytics_cube_report")
         XCTAssertEqual(root.dashboard?.reportBuilder?.unifiedFamilyRows, true)
         XCTAssertEqual(root.dashboard?.reportBuilder?.showResultHeader, false)
     }
@@ -828,9 +1038,9 @@ final class ForgeIOSTests: XCTestCase {
           "view": {
             "content": {
               "kind": "dashboard.reportBuilder",
-              "id": "forecastingCubeBuilder",
-              "title": "Forecasting",
-              "dataSourceRef": "forecasting_cube_report",
+              "id": "analyticsCubeBuilder",
+              "title": "Analytics",
+              "dataSourceRef": "analytics_cube_report",
               "reportBuilder": {
                 "unifiedFamilyRows": true,
                 "showResultHeader": false
@@ -844,9 +1054,9 @@ final class ForgeIOSTests: XCTestCase {
         let root = try XCTUnwrap(metadata.view?.content?.containers.first)
 
         XCTAssertEqual(root.kind, "dashboard.reportBuilder")
-        XCTAssertEqual(root.id, "forecastingCubeBuilder")
-        XCTAssertEqual(root.title, "Forecasting")
-        XCTAssertEqual(root.dataSourceRef, "forecasting_cube_report")
+        XCTAssertEqual(root.id, "analyticsCubeBuilder")
+        XCTAssertEqual(root.title, "Analytics")
+        XCTAssertEqual(root.dataSourceRef, "analytics_cube_report")
         XCTAssertEqual(root.dashboard?.reportBuilder?.unifiedFamilyRows, true)
         XCTAssertEqual(root.dashboard?.reportBuilder?.showResultHeader, false)
     }
@@ -858,7 +1068,7 @@ final class ForgeIOSTests: XCTestCase {
             "content": {
               "kind": "dashboard.reportBuilder",
               "id": "metricsCubeBuilder",
-              "dataSourceRef": "metrics_ad_cube_report",
+              "dataSourceRef": "metrics_cube_report",
               "reportBuilder": {
                 "measures": [
                   { "id": "totalSpend", "key": "totalSpend", "label": "Spend", "default": true }
@@ -874,7 +1084,7 @@ final class ForgeIOSTests: XCTestCase {
                     "id": "scope",
                     "label": "Scope",
                     "filters": [
-                      { "id": "advertiserIds", "label": "Advertiser", "paramPath": "filters.advertiserId" }
+                      { "id": "accountIds", "label": "Account", "paramPath": "filters.accountId" }
                     ]
                   }
                 ],
@@ -894,13 +1104,52 @@ final class ForgeIOSTests: XCTestCase {
 
         XCTAssertEqual(root.kind, "dashboard.reportBuilder")
         XCTAssertEqual(root.id, "metricsCubeBuilder")
-        XCTAssertEqual(root.dataSourceRef, "metrics_ad_cube_report")
+        XCTAssertEqual(root.dataSourceRef, "metrics_cube_report")
         XCTAssertEqual(reportBuilder.measures.count, 1)
         XCTAssertEqual(reportBuilder.dimensions.count, 1)
         XCTAssertEqual(reportBuilder.staticFilters.count, 1)
         XCTAssertEqual(reportBuilder.dynamicFilterGroups.count, 1)
         XCTAssertTrue(reportBuilder.dynamicFilterFamilies.isEmpty)
         XCTAssertEqual(reportBuilder.result?.defaultMode, "table")
+    }
+
+    func testWindowMetadataDecodesReportBuilderNestedArrayDefaults() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "metricsCubeBuilder",
+              "dataSourceRef": "metrics_cube_report",
+              "reportBuilder": {
+                "dynamicFilterGroups": [
+                  { "id": "scope", "label": "Scope" }
+                ],
+                "dynamicFilterFamilies": [
+                  { "id": "primary", "label": "Primary" }
+                ],
+                "result": {
+                  "chartWizard": {},
+                  "defaultChartSpecs": [
+                    { "title": "Trend", "type": "line", "xField": "date" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let reportBuilder = try XCTUnwrap(
+            metadata.view?.content?.containers.first?.dashboard?.reportBuilder
+        )
+
+        XCTAssertEqual(reportBuilder.dynamicFilterGroups.first?.filters.isEmpty, true)
+        XCTAssertEqual(reportBuilder.dynamicFilterFamilies.first?.includeFilterIds, [])
+        XCTAssertEqual(reportBuilder.dynamicFilterFamilies.first?.excludeFilterIds, [])
+        XCTAssertEqual(reportBuilder.result?.chartWizard?.supportedTypes, [])
+        XCTAssertEqual(reportBuilder.result?.defaultChartSpecs.first?.yFields, [])
     }
 
     func testWindowMetadataDecodesDynamicFilterAdvancedFields() throws {
@@ -910,7 +1159,7 @@ final class ForgeIOSTests: XCTestCase {
             "content": {
               "kind": "dashboard.reportBuilder",
               "id": "metricsCubeBuilder",
-              "dataSourceRef": "metrics_ad_cube_report",
+              "dataSourceRef": "metrics_cube_report",
               "reportBuilder": {
                 "measures": [],
                 "dimensions": [],
@@ -920,19 +1169,19 @@ final class ForgeIOSTests: XCTestCase {
                     "label": "Scope",
                     "filters": [
                       {
-                        "id": "advertiserIds",
-                        "label": "Advertiser",
-                        "paramPath": "filters.advertiserIds",
+                        "id": "accountIds",
+                        "label": "Account",
+                        "paramPath": "filters.accountIds",
                         "multiple": false,
                         "emitArray": true,
                         "manualEntry": true,
                         "manualValueType": "int",
-                        "manualPlaceholder": "Enter advertiser id",
-                        "dialogId": "advertiserPicker",
-                        "valueSelector": "advertiserId",
-                        "labelSelector": "advertiserName",
-                        "groupSelector": "agencyName",
-                        "recordSelectors": ["agencyId", "advertiserId", "advertiserName"],
+                        "manualPlaceholder": "Enter account id",
+                        "dialogId": "accountPicker",
+                        "valueSelector": "accountId",
+                        "labelSelector": "accountName",
+                        "groupSelector": "groupName",
+                        "recordSelectors": ["groupId", "accountId", "accountName"],
                         "requestMapping": "hook"
                       }
                     ]
@@ -949,15 +1198,15 @@ final class ForgeIOSTests: XCTestCase {
             metadata.view?.content?.containers.first?.dashboard?.reportBuilder?.dynamicFilterGroups.first?.filters.first
         )
 
-        XCTAssertEqual(filter.id, "advertiserIds")
-        XCTAssertEqual(filter.paramPath, "filters.advertiserIds")
+        XCTAssertEqual(filter.id, "accountIds")
+        XCTAssertEqual(filter.paramPath, "filters.accountIds")
         XCTAssertEqual(filter.emitArray, true)
         XCTAssertEqual(filter.manualValueType, "int")
-        XCTAssertEqual(filter.dialogId, "advertiserPicker")
-        XCTAssertEqual(filter.valueSelector, "advertiserId")
-        XCTAssertEqual(filter.labelSelector, "advertiserName")
-        XCTAssertEqual(filter.groupSelector, "agencyName")
-        XCTAssertEqual(filter.recordSelectors ?? [], ["agencyId", "advertiserId", "advertiserName"])
+        XCTAssertEqual(filter.dialogId, "accountPicker")
+        XCTAssertEqual(filter.valueSelector, "accountId")
+        XCTAssertEqual(filter.labelSelector, "accountName")
+        XCTAssertEqual(filter.groupSelector, "groupName")
+        XCTAssertEqual(filter.recordSelectors ?? [], ["groupId", "accountId", "accountName"])
         XCTAssertEqual(filter.requestMapping, "hook")
     }
 
@@ -1004,7 +1253,7 @@ final class ForgeIOSTests: XCTestCase {
             title: "Metrics Report",
             parameters: [
                 "prefill": .object([
-                    "advertiserId": .number(7)
+                    "accountId": .number(7)
                 ])
             ]
         )
@@ -1012,7 +1261,7 @@ final class ForgeIOSTests: XCTestCase {
         let windowForm = await runtime.windowFormJSONValue(windowID: state.id)
         XCTAssertEqual(windowForm["granularity"], .string("day"))
         XCTAssertEqual(windowForm["periodView"], .string("today"))
-        XCTAssertEqual(windowForm["prefill"]?.objectValue?["advertiserId"], .number(7))
+        XCTAssertEqual(windowForm["prefill"]?.objectValue?["accountId"], .number(7))
     }
 
     func testParameterResolverResolvesWindowFormSelectors() {
@@ -1020,7 +1269,7 @@ final class ForgeIOSTests: XCTestCase {
             identityDataSourceRef: "default",
             dataSources: [:],
             windowForm: [
-                "AdOrderId": .array([.number(2637048)]),
+                "entityId": .array([.number(2637048)]),
                 "granularity": .string("hour"),
                 "periodView": .string("today")
             ],
@@ -1029,13 +1278,13 @@ final class ForgeIOSTests: XCTestCase {
 
         let resolved = ParameterResolver.resolve(
             parameters: [
-                ParameterDef(name: "order_id", input: "windowForm", location: .string("AdOrderId.0")),
+                ParameterDef(name: "entity_id", input: "windowForm", location: .string("entityId.0")),
                 ParameterDef(name: "granularity", input: "windowForm", location: .string("granularity"))
             ],
             context: context
         )
 
-        XCTAssertEqual(resolved["order_id"], .number(2637048))
+        XCTAssertEqual(resolved["entity_id"], .number(2637048))
         XCTAssertEqual(resolved["granularity"], .string("hour"))
     }
 
@@ -1047,7 +1296,7 @@ final class ForgeIOSTests: XCTestCase {
             "lifetimeSummary": .object([
                 "lifetimePacingIndex": .number(0)
             ]),
-            "AdOrderId": .array([.number(2673453)])
+            "entityId": .array([.number(2673453)])
         ]
 
         XCTAssertEqual(
@@ -1059,7 +1308,7 @@ final class ForgeIOSTests: XCTestCase {
             0
         )
         XCTAssertEqual(
-            SelectorUtil.resolve(metrics, selector: "AdOrderId.0") as? Double,
+            SelectorUtil.resolve(metrics, selector: "entityId.0") as? Double,
             2673453
         )
     }
@@ -1098,11 +1347,11 @@ final class ForgeIOSTests: XCTestCase {
         {
           "dialogs": [
             {
-              "id": "advertiserPicker",
-              "title": "Pick advertiser",
+              "id": "accountPicker",
+              "title": "Pick account",
               "content": {
-                "id": "advertiserTable",
-                "dataSourceRef": "advertisers",
+                "id": "accountTable",
+                "dataSourceRef": "accounts",
                 "table": {
                   "columns": ["id", "name"]
                 }
@@ -1128,9 +1377,9 @@ final class ForgeIOSTests: XCTestCase {
         let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
         let dialog = try XCTUnwrap(metadata.dialogs.first)
 
-        XCTAssertEqual(dialog.id, "advertiserPicker")
-        XCTAssertEqual(dialog.title, "Pick advertiser")
-        XCTAssertEqual(dialog.content?.dataSourceRef, "advertisers")
+        XCTAssertEqual(dialog.id, "accountPicker")
+        XCTAssertEqual(dialog.title, "Pick account")
+        XCTAssertEqual(dialog.content?.dataSourceRef, "accounts")
         XCTAssertEqual(dialog.actions.count, 2)
         XCTAssertEqual(dialog.actions.last?.on.first?.action, "dialog.commit")
     }
@@ -1252,7 +1501,7 @@ final class ForgeIOSTests: XCTestCase {
             dataSourceRef: "dialogSource",
             selected: [
                 "id": .string("adv-1"),
-                "name": .string("Advertiser One")
+                "name": .string("Account One")
             ]
         )
         _ = await runtime.execute(
@@ -1266,7 +1515,7 @@ final class ForgeIOSTests: XCTestCase {
 
         let result = await resultTask.value
         XCTAssertEqual(result?["id"], .string("adv-1"))
-        XCTAssertEqual(result?["name"], .string("Advertiser One"))
+        XCTAssertEqual(result?["name"], .string("Account One"))
     }
 
     func testOpenDialogAwaitResultResolvesCommittedMultiSelection() async throws {

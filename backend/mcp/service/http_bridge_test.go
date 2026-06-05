@@ -57,8 +57,8 @@ func TestUIRPCHandler_PollWrapsSetFormDataCommandEnvelope(t *testing.T) {
 			"windowId": "metricReportBuilder__conv-1",
 			"values": map[string]interface{}{
 				"prefill": map[string]interface{}{
-					"advertiserId": 123,
-					"dealId":       778899,
+					"recordId": 123,
+					"groupId":  778899,
 				},
 			},
 		},
@@ -93,11 +93,47 @@ func TestUIRPCHandler_PollWrapsSetFormDataCommandEnvelope(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected prefill object, got %#v", values["prefill"])
 	}
-	if got := prefill["advertiserId"]; got != float64(123) {
-		t.Fatalf("expected advertiserId 123, got %#v", got)
+	if got := prefill["recordId"]; got != float64(123) {
+		t.Fatalf("expected recordId 123, got %#v", got)
 	}
-	if got := prefill["dealId"]; got != float64(778899) {
-		t.Fatalf("expected dealId 778899, got %#v", got)
+	if got := prefill["groupId"]; got != float64(778899) {
+		t.Fatalf("expected groupId 778899, got %#v", got)
+	}
+}
+
+func TestUIRPCHandler_UsesDefaultNamespaceWithoutExplicitBridgeToken(t *testing.T) {
+	hub := NewHub(&Config{})
+	bridge := &httpRPCBridge{hub: hub, sessions: map[string]*httpSessionInfo{}}
+	handler := &uiRPCHandler{bridge: bridge}
+	ctx := context.Background()
+
+	_, jerr := handler.handle(ctx, "ui.hello", json.RawMessage(`{"clientId":"mobile-client"}`))
+	if jerr != nil {
+		t.Fatalf("ui.hello error: %v", jerr)
+	}
+
+	hub.enqueueCommand("default", "mobile-client", rpcRequest{
+		ID:     "cmd-mobile",
+		Method: "ui.window.open",
+		Params: map[string]interface{}{
+			"windowKey": "recordDetail",
+		},
+	})
+	result, jerr := handler.handle(ctx, "ui.poll", json.RawMessage(`{"clientId":"mobile-client","timeoutMs":10}`))
+	if jerr != nil {
+		t.Fatalf("ui.poll error: %v", jerr)
+	}
+
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(result, &decoded); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	params, ok := decoded["params"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected command params, got %#v", decoded["params"])
+	}
+	if got := params["id"]; got != "cmd-mobile" {
+		t.Fatalf("expected command from default namespace, got %#v", got)
 	}
 }
 
@@ -114,9 +150,9 @@ func TestServiceUICommand_QueueRoundTripForSetFormData(t *testing.T) {
 				"windowId": "metricReportBuilder__conv-1",
 				"values": map[string]interface{}{
 					"prefill": map[string]interface{}{
-						"advertiserId":  123,
-						"dealId":        778899,
-						"targetingIncl": "iris:1466062,123",
+						"recordId": 123,
+						"groupId":  778899,
+						"flags":    "alpha,beta",
 					},
 				},
 			},
@@ -151,8 +187,8 @@ func TestServiceUICommand_QueueRoundTripForSetFormData(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected prefill map, got %#v", values["prefill"])
 	}
-	if got := prefill["advertiserId"]; got != 123 {
-		t.Fatalf("expected advertiserId 123, got %#v", got)
+	if got := prefill["recordId"]; got != 123 {
+		t.Fatalf("expected recordId 123, got %#v", got)
 	}
 
 	svc.hub.deliverResponse(&rpcResponse{

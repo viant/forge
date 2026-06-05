@@ -13,6 +13,7 @@ public struct ChartRenderer: View {
     @State private var rows: [[String: JSONValue]] = []
     @State private var chartWindowForm: [String: JSONValue] = [:]
     @State private var selectedSeriesKeys: Set<String> = []
+    @State private var appliedSeriesKeys: [String] = []
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, chart: ChartDef) {
         self.runtime = runtime
@@ -67,9 +68,10 @@ public struct ChartRenderer: View {
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
         .onAppear {
-            if selectedSeriesKeys.isEmpty {
-                selectedSeriesKeys = Set(seriesKeys)
-            }
+            reconcileSeriesSelectionIfNeeded()
+        }
+        .onChange(of: seriesKeys) {
+            reconcileSeriesSelectionIfNeeded(force: true)
         }
         .task(id: chartTaskKey) {
             await loadRows()
@@ -102,15 +104,27 @@ public struct ChartRenderer: View {
     private var chartBody: some View {
         let type = normalizedChartType
         let singleCategory = Set(chartSeriesData.map(\.category)).count <= 1
-        if type == "pie" {
-            Chart(pieData) { item in
-                SectorMark(
-                    angle: .value("Value", item.value),
-                    innerRadius: .ratio(0.45)
-                )
-                .foregroundStyle(by: .value("Category", item.label))
+        if type == "pie" || type == "donut" {
+            if pieDataUsesSeriesStyle {
+                Chart(pieData) { item in
+                    SectorMark(
+                        angle: .value("Value", item.value),
+                        innerRadius: type == "donut" ? .ratio(0.45) : .ratio(0)
+                    )
+                    .foregroundStyle(by: .value("Series", item.seriesKey))
+                }
+                .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
+                .chartLegend(position: .bottom)
+            } else {
+                Chart(pieData) { item in
+                    SectorMark(
+                        angle: .value("Value", item.value),
+                        innerRadius: type == "donut" ? .ratio(0.45) : .ratio(0)
+                    )
+                    .foregroundStyle(by: .value("Category", item.label))
+                }
+                .chartLegend(position: .bottom)
             }
-            .chartLegend(position: .bottom)
         } else {
             Chart(chartSeriesData) { item in
                 switch type {
@@ -120,30 +134,36 @@ public struct ChartRenderer: View {
                             x: .value("Category", item.category),
                             y: .value("Value", item.value)
                         )
-                        .foregroundStyle(by: .value("Series", item.series))
-                        .position(by: .value("Series", item.series))
+                        .foregroundStyle(by: .value("Series", item.seriesKey))
+                        .position(by: .value("Series", item.seriesKey))
                     } else {
                         LineMark(
                             x: .value("Category", item.category),
                             y: .value("Value", item.value),
-                            series: .value("Series", item.series)
+                            series: .value("Series", item.seriesKey)
                         )
-                        .foregroundStyle(by: .value("Series", item.series))
+                        .foregroundStyle(by: .value("Series", item.seriesKey))
                     }
-                case "bar", "stacked_bar":
+                case "bar":
                     BarMark(
                         x: .value("Category", item.category),
                         y: .value("Value", item.value)
                     )
-                    .foregroundStyle(by: .value("Series", item.series))
-                    .position(by: .value("Series", item.series))
+                    .foregroundStyle(by: .value("Series", item.seriesKey))
+                    .position(by: .value("Series", item.seriesKey))
+                case "stacked_bar":
+                    BarMark(
+                        x: .value("Category", item.category),
+                        y: .value("Value", item.value)
+                    )
+                    .foregroundStyle(by: .value("Series", item.seriesKey))
                 default:
                     LineMark(
                         x: .value("Category", item.category),
                         y: .value("Value", item.value),
-                        series: .value("Series", item.series)
+                        series: .value("Series", item.seriesKey)
                     )
-                    .foregroundStyle(by: .value("Series", item.series))
+                    .foregroundStyle(by: .value("Series", item.seriesKey))
                 }
             }
             .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
@@ -184,7 +204,7 @@ public struct ChartRenderer: View {
     }
 
     private var seriesKeys: [String] {
-        chart.series.isEmpty ? [chart.valueKey ?? "value"] : chart.series
+        seriesDisplays.map(\.key)
     }
 
     private var supportsSeriesSelection: Bool {
@@ -197,8 +217,38 @@ public struct ChartRenderer: View {
     }
 
     private var seriesColors: [Color] {
-        let palette = [Color.blue, Color.green, Color.orange, Color.purple, Color.pink]
-        return seriesKeys.enumerated().map { index, _ in palette[index % palette.count] }
+        seriesDisplays.map(\.color)
+    }
+
+    private var pieDataUsesSeriesStyle: Bool {
+        seriesKeys.count > 1
+    }
+
+    private var seriesDisplays: [ChartSeriesDisplay] {
+        let options = resolvedChartSeriesOptions
+        let palette = chart.seriesDef?.palette.compactMap(chartColor(from:)) ?? []
+        let fallbackPalette = [Color.blue, Color.green, Color.orange, Color.purple, Color.pink]
+        var seen: Set<String> = []
+        return options.enumerated().compactMap { index, option in
+            guard let key = nonEmptyChartString(option.value), seen.insert(key).inserted else {
+                return nil
+            }
+            let color = palette[safe: index] ?? fallbackPalette[index % fallbackPalette.count]
+            return ChartSeriesDisplay(
+                key: key,
+                label: nonEmptyChartString(option.name) ?? titleizedSeriesKey(key),
+                color: color
+            )
+        }
+    }
+
+    private var resolvedChartSeriesOptions: [ChartValueOption] {
+        let structured = chart.seriesDef?.values ?? []
+        if !structured.isEmpty {
+            return structured
+        }
+        let keys = chart.series.isEmpty ? [chart.valueKey ?? "value"] : chart.series
+        return keys.map { ChartValueOption(value: $0) }
     }
 
     @ViewBuilder
@@ -208,22 +258,18 @@ public struct ChartRenderer: View {
             alignment: .leading,
             spacing: 8
         ) {
-            ForEach(Array(seriesKeys.enumerated()), id: \.element) { index, key in
-                let checked = selectedSeriesKeys.contains(key)
+            ForEach(Array(seriesDisplays.enumerated()), id: \.element.key) { _, series in
+                let checked = selectedSeriesKeys.contains(series.key)
                 Button {
-                    if checked {
-                        selectedSeriesKeys.remove(key)
-                    } else {
-                        selectedSeriesKeys.insert(key)
-                    }
+                    selectedSeriesKeys = toggledChartSeriesSelection(current: selectedSeriesKeys, key: series.key)
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: checked ? "checkmark.square.fill" : "square")
                             .foregroundStyle(checked ? Color.accentColor : Color.secondary)
                         Circle()
-                            .fill(seriesColors[index])
+                            .fill(series.color)
                             .frame(width: 8, height: 8)
-                        Text(titleizedSeriesKey(key))
+                        Text(series.label)
                             .font(isCompactPresentation ? .caption : .footnote)
                             .foregroundStyle(checked ? .primary : .secondary)
                     }
@@ -340,28 +386,70 @@ public struct ChartRenderer: View {
     }
 
     private var pieData: [PieDatum] {
-        let nameKey = chart.nameKey ?? chart.xKey ?? chart.series.first ?? "label"
-        let valueKey = filteredSeriesKeys.first ?? chart.valueKey ?? chart.series.first ?? "value"
-        return rows.compactMap { row in
-            guard let label = row[nameKey]?.displayStringValue,
-                  let value = row[valueKey]?.doubleValueValue else {
-                return nil
+        let nameKey = chart.nameKey ?? chart.xKey ?? seriesKeys.first ?? "label"
+        let valueKeys = filteredSeriesKeys
+        let displayByKey = Dictionary(uniqueKeysWithValues: seriesDisplays.map { ($0.key, $0) })
+        return rows.enumerated().flatMap { rowIndex, row in
+            let rowLabel = row[nameKey]?.displayStringValue
+            return valueKeys.compactMap { key -> PieDatum? in
+                guard let value = row[key]?.doubleValueValue else { return nil }
+                let display = displayByKey[key]
+                let seriesLabel = display?.label ?? titleizedSeriesKey(key)
+                let label = rowLabel ?? seriesLabel
+                return PieDatum(
+                    id: "\(rowIndex)|\(key)|\(label)",
+                    label: label,
+                    seriesKey: key,
+                    seriesLabel: seriesLabel,
+                    value: value
+                )
             }
-            return PieDatum(label: label, value: value)
         }
     }
 
     private var chartSeriesData: [SeriesDatum] {
-        let categoryKey = chart.xKey ?? chart.nameKey ?? chart.series.first ?? "label"
+        let categoryKey = chart.xKey ?? chart.nameKey ?? seriesKeys.first ?? "label"
         let valueKeys = filteredSeriesKeys
+        let displayByKey = Dictionary(uniqueKeysWithValues: seriesDisplays.map { ($0.key, $0) })
         return rows.flatMap { row in
             let category = row[categoryKey]?.displayStringValue ?? "—"
             return valueKeys.compactMap { key -> SeriesDatum? in
                 guard let value = row[key]?.doubleValueValue else { return nil }
-                return SeriesDatum(category: category, series: key, value: value)
+                let display = displayByKey[key]
+                return SeriesDatum(
+                    category: category,
+                    seriesKey: key,
+                    seriesLabel: display?.label ?? titleizedSeriesKey(key),
+                    value: value
+                )
             }
         }
     }
+
+    private func reconcileSeriesSelectionIfNeeded(force: Bool = false) {
+        guard force || appliedSeriesKeys != seriesKeys else {
+            return
+        }
+        selectedSeriesKeys = reconciledChartSeriesSelection(current: selectedSeriesKeys, available: seriesKeys)
+        appliedSeriesKeys = seriesKeys
+    }
+}
+
+internal func reconciledChartSeriesSelection(current: Set<String>, available: [String]) -> Set<String> {
+    let availableSet = Set(available)
+    guard !availableSet.isEmpty else {
+        return []
+    }
+    let retained = current.intersection(availableSet)
+    return retained.isEmpty ? availableSet : retained
+}
+
+internal func toggledChartSeriesSelection(current: Set<String>, key: String) -> Set<String> {
+    var next = current
+    if !next.insert(key).inserted {
+        next.remove(key)
+    }
+    return next
 }
 
 private func chartDataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) -> Bool {
@@ -388,16 +476,64 @@ private func chartSelectorStringValue(from value: Any?) -> String? {
 }
 
 private struct PieDatum: Identifiable {
-    let id = UUID()
+    let id: String
     let label: String
+    let seriesKey: String
+    let seriesLabel: String
     let value: Double
 }
 
 private struct SeriesDatum: Identifiable {
     let id = UUID()
     let category: String
-    let series: String
+    let seriesKey: String
+    let seriesLabel: String
     let value: Double
+}
+
+private struct ChartSeriesDisplay: Identifiable {
+    var id: String { key }
+    let key: String
+    let label: String
+    let color: Color
+}
+
+private func nonEmptyChartString(_ value: String?) -> String? {
+    let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return trimmed.isEmpty ? nil : trimmed
+}
+
+private func chartColor(from raw: String) -> Color? {
+    var hex = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    if hex.hasPrefix("#") {
+        hex.removeFirst()
+    }
+    guard hex.count == 6 || hex.count == 8,
+          let value = UInt64(hex, radix: 16) else {
+        return nil
+    }
+    let red: Double
+    let green: Double
+    let blue: Double
+    let alpha: Double
+    if hex.count == 8 {
+        red = Double((value >> 24) & 0xFF) / 255
+        green = Double((value >> 16) & 0xFF) / 255
+        blue = Double((value >> 8) & 0xFF) / 255
+        alpha = Double(value & 0xFF) / 255
+    } else {
+        red = Double((value >> 16) & 0xFF) / 255
+        green = Double((value >> 8) & 0xFF) / 255
+        blue = Double(value & 0xFF) / 255
+        alpha = 1
+    }
+    return Color(red: red, green: green, blue: blue, opacity: alpha)
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }
 
 private func titleizedSeriesKey(_ key: String) -> String {

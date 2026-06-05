@@ -126,15 +126,13 @@ public actor ForgeRuntime {
     // MARK: - Window lifecycle
 
     @discardableResult
-    public func openWindowInline(key: String, title: String, metadata: WindowMetadata) -> WindowState {
+    public func openWindowInline(key: String, title: String, metadata: WindowMetadata) async -> WindowState {
         let resolved = MetadataResolver.resolve(metadata, for: targetContext)
         let state = WindowState(key: key, title: title, metadata: resolved)
         windows.append(state)
-        Task {
-            let signal = await signals.metadata(windowID: state.id)
-            await signal.set(resolved)
-            await reconcileWindowForm(windowID: state.id, metadata: resolved, parameters: [:])
-        }
+        let signal = await signals.metadata(windowID: state.id)
+        await signal.set(resolved)
+        await reconcileWindowForm(windowID: state.id, metadata: resolved, parameters: [:])
         return state
     }
 
