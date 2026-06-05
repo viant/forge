@@ -58,6 +58,7 @@ class MetadataNormalizationTest {
                       "measures": [],
                       "dimensions": [],
                       "staticFilters": [],
+                      "unifiedFamilyRows": true,
                       "dynamicFilterGroups": []
                     }
                   }
@@ -73,6 +74,7 @@ class MetadataNormalizationTest {
         assertEquals(1, decoded.view?.content?.containers?.size)
         assertEquals("forecasting_cube_report", decoded.view?.content?.containers?.first()?.dataSourceRef)
         assertEquals(true, decoded.view?.content?.containers?.first()?.dashboard?.reportBuilder != null)
+        assertEquals(true, decoded.view?.content?.containers?.first()?.dashboard?.reportBuilder?.unifiedFamilyRows)
         assertEquals(true, decoded.dataSources.containsKey("forecasting_cube_report"))
     }
 

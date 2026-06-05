@@ -805,6 +805,7 @@ final class ForgeIOSTests: XCTestCase {
           "title": "Forecasting",
           "dataSourceRef": "forecasting_cube_report",
           "reportBuilder": {
+            "unifiedFamilyRows": true,
             "showResultHeader": false
           }
         }
@@ -817,6 +818,7 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(root.id, "forecastingCubeBuilder")
         XCTAssertEqual(root.title, "Forecasting")
         XCTAssertEqual(root.dataSourceRef, "forecasting_cube_report")
+        XCTAssertEqual(root.dashboard?.reportBuilder?.unifiedFamilyRows, true)
         XCTAssertEqual(root.dashboard?.reportBuilder?.showResultHeader, false)
     }
 
@@ -830,6 +832,7 @@ final class ForgeIOSTests: XCTestCase {
               "title": "Forecasting",
               "dataSourceRef": "forecasting_cube_report",
               "reportBuilder": {
+                "unifiedFamilyRows": true,
                 "showResultHeader": false
               }
             }
@@ -844,6 +847,7 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(root.id, "forecastingCubeBuilder")
         XCTAssertEqual(root.title, "Forecasting")
         XCTAssertEqual(root.dataSourceRef, "forecasting_cube_report")
+        XCTAssertEqual(root.dashboard?.reportBuilder?.unifiedFamilyRows, true)
         XCTAssertEqual(root.dashboard?.reportBuilder?.showResultHeader, false)
     }
 

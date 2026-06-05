@@ -197,6 +197,7 @@ public struct ReportBuilderRenderer: View {
             ReportBuilderDynamicFiltersView(
                 groups: config.dynamicFilterGroups,
                 families: config.dynamicFilterFamilies,
+                unifiedFamilyRows: config.unifiedFamilyRows,
                 rowsByGroupID: dynamicGroups,
                 drafts: dynamicFilterDrafts,
                 isLookupAvailable: { groupID, filter in
@@ -220,6 +221,23 @@ public struct ReportBuilderRenderer: View {
                             enabled: row.enabled,
                             selections: []
                         )
+                    }
+                },
+                onMoveRow: { fromGroupID, rowID, toGroupID, filterID, resetSelections in
+                    guard let row = dynamicGroups[fromGroupID, default: []].first(where: { $0.id == rowID }) else {
+                        return
+                    }
+                    dynamicGroups[fromGroupID] = dynamicGroups[fromGroupID, default: []].filter { $0.id != rowID }
+                    dynamicGroups[toGroupID, default: []].append(
+                        ReportBuilderDynamicRowState(
+                            id: row.id,
+                            filterId: filterID,
+                            enabled: row.enabled,
+                            selections: resetSelections ? [] : row.selections
+                        )
+                    )
+                    if resetSelections {
+                        dynamicFilterDrafts[rowID] = nil
                     }
                 },
                 onToggleEnabled: { groupID, rowID in
@@ -407,18 +425,20 @@ public struct ReportBuilderRenderer: View {
                         if (filter.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "daterange" {
                             let current = staticFilters[key] ?? .dateRange(start: "", end: "")
                             HStack(spacing: 8) {
-                                TextField("Start", text: Binding(
-                                    get: { current.startValue },
-                                    set: { next in staticFilters[key] = .dateRange(start: next, end: current.endValue) }
-                                ))
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 128)
-                                TextField("End", text: Binding(
-                                    get: { current.endValue },
-                                    set: { next in staticFilters[key] = .dateRange(start: current.startValue, end: next) }
-                                ))
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 128)
+                                dateRangeTextField(
+                                    "Start",
+                                    text: Binding(
+                                        get: { current.startValue },
+                                        set: { next in staticFilters[key] = .dateRange(start: next, end: current.endValue) }
+                                    )
+                                )
+                                dateRangeTextField(
+                                    "End",
+                                    text: Binding(
+                                        get: { current.endValue },
+                                        set: { next in staticFilters[key] = .dateRange(start: current.startValue, end: next) }
+                                    )
+                                )
                             }
                         } else {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -471,6 +491,18 @@ public struct ReportBuilderRenderer: View {
                 }
             }
         }
+    }
+
+    private func dateRangeTextField(_ placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text)
+            .font(.footnote.monospacedDigit().weight(.medium))
+            .textFieldStyle(.plain)
+            .foregroundStyle(Color(red: 0.12, green: 0.23, blue: 0.17))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(width: 118, alignment: .leading)
+            .background(Color(red: 0.93, green: 0.98, blue: 0.95), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(red: 0.78, green: 0.88, blue: 0.82), lineWidth: 1))
     }
 
     @ViewBuilder
