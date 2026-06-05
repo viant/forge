@@ -14,6 +14,25 @@ function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+const WINDOW_FORM_META_KEY = "__forge";
+
+export const withWindowFormPrefillRevision = (previous = {}, next = {}) => {
+    if (!isPlainObject(next) || !Object.prototype.hasOwnProperty.call(next, "prefill")) {
+        return next;
+    }
+    const previousMeta = isPlainObject(previous?.[WINDOW_FORM_META_KEY]) ? previous[WINDOW_FORM_META_KEY] : {};
+    const nextMeta = isPlainObject(next?.[WINDOW_FORM_META_KEY]) ? next[WINDOW_FORM_META_KEY] : {};
+    const previousRevision = Number(previousMeta.prefillRevision || 0);
+    const prefillRevision = (Number.isFinite(previousRevision) ? previousRevision : 0) + 1;
+    return {
+        ...next,
+        [WINDOW_FORM_META_KEY]: {
+            ...nextMeta,
+            prefillRevision,
+        },
+    };
+};
+
 export const mergeWindowFormValues = (previous = {}, next = {}) => {
     const left = isPlainObject(previous) ? previous : {};
     const right = isPlainObject(next) ? next : {};
@@ -775,7 +794,10 @@ const setWindowFormData = ({values = {}, parameters = {}}) => {
     const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
     if (signals.windowForm) {
         const previousValues = signals.windowForm.peek?.() || {};
-        signals.windowForm.value = mergeWindowFormValues(previousValues, nextValues);
+        signals.windowForm.value = mergeWindowFormValues(
+            previousValues,
+            withWindowFormPrefillRevision(previousValues, nextValues),
+        );
     }
     return true;
 }

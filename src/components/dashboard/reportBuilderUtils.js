@@ -35,7 +35,11 @@ function setNestedValue(target, path, value) {
 }
 
 function normalizeArray(values = []) {
-    return Array.isArray(values) ? values.filter(Boolean) : [];
+    const isPresent = (entry) => entry !== undefined && entry !== null && entry !== "";
+    if (Array.isArray(values)) {
+        return values.filter(isPresent);
+    }
+    return isPresent(values) ? [values] : [];
 }
 
 function formatDateISO(date) {
@@ -123,12 +127,7 @@ function normalizeDynamicRow(row = {}, group = {}, index = 0) {
         id: rowId || `row_${index + 1}`,
         filterId: String(row.filterId || firstFilterId).trim(),
         enabled: row?.enabled !== false,
-        selections: normalizeArray(row.selections).map((entry) => ({
-            value: entry?.value,
-            label: entry?.label,
-            group: entry?.group || "",
-            record: entry?.record ?? null,
-        })),
+        selections: normalizeArray(row.selections).map((entry) => clone(entry)),
     };
 }
 
@@ -138,29 +137,30 @@ function filterDefinitionForRow(group = {}, row = {}) {
 }
 
 function normalizeSelectionForFilter(filterDef = {}, entry = null) {
-    if (!entry || typeof entry !== "object") {
-        return null;
-    }
+    const isObjectEntry = entry && typeof entry === "object" && !Array.isArray(entry);
     const valueSelector = String(filterDef?.valueSelector || "value").trim() || "value";
     const labelSelector = String(filterDef?.labelSelector || "label").trim() || "label";
-    const valueType = String(filterDef?.manualValueType || "string").trim().toLowerCase();
-    const record = entry?.record && typeof entry.record === "object" ? entry.record : {};
-    const rawValue = entry?.value ?? record?.[valueSelector];
+    const record = isObjectEntry && entry?.record && typeof entry.record === "object"
+        ? entry.record
+        : (isObjectEntry ? entry : {});
+    const rawValue = isObjectEntry
+        ? (
+            entry?.value
+            ?? selectFirstDefined(entry, lookupValueFallbackSelectors(valueSelector))
+            ?? selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector))
+        )
+        : entry;
     const coerced = coerceManualSelectionValue(filterDef, rawValue);
     if (!coerced.ok) {
         return null;
     }
-    const recordLabel = String(record?.[labelSelector] ?? "").trim();
-    const entryLabel = String(entry?.label ?? "").trim();
-    const label = (
-        recordLabel
-        || ((valueType === "int" || valueType === "integer") ? "" : entryLabel)
-        || String(coerced.label || "").trim()
-    );
+    const recordLabel = String(selectFirstDefined(record, lookupLabelFallbackSelectors(labelSelector, valueSelector)) ?? "").trim();
+    const entryLabel = String(isObjectEntry ? (entry?.label ?? "") : "").trim();
+    const label = recordLabel || entryLabel || String(coerced.label || "").trim();
     return {
         value: coerced.value,
         label,
-        group: entry?.group || "",
+        group: isObjectEntry ? (entry?.group || "") : "",
         record: {
             ...record,
             [valueSelector]: coerced.value,
@@ -173,7 +173,7 @@ function rowHasSelections(row = {}) {
     return Array.isArray(row?.selections) && row.selections.length > 0;
 }
 
-function normalizeDynamicGroupRows(rows = [], group = {}) {
+export function normalizeDynamicGroupRows(rows = [], group = {}) {
     return normalizeArray(rows).map((row, index) => {
         const normalizedRow = normalizeDynamicRow(row, group, index);
         const filterDef = filterDefinitionForRow(group, normalizedRow);
@@ -915,8 +915,7 @@ export function buildReportBuilderDefaultState(config = {}) {
     dynamicFilterGroups.forEach((group) => {
         const key = String(group.id || "").trim();
         if (!key) return;
-        const seededRows = normalizeArray(group.defaultRows).map((row, index) => normalizeDynamicRow(row, group, index));
-        defaultDynamicGroups[key] = seededRows;
+        defaultDynamicGroups[key] = normalizeDynamicGroupRows(group.defaultRows, group);
     });
 
     const defaultChartSpec = sanitizeChartSpecAgainstConfig(config, config?.result?.defaultChartSpec || null);

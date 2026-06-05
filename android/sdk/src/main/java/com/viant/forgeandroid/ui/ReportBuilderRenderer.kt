@@ -297,12 +297,20 @@ fun ReportBuilderRenderer(
                     selectedMeasures = toggleKey(selectedMeasures, key).ifEmpty { listOf(key) }
                 }
             )
-            ChipSection(
+            BreakdownSection(
                 title = "Breakdowns",
                 items = visibleDimensions.map { reportBuilderDimensionLabel(it) to reportBuilderDimensionKey(it) },
                 selected = selectedDimensions,
-                onToggle = { key ->
-                    selectedDimensions = toggleKey(selectedDimensions, key).ifEmpty { listOf(key) }
+                onAdd = { key ->
+                    if (!selectedDimensions.contains(key)) {
+                        selectedDimensions = selectedDimensions + key
+                    }
+                },
+                onRemove = { key ->
+                    val next = selectedDimensions.filterNot { it == key }
+                    if (next.isNotEmpty()) {
+                        selectedDimensions = next
+                    }
                 }
             )
             StaticFilterSection(config.staticFilters, staticFilters) { key, value ->
@@ -606,7 +614,7 @@ private fun DynamicFilterGroupFields(
         rows.forEach { row ->
             val filter = filters.firstOrNull { it.id == row.filterId } ?: return@forEach
             val rowId = row.id
-            val chips = row.selections
+            val lookupAvailable = isLookupAvailable(groupId, filter)
             var rowMenuExpanded by remember(rowId, filters) { mutableStateOf(false) }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -630,45 +638,92 @@ private fun DynamicFilterGroupFields(
                     OutlinedButton(onClick = { onToggleEnabled(groupId, rowId) }) {
                         Text(if (row.enabled) "On" else "Off")
                     }
-                    OutlinedTextField(
-                        value = drafts[rowId].orEmpty(),
-                        onValueChange = { next -> onDraftChange(rowId, next) },
-                        modifier = Modifier.weight(1f),
-                        label = { Text(filter.label ?: rowId) },
-                        placeholder = { Text(filter.manualPlaceholder ?: "Enter value") }
-                    )
-                    Button(
-                        onClick = {
-                            onAddManualSelection(groupId, rowId, filter)
-                        }
-                    ) {
-                        Text("Add")
-                    }
-                    if (isLookupAvailable(groupId, filter)) {
-                        OutlinedButton(onClick = { onPickSelection(groupId, rowId, filter) }) {
-                            Text("Pick")
-                        }
-                    }
                     OutlinedButton(onClick = { onRemoveRow(groupId, rowId) }) {
                         Icon(Icons.Filled.Delete, contentDescription = null)
                     }
                 }
-                if (chips.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        chips.forEach { chip ->
-                            AssistChip(
-                                onClick = {
-                                    onRemoveSelection(groupId, rowId, chip)
-                                },
-                                label = { Text(chip.label.ifBlank { dynamicSelectionValueText(chip.value) }) },
-                                trailingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
-                                colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFE8F0FF))
+                LookupSelectionControl(
+                    selections = row.selections,
+                    draft = drafts[rowId].orEmpty(),
+                    placeholder = filter.manualPlaceholder ?: filter.label ?: "Enter value",
+                    manualEntry = filter.manualEntry == true,
+                    lookupAvailable = lookupAvailable,
+                    enabled = row.enabled,
+                    onDraftChange = { next -> onDraftChange(rowId, next) },
+                    onCommitManual = { onAddManualSelection(groupId, rowId, filter) },
+                    onPick = { onPickSelection(groupId, rowId, filter) },
+                    onRemoveSelection = { selection -> onRemoveSelection(groupId, rowId, selection) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LookupSelectionControl(
+    selections: List<ReportBuilderDynamicSelectionState>,
+    draft: String,
+    placeholder: String,
+    manualEntry: Boolean,
+    lookupAvailable: Boolean,
+    enabled: Boolean,
+    onDraftChange: (String) -> Unit,
+    onCommitManual: () -> Unit,
+    onPick: () -> Unit,
+    onRemoveSelection: (ReportBuilderDynamicSelectionState) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (selections.isNotEmpty()) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                selections.forEach { chip ->
+                    AssistChip(
+                        onClick = { onRemoveSelection(chip) },
+                        label = {
+                            Text(
+                                chip.label.ifBlank { dynamicSelectionValueText(chip.value) },
+                                color = Color(0xFF755600)
                             )
-                        }
+                        },
+                        trailingIcon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFFFF7D8))
+                    )
+                }
+            }
+        }
+
+        if (manualEntry || lookupAvailable) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (manualEntry) {
+                    OutlinedTextField(
+                        value = draft,
+                        onValueChange = onDraftChange,
+                        modifier = Modifier.width(176.dp),
+                        placeholder = { Text(placeholder) },
+                        singleLine = true,
+                        enabled = enabled,
+                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+                    )
+                } else {
+                    OutlinedButton(
+                        onClick = onPick,
+                        enabled = enabled && lookupAvailable,
+                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp)
+                    ) {
+                        Text(placeholder)
                     }
+                }
+                OutlinedButton(
+                    onClick = {
+                        if (lookupAvailable) onPick() else onCommitManual()
+                    },
+                    enabled = enabled && (lookupAvailable || draft.isNotBlank()),
+                    modifier = Modifier.height(56.dp).width(44.dp),
+                    shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 28.dp, bottomEnd = 28.dp)
+                ) {
+                    Icon(if (lookupAvailable) Icons.Filled.ArrowDropDown else Icons.Filled.Add, contentDescription = null)
                 }
             }
         }
@@ -691,22 +746,27 @@ private fun StaticFilterSection(
                 Text(filter.label ?: key, style = MaterialTheme.typography.labelMedium, color = Color(0xFF6A7280))
                 if (type == "daterange") {
                     val current = state[key] as? Map<*, *> ?: emptyMap<String, String>()
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         OutlinedTextField(
                             value = current["start"]?.toString().orEmpty(),
                             onValueChange = { next ->
                                 onChange(key, mapOf("start" to next, "end" to current["end"]?.toString().orEmpty()))
                             },
-                            modifier = Modifier.weight(1f),
-                            label = { Text("Start") }
+                            modifier = Modifier.width(136.dp),
+                            label = { Text("Start") },
+                            singleLine = true
                         )
                         OutlinedTextField(
                             value = current["end"]?.toString().orEmpty(),
                             onValueChange = { next ->
                                 onChange(key, mapOf("start" to current["start"]?.toString().orEmpty(), "end" to next))
                             },
-                            modifier = Modifier.weight(1f),
-                            label = { Text("End") }
+                            modifier = Modifier.width(136.dp),
+                            label = { Text("End") },
+                            singleLine = true
                         )
                     }
                 } else {
@@ -786,6 +846,66 @@ private fun ChipSection(
                         selectedContainerColor = Color(0xFFE8F0FF)
                     )
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BreakdownSection(
+    title: String,
+    items: List<Pair<String, String>>,
+    selected: List<String>,
+    onAdd: (String) -> Unit,
+    onRemove: (String) -> Unit
+) {
+    var expanded by remember(items, selected) { mutableStateOf(false) }
+    val selectedKeys = selected.toSet()
+    val available = items.filterNot { selectedKeys.contains(it.second) }
+    val selectedItems = selected.mapNotNull { key -> items.firstOrNull { it.second == key } }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                enabled = available.isNotEmpty()
+            ) {
+                Text(if (available.isEmpty()) "All breakdowns added" else "Add breakdown...")
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                if (available.isEmpty()) {
+                    DropdownMenuItem(text = { Text("All breakdowns added") }, onClick = { expanded = false })
+                } else {
+                    available.forEach { (label, key) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                expanded = false
+                                onAdd(key)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+        if (selectedItems.isNotEmpty()) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                selectedItems.forEach { (label, key) ->
+                    val removable = selectedItems.size > 1
+                    AssistChip(
+                        onClick = { if (removable) onRemove(key) },
+                        label = { Text(label) },
+                        trailingIcon = if (removable) {
+                            { Icon(Icons.Filled.Delete, contentDescription = null) }
+                        } else null,
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFE8F0FF))
+                    )
+                }
             }
         }
     }

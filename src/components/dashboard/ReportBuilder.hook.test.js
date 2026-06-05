@@ -2,12 +2,25 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyReportBuilderStateHook,
+  prefillSignature,
   resolveReportBuilderHookHandler,
   resolveReportBuilderLookupDescriptor,
   resolveReportBuilderNotices,
 } from "./ReportBuilder.jsx";
 
 describe("resolveReportBuilderHookHandler", () => {
+  it("includes generic prefill revision in the report-builder prefill signature", () => {
+    const prefill = { dealId: 778899 };
+
+    expect(prefillSignature({
+      prefill,
+      __forge: { prefillRevision: 1 },
+    })).not.toEqual(prefillSignature({
+      prefill,
+      __forge: { prefillRevision: 2 },
+    }));
+  });
+
   it("resolves unqualified handlers from the current window namespace", () => {
     const calls = [];
     const handler = () => "ok";

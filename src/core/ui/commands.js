@@ -32,7 +32,7 @@ import { buildDashboardDemoStandaloneHtml, getDashboardDemoExportFilename, listD
 import { DASHBOARD_BLOCK_KINDS, DASHBOARD_CHART_TYPES, DASHBOARD_COMMANDS, DASHBOARD_METADATA_SCHEMA } from './dashboardCapabilities.js';
 import { getWindowContext } from '../context/registry.js';
 import { buildDashboardDefaultFilters, setDashboardSelectionState } from '../../components/dashboard/dashboardUtils.js';
-import { mergeWindowFormValues } from '../../hooks/dataSource.js';
+import { mergeWindowFormValues, withWindowFormPrefillRevision } from '../../hooks/dataSource.js';
 
 function requireString(name, v) {
   if (typeof v !== 'string' || v.trim() === '') {
@@ -519,7 +519,8 @@ export async function runUICommand(cmd = {}) {
       const windowForm = getFormSignal(`${windowId}:windowForm`);
       const previous = windowForm.peek() || {};
       const replace = params.replace === true;
-      windowForm.value = replace ? values : mergeWindowFormValues(previous, values);
+      const nextValues = withWindowFormPrefillRevision(previous, values);
+      windowForm.value = replace ? nextValues : mergeWindowFormValues(previous, nextValues);
       return { ok: true };
     }
     case 'ui.window.activate': {

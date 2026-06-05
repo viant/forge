@@ -138,6 +138,9 @@
     color: #c23030;
 }
 
+.forge-lookup-dialog .bp6-dialog,
+.forge-lookup-dialog .bp5-dialog,
+.forge-lookup-dialog .bp4-dialog,
 .steward-lookup-dialog .bp6-dialog,
 .steward-lookup-dialog .bp5-dialog,
 .steward-lookup-dialog .bp4-dialog {
@@ -149,20 +152,38 @@
         0 0 0 1px rgba(255, 255, 255, 0.7) inset;
 }
 
+.forge-lookup-dialog .bp6-dialog-header,
+.forge-lookup-dialog .bp5-dialog-header,
+.forge-lookup-dialog .bp4-dialog-header,
 .steward-lookup-dialog .bp6-dialog-header,
 .steward-lookup-dialog .bp5-dialog-header,
 .steward-lookup-dialog .bp4-dialog-header {
-    background: linear-gradient(135deg, rgba(208, 234, 214, 0.96) 0%, rgba(229, 245, 233, 0.92) 100%);
-    border-bottom: 1px solid rgba(102, 145, 115, 0.2);
+    background: linear-gradient(135deg, #187a4f 0%, #0f633d 100%);
+    border-bottom: 1px solid rgba(10, 72, 44, 0.85);
 }
 
+.forge-lookup-dialog .bp6-heading,
+.forge-lookup-dialog .bp5-heading,
+.forge-lookup-dialog .bp4-heading,
 .steward-lookup-dialog .bp6-heading,
 .steward-lookup-dialog .bp5-heading,
 .steward-lookup-dialog .bp4-heading {
-    color: #21412b;
+    color: #ffffff;
     letter-spacing: 0.01em;
 }
 
+.forge-lookup-dialog .bp6-dialog-header .bp6-button,
+.forge-lookup-dialog .bp5-dialog-header .bp5-button,
+.forge-lookup-dialog .bp4-dialog-header .bp4-button,
+.steward-lookup-dialog .bp6-dialog-header .bp6-button,
+.steward-lookup-dialog .bp5-dialog-header .bp5-button,
+.steward-lookup-dialog .bp4-dialog-header .bp4-button {
+    color: #ffffff;
+}
+
+.forge-lookup-dialog .bp6-dialog-footer,
+.forge-lookup-dialog .bp5-dialog-footer,
+.forge-lookup-dialog .bp4-dialog-footer,
 .steward-lookup-dialog .bp6-dialog-footer,
 .steward-lookup-dialog .bp5-dialog-footer,
 .steward-lookup-dialog .bp4-dialog-footer {
