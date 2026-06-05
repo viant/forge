@@ -262,6 +262,161 @@ try {
   assert.deepEqual(readyEventCalls.slice(0, 4), ['ui.hello', 'ui.snapshot.get', 'ui.snapshot', 'ui.poll']);
   console.log('bridge startup readiness ✓ defers first publish/poll until the configured startup event');
 
+  const commandCalls = [];
+  let commandPollCount = 0;
+  const openedWindowId = 'forecastingCubeBuilder__conv-command';
+  visibilityState = 'visible';
+  focused = true;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    commandCalls.push(body);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-command-order' });
+    if (body.method === 'ui.hello') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { snapshot: { selected: { windowId: 'chat/new', tabId: 'chat/new' }, windows: [] } }
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      commandPollCount += 1;
+      if (commandPollCount === 1) {
+        return new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            method: 'ui.command',
+            params: {
+              id: 'cmd-open-forecasting',
+              method: 'ui.window.open',
+              params: {
+                windowId: openedWindowId,
+                windowKey: 'forecastingCubeBuilder',
+                windowTitle: 'Forecasting',
+                parameters: {},
+                options: {
+                  conversationId: 'conv-command',
+                  presentation: 'hosted',
+                  region: 'chat.top',
+                  parentKey: 'chat/new',
+                }
+              }
+            }
+          }
+        }), { status: 200, headers });
+      }
+      return new Response('', { status: 202, headers });
+    }
+    if (body.method === 'ui.response') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopCommandOrder = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10,
+  });
+
+  await sleep(120);
+  stopCommandOrder();
+  const responseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-open-forecasting');
+  assert.equal(responseIndex > 0, true);
+  let snapshotBeforeResponse = null;
+  for (let i = responseIndex - 1; i >= 0; i -= 1) {
+    if (commandCalls[i].method === 'ui.snapshot') {
+      snapshotBeforeResponse = commandCalls[i];
+      break;
+    }
+  }
+  assert.equal(!!snapshotBeforeResponse, true);
+  assert.equal(snapshotBeforeResponse.params?.data?.windows?.some((win) => win?.windowId === openedWindowId), true);
+  console.log('bridge command ordering ✓ publishes opened window snapshot before ui.response');
+
+  const commandFailureCalls = [];
+  const commandFailureResponses = [];
+  let commandFailurePollCount = 0;
+  const rejectedWindowId = 'forecastingCubeBuilder__conv-snapshot-fail';
+  visibilityState = 'visible';
+  focused = true;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    commandFailureCalls.push(body);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-command-failure' });
+    if (body.method === 'ui.hello') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { snapshot: { selected: { windowId: 'chat/new', tabId: 'chat/new' }, windows: [] } }
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      const hasRejectedWindow = body.params?.data?.windows?.some((win) => win?.windowId === rejectedWindowId);
+      if (hasRejectedWindow) {
+        return new Response('snapshot rejected', { status: 500, headers });
+      }
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      commandFailurePollCount += 1;
+      if (commandFailurePollCount === 1) {
+        return new Response(JSON.stringify({
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            method: 'ui.command',
+            params: {
+              id: 'cmd-open-snapshot-fail',
+              method: 'ui.window.open',
+              params: {
+                windowId: rejectedWindowId,
+                windowKey: 'forecastingCubeBuilder',
+                windowTitle: 'Forecasting',
+                parameters: {},
+                options: {
+                  conversationId: 'conv-snapshot-fail',
+                  presentation: 'hosted',
+                  region: 'chat.top',
+                  parentKey: 'chat/new',
+                }
+              }
+            }
+          }
+        }), { status: 200, headers });
+      }
+      return new Response('', { status: 202, headers });
+    }
+    if (body.method === 'ui.response') {
+      commandFailureResponses.push(body.params);
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopCommandSnapshotFailure = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10,
+  });
+
+  await sleep(120);
+  stopCommandSnapshotFailure();
+  assert.equal(commandFailureResponses.length, 1);
+  assert.equal(commandFailureResponses[0]?.id, 'cmd-open-snapshot-fail');
+  assert.equal(commandFailureResponses[0]?.ok, false);
+  assert.match(String(commandFailureResponses[0]?.error || ''), /HTTP 500/);
+  console.log('bridge command failure ✓ rejects success response when opened-window snapshot is not accepted');
+
   let aborted = false;
   globalThis.fetch = async (_url, options = {}) => {
     const body = JSON.parse(String(options.body || '{}'));
@@ -336,7 +491,7 @@ try {
   focused = true;
   window.dispatchEvent(new Event('focus'));
   window.dispatchEvent(new Event('visibilitychange'));
-  await sleep(80);
+  await sleep(650);
   stopOwner();
   assert.equal(ownerCalls.includes('ui.poll'), true);
   console.log('bridge polling owner ✓ hidden/unfocused tabs skip ui.poll until focus returns');

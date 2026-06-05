@@ -22,6 +22,8 @@ public struct ReportBuilderRenderer: View {
     @State private var windowActionsCode: String? = nil
     @State private var windowNamespace: String = ""
     @State private var restoredStoredState = false
+    @State private var windowFormValues: [String: JSONValue] = [:]
+    @State private var appliedPrefillSignature = ""
     @State private var requestBridgeGeneration = 0
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, config: DashboardReportBuilderDef) {
@@ -38,6 +40,12 @@ public struct ReportBuilderRenderer: View {
         }
         .task(id: hydrationTaskKey) {
             await hydrateInitialStateIfNeeded()
+        }
+        .task(id: windowFormTaskKey) {
+            await observeWindowFormUpdates()
+        }
+        .task(id: currentPrefillSignature) {
+            await applyWindowFormPrefillIfNeeded()
         }
         .onChange(of: persistenceSignature) {
             guard restoredStoredState else { return }
@@ -76,6 +84,14 @@ public struct ReportBuilderRenderer: View {
 
     private var hydrationTaskKey: String {
         [window?.windowID ?? "", builderStateKey ?? "", container.dataSourceRef ?? ""].joined(separator: ":")
+    }
+
+    private var windowFormTaskKey: String {
+        window?.windowID ?? ""
+    }
+
+    private var currentPrefillSignature: String {
+        Self.reportBuilderPrefillSignature(windowFormValues)
     }
 
     private var explicitChartMode: Bool {
@@ -656,10 +672,12 @@ public struct ReportBuilderRenderer: View {
         }
 
         await refreshAvailableDialogs()
+        await refreshWindowFormValues()
 
         if let restored = await loadPersistedState() {
             apply(restored: restored)
-            await applyInitializeStateHookIfNeeded()
+            await applyInitializeStateHookIfNeeded(windowForm: windowFormValues)
+            appliedPrefillSignature = currentPrefillSignature
             return
         }
 
@@ -671,7 +689,31 @@ public struct ReportBuilderRenderer: View {
         } else {
             viewMode = config.result?.defaultMode ?? "table"
         }
-        await applyInitializeStateHookIfNeeded()
+        await applyInitializeStateHookIfNeeded(windowForm: windowFormValues)
+        appliedPrefillSignature = currentPrefillSignature
+    }
+
+    @MainActor
+    private func refreshWindowFormValues() async {
+        guard let runtime, let window else {
+            windowFormValues = [:]
+            return
+        }
+        windowFormValues = await runtime.windowFormJSONValue(windowID: window.windowID)
+    }
+
+    @MainActor
+    private func observeWindowFormUpdates() async {
+        guard let runtime, let window else {
+            windowFormValues = [:]
+            return
+        }
+        windowFormValues = await runtime.windowFormJSONValue(windowID: window.windowID)
+        let stream = await runtime.windowFormUpdates(windowID: window.windowID)
+        for await next in stream {
+            if Task.isCancelled { return }
+            windowFormValues = next
+        }
     }
 
     @MainActor
@@ -689,14 +731,19 @@ public struct ReportBuilderRenderer: View {
     }
 
     @MainActor
-    private func applyInitializeStateHookIfNeeded() async {
+    private func applyInitializeStateHookIfNeeded(windowForm: [String: JSONValue]? = nil) async {
         guard let hookName = config.hooks?.initializeState?.trimmingCharacters(in: .whitespacesAndNewlines),
               !hookName.isEmpty,
               let runtime,
               let window else {
             return
         }
-        let formValue = await runtime.windowFormJSONValue(windowID: window.windowID)
+        let formValue: [String: JSONValue]
+        if let windowForm {
+            formValue = windowForm
+        } else {
+            formValue = await runtime.windowFormJSONValue(windowID: window.windowID)
+        }
         guard let stateValue = Self.jsonValue(from: currentStoredState()) else { return }
         let props = Self.objectValue([
             "state": stateValue,
@@ -709,6 +756,19 @@ public struct ReportBuilderRenderer: View {
             return
         }
         apply(restored: next)
+    }
+
+    @MainActor
+    private func applyWindowFormPrefillIfNeeded() async {
+        let signature = currentPrefillSignature
+        guard restoredStoredState,
+              !signature.isEmpty,
+              signature != appliedPrefillSignature else {
+            return
+        }
+        await applyInitializeStateHookIfNeeded(windowForm: windowFormValues)
+        appliedPrefillSignature = signature
+        requestBridgeGeneration += 1
     }
 
     private func applyBuildRequestHook(_ request: [String: JSONValue]) -> [String: JSONValue] {
@@ -1015,6 +1075,20 @@ public struct ReportBuilderRenderer: View {
         let signature = dimensions.joined(separator: "|") + "::" + measures.joined(separator: "|")
         let hash = signature.utf8.reduce(5381) { (($0 << 5) &+ $0) &+ Int($1) }
         return "rb_\(String(hash, radix: 16))"
+    }
+
+    private static func reportBuilderPrefillSignature(_ windowForm: [String: JSONValue]) -> String {
+        guard let prefill = windowForm["prefill"]?.objectValue, !prefill.isEmpty else {
+            return ""
+        }
+        let meta = windowForm["__forge"]?.objectValue ?? [:]
+        let revision = meta["prefillRevision"]?.intValue
+            ?? meta["prefillRevision"]?.stringValue.flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+            ?? 0
+        return JSONValue.object([
+            "revision": .number(Double(revision)),
+            "prefill": .object(prefill)
+        ]).signature
     }
 
     private func dictionarySignature(_ values: [String: String]) -> String {
@@ -1682,6 +1756,23 @@ private extension JSONValue {
             return Double(value)
         default:
             return nil
+        }
+    }
+
+    var signature: String {
+        switch self {
+        case .string(let value):
+            return "s:\(value)"
+        case .number(let value):
+            return "n:\(value)"
+        case .bool(let value):
+            return "b:\(value)"
+        case .array(let values):
+            return "a:[\(values.map(\.signature).joined(separator: ","))]"
+        case .object(let values):
+            return "o:{\(values.keys.sorted().map { "\($0)=\(values[$0]?.signature ?? "null")" }.joined(separator: ","))}"
+        case .null:
+            return "null"
         }
     }
 }

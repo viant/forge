@@ -68,6 +68,7 @@ getViewSignal('W1').value = { tabs: { c1: 'kpiTab' } };
 
 const snap = buildUISnapshot({ includeCollection: false, includeInlineMetadata: true });
 
+assert.equal(snap.conversationId, null);
 assert.equal(snap.selected.windowId, 'W1');
 assert.equal(snap.windows.length, 1);
 assert.equal(snap.windows[0].metadata.loaded, true);
@@ -123,6 +124,7 @@ selectedTabId.value = 'order_2609393__conv-1';
 selectedWindowId.value = 'order_2609393__conv-1';
 
 const compareSnap = buildUISnapshot({ includeCollection: false });
+assert.equal(compareSnap.conversationId, 'conv-1');
 assert.deepEqual(compareSnap.windows[0].compareContext, {
   orderIds: ['2656980', '2609393'],
   windowIds: ['order_2656980__conv-1', 'order_2609393__conv-1'],

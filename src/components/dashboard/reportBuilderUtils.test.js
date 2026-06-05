@@ -24,6 +24,7 @@ import {
     projectManualSelection,
     resolveReportBuilderReadiness,
     sanitizeReportBuilderState,
+    shouldAutoCollapseReportBuilderFilters,
     validateReportBuilderChartSpec,
 } from "./reportBuilderUtils.js";
 
@@ -118,6 +119,31 @@ assert.deepEqual(defaults.selectedMeasures, ["totalSpend"]);
 assert.deepEqual(defaults.selectedDimensions.sort(), ["eventDate", "siteType"].sort());
 assert.equal(defaults.groupBy, "channelId");
 assert.deepEqual(defaults.staticFilters.channelIds, [1]);
+
+assert.equal(shouldAutoCollapseReportBuilderFilters({
+    canShowResults: true,
+    hasCompletedCurrentRun: true,
+    manualRunSequence: 1,
+    collapsedRunSequence: 0,
+}), true);
+assert.equal(shouldAutoCollapseReportBuilderFilters({
+    canShowResults: true,
+    hasCompletedCurrentRun: true,
+    manualRunSequence: 1,
+    collapsedRunSequence: 1,
+}), false);
+assert.equal(shouldAutoCollapseReportBuilderFilters({
+    canShowResults: false,
+    hasCompletedCurrentRun: true,
+    manualRunSequence: 2,
+    collapsedRunSequence: 1,
+}), false);
+assert.equal(shouldAutoCollapseReportBuilderFilters({
+    canShowResults: true,
+    hasCompletedCurrentRun: false,
+    manualRunSequence: 2,
+    collapsedRunSequence: 1,
+}), false);
 assert.deepEqual(defaults.staticFilters.dateRange, { start: "2026-04-01", end: "2026-04-30" });
 assert.equal(defaults.page, 1);
 assert.equal(defaults.pageSize, 50);

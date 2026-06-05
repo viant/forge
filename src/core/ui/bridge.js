@@ -172,10 +172,10 @@ export function startUIBridge(options = {}) {
 
     try {
       const result = await runUICommand({ method, params });
-      send({ id, ok: true, result });
       if (options.snapshotAfterCommand !== false) {
         publishSnapshot();
       }
+      send({ id, ok: true, result });
     } catch (e) {
       send({ id, ok: false, error: String(e?.message || e) });
     }
@@ -295,15 +295,23 @@ export function startUIBridgeHTTP(options = {}) {
     }
   };
 
-  const publishSnapshot = async () => {
-    if (!readyToPublish) return;
+  const publishSnapshot = async (publishOptions = {}) => {
+    const strict = publishOptions.strict === true;
+    if (!readyToPublish) return false;
     const snap = snapshotBuilder();
     const text = snapshotFingerprint(snap);
-    if (text === lastSnapshotText) return;
+    if (text === lastSnapshotText) return true;
     try {
-      await rpc('ui.snapshot', { clientId, data: snap }, `snapshot_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
+      const result = await rpc('ui.snapshot', { clientId, data: snap }, `snapshot_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
+      if (strict && result == null) {
+        throw new Error('UI bridge snapshot was not accepted');
+      }
       lastSnapshotText = text;
-    } catch (_) {}
+      return true;
+    } catch (err) {
+      if (strict) throw err;
+      return false;
+    }
   };
   activeSnapshotPublisher = async () => {
     if (!readyToPublish) return false;
@@ -430,10 +438,10 @@ export function startUIBridgeHTTP(options = {}) {
     if (!payload || !payload.method || !payload.id) return;
     try {
       const result = await runUICommand({ method: payload.method, params: payload.params || {} });
-      await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
       if (options.snapshotAfterCommand !== false) {
-        publishSnapshot();
+        await publishSnapshot({ strict: true });
       }
+      await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
     } catch (e) {
       await rpc('ui.response', { id: payload.id, ok: false, error: String(e?.message || e) }, `response_${payload.id}`);
     }

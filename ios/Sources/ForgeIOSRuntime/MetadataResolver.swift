@@ -61,18 +61,7 @@ public enum MetadataResolver {
             return []
         }
 
-        var keys: [String] = []
-        if !targetContext.platform.isEmpty {
-            keys.append(targetContext.platform)
-            if !targetContext.formFactor.isEmpty {
-                keys.append("\(targetContext.platform):\(targetContext.formFactor)")
-                keys.append("\(targetContext.platform).\(targetContext.formFactor)")
-            }
-        }
-        if !targetContext.formFactor.isEmpty {
-            keys.append("formFactor:\(targetContext.formFactor)")
-            keys.append(targetContext.formFactor)
-        }
+        let keys = targetOverrideKeys(for: targetContext)
 
         var result: [[String: JSONValue]] = []
         var seen = Set<String>()
@@ -83,6 +72,42 @@ public enum MetadataResolver {
             result.append(override)
         }
         return result
+    }
+
+    private static func targetOverrideKeys(for targetContext: ForgeTargetContext) -> [String] {
+        let platform = targetContext.platform.trimmingCharacters(in: .whitespacesAndNewlines)
+        let formFactor = targetContext.formFactor.trimmingCharacters(in: .whitespacesAndNewlines)
+        let surface = targetContext.surface.trimmingCharacters(in: .whitespacesAndNewlines)
+        let mobilePlatforms: Set<String> = ["android", "ios"]
+        let mobileFormFactors: Set<String> = ["phone", "tablet"]
+        let isMobile = mobilePlatforms.contains(platform) || mobileFormFactors.contains(formFactor)
+        var keys: [String] = []
+
+        if !surface.isEmpty {
+            keys.append("surface:\(surface)")
+            keys.append(surface)
+        }
+        if isMobile {
+            keys.append("mobile")
+        }
+        if !formFactor.isEmpty {
+            keys.append("formFactor:\(formFactor)")
+            keys.append(formFactor)
+        }
+        if !platform.isEmpty {
+            keys.append(platform)
+        }
+        if isMobile && !formFactor.isEmpty {
+            keys.append("mobile.\(formFactor)")
+            keys.append("mobile:\(formFactor)")
+            keys.append("mobile/\(formFactor)")
+        }
+        if !platform.isEmpty && !formFactor.isEmpty {
+            keys.append("\(platform).\(formFactor)")
+            keys.append("\(platform)/\(formFactor)")
+            keys.append("\(platform):\(formFactor)")
+        }
+        return keys
     }
 
     private static func matchesTarget(_ raw: JSONValue?, for targetContext: ForgeTargetContext) -> Bool {
