@@ -1,0 +1,113 @@
+.forge-lookup-selection-input {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 160px;
+    flex: 1 1 240px;
+}
+
+.forge-lookup-selection-input.is-disabled {
+    opacity: 0.65;
+}
+
+.forge-lookup-selection-input__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-width: 0;
+}
+
+.forge-lookup-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    min-height: 24px;
+    border: 1px solid #e2c96a;
+    border-radius: 999px;
+    background: #fff7d8;
+    color: #755600;
+    padding: 0 8px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.forge-lookup-chip.is-unresolved {
+    border-color: #e5bf68;
+    background: #fff5d6;
+    color: #8a5d00;
+}
+
+.forge-lookup-chip span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.forge-lookup-chip:disabled {
+    cursor: default;
+}
+
+.forge-lookup-selection-input__control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    width: fit-content;
+    max-width: 100%;
+    min-height: 36px;
+    border: 1px solid #cfe0f0;
+    border-radius: 999px;
+    background: #eef8f1;
+    padding: 3px 4px 3px 10px;
+    box-shadow:
+        0 0 0 2px rgba(47, 112, 225, 0.06),
+        0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.forge-lookup-selection-input__field {
+    min-width: 0;
+    width: 20ch;
+    min-height: 28px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #1f3b2b;
+    padding: 0 4px 0 0;
+    outline: none;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.forge-lookup-selection-input__field:focus {
+    box-shadow: none;
+}
+
+.forge-lookup-selection-input__field::placeholder {
+    color: #668873;
+}
+
+.forge-lookup-selection-input__end-button {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    border: 1px solid #0f6b43;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #187a4f 0%, #0f633d 100%);
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: 0 1px 1px rgba(15, 23, 42, 0.05);
+}
+
+.forge-lookup-selection-input__end-button:disabled {
+    cursor: default;
+    color: #ffffff;
+    border-color: #8fb7a0;
+    background: #8fb7a0;
+}

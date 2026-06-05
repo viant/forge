@@ -3,6 +3,7 @@ import { Button, Dialog, Icon } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
+import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { mergeWindowFormValues } from "../../hooks/dataSource.js";
 import { resolveKey, setSelector } from "../../utils/selector.js";
@@ -27,6 +28,7 @@ import {
     isExplicitReportBuilderChartMode,
     isReportBuilderChartSpecStale,
     mergeReportBuilderState,
+    normalizeDynamicGroupRows,
     normalizeReportBuilderChartSpec,
     projectManualSelection,
     projectLookupSelections,
@@ -128,12 +130,16 @@ export function applyReportBuilderStateHook(builderContext, config = {}, state =
     }
 }
 
-function prefillSignature(windowForm = {}) {
+export function prefillSignature(windowForm = {}) {
     const prefill = windowForm?.prefill;
     if (!prefill || typeof prefill !== "object" || Array.isArray(prefill)) {
         return "";
     }
-    return JSON.stringify(prefill);
+    const revision = Number(windowForm?.__forge?.prefillRevision || 0);
+    return JSON.stringify({
+        revision: Number.isFinite(revision) ? revision : 0,
+        prefill,
+    });
 }
 
 function getBuilderStateKey(container = {}) {
@@ -150,6 +156,122 @@ function dimensionById(config = {}, id = "") {
 
 function groupByOption(config = {}, value = "") {
     return (config?.groupBy?.options || []).find((entry) => String(entry?.value || "").trim() === String(value || "").trim()) || null;
+}
+
+function normalizeLookupFieldName(value = "") {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function selectorLeafName(selector = "") {
+    const parts = String(selector || "").trim().split(".").map((entry) => entry.trim()).filter(Boolean);
+    return parts[parts.length - 1] || "";
+}
+
+function findDialogDefinition(builderContext, dialogId = "") {
+    const id = String(dialogId || "").trim();
+    if (!id) return null;
+    const dialogs = Array.isArray(builderContext?.metadata?.dialogs) ? builderContext.metadata.dialogs : [];
+    return dialogs.find((entry) => String(entry?.id || "").trim() === id) || null;
+}
+
+function inferLookupResolveInput(dialog = {}, filterDef = {}) {
+    const explicit = String(filterDef?.lookup?.resolveInput || dialog?.properties?.resolveInput || "").trim();
+    if (explicit) return explicit;
+    const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
+        ? dialog.properties.quickFilters
+        : (dialog?.properties?.quickFilter ? [dialog.properties.quickFilter] : []);
+    const fields = specs.map((spec) => String(spec?.field || spec?.id || "").trim()).filter(Boolean);
+    if (fields.length === 0) return "";
+    const valueKey = normalizeLookupFieldName(selectorLeafName(filterDef?.valueSelector || "value"));
+    const exact = fields.find((field) => normalizeLookupFieldName(field) === valueKey);
+    if (exact) return exact;
+    return fields.find((field) => normalizeLookupFieldName(field).endsWith("id")) || fields[0] || "";
+}
+
+function selectionNeedsLabelHydration(selection = {}) {
+    if (!selection || selection.value === undefined || selection.value === null || selection.value === "") {
+        return false;
+    }
+    const valueText = String(selection.value).trim();
+    const labelText = String(selection.label ?? "").trim();
+    return !labelText || labelText === valueText;
+}
+
+function buildLookupHydrationJobs(builderContext, config = {}, state = {}, resolveLookup) {
+    const jobs = [];
+    (config.dynamicFilterGroups || []).forEach((group) => {
+        const groupId = String(group?.id || "").trim();
+        if (!groupId) return;
+        (state?.dynamicGroups?.[groupId] || []).forEach((row) => {
+            const filterDef = (group.filters || []).find((entry) => String(entry?.id || "").trim() === String(row?.filterId || "").trim());
+            if (!filterDef) return;
+            const descriptor = resolveLookup?.(group, filterDef, row.id) || {};
+            const dialogId = String(descriptor?.dialogId || filterDef?.dialogId || filterDef?.lookup?.dialogId || "").trim();
+            const dialog = findDialogDefinition(builderContext, dialogId);
+            const dataSourceRef = String(descriptor?.dataSourceRef || filterDef?.lookup?.dataSource || dialog?.dataSourceRef || "").trim();
+            const resolveInput = inferLookupResolveInput(dialog, filterDef);
+            if (!dataSourceRef || !resolveInput) return;
+            (row.selections || []).forEach((selection, selectionIndex) => {
+                if (!selectionNeedsLabelHydration(selection)) return;
+                jobs.push({
+                    groupId,
+                    rowId: row.id,
+                    selectionIndex,
+                    value: selection.value,
+                    filterDef,
+                    dataSourceRef,
+                    resolveInput,
+                });
+            });
+        });
+    });
+    return jobs;
+}
+
+async function fetchLookupHydrationRecord(job) {
+    const response = await fetch(`/v1/api/datasources/${encodeURIComponent(job.dataSourceRef)}/fetch`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            inputs: {
+                [job.resolveInput]: job.value,
+            },
+        }),
+    });
+    if (!response.ok) {
+        throw new Error(`lookup label resolve failed: ${response.status} ${response.statusText}`);
+    }
+    const body = await response.json();
+    const rows = Array.isArray(body?.rows) ? body.rows : [];
+    return rows[0] || null;
+}
+
+async function hydrateReportBuilderLookupLabels(builderContext, config = {}, state = {}, resolveLookup) {
+    const jobs = buildLookupHydrationJobs(builderContext, config, state, resolveLookup);
+    if (jobs.length === 0) return null;
+    const next = JSON.parse(JSON.stringify(state || {}));
+    let changed = false;
+    for (const job of jobs) {
+        try {
+            const record = await fetchLookupHydrationRecord(job);
+            if (!record) continue;
+            const [projected] = projectLookupSelections(job.filterDef, record);
+            if (!projected || !projected.label || String(projected.label).trim() === String(job.value).trim()) {
+                continue;
+            }
+            const rows = next?.dynamicGroups?.[job.groupId] || [];
+            const row = rows.find((entry) => entry.id === job.rowId);
+            if (!row || !Array.isArray(row.selections) || !row.selections[job.selectionIndex]) {
+                continue;
+            }
+            row.selections[job.selectionIndex] = projected;
+            changed = true;
+        } catch (error) {
+            console.warn("reportBuilder lookup label hydration failed", error);
+        }
+    }
+    return changed ? next : null;
 }
 
 export function resolveReportBuilderLookupDescriptor(builderContext, config = {}, state = {}, group = {}, filterDef = {}, rowId = "") {
@@ -1006,17 +1128,6 @@ function ReportBuilderChartQuickActions({
     );
 }
 
-function FilterChip({ label, onRemove }) {
-    return (
-        <span className="forge-report-builder-filter-chip">
-            {label}
-            <button type="button" onClick={onRemove} aria-label={`Remove ${label}`}>
-                ×
-            </button>
-        </span>
-    );
-}
-
 function collectOptionRows(rows = [], childKeys = ["children", "childNodes"], result = []) {
     (rows || []).forEach((row) => {
         if (!row || typeof row !== "object") return;
@@ -1172,6 +1283,15 @@ function DynamicFilterGroup({
     const filters = Array.isArray(group.filters) ? group.filters : [];
     const [manualDrafts, setManualDrafts] = useState({});
 
+    const renderAddLineButton = () => (
+        <button type="button" className="forge-report-builder-add-line-button" onClick={onAddRow}>
+            <span className="forge-report-builder-add-line-button__icon">
+                <Icon icon="add" size={13} />
+            </span>
+            <span>{group.addLabel || "Add line"}</span>
+        </button>
+    );
+
     return (
         <section className="forge-report-builder-dynamic-group">
             <div className="forge-report-builder-dynamic-group__header">
@@ -1179,9 +1299,7 @@ function DynamicFilterGroup({
                     <h4>{group.label || group.id}</h4>
                     {group.description ? <p>{group.description}</p> : null}
                 </div>
-                <Button small outlined icon="add" onClick={onAddRow}>
-                    {group.addLabel || "Add line"}
-                </Button>
+                {renderAddLineButton()}
             </div>
             <div className="forge-report-builder-dynamic-group__rows">
                 {(rows || []).length === 0 ? (
@@ -1204,7 +1322,7 @@ function DynamicFilterGroup({
                         ].filter(Boolean).join(" ")} data-report-builder-row-id={row.id}>
                             <div className="forge-report-builder-dynamic-row__controls">
                                 <select
-                                    className="forge-report-builder-select"
+                                    className="forge-report-builder-select forge-report-builder-select--targeting-key"
                                     value={row.filterId || ""}
                                     onChange={(event) => onChangeFilter(row.id, event.target.value)}
                                 >
@@ -1214,69 +1332,29 @@ function DynamicFilterGroup({
                                         </option>
                                     ))}
                                 </select>
-                                {dialogId ? (
-                                    <Button
-                                        small
-                                        icon="search-template"
-                                        outlined
-                                        className="forge-report-builder-lookup-button"
-                                        onClick={() => onPick(row.id, selectedFilter, lookup)}
-                                    >
-                                        {placeholder}
-                                    </Button>
-                                ) : null}
-                                {allowManualEntry ? (
-                                    <div className="forge-report-builder-dynamic-row__manual-entry">
-                                        <input
-                                            type="text"
-                                            className="forge-report-builder-select forge-report-builder-manual-input"
-                                            value={manualDraft}
-                                            placeholder={selectedFilter?.manualPlaceholder || "Enter value"}
-                                            onChange={(event) => setManualDrafts((current) => ({
+                                <LookupSelectionInput
+                                    selections={row.selections || []}
+                                    inputValue={manualDraft}
+                                    placeholder={allowManualEntry ? (selectedFilter?.manualPlaceholder || placeholder) : placeholder}
+                                    browseLabel={placeholder}
+                                    allowManualEntry={allowManualEntry}
+                                    disabled={!enabled}
+                                    onInputChange={(value) => setManualDrafts((current) => ({
+                                        ...current,
+                                        [row.id]: value,
+                                    }))}
+                                    onInputCommit={(value) => {
+                                        const added = onAddManualSelection(row.id, selectedFilter, value);
+                                        if (added) {
+                                            setManualDrafts((current) => ({
                                                 ...current,
-                                                [row.id]: event.target.value,
-                                            }))}
-                                            onKeyDown={(event) => {
-                                                if (event.key !== "Enter") {
-                                                    return;
-                                                }
-                                                event.preventDefault();
-                                                const added = onAddManualSelection(row.id, selectedFilter, manualDraft);
-                                                if (added) {
-                                                    setManualDrafts((current) => ({
-                                                        ...current,
-                                                        [row.id]: "",
-                                                    }));
-                                                }
-                                            }}
-                                        />
-                                        <Button
-                                            small
-                                            outlined
-                                            icon="plus"
-                                            onClick={() => {
-                                                const added = onAddManualSelection(row.id, selectedFilter, manualDraft);
-                                                if (added) {
-                                                    setManualDrafts((current) => ({
-                                                        ...current,
-                                                        [row.id]: "",
-                                                    }));
-                                                }
-                                            }}
-                                        >
-                                            Add value
-                                        </Button>
-                                    </div>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder-dynamic-row__selection-line">
-                                {(row.selections || []).map((selection, index) => (
-                                    <FilterChip
-                                        key={`${row.id}_${index}_${selection.value}`}
-                                        label={selection.label || String(selection.value)}
-                                        onRemove={() => onRemoveSelection(row.id, index)}
-                                    />
-                                ))}
+                                                [row.id]: "",
+                                            }));
+                                        }
+                                    }}
+                                    onBrowse={dialogId ? () => onPick(row.id, selectedFilter, lookup) : null}
+                                    onRemoveSelection={(index) => onRemoveSelection(row.id, index)}
+                                />
                             </div>
                             <div className="forge-report-builder-dynamic-row__actions">
                                 <button
@@ -1391,13 +1469,17 @@ function DynamicFamilyGroup({
                     <h4>{family.label}</h4>
                     {family.description ? <p>{family.description}</p> : null}
                 </div>
-                <Button small outlined icon="add" onClick={onAddRow}>
-                    Add line
-                </Button>
+                <button type="button" className="forge-report-builder-add-line-button" onClick={onAddRow}>
+                    <span className="forge-report-builder-add-line-button__icon">
+                        <Icon icon="add" size={13} />
+                    </span>
+                    <span>Add line</span>
+                </button>
             </div>
             <div className="forge-report-builder-dynamic-group__rows">
                 {rows.map((row) => {
                     const option = options.find((entry) => entry.key === row.optionKey) || options[0] || null;
+                    const effectiveOptionKey = row.optionKey || option?.key || "";
                     const selectedFilter = row.direction === "exclude" ? option?.excludeFilter : option?.includeFilter;
                     const fallbackFilter = selectedFilter || option?.includeFilter || option?.excludeFilter || null;
                     const groupRef = { id: row.direction };
@@ -1413,8 +1495,8 @@ function DynamicFamilyGroup({
                         <div key={row.id} className={["forge-report-builder-dynamic-row", enabled ? "" : "is-disabled"].filter(Boolean).join(" ")} data-report-builder-row-id={row.id}>
                             <div className="forge-report-builder-dynamic-row__controls">
                                 <select
-                                    className="forge-report-builder-select"
-                                    value={row.optionKey || option?.key || ""}
+                                    className="forge-report-builder-select forge-report-builder-select--targeting-key"
+                                    value={effectiveOptionKey}
                                     onChange={(event) => onChangeFilter(row.id, row.direction, event.target.value)}
                                 >
                                     {options.map((entry) => (
@@ -1426,7 +1508,8 @@ function DynamicFamilyGroup({
                                         type="button"
                                         className={["forge-report-builder-direction-toggle__button", row.direction === "include" ? "is-active" : ""].filter(Boolean).join(" ")}
                                         disabled={!canInclude}
-                                        onClick={() => onChangeDirection(row.id, row.direction, row.optionKey, "include")}
+                                        aria-pressed={row.direction === "include"}
+                                        onClick={() => onChangeDirection(row.id, row.direction, effectiveOptionKey, "include")}
                                     >
                                         Include
                                     </button>
@@ -1434,63 +1517,29 @@ function DynamicFamilyGroup({
                                         type="button"
                                         className={["forge-report-builder-direction-toggle__button", row.direction === "exclude" ? "is-active" : ""].filter(Boolean).join(" ")}
                                         disabled={!canExclude}
-                                        onClick={() => onChangeDirection(row.id, row.direction, row.optionKey, "exclude")}
+                                        aria-pressed={row.direction === "exclude"}
+                                        onClick={() => onChangeDirection(row.id, row.direction, effectiveOptionKey, "exclude")}
                                     >
                                         Exclude
                                     </button>
                                 </div>
-                                {dialogId ? (
-                                    <Button
-                                        small
-                                        icon="search-template"
-                                        outlined
-                                        className="forge-report-builder-lookup-button"
-                                        onClick={() => onPick(row.id, row.direction, fallbackFilter, lookup)}
-                                    >
-                                        {placeholder}
-                                    </Button>
-                                ) : null}
-                                {allowManualEntry ? (
-                                    <div className="forge-report-builder-dynamic-row__manual-entry">
-                                        <input
-                                            type="text"
-                                            className="forge-report-builder-select forge-report-builder-manual-input"
-                                            value={manualDraft}
-                                            placeholder={fallbackFilter?.manualPlaceholder || "Enter value"}
-                                            onChange={(event) => setManualDrafts((current) => ({ ...current, [row.id]: event.target.value }))}
-                                            onKeyDown={(event) => {
-                                                if (event.key !== "Enter") return;
-                                                event.preventDefault();
-                                                const added = onAddManualSelection(row.id, row.direction, fallbackFilter, manualDraft);
-                                                if (added) {
-                                                    setManualDrafts((current) => ({ ...current, [row.id]: "" }));
-                                                }
-                                            }}
-                                        />
-                                        <Button
-                                            small
-                                            outlined
-                                            icon="plus"
-                                            onClick={() => {
-                                                const added = onAddManualSelection(row.id, row.direction, fallbackFilter, manualDraft);
-                                                if (added) {
-                                                    setManualDrafts((current) => ({ ...current, [row.id]: "" }));
-                                                }
-                                            }}
-                                        >
-                                            Add value
-                                        </Button>
-                                    </div>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder-dynamic-row__selection-line">
-                                {(row.selections || []).map((selection, index) => (
-                                    <FilterChip
-                                        key={`${row.id}_${index}_${selection.value}`}
-                                        label={selection.label || String(selection.value)}
-                                        onRemove={() => onRemoveSelection(row.id, row.direction, index)}
-                                    />
-                                ))}
+                                <LookupSelectionInput
+                                    selections={row.selections || []}
+                                    inputValue={manualDraft}
+                                    placeholder={allowManualEntry ? (fallbackFilter?.manualPlaceholder || placeholder) : placeholder}
+                                    browseLabel={placeholder}
+                                    allowManualEntry={allowManualEntry}
+                                    disabled={!enabled}
+                                    onInputChange={(value) => setManualDrafts((current) => ({ ...current, [row.id]: value }))}
+                                    onInputCommit={(value) => {
+                                        const added = onAddManualSelection(row.id, row.direction, fallbackFilter, value);
+                                        if (added) {
+                                            setManualDrafts((current) => ({ ...current, [row.id]: "" }));
+                                        }
+                                    }}
+                                    onBrowse={dialogId ? () => onPick(row.id, row.direction, fallbackFilter, lookup) : null}
+                                    onRemoveSelection={(index) => onRemoveSelection(row.id, row.direction, index)}
+                                />
                             </div>
                             <div className="forge-report-builder-dynamic-row__actions">
                                 <button
@@ -1581,6 +1630,7 @@ export default function ReportBuilder({ container, context }) {
     const lastManualRunFingerprintRef = useRef("");
     const seededDefaultsRef = useRef(false);
     const appliedPrefillSignatureRef = useRef("");
+    const hydrationFingerprintRef = useRef("");
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [chartDialogOpen, setChartDialogOpen] = useState(false);
     const [chartDraft, setChartDraft] = useState(null);
@@ -1613,6 +1663,36 @@ export default function ReportBuilder({ container, context }) {
     const resolveLookup = React.useCallback((group, filterDef, rowId = "") => (
         resolveReportBuilderLookupDescriptor(builderContext, config, state, group, filterDef, rowId)
     ), [builderContext, config, state]);
+
+    useEffect(() => {
+        const jobs = buildLookupHydrationJobs(builderContext, config, state, resolveLookup);
+        const fingerprint = JSON.stringify(jobs.map((job) => ({
+            groupId: job.groupId,
+            rowId: job.rowId,
+            selectionIndex: job.selectionIndex,
+            value: job.value,
+            dataSourceRef: job.dataSourceRef,
+            resolveInput: job.resolveInput,
+        })));
+        if (!jobs.length || hydrationFingerprintRef.current === fingerprint) {
+            return;
+        }
+        hydrationFingerprintRef.current = fingerprint;
+        let cancelled = false;
+        hydrateReportBuilderLookupLabels(builderContext, config, state, resolveLookup)
+            .then((next) => {
+                if (cancelled || !next) {
+                    return;
+                }
+                persistState(next);
+            })
+            .catch((error) => {
+                console.warn("reportBuilder lookup label hydration failed", error);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [builderContext, config, persistState, resolveLookup, state]);
 
     useEffect(() => {
         if (seededDefaultsRef.current) {
@@ -1730,6 +1810,18 @@ export default function ReportBuilder({ container, context }) {
     const measures = useMemo(() => getSelectableReportBuilderMeasures(config), [config]);
     const measureSections = useMemo(() => resolveMeasureSections(config, measures), [config, measures]);
     const dimensions = useMemo(() => getVisibleReportBuilderDimensions(config), [config]);
+    const selectedDimensionIds = useMemo(
+        () => new Set(normalizeArray(state.selectedDimensions).map((entry) => String(entry || "").trim()).filter(Boolean)),
+        [state.selectedDimensions],
+    );
+    const selectedDimensionDefs = useMemo(
+        () => dimensions.filter((dimension) => selectedDimensionIds.has(String(dimension?.id || "").trim())),
+        [dimensions, selectedDimensionIds],
+    );
+    const availableDimensionDefs = useMemo(
+        () => dimensions.filter((dimension) => !selectedDimensionIds.has(String(dimension?.id || "").trim())),
+        [dimensions, selectedDimensionIds],
+    );
     const staticFilters = Array.isArray(config.staticFilters) ? config.staticFilters : [];
     const dynamicFilterGroups = Array.isArray(config.dynamicFilterGroups) ? config.dynamicFilterGroups : [];
     const dynamicFilterFamilies = useMemo(() => resolveDynamicFilterFamilies(config), [config]);
@@ -2276,6 +2368,33 @@ export default function ReportBuilder({ container, context }) {
         });
     };
 
+    const addDimension = (dimensionId) => {
+        const id = String(dimensionId || "").trim();
+        if (!id) return;
+        const current = Array.isArray(state.selectedDimensions) ? state.selectedDimensions : [];
+        if (current.includes(id)) {
+            return;
+        }
+        persistState({
+            ...state,
+            selectedDimensions: [...current, id],
+        });
+    };
+
+    const removeDimension = (dimensionId) => {
+        const id = String(dimensionId || "").trim();
+        if (!id) return;
+        const current = Array.isArray(state.selectedDimensions) ? state.selectedDimensions : [];
+        if (current.length <= 1) {
+            return;
+        }
+        const nextDimensions = current.filter((entry) => entry !== id);
+        persistState({
+            ...state,
+            selectedDimensions: nextDimensions.length > 0 ? nextDimensions : current,
+        });
+    };
+
     const setViewMode = (viewMode) => {
         if (explicitChartMode && viewMode === "chart" && !hasValidChartSpec) {
             return;
@@ -2671,17 +2790,19 @@ export default function ReportBuilder({ container, context }) {
         if (currentDirection === nextDirection) {
             return;
         }
-        moveFamilyRow(family, rowId, currentDirection, nextDirection, optionKey, { selections: [] });
+        moveFamilyRow(family, rowId, currentDirection, nextDirection, optionKey);
     };
 
     const renderDynamicFamily = (family) => (
         <section key={family.id} className="forge-report-builder__family-group">
-            <div className="forge-report-builder__family-group-header">
-                <div>
-                    <h4>{family.label}</h4>
-                    {family.description ? <p>{family.description}</p> : null}
+            {!config.unifiedFamilyRows ? (
+                <div className="forge-report-builder__family-group-header">
+                    <div>
+                        <h4>{family.label}</h4>
+                        {family.description ? <p>{family.description}</p> : null}
+                    </div>
                 </div>
-            </div>
+            ) : null}
             {config.unifiedFamilyRows ? (
                 <DynamicFamilyGroup
                     family={family}
@@ -3014,24 +3135,43 @@ export default function ReportBuilder({ container, context }) {
                             </button>
                         </div>
                         {!dimensionsCollapsed ? (
-                            <div className="forge-report-builder__dimension-scroll">
-                                <div className="forge-report-builder__dimension-list">
-                                    {dimensions.map((dimension) => {
-                                        const active = state.selectedDimensions.includes(dimension.id);
-                                        return (
-                                            <button
-                                                key={dimension.id}
-                                                type="button"
-                                                className={active ? "forge-report-builder__dimension-item is-active" : "forge-report-builder__dimension-item"}
-                                                onClick={() => toggleDimension(dimension.id)}
-                                                title={dimension.label || dimension.id}
-                                            >
-                                                <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>{active ? "✓" : ""}</span>
-                                                <span>{dimension.label || dimension.id}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                            <div className="forge-report-builder__dimension-picker">
+                                <select
+                                    className="forge-report-builder-select forge-report-builder-select--add"
+                                    value=""
+                                    onChange={(event) => {
+                                        addDimension(event.target.value);
+                                        event.target.value = "";
+                                    }}
+                                    disabled={availableDimensionDefs.length === 0}
+                                >
+                                    <option value="">{availableDimensionDefs.length === 0 ? "All breakdowns added" : "Add breakdown..."}</option>
+                                    {availableDimensionDefs.map((dimension) => (
+                                        <option key={dimension.id} value={dimension.id}>
+                                            {dimension.label || dimension.id}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedDimensionDefs.length > 0 ? (
+                                    <div className="forge-report-builder__dimension-selected" aria-label="Selected breakdowns">
+                                        {selectedDimensionDefs.map((dimension) => {
+                                            const removable = selectedDimensionDefs.length > 1;
+                                            return (
+                                                <button
+                                                    key={dimension.id}
+                                                    type="button"
+                                                    className="forge-report-builder__dimension-pill"
+                                                    onClick={() => removeDimension(dimension.id)}
+                                                    disabled={!removable}
+                                                    title={removable ? `Remove ${dimension.label || dimension.id}` : dimension.label || dimension.id}
+                                                >
+                                                    <span>{dimension.label || dimension.id}</span>
+                                                    {removable ? <span aria-hidden="true">×</span> : null}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
                             </div>
                         ) : null}
                     </section>

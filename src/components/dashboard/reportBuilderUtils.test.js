@@ -890,6 +890,35 @@ assert.deepEqual(duplicateDraftState.dynamicGroups.scope, [
     },
 ]);
 
+const mixedSelectionShapeState = mergeReportBuilderState(config, {
+    dynamicGroups: {
+        scope: [
+            {
+                id: "row_mixed",
+                filterId: "orderIds",
+                selections: [
+                    2609393,
+                    { value: "2609400", label: "Order 2609400" },
+                    { adOrderId: "2609500", adOrderName: "Order 2609500" },
+                ],
+            },
+        ],
+    },
+});
+assert.deepEqual(
+    mixedSelectionShapeState.dynamicGroups.scope[0].selections.map((entry) => ({
+        value: entry.value,
+        label: entry.label,
+    })),
+    [
+        { value: 2609393, label: "2609393" },
+        { value: 2609400, label: "Order 2609400" },
+        { value: 2609500, label: "Order 2609500" },
+    ],
+);
+const mixedSelectionShapeRequest = buildReportBuilderRequest(config, mixedSelectionShapeState);
+assert.deepEqual(mixedSelectionShapeRequest.filters.orderIds, [2609393, 2609400, 2609500]);
+
 const sanitizedDrafts = sanitizeReportBuilderState(config, {
     dynamicGroups: {
         scope: [

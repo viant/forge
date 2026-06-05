@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mergeWindowFormValues } from './dataSource.js';
+import { mergeWindowFormValues, withWindowFormPrefillRevision } from './dataSource.js';
 
 describe('mergeWindowFormValues', () => {
   it('preserves seeded window parameters while applying defaults', () => {
@@ -18,6 +18,26 @@ describe('mergeWindowFormValues', () => {
 
   it('accepts empty existing state', () => {
     expect(mergeWindowFormValues(null, { granularity: 'hour' })).toEqual({
+      granularity: 'hour',
+    });
+  });
+
+  it('bumps a generic prefill revision for repeated semantic handoffs', () => {
+    const first = withWindowFormPrefillRevision({}, {
+      prefill: { dealId: 778899 },
+    });
+    expect(first.__forge.prefillRevision).toBe(1);
+
+    const second = withWindowFormPrefillRevision(first, {
+      prefill: { dealId: 778899 },
+    });
+    expect(second.__forge.prefillRevision).toBe(2);
+  });
+
+  it('does not add revision metadata for non-prefill patches', () => {
+    expect(withWindowFormPrefillRevision({ __forge: { prefillRevision: 4 } }, {
+      granularity: 'hour',
+    })).toEqual({
       granularity: 'hour',
     });
   });

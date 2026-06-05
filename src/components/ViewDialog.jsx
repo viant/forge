@@ -203,7 +203,9 @@ const ViewDialog = ({context, dialog}) => {
         if (isDialogOpen && !wasOpen) {
             const dialogContext = (() => {
                 try {
-                    return resolvedDataSourceRef ? context?.Context?.(resolvedDataSourceRef) : null;
+                    return resolvedDataSourceRef
+                        ? context?.Context?.(resolvedDataSourceRef, selectionModeOverride ? { selectionMode: selectionModeOverride } : {})
+                        : null;
                 } catch (_) {
                     return null;
                 }
@@ -215,9 +217,38 @@ const ViewDialog = ({context, dialog}) => {
                 const explicitParameters = (callerProps?.parameters && typeof callerProps.parameters === 'object')
                     ? callerProps.parameters
                     : {};
+                const dsRef = resolvedDataSourceRef;
+                let params = {};
+                if (Object.keys(explicitParameters).length > 0) {
+                    params = explicitParameters;
+                } else if (args && typeof args === 'object') {
+                    const scoped = (dsRef && args[dsRef]) ? args[dsRef] : args;
+                    const inputObj = (scoped && typeof scoped === 'object') ? (scoped.input || scoped) : {};
+                    params = (inputObj && typeof inputObj === 'object') ? (inputObj.parameters || inputObj) : {};
+                }
                 const current = dialogDataSourceHandlers?.peekInput?.() || {};
+                const filterSeedSource = Object.keys(explicitParameters).length > 0
+                    ? explicitParameters
+                    : args;
+                const nextFilter = buildQuickFilterSeed(filterSeedSource, quickFilterSpecs);
                 const nextArgsStr = JSON.stringify(args || {});
                 const prevArgsStr = JSON.stringify((current.args || {}));
+                const nextParamsStr = JSON.stringify(params || {});
+                const prevParamsStr = JSON.stringify((current.parameters || {}));
+                const nextFilterStr = JSON.stringify(nextFilter || {});
+                const prevFilterStr = JSON.stringify((current.filter || {}));
+                const inputChanged = nextArgsStr !== prevArgsStr || nextParamsStr !== prevParamsStr || nextFilterStr !== prevFilterStr;
+                if (inputChanged) {
+                    try {
+                        dialogDataSourceHandlers?.resetSelection?.();
+                        dialogDataSourceHandlers?.setCollection?.([]);
+                        if (dialogContext?.signals?.collectionInfo) {
+                            dialogContext.signals.collectionInfo.value = {};
+                        }
+                    } catch (e) {
+                        log.warn('reset dialog dataSource state error', { error: String(e?.message || e) });
+                    }
+                }
                 // Only set when changed to avoid signal cycles
                 if (nextArgsStr !== prevArgsStr) {
                     log.debug('setInputArgs', { nextArgs: args, prevArgs: current.args || {} });
@@ -227,18 +258,8 @@ const ViewDialog = ({context, dialog}) => {
                 // Seed DS input parameters from dialog args so dataSource.parameters
                 // (path/query deps) resolve correctly on first fetch.
                 try {
-                    const dsRef = resolvedDataSourceRef;
-                    let params = {};
-                    if (Object.keys(explicitParameters).length > 0) {
-                        params = explicitParameters;
-                    } else if (args && typeof args === 'object') {
-                        const scoped = (dsRef && args[dsRef]) ? args[dsRef] : args;
-                        const inputObj = (scoped && typeof scoped === 'object') ? (scoped.input || scoped) : {};
-                        params = (inputObj && typeof inputObj === 'object') ? (inputObj.parameters || inputObj) : {};
-                    }
-                    const prevParams = dialogDataSourceHandlers?.peekInput?.()?.parameters || {};
-                    if (JSON.stringify(prevParams) !== JSON.stringify(params)) {
-                        log.debug('setInputParameters', { ds: dsRef, params, prev: prevParams });
+                    if (prevParamsStr !== nextParamsStr) {
+                        log.debug('setInputParameters', { ds: dsRef, params, prev: current.parameters || {} });
                         dialogDataSourceHandlers?.setInputParameters?.(params);
                     }
                 } catch (e) {
@@ -251,7 +272,9 @@ const ViewDialog = ({context, dialog}) => {
             try {
                 setTimeout(() => {
                     try {
-                        const dsC = resolvedDataSourceRef ? context?.Context?.(resolvedDataSourceRef) : null;
+                        const dsC = resolvedDataSourceRef
+                            ? context?.Context?.(resolvedDataSourceRef, selectionModeOverride ? { selectionMode: selectionModeOverride } : {})
+                            : null;
                         const dsHandlers = dsC?.handlers?.dataSource;
                         const inSig = dsC?.signals?.input;
                         const args = (inSig?.peek?.() || {}).args || {};
@@ -273,14 +296,11 @@ const ViewDialog = ({context, dialog}) => {
                                 filter,
                             })
                         );
-                        log.debug('deferred fetchCollection', { filter, args });
+                        log.debug('deferred fetch', { filter, args });
                         dsHandlers?.setInactive?.(false);
-                        if (Object.keys(filter || {}).length > 0) {
-                            dsHandlers?.setSilentFilterValues?.({ filter });
-                        }
-                        dsHandlers?.fetchCollection?.();
+                        dsHandlers?.setFilter?.({ filter });
                     } catch (err) {
-                        log.warn('deferred fetchCollection error', { error: String(err?.message || err) });
+                        log.warn('deferred fetch error', { error: String(err?.message || err) });
                     }
                 }, 0);
             } catch (e) {
@@ -291,7 +311,7 @@ const ViewDialog = ({context, dialog}) => {
             }
         }
         previousOpenRef.current = isDialogOpen;
-    }, [dialogOpen, handlers, resolvedDataSourceRef, context, dialog, events, quickFilterSpecs, log]);
+    }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, log]);
 
     const handleClose = () => {
         handlers.dialog.close();
@@ -387,6 +407,8 @@ const ViewDialog = ({context, dialog}) => {
     const {style={}} = dialog
     const dialogStyle = {...style};
     const dialogClassName = [
+        "forge-view-dialog",
+        selectionModeOverride ? "forge-lookup-dialog" : "",
         dialog.className,
         dialog?.properties?.className,
     ].filter(Boolean).join(" ");

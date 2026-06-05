@@ -132,6 +132,9 @@ struct ReportBuilderDynamicFiltersView: View {
         availableFilters: [ReportBuilderDynamicFilterDef]
     ) -> some View {
         if let selectedFilter = availableFilters.first(where: { $0.identityKey == row.filterId }) ?? availableFilters.first {
+            let lookupAvailable = isLookupAvailable(groupID, selectedFilter)
+            let manualDraft = drafts[row.id] ?? ""
+            let canAddManualValue = selectedFilter.manualEntry == true && !manualDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 8) {
                     Menu {
@@ -164,37 +167,62 @@ struct ReportBuilderDynamicFiltersView: View {
                     .accessibilityLabel("Remove \(selectedFilter.label ?? selectedFilter.identityKey)")
                 }
 
-                if selectedFilter.manualEntry == true {
-                    HStack(spacing: 8) {
-                        TextField(
-                            selectedFilter.manualPlaceholder?.isEmpty == false ? selectedFilter.manualPlaceholder! : "Enter value",
-                            text: Binding(
-                                get: { drafts[row.id] ?? "" },
-                                set: { onDraftChange(row.id, $0) }
+                if selectedFilter.manualEntry == true || lookupAvailable {
+                    HStack(spacing: 4) {
+                        if selectedFilter.manualEntry == true {
+                            TextField(
+                                selectedFilter.manualPlaceholder?.isEmpty == false ? selectedFilter.manualPlaceholder! : "Enter value",
+                                text: Binding(
+                                    get: { drafts[row.id] ?? "" },
+                                    set: { onDraftChange(row.id, $0) }
+                                )
                             )
-                        )
-                        .textFieldStyle(.roundedBorder)
-                        .keyboardType(keyboardType(for: selectedFilter))
-
-                        Button("Add") {
-                            _ = onAddManualSelection(
-                                groupID,
-                                row.id,
-                                selectedFilter,
-                                (drafts[row.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                            )
+                            .textFieldStyle(.plain)
+                            .keyboardType(keyboardType(for: selectedFilter))
+                            .onSubmit {
+                                _ = onAddManualSelection(
+                                    groupID,
+                                    row.id,
+                                    selectedFilter,
+                                    manualDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                )
+                            }
+                            .frame(width: 160)
+                        } else {
+                            Text(selectedFilter.manualPlaceholder?.isEmpty == false ? selectedFilter.manualPlaceholder! : "Select value")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 160, alignment: .leading)
                         }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
 
-                if isLookupAvailable(groupID, selectedFilter) {
-                    Button {
-                        onPickSelection(groupID, row.id, selectedFilter)
-                    } label: {
-                        Label("Pick", systemImage: "magnifyingglass")
+                        Button {
+                            if lookupAvailable {
+                                onPickSelection(groupID, row.id, selectedFilter)
+                            } else {
+                                _ = onAddManualSelection(
+                                    groupID,
+                                    row.id,
+                                    selectedFilter,
+                                    manualDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                )
+                            }
+                        } label: {
+                            Image(systemName: lookupAvailable ? "chevron.down" : "plus")
+                                .font(.caption.weight(.semibold))
+                                .frame(width: 26, height: 26)
+                                .foregroundStyle(.white)
+                                .background(Color(red: 0.06, green: 0.39, blue: 0.24), in: Circle())
+                                .overlay(Circle().stroke(Color(red: 0.05, green: 0.34, blue: 0.21), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!lookupAvailable && !canAddManualValue)
                     }
-                    .buttonStyle(.bordered)
+                    .padding(.leading, 10)
+                    .padding(.trailing, 4)
+                    .padding(.vertical, 3)
+                    .background(Color(red: 0.93, green: 0.98, blue: 0.95), in: Capsule())
+                    .overlay(Capsule().stroke(Color(red: 0.81, green: 0.88, blue: 0.84), lineWidth: 1))
+                    .foregroundStyle(Color(red: 0.12, green: 0.23, blue: 0.17))
                 }
 
                 if !row.selections.isEmpty {
@@ -212,7 +240,9 @@ struct ReportBuilderDynamicFiltersView: View {
                                     .font(.caption.weight(.medium))
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
-                                    .background((row.enabled ? Color.accentColor : Color.secondary).opacity(0.12), in: Capsule())
+                                    .foregroundStyle(Color(red: 0.46, green: 0.34, blue: 0.0))
+                                    .background(Color(red: 1.0, green: 0.97, blue: 0.85), in: Capsule())
+                                    .overlay(Capsule().stroke(Color(red: 0.89, green: 0.79, blue: 0.42), lineWidth: 1))
                                 }
                                 .buttonStyle(.plain)
                             }

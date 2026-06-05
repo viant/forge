@@ -201,6 +201,9 @@ assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
     advertiserId: 123,
     dealId: 'deal-xyz',
   },
+  __forge: {
+    prefillRevision: 1,
+  },
 });
 
 await runUICommand({
@@ -221,6 +224,9 @@ assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
     dealId: 'deal-xyz',
     targetingIncl: 'iris:1466062,123',
   },
+  __forge: {
+    prefillRevision: 2,
+  },
 });
 
 await runUICommand({
@@ -238,6 +244,9 @@ await runUICommand({
 assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
   prefill: {
     advertiserId: 999,
+  },
+  __forge: {
+    prefillRevision: 3,
   },
 });
 

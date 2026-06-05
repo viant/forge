@@ -185,7 +185,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var dimensionsSection: AnyView {
-        AnyView(chipSection(title: "Breakdowns", items: dimensionItems, selection: $selectedDimensions))
+        AnyView(breakdownSection(title: "Breakdowns", items: dimensionItems, selection: $selectedDimensions))
     }
 
     private var staticFiltersSectionView: AnyView {
@@ -412,11 +412,13 @@ public struct ReportBuilderRenderer: View {
                                     set: { next in staticFilters[key] = .dateRange(start: next, end: current.endValue) }
                                 ))
                                 .textFieldStyle(.roundedBorder)
+                                .frame(width: 128)
                                 TextField("End", text: Binding(
                                     get: { current.endValue },
                                     set: { next in staticFilters[key] = .dateRange(start: current.startValue, end: next) }
                                 ))
                                 .textFieldStyle(.roundedBorder)
+                                .frame(width: 128)
                             }
                         } else {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -465,6 +467,68 @@ public struct ReportBuilderRenderer: View {
                                 .background(selection.wrappedValue.contains(key) ? Color.accentColor.opacity(0.14) : Color.secondary.opacity(0.08), in: Capsule())
                         }
                         .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func breakdownSection(title: String, items: [(String, String)], selection: Binding<[String]>) -> some View {
+        let availableItems = items.filter { item in !selection.wrappedValue.contains(item.1) }
+        let selectedItems = selection.wrappedValue.compactMap { key in
+            items.first(where: { $0.1 == key })
+        }
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.subheadline.weight(.semibold))
+            Menu {
+                if availableItems.isEmpty {
+                    Text("All breakdowns added")
+                } else {
+                    ForEach(availableItems, id: \.1) { label, key in
+                        Button(label) {
+                            selection.wrappedValue = selection.wrappedValue + [key]
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(availableItems.isEmpty ? "All breakdowns added" : "Add breakdown...")
+                        .font(.caption.weight(.medium))
+                    Image(systemName: "chevron.down")
+                        .font(.caption.weight(.semibold))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.secondary.opacity(0.08), in: Capsule())
+            }
+            .disabled(availableItems.isEmpty)
+
+            if !selectedItems.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(selectedItems, id: \.1) { label, key in
+                            let removable = selectedItems.count > 1
+                            Button {
+                                guard removable else { return }
+                                selection.wrappedValue = selection.wrappedValue.filter { $0 != key }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text(label)
+                                    if removable {
+                                        Image(systemName: "xmark")
+                                            .font(.caption2.weight(.bold))
+                                    }
+                                }
+                                .font(.caption.weight(.medium))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.accentColor.opacity(0.14), in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!removable)
+                        }
                     }
                 }
             }
