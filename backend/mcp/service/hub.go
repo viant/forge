@@ -375,12 +375,15 @@ func (h *Hub) unregisterHTTPClient(ns, clientID string, notifier transport.Notif
 	if ns == "" {
 		ns = "default"
 	}
-	if clientID == "" {
+	if clientID == "" || notifier == nil {
 		return
 	}
 	h.mu.Lock()
 	if h.notifiers[ns] != nil && h.notifiers[ns][clientID] == notifier {
 		delete(h.notifiers[ns], clientID)
+	} else {
+		h.mu.Unlock()
+		return
 	}
 	if h.clients[ns] != nil {
 		delete(h.clients[ns], clientID)

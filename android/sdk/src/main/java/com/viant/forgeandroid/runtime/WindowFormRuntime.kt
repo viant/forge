@@ -1,5 +1,9 @@
 package com.viant.forgeandroid.runtime
 
+private const val WINDOW_FORM_META_KEY = "__forge"
+private const val WINDOW_FORM_PREFILL_KEY = "prefill"
+private const val WINDOW_FORM_PREFILL_REVISION_KEY = "prefillRevision"
+
 internal fun ForgeRuntime.windowFormValue(windowId: String): Map<String, Any?> {
     return windowContext(windowId).peekWindowForm()
 }
@@ -7,15 +11,21 @@ internal fun ForgeRuntime.windowFormValue(windowId: String): Map<String, Any?> {
 internal fun ForgeRuntime.setWindowFormValue(
     windowId: String,
     values: Map<String, Any?>,
-    replace: Boolean = false
+    replace: Boolean = false,
+    bumpPrefillRevision: Boolean = true
 ) {
     val dsId = WindowIdentity(windowId).windowFormId()
     val signal = windowContext(windowId).signals.form(dsId)
+    val nextValues = if (bumpPrefillRevision) {
+        withWindowFormPrefillRevision(signal.peek(), values)
+    } else {
+        values
+    }
     if (replace) {
-        signal.set(values)
+        signal.set(nextValues)
         return
     }
-    signal.set(mergeWindowFormValues(signal.peek(), values))
+    signal.set(mergeWindowFormValues(signal.peek(), nextValues))
 }
 
 internal fun ForgeRuntime.reconcileWindowForm(
@@ -25,7 +35,7 @@ internal fun ForgeRuntime.reconcileWindowForm(
 ) {
     val seeded = mergeWindowFormValues(parameters, resolveInitialWindowFormValues(metadata))
     val current = windowFormValue(windowId)
-    setWindowFormValue(windowId, mergeWindowFormValues(seeded, current), replace = true)
+    setWindowFormValue(windowId, mergeWindowFormValues(seeded, current), replace = true, bumpPrefillRevision = false)
 }
 
 private fun resolveInitialWindowFormValues(metadata: WindowMetadata): Map<String, Any?> {
@@ -80,4 +90,27 @@ private fun mergeWindowFormValues(
         }
     }
     return result
+}
+
+private fun withWindowFormPrefillRevision(
+    previous: Map<String, Any?>,
+    values: Map<String, Any?>
+): Map<String, Any?> {
+    if (!values.containsKey(WINDOW_FORM_PREFILL_KEY)) {
+        return values
+    }
+    val previousMeta = JsonUtil.asStringMap(previous[WINDOW_FORM_META_KEY])
+    val nextMeta = JsonUtil.asStringMap(values[WINDOW_FORM_META_KEY])
+    val previousRevision = numericValue(previousMeta[WINDOW_FORM_PREFILL_REVISION_KEY]) ?: 0
+    val next = values.toMutableMap()
+    next[WINDOW_FORM_META_KEY] = nextMeta + (WINDOW_FORM_PREFILL_REVISION_KEY to previousRevision + 1)
+    return next
+}
+
+private fun numericValue(value: Any?): Int? {
+    return when (value) {
+        is Number -> value.toInt()
+        is String -> value.trim().toIntOrNull()
+        else -> null
+    }
 }

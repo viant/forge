@@ -139,9 +139,10 @@ class ForgeRuntime(
     fun setWindowFormValues(
         windowId: String,
         values: Map<String, Any?>,
-        replace: Boolean = false
+        replace: Boolean = false,
+        bumpPrefillRevision: Boolean = true
     ) {
-        setWindowFormValue(windowId, values, replace)
+        setWindowFormValue(windowId, values, replace, bumpPrefillRevision)
     }
 
     fun refreshDataSourceCollection(windowID: String, dataSourceRef: String) {

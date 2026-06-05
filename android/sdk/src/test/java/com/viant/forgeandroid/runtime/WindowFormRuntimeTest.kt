@@ -68,6 +68,28 @@ class WindowFormRuntimeTest {
     }
 
     @Test
+    fun setWindowFormValueBumpsGenericPrefillRevisionForRepeatedHandoffs() {
+        val runtime = ForgeRuntime(
+            endpoints = emptyMap(),
+            scope = CoroutineScope(Dispatchers.Unconfined)
+        )
+        val state = runtime.openWindowInline(windowKey = "metrics", title = "Metrics", metadata = WindowMetadata())
+
+        runtime.setWindowFormValue(
+            state.windowId,
+            mapOf("prefill" to mapOf("recordId" to 7))
+        )
+        runtime.setWindowFormValue(
+            state.windowId,
+            mapOf("prefill" to mapOf("recordId" to 7))
+        )
+
+        val windowForm = runtime.windowFormValue(state.windowId)
+        val meta = JsonUtil.asStringMap(windowForm["__forge"])
+        assertEquals(2, meta["prefillRevision"])
+    }
+
+    @Test
     fun openWindowInlineSeedsWindowFormFromScopedItems() {
         val runtime = ForgeRuntime(
             endpoints = emptyMap(),

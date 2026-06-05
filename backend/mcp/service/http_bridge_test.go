@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/viant/jsonrpc"
+	"github.com/viant/jsonrpc/transport/server/base"
 )
 
 func TestUIRPCHandler_PollWrapsCommandEnvelope(t *testing.T) {
@@ -134,6 +137,32 @@ func TestUIRPCHandler_UsesDefaultNamespaceWithoutExplicitBridgeToken(t *testing.
 	}
 	if got := params["id"]; got != "cmd-mobile" {
 		t.Fatalf("expected command from default namespace, got %#v", got)
+	}
+}
+
+func TestHTTPBridgeSessionCloseKeepsExplicitPollingClientSnapshot(t *testing.T) {
+	hub := NewHub(&Config{})
+	bridge := &httpRPCBridge{hub: hub, sessions: map[string]*httpSessionInfo{}}
+	ctx := context.WithValue(context.Background(), jsonrpc.SessionKey, &base.Session{Id: "session-1"})
+	handler := &uiRPCHandler{bridge: bridge}
+
+	_, jerr := handler.handle(ctx, "ui.hello", json.RawMessage(`{"clientId":"mobile-client"}`))
+	if jerr != nil {
+		t.Fatalf("ui.hello error: %v", jerr)
+	}
+	_, jerr = handler.handle(
+		context.Background(),
+		"ui.snapshot",
+		json.RawMessage(`{"clientId":"mobile-client","data":{"clientId":"mobile-client","windows":[]}}`),
+	)
+	if jerr != nil {
+		t.Fatalf("ui.snapshot error: %v", jerr)
+	}
+
+	bridge.onSessionClose(&base.Session{Id: "session-1"})
+
+	if got := hub.Snapshot("default", "mobile-client"); len(got) == 0 {
+		t.Fatalf("expected explicit polling client snapshot to remain after request session close")
 	}
 }
 

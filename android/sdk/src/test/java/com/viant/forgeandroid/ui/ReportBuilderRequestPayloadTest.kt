@@ -1,16 +1,42 @@
 package com.viant.forgeandroid.ui
 
+import com.dokar.quickjs.QuickJs
+import com.dokar.quickjs.evaluate
+import com.viant.forgeandroid.runtime.ActionHookRuntime
+import com.viant.forgeandroid.runtime.ActionsDef
 import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
+import com.viant.forgeandroid.runtime.ReportBuilderHooksDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef
+import com.viant.forgeandroid.runtime.WindowMetadata
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ReportBuilderRequestPayloadTest {
+    @BeforeTest
+    fun installJvmEvaluator() {
+        ActionHookRuntime.testScriptEvaluator = { script ->
+            val quickJs = QuickJs.create(Dispatchers.Default)
+            try {
+                quickJs.evaluate<String>(script)
+            } finally {
+                quickJs.close()
+            }
+        }
+    }
+
+    @AfterTest
+    fun clearJvmEvaluator() {
+        ActionHookRuntime.testScriptEvaluator = null
+    }
+
     @Test
     fun buildReportBuilderRequestPayloadUsesEnabledRowSelectionsAndSkipsHookMappedRows() {
         val config = DashboardReportBuilderDef(
@@ -121,5 +147,67 @@ class ReportBuilderRequestPayloadTest {
         val input = payload["input"] as? Map<*, *>
         val query = input?.get("query") as? Map<*, *>
         assertEquals(true, query?.get("hooked"))
+    }
+
+    @Test
+    fun applyReportBuilderInitializeStateHookMapsPrefillIntoGenericState() {
+        val metadata = WindowMetadata(
+            namespace = "Analytics",
+            actions = ActionsDef(
+                code = """
+                    (() => ({
+                      Analytics: {
+                        reportBuilderHooks: {
+                          initializeState: (props = {}) => ({
+                            ...props.state,
+                            dynamicGroups: {
+                              include: [
+                                {
+                                  id: "prefill_includeRecordIds",
+                                  filterId: "includeRecordIds",
+                                  enabled: true,
+                                  selections: (props.windowForm?.prefill?.includeRecordIds || []).map((value) => ({
+                                    value,
+                                    label: String(value),
+                                    record: { value, label: String(value) }
+                                  }))
+                                }
+                              ]
+                            }
+                          })
+                        }
+                      }
+                    }))()
+                """.trimIndent()
+            )
+        )
+        val config = DashboardReportBuilderDef(
+            hooks = ReportBuilderHooksDef(
+                initializeState = "reportBuilderHooks.initializeState"
+            )
+        )
+        val fallback = ReportBuilderStateValues(
+            selectedMeasures = listOf("avails"),
+            selectedDimensions = emptyList(),
+            chartSpec = null,
+            viewMode = "table",
+            staticFilters = emptyMap(),
+            dynamicGroups = emptyMap()
+        )
+
+        val next = applyReportBuilderInitializeStateHook(
+            metadata = metadata,
+            config = config,
+            values = fallback,
+            windowForm = mapOf(
+                "prefill" to mapOf(
+                    "includeRecordIds" to listOf(70731)
+                )
+            )
+        )
+
+        val row = next.dynamicGroups["include"]?.firstOrNull()
+        assertEquals("includeRecordIds", row?.filterId)
+        assertEquals(JsonPrimitive(70731), row?.selections?.firstOrNull()?.value)
     }
 }
