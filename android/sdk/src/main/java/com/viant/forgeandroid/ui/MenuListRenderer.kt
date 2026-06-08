@@ -51,6 +51,16 @@ fun MenuListRenderer(
 ) {
     val windowFormSignal = window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val baseMetrics by if (baseContext != null) {
+        baseContext.metrics.flow.collectAsState(initial = baseContext.metrics.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
+    }
+    val baseRows by if (baseContext != null) {
+        baseContext.collection.flow.collectAsState(initial = baseContext.collection.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
+    }
     val relevantContexts = remember(
         window.windowId,
         baseContext?.dataSourceRef,
@@ -66,6 +76,31 @@ fun MenuListRenderer(
         relevantContexts.map { it.dataSourceRef }.sorted().joinToString("|"),
         windowForm.toString()
     ) {
+        relevantContexts.forEach { context ->
+            if (context.dataSource.autoFetch != false) {
+                context.fetchCollection()
+            }
+        }
+    }
+    val upstreamContextNeedsFollowUpFetch = remember(baseContext?.dataSourceRef, relevantContexts) {
+        val upstreamRef = baseContext?.dataSourceRef?.trim().orEmpty()
+        upstreamRef.isNotEmpty() && relevantContexts.none { it.dataSourceRef == upstreamRef }
+    }
+    val upstreamSignature = remember(baseMetrics, baseRows) {
+        buildString {
+            append(baseMetrics.toString())
+            append('#')
+            append(baseRows.toString())
+        }
+    }
+    LaunchedEffect(upstreamContextNeedsFollowUpFetch, upstreamSignature) {
+        if (!upstreamContextNeedsFollowUpFetch) {
+            return@LaunchedEffect
+        }
+        val upstreamReady = baseMetrics.isNotEmpty() || baseRows.isNotEmpty()
+        if (!upstreamReady) {
+            return@LaunchedEffect
+        }
         relevantContexts.forEach { context ->
             if (context.dataSource.autoFetch != false) {
                 context.fetchCollection()

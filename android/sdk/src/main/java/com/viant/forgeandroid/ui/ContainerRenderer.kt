@@ -215,7 +215,7 @@ fun ContainerRenderer(
                 selectFirst = container.selectFirst
             ) { dsContext ->
                 if (useMenuList) {
-                    MenuListRenderer(runtime, window, container, container.items, menuListBaseContext ?: dsContext)
+                    MenuListRenderer(runtime, window, container, container.items, dsContext)
                 } else {
                     FormRenderer(runtime, dsContext, container.items)
                 }
