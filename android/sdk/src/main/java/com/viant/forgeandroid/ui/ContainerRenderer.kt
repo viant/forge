@@ -271,7 +271,7 @@ private fun shouldUseMenuList(items: List<ItemDef>): Boolean {
         item.on.isNotEmpty() ||
             item.properties["tile"].asString() == "true" ||
             type.isEmpty() ||
-            type in setOf("label", "markdown", "button", "action")
+            type in setOf("label", "markdown", "button", "action", "link")
     }
 }
 

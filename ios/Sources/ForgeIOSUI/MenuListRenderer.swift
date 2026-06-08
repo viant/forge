@@ -1,6 +1,8 @@
 import SwiftUI
 import ForgeIOSRuntime
 
+private let hostedWorkspaceDidOpenNotification = Notification.Name("forgeHostedWorkspaceDidOpen")
+
 public struct MenuListRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.openURL) private var openURL
@@ -13,6 +15,7 @@ public struct MenuListRenderer: View {
     @State private var windowFormValues: [String: JSONValue] = [:]
     @State private var formValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var metricsValuesByDataSource: [String: [String: JSONValue]] = [:]
+    @State private var collectionValuesByDataSource: [String: [[String: JSONValue]]] = [:]
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, items: [ItemDef]) {
         self.runtime = runtime
@@ -378,7 +381,7 @@ public struct MenuListRenderer: View {
             && link.newInstance != true
         let parameters = resolveLinkParameters(item, link: link)
         let title = resolveLinkWindowTitle(item, link: link)
-        _ = await runtime.openWindow(
+        let state = await runtime.openWindow(
             key: windowKey,
             title: title,
             id: shouldReplaceHostedWindow ? currentState?.id : nil,
@@ -392,6 +395,13 @@ public struct MenuListRenderer: View {
             parentKey: currentState?.parentKey,
             isModal: link.modal ?? false
         )
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: hostedWorkspaceDidOpenNotification,
+                object: nil,
+                userInfo: ["state": state]
+            )
+        }
     }
 
     private func loadValues() async {
@@ -400,6 +410,7 @@ public struct MenuListRenderer: View {
                 windowFormValues = [:]
                 formValuesByDataSource = [:]
                 metricsValuesByDataSource = [:]
+                collectionValuesByDataSource = [:]
             }
             return
         }
@@ -411,21 +422,26 @@ public struct MenuListRenderer: View {
 
         var nextForms: [String: [String: JSONValue]] = [:]
         var nextMetrics: [String: [String: JSONValue]] = [:]
+        var nextCollections: [String: [[String: JSONValue]]] = [:]
         for ref in relevantDataSourceRefs {
-            let form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
-            let metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+            var form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
+            var metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+            var collection = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             if container.fetchData != false && form.isEmpty && metrics.isEmpty {
-                Task {
-                    await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
-                }
+                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
+                metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+                collection = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             }
             nextForms[ref] = form
             nextMetrics[ref] = metrics
+            nextCollections[ref] = collection
         }
 
         await MainActor.run {
             formValuesByDataSource = nextForms
             metricsValuesByDataSource = nextMetrics
+            collectionValuesByDataSource = nextCollections
         }
     }
 
@@ -563,7 +579,12 @@ public struct MenuListRenderer: View {
         switch item.scope?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "metrics":
             guard let ref = resolveItemDataSourceRef(item) else { return nil }
-            return jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: key))
+            if let resolved = jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: key)),
+               resolved != .null {
+                return resolved
+            }
+            let firstRow = collectionValuesByDataSource[ref]?.first ?? [:]
+            return jsonValue(from: SelectorUtil.resolve(firstRow, selector: key))
         case "windowform":
             return jsonValue(from: SelectorUtil.resolve(windowFormValues, selector: key))
         default:
@@ -624,9 +645,19 @@ public struct MenuListRenderer: View {
         switch source {
         case "metrics":
             if let ref = resolveItemDataSourceRef(item) {
-                candidate = selector.isEmpty
-                    ? .object(metricsValuesByDataSource[ref] ?? [:])
-                    : jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: selector))
+                if selector.isEmpty {
+                    if let firstRow = collectionValuesByDataSource[ref]?.first, !firstRow.isEmpty {
+                        candidate = .object(firstRow)
+                    } else {
+                        candidate = .object(metricsValuesByDataSource[ref] ?? [:])
+                    }
+                } else if let resolved = jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: selector)),
+                          resolved != .null {
+                    candidate = resolved
+                } else {
+                    let firstRow = collectionValuesByDataSource[ref]?.first ?? [:]
+                    candidate = jsonValue(from: SelectorUtil.resolve(firstRow, selector: selector))
+                }
             } else {
                 candidate = nil
             }
@@ -703,7 +734,13 @@ public struct MenuListRenderer: View {
             candidate = jsonValue(from: SelectorUtil.resolve(windowFormValues, selector: field))
         case "metrics":
             if let ref = resolveItemDataSourceRef(item) {
-                candidate = jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: field))
+                if let resolved = jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: field)),
+                   resolved != .null {
+                    candidate = resolved
+                } else {
+                    let firstRow = collectionValuesByDataSource[ref]?.first ?? [:]
+                    candidate = jsonValue(from: SelectorUtil.resolve(firstRow, selector: field))
+                }
             } else {
                 candidate = nil
             }

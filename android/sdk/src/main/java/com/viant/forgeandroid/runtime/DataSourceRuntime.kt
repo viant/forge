@@ -284,7 +284,10 @@ class DataSourceRuntime(
         return when (source) {
             "const" -> parameter.location
             "form" -> location?.let { sourceContext.peekForm()[it] }
-            "metrics" -> location?.let { SelectorUtil.resolve(sourceContext.metrics.peek(), it) }
+            "metrics" -> location?.let {
+                SelectorUtil.resolve(sourceContext.metrics.peek(), it)
+                    ?: SelectorUtil.resolve(sourceContext.collection.peek().firstOrNull().orEmpty(), it)
+            }
             "filter", "input.query", "query" -> location?.let { sourceContext.peekFilter()[it] }
             "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
             "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }

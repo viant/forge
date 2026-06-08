@@ -59,6 +59,7 @@ class ParameterResolver {
             "selection" -> ctx.peekSelection().selected?.get(key)
             "filter" -> ctx.peekFilter()[key]
             "metrics" -> SelectorUtil.resolve(ctx.metrics.peek(), key)
+                ?: SelectorUtil.resolve(ctx.collection.peek().firstOrNull().orEmpty(), key)
             "input" -> SelectorUtil.resolve(ctx.input.peek(), key)
             "windowForm" -> SelectorUtil.resolve(context.window.peekWindowForm(), key)
             else -> null
@@ -98,7 +99,10 @@ class ParameterResolver {
             "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
             "form" -> location?.let { SelectorUtil.resolve(sourceContext.peekForm(), it) }
             "windowForm" -> location?.let { SelectorUtil.resolve(context.window.peekWindowForm(), it) }
-            "metrics" -> location?.let { SelectorUtil.resolve(sourceContext.metrics.peek(), it) }
+            "metrics" -> location?.let {
+                SelectorUtil.resolve(sourceContext.metrics.peek(), it)
+                    ?: SelectorUtil.resolve(sourceContext.collection.peek().firstOrNull().orEmpty(), it)
+            }
             "filter" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
             "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
             "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed

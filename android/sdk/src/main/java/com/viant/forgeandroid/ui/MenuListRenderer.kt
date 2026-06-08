@@ -15,8 +15,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
@@ -31,6 +33,8 @@ import com.viant.forgeandroid.runtime.LinkDef
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.WindowContext
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -45,6 +49,29 @@ fun MenuListRenderer(
     items: List<ItemDef>,
     baseContext: DataSourceContext? = null
 ) {
+    val windowFormSignal = window.windowFormSignal()
+    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val relevantContexts = remember(
+        window.windowId,
+        baseContext?.dataSourceRef,
+        container.dataSourceRef,
+        items,
+        windowForm
+    ) {
+        items.mapNotNull { item ->
+            resolveMenuListContext(window, baseContext, container, item)
+        }.distinctBy { it.dataSourceRef }
+    }
+    LaunchedEffect(
+        relevantContexts.map { it.dataSourceRef }.sorted().joinToString("|"),
+        windowForm.toString()
+    ) {
+        relevantContexts.forEach { context ->
+            if (context.dataSource.autoFetch != false) {
+                context.fetchCollection()
+            }
+        }
+    }
     val visibleItems = items.filter(::shouldRenderItem)
     if (visibleItems.isEmpty()) return
 
@@ -157,9 +184,16 @@ private fun SummaryList(
                     } else {
                         androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
                     }
+                    val rows by if (dataContext != null) {
+                        dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
+                    } else {
+                        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
+                    }
                     val key = item.dataField ?: item.bindingPath ?: item.id ?: return@forEach
-                    val value = resolveItemValue(item, key, form, metrics, windowForm)
-                    SummaryCard(item.label ?: key, value)
+                    if (isItemVisible(item, form, metrics, windowForm, rows)) {
+                        val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
+                        SummaryCard(item.label ?: key, value)
+                    }
                 }
             }
         } else {
@@ -181,9 +215,16 @@ private fun SummaryList(
                 } else {
                     androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
                 }
+                val rows by if (dataContext != null) {
+                    dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
+                } else {
+                    androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
+                }
                 val key = item.dataField ?: item.bindingPath ?: item.id ?: return@StaticGrid
-                val value = resolveItemValue(item, key, form, metrics, windowForm)
-                SummaryCard(item.label ?: key, value)
+                if (isItemVisible(item, form, metrics, windowForm, rows)) {
+                    val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
+                    SummaryCard(item.label ?: key, value)
+                }
             }
         }
     }
@@ -212,16 +253,24 @@ private fun PlainList(
             } else {
                 androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
             }
+            val rows by if (dataContext != null) {
+                dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
+            } else {
+                androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
+            }
+            if (!isItemVisible(item, form, metrics, windowForm, rows)) {
+                return@forEachIndexed
+            }
             val key = item.dataField ?: item.bindingPath ?: item.id ?: ""
-            val value = if (key.isNotBlank()) resolveItemValue(item, key, form, metrics, windowForm) else ""
-            val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm) else null
+            val value = if (key.isNotBlank()) resolveItemValue(item, key, form, metrics, windowForm, rows) else ""
+            val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm, rows) else null
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
                         if (item.type?.trim()?.lowercase() == "link" && item.link != null) {
-                            openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rawValue)
+                            openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rows, rawValue)
                         } else if (item.on.isNotEmpty()) {
                             val args = mapOf("windowId" to window.windowId)
                             item.on.forEach { exec ->
@@ -279,8 +328,16 @@ private fun InlineItem(
     } else {
         androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
     }
+    val rows by if (dataContext != null) {
+        dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
+    }
+    if (!isItemVisible(item, form, metrics, windowForm, rows)) {
+        return
+    }
     val key = item.dataField ?: item.bindingPath ?: item.id ?: ""
-    val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm) else null
+    val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm, rows) else null
     val value = normalizeValue(rawValue?.toString().orEmpty())
 
     Surface(
@@ -292,7 +349,7 @@ private fun InlineItem(
                 if (href.isNotEmpty()) {
                     uriHandler.openUri(href)
                 } else {
-                    openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rawValue)
+                    openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rows, rawValue)
                 }
             }
         }
@@ -372,6 +429,7 @@ private fun openLinkedWindow(
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
     windowForm: Map<String, Any?>,
+    rows: List<Map<String, Any?>>,
     rawValue: Any?
 ) {
     val link = item.link ?: return
@@ -385,7 +443,7 @@ private fun openLinkedWindow(
             && currentState.region?.trim()?.lowercase() == "chat.top"
             && link.newInstance != true
     val title = resolveLinkWindowTitle(item, link, rawValue)
-    val parameters = resolveLinkParameters(item, link, form, metrics, windowForm, rawValue)
+    val parameters = resolveLinkParameters(item, link, form, metrics, windowForm, rows, rawValue)
     runtime.openWindow(
         windowKey = windowKey,
         title = title,
@@ -433,10 +491,11 @@ private fun resolveLinkParameters(
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
     windowForm: Map<String, Any?>,
+    rows: List<Map<String, Any?>>,
     rawValue: Any?
 ): Map<String, Any?> {
     return link.parameters.mapNotNull { (key, spec) ->
-        resolveLinkParameterValue(item, spec, form, metrics, windowForm, rawValue)?.let { key to it }
+        resolveLinkParameterValue(item, spec, form, metrics, windowForm, rows, rawValue)?.let { key to it }
     }.toMap()
 }
 
@@ -446,6 +505,7 @@ private fun resolveLinkParameterValue(
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
     windowForm: Map<String, Any?>,
+    rows: List<Map<String, Any?>>,
     rawValue: Any?
 ): Any? {
     val obj = spec as? kotlinx.serialization.json.JsonObject ?: return jsonElementToAny(spec)
@@ -457,13 +517,85 @@ private fun resolveLinkParameterValue(
     val wrap = obj["wrap"].asString()?.trim()?.lowercase().orEmpty()
 
     val candidate = when (source) {
-        "metrics" -> if (selector.isEmpty()) metrics else SelectorUtil.resolve(metrics, selector)
+        "metrics" -> if (selector.isEmpty()) {
+            if (metrics.isNotEmpty()) metrics else rows.firstOrNull().orEmpty()
+        } else {
+            SelectorUtil.resolve(metrics, selector)
+                ?: SelectorUtil.resolve(rows.firstOrNull().orEmpty(), selector)
+        }
         "form" -> if (selector.isEmpty()) form else SelectorUtil.resolve(form, selector)
         "windowform" -> if (selector.isEmpty()) windowForm else SelectorUtil.resolve(windowForm, selector)
         "value" -> rawValue
         else -> rawValue
     }
     return if (wrap == "array" && candidate != null) listOf(candidate) else candidate
+}
+
+private fun isItemVisible(
+    item: ItemDef,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>,
+    windowForm: Map<String, Any?>,
+    rows: List<Map<String, Any?>>
+): Boolean {
+    val condition = item.visibleWhen ?: return true
+    val selector = condition.selector?.takeIf { it.isNotBlank() }
+        ?: condition.field?.takeIf { it.isNotBlank() }
+        ?: condition.key?.takeIf { it.isNotBlank() }
+    val actual = when (condition.source?.trim()?.lowercase()) {
+        "windowform" -> if (selector == null) windowForm else SelectorUtil.resolve(windowForm, selector)
+        "form" -> if (selector == null) form else SelectorUtil.resolve(form, selector)
+        "metrics" -> if (selector == null) {
+            if (metrics.isNotEmpty()) metrics else rows.firstOrNull().orEmpty()
+        } else {
+            SelectorUtil.resolve(metrics, selector) ?: SelectorUtil.resolve(rows.firstOrNull().orEmpty(), selector)
+        }
+        else -> if (selector == null) metrics else SelectorUtil.resolve(metrics, selector)
+    }
+    condition.whenValue?.let { if (!jsonMatches(actual, it)) return false }
+    condition.equals?.let { if (!jsonMatches(actual, it)) return false }
+    condition.notEquals?.let { if (jsonMatches(actual, it)) return false }
+    if (condition.inValues.isNotEmpty() && condition.inValues.none { jsonMatches(actual, it) }) return false
+    condition.gt?.let { if ((actual as? Number)?.toDouble()?.let { value -> value > it } != true) return false }
+    condition.gte?.let { if ((actual as? Number)?.toDouble()?.let { value -> value >= it } != true) return false }
+    condition.lt?.let { if ((actual as? Number)?.toDouble()?.let { value -> value < it } != true) return false }
+    condition.lte?.let { if ((actual as? Number)?.toDouble()?.let { value -> value <= it } != true) return false }
+    condition.empty?.let { required ->
+        val empty = when (actual) {
+            null -> true
+            is String -> actual.isBlank()
+            is Collection<*> -> actual.isEmpty()
+            is Map<*, *> -> actual.isEmpty()
+            else -> false
+        }
+        if (empty != required) return false
+    }
+    condition.notEmpty?.let { required ->
+        val present = when (actual) {
+            null -> false
+            is String -> actual.isNotBlank()
+            is Collection<*> -> actual.isNotEmpty()
+            is Map<*, *> -> actual.isNotEmpty()
+            else -> true
+        }
+        if (present != required) return false
+    }
+    return true
+}
+
+private fun jsonMatches(actual: Any?, expected: JsonElement): Boolean {
+    return when (expected) {
+        JsonNull -> actual == null
+        is JsonPrimitive -> when {
+            expected.isString -> actual?.toString() == expected.content
+            expected.booleanOrNull != null -> actual == expected.booleanOrNull
+            expected.longOrNull != null -> (actual as? Number)?.toLong() == expected.longOrNull
+            expected.doubleOrNull != null -> (actual as? Number)?.toDouble() == expected.doubleOrNull
+            else -> actual?.toString() == expected.content
+        }
+        is JsonObject -> actual == jsonElementToAny(expected)
+        else -> actual == jsonElementToAny(expected)
+    }
 }
 
 private fun jsonElementToAny(value: JsonElement): Any? {
