@@ -14,6 +14,7 @@ import {classify} from './widgetClassifier.js';
 import {getWidgetEntry} from './widgetRegistry.jsx';
 import {getEventAdapter, resolveStateAdapter, runDynamicEvaluators,} from './binding.js';
 import {resolveSelector} from '../utils/selector.js';
+import { resolveLinkTarget } from '../utils/linkTarget.js';
 
 import ControlWrapper from './ControlWrapper.jsx';
 
@@ -27,6 +28,27 @@ export default function WidgetRenderer({
 }) {
     useSignals();
     if (!item) return null;
+
+    const resolveItemBoundValue = (ctx, currentItem) => {
+        if (!currentItem?.dataField) return undefined;
+        const scope = String(currentItem?.scope || 'form').trim().toLowerCase();
+        switch (scope) {
+            case 'metrics':
+                return resolveSelector(ctx?.signals?.metrics?.peek?.() || ctx?.signals?.metrics?.value || {}, currentItem.dataField);
+            case 'windowform':
+                return resolveSelector(ctx?.signals?.windowForm?.peek?.() || ctx?.signals?.windowForm?.value || {}, currentItem.dataField);
+            case 'input':
+                return resolveSelector(ctx?.signals?.input?.peek?.() || ctx?.signals?.input?.value || {}, currentItem.dataField);
+            case 'selection': {
+                const selection = ctx?.handlers?.dataSource?.getSelection?.() || ctx?.handlers?.dataSource?.peekSelection?.() || {};
+                const selected = selection?.selected ?? selection?.selection ?? selection;
+                return resolveSelector(selected || {}, currentItem.dataField);
+            }
+            case 'form':
+            default:
+                return resolveSelector(ctx?.handlers?.dataSource?.getFormData?.() || ctx?.signals?.form?.peek?.() || ctx?.signals?.form?.value || {}, currentItem.dataField);
+        }
+    };
 
     const resolveItemContext = () => {
         const refs = item?.dataSourceRefs || {};
@@ -62,7 +84,15 @@ export default function WidgetRenderer({
     // ------------------------------------------------------------------
     // 1. Resolve widget key / factory
     // ------------------------------------------------------------------
-    const widgetKey = item.widget || classify(item);
+    const classifiedWidgetKey = item.widget || classify(item);
+    const resolvedItemLink = resolveLinkTarget({
+        linkConfig: item?.link,
+        value: resolveItemBoundValue(resolvedContext, item),
+        context: resolvedContext,
+    });
+    const widgetKey = resolvedItemLink?.kind === 'window' || item?.type === 'link'
+        ? 'link'
+        : classifiedWidgetKey;
     const { factory: Widget, framework } = getWidgetEntry(widgetKey);
     // ------------------------------------------------------------------
     // 2. State adapter (scope-aware)
@@ -172,11 +202,14 @@ export default function WidgetRenderer({
     // ------------------------------------------------------------------
     // 5. Pass-through of common display properties present directly on item
     // ------------------------------------------------------------------
-    ['icon', 'leftIcon', 'rightIcon', 'intent', 'appearance'].forEach((k) => {
+    ['icon', 'leftIcon', 'rightIcon', 'intent', 'appearance', 'link', 'format', 'className', 'style', 'title'].forEach((k) => {
         if (item?.[k] !== undefined && widgetProps[k] === undefined) {
             widgetProps[k] = item[k];
         }
     });
+    if (resolvedItemLink && widgetProps.link === undefined) {
+        widgetProps.link = item?.link;
+    }
 
 
 

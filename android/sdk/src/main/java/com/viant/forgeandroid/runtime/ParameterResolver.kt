@@ -58,6 +58,8 @@ class ParameterResolver {
             "form" -> ctx.peekForm()[key]
             "selection" -> ctx.peekSelection().selected?.get(key)
             "filter" -> ctx.peekFilter()[key]
+            "metrics" -> SelectorUtil.resolve(ctx.metrics.peek(), key)
+            "input" -> SelectorUtil.resolve(ctx.input.peek(), key)
             "windowForm" -> SelectorUtil.resolve(context.window.peekWindowForm(), key)
             else -> null
         }
@@ -91,11 +93,15 @@ class ParameterResolver {
     }
 
     private fun readLegacy(context: DataSourceContext, p: ParameterDef): Any? {
+        val (sourceContext, location) = resolveLegacySourceContext(context, p.location)
         return when (p.input) {
-            "selection" -> context.peekSelection().selected?.get(p.location ?: "")
-            "form" -> context.peekForm()[p.location ?: ""]
-            "windowForm" -> SelectorUtil.resolve(context.window.peekWindowForm(), p.location ?: "")
-            "metadata" -> context.window.metadata.peek()?.let { it } // full metadata if needed
+            "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
+            "form" -> location?.let { SelectorUtil.resolve(sourceContext.peekForm(), it) }
+            "windowForm" -> location?.let { SelectorUtil.resolve(context.window.peekWindowForm(), it) }
+            "metrics" -> location?.let { SelectorUtil.resolve(sourceContext.metrics.peek(), it) }
+            "filter" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
+            "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
+            "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed
             "const" -> p.location
             else -> null
         }
@@ -109,6 +115,26 @@ class ParameterResolver {
             resolved[name] = value
         }
         return resolved
+    }
+
+    private fun resolveLegacySourceContext(
+        context: DataSourceContext,
+        rawLocation: String?
+    ): Pair<DataSourceContext, String?> {
+        val location = rawLocation?.trim().orEmpty()
+        if (location.isEmpty()) {
+            return context to rawLocation
+        }
+        val dotIndex = location.indexOf('.')
+        if (dotIndex <= 0) {
+            return context to location
+        }
+        val possibleRef = location.substring(0, dotIndex)
+        val metadata = context.window.metadata.peek()
+        if (metadata?.dataSources?.containsKey(possibleRef) == true) {
+            return context.window.context(possibleRef) to location.substring(dotIndex + 1)
+        }
+        return context to location
     }
 }
 

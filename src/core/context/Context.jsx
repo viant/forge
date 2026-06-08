@@ -22,7 +22,7 @@ function resolveActionHandler(actions, handlers, name) {
     const keys = name.split(".");
     let result = actions;
     for (const key of keys) {
-        if (!key || typeof result[key] === "undefined") {
+        if (!key || result == null || typeof result !== "object" || typeof result[key] === "undefined") {
             return resolveHandler(handlers, name);
         }
         result = result[key];
@@ -83,6 +83,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
     return {
 
         identity: {windowId, getDataSourceId, dataSourceRef, getDialogId},
+        windowState: services?.windowState || null,
         resources: {},
         metadata: metadata,
         dataSourceRef: dataSourceRef,

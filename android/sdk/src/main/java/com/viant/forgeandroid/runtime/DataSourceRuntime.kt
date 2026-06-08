@@ -280,14 +280,34 @@ class DataSourceRuntime(
 
     private fun resolveParameterValue(ctx: DataSourceContext, parameter: ParameterDef): Any? {
         val source = ((parameter.from ?: "").ifBlank { parameter.input ?: "" }).lowercase()
+        val (sourceContext, location) = resolveSourceContext(ctx, parameter.location)
         return when (source) {
             "const" -> parameter.location
-            "form" -> parameter.location?.let { ctx.peekForm()[it] }
-            "filter", "input.query", "query" -> parameter.location?.let { ctx.peekFilter()[it] }
-            "selection" -> parameter.location?.let { SelectorUtil.resolve(ctx.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
-            "windowform" -> parameter.location?.let { SelectorUtil.resolve(ctx.window.peekWindowForm(), it) }
-            else -> parameter.location?.let { ctx.peekFilter()[it] } ?: parameter.location
+            "form" -> location?.let { sourceContext.peekForm()[it] }
+            "metrics" -> location?.let { SelectorUtil.resolve(sourceContext.metrics.peek(), it) }
+            "filter", "input.query", "query" -> location?.let { sourceContext.peekFilter()[it] }
+            "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
+            "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
+            "windowform" -> location?.let { SelectorUtil.resolve(ctx.window.peekWindowForm(), it) }
+            else -> location?.let { sourceContext.peekFilter()[it] } ?: parameter.location
         }
+    }
+
+    private fun resolveSourceContext(ctx: DataSourceContext, rawLocation: String?): Pair<DataSourceContext, String?> {
+        val location = rawLocation?.trim().orEmpty()
+        if (location.isEmpty()) {
+            return ctx to rawLocation
+        }
+        val dotIndex = location.indexOf('.')
+        if (dotIndex <= 0) {
+            return ctx to location
+        }
+        val possibleRef = location.substring(0, dotIndex)
+        val metadata = ctx.window.metadata.peek()
+        if (metadata?.dataSources?.containsKey(possibleRef) == true) {
+            return ctx.window.context(possibleRef) to location.substring(dotIndex + 1)
+        }
+        return ctx to location
     }
 
     private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())

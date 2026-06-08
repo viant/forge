@@ -51,10 +51,10 @@ export const resolveHandler = (registry = {}, name) => {
     const keys = name.split(".");
     let result = registry;
     for (const key of keys) {
-        if (!key || typeof result[key] === "undefined") {
+        if (!key || result == null || typeof result !== "object" || typeof result[key] === "undefined") {
             let reportAvailableKeys = ''
-            for (const key in result) {
-                reportAvailableKeys += +' ' + key
+            for (const availableKey in (result || {})) {
+                reportAvailableKeys += ' ' + availableKey
             }
             throw new Error(`Handler key "${key}" not found in registry, avails: "${reportAvailableKeys}".`, result);
         }
@@ -66,4 +66,3 @@ export const resolveHandler = (registry = {}, name) => {
     }
     return result;
 };
-

@@ -1,12 +1,15 @@
 package com.viant.forgeandroid.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,10 +27,15 @@ import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.ItemDef
+import com.viant.forgeandroid.runtime.LinkDef
+import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.WindowContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.longOrNull
 
 @Composable
 fun MenuListRenderer(
@@ -41,11 +50,35 @@ fun MenuListRenderer(
 
     val useTiles = visibleItems.any { it.properties["tile"].asString() == "true" }
     val useSummaryCards = visibleItems.size >= 2 && visibleItems.all(::isSummaryLabelItem)
+    val useInlineRow = visibleItems.isNotEmpty() && visibleItems.all {
+        it.appearance?.trim()?.lowercase().orEmpty() == "inline"
+    }
 
     when {
         useTiles -> TileList(runtime, window, visibleItems)
+        useInlineRow -> InlineList(runtime, window, baseContext, container, visibleItems)
         useSummaryCards -> SummaryList(window, baseContext, container, visibleItems)
         else -> PlainList(runtime, window, baseContext, container, visibleItems)
+    }
+}
+
+@Composable
+private fun InlineList(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    baseContext: DataSourceContext?,
+    container: ContainerDef,
+    items: List<ItemDef>
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items.forEach { item ->
+            InlineItem(runtime, window, baseContext, container, item)
+        }
     }
 }
 
@@ -181,13 +214,16 @@ private fun PlainList(
             }
             val key = item.dataField ?: item.bindingPath ?: item.id ?: ""
             val value = if (key.isNotBlank()) resolveItemValue(item, key, form, metrics, windowForm) else ""
+            val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm) else null
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        val args = mapOf("windowId" to window.windowId)
-                        if (item.on.isNotEmpty()) {
+                        if (item.type?.trim()?.lowercase() == "link" && item.link != null) {
+                            openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rawValue)
+                        } else if (item.on.isNotEmpty()) {
+                            val args = mapOf("windowId" to window.windowId)
                             item.on.forEach { exec ->
                                 runtime.execute(exec, dataContext, args)
                             }
@@ -200,11 +236,11 @@ private fun PlainList(
                         text = item.label ?: item.id.orEmpty(),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
-                        color = Color(0xFF111111)
+                        color = if (item.type?.trim()?.lowercase() == "link") Color(0xFF175CD3) else Color(0xFF111111)
                     )
                 }
-                val subtitle = item.properties["subtitle"].asString()?.ifBlank { value.ifBlank { null } }
-                    ?: value.ifBlank { null }
+                val subtitle = item.properties["subtitle"].asString()?.ifBlank { normalizeValue(value).ifBlank { null } }
+                    ?: normalizeValue(value).ifBlank { null }
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
@@ -218,6 +254,55 @@ private fun PlainList(
                 HorizontalDivider(color = Color(0xFFE6E6E6))
             }
         }
+    }
+}
+
+@Composable
+private fun InlineItem(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    baseContext: DataSourceContext?,
+    container: ContainerDef,
+    item: ItemDef
+) {
+    val dataContext = resolveMenuListContext(window, baseContext, container, item)
+    val uriHandler = LocalUriHandler.current
+    val windowFormSignal = window.windowFormSignal()
+    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val form by if (dataContext != null) {
+        dataContext.form.flow.collectAsState(initial = dataContext.form.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
+    }
+    val metrics by if (dataContext != null) {
+        dataContext.metrics.flow.collectAsState(initial = dataContext.metrics.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
+    }
+    val key = item.dataField ?: item.bindingPath ?: item.id ?: ""
+    val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm) else null
+    val value = normalizeValue(rawValue?.toString().orEmpty())
+
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = if (item.type?.trim()?.lowercase() == "link") Color(0xFFE8F1FF) else Color(0xFFF2F4F7),
+        modifier = Modifier.clickable {
+            if (item.type?.trim()?.lowercase() == "link" && item.link != null) {
+                val href = item.link.href?.trim().orEmpty()
+                if (href.isNotEmpty()) {
+                    uriHandler.openUri(href)
+                } else {
+                    openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rawValue)
+                }
+            }
+        }
+    ) {
+        Text(
+            text = value.ifBlank { item.label ?: item.id.orEmpty() },
+            color = if (item.type?.trim()?.lowercase() == "link") Color(0xFF175CD3) else Color(0xFF475467),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+        )
     }
 }
 
@@ -240,7 +325,7 @@ private fun SummaryCard(label: String, value: String) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = value.ifBlank { "—" },
+                text = normalizeValue(value),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -277,6 +362,129 @@ private fun resolveMenuListContext(
         baseContext?.dataSourceRef == ref -> baseContext
         else -> window.contextOrNull(ref)
     }
+}
+
+private fun openLinkedWindow(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    container: ContainerDef,
+    item: ItemDef,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>,
+    windowForm: Map<String, Any?>,
+    rawValue: Any?
+) {
+    val link = item.link ?: return
+    val windowKey = link.windowKey?.trim().orEmpty()
+    if (windowKey.isEmpty()) {
+        return
+    }
+    val currentState = runtime.windowState(window.windowId)
+    val replaceHostedWindow =
+        currentState?.presentation?.trim()?.lowercase() == "hosted"
+            && currentState.region?.trim()?.lowercase() == "chat.top"
+            && link.newInstance != true
+    val title = resolveLinkWindowTitle(item, link, rawValue)
+    val parameters = resolveLinkParameters(item, link, form, metrics, windowForm, rawValue)
+    runtime.openWindow(
+        windowKey = windowKey,
+        title = title,
+        inTab = link.inTab ?: currentState?.inTab ?: true,
+        parameters = parameters,
+        windowIdOverride = if (replaceHostedWindow) currentState?.windowId else null,
+        conversationId = currentState?.conversationId,
+        presentation = currentState?.presentation,
+        region = currentState?.region,
+        workspaceSharePct = currentState?.workspaceSharePct,
+        workspaceMinHeight = currentState?.workspaceMinHeight,
+        parentKey = currentState?.parentKey,
+        isModal = link.modal == true
+    )
+}
+
+private fun resolveLinkWindowTitle(
+    item: ItemDef,
+    link: LinkDef,
+    rawValue: Any?
+): String {
+    val source = link.windowTitleSource?.trim()?.lowercase().orEmpty()
+    if (source == "value") {
+        val value = rawValue?.toString()?.trim().orEmpty()
+        if (value.isNotEmpty()) {
+            return value
+        }
+    }
+    val explicit = link.windowTitle?.trim().orEmpty()
+    if (explicit.isNotEmpty()) {
+        return explicit
+    }
+    return item.label?.takeIf { it.isNotBlank() }
+        ?: rawValue?.toString()?.takeIf { it.isNotBlank() }
+        ?: windowKeyFallback(link)
+}
+
+private fun windowKeyFallback(link: LinkDef): String {
+    return link.windowKey?.trim().orEmpty().ifBlank { "window" }
+}
+
+private fun resolveLinkParameters(
+    item: ItemDef,
+    link: LinkDef,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>,
+    windowForm: Map<String, Any?>,
+    rawValue: Any?
+): Map<String, Any?> {
+    return link.parameters.mapNotNull { (key, spec) ->
+        resolveLinkParameterValue(item, spec, form, metrics, windowForm, rawValue)?.let { key to it }
+    }.toMap()
+}
+
+private fun resolveLinkParameterValue(
+    item: ItemDef,
+    spec: JsonElement,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>,
+    windowForm: Map<String, Any?>,
+    rawValue: Any?
+): Any? {
+    val obj = spec as? kotlinx.serialization.json.JsonObject ?: return jsonElementToAny(spec)
+    val source = obj["source"].asString()?.trim()?.lowercase().orEmpty().ifBlank { "value" }
+    val selector = (obj["selector"].asString()
+        ?: obj["field"].asString()
+        ?: obj["location"].asString()
+        ?: "").trim()
+    val wrap = obj["wrap"].asString()?.trim()?.lowercase().orEmpty()
+
+    val candidate = when (source) {
+        "metrics" -> if (selector.isEmpty()) metrics else SelectorUtil.resolve(metrics, selector)
+        "form" -> if (selector.isEmpty()) form else SelectorUtil.resolve(form, selector)
+        "windowform" -> if (selector.isEmpty()) windowForm else SelectorUtil.resolve(windowForm, selector)
+        "value" -> rawValue
+        else -> rawValue
+    }
+    return if (wrap == "array" && candidate != null) listOf(candidate) else candidate
+}
+
+private fun jsonElementToAny(value: JsonElement): Any? {
+    return when (value) {
+        is kotlinx.serialization.json.JsonObject -> value.mapValues { (_, entry) -> jsonElementToAny(entry) }
+        is kotlinx.serialization.json.JsonArray -> value.map { jsonElementToAny(it) }
+        is JsonPrimitive -> {
+            if (value.isString) value.contentOrNull
+            else value.booleanOrNull ?: value.longOrNull ?: value.doubleOrNull ?: value.contentOrNull
+        }
+        else -> null
+    }
+}
+
+private fun normalizeValue(value: String): String {
+    return if (isPlaceholderValue(value)) "No data" else value
+}
+
+private fun isPlaceholderValue(value: String): Boolean {
+    val normalized = value.trim().lowercase()
+    return normalized.isEmpty() || normalized in setOf("-", "—", "/", "n/a", "na", "null")
 }
 
 private fun parseColor(value: String?): Color? {

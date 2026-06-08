@@ -114,12 +114,11 @@ const WindowManager = () => {
     };
 
     const resolveDisplayWindowTitle = (win) => {
-        const windowKey = String(win?.windowKey || '').trim();
-        if ((windowKey === 'orderPerformance' || windowKey === 'order') && win?.windowId) {
-            const parameterOrderId = String(win?.parameters?.AdOrderId?.[0] ?? '').trim();
-            if (parameterOrderId) return `Order ${parameterOrderId}`;
+        const explicitTitle = String(win?.windowTitle || '').trim();
+        if (explicitTitle) {
+            return explicitTitle;
         }
-        return String(win?.windowTitle || win?.windowKey || '').trim();
+        return String(win?.windowKey || '').trim();
     };
 
     return (

@@ -3,6 +3,7 @@ import {Button, Icon, Checkbox} from "@blueprintjs/core";
 import ProgressBar from "../../control/ProgressBar.jsx";
 import {useCellEvents} from "../../../hooks/event.js";
 import {resolveTableLink} from "../../../utils/tableLink.js";
+import { resolveLinkTarget } from "../../../utils/linkTarget.js";
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -142,8 +143,31 @@ const TableCell = ({
             }
             break;
         case "link": {
-            const link = resolveTableLink({row, column: col, value});
-            cellContent = link ? (
+            const link = resolveTableLink({row, column: col, value})
+                || resolveLinkTarget({ linkConfig: col?.link, row, value, context });
+            if (!link) {
+                cellContent = displayedText;
+                break;
+            }
+            if (link.kind === 'window') {
+                cellContent = (
+                    <button
+                        type="button"
+                        title={link.title || link.text}
+                        className="forge-table-link"
+                        style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            context?.handlers?.window?.openTarget?.({ target: link, context });
+                        }}
+                    >
+                        {link.text}
+                    </button>
+                );
+                break;
+            }
+            cellContent = (
                 <a
                     href={link.href}
                     target={link.target}
@@ -154,7 +178,7 @@ const TableCell = ({
                 >
                     {link.text}
                 </a>
-            ) : displayedText;
+            );
             break;
         }
         default:

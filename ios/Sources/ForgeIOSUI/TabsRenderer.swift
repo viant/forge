@@ -84,7 +84,7 @@ public struct TabsRenderer: View {
                     runtime: runtime,
                     window: window,
                     container: child,
-                    suppressTitle: usesMenuStyle
+                    suppressTitle: true
                 )
             }
         }

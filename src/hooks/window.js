@@ -1,5 +1,6 @@
 // useGenericDataSourceHandlers.js
 import {
+    activeWindows,
     addWindow,
     getDialogSignal, removeSignalsForKey,
 } from "../core/store/signals.js";
@@ -188,8 +189,6 @@ export function useWindowHandlers(windowId) {
     const inTab = true;
     const getDialogId = (id) => `${windowId}Dialog${id}`;
     const openWindow = (props = {}) => {
-
-
         const { execution = {}, parameters = {} } = props; // parameters = legacy map
         const parameterDefinitions = Array.isArray(execution.parameters) ? execution.parameters : [];
 
@@ -199,7 +198,25 @@ export function useWindowHandlers(windowId) {
         let options = {};
         if (rawArgs.length > 0 && typeof rawArgs[rawArgs.length - 1] === 'object') {
             const maybe = rawArgs[rawArgs.length - 1];
-            if (maybe && (maybe.awaitResult !== undefined || maybe.parameters || maybe.newInstance !== undefined || maybe.autoIndexTitle !== undefined)) {
+            if (maybe && (
+                maybe.awaitResult !== undefined
+                || maybe.parameters
+                || maybe.newInstance !== undefined
+                || maybe.autoIndexTitle !== undefined
+                || maybe.modal !== undefined
+                || maybe.size !== undefined
+                || maybe.width !== undefined
+                || maybe.height !== undefined
+                || maybe.footer !== undefined
+                || maybe.presentation !== undefined
+                || maybe.region !== undefined
+                || maybe.conversationId !== undefined
+                || maybe.replaceHostedRegion !== undefined
+                || maybe.parentKey !== undefined
+                || maybe.workspaceSharePct !== undefined
+                || maybe.workspaceMinHeight !== undefined
+                || maybe.workspaceCollapsed !== undefined
+            )) {
                 options = rawArgs.pop();
             }
         }
@@ -250,12 +267,26 @@ export function useWindowHandlers(windowId) {
 
         const winObj = addWindow(
             windowTitle,
-            windowId,
+            options.parentKey !== undefined ? options.parentKey : windowId,
             windowKey,
             windowData,
             effectiveInTab,
             initialParameters,
-            { modal, size, footer: options.footer, newInstance: options.newInstance === true, autoIndexTitle: options.autoIndexTitle === true }
+            {
+                modal,
+                size,
+                footer: options.footer,
+                newInstance: options.newInstance === true,
+                autoIndexTitle: options.autoIndexTitle === true,
+                presentation: options.presentation,
+                region: options.region,
+                conversationId: options.conversationId,
+                replaceHostedRegion: options.replaceHostedRegion,
+                parentKey: options.parentKey,
+                workspaceSharePct: options.workspaceSharePct,
+                workspaceMinHeight: options.workspaceMinHeight,
+                workspaceCollapsed: options.workspaceCollapsed,
+            }
         );
 
         const entryBase = {
@@ -284,6 +315,68 @@ export function useWindowHandlers(windowId) {
 
     const closeWindow = (props = {}) => {
         removeSignalsForKey(windowId);
+    }
+
+    const openTarget = (props = {}) => {
+        const target = props?.target;
+        if (!target || typeof target !== 'object') {
+            return undefined;
+        }
+        if (String(target.kind || '').trim().toLowerCase() !== 'window') {
+            return undefined;
+        }
+        const options = {};
+        if (target.awaitResult === true) options.awaitResult = true;
+        if (target.newInstance === true) options.newInstance = true;
+        if (target.autoIndexTitle === true) options.autoIndexTitle = true;
+        if (target.modal === true) options.modal = true;
+        if (target.size) options.size = target.size;
+        if (target.width !== undefined) options.width = target.width;
+        if (target.height !== undefined) options.height = target.height;
+        if (target.footer !== undefined) options.footer = target.footer;
+        const currentWindow =
+            activeWindows.peek().find((entry) => String(entry?.windowId || '').trim() === String(windowId || '').trim())
+            || props?.context?.windowState
+            || getWindowContext(windowId)?.windowState
+            || null;
+        if (currentWindow) {
+            if (target.presentation !== undefined) options.presentation = target.presentation;
+            else if (currentWindow.presentation !== undefined) options.presentation = currentWindow.presentation;
+
+            if (target.region !== undefined) options.region = target.region;
+            else if (currentWindow.region !== undefined) options.region = currentWindow.region;
+
+            if (target.conversationId !== undefined) options.conversationId = target.conversationId;
+            else if (currentWindow.conversationId !== undefined) options.conversationId = currentWindow.conversationId;
+
+            if (target.workspaceSharePct !== undefined) options.workspaceSharePct = target.workspaceSharePct;
+            else if (currentWindow.workspaceSharePct !== undefined) options.workspaceSharePct = currentWindow.workspaceSharePct;
+
+            if (target.workspaceMinHeight !== undefined) options.workspaceMinHeight = target.workspaceMinHeight;
+
+            if (target.workspaceCollapsed !== undefined) options.workspaceCollapsed = target.workspaceCollapsed;
+            else if (currentWindow.workspaceCollapsed !== undefined) options.workspaceCollapsed = currentWindow.workspaceCollapsed;
+
+            const normalizedPresentation = String(options.presentation || '').trim().toLowerCase();
+            const normalizedRegion = String(options.region || '').trim().toLowerCase();
+            if (normalizedPresentation === 'hosted' && normalizedRegion === 'chat.top') {
+                options.replaceHostedRegion = target.replaceHostedRegion !== false;
+                options.parentKey = target.parentKey !== undefined ? target.parentKey : currentWindow.parentKey;
+            }
+        }
+        return openWindow({
+            execution: {
+                args: [
+                    target.windowKey,
+                    target.windowTitle || '',
+                    target.windowData || '',
+                    target.inTab !== false,
+                    options,
+                ],
+            },
+            parameters: target.parameters || {},
+            context: props?.context || props?.execution?.context || props?.context,
+        });
     }
 
     const exportDashboard = (props = {}) => {
@@ -644,6 +737,7 @@ export function useWindowHandlers(windowId) {
 
     return {
         openWindow,
+        openTarget,
         closeWindow,
         exportDashboard,
         setDashboardFilter,

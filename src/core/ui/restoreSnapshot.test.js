@@ -90,4 +90,52 @@ assert.deepEqual(getControlSignal('orderPerformance_1DSprofile').peek(), { loadi
 assert.deepEqual(getCollectionSignal('orderPerformance_1DSprofile').peek(), [{ date: '2026-05-15', spend: 120 }]);
 assert.deepEqual(getMetricsSignal('orderPerformance_1DSprofile').peek(), { spend: 120 });
 
+restoreWindowsFromSnapshot({
+  selected: { windowId: 'line_1', tabId: 'line_1' },
+  windows: [{
+    windowId: 'line_1',
+    windowKey: 'line',
+    windowTitle: 'Line',
+    inTab: true,
+    parameters: { AudienceId: [7289845] },
+    dataSources: {
+      period30d: {
+        dataSourceRef: 'line_performance_period_30d',
+        input: { fetch: false, parameters: { AudienceId: [7289845], granularity: 'day' } },
+        control: { loading: true, error: null, stale: true },
+        collection: [],
+        metrics: {},
+      },
+      profile: {
+        dataSourceRef: 'line_performance_profile',
+        input: { fetch: false, parameters: { AudienceId: [7289845] } },
+        control: { loading: false, error: { message: 'authorization required' }, stale: true },
+        collection: [],
+        metrics: {},
+      },
+    },
+  }]
+});
+
+assert.deepEqual(getInputSignal('line_1DSline_performance_period_30d').peek(), {
+  fetch: true,
+  refresh: false,
+  parameters: { AudienceId: [7289845], granularity: 'day' },
+});
+assert.deepEqual(getControlSignal('line_1DSline_performance_period_30d').peek(), {
+  loading: false,
+  error: null,
+  stale: false,
+});
+assert.deepEqual(getInputSignal('line_1DSline_performance_profile').peek(), {
+  fetch: true,
+  refresh: false,
+  parameters: { AudienceId: [7289845] },
+});
+assert.deepEqual(getControlSignal('line_1DSline_performance_profile').peek(), {
+  loading: false,
+  error: null,
+  stale: false,
+});
+
 console.log('restoreSnapshot ✓ rehydrates windows and datasource state from UI snapshot');

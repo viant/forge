@@ -77,6 +77,12 @@ function currentWindowFocus() {
   }
 }
 
+function snapshotLooksStartupReady(snapshot = null) {
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  const conversationId = String(snapshot.conversationId || '').trim();
+  return !!conversationId;
+}
+
 /**
  * Optional UI bridge for "reverse API" control.
  *
@@ -376,6 +382,11 @@ export function startUIBridgeHTTP(options = {}) {
     if (typeof window === 'undefined' || !startupReadyEvent) {
       return Promise.resolve();
     }
+    try {
+      if (snapshotLooksStartupReady(snapshotBuilder())) {
+        return Promise.resolve();
+      }
+    } catch (_) {}
     return new Promise((resolve) => {
       let settled = false;
       let timer = null;

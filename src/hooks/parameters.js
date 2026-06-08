@@ -1,5 +1,28 @@
 import {resolveSelector} from "../utils/selector.js";
 
+function shouldPreserveResolvedValue(existingValue, nextValue) {
+    if (existingValue === undefined) {
+        return false;
+    }
+    if (nextValue === undefined || nextValue === null) {
+        return true;
+    }
+    if (typeof nextValue === 'string' && nextValue.trim() === '') {
+        return true;
+    }
+    if (Array.isArray(nextValue) && nextValue.length === 0) {
+        return true;
+    }
+    return false;
+}
+
+function assignResolvedField(target, fieldName, nextValue) {
+    if (!target || !fieldName) return;
+    if (shouldPreserveResolvedValue(target[fieldName], nextValue)) {
+        return;
+    }
+    target[fieldName] = nextValue;
+}
 
 export function resolveParameters(parameterDefinitions = [], context) {
     // New-style rows: have explicit `from` and `to` with a ':' separator.
@@ -56,6 +79,15 @@ export function resolveParameters(parameterDefinitions = [], context) {
                     break;
                 case 'filter':
                     srcVal = resolveSelector(srcCtx.handlers.dataSource.peekFilter(), srcPath);
+                    break;
+                case 'metrics':
+                    srcVal = resolveSelector(srcCtx.signals.metrics?.peek?.() || {}, srcPath);
+                    break;
+                case 'windowform':
+                    srcVal = resolveSelector(context?.signals?.windowForm?.peek?.() || {}, srcPath);
+                    break;
+                case 'input':
+                    srcVal = resolveSelector(srcCtx.signals.input?.peek?.() || {}, srcPath);
                     break;
                 default:
                     console.warn('resolveParameters: unsupported store in new-style param (M-1)', srcStore);
@@ -164,9 +196,9 @@ export function resolveParameters(parameterDefinitions = [], context) {
 
         } else {
             if(toDataSource) {
-                resolved[toDataSource][name] = value;
+                assignResolvedField(resolved[toDataSource], name, value);
             } else {
-                resolved[name] = value;
+                assignResolvedField(resolved, name, value);
             }
         }
     });
@@ -190,6 +222,12 @@ function resolveParameter(context, inWhere, location) {
             return resolveFromMetadata(context, location);
         case 'filterSet':
             return resolveFromFilterSet(context, location);
+        case 'metrics':
+            return resolveFromDataSource(context, location, 'metrics');
+        case 'input':
+            return resolveFromDataSource(context, location, 'input');
+        case 'filter':
+            return resolveFromDataSource(context, location, 'filter');
         case 'tableSetting':
             return resolveFromTableSetting(context, location);
         case 'const':

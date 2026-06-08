@@ -29,9 +29,6 @@ export default function ControlWrapper({ item, container, context, framework = '
     const regKeyRef = useRef(null);
 
     const custom = getWrapper(framework);
-    if (custom) {
-        return custom(item, container, children);
-    }
 
     // ----- fallback simple wrapper ---------------------------------
     const columns = container?.layout?.columns || 1;
@@ -79,8 +76,26 @@ export default function ControlWrapper({ item, container, context, framework = '
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [context?.identity?.windowId, context?.identity?.dataSourceRef, item?.id]);
 
+    if (custom) {
+        return (
+            <div
+                style={style}
+                className={["forge-control-wrapper", item?.className].filter(Boolean).join(" ")}
+                ref={wrapperRef}
+                data-forge-control-id={item?.id || undefined}
+            >
+                {custom(item, container, children, context)}
+            </div>
+        );
+    }
+
     return (
-        <div style={style} className="forge-control-wrapper" ref={wrapperRef} data-forge-control-id={item?.id || undefined}>
+        <div
+            style={style}
+            className={["forge-control-wrapper", item?.className].filter(Boolean).join(" ")}
+            ref={wrapperRef}
+            data-forge-control-id={item?.id || undefined}
+        >
             {item?.label && !item.hideLabel && !isLabelWidget && (
                 <label
                     style={{ display: inline ? 'inline-block' : 'block', marginRight: inline ? 8 : 0 }}

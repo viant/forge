@@ -126,4 +126,96 @@ assert.deepEqual(openedWindow.parameters, {
 });
 console.log('openWindow ✓ preserves explicit prefill parameters for windowForm seeding');
 
+activeWindows.value = [{
+  windowId,
+  windowKey: 'order',
+  windowTitle: 'Order Summary',
+  parentKey: 'chat/new',
+  presentation: 'hosted',
+  region: 'chat.top',
+  conversationId: 'conv-123',
+  workspaceSharePct: 72,
+  workspaceMinHeight: 500,
+  inTab: true,
+  parameters: {
+    AdOrderId: [123],
+  },
+}];
+
+handlers.openTarget({
+  target: {
+    kind: 'window',
+    windowKey: 'campaign',
+    windowTitle: 'Campaign',
+    inTab: true,
+    parameters: {
+      CampaignId: [456],
+    },
+  },
+  context: {
+    identity: {
+      dataSourceRef: 'perf',
+    },
+  },
+});
+const targetWindow = activeWindows.peek().find((entry) => entry.windowKey === 'campaign');
+assert.equal(targetWindow.windowTitle, 'Campaign');
+assert.deepEqual(targetWindow.parameters, {
+  CampaignId: [456],
+});
+assert.equal(targetWindow.presentation, 'hosted');
+assert.equal(targetWindow.region, 'chat.top');
+assert.equal(targetWindow.conversationId, 'conv-123');
+assert.equal(targetWindow.parentKey, 'chat/new');
+console.log('openTarget ✓ opens a window from a resolved target contract');
+
+activeWindows.value = [{
+  windowId: 'line_7289845__conv-123',
+  windowKey: 'line',
+  windowTitle: 'OLV_BAU_AUS_Lotame F1 Fans_OM',
+  parentKey: 'chat/new',
+  presentation: 'hosted',
+  region: 'chat.top',
+  conversationId: 'conv-123',
+  workspaceSharePct: 72,
+  workspaceMinHeight: 500,
+  inTab: true,
+  parameters: {
+    AudienceId: [7289845],
+    AdOrderId: [2660900],
+    CampaignId: [551549],
+  },
+}];
+
+const hostedHandlers = useWindowHandlers('line_7289845__conv-123');
+
+hostedHandlers.openTarget({
+  target: {
+    kind: 'window',
+    windowKey: 'order',
+    windowTitle: '2660900',
+    inTab: true,
+    parameters: {
+      AdOrderId: [2660900],
+      CampaignId: [551549],
+    },
+  },
+  context: {
+    identity: {
+      dataSourceRef: 'line_header_lookup',
+    },
+  },
+});
+assert.equal(activeWindows.peek().length, 1);
+assert.equal(activeWindows.peek()[0].windowKey, 'order');
+assert.deepEqual(activeWindows.peek()[0].parameters, {
+  AdOrderId: [2660900],
+  CampaignId: [551549],
+});
+assert.equal(activeWindows.peek()[0].conversationId, 'conv-123');
+assert.equal(activeWindows.peek()[0].parentKey, 'chat/new');
+assert.equal(activeWindows.peek()[0].workspaceSharePct, 72);
+assert.equal(activeWindows.peek()[0].workspaceMinHeight, undefined);
+console.log('openTarget ✓ replaces the current hosted workspace region for drillback navigation');
+
 clearWindowContext(windowId);

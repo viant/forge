@@ -6,7 +6,7 @@ import {useControlEvents} from "../hooks";
 import TablePanel from "./TablePanel.jsx";
 import FormPanel from "./FormPanel.jsx";
 import Chart from "./Chart.jsx";
-import {resolveParameterValue, resolveTemplate} from "../utils/selector.js";
+import {resolveParameterValue, resolveSelector, resolveTemplate} from "../utils/selector.js";
 import Splitter from './Splitter';
 
 import {expandRepeatItems} from "../utils/repeat.js";
@@ -27,7 +27,7 @@ import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSe
 import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
 import {isContainerVisible, resolveChildContext, trackContainerVisibility} from "./visibleWhen.js";
 
-const wrapContainerChrome = (container, content) => {
+const wrapContainerChrome = (container, content, suppressTitle = false) => {
     if (!container?.section && !container?.card) {
         return content;
     }
@@ -63,7 +63,7 @@ const wrapContainerChrome = (container, content) => {
             ...(sectionProperties.style || {}),
         };
         wrapped = (
-            <Section title={container.title || ''} {...sectionProperties} style={sectionStyle}>
+            <Section {...(suppressTitle ? {} : {title: container.title || ''})} {...sectionProperties} style={sectionStyle}>
                 {wrapped}
             </Section>
         );
@@ -86,7 +86,32 @@ const buildGridStyle = (style, columns, layout) => {
     };
 };
 
-const Container = ({context, container, isActive}) => {
+const isMissingBoundValue = (value) => value == null || (typeof value === 'string' && value.trim() === '');
+
+const resolveContainerItemValue = (item, context) => {
+    if (!item || !context) return undefined;
+    if (item.value !== undefined) return item.value;
+    const scope = String(item.scope || 'form').trim().toLowerCase();
+    let holder = {};
+    switch (scope) {
+        case 'metrics':
+            holder = context?.signals?.metrics?.value || {};
+            break;
+        case 'windowform':
+            holder = context?.signals?.windowForm?.value || {};
+            break;
+        case 'input':
+            holder = context?.signals?.input?.value || {};
+            break;
+        case 'form':
+        default:
+            holder = context?.handlers?.dataSource?.getFormData?.() || context?.signals?.form?.value || {};
+            break;
+    }
+    return item?.dataField ? resolveSelector(holder, item.dataField) : undefined;
+};
+
+const Container = ({context, container, isActive, suppressTitle = false}) => {
     useSignals();
     const isDashboardBlock = isSemanticDashboardBlock(container);
     const isDashboardRoot = isDashboardRootContainer(container, context);
@@ -535,11 +560,32 @@ const Container = ({context, container, isActive}) => {
         );
     }
 
+    const boundLabelItems = Array.isArray(visualItems)
+        ? visualItems.filter((item) => item?.type === 'label' && item?.dataField)
+        : [];
+    const shouldRenderSectionNoDataState =
+        !tablePanel &&
+        !chartPanel &&
+        !chatPanel &&
+        !terminalPanel &&
+        !fileBrowserPanel &&
+        !treeBrowserPanel &&
+        !editorPanel &&
+        !schemaFormPanel &&
+        !formPanel &&
+        (!containers || containers.length === 0) &&
+        boundLabelItems.length > 0 &&
+        boundLabelItems.every((item) => {
+            const subCtx = resolveChildContext(effectiveContext, item.dataSourceRef || dataSourceRef);
+            return isMissingBoundValue(resolveContainerItemValue(item, subCtx));
+        });
+    const shouldRenderVisualItems = !shouldRenderSectionNoDataState;
+
     return wrapContainerChrome(container, (
         <>
             <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 {container.toolbar ? renderContainerToolbar() : null}
-                {(visualItems?.length || 0) > 0 ? (
+                {shouldRenderVisualItems && (visualItems?.length || 0) > 0 ? (
                     container?.layout?.kind === 'grid' ? (
                         <GridLayoutRenderer
                             context={effectiveContext}
@@ -584,6 +630,24 @@ const Container = ({context, container, isActive}) => {
                 {formPanel ? formPanel :
                     renderNestedContainers()
                 }
+                {shouldRenderSectionNoDataState ? (
+                    <div
+                        style={{
+                            marginTop: 12,
+                            padding: '10px 12px',
+                            borderRadius: 10,
+                            background: '#f8fafc',
+                            border: '1px dashed #d8e1ea',
+                            color: '#7d8da1',
+                            fontSize: 12,
+                            fontStyle: 'italic',
+                        }}
+                    >
+                        {container?.title
+                            ? `No data available for ${container.title} yet.`
+                            : 'No data available for this section yet.'}
+                    </div>
+                ) : null}
 
             </div>
             {/* Container-level fetcher */}
@@ -596,7 +660,7 @@ const Container = ({context, container, isActive}) => {
                 />
             )}
         </>
-    ));
+    ), suppressTitle);
 };
 
 export default Container;

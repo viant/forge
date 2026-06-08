@@ -16,6 +16,7 @@ class ForgeRuntime(
 ) {
     data class DataSourceFetchRequest(
         val windowId: String,
+        val conversationId: String? = null,
         val dataSourceRef: String,
         val dataSource: DataSourceDef,
         val input: InputState,
@@ -60,6 +61,7 @@ class ForgeRuntime(
             loader(
                 DataSourceFetchRequest(
                     windowId = context.window.windowId,
+                    conversationId = windows.value.firstOrNull { it.windowId == context.window.windowId }?.conversationId,
                     dataSourceRef = context.dataSourceRef,
                     dataSource = context.dataSource,
                     input = context.input.peek(),
@@ -135,6 +137,8 @@ class ForgeRuntime(
     fun metadataSignal(windowId: String): Signal<WindowMetadata?> = signals.metadata(windowId)
 
     fun windowContext(windowId: String): WindowContext = windowRuntime.context(windowId, metadataSignal(windowId))
+
+    fun windowState(windowId: String): WindowState? = windows.value.firstOrNull { it.windowId == windowId }
 
     fun setWindowFormValues(
         windowId: String,

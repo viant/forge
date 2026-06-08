@@ -62,6 +62,7 @@ data class ContainerDef(
     val title: String? = null,
     val subtitle: String? = null,
     val kind: String? = null,
+    val scrollMode: String? = null,
     val role: String? = null,
     val dataSourceRef: String? = null,
     val card: CardDef? = null,
@@ -626,7 +627,22 @@ data class ColumnDef(
 
 @Serializable
 data class LinkDef(
-    val href: String? = null
+    val href: String? = null,
+    val kind: String? = null,
+    val windowKey: String? = null,
+    val windowTitle: String? = null,
+    val windowTitleSource: String? = null,
+    val windowTitleSelector: String? = null,
+    val text: String? = null,
+    val textSource: String? = null,
+    val textSelector: String? = null,
+    val title: String? = null,
+    val inTab: Boolean? = null,
+    val newInstance: Boolean? = null,
+    val autoIndexTitle: Boolean? = null,
+    val awaitResult: Boolean? = null,
+    val modal: Boolean? = null,
+    val parameters: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -654,6 +670,7 @@ data class ItemDef(
     val bindingPath: String? = null,
     val scope: String? = null,
     val value: JsonElement? = null,
+    val link: LinkDef? = null,
     val visibleWhen: DashboardConditionDef? = null,
     val options: List<OptionDef> = emptyList(),
     val properties: Map<String, JsonElement> = emptyMap(),

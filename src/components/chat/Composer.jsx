@@ -1,6 +1,6 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea, Tooltip } from "@blueprintjs/core";
+import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea } from "@blueprintjs/core";
 import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, UserCircle, Lightbulb } from '@phosphor-icons/react';
 import BundlesDialog from "./BundlesDialog.jsx";
 
@@ -645,9 +645,44 @@ export default function Composer({
         ? toolOptions
         : (Array.isArray(tools) ? tools.map(t => ({ value: String(t), label: String(t) })) : []);
 
-	const withTooltip = (node, content) => content ? (
-	    <Tooltip content={content} hoverOpenDelay={250}>{node}</Tooltip>
-	) : node;
+	const withTooltip = (node, content) => {
+	    const text = String(content || '').trim();
+	    if (!text || !React.isValidElement(node)) {
+	        return node;
+	    }
+	    const existingTitle = String(node.props?.title || '').trim();
+	    if (existingTitle) {
+	        return node;
+	    }
+	    return React.cloneElement(node, { title: text });
+	};
+
+	const renderStablePopover = ({
+	    open = false,
+	    content = null,
+	    onInteraction,
+	    placement = 'bottom-start',
+	    closeOnContentClick = true,
+	    button = null,
+	}) => {
+	    if (!React.isValidElement(button)) {
+	        return button;
+	    }
+	    if (!open) {
+	        return button;
+	    }
+	    return (
+	        <Popover
+	            content={content}
+	            isOpen={open}
+	            onInteraction={onInteraction}
+	            closeOnContentClick={closeOnContentClick}
+	            placement={placement}
+	        >
+	            {button}
+	        </Popover>
+	    );
+	};
 
 	const normalizedAgentOptions = useMemo(() => {
 	    const list = Array.isArray(agentOptions) ? agentOptions : [];
@@ -1207,6 +1242,80 @@ export default function Composer({
 	            || normalizedAgentOptions.find((opt) => normalizeString(opt?.value ?? opt?.id).toLowerCase() !== 'auto');
 	        return normalizeString(defaultOption?.label) || 'Agent';
 	    })();
+	    const agentButton = withTooltip(
+	        <Button
+	            minimal
+	            small
+	            disabled={disabled}
+	            active={String(agentValue || '') === 'auto'}
+	            data-testid="chat-composer-agent"
+	            aria-label="Agent"
+	            title="Agent"
+	            className="composer-icon-btn composer-icon-btn--agent composer-icon-btn--labelText"
+	            icon={<UserCircle size={20} weight="duotone" />}
+	            text={currentAgentLabel}
+	            onClick={(e) => { e.preventDefault(); setAgentOpen((v) => !v); }}
+	        />,
+	        `Agent: ${optionLabel(normalizedAgentOptions, agentValue)}`
+	    );
+	    const modelButton = withTooltip(
+	        <Button
+	            minimal
+	            small
+	            disabled={disabled}
+	            data-testid="chat-composer-model"
+	            aria-label="Model"
+	            title="Model"
+	            className="composer-icon-btn composer-icon-btn--model composer-icon-btn--labelText"
+	            icon={<Lightbulb size={20} weight="duotone" />}
+	            text={currentModelLabel === '—' ? 'Model' : currentModelLabel}
+	            onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
+	        />,
+	        `Model: ${optionLabel(normalizedModelOptions, modelValue)}`
+	    );
+	    const toolsButton = withTooltip(
+	        <Button
+	            icon="wrench"
+	            minimal
+	            small
+	            disabled={disabled}
+	            active={!!autoSelectTools}
+	            className="composer-icon-btn composer-icon-btn--tools"
+	            data-testid="chat-composer-tools"
+	            aria-label="Toolsets"
+	            title="Toolsets"
+	            onClick={(e) => { e.preventDefault(); setBundlesMenuOpen((v) => !v); }}
+	        />,
+	        autoSelectTools
+	            ? 'Auto tools is on'
+	            : (selectedBundleIDs.length ? `Toolsets: ${selectedBundlesSummary()}` : 'Toolsets')
+	    );
+	    const queueButton = (
+	        <Button
+	            minimal
+	            small
+	            disabled={disabled}
+	            data-testid="chat-composer-queue-badge"
+	            aria-label={`Queued: ${effectiveQueueCount}`}
+	            title={`Queued: ${effectiveQueueCount}`}
+	            onClick={(e) => { e.preventDefault(); setQueueOpen((v) => !v); }}
+	        >
+	            Queued: {effectiveQueueCount}
+	        </Button>
+	    );
+	    const reasoningButton = (
+	        <Button
+	            minimal
+	            small
+	            disabled={disabled}
+	            data-testid="chat-composer-reasoning"
+	            aria-label="Reasoning"
+	            title="Reasoning"
+	            onClick={(e) => { e.preventDefault(); setReasoningOpen((v) => !v); }}
+	        >
+	            {String(reasoningValue || '').trim() ? `Reasoning: ${reasoningValue}` : 'Reasoning'}
+	        </Button>
+	    );
 
 	    if (commandCenter) {
 	        return (
@@ -1227,88 +1336,40 @@ export default function Composer({
                                 title={uploadTooltip}
                                 onClick={(e) => { e.preventDefault(); onOpenAttach?.(); }}
                             />,
-                            uploadTooltip
-                        )}
+	                            uploadTooltip
+	                        )}
 	                        {Array.isArray(normalizedAgentOptions) && normalizedAgentOptions.length > 0 && (
-	                            <Popover
-	                                content={agentMenu(normalizedAgentOptions, agentValue, onAgentChange, setAgentOpen)}
-	                                isOpen={agentOpen}
-	                                onInteraction={(open) => setAgentOpen(open)}
-	                                closeOnContentClick={false}
-	                                placement="bottom-start"
-	                            >
-                                {withTooltip(
-                                    <Button
-                                        minimal
-                                        small
-                                        disabled={disabled}
-	                                    active={String(agentValue || '') === 'auto'}
-                                        data-testid="chat-composer-agent"
-                                        aria-label="Agent"
-                                        title="Agent"
-                                        className="composer-icon-btn composer-icon-btn--agent composer-icon-btn--labelText"
-                                        icon={<UserCircle size={20} weight="duotone" />}
-	                                    text={currentAgentLabel}
-                                        onClick={(e) => { e.preventDefault(); setAgentOpen((v) => !v); }}
-                                    />,
-                                    `Agent: ${optionLabel(normalizedAgentOptions, agentValue)}`
-                                )}
-                            </Popover>
+	                            renderStablePopover({
+	                                open: agentOpen,
+	                                content: agentMenu(normalizedAgentOptions, agentValue, onAgentChange, setAgentOpen),
+	                                onInteraction: (open) => setAgentOpen(open),
+	                                closeOnContentClick: false,
+	                                placement: 'bottom-start',
+	                                button: agentButton,
+	                            })
                         )}
                         {Array.isArray(normalizedModelOptions) && normalizedModelOptions.length > 0 && (
-                            <Popover
-                                content={optionMenu(
+                            renderStablePopover({
+                                open: modelOpen,
+                                content: optionMenu(
                                     normalizedModelOptions,
                                     modelValue,
                                     onModelChange,
                                     setModelOpen
-                                )}
-                                isOpen={modelOpen}
-                                onInteraction={(open) => setModelOpen(open)}
-                                placement="bottom-start"
-                            >
-                                {withTooltip(
-                                    <Button
-                                        minimal
-                                        small
-                                        disabled={disabled}
-                                        data-testid="chat-composer-model"
-                                        aria-label="Model"
-                                        title="Model"
-                                        className="composer-icon-btn composer-icon-btn--model composer-icon-btn--labelText"
-                                        icon={<Lightbulb size={20} weight="duotone" />}
-	                                    text={currentModelLabel === '—' ? 'Model' : currentModelLabel}
-                                        onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
-                                    />,
-                                    `Model: ${optionLabel(normalizedModelOptions, modelValue)}`
-                                )}
-                            </Popover>
+                                ),
+                                onInteraction: (open) => setModelOpen(open),
+                                placement: 'bottom-start',
+                                button: modelButton,
+                            })
                         )}
 	                        {hasToolsPicker && (showTools || commandCenter) && (
-	                            <Popover
-	                                content={bundlesMenu}
-	                                isOpen={bundlesMenuOpen}
-	                                onInteraction={(open) => setBundlesMenuOpen(open)}
-	                                placement="top-start"
-	                            >
-	                                {withTooltip(
-	                                    <Button
-	                                        icon="wrench"
-	                                        minimal
-	                                        small
-	                                        disabled={disabled}
-	                                        active={!!autoSelectTools}
-	                                        className="composer-icon-btn composer-icon-btn--tools"
-	                                        data-testid="chat-composer-tools"
-	                                        aria-label="Toolsets"
-	                                        title="Toolsets"
-	                                        onClick={(e) => { e.preventDefault(); setBundlesMenuOpen((v) => !v); }}
-	                                    />,
-	                                    autoSelectTools
-	                                        ? 'Auto tools is on'
-	                                        : (selectedBundleIDs.length ? `Toolsets: ${selectedBundlesSummary()}` : 'Toolsets')
-	                                )}
-	                            </Popover>
+	                            renderStablePopover({
+	                                open: bundlesMenuOpen,
+	                                content: bundlesMenu,
+	                                onInteraction: (open) => setBundlesMenuOpen(open),
+	                                placement: 'top-start',
+	                                button: toolsButton,
+	                            })
 	                        )}
 	                    </div>
 
@@ -1323,44 +1384,22 @@ export default function Composer({
 
                     <div className="composer-bar-right">
                         {(commandCenter && effectiveQueueCount > 0) && (
-                            <Popover
-                                content={queuePopover}
-                                isOpen={queueOpen}
-                                onInteraction={(open) => setQueueOpen(open)}
-                                placement="top-end"
-                            >
-                                <Button
-                                    minimal
-                                    small
-                                    disabled={disabled}
-                                    data-testid="chat-composer-queue-badge"
-                                    aria-label={`Queued: ${effectiveQueueCount}`}
-                                    title={`Queued: ${effectiveQueueCount}`}
-                                    onClick={(e) => { e.preventDefault(); setQueueOpen((v) => !v); }}
-                                >
-                                    Queued: {effectiveQueueCount}
-                                </Button>
-                            </Popover>
+                            renderStablePopover({
+                                open: queueOpen,
+                                content: queuePopover,
+                                onInteraction: (open) => setQueueOpen(open),
+                                placement: 'top-end',
+                                button: queueButton,
+                            })
                         )}
                         {Array.isArray(reasoningOptions) && reasoningOptions.length > 0 && (
-                            <Popover
-                                content={optionMenu(reasoningOptions, reasoningValue, onReasoningChange, setReasoningOpen)}
-                                isOpen={reasoningOpen}
-                                onInteraction={(open) => setReasoningOpen(open)}
-                                placement="bottom-end"
-                            >
-                                <Button
-                                    minimal
-                                    small
-                                    disabled={disabled}
-                                    data-testid="chat-composer-reasoning"
-                                    aria-label="Reasoning"
-                                    title="Reasoning"
-                                    onClick={(e) => { e.preventDefault(); setReasoningOpen((v) => !v); }}
-                                >
-                                    {String(reasoningValue || '').trim() ? `Reasoning: ${reasoningValue}` : 'Reasoning'}
-                                </Button>
-                            </Popover>
+                            renderStablePopover({
+                                open: reasoningOpen,
+                                content: optionMenu(reasoningOptions, reasoningValue, onReasoningChange, setReasoningOpen),
+                                onInteraction: (open) => setReasoningOpen(open),
+                                placement: 'bottom-end',
+                                button: reasoningButton,
+                            })
                         )}
 
                         {showSettings && withTooltip(

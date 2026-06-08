@@ -100,7 +100,13 @@ fun TabsRenderer(runtime: ForgeRuntime, window: WindowContext, container: Contai
         }
     }
 
-    ContainerRenderer(runtime, window, currentContainer)
+    ContainerRenderer(
+        runtime,
+        window,
+        currentContainer,
+        suppressTitle = true
+    )
+    
 }
 
 private fun resolveInitialTabIndex(container: ContainerDef): Int {

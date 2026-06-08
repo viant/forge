@@ -42,4 +42,41 @@ describe('createDataConnector', () => {
         await expect(second).resolves.toEqual({ ok: true });
         expect(global.fetch).toHaveBeenCalledTimes(1);
     });
+
+    it('applies caller-provided request preparation without hardcoding app context', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true }),
+        });
+
+        const connector = createDataConnector({
+            service: {
+                URL: '/v1/api/datasources/account/fetch',
+                method: 'POST',
+            },
+        }, {
+            endpoints: {},
+            targetContext: {},
+            auth: {},
+            prepareRequest: ({ queryParams, body }) => {
+                queryParams.append('scope', 'conversation');
+                if (body && typeof body === 'object') {
+                    body.conversationId = 'conv-1';
+                }
+            },
+        });
+
+        await expect(connector.get({ filter: {}, inputParameters: {} })).resolves.toEqual({ ok: true });
+        expect(global.fetch).toHaveBeenCalledWith(
+            '/v1/api/datasources/account/fetch?scope=conversation',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({
+                    inputs: {},
+                    conversationId: 'conv-1',
+                }),
+            })
+        );
+    });
 });

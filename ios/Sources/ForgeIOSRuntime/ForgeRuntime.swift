@@ -201,6 +201,44 @@ public actor ForgeRuntime {
         return WindowContext(windowID: id, parameters: parameters)
     }
 
+    public func windowState(id: String) -> WindowState? {
+        windows.first(where: { $0.id == id })
+    }
+
+    internal func buildParameterResolutionContext(
+        windowID: String,
+        metadata: WindowMetadata?,
+        identityDataSourceRef: String,
+        preferredInput: InputState? = nil
+    ) async -> ParameterResolver.ResolutionContext {
+        let windowForm = await windowFormJSONValue(windowID: windowID)
+        var snapshots: [String: ParameterResolver.DataSourceSnapshot] = [:]
+        var dataSourceRefs = Set(metadata?.dataSources.keys.map { $0 } ?? [])
+        let trimmedIdentity = identityDataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedIdentity.isEmpty {
+            dataSourceRefs.insert(trimmedIdentity)
+        }
+        for ref in dataSourceRefs {
+            let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: ref)
+            let input = ref == trimmedIdentity && preferredInput != nil
+                ? preferredInput!
+                : await dataSourceRuntime.input(dataSourceID: dataSourceID)
+            snapshots[ref] = ParameterResolver.DataSourceSnapshot(
+                selectionMode: metadata?.dataSources[ref]?.selectionMode,
+                form: await dataSourceRuntime.form(dataSourceID: dataSourceID),
+                metrics: await dataSourceRuntime.metrics(dataSourceID: dataSourceID),
+                selection: await dataSourceRuntime.selection(dataSourceID: dataSourceID),
+                input: input
+            )
+        }
+        return ParameterResolver.ResolutionContext(
+            identityDataSourceRef: trimmedIdentity,
+            dataSources: snapshots,
+            windowForm: windowForm,
+            metadata: metadata
+        )
+    }
+
     public func windowMetadata(id: String) async -> WindowMetadata? {
         let signal = await signals.metadata(windowID: id)
         return await signal.peek()
@@ -391,18 +429,11 @@ public actor ForgeRuntime {
                         input: input,
                         resolvedInputs: ParameterResolver.resolve(
                             parameters: dataSource.parameters,
-                            context: ParameterResolver.ResolutionContext(
+                            context: await buildParameterResolutionContext(
+                                windowID: windowID,
+                                metadata: metadata,
                                 identityDataSourceRef: dataSourceRef,
-                                dataSources: [
-                                    dataSourceRef: ParameterResolver.DataSourceSnapshot(
-                                        selectionMode: dataSource.selectionMode,
-                                        form: await dataSourceRuntime.form(dataSourceID: dataSourceID),
-                                        selection: await dataSourceRuntime.selection(dataSourceID: dataSourceID),
-                                        input: input
-                                    )
-                                ],
-                                windowForm: await windowFormJSONValue(windowID: windowID),
-                                metadata: metadata
+                                preferredInput: input
                             )
                         )
                     )

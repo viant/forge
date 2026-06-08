@@ -251,7 +251,7 @@ try {
     snapshotBuilder: () => ({
       selected: { windowId: 'chat/new', tabId: 'chat/new' },
       windows: [{ windowId: 'chat/new', windowKey: 'chat/new' }],
-      conversationId: 'conv-ready',
+      conversationId: '',
     })
   });
 
@@ -261,6 +261,48 @@ try {
   stopReady();
   assert.deepEqual(readyEventCalls.slice(0, 4), ['ui.hello', 'ui.snapshot.get', 'ui.snapshot', 'ui.poll']);
   console.log('bridge startup readiness ✓ defers first publish/poll until the configured startup event');
+
+  const immediateReadyCalls = [];
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    immediateReadyCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-ready-immediate' });
+    if (body.method === 'ui.hello') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { snapshot: { selected: { windowId: 'chat/new', tabId: 'chat/new' }, windows: [] } }
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopImmediateReady = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10_000,
+    startupReadyEvent: 'forge:conversation-active',
+    startupReadyTimeoutMs: 10_000,
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [{ windowId: 'chat/new', windowKey: 'chat/new' }],
+      conversationId: 'conv-ready',
+    })
+  });
+
+  await sleep(40);
+  stopImmediateReady();
+  assert.deepEqual(immediateReadyCalls.slice(0, 4), ['ui.hello', 'ui.snapshot.get', 'ui.snapshot', 'ui.poll']);
+  console.log('bridge startup readiness ✓ skips startup wait when snapshot already knows the conversation');
 
   const commandCalls = [];
   let commandPollCount = 0;

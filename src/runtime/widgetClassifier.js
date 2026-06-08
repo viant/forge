@@ -107,6 +107,8 @@ export function classify(item) {
 registerClassifier((item) => {
     if (!item) return undefined;
 
+    if (item.type === 'link') return 'link';
+
     // enum → select
     if (Array.isArray(item.enum) && item.enum.length > 0) return 'select';
 

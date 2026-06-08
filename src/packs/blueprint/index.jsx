@@ -40,6 +40,7 @@ import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
 import MarkdownView from '../../components/MarkdownView.jsx';
 import MarkdownEditor from '../../components/MarkdownEditor.jsx';
 import { formatDisplayValue } from '../../utils/formatValue.js';
+import { resolveLinkTarget } from '../../utils/linkTarget.js';
 
 /* ------------------------ Widget implementation ----------------------- */
 
@@ -367,15 +368,85 @@ export function registerPack() {
     /* -------------------- Read-only Link ---------------------------- */
     registerWidget(
         'link',
-        ({ value = '', readOnly, ...rest }) => {
-            if (!value) return null;
+        ({ value = '', readOnly, context, link, text, appearance, className, style, title, ...rest }) => {
+            const resolved = resolveLinkTarget({
+                linkConfig: link,
+                value,
+                context,
+            });
+            const isInline = String(appearance || '').trim().toLowerCase() === 'inline';
+            const inlineStyle = {
+                color: '#2f6de1',
+                cursor: readOnly ? 'default' : 'pointer',
+                fontWeight: 500,
+                textDecoration: 'none',
+                ...(style || {}),
+            };
+            if (resolved?.kind === 'window') {
+                const buttonText = resolved.text || text || resolved.windowTitle || resolved.windowKey;
+                const baseWindowButtonStyle = {
+                    ...inlineStyle,
+                    background: 'rgba(47, 109, 225, 0.08)',
+                    border: '1px solid rgba(47, 109, 225, 0.18)',
+                    borderRadius: 999,
+                    padding: '2px 10px',
+                    lineHeight: 1.5,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                };
+                const windowButtonStyle = isInline
+                    ? baseWindowButtonStyle
+                    : {
+                        ...baseWindowButtonStyle,
+                        background: '#f5f8fd',
+                        border: '1px solid #d0daea',
+                        color: '#2d5a9e',
+                        minHeight: 30,
+                        fontSize: 12,
+                    };
+                return (
+                    <button
+                        type="button"
+                        className={className}
+                        style={{ ...windowButtonStyle, ...(style || {}) }}
+                        title={title || resolved.title || buttonText}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            context?.handlers?.window?.openTarget?.({ target: resolved, context });
+                        }}
+                        {...rest}
+                    >
+                        {buttonText}
+                    </button>
+                );
+            }
+            const href = resolved?.href || value;
+            if (!href) return null;
+            if (isInline) {
+                return (
+                    <a
+                        href={href}
+                        target={resolved?.target || "_blank"}
+                        rel={resolved?.rel || "noopener noreferrer"}
+                        className={className}
+                        style={inlineStyle}
+                        title={title || resolved?.title || resolved?.text || text || href}
+                    >
+                        {resolved?.text || text || href}
+                    </a>
+                );
+            }
             return (
                 <AnchorButton
-                    href={value}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    text={value}
+                    href={href}
+                    target={resolved?.target || "_blank"}
+                    rel={resolved?.rel || "noopener noreferrer"}
+                    text={resolved?.text || text || href}
                     minimal
+                    className={className}
+                    style={style}
+                    title={title || resolved?.title || resolved?.text || text || href}
                     {...rest}
                 />
             );
@@ -448,11 +519,11 @@ export function registerPack() {
                     {options.map((opt) => {
                         const isActive = String(value) === String(opt.value);
                         return (
-                            <Button
+                            <button
                                 key={opt.value}
-                                small
+                                type="button"
                                 disabled={readOnly}
-                                minimal={!isActive}
+                                aria-pressed={isActive}
                                 style={{
                                     borderRadius: 7,
                                     fontWeight: isActive ? 700 : 500,
@@ -465,11 +536,13 @@ export function registerPack() {
                                     transition: 'all 0.15s ease',
                                     cursor: readOnly ? 'not-allowed' : 'pointer',
                                     whiteSpace: 'nowrap',
+                                    minHeight: 30,
+                                    fontFamily: 'inherit',
                                 }}
                                 onClick={() => !readOnly && onChange?.(opt.value)}
                             >
                                 {opt.label || opt.value}
-                            </Button>
+                            </button>
                         );
                     })}
                 </div>
@@ -532,16 +605,66 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Button ------------------------------------ */
-    registerWidget('button', ({ onClick, readOnly, intent, children, ...rest }) => (
-        <Button {...rest} intent={intent} disabled={readOnly} onClick={onClick}>
-            {children}
-        </Button>
-    ), { framework: 'blueprint' });
+    registerWidget('button', ({ onClick, readOnly, intent, children, className, style, title, ...rest }) => {
+        const intentColors = {
+            primary: { background: '#2f6de1', border: '#2f6de1', color: '#fff' },
+            success: { background: '#0f9960', border: '#0f9960', color: '#fff' },
+            warning: { background: '#d9822b', border: '#d9822b', color: '#fff' },
+            danger: { background: '#db3737', border: '#db3737', color: '#fff' },
+        };
+        const palette = intentColors[String(intent || '').trim().toLowerCase()] || null;
+        return (
+            <button
+                type="button"
+                className={className}
+                disabled={readOnly}
+                title={title}
+                onClick={onClick}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    minHeight: 30,
+                    padding: '0 12px',
+                    borderRadius: 8,
+                    border: `1px solid ${palette?.border || '#d0daea'}`,
+                    background: palette?.background || '#f5f8fd',
+                    color: palette?.color || '#2d5a9e',
+                    cursor: readOnly ? 'default' : 'pointer',
+                    font: 'inherit',
+                    fontWeight: 600,
+                    lineHeight: 1.2,
+                    ...(style || {}),
+                }}
+                {...rest}
+            >
+                {children}
+            </button>
+        );
+    }, { framework: 'blueprint' });
 
     /* -------------------- Label ------------------------------------- */
-    registerWidget('label', ({ value, format, locale, timeZone, ...rest }) => (
-        <Label {...rest}>{formatDisplayValue(value, format, locale, {timeZone})}</Label>
-    ), { framework: 'blueprint' });
+    registerWidget('label', ({ value, format, locale, timeZone, item, ...rest }) => {
+        const hasBoundValue = value !== null && value !== undefined && !(typeof value === 'string' && value.trim() === '');
+        const shouldRenderEmptyState = !!item?.dataField && !hasBoundValue;
+        const inferredIdFormat = format === undefined && (
+            /\bID\b/i.test(String(item?.label || ''))
+            || /Id(Display)?$/i.test(String(item?.id || ''))
+        )
+            ? 'raw'
+            : format;
+        if (shouldRenderEmptyState) {
+            return (
+                <Label {...rest}>
+                    <span style={{ color: '#8a9ba8', fontStyle: 'italic' }}>No data</span>
+                </Label>
+            );
+        }
+        return (
+            <Label {...rest}>{formatDisplayValue(value, inferredIdFormat, locale, {timeZone})}</Label>
+        );
+    }, { framework: 'blueprint' });
 
     /* -------------------- Math (MathQuill) -------------------------- */
     // Ensure MathQuill CSS injected once
@@ -660,7 +783,7 @@ registerWrapper('blueprint', (item, container, children) => {
                 labelFor={item.id}
                 helperText={item.validationError}
                 intent={item.validationError ? 'danger' : 'none'}
-                style={{ gridColumn: `span ${Math.min(item.columnSpan || 1, container?.layout?.columns || 1)}` }}
+                style={{ marginBottom: 0 }}
             >
                 {children}
             </FormGroup>

@@ -195,6 +195,7 @@ type Window struct {
 	Namespace       string                            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Presentation    string                            `json:"presentation,omitempty" yaml:"presentation,omitempty"`
 	Region          string                            `json:"region,omitempty" yaml:"region,omitempty"`
+	Window          *WindowSettings                   `json:"window,omitempty" yaml:"window,omitempty"`
 	DataSource      map[string]DataSource             `json:"dataSource" yaml:"dataSource"`
 	View            View                              `json:"view" yaml:"view"`
 	Dialogs         []Dialog                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
@@ -202,6 +203,23 @@ type Window struct {
 	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
 	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+}
+
+type WindowSettings struct {
+	TitleBinding *WindowTitleBinding `json:"titleBinding,omitempty" yaml:"titleBinding,omitempty"`
+	On           []*Execute          `json:"on,omitempty" yaml:"on,omitempty"`
+}
+
+type WindowTitleBinding struct {
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Ref           string `json:"ref,omitempty" yaml:"ref,omitempty"`
+	Selector      string `json:"selector,omitempty" yaml:"selector,omitempty"`
+	Field         string `json:"field,omitempty" yaml:"field,omitempty"`
+	Source        string `json:"source,omitempty" yaml:"source,omitempty"`
+	ControlID     string `json:"controlId,omitempty" yaml:"controlId,omitempty"`
+	DomControlID  string `json:"domControlId,omitempty" yaml:"domControlId,omitempty"`
+	DOMSelector   string `json:"domSelector,omitempty" yaml:"domSelector,omitempty"`
+	SelectorCSS   string `json:"selectorCss,omitempty" yaml:"selectorCss,omitempty"`
 }
 
 func (w *Window) SetCode(code []byte) {
@@ -1114,10 +1132,27 @@ type TableFormattingRule struct {
 }
 
 type TableLink struct {
-	Href   string `json:"href,omitempty" yaml:"href,omitempty"`
-	Label  string `json:"label,omitempty" yaml:"label,omitempty"`
-	Target string `json:"target,omitempty" yaml:"target,omitempty"`
-	Rel    string `json:"rel,omitempty" yaml:"rel,omitempty"`
+	Kind                string                 `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Href                string                 `json:"href,omitempty" yaml:"href,omitempty"`
+	Label               string                 `json:"label,omitempty" yaml:"label,omitempty"`
+	Text                string                 `json:"text,omitempty" yaml:"text,omitempty"`
+	Title               string                 `json:"title,omitempty" yaml:"title,omitempty"`
+	Target              string                 `json:"target,omitempty" yaml:"target,omitempty"`
+	Rel                 string                 `json:"rel,omitempty" yaml:"rel,omitempty"`
+	WindowKey           string                 `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
+	WindowTitle         string                 `json:"windowTitle,omitempty" yaml:"windowTitle,omitempty"`
+	WindowTitleSelector string                 `json:"windowTitleSelector,omitempty" yaml:"windowTitleSelector,omitempty"`
+	WindowTitleSource   string                 `json:"windowTitleSource,omitempty" yaml:"windowTitleSource,omitempty"`
+	InTab               *bool                  `json:"inTab,omitempty" yaml:"inTab,omitempty"`
+	NewInstance         bool                   `json:"newInstance,omitempty" yaml:"newInstance,omitempty"`
+	AutoIndexTitle      bool                   `json:"autoIndexTitle,omitempty" yaml:"autoIndexTitle,omitempty"`
+	AwaitResult         bool                   `json:"awaitResult,omitempty" yaml:"awaitResult,omitempty"`
+	Modal               bool                   `json:"modal,omitempty" yaml:"modal,omitempty"`
+	Width               string                 `json:"width,omitempty" yaml:"width,omitempty"`
+	Height              string                 `json:"height,omitempty" yaml:"height,omitempty"`
+	Size                map[string]interface{} `json:"size,omitempty" yaml:"size,omitempty"`
+	Footer              map[string]interface{} `json:"footer,omitempty" yaml:"footer,omitempty"`
+	Parameters          map[string]interface{} `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 }
 
 type Toolbar struct {
@@ -1213,6 +1248,7 @@ type Item struct {
 	Properties map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`
 	Enabled    bool                   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	On         []*Execute             `json:"on,omitempty" yaml:"on,omitempty"` // For message-bus events
+	Link       *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
 	Lookup     *Lookup                `json:"lookup,omitempty" yaml:"lookup,omitempty"`
 }
 
