@@ -326,10 +326,12 @@ internal fun resolveItemRawValue(
     key: String,
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
-    windowForm: Map<String, Any?>
+    windowForm: Map<String, Any?>,
+    collection: List<Map<String, Any?>> = emptyList()
 ): Any? {
     return when (item.scope?.trim()?.lowercase()) {
         "metrics" -> SelectorUtil.resolve(metrics, key)
+            ?: SelectorUtil.resolve(collection.firstOrNull().orEmpty(), key)
         "windowform" -> SelectorUtil.resolve(windowForm, key)
         else -> SelectorUtil.resolve(form, key)
     }
@@ -340,9 +342,10 @@ internal fun resolveItemValue(
     key: String,
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
-    windowForm: Map<String, Any?>
+    windowForm: Map<String, Any?>,
+    collection: List<Map<String, Any?>> = emptyList()
 ): String {
-    return resolveItemRawValue(item, key, form, metrics, windowForm)?.toString().orEmpty()
+    return resolveItemRawValue(item, key, form, metrics, windowForm, collection)?.toString().orEmpty()
 }
 
 internal fun setScopedItemValue(

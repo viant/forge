@@ -7,17 +7,20 @@ public struct ContainerRenderer: View {
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
+    private let inheritedDataSourceRef: String?
     private let suppressTitle: Bool
 
     public init(
         runtime: ForgeRuntime? = nil,
         window: WindowContext? = nil,
         container: ContainerDef,
+        inheritedDataSourceRef: String? = nil,
         suppressTitle: Bool = false
     ) {
         self.runtime = runtime
         self.window = window
         self.container = container
+        self.inheritedDataSourceRef = inheritedDataSourceRef
         self.suppressTitle = suppressTitle
     }
 
@@ -41,79 +44,125 @@ public struct ContainerRenderer: View {
 
     @ViewBuilder
     private var renderedBody: some View {
-        if container.kind == "dashboard" || container.kind?.starts(with: "dashboard.") == true {
-            DashboardRenderer(runtime: runtime, window: window, container: container)
-        } else if container.schemaBasedForm != nil {
+        let effectiveContainer = resolvedContainer()
+        if effectiveContainer.kind == "dashboard" || effectiveContainer.kind?.starts(with: "dashboard.") == true {
+            DashboardRenderer(runtime: runtime, window: window, container: effectiveContainer)
+        } else if effectiveContainer.schemaBasedForm != nil {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                SchemaBasedFormRenderer(container: container)
+                SchemaBasedFormRenderer(container: effectiveContainer)
             }
-        } else if let table = container.table {
+        } else if let table = effectiveContainer.table {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                TableRenderer(runtime: runtime, window: window, container: container, table: table)
+                TableRenderer(runtime: runtime, window: window, container: effectiveContainer, table: table)
             }
-        } else if let chart = container.chart {
+        } else if let chart = effectiveContainer.chart {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                if !container.items.isEmpty {
-                    MenuListRenderer(runtime: runtime, window: window, container: container, items: container.items)
+                if !effectiveContainer.items.isEmpty {
+                    MenuListRenderer(runtime: runtime, window: window, container: effectiveContainer, items: effectiveContainer.items)
                 }
-                ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
+                ChartRenderer(runtime: runtime, window: window, container: effectiveContainer, chart: chart)
             }
-        } else if let treeBrowser = container.treeBrowser {
+        } else if let treeBrowser = effectiveContainer.treeBrowser {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                TreeBrowserRenderer(runtime: runtime, window: window, container: container, treeBrowser: treeBrowser)
+                TreeBrowserRenderer(runtime: runtime, window: window, container: effectiveContainer, treeBrowser: treeBrowser)
             }
-        } else if container.tabs != nil, !container.containers.isEmpty {
-            TabsRenderer(runtime: runtime, window: window, container: container)
-        } else if let editor = container.editor {
+        } else if effectiveContainer.tabs != nil, !effectiveContainer.containers.isEmpty {
+            TabsRenderer(runtime: runtime, window: window, container: effectiveContainer)
+        } else if let editor = effectiveContainer.editor {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
                 EditorRenderer(runtime: runtime, window: window, editor: editor)
             }
-        } else if container.kind == "chat" {
+        } else if effectiveContainer.kind == "chat" {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                ChatRenderer(runtime: runtime, window: window, container: container)
+                ChatRenderer(runtime: runtime, window: window, container: effectiveContainer)
             }
-        } else if !container.items.isEmpty {
+        } else if !effectiveContainer.items.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                MenuListRenderer(runtime: runtime, window: window, container: container, items: container.items)
+                MenuListRenderer(runtime: runtime, window: window, container: effectiveContainer, items: effectiveContainer.items)
             }
-        } else if !container.containers.isEmpty {
-            VStack(alignment: .leading, spacing: resolvedSpacing(from: container.layout?.gap, fallback: 12)) {
+        } else if !effectiveContainer.containers.isEmpty {
+            VStack(alignment: .leading, spacing: resolvedSpacing(from: effectiveContainer.layout?.gap, fallback: 12)) {
                 titleBlock
-                if container.layout?.kind?.lowercased() == "grid" {
-                    LazyVGrid(columns: nestedGridColumns, spacing: resolvedSpacing(from: container.layout?.rowGap ?? container.layout?.gap, fallback: 12)) {
-                        ForEach(container.containers) { child in
-                            ContainerRenderer(runtime: runtime, window: window, container: child)
+                if effectiveContainer.layout?.kind?.lowercased() == "grid" {
+                    LazyVGrid(columns: nestedGridColumns, spacing: resolvedSpacing(from: effectiveContainer.layout?.rowGap ?? effectiveContainer.layout?.gap, fallback: 12)) {
+                        ForEach(effectiveContainer.containers) { child in
+                            ContainerRenderer(runtime: runtime, window: window, container: child, inheritedDataSourceRef: effectiveContainer.dataSourceRef)
                         }
                     }
-                } else if container.layout?.kind?.lowercased() == "split",
-                          container.layout?.orientation?.lowercased() == "horizontal",
+                } else if effectiveContainer.layout?.kind?.lowercased() == "split",
+                          effectiveContainer.layout?.orientation?.lowercased() == "horizontal",
                           horizontalSizeClass == .regular {
-                    HStack(alignment: .top, spacing: resolvedSpacing(from: container.layout?.gap, fallback: 12)) {
-                        ForEach(container.containers) { child in
-                            ContainerRenderer(runtime: runtime, window: window, container: child)
+                    HStack(alignment: .top, spacing: resolvedSpacing(from: effectiveContainer.layout?.gap, fallback: 12)) {
+                        ForEach(effectiveContainer.containers) { child in
+                            ContainerRenderer(runtime: runtime, window: window, container: child, inheritedDataSourceRef: effectiveContainer.dataSourceRef)
                                 .frame(maxWidth: .infinity, alignment: .topLeading)
                         }
                     }
                 } else {
-                    ForEach(container.containers) { child in
-                        ContainerRenderer(runtime: runtime, window: window, container: child)
+                    ForEach(effectiveContainer.containers) { child in
+                        ContainerRenderer(runtime: runtime, window: window, container: child, inheritedDataSourceRef: effectiveContainer.dataSourceRef)
                     }
                 }
             }
         } else {
-            PlaceholderContainerView(container: container)
+            PlaceholderContainerView(container: effectiveContainer)
         }
     }
 
+    private func resolvedContainer() -> ContainerDef {
+        guard container.dataSourceRef == nil,
+              let inheritedDataSourceRef,
+              !inheritedDataSourceRef.isEmpty else {
+            return container
+        }
+        return ContainerDef(
+            id: container.id,
+            title: container.title,
+            subtitle: container.subtitle,
+            kind: container.kind,
+            scrollMode: container.scrollMode,
+            dataSourceRef: inheritedDataSourceRef,
+            columnSpan: container.columnSpan,
+            rowSpan: container.rowSpan,
+            filterBindings: container.filterBindings,
+            visibleWhen: container.visibleWhen,
+            metrics: container.metrics,
+            checks: container.checks,
+            rows: container.rows,
+            sections: container.sections,
+            fields: container.fields,
+            dimension: container.dimension,
+            metric: container.metric,
+            viewModes: container.viewModes,
+            limit: container.limit,
+            orderBy: container.orderBy,
+            containers: container.containers,
+            selectFirst: container.selectFirst,
+            layout: container.layout,
+            stateKey: container.stateKey,
+            schemaBasedForm: container.schemaBasedForm,
+            dashboard: container.dashboard,
+            tabs: container.tabs,
+            items: container.items,
+            chart: container.chart,
+            table: container.table,
+            treeBrowser: container.treeBrowser,
+            editor: container.editor,
+            fetchData: container.fetchData,
+            target: container.target,
+            targetOverrides: container.targetOverrides
+        )
+    }
+
     private var nestedGridColumns: [GridItem] {
-        let layoutColumns = container.layout?.columns ?? 0
+        let layoutColumns = resolvedContainer().layout?.columns ?? 0
         if layoutColumns >= 12 && horizontalSizeClass == .regular {
             return [GridItem(.adaptive(minimum: 220), spacing: 12, alignment: .top)]
         }
