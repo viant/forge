@@ -3,6 +3,7 @@ import ForgeIOSRuntime
 
 public struct MenuListRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.openURL) private var openURL
 
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
@@ -22,10 +23,27 @@ public struct MenuListRenderer: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if shouldUseSummaryGrid {
-                LazyVGrid(columns: summaryColumns, spacing: 12) {
-                    ForEach(visibleItems) { item in
-                        summaryCard(item)
+            if shouldUseInlineRow {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(visibleItems) { item in
+                            renderedItem(item)
+                        }
+                    }
+                }
+            } else if shouldUseSummaryGrid {
+                if summaryItems.isEmpty {
+                    emptyStateCard("No data available for this section yet.")
+                } else {
+                    LazyVGrid(columns: summaryColumns, spacing: 12) {
+                        ForEach(summaryItems) { item in
+                            summaryCard(item)
+                        }
+                    }
+                    if summaryItems.count < visibleItems.count {
+                        Text("Some values are unavailable for this view.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
             } else {
@@ -68,9 +86,15 @@ public struct MenuListRenderer: View {
         items.filter(isVisible(_:))
     }
 
+    private var summaryItems: [ItemDef] {
+        visibleItems.filter { item in
+            !isPlaceholderSummaryValue(resolvedItemDisplayValue(item) ?? item.value?.displayString)
+        }
+    }
+
     private var relevantDataSourceRefs: [String] {
         orderedUnique(
-            items.compactMap(resolveItemDataSourceRef(_:))
+            ([container.dataSourceRef].compactMap { $0 } + items.compactMap(resolveItemDataSourceRef(_:)))
                 .filter { !$0.isEmpty }
         )
     }
@@ -87,6 +111,8 @@ public struct MenuListRenderer: View {
             switch (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
             case "markdown":
                 markdownItem(item)
+            case "link":
+                linkItem(item)
             case "button":
                 buttonItem(item)
             default:
@@ -98,22 +124,29 @@ public struct MenuListRenderer: View {
     @ViewBuilder
     private func labelItem(_ item: ItemDef) -> some View {
         let title = item.label ?? item.title ?? item.id ?? "Item"
-        let value = resolvedItemDisplayValue(item) ?? item.value?.displayString ?? "—"
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
+        let value = normalizedItemDisplayValue(item)
+        let isInline = (item.appearance ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "inline"
+        if isInline {
+            Text(value == "No data" ? title : value)
+                .font(.footnote.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.body)
-                .foregroundStyle(.primary)
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.body)
+                    .foregroundStyle(.primary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.black.opacity(0.05), lineWidth: 1)
-        )
     }
 
     @ViewBuilder
@@ -137,16 +170,16 @@ public struct MenuListRenderer: View {
     @ViewBuilder
     private func summaryCard(_ item: ItemDef) -> some View {
         let title = item.label ?? item.title ?? item.id ?? "Item"
-        let value = resolvedItemDisplayValue(item) ?? item.value?.displayString ?? "—"
+        let value = normalizedItemDisplayValue(item)
         let showsSingleLineValue = shouldUseCompactSummaryStyle(title: title, value: value)
         VStack(alignment: .leading, spacing: 8) {
-            if showsSingleLineValue {
-                Text(value == "—" ? title : value)
+            if showsSingleLineValue && value != "No data" {
+                Text(value)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                if value != "—", normalizedSummaryTitle(title) != normalizedSummaryTitle(value) {
+                if normalizedSummaryTitle(title) != normalizedSummaryTitle(value) {
                     Text(title)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -172,6 +205,20 @@ public struct MenuListRenderer: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private func emptyStateCard(_ message: String) -> some View {
+        Text(message)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
     }
 
     @ViewBuilder
@@ -226,6 +273,55 @@ public struct MenuListRenderer: View {
     }
 
     @ViewBuilder
+    private func linkItem(_ item: ItemDef) -> some View {
+        let title = resolvedLinkDisplayText(item)
+        let isInline = (item.appearance ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "inline"
+        if let url = resolvedExternalLinkURL(item) {
+            Link(destination: url) {
+                Text(title)
+                    .font(isInline ? .footnote.weight(.semibold) : .body.weight(.semibold))
+                    .foregroundStyle(isInline ? Color.accentColor : .primary)
+                    .padding(.horizontal, isInline ? 10 : 14)
+                    .padding(.vertical, isInline ? 6 : 10)
+                    .frame(maxWidth: isInline ? nil : .infinity, alignment: .leading)
+                    .background(
+                        isInline
+                            ? Color.accentColor.opacity(0.10)
+                            : Color(.systemBackground),
+                        in: RoundedRectangle(cornerRadius: isInline ? 999 : 14)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: isInline ? 999 : 14)
+                            .stroke(Color.accentColor.opacity(isInline ? 0.18 : 0.05), lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button(title) {
+                Task {
+                    await openLinkedWindow(item)
+                }
+            }
+            .buttonStyle(.plain)
+            .font(isInline ? .footnote.weight(.semibold) : .body.weight(.semibold))
+            .foregroundStyle(isInline ? Color.accentColor : .primary)
+            .padding(.horizontal, isInline ? 10 : 14)
+            .padding(.vertical, isInline ? 6 : 10)
+            .frame(maxWidth: isInline ? nil : .infinity, alignment: .leading)
+            .background(
+                isInline
+                    ? Color.accentColor.opacity(0.10)
+                    : Color(.systemBackground),
+                in: RoundedRectangle(cornerRadius: isInline ? 999 : 14)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: isInline ? 999 : 14)
+                    .stroke(Color.accentColor.opacity(isInline ? 0.18 : 0.05), lineWidth: 1)
+            )
+        }
+    }
+
+    @ViewBuilder
     private func buttonItem(_ item: ItemDef) -> some View {
         let title = item.properties["text"]?.displayString ?? item.label ?? item.title ?? item.id ?? "Action"
         Button(title) {
@@ -258,6 +354,44 @@ public struct MenuListRenderer: View {
                 await refreshWindowFormDrivenDataSources(windowFormValues: next)
             }
         }
+    }
+
+    private func openLinkedWindow(_ item: ItemDef) async {
+        guard let runtime, let window else {
+            return
+        }
+        guard let link = item.link else {
+            return
+        }
+        let windowKey = (link.windowKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !windowKey.isEmpty else {
+            if let url = resolvedExternalLinkURL(item) {
+                openURL(url)
+            }
+            return
+        }
+
+        let currentState = await runtime.windowState(id: window.windowID)
+        let shouldReplaceHostedWindow =
+            currentState?.presentation?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "hosted"
+            && currentState?.region?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "chat.top"
+            && link.newInstance != true
+        let parameters = resolveLinkParameters(item, link: link)
+        let title = resolveLinkWindowTitle(item, link: link)
+        _ = await runtime.openWindow(
+            key: windowKey,
+            title: title,
+            id: shouldReplaceHostedWindow ? currentState?.id : nil,
+            inTab: link.inTab ?? currentState?.inTab ?? true,
+            parameters: parameters,
+            conversationID: currentState?.conversationID,
+            presentation: currentState?.presentation,
+            region: currentState?.region,
+            workspaceSharePct: currentState?.workspaceSharePct,
+            workspaceMinHeight: currentState?.workspaceMinHeight,
+            parentKey: currentState?.parentKey,
+            isModal: link.modal ?? false
+        )
     }
 
     private func loadValues() async {
@@ -307,6 +441,7 @@ public struct MenuListRenderer: View {
                         await MainActor.run {
                             formValuesByDataSource[ref] = next
                         }
+                        await refreshDependentDataSources(sourceRef: ref, sourceKind: "form")
                     }
                 }
                 group.addTask {
@@ -315,6 +450,7 @@ public struct MenuListRenderer: View {
                         await MainActor.run {
                             metricsValuesByDataSource[ref] = next
                         }
+                        await refreshDependentDataSources(sourceRef: ref, sourceKind: "metrics")
                     }
                 }
             }
@@ -334,6 +470,27 @@ public struct MenuListRenderer: View {
         }
         for ref in relevantDataSourceRefs(for: windowFormValues) {
             guard dataSourceDependsOnWindowForm(metadata.dataSources[ref]) else {
+                continue
+            }
+            Task(priority: .userInitiated) {
+                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+            }
+        }
+    }
+
+    private func refreshDependentDataSources(sourceRef: String, sourceKind: String) async {
+        guard let runtime, let window else {
+            return
+        }
+        guard container.fetchData != false else {
+            return
+        }
+        guard let metadata = await runtime.windowMetadata(id: window.windowID) else {
+            return
+        }
+        let refs = relevantDataSourceRefs(for: windowFormValues)
+        for ref in refs where ref != sourceRef {
+            guard dataSourceDependsOnUpstream(metadata.dataSources[ref], sourceRef: sourceRef, sourceKind: sourceKind) else {
                 continue
             }
             Task(priority: .userInitiated) {
@@ -419,6 +576,118 @@ public struct MenuListRenderer: View {
         resolvedItemValue(item)?.displayString
     }
 
+    private func resolvedLinkDisplayText(_ item: ItemDef) -> String {
+        let raw = resolvedItemDisplayValue(item)
+            ?? item.link?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+            ?? item.label
+            ?? item.title
+            ?? item.id
+            ?? item.link?.windowTitle
+            ?? item.link?.windowKey
+            ?? "Open"
+        return isPlaceholderSummaryValue(raw) ? "No data" : raw
+    }
+
+    private func normalizedItemDisplayValue(_ item: ItemDef) -> String {
+        let raw = resolvedItemDisplayValue(item) ?? item.value?.displayString
+        return isPlaceholderSummaryValue(raw) ? "No data" : (raw ?? "No data")
+    }
+
+    private func resolveLinkParameters(_ item: ItemDef, link: LinkDef) -> [String: JSONValue] {
+        var resolved: [String: JSONValue] = [:]
+        for (key, spec) in link.parameters {
+            guard let value = resolveLinkParameterValue(spec, item: item) else {
+                continue
+            }
+            resolved[key] = value
+        }
+        return resolved
+    }
+
+    private func resolveLinkParameterValue(_ spec: JSONValue, item: ItemDef) -> JSONValue? {
+        guard let object = spec.objectValue else {
+            return spec
+        }
+        let source = (object["source"]?.stringValue ?? "value")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let selector = (object["selector"]?.stringValue
+            ?? object["field"]?.stringValue
+            ?? object["location"]?.stringValue
+            ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let wrap = (object["wrap"]?.stringValue ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        let candidate: JSONValue?
+        switch source {
+        case "metrics":
+            if let ref = resolveItemDataSourceRef(item) {
+                candidate = selector.isEmpty
+                    ? .object(metricsValuesByDataSource[ref] ?? [:])
+                    : jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: selector))
+            } else {
+                candidate = nil
+            }
+        case "form":
+            if let ref = resolveItemDataSourceRef(item) {
+                candidate = selector.isEmpty
+                    ? .object(formValuesByDataSource[ref] ?? [:])
+                    : jsonValue(from: SelectorUtil.resolve(formValuesByDataSource[ref], selector: selector))
+            } else {
+                candidate = nil
+            }
+        case "windowform":
+            candidate = selector.isEmpty
+                ? .object(windowFormValues)
+                : jsonValue(from: SelectorUtil.resolve(windowFormValues, selector: selector))
+        case "value":
+            if selector.isEmpty {
+                candidate = resolvedItemValue(item)
+            } else if let base = resolvedItemValue(item)?.objectValue {
+                candidate = jsonValue(from: SelectorUtil.resolve(base, selector: selector))
+            } else {
+                candidate = nil
+            }
+        default:
+            candidate = selector.isEmpty ? resolvedItemValue(item) : nil
+        }
+
+        guard let candidate else {
+            return nil
+        }
+        if wrap == "array" {
+            return .array([candidate])
+        }
+        return candidate
+    }
+
+    private func resolveLinkWindowTitle(_ item: ItemDef, link: LinkDef) -> String {
+        let source = (link.windowTitleSource ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if source == "value" || !source.isEmpty {
+            let value = resolvedItemDisplayValue(item)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !value.isEmpty {
+                return value
+            }
+        }
+        let explicit = (link.windowTitle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !explicit.isEmpty {
+            return explicit
+        }
+        return resolvedLinkDisplayText(item)
+    }
+
+    private func resolvedExternalLinkURL(_ item: ItemDef) -> URL? {
+        let href = item.link?.href?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !href.isEmpty else {
+            return nil
+        }
+        return URL(string: href)
+    }
+
     private func isVisible(_ item: ItemDef) -> Bool {
         guard let visibleWhen = item.visibleWhen else {
             return true
@@ -465,6 +734,17 @@ public struct MenuListRenderer: View {
             let type = (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             return (type.isEmpty || type == "label") && item.options.isEmpty
         }
+    }
+
+    private var shouldUseInlineRow: Bool {
+        !visibleItems.isEmpty && visibleItems.allSatisfy { item in
+            String(item.appearance ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "inline"
+        }
+    }
+
+    private func isPlaceholderSummaryValue(_ value: String?) -> Bool {
+        let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        return normalized.isEmpty || ["-", "—", "/", "n/a", "na", "null"].contains(normalized)
     }
 
     private var summaryColumns: [GridItem] {
@@ -533,6 +813,23 @@ private func dataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) -> Bool
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return source == "windowform"
+    }
+}
+
+private func dataSourceDependsOnUpstream(
+    _ dataSource: DataSourceDef?,
+    sourceRef: String,
+    sourceKind: String
+) -> Bool {
+    guard let dataSource else {
+        return false
+    }
+    let normalizedSourceRef = sourceRef.trimmingCharacters(in: .whitespacesAndNewlines)
+    let normalizedKind = sourceKind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return dataSource.parameters.contains { parameter in
+        let input = (parameter.input ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let location = (parameter.location?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return input == normalizedKind && location.hasPrefix("\(normalizedSourceRef).")
     }
 }
 

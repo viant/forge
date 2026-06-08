@@ -1,50 +1,25 @@
-import {resolveKey} from './selector.js';
+import { resolveLinkTarget } from './linkTarget.js';
+import { formatDisplayValue } from './formatValue.js';
 
-function normalizeString(value) {
-    if (typeof value !== 'string') {
-        return '';
+function inferTableCellFormat(column = {}) {
+    if (column?.format) {
+        return column.format;
     }
-    return value.trim();
-}
-
-function isObjectValue(value) {
-    return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function normalizeLinkText(value, fallbackHref) {
-    if (value == null) {
-        return fallbackHref;
+    const label = String(column?.label || column?.name || '');
+    const id = String(column?.id || '');
+    if (/\bID\b/i.test(label) || /(^|[._])id$/i.test(id) || /Id$/i.test(id)) {
+        return 'raw';
     }
-    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        const text = String(value);
-        return text || fallbackHref;
-    }
-    return fallbackHref;
+    return undefined;
 }
 
 export function resolveTableLink({row, column, value} = {}) {
-    const linkConfig = isObjectValue(column?.link) ? column.link : null;
-    const objectValue = isObjectValue(value) ? value : null;
-    const href = normalizeString(
-        linkConfig?.href
-            ? resolveKey(row, linkConfig.href)
-            : objectValue?.href ?? (column?.type === 'link' ? value : '')
-    );
-
-    if (!href) {
-        return null;
-    }
-
-    const textSource = linkConfig?.label
-        ? resolveKey(row, linkConfig.label)
-        : objectValue?.label ?? objectValue?.text ?? value;
-    const text = normalizeLinkText(textSource, href);
-
-    const target = normalizeString(objectValue?.target || linkConfig?.target) || '_blank';
-    const rel = normalizeString(objectValue?.rel || linkConfig?.rel) || 'noopener noreferrer';
-    const title = normalizeString(objectValue?.title);
-
-    return {href, text, target, rel, title};
+    const resolved = resolveLinkTarget({
+        row,
+        value: column?.type === 'link' ? value : value,
+        linkConfig: column?.link,
+    });
+    return resolved;
 }
 
 export function resolveTableCellText({row, column, value} = {}) {
@@ -56,7 +31,7 @@ export function resolveTableCellText({row, column, value} = {}) {
         return value;
     }
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        return value;
+        return formatDisplayValue(value, inferTableCellFormat(column));
     }
     return '';
 }

@@ -31,7 +31,19 @@ class WindowRuntime(
             ?: windowKey + if (parameters.isNotEmpty()) "_${parameters.hashCode()}" else ""
         val existing = windowList.peek().find { it.windowId == windowId }
         if (existing != null) {
+            val requiresRuntimeReset =
+                existing.windowKey != windowKey ||
+                    existing.parameters != parameters ||
+                    existing.inlineMetadata != inline ||
+                    existing.conversationId != conversationId ||
+                    existing.presentation != presentation ||
+                    existing.region != region ||
+                    existing.workspaceSharePct != workspaceSharePct ||
+                    existing.workspaceMinHeight != workspaceMinHeight ||
+                    existing.parentKey != parentKey ||
+                    existing.isModal != isModal
             val updated = existing.copy(
+                windowKey = windowKey,
                 windowTitle = title,
                 inTab = inTab,
                 parameters = parameters,
@@ -44,8 +56,14 @@ class WindowRuntime(
                 workspaceMinHeight = workspaceMinHeight,
                 parentKey = parentKey
             )
+            if (requiresRuntimeReset) {
+                dataSourceRuntime.detachWindow(windowId)
+                signals.removeWindow(windowId)
+                windowContexts.remove(windowId)
+            } else {
+                windowContexts.remove(windowId)
+            }
             windowList.set(windowList.peek().map { if (it.windowId == windowId) updated else it })
-            windowContexts.remove(windowId)
             return updated
         }
 

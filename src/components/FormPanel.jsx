@@ -77,6 +77,7 @@ const FormPanel = ({context, container, children}) => {
                                 context={context}
                                 container={tab}
                                 isActive={selectedTabId === tab.id}
+                                suppressTitle={true}
                             />
                         }
                     />

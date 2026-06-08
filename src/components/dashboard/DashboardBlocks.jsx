@@ -130,9 +130,26 @@ function dashboardStatusTone(value = '') {
     return toneColors.warning;
 }
 
-function renderDashboardTableCell(cell, row, column, locale) {
+function renderDashboardTableCell(cell, row, column, locale, context) {
     const link = resolveTableLink({row, column, value: cell});
     if (link) {
+        if (link.kind === 'window') {
+            return (
+                <button
+                    type="button"
+                    title={link.title || link.text}
+                    className="forge-dashboard-table-link"
+                    style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
+                    onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        context?.handlers?.window?.openTarget?.({ target: link, context });
+                    }}
+                >
+                    {link.text}
+                </button>
+            );
+        }
         return (
             <a
                 href={link.href}
@@ -397,7 +414,7 @@ export function DashboardKPITable({container, context}) {
                                     <tr key={index} style={{background: index % 2 === 0 ? '#ffffff' : '#fbfdff'}}>
                                         {cells.map((cell, cellIndex) => (
                                             <td key={`${index}-${cellIndex}`} style={{padding: '10px 8px', borderBottom: '1px solid #ebf1f5', color: cellIndex === 0 ? '#182026' : '#30404d', fontWeight: cellIndex === 0 ? 600 : 400, fontSize: '12px', lineHeight: 1.45, verticalAlign: 'top', maxWidth: cellIndex >= normalizedColumns.length - 1 ? '320px' : undefined, whiteSpace: cellIndex >= normalizedColumns.length - 2 ? 'normal' : 'nowrap'}}>
-                                                {renderDashboardTableCell(cell, normalizedColumns[cellIndex], locale)}
+                                                {renderDashboardTableCell(cell, row, normalizedColumns[cellIndex], locale, context)}
                                             </td>
                                         ))}
                                     </tr>
@@ -1555,7 +1572,7 @@ export function DashboardTable({container, context}) {
                                         const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(" ");
                                         return (
                                             <td key={`${index}-${ci}`} className={cellClassName} style={cellStyle}>
-                                                {renderDashboardTableCell(resolveKey(row, col.key), row, col, locale)}
+                                                {renderDashboardTableCell(resolveKey(row, col.key), row, col, locale, context)}
                                             </td>
                                         );
                                     })}

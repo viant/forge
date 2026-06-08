@@ -226,60 +226,6 @@ function getInlineMetadataSnapshot(windowId, options) {
   return serializeInlineMetadata(meta);
 }
 
-function extractOrderIds(win = {}) {
-  const values = [];
-  const appendRaw = (raw) => {
-    if (Array.isArray(raw)) {
-      raw.forEach((entry) => {
-        const value = String(entry ?? '').trim();
-        if (value) values.push(value);
-      });
-      return;
-    }
-    const value = String(raw ?? '').trim();
-    if (value) values.push(value);
-  };
-  if (win?.parameters && Object.prototype.hasOwnProperty.call(win.parameters, 'AdOrderId')) {
-    appendRaw(win.parameters.AdOrderId);
-  }
-  return [...new Set(values)];
-}
-
-function buildCompareContextMap(windows = []) {
-  const hostedOrders = (Array.isArray(windows) ? windows : []).filter((win) =>
-    String(win?.windowKey || '').trim() === 'order'
-    && String(win?.presentation || '').trim().toLowerCase() === 'hosted'
-    && String(win?.region || '').trim().toLowerCase() === 'chat.top'
-    && String(win?.conversationId || '').trim()
-    && String(win?.parentKey || '').trim()
-  );
-  const grouped = new Map();
-  for (const win of hostedOrders) {
-    const key = [
-      String(win.conversationId || '').trim(),
-      String(win.parentKey || '').trim(),
-      String(win.region || '').trim().toLowerCase(),
-    ].join('|');
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(win);
-  }
-  const result = new Map();
-  for (const group of grouped.values()) {
-    if (group.length < 2) continue;
-    const orderIds = [...new Set(group.flatMap((win) => extractOrderIds(win)))];
-    const windowIds = group.map((win) => String(win.windowId || '').trim()).filter(Boolean);
-    for (const win of group) {
-      const activeOrderId = extractOrderIds(win)[0] || null;
-      result.set(String(win.windowId || '').trim(), {
-        orderIds,
-        windowIds,
-        activeOrderId,
-      });
-    }
-  }
-  return result;
-}
-
 function deriveSnapshotConversationId(windows = [], selectedId = '') {
   const selectedWindowIdValue = String(selectedId || '').trim();
   const selectedWindow = windows.find((win) => String(win?.windowId || '').trim() === selectedWindowIdValue);
@@ -307,7 +253,6 @@ function deriveSnapshotConversationId(windows = [], selectedId = '') {
  */
 export function buildUISnapshot(options = {}) {
   const windows = activeWindows.peek() || [];
-  const compareContextByWindowId = buildCompareContextMap(windows);
   const selectedWindowIdValue = selectedWindowId.peek() || null;
   const selectedTabIdValue = selectedTabId.peek() || null;
   let focused = null;
@@ -354,7 +299,6 @@ export function buildUISnapshot(options = {}) {
         zIndex: w.zIndex ?? null,
         position: { x: w.x ?? null, y: w.y ?? null },
         size: w.size ? safeJSON(w.size, options) : undefined,
-        compareContext: compareContextByWindowId.get(String(w.windowId || '').trim()) || undefined,
         inlineMetadata: getInlineMetadataSnapshot(w.windowId, options),
         metadata: metaSummary,
         dialogs: dialogStates,

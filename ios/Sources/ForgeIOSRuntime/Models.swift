@@ -351,6 +351,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
     public let title: String?
     public let subtitle: String?
     public let kind: String?
+    public let scrollMode: String?
     public let dataSourceRef: String?
     public let columnSpan: Int?
     public let rowSpan: Int?
@@ -387,6 +388,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case title
         case subtitle
         case kind
+        case scrollMode
         case dataSourceRef
         case columnSpan
         case rowSpan
@@ -436,6 +438,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         title: String? = nil,
         subtitle: String? = nil,
         kind: String? = nil,
+        scrollMode: String? = nil,
         dataSourceRef: String? = nil,
         columnSpan: Int? = nil,
         rowSpan: Int? = nil,
@@ -471,6 +474,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         self.title = title
         self.subtitle = subtitle
         self.kind = kind
+        self.scrollMode = scrollMode
         self.dataSourceRef = dataSourceRef
         self.columnSpan = columnSpan
         self.rowSpan = rowSpan
@@ -509,6 +513,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         title = try container.decodeIfPresent(String.self, forKey: .title)
         subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
         kind = try container.decodeIfPresent(String.self, forKey: .kind)
+        scrollMode = try container.decodeIfPresent(String.self, forKey: .scrollMode)
         dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
         columnSpan = try container.decodeIfPresent(Int.self, forKey: .columnSpan)
         rowSpan = try container.decodeIfPresent(Int.self, forKey: .rowSpan)
@@ -548,6 +553,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(title, forKey: .title)
         try container.encodeIfPresent(subtitle, forKey: .subtitle)
         try container.encodeIfPresent(kind, forKey: .kind)
+        try container.encodeIfPresent(scrollMode, forKey: .scrollMode)
         try container.encodeIfPresent(dataSourceRef, forKey: .dataSourceRef)
         try container.encodeIfPresent(columnSpan, forKey: .columnSpan)
         try container.encodeIfPresent(rowSpan, forKey: .rowSpan)
@@ -1643,6 +1649,7 @@ public struct LayoutDef: Codable, Sendable {
 public struct ItemDef: Codable, Sendable, Identifiable {
     public let id: String?
     public let label: String?
+    public let appearance: String?
     public let title: String?
     public let subtitle: String?
     public let body: String?
@@ -1664,6 +1671,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
     public let bindingPath: String?
     public let scope: String?
     public let value: JSONValue?
+    public let link: LinkDef?
     public let visibleWhen: DashboardConditionDef?
     public let options: [OptionDef]
     public let properties: [String: JSONValue]
@@ -1674,6 +1682,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id
         case label
+        case appearance
         case title
         case subtitle
         case body
@@ -1695,6 +1704,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         case bindingPath
         case scope
         case value
+        case link
         case visibleWhen
         case options
         case properties
@@ -1706,6 +1716,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
     public init(
         id: String? = nil,
         label: String? = nil,
+        appearance: String? = nil,
         title: String? = nil,
         subtitle: String? = nil,
         body: String? = nil,
@@ -1727,6 +1738,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         bindingPath: String? = nil,
         scope: String? = nil,
         value: JSONValue? = nil,
+        link: LinkDef? = nil,
         visibleWhen: DashboardConditionDef? = nil,
         options: [OptionDef] = [],
         properties: [String: JSONValue] = [:],
@@ -1736,6 +1748,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
     ) {
         self.id = id
         self.label = label
+        self.appearance = appearance
         self.title = title
         self.subtitle = subtitle
         self.body = body
@@ -1757,6 +1770,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         self.bindingPath = bindingPath
         self.scope = scope
         self.value = value
+        self.link = link
         self.visibleWhen = visibleWhen
         self.options = options
         self.properties = properties
@@ -1769,6 +1783,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decodeIfPresent(String.self, forKey: .id)
         label = try container.decodeIfPresent(String.self, forKey: .label)
+        appearance = try container.decodeIfPresent(String.self, forKey: .appearance)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
         body = try container.decodeIfPresent(String.self, forKey: .body)
@@ -1790,6 +1805,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         bindingPath = try container.decodeIfPresent(String.self, forKey: .bindingPath)
         scope = try container.decodeIfPresent(String.self, forKey: .scope)
         value = try container.decodeIfPresent(JSONValue.self, forKey: .value)
+        link = try container.decodeIfPresent(LinkDef.self, forKey: .link)
         visibleWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .visibleWhen)
         options = try container.decodeIfPresent([OptionDef].self, forKey: .options) ?? []
         properties = try container.decodeIfPresent([String: JSONValue].self, forKey: .properties) ?? [:]
@@ -2327,9 +2343,56 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
 
 public struct LinkDef: Codable, Sendable {
     public let href: String?
+    public let kind: String?
+    public let windowKey: String?
+    public let windowTitle: String?
+    public let windowTitleSource: String?
+    public let windowTitleSelector: String?
+    public let text: String?
+    public let textSource: String?
+    public let textSelector: String?
+    public let title: String?
+    public let inTab: Bool?
+    public let newInstance: Bool?
+    public let autoIndexTitle: Bool?
+    public let awaitResult: Bool?
+    public let modal: Bool?
+    public let parameters: [String: JSONValue]
 
-    public init(href: String? = nil) {
+    public init(
+        href: String? = nil,
+        kind: String? = nil,
+        windowKey: String? = nil,
+        windowTitle: String? = nil,
+        windowTitleSource: String? = nil,
+        windowTitleSelector: String? = nil,
+        text: String? = nil,
+        textSource: String? = nil,
+        textSelector: String? = nil,
+        title: String? = nil,
+        inTab: Bool? = nil,
+        newInstance: Bool? = nil,
+        autoIndexTitle: Bool? = nil,
+        awaitResult: Bool? = nil,
+        modal: Bool? = nil,
+        parameters: [String: JSONValue] = [:]
+    ) {
         self.href = href
+        self.kind = kind
+        self.windowKey = windowKey
+        self.windowTitle = windowTitle
+        self.windowTitleSource = windowTitleSource
+        self.windowTitleSelector = windowTitleSelector
+        self.text = text
+        self.textSource = textSource
+        self.textSelector = textSelector
+        self.title = title
+        self.inTab = inTab
+        self.newInstance = newInstance
+        self.autoIndexTitle = autoIndexTitle
+        self.awaitResult = awaitResult
+        self.modal = modal
+        self.parameters = parameters
     }
 }
 

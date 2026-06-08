@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -199,38 +200,51 @@ private fun DashboardActions(runtime: ForgeRuntime, window: WindowContext, conta
 @Composable
 private fun DashboardSummaryBlock(container: ContainerDef, metrics: Map<String, Any?>) {
     val summaryMetrics = container.dashboard?.summary?.metrics ?: container.metrics
-    StaticGrid(
-        items = summaryMetrics,
-        minCellWidth = 180.dp,
-        modifier = Modifier.fillMaxWidth(),
-        horizontalSpacing = 10.dp,
-        verticalSpacing = 10.dp
-    ) { metric ->
-            val value = SelectorUtil.resolve(metrics, metric.selector)
-            val displayValue = formatDashboardValue(value, metric.format)
-            val tone = summaryMetricTone(metric, summaryMetrics.indexOf(metric))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(tone.background, RoundedCornerShape(14.dp))
-                    .border(1.dp, tone.border, RoundedCornerShape(14.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Text(
-                    text = metric.label ?: metric.selector ?: "Metric",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = tone.text.copy(alpha = 0.82f)
-                )
-                Text(
-                    text = displayValue,
-                    style = summaryMetricValueStyle(displayValue),
-                    fontWeight = FontWeight.SemiBold,
-                    color = tone.text,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
+    val cards = remember(summaryMetrics, metrics) {
+        resolveSummaryCards(summaryMetrics, metrics)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (cards.isEmpty()) {
+            DashboardEmptyState("No summary data available for this view.")
+        } else {
+            StaticGrid(
+                items = cards,
+                minCellWidth = 180.dp,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalSpacing = 10.dp,
+                verticalSpacing = 10.dp
+            ) { card ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(card.tone.background, RoundedCornerShape(14.dp))
+                        .border(1.dp, card.tone.border, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = card.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = card.tone.text.copy(alpha = 0.82f)
+                    )
+                    Text(
+                        text = card.displayValue,
+                        style = summaryMetricValueStyle(card.displayValue),
+                        fontWeight = FontWeight.SemiBold,
+                        color = card.tone.text,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
+        }
+        if (cards.isNotEmpty() && cards.size < summaryMetrics.size) {
+            Text(
+                text = "Some values are unavailable for this view.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF6A7280)
+            )
+        }
     }
 }
 
@@ -709,6 +723,20 @@ private fun DashboardPlaceholderBlock(container: ContainerDef) {
     }
 }
 
+@Composable
+private fun DashboardEmptyState(message: String) {
+    Text(
+        text = message,
+        style = MaterialTheme.typography.bodySmall,
+        color = Color(0xFF6A7280),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF6F8FB), RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+    )
+}
+
 private data class DashboardToneColors(
     val background: Color,
     val border: Color,
@@ -957,6 +985,32 @@ private fun summaryMetricTone(metric: com.viant.forgeandroid.runtime.DashboardMe
     return severityTone("neutral")
 }
 
+private fun resolveSummaryCards(
+    metrics: List<com.viant.forgeandroid.runtime.DashboardMetricDef>,
+    values: Map<String, Any?>
+): List<DashboardSummaryCard> {
+    return metrics.mapIndexedNotNull { index, metric ->
+        val value = SelectorUtil.resolve(values, metric.selector)
+        val displayValue = formatDashboardValue(value, metric.format)
+        if (!isMeaningfulSummaryValue(displayValue)) {
+            return@mapIndexedNotNull null
+        }
+        DashboardSummaryCard(
+            label = metric.label ?: metric.selector ?: "Metric",
+            displayValue = displayValue,
+            tone = summaryMetricTone(metric, index)
+        )
+    }
+}
+
+private fun isMeaningfulSummaryValue(value: String): Boolean {
+    val normalized = value.trim()
+    if (normalized.isEmpty()) {
+        return false
+    }
+    return normalized.lowercase() !in setOf("-", "—", "/", "n/a", "na", "null")
+}
+
 @Composable
 private fun summaryMetricValueStyle(text: String): androidx.compose.ui.text.TextStyle {
     val normalized = text.trim()
@@ -970,3 +1024,9 @@ private fun summaryMetricValueStyle(text: String): androidx.compose.ui.text.Text
         else -> MaterialTheme.typography.titleMedium
     }
 }
+
+private data class DashboardSummaryCard(
+    val label: String,
+    val displayValue: String,
+    val tone: DashboardToneColors
+)

@@ -11,6 +11,7 @@ public struct ChartRenderer: View {
     private let container: ContainerDef
     private let chart: ChartDef
     @State private var rows: [[String: JSONValue]] = []
+    @State private var hasResolvedRows = false
     @State private var chartWindowForm: [String: JSONValue] = [:]
     @State private var selectedSeriesKeys: Set<String> = []
     @State private var appliedSeriesKeys: [String] = []
@@ -29,10 +30,11 @@ public struct ChartRenderer: View {
                     .font((isCompactPresentation ? Font.footnote : .subheadline).weight(.semibold))
                     .foregroundStyle(.primary.opacity(0.9))
             }
-            if supportsSeriesSelection {
+            let showsEmptyChartState = hasResolvedRows && rows.isEmpty
+            if supportsSeriesSelection && !showsEmptyChartState {
                 chartSeriesSelector
             }
-            if supportsSeriesSelection && filteredSeriesKeys.isEmpty {
+            if supportsSeriesSelection && !showsEmptyChartState && filteredSeriesKeys.isEmpty {
                 Text("Select at least one measure")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -45,7 +47,7 @@ public struct ChartRenderer: View {
                             Image(systemName: "chart.xyaxis.line")
                                 .font(.title3.weight(.semibold))
                                 .foregroundStyle(.secondary.opacity(0.7))
-                            Text("Loading chart")
+                            Text(showsEmptyChartState ? "No data for the selected period." : "Loading chart")
                                 .font(.footnote.weight(.medium))
                                 .foregroundStyle(.secondary)
                         }
@@ -287,13 +289,16 @@ public struct ChartRenderer: View {
     private func loadRows() async {
         guard let runtime, let window else {
             rows = []
+            hasResolvedRows = true
             return
         }
         guard !resolvedDataSourceRef.isEmpty else {
             rows = []
+            hasResolvedRows = true
             return
         }
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        hasResolvedRows = true
         guard rows.isEmpty else {
             return
         }
@@ -317,6 +322,7 @@ public struct ChartRenderer: View {
         for await next in stream {
             await MainActor.run {
                 rows = next
+                hasResolvedRows = true
             }
         }
     }

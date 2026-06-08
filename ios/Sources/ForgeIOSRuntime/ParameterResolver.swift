@@ -4,17 +4,20 @@ public enum ParameterResolver {
     public struct DataSourceSnapshot: Sendable {
         public let selectionMode: String?
         public let form: [String: JSONValue]
+        public let metrics: [String: JSONValue]
         public let selection: SelectionState
         public let input: InputState
 
         public init(
             selectionMode: String? = nil,
             form: [String: JSONValue] = [:],
+            metrics: [String: JSONValue] = [:],
             selection: SelectionState = SelectionState(),
             input: InputState = InputState()
         ) {
             self.selectionMode = selectionMode
             self.form = form
+            self.metrics = metrics
             self.selection = selection
             self.input = input
         }
@@ -84,6 +87,8 @@ public enum ParameterResolver {
             return resolveFromMetadata(context: context, location: parameter.location?.stringValue)
         case "filterSet":
             return resolveFromFilterSet(context: context, location: parameter.location?.stringValue)
+        case "metrics":
+            return resolveFromMetrics(context: context, location: parameter.location?.stringValue)
         case "const":
             return parameter.location ?? parameter.value
         default:
@@ -169,6 +174,18 @@ public enum ParameterResolver {
             return .object(snapshot.input.filter)
         }
         return jsonValue(any: SelectorUtil.resolve(jsonObjectAny(snapshot.input.filter), selector: fieldPath))
+    }
+
+    private static func resolveFromMetrics(
+        context: ResolutionContext,
+        location: String?
+    ) -> JSONValue? {
+        let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
+        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        if fieldPath.isEmpty {
+            return .object(snapshot.metrics)
+        }
+        return jsonValue(any: SelectorUtil.resolve(jsonObjectAny(snapshot.metrics), selector: fieldPath))
     }
 
     private static func resolveDataSourceRef(

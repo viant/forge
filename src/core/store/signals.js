@@ -438,6 +438,31 @@ export const activeWindows = signal([]);
 export const selectedWindowId = signal(null);
 export const selectedTabId = signal(null);
 
+function shouldRetryRestoredDatasourceSnapshot(controlSnapshot = null) {
+    if (!controlSnapshot || typeof controlSnapshot !== 'object') {
+        return false;
+    }
+    if (controlSnapshot.loading === true) {
+        return true;
+    }
+    const errorText = String(
+        controlSnapshot?.error?.message
+        || controlSnapshot?.error?.detail
+        || controlSnapshot?.error
+        || ''
+    ).trim().toLowerCase();
+    if (!errorText) {
+        return false;
+    }
+    return (
+        errorText.includes('authorization required')
+        || errorText.includes('unauthorized')
+        || errorText.includes('forbidden')
+        || errorText.includes('user access denied')
+        || errorText.includes('oauth session is missing a valid token')
+    );
+}
+
 function restoreWindowSignalsFromSnapshot(win) {
     const windowId = String(win?.windowId || '').trim();
     if (!windowId) return;
@@ -465,11 +490,30 @@ function restoreWindowSignalsFromSnapshot(win) {
         const dataSourceRef = String(snapshot?.dataSourceRef || '').trim();
         if (!dataSourceRef) continue;
         const dataSourceId = `${windowId}DS${dataSourceRef}`;
-        if (snapshot?.input && typeof snapshot.input === 'object') {
-            getInputSignal(dataSourceId).value = snapshot.input;
+        let nextInput = snapshot?.input && typeof snapshot.input === 'object'
+            ? { ...snapshot.input }
+            : null;
+        let nextControl = snapshot?.control && typeof snapshot.control === 'object'
+            ? { ...snapshot.control }
+            : null;
+        if (shouldRetryRestoredDatasourceSnapshot(nextControl)) {
+            nextInput = {
+                ...(nextInput || {}),
+                fetch: true,
+                refresh: false,
+            };
+            nextControl = {
+                ...nextControl,
+                loading: false,
+                error: null,
+                stale: false,
+            };
         }
-        if (snapshot?.control && typeof snapshot.control === 'object') {
-            getControlSignal(dataSourceId).value = snapshot.control;
+        if (nextInput && typeof nextInput === 'object') {
+            getInputSignal(dataSourceId).value = nextInput;
+        }
+        if (nextControl && typeof nextControl === 'object') {
+            getControlSignal(dataSourceId).value = nextControl;
         }
         if (snapshot?.form && typeof snapshot.form === 'object') {
             getFormSignal(dataSourceId).value = snapshot.form;
@@ -744,6 +788,8 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         }
         if (options.workspaceMinHeight !== undefined) {
             nextWindow.workspaceMinHeight = options.workspaceMinHeight;
+        } else if (replacingSemanticWindow) {
+            delete nextWindow.workspaceMinHeight;
         }
         if (options.workspaceCollapsed !== undefined) {
             nextWindow.workspaceCollapsed = options.workspaceCollapsed === true;

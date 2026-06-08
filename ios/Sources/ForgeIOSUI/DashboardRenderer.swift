@@ -151,42 +151,47 @@ public struct DashboardRenderer: View {
         if summaryMetrics.isEmpty {
             unsupportedBlock("dashboard summary has no metrics")
         } else {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: isCompactPresentation ? 136 : (horizontalSizeClass == .regular ? 156 : 160)), spacing: 10, alignment: .top)],
-                alignment: .leading,
-                spacing: 10
-            ) {
-                ForEach(Array(summaryMetrics.enumerated()), id: \.offset) { _, metric in
-                    let value = DashboardRuntime.resolveDashboardValue(
-                        source: nil,
-                        selector: metric.selector,
-                        metrics: metrics
-                    )
-                    let displayValue = DashboardRuntime.formatDashboardValue(value, format: metric.format)
-                    let cardTone = summaryCardTone(for: metric, index: summaryMetrics.firstIndex(where: { $0.id == metric.id && $0.selector == metric.selector && $0.label == metric.label }) ?? 0)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(metric.label ?? metric.selector ?? "Metric")
-                            .font((isCompactPresentation ? Font.caption2 : .caption).weight(.medium))
-                            .foregroundStyle(cardTone.text.opacity(0.8))
-                        Text(displayValue)
-                            .font(summaryValueFont(for: displayValue).weight(.semibold))
-                            .foregroundStyle(cardTone.text)
-                            .lineLimit(3)
-                            .minimumScaleFactor(0.62)
-                            .allowsTightening(true)
-                            .fixedSize(horizontal: false, vertical: true)
+            let cards = resolvedSummaryCards(summaryMetrics, metrics: metrics)
+            VStack(alignment: .leading, spacing: 10) {
+                if cards.isEmpty {
+                    emptyDashboardState("No summary data available for this view.")
+                } else {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: isCompactPresentation ? 136 : (horizontalSizeClass == .regular ? 156 : 160)), spacing: 10, alignment: .top)],
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+                        ForEach(Array(cards.enumerated()), id: \.offset) { _, card in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(card.label)
+                                    .font((isCompactPresentation ? Font.caption2 : .caption).weight(.medium))
+                                    .foregroundStyle(card.tone.text.opacity(0.8))
+                                Text(card.displayValue)
+                                    .font(summaryValueFont(for: card.displayValue).weight(.semibold))
+                                    .foregroundStyle(card.tone.text)
+                                    .lineLimit(3)
+                                    .minimumScaleFactor(0.62)
+                                    .allowsTightening(true)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: isCompactPresentation ? 52 : (horizontalSizeClass == .regular ? 60 : 72), alignment: .leading)
+                            .padding(.horizontal, isCompactPresentation ? 10 : 12)
+                            .padding(.vertical, isCompactPresentation ? 9 : (horizontalSizeClass == .regular ? 10 : 11))
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(card.tone.background)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(card.tone.border, lineWidth: 1)
+                            )
+                        }
                     }
-                    .frame(maxWidth: .infinity, minHeight: isCompactPresentation ? 52 : (horizontalSizeClass == .regular ? 60 : 72), alignment: .leading)
-                    .padding(.horizontal, isCompactPresentation ? 10 : 12)
-                    .padding(.vertical, isCompactPresentation ? 9 : (horizontalSizeClass == .regular ? 10 : 11))
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(cardTone.background)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(cardTone.border, lineWidth: 1)
-                    )
+                }
+                if !cards.isEmpty && cards.count < summaryMetrics.count {
+                    Text("Some values are unavailable for this view.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -521,6 +526,22 @@ public struct DashboardRenderer: View {
             )
     }
 
+    private func emptyDashboardState(_ message: String) -> some View {
+        Text(message)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.secondary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
+    }
+
     private func dashboardMetrics(_ container: ContainerDef) -> [String: Any] {
         var metrics = runtimeMetrics
         for item in container.items {
@@ -640,6 +661,25 @@ public struct DashboardRenderer: View {
         }
     }
 
+    private func resolvedSummaryCards(_ definitions: [DashboardMetricDef], metrics: [String: Any]) -> [DashboardSummaryCard] {
+        definitions.enumerated().compactMap { index, metric in
+            let value = DashboardRuntime.resolveDashboardValue(
+                source: nil,
+                selector: metric.selector,
+                metrics: metrics
+            )
+            let displayValue = DashboardRuntime.formatDashboardValue(value, format: metric.format)
+            guard isMeaningfulSummaryValue(displayValue) else {
+                return nil
+            }
+            return DashboardSummaryCard(
+                label: metric.label ?? metric.selector ?? "Metric",
+                displayValue: displayValue,
+                tone: summaryCardTone(for: metric, index: index)
+            )
+        }
+    }
+
     private func numericValue(_ value: Any?) -> Double {
         switch value {
         case let number as Double:
@@ -663,12 +703,25 @@ public struct DashboardRenderer: View {
     private func isBlank(_ value: String?) -> Bool {
         value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
     }
+
+    private func isMeaningfulSummaryValue(_ value: String) -> Bool {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return false }
+        let lowered = normalized.lowercased()
+        return !["-", "—", "/", "n/a", "na", "null"].contains(lowered)
+    }
 }
 
 private struct DashboardCardTone {
     let background: Color
     let border: Color
     let text: Color
+}
+
+private struct DashboardSummaryCard {
+    let label: String
+    let displayValue: String
+    let tone: DashboardCardTone
 }
 
 private extension JSONValue {

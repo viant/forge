@@ -13,26 +13,26 @@ import Toolbar from "./basic/Toolbar.jsx";
 import FullContentDialog from "./FullContentDialog";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "./formattingRules.js";
 import {resolveTableCellText, resolveTableLink} from "../../utils/tableLink.js";
+import {resolveKey} from "../../utils/selector.js";
 
 const defaultCellWidth = 30; // Adjust as needed
 
 const isFooterToolbarItem = (item = {}) => ["footer", "bottom"].includes(String(item.placement || "").toLowerCase());
 
-export const resolveKey = (holder, name) => {
-    if (holder == null) return undefined;
-    const keys = name.split(".");
-    if (keys.length === 1) {
-        return holder[name];
-    }
-    let result = holder;
-    for (const key of keys) {
-        result = result[key];
-        if(result === undefined) {
-            break;
-        }
-    }
-    return result;
-};
+function stableColumnsSignature(columns = []) {
+    return JSON.stringify(
+        (Array.isArray(columns) ? columns : []).map((col) => ({
+            id: col?.id,
+            visible: col?.visible,
+            displayName: col?.displayName,
+            width: col?.width,
+            widthPct: col?.widthPct,
+            minWidth: col?.minWidth,
+            multiSelect: col?.multiSelect,
+            nonExcludable: col?.nonExcludable,
+        }))
+    );
+}
 
 function convertWidthsToPct(columns, tableWidth) {
     const total = columns.reduce((acc, col) => acc + (col.width || defaultCellWidth), 0) || 1;
@@ -118,18 +118,8 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const [popupContent, setPopupContent] = useState("");
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [columnsHandlers, setColumnsHandlers] = useState({});
-
-    const { collection: collectionData, loading, error, selection } = useDataSourceState(context);
+    const { collection: collectionData, loading, error } = useDataSourceState(context);
     const collection = collectionData; // keep old variable name for compatibility
-    const [selectedRecord, setSelectedRecord] = useState({});
-
-    // keep selectedRecord in sync with DataSource selection
-    useEffect(() => {
-        if (selection) {
-            setSelectedRecord(selection);
-        }
-    }, [selection]);
 
     const [sortColumnId, setSortColumnId] = useState(null);
     const [sortDirection, setSortDirection] = useState("asc");
@@ -140,6 +130,10 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const resolvedColumns = useMemo(
         () => resolveTableColumnsForSelection(columns, context),
         [columns, context],
+    );
+    const columnsHandlers = useMemo(
+        () => useColumnsHandlers(context, resolvedColumns),
+        [context, resolvedColumns],
     );
     const formattingRules = useMemo(
         () => normalizeRuleList(container?.table?.formattingRules || container?.table?.formatting || []),
@@ -173,18 +167,25 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     useEffect(() => {
         const key = context.tableSettingKey(container.id);
         const savedColumns = localStorage.getItem(key);
-
-        if (savedColumns) {
-            try {
-                const parsedColumns = JSON.parse(savedColumns);
-                setConfiguredColumns(reconcileConfiguredColumns(parsedColumns, initConfiguredColumns(resolvedColumns)));
-            } catch (e) {
-                console.error('Error parsing saved column settings:', e);
-                setConfiguredColumns(initConfiguredColumns(resolvedColumns));
+        const resolveNextConfiguredColumns = () => {
+            if (savedColumns) {
+                try {
+                    const parsedColumns = JSON.parse(savedColumns);
+                    return reconcileConfiguredColumns(parsedColumns, initConfiguredColumns(resolvedColumns));
+                } catch (e) {
+                    console.error('Error parsing saved column settings:', e);
+                }
             }
-        } else {
-            setConfiguredColumns(initConfiguredColumns(resolvedColumns));
-        }
+            return initConfiguredColumns(resolvedColumns);
+        };
+        const nextColumns = resolveNextConfiguredColumns();
+        const nextSignature = stableColumnsSignature(nextColumns);
+
+        setConfiguredColumns((previousColumns) => (
+            stableColumnsSignature(previousColumns) === nextSignature
+                ? previousColumns
+                : nextColumns
+        ));
     }, [resolvedColumns, container.id]);
 
     // Ensure non-excludable columns are always visible
@@ -196,7 +197,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const [columnsToUse, setColumnsToUse] = useState(visibleColumns);
 
     useEffect(() => {
-        setColumnsHandlers(useColumnsHandlers(context, resolvedColumns));
         const data = handlers.dataSource.getCollection();
         if (!data?.length && collection?.length === 0) {
             events.onInit.execute({});
@@ -239,12 +239,23 @@ const Basic = ({ context, container, columns, pagination, children }) => {
 
 
     useEffect(() => {
+        const nextColumns = enforceColumnSize && tableWidth > 0
+            ? convertWidthsToPct(visibleColumns, tableWidth)
+            : visibleColumns;
+        const nextSignature = stableColumnsSignature(nextColumns);
         if (enforceColumnSize && tableWidth > 0) {
-            const updatedColumns = convertWidthsToPct(visibleColumns, tableWidth);
-            setColumnsToUse(updatedColumns);
-        } else {
-            setColumnsToUse(visibleColumns);
+            setColumnsToUse((previousColumns) => (
+                stableColumnsSignature(previousColumns) === nextSignature
+                    ? previousColumns
+                    : nextColumns
+            ));
+            return;
         }
+        setColumnsToUse((previousColumns) => (
+            stableColumnsSignature(previousColumns) === nextSignature
+                ? previousColumns
+                : nextColumns
+        ));
     }, [enforceColumnSize, tableWidth, visibleColumns]);
 
     // Added useEffect to update tableWidth when the table's width changes

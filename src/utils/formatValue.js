@@ -21,6 +21,10 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
     if (value == null) return '-';
     if (typeof value === 'string' && value.trim() === '') return '';
 
+    if (format === 'raw' || format === 'plain' || format === 'id' || format === 'text') {
+        return String(value);
+    }
+
     if (format === 'date' || format === 'dateTime' || format === 'wallClockHour' || format === 'wallClockDate') {
         const date = new Date(value);
         if (!Number.isNaN(date.getTime())) {

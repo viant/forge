@@ -5,13 +5,16 @@ import {Spinner} from '@blueprintjs/core';
 import SoftSkeleton, { SoftBlock } from './SoftSkeleton.jsx';
 
 import {
+    activeWindows,
     getMetadataSignal,
     findMetadataSignal,
     getCollectionSignal,
+    findCollectionSignal,
     getControlSignal,
     findDialogSignal,
     getInputSignal,
-    getFormSignal,
+    findFormSignal,
+    findMetricsSignal,
     primeWindowSignals,
     removeWindow,
 } from '../core';
@@ -173,6 +176,16 @@ function expandRequiredDataSourceRefs(metadata, refs) {
 export function resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef = '', scope = {}) {
     const refs = new Set();
     if (defaultDataSourceRef) refs.add(String(defaultDataSourceRef).trim());
+    const titleBindingRef = String(
+        metadata?.window?.titleBinding?.dataSourceRef
+        || metadata?.window?.titleBinding?.ref
+        || metadata?.view?.titleBinding?.dataSourceRef
+        || metadata?.view?.titleBinding?.ref
+        || ''
+    ).trim();
+    if (titleBindingRef) {
+        refs.add(titleBindingRef);
+    }
     collectRequiredDataSourceRefs(metadata?.view?.content || null, scope, refs);
     return expandRequiredDataSourceRefs(metadata, refs);
 }
@@ -200,6 +213,102 @@ function hasOwnDataSourceParameters(dataSource = {}, windowParameters = {}) {
     return false;
 }
 
+function resolveBoundWindowTitle(metadata, window = {}) {
+    const binding = metadata?.window?.titleBinding || metadata?.view?.titleBinding;
+    const windowId = String(window?.windowId || '').trim();
+    if (!binding || !windowId) {
+        return '';
+    }
+    const dataSourceRef = String(binding?.dataSourceRef || binding?.ref || '').trim();
+    const selector = String(binding?.selector || binding?.field || '').trim();
+    const source = String(binding?.source || 'metrics').trim().toLowerCase();
+    if (!dataSourceRef) {
+        return '';
+    }
+    const dataSourceId = `${windowId}DS${dataSourceRef}`;
+    let data = null;
+    switch (source) {
+        case 'collection':
+        case 'data': {
+            const collection = findCollectionSignal(dataSourceId)?.value;
+            data = Array.isArray(collection) ? (collection[0] || null) : collection;
+            break;
+        }
+        case 'metrics':
+        default:
+            data = findMetricsSignal(dataSourceId)?.value || null;
+            break;
+    }
+    const resolved = selector ? resolveSelector(data || {}, selector) : data;
+    if (resolved != null && String(resolved).trim() !== '') {
+        return String(resolved).trim();
+    }
+    const domSelector = String(binding?.domSelector || binding?.selectorCss || '').trim();
+    const controlId = String(binding?.controlId || binding?.domControlId || '').trim();
+    if ((!controlId && !domSelector) || typeof document === 'undefined') {
+        return '';
+    }
+    try {
+        const base = document.querySelector(`[data-workspace-window-id="${windowId}"]`);
+        const control = domSelector
+            ? base?.querySelector?.(domSelector)
+            : base?.querySelector?.(`[data-forge-control-id="${controlId}"]`);
+        return String(control?.textContent || '').trim();
+    } catch (_) {
+        return '';
+    }
+}
+
+function resolveNumericWindowRuntimeHint(metadata, key = '') {
+    const value = Number(metadata?.[key]);
+    return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+function syncWindowRuntimeHints(windowId, metadata, windowState = null) {
+    const normalizedWindowId = String(windowId || '').trim();
+    if (!normalizedWindowId || !metadata || typeof metadata !== 'object') {
+        return;
+    }
+    const current = Array.isArray(activeWindows.peek?.()) ? activeWindows.peek() : [];
+    const matched = current.find((entry) => String(entry?.windowId || '').trim() === normalizedWindowId);
+    if (!matched) {
+        return;
+    }
+    const next = { ...matched };
+    let changed = false;
+
+    const metadataPresentation = String(metadata?.presentation || '').trim();
+    if (metadataPresentation && String(next.presentation || '').trim() !== metadataPresentation) {
+        next.presentation = metadataPresentation;
+        changed = true;
+    }
+    const metadataRegion = String(metadata?.region || '').trim();
+    if (metadataRegion && String(next.region || '').trim() !== metadataRegion) {
+        next.region = metadataRegion;
+        changed = true;
+    }
+    const metadataWorkspaceSharePct = resolveNumericWindowRuntimeHint(metadata, 'workspaceSharePct');
+    if (metadataWorkspaceSharePct !== undefined && next.workspaceSharePct !== metadataWorkspaceSharePct) {
+        next.workspaceSharePct = metadataWorkspaceSharePct;
+        changed = true;
+    }
+    const metadataWorkspaceMinHeight = resolveNumericWindowRuntimeHint(metadata, 'workspaceMinHeight');
+    if (metadataWorkspaceMinHeight !== undefined && next.workspaceMinHeight !== metadataWorkspaceMinHeight) {
+        next.workspaceMinHeight = metadataWorkspaceMinHeight;
+        changed = true;
+    }
+    if (windowState?.workspaceCollapsed !== undefined && next.workspaceCollapsed !== windowState.workspaceCollapsed) {
+        next.workspaceCollapsed = windowState.workspaceCollapsed === true;
+        changed = true;
+    }
+    if (!changed) {
+        return;
+    }
+    activeWindows.value = current.map((entry) => (
+        String(entry?.windowId || '').trim() === normalizedWindowId ? next : entry
+    ));
+}
+
 
 /* ------------------------------------------------------------------
  * WindowContentInner – rendered ONLY after metadata has been fetched so
@@ -214,13 +323,12 @@ function WindowContentInner({window, metadata, services}) {
     const isHostedWorkspaceSurface = String(window?.presentation || '').trim().toLowerCase() === 'hosted'
         && String(window?.region || '').trim().toLowerCase() === 'chat.top';
     const shouldFillParent = isHostedWorkspaceSurface || window.isInTab !== false;
-    const baseKey = (windowKey || '').split('?')[0];
     const defaultDataSourceRef = resolveDefaultDataSourceRef(metadata);
     const initialWindowFormSeed = useMemo(() => ({
         ...(parameters && typeof parameters === 'object' ? parameters : {}),
         ...resolveInitialWindowFormValues(metadata),
     }), [parameters, metadata]);
-    const windowFormSignal = useMemo(() => getFormSignal(`${windowId}:windowForm`), [windowId]);
+    const windowFormSignal = useMemo(() => findFormSignal(`${windowId}:windowForm`), [windowId]);
 
     const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
     const existingContext = getWindowContext(windowId);
@@ -231,6 +339,8 @@ function WindowContentInner({window, metadata, services}) {
         ...initialWindowFormSeed,
         ...liveWindowForm,
     }), [initialWindowFormSeed, liveWindowForm]);
+
+    const desiredWindowTitle = resolveBoundWindowTitle(metadata, window);
 
     useEffect(() => {
         if (!context) {
@@ -260,6 +370,119 @@ function WindowContentInner({window, metadata, services}) {
         } catch (_) {}
         windowFormSignal.value = windowFormSnapshot;
     }, [initialWindowFormSeed, liveWindowForm, windowFormSignal, windowFormSnapshot, windowId, windowKey]);
+
+    useEffect(() => {
+        let title = String(desiredWindowTitle || '').trim();
+        if (!title && typeof document !== 'undefined') {
+            try {
+                const binding = metadata?.window?.titleBinding || metadata?.view?.titleBinding;
+                const domSelector = String(binding?.domSelector || binding?.selectorCss || '').trim();
+                const controlId = String(binding?.controlId || binding?.domControlId || '').trim();
+                if (controlId || domSelector) {
+                    const base = document.querySelector(`[data-workspace-window-id="${windowId}"]`);
+                    const control = domSelector
+                        ? base?.querySelector?.(domSelector)
+                        : base?.querySelector?.(`[data-forge-control-id="${controlId}"]`);
+                    title = String(control?.textContent || '').trim();
+                }
+            } catch (_) {}
+        }
+        if (!title || !windowId) {
+            return;
+        }
+        const current = Array.isArray(activeWindows.peek?.()) ? activeWindows.peek() : [];
+        const matched = current.find((entry) => String(entry?.windowId || '').trim() === String(windowId || '').trim());
+        if (!matched || String(matched?.windowTitle || '').trim() === title) {
+            return;
+        }
+        activeWindows.value = current.map((entry) => (
+            String(entry?.windowId || '').trim() === String(windowId || '').trim()
+                ? { ...entry, windowTitle: title }
+                : entry
+        ));
+
+        if (typeof document !== 'undefined') {
+            try {
+                const workspaceRoot = document.querySelector(`[data-workspace-window-id="${windowId}"]`);
+                const titleNode = workspaceRoot?.querySelector?.('.app-window-split-workspace-title');
+                if (titleNode) {
+                    titleNode.textContent = title;
+                }
+                if (workspaceRoot) {
+                    workspaceRoot.setAttribute('aria-label', `${title} workspace`);
+                }
+            } catch (_) {}
+        }
+    }, [desiredWindowTitle, windowId]);
+
+    useEffect(() => {
+        if (typeof document === 'undefined' || !windowId) {
+            return;
+        }
+        const binding = metadata?.window?.titleBinding || metadata?.view?.titleBinding;
+        const domSelector = String(binding?.domSelector || binding?.selectorCss || '').trim();
+        const controlId = String(binding?.controlId || binding?.domControlId || '').trim();
+        if (!controlId && !domSelector) {
+            return;
+        }
+        try {
+            const base = document.querySelector(`[data-workspace-window-id="${windowId}"]`);
+            const control = domSelector
+                ? base?.querySelector?.(domSelector)
+                : base?.querySelector?.(`[data-forge-control-id="${controlId}"]`);
+            const title = String(control?.textContent || '').trim();
+            if (!title) {
+                return;
+            }
+            const current = Array.isArray(activeWindows.peek?.()) ? activeWindows.peek() : [];
+            const matched = current.find((entry) => String(entry?.windowId || '').trim() === String(windowId || '').trim());
+            if (matched && String(matched?.windowTitle || '').trim() !== title) {
+                activeWindows.value = current.map((entry) => (
+                    String(entry?.windowId || '').trim() === String(windowId || '').trim()
+                        ? { ...entry, windowTitle: title }
+                        : entry
+                ));
+            }
+            const workspaceRoot = document.querySelector(`[data-workspace-window-id="${windowId}"]`);
+            const titleNode = workspaceRoot?.querySelector?.('.app-window-split-workspace-title');
+            if (titleNode && titleNode.textContent !== title) {
+                titleNode.textContent = title;
+            }
+            if (workspaceRoot) {
+                workspaceRoot.setAttribute('aria-label', `${title} workspace`);
+            }
+        } catch (_) {}
+    }, [windowId, metadata, desiredWindowTitle]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !windowId) {
+            return;
+        }
+        let title = String(desiredWindowTitle || '').trim();
+        if (!title) {
+            try {
+                const binding = metadata?.window?.titleBinding || metadata?.view?.titleBinding;
+                const domSelector = String(binding?.domSelector || binding?.selectorCss || '').trim();
+                const controlId = String(binding?.controlId || binding?.domControlId || '').trim();
+                const base = document.querySelector(`[data-workspace-window-id="${windowId}"]`);
+                const control = domSelector
+                    ? base?.querySelector?.(domSelector)
+                    : base?.querySelector?.(`[data-forge-control-id="${controlId}"]`);
+                title = String(control?.textContent || '').trim();
+            } catch (_) {}
+        }
+        if (!title) {
+            return;
+        }
+        try {
+            window.dispatchEvent(new CustomEvent('forge:window-title', {
+                detail: {
+                    windowId,
+                    title,
+                },
+            }));
+        } catch (_) {}
+    }, [windowId, metadata, desiredWindowTitle]);
 
     /* ------------------------------------------------------------
      * Execute window-level onInit events (declared in metadata.window.on)
@@ -563,14 +786,24 @@ export default function WindowContent({window, isInTab = false}) {
     // Settings & connector
     const {endpoints = {}, connectorConfig = {}, services = {}, targetContext = {}, useAuth = () => ({})} = useSetting();
     const auth = useAuth();
+    const prepareConnectorRequest = useMemo(() => (
+        typeof services?.prepareDataConnectorRequest === 'function'
+            ? (request) => services.prepareDataConnectorRequest({
+                ...request,
+                windowState: window,
+            })
+            : undefined
+    ), [services, window]);
     const resolvedServices = useMemo(() => ({
         ...(services || {}),
+        windowState: window,
         __connectorRuntime: {
             endpoints,
             targetContext,
             auth,
+            prepareRequest: prepareConnectorRequest,
         },
-    }), [services, endpoints, targetContext, auth]);
+    }), [services, endpoints, targetContext, auth, prepareConnectorRequest]);
     if (!connectorConfig.window) {
         throw new Error('No connectorConfig.window found');
     }
@@ -649,9 +882,10 @@ export default function WindowContent({window, isInTab = false}) {
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;
         if (!metadata || typeof metadata !== 'object') return;
+        syncWindowRuntimeHints(windowId, metadata, window);
         primeWindowSignals(windowId, metadata);
         setSignalsReady(true);
-    }, [windowId, metadataSignalHandle?.value, resolvedServices]);
+    }, [windowId, metadataSignalHandle?.value, resolvedServices, window]);
 
     const metadata = metadataSignalHandle?.peek?.();
 

@@ -155,41 +155,67 @@ private fun WindowContentBody(
                         horizontalArrangement = Arrangement.spacedBy(spacing)
                     ) {
                         containers.forEachIndexed { index, container ->
-                            val paneScrollState = remember(windowId, container.id) { ScrollState(0) }
-                            val scope = rememberCoroutineScope()
-                            LaunchedEffect(windowId, container.id) {
-                                scope.launch { paneScrollState.scrollTo(0) }
-                            }
-                            Column(
-                                modifier = Modifier
-                                    .weight(fractions.getOrElse(index) { 1f / containers.size.toFloat() })
-                                    .fillMaxHeight()
-                                    .verticalScroll(paneScrollState)
-                            ) {
-                                ContainerRenderer(
-                                    runtime,
-                                    context,
-                                    container,
-                                    selectionModeOverride = null,
-                                    inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                            val paneModifier = Modifier
+                                .weight(fractions.getOrElse(index) { 1f / containers.size.toFloat() })
+                                .fillMaxHeight()
+                            if (containerOwnsScrollSpace(container)) {
+                                Column(modifier = paneModifier) {
+                                    ContainerRenderer(
+                                        runtime,
+                                        context,
+                                        container,
+                                        selectionModeOverride = null,
+                                        inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            } else {
+                                val paneScrollState = remember(windowId, container.id) { ScrollState(0) }
+                                val scope = rememberCoroutineScope()
+                                LaunchedEffect(windowId, container.id) {
+                                    scope.launch { paneScrollState.scrollTo(0) }
+                                }
+                                Column(
+                                    modifier = paneModifier.verticalScroll(paneScrollState)
+                                ) {
+                                    ContainerRenderer(
+                                        runtime,
+                                        context,
+                                        container,
+                                        selectionModeOverride = null,
+                                        inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
                     }
                 } else {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        containers.forEach { container ->
-                            ContainerRenderer(
-                                runtime,
-                                context,
-                                container,
-                                inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
-                            )
+                    if (containers.any(::containerOwnsScrollSpace)) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            containers.forEach { container ->
+                                ContainerRenderer(
+                                    runtime,
+                                    context,
+                                    container,
+                                    inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
+                                )
+                            }
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            containers.forEach { container ->
+                                ContainerRenderer(
+                                    runtime,
+                                    context,
+                                    container,
+                                    inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
+                                )
+                            }
                         }
                     }
                 }
@@ -221,4 +247,12 @@ private fun splitFractions(count: Int): List<Float> {
     if (count == 2) return listOf(0.56f, 0.44f)
     val even = 1f / count.toFloat()
     return List(count) { even }
+}
+
+private fun containerOwnsScrollSpace(container: com.viant.forgeandroid.runtime.ContainerDef): Boolean {
+    val mode = (container.scrollMode ?: "").trim().lowercase()
+    if (mode == "self" || mode == "content") {
+        return true
+    }
+    return container.containers.any(::containerOwnsScrollSpace)
 }

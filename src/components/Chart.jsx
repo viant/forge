@@ -1,14 +1,11 @@
 import React, {useState, useEffect, useMemo} from "react";
 import {useSignals} from '@preact/signals-react/runtime';
 import {
-    Button,
     Dialog,
-    MenuItem,
     RadioGroup,
     Radio,
     Tooltip as BpTooltip,
 } from "@blueprintjs/core";
-import {MultiSelect} from "@blueprintjs/select";
 import { Table as BpTable, Column as BpColumn, Cell as BpCell, ColumnHeaderCell as BpColumnHeaderCell } from "@blueprintjs/table";
 import {
     LineChart,
@@ -33,6 +30,44 @@ import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
 import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
+
+function ChartActionButton({
+    children,
+    onClick,
+    active = false,
+    disabled = false,
+    title = '',
+    style = {},
+}) {
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            title={title || undefined}
+            onClick={onClick}
+            style={{
+                minHeight: 30,
+                padding: '0 12px',
+                borderRadius: 8,
+                border: `1px solid ${active ? '#2f6de1' : '#d0daea'}`,
+                background: active ? '#2f6de1' : '#f5f8fd',
+                color: active ? '#fff' : '#2d5a9e',
+                cursor: disabled ? 'default' : 'pointer',
+                font: 'inherit',
+                fontSize: 12,
+                fontWeight: 600,
+                lineHeight: 1.2,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                ...style,
+            }}
+        >
+            {children}
+        </button>
+    );
+}
 
 function useMeasuredContainer() {
     const ref = React.useRef(null);
@@ -184,6 +219,45 @@ function tooltipFormatterForFormat(formatType) {
     return (value) => formatValueByFormat(value, formatType);
 }
 
+function formatChartErrorMessage(error) {
+    if (error == null) {
+        return "";
+    }
+    if (typeof error === "string") {
+        return error;
+    }
+    if (error instanceof Error) {
+        return error.message || String(error);
+    }
+    if (typeof error === "object") {
+        if (typeof error.message === "string" && error.message.trim()) {
+            return error.message;
+        }
+        try {
+            return JSON.stringify(error);
+        } catch (_) {
+            return "Chart data failed to load.";
+        }
+    }
+    return String(error);
+}
+
+function normalizeSelectorLookupKey(value) {
+    if (Array.isArray(value)) {
+        return normalizeSelectorLookupKey(value[0]);
+    }
+    if (value == null) {
+        return null;
+    }
+    if (typeof value === "object") {
+        if (value.value != null) return normalizeSelectorLookupKey(value.value);
+        if (value.id != null) return normalizeSelectorLookupKey(value.id);
+        if (value.key != null) return normalizeSelectorLookupKey(value.key);
+        return null;
+    }
+    return String(value);
+}
+
 export function formatTimestamp(timestamp, fmt = "MM/dd") {
     if (timestamp === null || timestamp === undefined || timestamp === "") {
         return "";
@@ -219,7 +293,7 @@ function resolveMappedConfigValue(baseContext, entry = {}, valueKey = "", defaul
             scope = baseContext?.signals?.windowForm?.peek?.() || {};
             break;
     }
-    const key = resolveSelector(scope, selector);
+    const key = normalizeSelectorLookupKey(resolveSelector(scope, selector));
     if (key == null) {
         return entry?.[valueKey];
     }
@@ -264,6 +338,10 @@ function normalizeChartExtent(value, fallback) {
         return normalized || fallback;
     }
     return fallback;
+}
+
+export function resolveEmptyChartMessage(metrics = {}) {
+    return 'No data for the selected period.';
 }
 
 function fillMissingTemporalBuckets(chartData = [], xAxisKey = "", seriesDefinitions = [], step = "") {
@@ -402,7 +480,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     scope = context?.signals?.windowForm?.value || {};
                     break;
             }
-            const key = resolveSelector(scope, selector);
+            const key = normalizeSelectorLookupKey(resolveSelector(scope, selector));
             if (key != null && refs[key]) {
                 directRef = refs[key];
             }
@@ -423,6 +501,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     }, [chartContext, chart?.dataSourceRefSelector, chart?.dataSourceSelector, container?.id, context?.identity?.dataSourceRef]);
     const resolvedTickFormat = resolveMappedConfigValue(context, xAxis, "tickFormat", "windowForm");
     const { collection, loading, error } = useDataSourceState(chartContext);
+    const chartMetrics = chartContext?.signals?.metrics?.value || {};
     const effectiveCollection = Array.isArray(container?.collection) ? container.collection : collection;
     const chartSourceKey = useMemo(() => {
         const dataSourceId = String(chartContext?.identity?.dataSourceId || chartContext?.identity?.dataSourceRef || "");
@@ -549,20 +628,6 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         setSelectedDataKeys([]);
     };
 
-    const renderDataKeyItem = (dataKey, {modifiers, handleClick}) => {
-        const seriesDef = seriesDefinitions.find((entry) => entry.value === dataKey);
-        return (
-            <MenuItem
-                key={dataKey}
-                text={seriesDef?.label || dataKey}
-                active={modifiers.active}
-                icon={selectedDataKeys.includes(dataKey) ? "tick" : "blank"}
-                onClick={handleClick}
-                shouldDismissPopover={false}
-            />
-        );
-    };
-
     // Handle valueKey change
     const handleValueKeyChange = (e) => {
         const newValueKey = e.target.value;
@@ -575,6 +640,13 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const legendProps = embedded
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
         : {};
+    const axisTickStyle = embedded
+        ? {fontSize: 11, fill: "#5f6b7c"}
+        : {fontSize: 12, fill: "#667085"};
+    const axisLabelStyle = embedded
+        ? undefined
+        : {fontSize: 12, fill: "#667085", fontWeight: 500};
+    const gridStroke = embedded ? "rgba(95,107,124,0.18)" : "rgba(152,162,179,0.22)";
     const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
     const showChartLegend = !showEmbeddedSeriesSelector;
 
@@ -600,27 +672,33 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
 
     const sharedChartChildren = (
         <>
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
+            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={gridStroke}/>
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
                 tickFormatter={(val) => formatTimestamp(val, resolvedTickFormat)}
-                tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                tick={axisTickStyle}
+                axisLine={false}
+                tickLine={false}
                 minTickGap={embedded ? 24 : 5}
                 label={{
                     value: embedded ? "" : xAxis.label,
                     position: "insideBottomRight",
                     offset: 0,
+                    ...axisLabelStyle,
                 }}
             />
             <YAxis
                 yAxisId="left"
-                width={embedded ? 56 : 100}
+                width={embedded ? 56 : 76}
                 tickFormatter={createAxisTickFormatter(leftAxis.format)}
-                tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                tick={axisTickStyle}
+                axisLine={false}
+                tickLine={false}
                 label={{
                     value: embedded ? "" : (leftAxis.label || yAxisLabel),
                     angle: -90,
                     position: "insideLeft",
+                    ...axisLabelStyle,
                 }}
                 domain={leftAxis.domain}
             />
@@ -628,13 +706,16 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 <YAxis
                     yAxisId="right"
                     orientation="right"
-                    width={embedded ? 56 : 80}
+                    width={embedded ? 56 : 68}
                     tickFormatter={createAxisTickFormatter(rightAxis?.format)}
-                    tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                    tick={axisTickStyle}
+                    axisLine={false}
+                    tickLine={false}
                     label={rightAxis?.label ? {
                         value: embedded ? "" : rightAxis.label,
                         angle: 90,
                         position: "insideRight",
+                        ...axisLabelStyle,
                     } : undefined}
                     domain={rightAxis?.domain}
                 />
@@ -893,6 +974,75 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const hasRenderableSeriesValues = isPieChart
         ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)))
         : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => Number.isFinite(Number(row?.[entry.value]))));
+    const hasResolvedMetricsPayload = chartMetrics && typeof chartMetrics === 'object' && Object.keys(chartMetrics).length > 0;
+    const showResolvedEmptyStateWhileLoading =
+        loading
+        && !staleWhileLoading
+        && !error
+        && !hasChartRows
+        && hasResolvedMetricsPayload;
+    const emptyChartMessage = resolveEmptyChartMessage(chartMetrics);
+    const showSeriesSelectionControls = !showResolvedEmptyStateWhileLoading;
+
+    const renderSeriesSelectionControls = () => (
+        <div
+            aria-label="Chart series selector"
+            style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "8px",
+                marginTop: 8,
+                marginBottom: 8,
+            }}
+        >
+            {seriesToggleOptions.map((option) => {
+                const checked = selectedDataKeys.includes(option.value);
+                return (
+                    <label
+                        key={option.value}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "6px 10px",
+                            borderRadius: 999,
+                            border: checked ? "1px solid rgba(47,109,225,0.28)" : "1px solid rgba(138,155,168,0.18)",
+                            background: checked ? "rgba(47,109,225,0.08)" : "#fff",
+                            color: checked ? "#2f6de1" : "#4b5563",
+                            cursor: "pointer",
+                            userSelect: "none",
+                            fontSize: 12,
+                            lineHeight: 1.2,
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => handleDataKeySelect(option.value)}
+                            style={{margin: 0}}
+                        />
+                        <span
+                            aria-hidden="true"
+                            style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: "999px",
+                                background: option.color,
+                                opacity: checked ? 1 : 0.4,
+                            }}
+                        />
+                        <span>{option.label}</span>
+                    </label>
+                );
+            })}
+            <ChartActionButton
+                title="Clear series selection"
+                onClick={handleClearSelection}
+            >
+                Clear
+            </ChartActionButton>
+        </div>
+    );
 
     const resolvedWidth = isHorizontalBar
         ? normalizeChartExtent(width, embedded ? "82%" : "85%")
@@ -918,7 +1068,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             data-chart-loading={loading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
         >
-            {showEmbeddedSeriesSelector ? (
+            {showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
                 <div
                     aria-label="Chart series selector"
                     style={{
@@ -967,7 +1117,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     })}
                 </div>
             ) : null}
-            {!embedded ? (
+            {!embedded && showSeriesSelectionControls ? (
                 <>
                     {!directSeriesChart && !isPieChart ? (
                         <RadioGroup
@@ -982,52 +1132,30 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                         </RadioGroup>
                     ) : null}
 
-                    <MultiSelect
-                        items={availableDataKeys}
-                        itemRenderer={renderDataKeyItem}
-                        onItemSelect={handleDataKeySelect}
-                        tagRenderer={(dataKey) => seriesDefinitions.find((entry) => entry.value === dataKey)?.label || dataKey}
-                        selectedItems={selectedDataKeys}
-                        fill={true}
-                        placeholder="Select data keys..."
-                        popoverProps={{minimal: true}}
-                        resetOnSelect={false}
-                        tagInputProps={{
-                            onRemove: (dataKey) => {
-                                handleDataKeySelect(dataKey);
-                            },
-                            rightElement: (
-                                <Button
-                                    icon="cross"
-                                    minimal={true}
-                                    onClick={handleClearSelection}
-                                />
-                            ),
-                        }}
-                    />
+                    {renderSeriesSelectionControls()}
                     <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8}}>
                         <div style={{display: "flex", gap: 6}}>
-                            <Button small minimal={viewMode !== "chart"} intent={viewMode === "chart" ? "primary" : "none"} onClick={() => setViewMode("chart")}>
+                            <ChartActionButton active={viewMode === "chart"} onClick={() => setViewMode("chart")}>
                                 Chart
-                            </Button>
-                            <Button small minimal={viewMode !== "table"} intent={viewMode === "table" ? "primary" : "none"} onClick={() => setViewMode("table")}>
+                            </ChartActionButton>
+                            <ChartActionButton active={viewMode === "table"} onClick={() => setViewMode("table")}>
                                 Table
-                            </Button>
+                            </ChartActionButton>
                         </div>
                         {viewMode === "table" ? (
                             <div style={{display: "flex", gap: 6}}>
-                                <Button small icon="cog" onClick={() => setShowColumnDialog(true)}>Columns</Button>
-                                <Button small icon="download" onClick={downloadCsv}>CSV</Button>
+                                <ChartActionButton onClick={() => setShowColumnDialog(true)}>Columns</ChartActionButton>
+                                <ChartActionButton onClick={downloadCsv}>CSV</ChartActionButton>
                             </div>
                         ) : null}
                     </div>
                 </>
             ) : null}
-            {loading && !staleWhileLoading && (
+            {loading && !staleWhileLoading && !showResolvedEmptyStateWhileLoading && (
                 <div style={{textAlign: 'center', padding: 4}}>Loading…</div>
             )}
             {error && (
-                <div style={{color: 'red', padding: 4}}>{`${error}`}</div>
+                <div style={{color: 'red', padding: 4}}>{formatChartErrorMessage(error)}</div>
             )}
 
             {viewMode === "chart" ? (
@@ -1046,7 +1174,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     >
                         Select at least one series to render the chart.
                     </div>
-                ) : (!hasChartRows || !hasRenderableSeriesValues) && !loading && !error ? (
+                ) : (!hasChartRows || !hasRenderableSeriesValues) && (!loading || showResolvedEmptyStateWhileLoading) && !error ? (
                     <div
                         style={{
                             height: "100%",
@@ -1059,7 +1187,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                             fontSize: 12,
                         }}
                     >
-                        No data for the selected period.
+                        {emptyChartMessage}
                     </div>
                 ) : chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
                     <ResponsiveContainer width={chartSize.width} height={chartSize.height}>

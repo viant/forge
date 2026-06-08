@@ -269,30 +269,10 @@ extension ForgeRuntime {
     ) async -> [String: JSONValue] {
         guard !args.execution.parameters.isEmpty else { return [:] }
         let metadata = await runtime.windowMetadata(id: windowID)
-        let windowForm = await runtime.windowFormJSONValue(windowID: windowID)
-        var snapshots: [String: ParameterResolver.DataSourceSnapshot] = [:]
-        var dataSourceRefs = Set(metadata?.dataSources.keys.map { $0 } ?? [])
-        if let dataSourceRef = args.context?.dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines),
-           !dataSourceRef.isEmpty {
-            dataSourceRefs.insert(dataSourceRef)
-        }
-        for ref in dataSourceRefs {
-            let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: ref)
-            let form = await runtime.dataSourceRuntime.form(dataSourceID: dataSourceID)
-            let selection = await runtime.dataSourceRuntime.selection(dataSourceID: dataSourceID)
-            let input = await runtime.dataSourceRuntime.input(dataSourceID: dataSourceID)
-            snapshots[ref] = ParameterResolver.DataSourceSnapshot(
-                selectionMode: metadata?.dataSources[ref]?.selectionMode,
-                form: form,
-                selection: selection,
-                input: input
-            )
-        }
-        let context = ParameterResolver.ResolutionContext(
-            identityDataSourceRef: args.context?.dataSourceRef ?? "",
-            dataSources: snapshots,
-            windowForm: windowForm,
-            metadata: metadata
+        let context = await runtime.buildParameterResolutionContext(
+            windowID: windowID,
+            metadata: metadata,
+            identityDataSourceRef: args.context?.dataSourceRef ?? ""
         )
         return ParameterResolver.resolve(parameters: args.execution.parameters, context: context)
     }

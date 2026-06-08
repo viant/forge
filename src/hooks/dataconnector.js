@@ -39,6 +39,7 @@ export function createDataConnector(dataSource, runtime = {}) {
         endpoints = {},
         targetContext = {},
         auth = {},
+        prepareRequest,
     } = runtime || {};
     const {authStates, defaultAuthProvider} = auth;
     const {paging, parameters = []} = dataSource;
@@ -58,6 +59,30 @@ export function createDataConnector(dataSource, runtime = {}) {
                 }
             }
         }
+    }
+
+    function applyRequestPreparation({url, method, headers, queryParams, body}) {
+        if (typeof prepareRequest !== 'function') {
+            return {url, method, headers, queryParams, body};
+        }
+        const overrides = prepareRequest({
+            dataSource,
+            url,
+            method,
+            headers,
+            queryParams,
+            body,
+            endpoints,
+            targetContext,
+            auth,
+        }) || {};
+        return {
+            url: typeof overrides.url === 'string' && overrides.url.trim() ? overrides.url : url,
+            method: typeof overrides.method === 'string' && overrides.method.trim() ? overrides.method : method,
+            headers: overrides.headers && typeof overrides.headers === 'object' ? overrides.headers : headers,
+            queryParams: overrides.queryParams instanceof URLSearchParams ? overrides.queryParams : queryParams,
+            body: Object.prototype.hasOwnProperty.call(overrides, 'body') ? overrides.body : body,
+        };
     }
 
     function summarizeErrorPayload(raw) {
@@ -197,7 +222,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     async function request({query = {}, inputParameters = []}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
-            const queryParams = new URLSearchParams();
+            let queryParams = new URLSearchParams();
 
             // Append query parameters
             Object.entries(query).forEach(([key, val]) => {
@@ -210,6 +235,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             if (dataSource?.service?.includeTargetContext) {
                 appendTargetContextQuery(queryParams, targetContext);
             }
+            ({url, method, headers, queryParams, body} = applyRequestPreparation({url, method, headers, queryParams, body}));
             const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
 
             const request = {method, headers};
@@ -241,7 +267,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     async function get({filter = {}, page, inputParameters = {}}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
-            const queryParams = new URLSearchParams();
+            let queryParams = new URLSearchParams();
             const requestMethod = String(method || 'GET').toUpperCase();
             const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
             const pagingValues = resolvePagingValues(page, paging);
@@ -269,17 +295,28 @@ export function createDataConnector(dataSource, runtime = {}) {
             if (dataSource?.service?.includeTargetContext) {
                 appendTargetContextQuery(queryParams, targetContext);
             }
+            let payload = requestMethod !== 'GET' && isDatasourceFetchRoute
+                ? {
+                    inputs: buildDatasourceFetchInputs({
+                        inputParameters: effectiveInputParameters,
+                        filter,
+                        pagingValues,
+                    }),
+                }
+                : body;
+            ({url, method, headers, queryParams, body: payload} = applyRequestPreparation({
+                url,
+                method: requestMethod,
+                headers,
+                queryParams,
+                body: payload,
+            }));
 
             const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
-            const request = {method: requestMethod, headers};
+            const request = {method: String(method || requestMethod).toUpperCase(), headers};
 
             if (requestMethod !== 'GET' && isDatasourceFetchRoute) {
-                const inputs = buildDatasourceFetchInputs({
-                    inputParameters: effectiveInputParameters,
-                    filter,
-                    pagingValues,
-                });
-                request["body"] = JSON.stringify({ inputs });
+                request["body"] = JSON.stringify(payload);
                 request.headers = {
                     ...headers,
                     "Content-Type": "application/json",
@@ -329,15 +366,23 @@ export function createDataConnector(dataSource, runtime = {}) {
      */
     async function post({body = {}, inputParameters = {}}) {
         try {
-            let {url, headers} = getUrlAndHeaders('POST');
-            const queryParams = new URLSearchParams();
+            let {method, url, headers} = getUrlAndHeaders('POST');
+            let queryParams = new URLSearchParams();
 
             // apply path/query/header/body parameters
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            ({url, method, headers, queryParams, body} = applyRequestPreparation({
+                url,
+                method: String(method || 'POST').toUpperCase(),
+                headers,
+                queryParams,
+                body,
+            }));
+            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
             const log = getLogger('connector');
-            try { log.debug('[request][POST]', { url, body }); } catch(_) {}
-            const resp = await fetch(url, {
-                method: "POST",
+            try { log.debug('[request][POST]', { url: finalUrl, body }); } catch(_) {}
+            const resp = await fetch(finalUrl, {
+                method: String(method || 'POST').toUpperCase(),
                 headers: {...headers, "Content-Type": "application/json"},
                 body: JSON.stringify(body),
             });
@@ -347,7 +392,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 throw err;
             }
             const json = await resp.json();
-            try { log.debug('[response][POST]', { url, status: resp.status }); } catch(_) {}
+            try { log.debug('[response][POST]', { url: finalUrl, status: resp.status }); } catch(_) {}
             return json;
         } catch (err) {
             console.error("Failed to fetch data", err);
@@ -362,11 +407,19 @@ export function createDataConnector(dataSource, runtime = {}) {
      */
     async function patch({body = {}, inputParameters = {}}) {
         try {
-            let {url, headers} = getUrlAndHeaders('PATCH');
-            const queryParams = new URLSearchParams();
+            let {method, url, headers} = getUrlAndHeaders('PATCH');
+            let queryParams = new URLSearchParams();
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
-            const resp = await fetch(url, {
-                method: "PATCH",
+            ({url, method, headers, queryParams, body} = applyRequestPreparation({
+                url,
+                method: String(method || 'PATCH').toUpperCase(),
+                headers,
+                queryParams,
+                body,
+            }));
+            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const resp = await fetch(finalUrl, {
+                method: String(method || 'PATCH').toUpperCase(),
                 headers: {...headers, "Content-Type": "application/json"},
                 body: JSON.stringify(body),
             });
@@ -388,13 +441,19 @@ export function createDataConnector(dataSource, runtime = {}) {
      */
     async function put({body = {}, inputParameters={}}) {
         try {
-            let {url, headers} = getUrlAndHeaders('PUT');
-            const queryParams = new URLSearchParams();
-
-
-            url = applyParameters({url, headers,  body}, inputParameters);
-            const resp = await fetch(url, {
-                method: "PUT",
+            let {method, url, headers} = getUrlAndHeaders('PUT');
+            let queryParams = new URLSearchParams();
+            url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            ({url, method, headers, queryParams, body} = applyRequestPreparation({
+                url,
+                method: String(method || 'PUT').toUpperCase(),
+                headers,
+                queryParams,
+                body,
+            }));
+            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const resp = await fetch(finalUrl, {
+                method: String(method || 'PUT').toUpperCase(),
                 headers: {...headers, "Content-Type": "application/json"},
                 body: JSON.stringify(body),
             });
@@ -416,9 +475,18 @@ export function createDataConnector(dataSource, runtime = {}) {
             throw new Error("DELETE requires 'id'");
         }
         try {
-            const {url, headers} = getUrlAndHeaders('DELETE');
-            const finalUrl = `${url}/${id}`;
-            const resp = await fetch(finalUrl, {method: "DELETE", headers});
+            let {method, url, headers} = getUrlAndHeaders('DELETE');
+            let queryParams = new URLSearchParams();
+            url = `${url}/${id}`;
+            ({url, method, headers, queryParams} = applyRequestPreparation({
+                url,
+                method: String(method || 'DELETE').toUpperCase(),
+                headers,
+                queryParams,
+                body: undefined,
+            }));
+            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const resp = await fetch(finalUrl, {method: String(method || 'DELETE').toUpperCase(), headers});
             if (!resp.ok) {
                 throw new Error(`DELETE error: ${resp.statusText}`);
             }
@@ -441,9 +509,16 @@ export function createDataConnector(dataSource, runtime = {}) {
 }
 
 function useDataConnector(dataSource) {
-    const {endpoints = {}, useAuth = () => ({}), targetContext = {}} = useSetting();
+    const {endpoints = {}, useAuth = () => ({}), targetContext = {}, services = {}} = useSetting();
     const auth = useAuth();
-    return createDataConnector(dataSource, { endpoints, targetContext, auth });
+    return createDataConnector(dataSource, {
+        endpoints,
+        targetContext,
+        auth,
+        prepareRequest: typeof services?.prepareDataConnectorRequest === 'function'
+            ? services.prepareDataConnectorRequest
+            : undefined,
+    });
 }
 
 export default useDataConnector;
