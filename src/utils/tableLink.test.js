@@ -111,3 +111,12 @@ assert.equal(
   }),
   '$12,346',
 );
+
+assert.equal(
+  resolveTableCellText({
+    row: { lifetimeSpend: null },
+    column: { id: 'lifetimeSpend', name: 'Lifetime Spend', emptyText: 'No data' },
+    value: null,
+  }),
+  'No data',
+);

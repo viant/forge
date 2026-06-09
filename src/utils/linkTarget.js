@@ -22,6 +22,17 @@ function normalizeLinkText(value, fallbackText = '') {
     return fallbackText;
 }
 
+function resolveTemplateText(template = '', holder = null) {
+    const source = normalizeString(template);
+    if (!source) {
+        return '';
+    }
+    return source.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, selector) => {
+        const value = resolveKey(holder || {}, String(selector || '').trim());
+        return value == null ? '' : String(value);
+    }).replace(/\s{2,}/g, ' ').trim();
+}
+
 function resolveContextSourceValue({ source = 'value', selector = '', context = null, row = null, value = null } = {}) {
     switch (String(source || 'value').trim().toLowerCase()) {
         case 'row':
@@ -127,7 +138,19 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
                 value,
             })
             : linkConfig.windowTitle;
-        const windowTitle = normalizeLinkText(titleSource, '');
+        const titleTemplate = normalizeString(linkConfig.windowTitleTemplate);
+        const titleTemplateSource = titleTemplate
+            ? resolveContextSourceValue({
+                source: linkConfig.windowTitleSource || 'row',
+                selector: '',
+                context,
+                row,
+                value,
+            })
+            : null;
+        const windowTitle = titleTemplate
+            ? resolveTemplateText(titleTemplate, titleTemplateSource)
+            : normalizeLinkText(titleSource, '');
         return {
             kind: 'window',
             text,

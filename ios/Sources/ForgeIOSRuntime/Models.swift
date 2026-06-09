@@ -712,6 +712,16 @@ public struct DataSourceServiceDef: Codable, Sendable {
     public let endpoint: String?
     public let uri: String?
     public let method: String?
+
+    public init(
+        endpoint: String? = nil,
+        uri: String? = nil,
+        method: String? = nil
+    ) {
+        self.endpoint = endpoint
+        self.uri = uri
+        self.method = method
+    }
 }
 
 public struct DataSourceSelectorDef: Codable, Sendable {
@@ -2261,6 +2271,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
     public let label: String?
     public let type: String?
     public let format: String?
+    public let emptyText: String?
     public let link: LinkDef?
     public let width: Int?
     public let icon: String?
@@ -2274,6 +2285,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         case label
         case type
         case format
+        case emptyText
         case link
         case width
         case icon
@@ -2288,6 +2300,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         label: String? = nil,
         type: String? = nil,
         format: String? = nil,
+        emptyText: String? = nil,
         link: LinkDef? = nil,
         width: Int? = nil,
         icon: String? = nil,
@@ -2300,6 +2313,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         self.label = label
         self.type = type
         self.format = format
+        self.emptyText = emptyText
         self.link = link
         self.width = width
         self.icon = icon
@@ -2317,6 +2331,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
             self.label = trimmed
             self.type = nil
             self.format = nil
+            self.emptyText = nil
             self.link = nil
             self.width = nil
             self.icon = nil
@@ -2332,6 +2347,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         label = try container.decodeIfPresent(String.self, forKey: .label)
         type = try container.decodeIfPresent(String.self, forKey: .type)
         format = try container.decodeIfPresent(String.self, forKey: .format)
+        emptyText = try container.decodeIfPresent(String.self, forKey: .emptyText)
         link = try container.decodeIfPresent(LinkDef.self, forKey: .link)
         width = try container.decodeIfPresent(Int.self, forKey: .width)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
@@ -2348,6 +2364,7 @@ public struct LinkDef: Codable, Sendable {
     public let windowTitle: String?
     public let windowTitleSource: String?
     public let windowTitleSelector: String?
+    public let windowTitleTemplate: String?
     public let text: String?
     public let textSource: String?
     public let textSelector: String?
@@ -2366,6 +2383,7 @@ public struct LinkDef: Codable, Sendable {
         windowTitle: String? = nil,
         windowTitleSource: String? = nil,
         windowTitleSelector: String? = nil,
+        windowTitleTemplate: String? = nil,
         text: String? = nil,
         textSource: String? = nil,
         textSelector: String? = nil,
@@ -2383,6 +2401,7 @@ public struct LinkDef: Codable, Sendable {
         self.windowTitle = windowTitle
         self.windowTitleSource = windowTitleSource
         self.windowTitleSelector = windowTitleSelector
+        self.windowTitleTemplate = windowTitleTemplate
         self.text = text
         self.textSource = textSource
         self.textSelector = textSelector

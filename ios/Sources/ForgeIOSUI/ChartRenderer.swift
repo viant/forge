@@ -40,7 +40,7 @@ public struct ChartRenderer: View {
                     .foregroundStyle(.secondary)
             } else if rows.isEmpty {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground))
+                    .fill(Color.forgeSystemBackground)
                     .frame(height: compactChartHeight)
                     .overlay(
                         VStack(spacing: 10) {
@@ -64,7 +64,7 @@ public struct ChartRenderer: View {
             }
         }
         .padding(isCompactPresentation ? 10 : 12)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : 18))
+        .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : 18))
         .overlay(
             RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : 18)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)

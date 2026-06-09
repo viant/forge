@@ -206,6 +206,41 @@ func (l *Service) ResolveWindowBase(ctx context.Context, basePath string, target
 	return "", fmt.Errorf("open %s.yaml: file does not exist", basePath)
 }
 
+func (l *Service) ResolveWindowAsset(ctx context.Context, basePath, ext string, target *TargetContext) (string, error) {
+	extension := strings.TrimSpace(ext)
+	if extension == "" {
+		return "", fmt.Errorf("asset extension is required")
+	}
+	if !strings.HasPrefix(extension, ".") {
+		extension = "." + extension
+	}
+	baseDir, leaf := splitMetaBase(basePath)
+	candidates := make([]string, 0)
+	if target == nil {
+		candidates = append(candidates, basePath)
+	} else {
+		for _, branch := range branchPathCandidates(target) {
+			candidates = append(candidates, url.Join(baseDir, branch, leaf))
+		}
+		for _, branch := range branchPathCandidates(target) {
+			candidates = append(candidates, url.Join(baseDir, "shared", branch, leaf))
+		}
+		candidates = append(candidates, url.Join(baseDir, "shared", leaf))
+		candidates = append(candidates, basePath)
+	}
+	candidates = uniqueStrings(candidates)
+	for _, candidate := range candidates {
+		ok, err := l.Exists(ctx, candidate+extension)
+		if err != nil {
+			continue
+		}
+		if ok {
+			return candidate + extension, nil
+		}
+	}
+	return "", fmt.Errorf("open %s%s: file does not exist", basePath, extension)
+}
+
 func (l *Service) resolveImportURL(ctx context.Context, baseDir, importPath string, target *TargetContext) (string, error) {
 	candidates := importCandidates(baseDir, importPath, target)
 	for _, candidate := range candidates {

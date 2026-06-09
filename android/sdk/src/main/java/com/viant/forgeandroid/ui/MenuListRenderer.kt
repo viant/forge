@@ -77,7 +77,12 @@ fun MenuListRenderer(
         windowForm.toString()
     ) {
         relevantContexts.forEach { context ->
-            if (context.dataSource.autoFetch != false) {
+            val dependsOnBaseMetrics = baseContext != null && dataSourceDependsOnMetricsContext(
+                context.dataSource,
+                baseContext.dataSourceRef
+            )
+            val baseReady = baseMetrics.isNotEmpty() || baseRows.isNotEmpty()
+            if (context.dataSource.autoFetch != false && (!dependsOnBaseMetrics || baseReady)) {
                 context.fetchCollection()
             }
         }
@@ -121,6 +126,24 @@ fun MenuListRenderer(
         useInlineRow -> InlineList(runtime, window, baseContext, container, visibleItems)
         useSummaryCards -> SummaryList(window, baseContext, container, visibleItems)
         else -> PlainList(runtime, window, baseContext, container, visibleItems)
+    }
+}
+
+private fun dataSourceDependsOnMetricsContext(
+    dataSource: com.viant.forgeandroid.runtime.DataSourceDef,
+    baseDataSourceRef: String
+): Boolean {
+    val normalizedBaseRef = baseDataSourceRef.trim()
+    if (normalizedBaseRef.isEmpty()) {
+        return false
+    }
+    return dataSource.parameters.any { parameter ->
+        val source = ((parameter.from ?: "").ifBlank { parameter.input ?: "" }).trim().lowercase()
+        if (source != "metrics") {
+            return@any false
+        }
+        val location = parameter.location?.trim().orEmpty()
+        location.startsWith("$normalizedBaseRef.")
     }
 }
 
@@ -305,7 +328,7 @@ private fun PlainList(
                     .fillMaxWidth()
                     .clickable {
                         if (item.type?.trim()?.lowercase() == "link" && item.link != null) {
-                            openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rows, rawValue)
+                            openLinkedWindow(runtime, window, item, form, metrics, windowForm, rawValue)
                         } else if (item.on.isNotEmpty()) {
                             val args = mapOf("windowId" to window.windowId)
                             item.on.forEach { exec ->
@@ -384,7 +407,7 @@ private fun InlineItem(
                 if (href.isNotEmpty()) {
                     uriHandler.openUri(href)
                 } else {
-                    openLinkedWindow(runtime, window, container, item, form, metrics, windowForm, rows, rawValue)
+                    openLinkedWindow(runtime, window, item, form, metrics, windowForm, rawValue)
                 }
             }
         }
@@ -459,12 +482,10 @@ private fun resolveMenuListContext(
 private fun openLinkedWindow(
     runtime: ForgeRuntime,
     window: WindowContext,
-    container: ContainerDef,
     item: ItemDef,
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    rows: List<Map<String, Any?>>,
     rawValue: Any?
 ) {
     val link = item.link ?: return
@@ -472,98 +493,35 @@ private fun openLinkedWindow(
     if (windowKey.isEmpty()) {
         return
     }
-    val currentState = runtime.windowState(window.windowId)
-    val replaceHostedWindow =
-        currentState?.presentation?.trim()?.lowercase() == "hosted"
-            && currentState.region?.trim()?.lowercase() == "chat.top"
-            && link.newInstance != true
-    val title = resolveLinkWindowTitle(item, link, rawValue)
-    val parameters = resolveLinkParameters(item, link, form, metrics, windowForm, rows, rawValue)
-    runtime.openWindow(
-        windowKey = windowKey,
-        title = title,
-        inTab = link.inTab ?: currentState?.inTab ?: true,
-        parameters = parameters,
-        windowIdOverride = if (replaceHostedWindow) currentState?.windowId else null,
-        conversationId = currentState?.conversationId,
-        presentation = currentState?.presentation,
-        region = currentState?.region,
-        workspaceSharePct = currentState?.workspaceSharePct,
-        workspaceMinHeight = currentState?.workspaceMinHeight,
-        parentKey = currentState?.parentKey,
-        isModal = link.modal == true
+    val resolutionContext = LinkResolutionContext(
+        row = emptyMap(),
+        value = rawValue,
+        form = form,
+        metrics = metrics,
+        windowForm = windowForm
     )
-}
-
-private fun resolveLinkWindowTitle(
-    item: ItemDef,
-    link: LinkDef,
-    rawValue: Any?
-): String {
-    val source = link.windowTitleSource?.trim()?.lowercase().orEmpty()
-    if (source == "value") {
-        val value = rawValue?.toString()?.trim().orEmpty()
-        if (value.isNotEmpty()) {
-            return value
-        }
-    }
-    val explicit = link.windowTitle?.trim().orEmpty()
-    if (explicit.isNotEmpty()) {
-        return explicit
-    }
-    return item.label?.takeIf { it.isNotBlank() }
-        ?: rawValue?.toString()?.takeIf { it.isNotBlank() }
-        ?: windowKeyFallback(link)
+    openResolvedWindowLink(
+        runtime = runtime,
+        window = window,
+        link = WindowLinkTarget(
+            windowKey = windowKey,
+            title = resolveLinkWindowTitleFromContext(
+                link = link,
+                context = resolutionContext,
+                fallbackTitle = item.label?.takeIf { it.isNotBlank() }
+                    ?: rawValue?.toString()?.takeIf { it.isNotBlank() }
+                    ?: windowKeyFallback(link)
+            ),
+            parameters = resolveLinkParametersFromContext(link, resolutionContext),
+            inTab = link.inTab != false,
+            modal = link.modal == true,
+            newInstance = link.newInstance == true
+        )
+    )
 }
 
 private fun windowKeyFallback(link: LinkDef): String {
     return link.windowKey?.trim().orEmpty().ifBlank { "window" }
-}
-
-private fun resolveLinkParameters(
-    item: ItemDef,
-    link: LinkDef,
-    form: Map<String, Any?>,
-    metrics: Map<String, Any?>,
-    windowForm: Map<String, Any?>,
-    rows: List<Map<String, Any?>>,
-    rawValue: Any?
-): Map<String, Any?> {
-    return link.parameters.mapNotNull { (key, spec) ->
-        resolveLinkParameterValue(item, spec, form, metrics, windowForm, rows, rawValue)?.let { key to it }
-    }.toMap()
-}
-
-private fun resolveLinkParameterValue(
-    item: ItemDef,
-    spec: JsonElement,
-    form: Map<String, Any?>,
-    metrics: Map<String, Any?>,
-    windowForm: Map<String, Any?>,
-    rows: List<Map<String, Any?>>,
-    rawValue: Any?
-): Any? {
-    val obj = spec as? kotlinx.serialization.json.JsonObject ?: return jsonElementToAny(spec)
-    val source = obj["source"].asString()?.trim()?.lowercase().orEmpty().ifBlank { "value" }
-    val selector = (obj["selector"].asString()
-        ?: obj["field"].asString()
-        ?: obj["location"].asString()
-        ?: "").trim()
-    val wrap = obj["wrap"].asString()?.trim()?.lowercase().orEmpty()
-
-    val candidate = when (source) {
-        "metrics" -> if (selector.isEmpty()) {
-            if (metrics.isNotEmpty()) metrics else rows.firstOrNull().orEmpty()
-        } else {
-            SelectorUtil.resolve(metrics, selector)
-                ?: SelectorUtil.resolve(rows.firstOrNull().orEmpty(), selector)
-        }
-        "form" -> if (selector.isEmpty()) form else SelectorUtil.resolve(form, selector)
-        "windowform" -> if (selector.isEmpty()) windowForm else SelectorUtil.resolve(windowForm, selector)
-        "value" -> rawValue
-        else -> rawValue
-    }
-    return if (wrap == "array" && candidate != null) listOf(candidate) else candidate
 }
 
 private fun isItemVisible(

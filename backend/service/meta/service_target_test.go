@@ -86,6 +86,28 @@ func TestResolveWindowBase_BroadTargetBranches(t *testing.T) {
 	}
 }
 
+func TestResolveWindowAsset_BroadTargetBranches(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "window", "order")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "web", "main.js"), "(() => ({}))()")
+	mustWriteMetaFile(t, filepath.Join(base, "web", "main.yaml"), "namespace: web\nview:\n  content: {}\n")
+
+	service := New(afs.New(), filepath.Join(root, "window"))
+	ctx := context.Background()
+
+	got, err := service.ResolveWindowAsset(ctx, "order/main", ".js", &TargetContext{
+		Platform:   "web",
+		FormFactor: "desktop",
+		Surface:    "app",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "order/shared/web/main.js" {
+		t.Fatalf("expected %q, got %q", "order/shared/web/main.js", got)
+	}
+}
+
 func TestLoadWithTarget_ImportFallbacksToShared(t *testing.T) {
 	root := t.TempDir()
 	base := filepath.Join(root, "window", "demo")

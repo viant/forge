@@ -343,6 +343,79 @@ final class ForgeIOSTests: XCTestCase {
         )
     }
 
+    func testResolveColumnLinkTargetBuildsWindowTargetFromRowMetadata() {
+        let column = ColumnDef(
+            id: "adOrderName",
+            type: "link",
+            link: LinkDef(
+                kind: "window",
+                windowKey: "order",
+                windowTitleSource: "row",
+                windowTitleTemplate: "{{adOrderName}} ({{adOrderId}})",
+                parameters: [
+                    "AdOrderId": .object([
+                        "source": .string("row"),
+                        "selector": .string("adOrderId"),
+                        "wrap": .string("array")
+                    ])
+                ]
+            )
+        )
+
+        let target = resolveColumnLinkTargetFromContext(
+            column: column,
+            context: LinkResolutionContext(
+                row: [
+                    "adOrderId": .number(2660900),
+                    "adOrderName": .string("OLV_BAU_AUS")
+                ],
+                value: .string("OLV_BAU_AUS")
+            )
+        )
+
+        guard case .window(let link)? = target else {
+            return XCTFail("Expected a window link target")
+        }
+        XCTAssertEqual(link.windowKey, "order")
+        XCTAssertEqual(link.title, "OLV_BAU_AUS (2660900)")
+        XCTAssertEqual(link.parameters["AdOrderId"], .array([.number(2660900)]))
+    }
+
+    func testResolveLinkWindowTitleUsesMetricsTemplateWithoutRowInference() {
+        let title = resolveLinkWindowTitleFromContext(
+            link: LinkDef(
+                windowKey: "order",
+                windowTitleSource: "metrics",
+                windowTitleTemplate: "{{adOrderName}} ({{adOrderId}})"
+            ),
+            context: LinkResolutionContext(
+                metrics: [
+                    "adOrderId": .number(2660900),
+                    "adOrderName": .string("OLV_BAU_AUS")
+                ]
+            ),
+            fallbackTitle: "Order"
+        )
+
+        XCTAssertEqual(title, "OLV_BAU_AUS (2660900)")
+    }
+
+    func testResolveColumnLinkTargetRejectsWindowLinksWithoutAKey() {
+        let target = resolveColumnLinkTargetFromContext(
+            column: ColumnDef(
+                id: "broken",
+                type: "link",
+                link: LinkDef(kind: "window")
+            ),
+            context: LinkResolutionContext(
+                row: ["broken": .string("Open")],
+                value: .string("Open")
+            )
+        )
+
+        XCTAssertNil(target)
+    }
+
     func testTableDefDecodesLegacyStringColumnsAndRichActionColumns() throws {
         let payload = """
         {

@@ -40,7 +40,11 @@ internal fun ForgeRuntime.reconcileWindowForm(
 
 private fun resolveInitialWindowFormValues(metadata: WindowMetadata): Map<String, Any?> {
     val initial = linkedMapOf<String, Any?>()
-    metadata.on
+    val entries = buildList {
+        addAll(metadata.on)
+        addAll(metadata.window?.on.orEmpty())
+    }
+    entries
         .filter { it.event == "onInit" && it.handler == "dataSource.setWindowFormData" }
         .forEach { execution ->
             execution.parameters

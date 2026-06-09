@@ -137,7 +137,7 @@ public struct DashboardRenderer: View {
         .padding(.vertical, isCompactPresentation ? 10 : (horizontalSizeClass == .regular ? 12 : 14))
         .background(
             RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : (horizontalSizeClass == .regular ? 18 : 16))
-                .fill(Color(.systemBackground))
+                .fill(Color.forgeSystemBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: isCompactPresentation ? 14 : (horizontalSizeClass == .regular ? 18 : 16))

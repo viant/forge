@@ -192,13 +192,21 @@ private fun WindowContentBody(
                     }
                 } else {
                     if (containers.any(::containerOwnsScrollSpace)) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxSize()) {
                             containers.forEach { container ->
+                                val childModifier = if (containerOwnsScrollSpace(container)) {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f, fill = true)
+                                } else {
+                                    Modifier.fillMaxWidth()
+                                }
                                 ContainerRenderer(
                                     runtime,
                                     context,
                                     container,
-                                    inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
+                                    inheritedDataSourceRef = container.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef,
+                                    modifier = childModifier
                                 )
                             }
                         }

@@ -28,7 +28,7 @@ export function resolveTableCellText({row, column, value} = {}) {
         return link.text;
     }
     if (value == null) {
-        return value;
+        return column?.emptyText ?? value;
     }
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         return formatDisplayValue(value, inferTableCellFormat(column));

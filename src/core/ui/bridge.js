@@ -4,6 +4,25 @@ import { restoreWindowsFromSnapshot } from '../store/signals.js';
 
 let activeSnapshotPublisher = null;
 const UI_BRIDGE_CLIENT_STORAGE_KEY = 'forge.uiBridge.clientId';
+let seededUIBridgeClientId = '';
+let activeBridgeReadyState = null;
+
+function createBridgeReadyState() {
+  let resolve = null;
+  const promise = new Promise((res) => {
+    resolve = res;
+  });
+  activeBridgeReadyState = { promise, resolve };
+  return activeBridgeReadyState;
+}
+
+function settleBridgeReadyState(ok) {
+  if (!activeBridgeReadyState?.resolve) return;
+  try {
+    activeBridgeReadyState.resolve(!!ok);
+  } catch (_) {}
+  activeBridgeReadyState = null;
+}
 
 function snapshotFingerprint(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') return String(snapshot || '');
@@ -22,22 +41,37 @@ function randomId() {
 }
 
 export function ensureUIBridgeClientId(preferred = '') {
-  if (typeof window === 'undefined') return String(preferred || '').trim();
+  const preferredText = String(preferred || '').trim();
+  if (seededUIBridgeClientId) return seededUIBridgeClientId;
+  if (typeof window === 'undefined') {
+    seededUIBridgeClientId = preferredText || seededUIBridgeClientId;
+    return seededUIBridgeClientId;
+  }
   try {
-    const existing = String(window.__forgeUIBridgeClientId || '').trim();
-    if (existing) return existing;
+    let existing = '';
+    try {
+      existing = String(window.__forgeUIBridgeClientId || '').trim();
+    } catch (_) {}
+    if (existing) {
+      seededUIBridgeClientId = existing;
+      return existing;
+    }
     let stored = '';
     try {
       stored = String(window.sessionStorage?.getItem(UI_BRIDGE_CLIENT_STORAGE_KEY) || '').trim();
     } catch (_) {}
-    const next = String(preferred || '').trim() || stored || randomId();
-    window.__forgeUIBridgeClientId = next;
+    const next = preferredText || stored || randomId();
+    seededUIBridgeClientId = next;
+    try {
+      window.__forgeUIBridgeClientId = next;
+    } catch (_) {}
     try {
       window.sessionStorage?.setItem(UI_BRIDGE_CLIENT_STORAGE_KEY, next);
     } catch (_) {}
     return next;
   } catch (_) {
-    return String(preferred || '').trim();
+    seededUIBridgeClientId = preferredText || seededUIBridgeClientId || randomId();
+    return seededUIBridgeClientId;
   }
 }
 
@@ -142,6 +176,7 @@ export function startUIBridge(options = {}) {
   };
 
   ws = new WebSocket(url);
+  createBridgeReadyState();
 
   ws.addEventListener('open', () => {
     send({
@@ -155,6 +190,7 @@ export function startUIBridge(options = {}) {
     });
     readyToPublish = true;
     publishSnapshot();
+    settleBridgeReadyState(true);
     timer = setInterval(publishSnapshot, snapshotIntervalMs);
     detachListeners = bindImmediateSnapshotListeners();
   });
@@ -188,6 +224,7 @@ export function startUIBridge(options = {}) {
   });
 
   ws.addEventListener('close', () => {
+    settleBridgeReadyState(false);
     if (timer) clearInterval(timer);
     timer = null;
   });
@@ -202,6 +239,7 @@ export function startUIBridge(options = {}) {
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
+    settleBridgeReadyState(false);
     readyToPublish = false;
     if (timer) clearInterval(timer);
     timer = null;
@@ -350,7 +388,7 @@ export function startUIBridgeHTTP(options = {}) {
     };
   };
 
-  const isPollingOwner = () => visibilityState === 'visible' && !!hasWindowFocus;
+  const isPollingOwner = () => visibilityState === 'visible';
 
   const bindOwnerListeners = () => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return () => {};
@@ -525,12 +563,14 @@ export function startUIBridgeHTTP(options = {}) {
       await waitForStartupReady();
       readyToPublish = true;
       await publishSnapshot();
+      settleBridgeReadyState(true);
       snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
       detachListeners = bindImmediateSnapshotListeners();
       detachLifecycle = bindLifecycleListeners(stop);
       detachOwner = bindOwnerListeners();
       pollLoop();
     } catch (err) {
+      settleBridgeReadyState(false);
       if (isUnauthorizedError(err)) {
         readyToPublish = false;
         scheduleAuthRetry();
@@ -549,6 +589,7 @@ export function startUIBridgeHTTP(options = {}) {
     return startInFlight;
   };
 
+  createBridgeReadyState();
   void ensureStarted();
 
   function stop() {
@@ -563,6 +604,7 @@ export function startUIBridgeHTTP(options = {}) {
     try { detachAuthRetry?.(); } catch (_) {}
     detachAuthRetry = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
+    settleBridgeReadyState(false);
     readyToPublish = false;
     abortInflightRPC();
     try { streamAbort?.abort(); } catch (_) {}
@@ -577,4 +619,24 @@ export async function publishUIBridgeSnapshotNow() {
   if (typeof activeSnapshotPublisher !== 'function') return false;
   await activeSnapshotPublisher();
   return true;
+}
+
+export async function waitForUIBridgeReady(timeoutMs = 1500) {
+  if (typeof activeSnapshotPublisher === 'function') {
+    try {
+      if (await activeSnapshotPublisher()) {
+        return true;
+      }
+    } catch (_) {}
+  }
+  const promise = activeBridgeReadyState?.promise;
+  if (!promise) return false;
+  const timeout = Math.max(0, Number(timeoutMs || 0) || 0);
+  if (!timeout) {
+    return !!(await promise);
+  }
+  return await Promise.race([
+    promise.then((value) => !!value).catch(() => false),
+    new Promise((resolve) => setTimeout(() => resolve(false), timeout)),
+  ]);
 }

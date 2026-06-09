@@ -144,7 +144,7 @@ public struct MenuListRenderer: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
-            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
+            .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 14))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(Color.black.opacity(0.05), lineWidth: 1)
@@ -203,7 +203,7 @@ public struct MenuListRenderer: View {
         .frame(maxWidth: .infinity, minHeight: showsSingleLineValue ? 56 : 80, alignment: .topLeading)
         .padding(.horizontal, 14)
         .padding(.vertical, showsSingleLineValue ? 12 : 14)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
@@ -255,7 +255,7 @@ public struct MenuListRenderer: View {
                             .padding(.vertical, 7)
                             .background(
                                 Capsule()
-                                    .fill(isSelected ? Color.accentColor.opacity(0.14) : Color(.systemBackground))
+                                    .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.forgeSystemBackground)
                             )
                             .overlay(
                                 Capsule()
@@ -268,7 +268,7 @@ public struct MenuListRenderer: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
@@ -290,7 +290,7 @@ public struct MenuListRenderer: View {
                     .background(
                         isInline
                             ? Color.accentColor.opacity(0.10)
-                            : Color(.systemBackground),
+                            : Color.forgeSystemBackground,
                         in: RoundedRectangle(cornerRadius: isInline ? 999 : 14)
                     )
                     .overlay(
@@ -314,7 +314,7 @@ public struct MenuListRenderer: View {
             .background(
                 isInline
                     ? Color.accentColor.opacity(0.10)
-                    : Color(.systemBackground),
+                    : Color.forgeSystemBackground,
                 in: RoundedRectangle(cornerRadius: isInline ? 999 : 14)
             )
             .overlay(
@@ -374,26 +374,34 @@ public struct MenuListRenderer: View {
             return
         }
 
-        let currentState = await runtime.windowState(id: window.windowID)
-        let shouldReplaceHostedWindow =
-            currentState?.presentation?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "hosted"
-            && currentState?.region?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "chat.top"
-            && link.newInstance != true
-        let parameters = resolveLinkParameters(item, link: link)
-        let title = resolveLinkWindowTitle(item, link: link)
-        let state = await runtime.openWindow(
-            key: windowKey,
-            title: title,
-            id: shouldReplaceHostedWindow ? currentState?.id : nil,
-            inTab: link.inTab ?? currentState?.inTab ?? true,
-            parameters: parameters,
-            conversationID: currentState?.conversationID,
-            presentation: currentState?.presentation,
-            region: currentState?.region,
-            workspaceSharePct: currentState?.workspaceSharePct,
-            workspaceMinHeight: currentState?.workspaceMinHeight,
-            parentKey: currentState?.parentKey,
-            isModal: link.modal ?? false
+        let context = LinkResolutionContext(
+            row: [:],
+            value: resolvedItemValue(item),
+            form: {
+                guard let ref = resolveItemDataSourceRef(item) else { return [:] }
+                return formValuesByDataSource[ref] ?? [:]
+            }(),
+            metrics: {
+                guard let ref = resolveItemDataSourceRef(item) else { return [:] }
+                return metricsValuesByDataSource[ref] ?? [:]
+            }(),
+            windowForm: windowFormValues
+        )
+        let state = await openResolvedWindowLink(
+            runtime: runtime,
+            window: window,
+            link: WindowLinkTarget(
+                windowKey: windowKey,
+                title: resolveLinkWindowTitleFromContext(
+                    link: link,
+                    context: context,
+                    fallbackTitle: resolvedLinkDisplayText(item)
+                ),
+                parameters: resolveLinkParametersFromContext(link: link, context: context),
+                inTab: link.inTab != false,
+                modal: link.modal == true,
+                newInstance: link.newInstance == true
+            )
         )
         await MainActor.run {
             NotificationCenter.default.post(

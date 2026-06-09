@@ -463,6 +463,25 @@ function shouldRetryRestoredDatasourceSnapshot(controlSnapshot = null) {
     );
 }
 
+function shouldRevalidateRestoredDatasourceSnapshot(snapshot = null, controlSnapshot = null) {
+    if (!snapshot || typeof snapshot !== 'object') {
+        return false;
+    }
+    if (shouldRetryRestoredDatasourceSnapshot(controlSnapshot)) {
+        return true;
+    }
+    if (Array.isArray(snapshot?.collection) && snapshot.collection.length > 0) {
+        return true;
+    }
+    if (snapshot?.metrics && typeof snapshot.metrics === 'object' && Object.keys(snapshot.metrics).length > 0) {
+        return true;
+    }
+    if (snapshot?.collectionInfo && typeof snapshot.collectionInfo === 'object' && Object.keys(snapshot.collectionInfo).length > 0) {
+        return true;
+    }
+    return false;
+}
+
 function restoreWindowSignalsFromSnapshot(win) {
     const windowId = String(win?.windowId || '').trim();
     if (!windowId) return;
@@ -496,7 +515,7 @@ function restoreWindowSignalsFromSnapshot(win) {
         let nextControl = snapshot?.control && typeof snapshot.control === 'object'
             ? { ...snapshot.control }
             : null;
-        if (shouldRetryRestoredDatasourceSnapshot(nextControl)) {
+        if (shouldRevalidateRestoredDatasourceSnapshot(snapshot, nextControl)) {
             nextInput = {
                 ...(nextInput || {}),
                 fetch: true,

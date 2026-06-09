@@ -225,6 +225,7 @@ func (h *uiRPCHandler) handle(ctx context.Context, method string, params json.Ra
 		if clientID == "" {
 			return nil, jsonrpc.NewInvalidParamsError("clientId required", nil)
 		}
+		h.bridge.hub.markPolled(ns, clientID)
 		timeout := 20 * time.Second
 		if p.TimeoutMs > 0 {
 			timeout = time.Duration(p.TimeoutMs) * time.Millisecond

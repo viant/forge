@@ -7,6 +7,7 @@
 .forge-form-panel-tabs.bp5-tabs,
 .forge-form-panel-tabs.bp6-tabs {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
     height: 100%;
     min-height: 0;
@@ -21,6 +22,8 @@
 .forge-form-panel-tabs .bp4-tab-panels,
 .forge-form-panel-tabs .bp5-tab-panels,
 .forge-form-panel-tabs .bp6-tab-panels {
+    display: flex;
+    flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
     height: 100%;
@@ -29,6 +32,9 @@
 .forge-form-panel-tabs .bp4-tab-panel,
 .forge-form-panel-tabs .bp5-tab-panel,
 .forge-form-panel-tabs .bp6-tab-panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
     height: 100%;
     min-height: 0;
     overflow: hidden;

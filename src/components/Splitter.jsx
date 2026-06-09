@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Divider} from '@blueprintjs/core';
 import './Splitter.css';
 
@@ -8,16 +8,39 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
     const activeDividerIndexRef = useRef(null);
 
     const isVertical = orientation === 'vertical';
+    const [containerSize, setContainerSize] = useState(0);
+    const childCount = React.Children.count(children);
 
     const [sizes, setSizes] = useState(() => {
         if(divider.sizes) {
             return divider.sizes
         }
-        const initialSize = (100 / React.Children.count(children));
-        return Array(React.Children.count(children)).fill(initialSize);
+        const initialSize = (100 / childCount);
+        return Array(childCount).fill(initialSize);
     });
 
     const isVisible = divider.visible || false;
+    useEffect(() => {
+        if (!containerRef.current || typeof ResizeObserver === 'undefined') {
+            return undefined;
+        }
+        const updateSize = () => {
+            const nextSize = isVertical
+                ? containerRef.current?.offsetHeight
+                : containerRef.current?.offsetWidth;
+            setContainerSize(Number(nextSize || 0));
+        };
+        updateSize();
+        const observer = new ResizeObserver(() => updateSize());
+        observer.observe(containerRef.current);
+        return () => observer.disconnect();
+    }, [isVertical]);
+
+    const dividerThickness = isVisible ? 5 : 0;
+    const availableMainSize = containerSize > 0
+        ? Math.max(0, containerSize - (Math.max(childCount - 1, 0) * dividerThickness))
+        : 0;
+
     const handleMouseDown = (index, event) => {
         event.preventDefault();
         startPosRef.current = isVertical ? event.clientY : event.clientX;
@@ -63,29 +86,33 @@ const Splitter = ({orientation = 'horizontal', divider = {}, children}) => {
             ref={containerRef}
             style={{
                 display: 'flex',
+                flex: '1 1 auto',
                 flexDirection: isVertical ? 'column' : 'row',
                 height: '100%',
                 width: '100%',
                 minHeight: 0,
                 minWidth: 0,
+                overflow: 'hidden',
             }}
         >
             {React.Children.map(children, (child, index) => {
 
                 const style = {
-                    flexBasis: `${sizes[index]}%`,
                     flexGrow: 0,
                     flexShrink: 0,
-                    marginRight: '5px',
-                    marginLeft: '5px',
-                    overflow: 'hidden',
+                    overflow: 'auto',
                     minHeight: 0,
                     minWidth: 0,
                 }
-                if (index !== sizes.length - 1) {
+                if (availableMainSize > 0) {
+                    const basis = `${Math.max(0, (availableMainSize * sizes[index]) / 100)}px`;
                     if (isVertical) {
-                        style['marginBottom'] = '5px'
+                        style.height = basis;
+                    } else {
+                        style.width = basis;
                     }
+                } else {
+                    style.flexBasis = `${sizes[index]}%`;
                 }
                 return (
                     <React.Fragment key={'sf' + (child?.id || index)}>

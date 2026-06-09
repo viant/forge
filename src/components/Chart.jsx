@@ -28,6 +28,7 @@ import {
 import {format} from "date-fns";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
+import { SoftBlock } from "./SoftSkeleton.jsx";
 import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
 
@@ -587,13 +588,13 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     }, [availableDataKeys]);
 
     useEffect(() => {
-        if (!isActive || viewMode !== "chart" || chartSize.width <= 0 || chartSize.height <= 0) {
+        if (viewMode !== "chart" || chartSize.width <= 0 || chartSize.height <= 0) {
             setChartReady(false);
             return undefined;
         }
-        const raf = window.requestAnimationFrame(() => setChartReady(true));
-        return () => window.cancelAnimationFrame(raf);
-    }, [isActive, viewMode, chartSize.width, chartSize.height]);
+        setChartReady(true);
+        return undefined;
+    }, [viewMode, chartSize.width, chartSize.height]);
 
     useEffect(() => {
         if (embedded && viewMode !== "chart") {
@@ -984,15 +985,17 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const emptyChartMessage = resolveEmptyChartMessage(chartMetrics);
     const showSeriesSelectionControls = !showResolvedEmptyStateWhileLoading;
 
-    const renderSeriesSelectionControls = () => (
+    const renderSeriesSelectionControls = ({compact = false} = {}) => (
         <div
             aria-label="Chart series selector"
             style={{
                 display: "flex",
                 flexWrap: "wrap",
                 gap: "8px",
-                marginTop: 8,
-                marginBottom: 8,
+                alignItems: "center",
+                justifyContent: compact ? "flex-end" : "flex-start",
+                marginTop: compact ? 0 : 8,
+                marginBottom: compact ? 0 : 8,
             }}
         >
             {seriesToggleOptions.map((option) => {
@@ -1060,10 +1063,18 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         }
         return 0;
     })();
+    const chartViewportStyle = {
+        width: "100%",
+        height: resolvedHeight,
+        minHeight: resolvedMinHeight || undefined,
+        minWidth: 0,
+        flex: "0 0 auto",
+        margin: isHorizontalBar ? "0 auto" : undefined,
+        position: "relative",
+    };
     return (
         <div
-            style={{width: resolvedWidth, height: resolvedHeight, minWidth: 0, minHeight: resolvedMinHeight, margin: isHorizontalBar ? "0 auto" : undefined, position: "relative"}}
-            ref={chartRef}
+            style={{width: resolvedWidth, minWidth: 0, display: "flex", flexDirection: "column", gap: 8, position: "relative"}}
             data-dashboard-chart-id={chartExportId}
             data-chart-loading={loading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
@@ -1131,9 +1142,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                             ))}
                         </RadioGroup>
                     ) : null}
-
-                    {renderSeriesSelectionControls()}
-                    <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8}}>
+                    <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8, flexWrap: "wrap"}}>
                         <div style={{display: "flex", gap: 6}}>
                             <ChartActionButton active={viewMode === "chart"} onClick={() => setViewMode("chart")}>
                                 Chart
@@ -1142,68 +1151,103 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                                 Table
                             </ChartActionButton>
                         </div>
-                        {viewMode === "table" ? (
-                            <div style={{display: "flex", gap: 6}}>
-                                <ChartActionButton onClick={() => setShowColumnDialog(true)}>Columns</ChartActionButton>
-                                <ChartActionButton onClick={downloadCsv}>CSV</ChartActionButton>
-                            </div>
-                        ) : null}
+                        {viewMode === "chart"
+                            ? renderSeriesSelectionControls({compact: true})
+                            : (
+                                <div style={{display: "flex", gap: 6}}>
+                                    <ChartActionButton onClick={() => setShowColumnDialog(true)}>Columns</ChartActionButton>
+                                    <ChartActionButton onClick={downloadCsv}>CSV</ChartActionButton>
+                                </div>
+                            )}
                     </div>
                 </>
             ) : null}
-            {loading && !staleWhileLoading && !showResolvedEmptyStateWhileLoading && (
-                <div style={{textAlign: 'center', padding: 4}}>Loading…</div>
-            )}
             {error && (
                 <div style={{color: 'red', padding: 4}}>{formatChartErrorMessage(error)}</div>
             )}
 
             {viewMode === "chart" ? (
-                !canRenderChartSelection && !loading && !error ? (
-                    <div
-                        style={{
-                            height: "100%",
-                            minHeight: embedded ? 110 : 180,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            textAlign: "center",
-                            color: "#7d8da1",
-                            fontSize: 12,
-                        }}
-                    >
-                        Select at least one series to render the chart.
-                    </div>
-                ) : (!hasChartRows || !hasRenderableSeriesValues) && (!loading || showResolvedEmptyStateWhileLoading) && !error ? (
-                    <div
-                        style={{
-                            height: "100%",
-                            minHeight: embedded ? 110 : 180,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            textAlign: "center",
-                            color: "#7d8da1",
-                            fontSize: 12,
-                        }}
-                    >
-                        {emptyChartMessage}
-                    </div>
-                ) : chartReady && isActive && chartSize.width > 0 && chartSize.height > 0 ? (
-                    <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
-                        {isPieChart
-                            ? pieChart
-                            : isHorizontalBar
-                                ? horizontalBarChart
-                            : type === "composed" || directSeriesChart || hasRightAxis
-                                ? composedChart
-                                : type === "bar"
-                                    ? barChart
-                                    : type === "area"
-                                        ? areaChart
-                                        : lineChart}
-                    </ResponsiveContainer>
-                ) : null
+                <div ref={chartRef} style={chartViewportStyle}>
+                    {loading && !staleWhileLoading && !showResolvedEmptyStateWhileLoading && !error ? (
+                        <div
+                            style={{
+                                height: "100%",
+                                minHeight: embedded ? 110 : 180,
+                                position: "relative",
+                                overflow: "hidden",
+                                borderRadius: 12,
+                            }}
+                        >
+                            <SoftBlock
+                                height="100%"
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    borderRadius: 12,
+                                }}
+                            />
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#7d8da1",
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    pointerEvents: "none",
+                                }}
+                            >
+                                Loading chart…
+                            </div>
+                        </div>
+                    ) : !canRenderChartSelection && !loading && !error ? (
+                        <div
+                            style={{
+                                height: "100%",
+                                minHeight: embedded ? 110 : 180,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                textAlign: "center",
+                                color: "#7d8da1",
+                                fontSize: 12,
+                            }}
+                        >
+                            Select at least one series to render the chart.
+                        </div>
+                    ) : (!hasChartRows || !hasRenderableSeriesValues) && (!loading || showResolvedEmptyStateWhileLoading) && !error ? (
+                        <div
+                            style={{
+                                height: "100%",
+                                minHeight: embedded ? 110 : 180,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                textAlign: "center",
+                                color: "#7d8da1",
+                                fontSize: 12,
+                            }}
+                        >
+                            {emptyChartMessage}
+                        </div>
+                    ) : chartReady && chartSize.width > 0 && chartSize.height > 0 ? (
+                        <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
+                            {isPieChart
+                                ? pieChart
+                                : isHorizontalBar
+                                    ? horizontalBarChart
+                                : type === "composed" || directSeriesChart || hasRightAxis
+                                    ? composedChart
+                                    : type === "bar"
+                                        ? barChart
+                                        : type === "area"
+                                            ? areaChart
+                                            : lineChart}
+                        </ResponsiveContainer>
+                    ) : null}
+                </div>
             ) : (
                 <div style={{width: "100%", marginTop: 8, overflowX: "auto"}}>
                     <BpTable

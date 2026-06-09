@@ -215,6 +215,7 @@ type WindowTitleBinding struct {
 	Ref           string `json:"ref,omitempty" yaml:"ref,omitempty"`
 	Selector      string `json:"selector,omitempty" yaml:"selector,omitempty"`
 	Field         string `json:"field,omitempty" yaml:"field,omitempty"`
+	Template      string `json:"template,omitempty" yaml:"template,omitempty"`
 	Source        string `json:"source,omitempty" yaml:"source,omitempty"`
 	ControlID     string `json:"controlId,omitempty" yaml:"controlId,omitempty"`
 	DomControlID  string `json:"domControlId,omitempty" yaml:"domControlId,omitempty"`
@@ -1171,6 +1172,7 @@ type Column struct {
 	Width             int                    `json:"width,omitempty" yaml:"width,omitempty"`
 	Align             string                 `json:"align,omitempty" yaml:"align,omitempty"`
 	NumericFormat     string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	EmptyText         string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
 	Sortable          bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
 	Icon              string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
 	Type              string                 `json:"type,omitempty" yaml:"type,omitempty"`

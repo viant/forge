@@ -1,6 +1,8 @@
 import SwiftUI
 import ForgeIOSRuntime
 
+private let hostedWorkspaceDidOpenNotification = Notification.Name("forgeHostedWorkspaceDidOpen")
+
 public struct TableRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.forgeEmbeddedNonScrolling) private var forgeEmbeddedNonScrolling
@@ -36,7 +38,7 @@ public struct TableRenderer: View {
             }
         }
         .padding(10)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 18))
+        .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
@@ -204,7 +206,7 @@ public struct TableRenderer: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.forgeSecondarySystemBackground, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(selectedRowIndex == rowIndex ? Color.accentColor.opacity(0.30) : Color.black.opacity(0.06), lineWidth: selectedRowIndex == rowIndex ? 1.5 : 1)
@@ -214,7 +216,7 @@ public struct TableRenderer: View {
         .accessibilityLabel(rowAccessibilityLabel(row: row))
         .accessibilityAddTraits(actionColumns.isEmpty ? .isButton : [])
 
-        if actionColumns.isEmpty {
+        if actionColumns.isEmpty && !rowHasInteractiveLinks(row) {
             Button {
                 handleRowSelection(row: row, rowIndex: rowIndex)
             } label: {
@@ -243,7 +245,7 @@ public struct TableRenderer: View {
                     }
                 }
             }
-            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+            .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.black.opacity(0.05), lineWidth: 1)
@@ -272,7 +274,7 @@ public struct TableRenderer: View {
                     .padding(.vertical, 8)
             }
         }
-        .background(Color(.secondarySystemBackground))
+        .background(Color.forgeSecondarySystemBackground)
     }
 
     @ViewBuilder
@@ -303,7 +305,7 @@ public struct TableRenderer: View {
         .accessibilityLabel(rowAccessibilityLabel(row: row))
         .accessibilityAddTraits(actionColumns.isEmpty ? .isButton : [])
 
-        if actionColumns.isEmpty {
+        if actionColumns.isEmpty && !rowHasInteractiveLinks(row) {
             Button {
                 handleRowSelection(row: row, rowIndex: index)
             } label: {
@@ -428,6 +430,10 @@ public struct TableRenderer: View {
         }.joined(separator: ", ")
     }
 
+    private func rowHasInteractiveLinks(_ row: [String: JSONValue]) -> Bool {
+        displayColumns.contains { resolvedLinkTarget(for: $0, row: row) != nil }
+    }
+
     private func displayValue(_ value: JSONValue?, column: ColumnDef? = nil, fallback: String? = nil) -> String {
         if let value {
             if let format = column?.format?.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -435,6 +441,10 @@ public struct TableRenderer: View {
                 return DashboardRuntime.formatDashboardValue(value.anyValueValue, format: format)
             }
             return value.displayString
+        }
+        if let emptyText = column?.emptyText?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !emptyText.isEmpty {
+            return emptyText
         }
         if let fallback, !fallback.isEmpty {
             return fallback
@@ -445,11 +455,26 @@ public struct TableRenderer: View {
     @ViewBuilder
     private func valueLabel(row: [String: JSONValue], column: ColumnDef, fallback: String? = nil, font: Font, color: Color) -> some View {
         let text = displayValue(row[columnKey(column)], column: column, fallback: fallback)
-        if let destination = linkDestination(for: column, row: row) {
-            Link(text, destination: destination)
-                .font(font)
-                .foregroundStyle(.tint)
-                .lineLimit(2)
+        if let resolved = resolvedLinkTarget(for: column, row: row) {
+            switch resolved {
+            case .external(let destination):
+                Link(text, destination: destination)
+                    .font(font)
+                    .foregroundStyle(.tint)
+                    .lineLimit(2)
+            case .window(let link):
+                Button {
+                    Task {
+                        await openWindowLink(link)
+                    }
+                } label: {
+                    Text(text)
+                        .font(font)
+                        .foregroundStyle(.tint)
+                        .lineLimit(2)
+                }
+                .buttonStyle(.plain)
+            }
         } else {
             Text(text)
                 .font(font)
@@ -458,17 +483,28 @@ public struct TableRenderer: View {
         }
     }
 
-    private func linkDestination(for column: ColumnDef, row: [String: JSONValue]) -> URL? {
-        guard column.type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "link" else {
-            return nil
+    private func resolvedLinkTarget(for column: ColumnDef, row: [String: JSONValue]) -> ResolvedLinkTarget? {
+        resolveColumnLinkTargetFromContext(
+            column: column,
+            context: LinkResolutionContext(
+                row: row,
+                value: row[columnKey(column)]
+            )
+        )
+    }
+
+    private func openWindowLink(_ link: WindowLinkTarget) async {
+        guard let runtime, let window else {
+            return
         }
-        guard let hrefField = column.link?.href?.trimmingCharacters(in: .whitespacesAndNewlines), !hrefField.isEmpty else {
-            return nil
+        let state = await openResolvedWindowLink(runtime: runtime, window: window, link: link)
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: hostedWorkspaceDidOpenNotification,
+                object: nil,
+                userInfo: ["state": state]
+            )
         }
-        guard let hrefValue = row[hrefField]?.displayString.trimmingCharacters(in: .whitespacesAndNewlines), !hrefValue.isEmpty else {
-            return nil
-        }
-        return URL(string: hrefValue)
     }
 
 }
