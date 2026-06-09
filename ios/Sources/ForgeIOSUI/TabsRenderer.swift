@@ -38,7 +38,7 @@ public struct TabsRenderer: View {
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(Color(.systemBackground))
+                            .fill(Color.forgeSystemBackground)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
@@ -66,7 +66,7 @@ public struct TabsRenderer: View {
                                 .padding(.vertical, 10)
                                 .background(
                                     Capsule()
-                                        .fill(isSelected ? Color.accentColor.opacity(0.14) : Color(.systemBackground))
+                                        .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.forgeSystemBackground)
                                 )
                                 .overlay(
                                     Capsule()

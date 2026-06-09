@@ -50,6 +50,9 @@ func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey 
 	}
 	filePath := url.Join(baseURL, key, subPath)
 	resolvedBase, err := loader.ResolveWindowBase(ctx, filePath, target)
+	if err != nil && subKey == "" {
+		resolvedBase, err = loader.ResolveWindowBase(ctx, url.Join(baseURL, key), target)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to load window for key %s: %w", key, err)
 	}
@@ -57,8 +60,12 @@ func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey 
 	if err := loader.LoadWithTarget(ctx, resolvedBase+".yaml", result, target); err != nil {
 		return nil, fmt.Errorf("failed to load window for key %s: %w", key, err)
 	}
-	if ok, _ := loader.Exists(context.Background(), resolvedBase+".js"); ok {
-		code, err := loader.Download(context.Background(), resolvedBase+".js")
+	assetPath, assetErr := loader.ResolveWindowAsset(ctx, resolvedBase, ".js", target)
+	if assetErr != nil {
+		assetPath, assetErr = loader.ResolveWindowAsset(ctx, filePath, ".js", target)
+	}
+	if assetErr == nil {
+		code, err := loader.Download(context.Background(), assetPath)
 		if err != nil {
 			return nil, err
 		}

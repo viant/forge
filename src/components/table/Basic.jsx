@@ -303,7 +303,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                 const col = columnsToUse[colIndex];
                 const rawValue = resolveKey(item, col.id);
                 let displayedText = resolveTableCellText({row: item, column: col, value: rawValue});
-                if (col.numericFormat) {
+                if (col.numericFormat && rawValue != null && rawValue !== "") {
                     const format = numeralFormats[col.numericFormat] || col.numericFormat
                     let numeralValue = 0.0
                     if (typeof rawValue !== 'number') {

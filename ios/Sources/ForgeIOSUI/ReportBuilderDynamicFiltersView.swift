@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import ForgeIOSRuntime
 
 struct ReportBuilderDynamicFiltersView: View {
@@ -242,7 +241,7 @@ struct ReportBuilderDynamicFiltersView: View {
                             )
                         )
                         .textFieldStyle(.plain)
-                        .keyboardType(keyboardType(for: selectedFilter))
+                        .forgeManualEntryKeyboardType(for: selectedFilter)
                         .onSubmit {
                             _ = onAddManualSelection(
                                 groupID,
@@ -506,7 +505,7 @@ struct ReportBuilderDynamicFiltersView: View {
                                 )
                             )
                             .textFieldStyle(.plain)
-                            .keyboardType(keyboardType(for: selectedFilter))
+                            .forgeManualEntryKeyboardType(for: selectedFilter)
                             .onSubmit {
                                 _ = onAddManualSelection(
                                     groupID,
@@ -582,15 +581,6 @@ struct ReportBuilderDynamicFiltersView: View {
         }
     }
 
-    private func keyboardType(for filter: ReportBuilderDynamicFilterDef) -> UIKeyboardType {
-        let valueType = (filter.manualValueType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        switch valueType {
-        case "int", "integer":
-            return .numberPad
-        default:
-            return .default
-        }
-    }
 }
 
 private struct DynamicFamilyOption: Identifiable {
@@ -626,5 +616,22 @@ private extension JSONValue {
         case .null:
             return ""
         }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func forgeManualEntryKeyboardType(for filter: ReportBuilderDynamicFilterDef) -> some View {
+        #if canImport(UIKit)
+        let valueType = (filter.manualValueType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch valueType {
+        case "int", "integer":
+            self.keyboardType(.numberPad)
+        default:
+            self.keyboardType(.default)
+        }
+        #else
+        self
+        #endif
     }
 }

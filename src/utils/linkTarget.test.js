@@ -35,6 +35,41 @@ assert.deepEqual(
     linkConfig: {
       kind: 'window',
       windowKey: 'order',
+      windowTitleSource: 'row',
+      windowTitleTemplate: '{{name}} ({{id}})',
+      parameters: {
+        AdOrderId: { source: 'row', selector: 'id', wrap: 'array' },
+      },
+    },
+  }),
+  {
+    kind: 'window',
+    text: 'Order Alpha',
+    title: '',
+    windowKey: 'order',
+    windowTitle: 'Order Alpha (123)',
+    inTab: true,
+    newInstance: false,
+    autoIndexTitle: false,
+    awaitResult: false,
+    modal: false,
+    size: undefined,
+    width: undefined,
+    height: undefined,
+    footer: undefined,
+    parameters: {
+      AdOrderId: [123],
+    },
+  },
+);
+
+assert.deepEqual(
+  resolveLinkTarget({
+    row,
+    value: row.name,
+    linkConfig: {
+      kind: 'window',
+      windowKey: 'order',
       windowTitleSource: 'value',
       parameters: {
         AdOrderId: { source: 'row', selector: 'id', wrap: 'array' },

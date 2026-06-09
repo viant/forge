@@ -31,9 +31,10 @@ const wrapContainerChrome = (container, content, suppressTitle = false) => {
     if (!container?.section && !container?.card) {
         return content;
     }
+    const selfScroll = String(container?.scrollMode || '').trim().toLowerCase() === 'self';
 
     const framedContent = (
-        <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: selfScroll ? 'auto' : 'visible' }}>
             {content}
         </div>
     );
@@ -47,6 +48,7 @@ const wrapContainerChrome = (container, content, suppressTitle = false) => {
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
+            overflow: selfScroll ? 'auto' : 'visible',
             ...(container.card?.style || {}),
         };
         wrapped = <Card {...container.card} style={cardStyle}>{wrapped}</Card>;
@@ -60,6 +62,7 @@ const wrapContainerChrome = (container, content, suppressTitle = false) => {
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
+            overflow: selfScroll ? 'auto' : 'visible',
             ...(sectionProperties.style || {}),
         };
         wrapped = (
@@ -583,7 +586,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
 
     return wrapContainerChrome(container, (
         <>
-            <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flex: '1 1 auto', flexDirection: 'column' }}>
                 {container.toolbar ? renderContainerToolbar() : null}
                 {shouldRenderVisualItems && (visualItems?.length || 0) > 0 ? (
                     container?.layout?.kind === 'grid' ? (

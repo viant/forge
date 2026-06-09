@@ -61,8 +61,9 @@ type snapshotMsg struct {
 }
 
 type snapshotState struct {
-	Data      json.RawMessage
-	UpdatedAt time.Time
+	Data       json.RawMessage
+	UpdatedAt  time.Time
+	LastPollAt time.Time
 }
 
 type rpcResponse struct {
@@ -124,9 +125,11 @@ func (h *Hub) setSnapshot(ns, clientID string, data json.RawMessage) {
 	if h.snapshots[ns] == nil {
 		h.snapshots[ns] = map[string]snapshotState{}
 	}
+	prev := h.snapshots[ns][clientID]
 	h.snapshots[ns][clientID] = snapshotState{
-		Data:      data,
-		UpdatedAt: time.Now(),
+		Data:       data,
+		UpdatedAt:  time.Now(),
+		LastPollAt: prev.LastPollAt,
 	}
 
 	if h.watchers[ns] != nil && h.watchers[ns][clientID] != nil {
@@ -257,10 +260,12 @@ func (h *Hub) ListClients(ns string) []string {
 }
 
 type SnapshotEntry struct {
-	Namespace string
-	ClientID  string
-	Snapshot  json.RawMessage
-	UpdatedAt time.Time
+	Namespace  string
+	ClientID   string
+	Snapshot   json.RawMessage
+	UpdatedAt  time.Time
+	LastPollAt time.Time
+	Transport  string
 }
 
 func (h *Hub) SnapshotEntries() []SnapshotEntry {
@@ -272,15 +277,40 @@ func (h *Hub) SnapshotEntries() []SnapshotEntry {
 			if len(snap.Data) == 0 {
 				continue
 			}
+			transportMode := "http"
+			if h.clients[ns] != nil {
+				if client := h.clients[ns][clientID]; client != nil && client.ws != nil {
+					transportMode = "ws"
+				}
+			}
 			out = append(out, SnapshotEntry{
-				Namespace: ns,
-				ClientID:  clientID,
-				Snapshot:  snap.Data,
-				UpdatedAt: snap.UpdatedAt,
+				Namespace:  ns,
+				ClientID:   clientID,
+				Snapshot:   snap.Data,
+				UpdatedAt:  snap.UpdatedAt,
+				LastPollAt: snap.LastPollAt,
+				Transport:  transportMode,
 			})
 		}
 	}
 	return out
+}
+
+func (h *Hub) markPolled(ns, clientID string) {
+	if ns == "" {
+		ns = "default"
+	}
+	if clientID == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.snapshots[ns] == nil {
+		h.snapshots[ns] = map[string]snapshotState{}
+	}
+	current := h.snapshots[ns][clientID]
+	current.LastPollAt = time.Now()
+	h.snapshots[ns][clientID] = current
 }
 
 func (h *Hub) Snapshot(ns, clientID string) json.RawMessage {

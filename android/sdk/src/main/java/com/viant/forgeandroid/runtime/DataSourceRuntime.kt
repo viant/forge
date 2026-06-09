@@ -478,7 +478,8 @@ class DataSourceContext(
     }
 
     fun fetchCollection() {
-        input.set(input.peek().copy(fetch = true))
+        val current = input.peek()
+        input.set(current.copy(fetch = true, refresh = !current.refresh))
     }
 
     suspend fun toggleSelection(row: Map<String, Any?>, rowIndex: Int, selectionModeOverride: String? = null) {

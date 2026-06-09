@@ -2,21 +2,37 @@ import { startUIBridge, startUIBridgeHTTP } from './bridge.js';
 
 const UI_BRIDGE_STOP_KEY = '__forgeUIBridgeAutoStartStop';
 const UI_BRIDGE_STARTED_KEY = '__forgeUIBridgeAutoStartStarted';
+let startedState = false;
+let stopFnState = null;
 
 function getGlobalBridgeState() {
   if (typeof window === 'undefined') {
-    return { started: false, stopFn: null };
+    return { started: startedState, stopFn: stopFnState };
   }
+  let started = false;
+  let stopFn = null;
+  try {
+    started = !!window[UI_BRIDGE_STARTED_KEY];
+  } catch (_) {}
+  try {
+    stopFn = typeof window[UI_BRIDGE_STOP_KEY] === 'function' ? window[UI_BRIDGE_STOP_KEY] : null;
+  } catch (_) {}
   return {
-    started: !!window[UI_BRIDGE_STARTED_KEY],
-    stopFn: typeof window[UI_BRIDGE_STOP_KEY] === 'function' ? window[UI_BRIDGE_STOP_KEY] : null,
+    started: started || startedState,
+    stopFn: stopFn || stopFnState,
   };
 }
 
 function setGlobalBridgeState(started, stopFn) {
+  startedState = !!started;
+  stopFnState = typeof stopFn === 'function' ? stopFn : null;
   if (typeof window === 'undefined') return;
-  window[UI_BRIDGE_STARTED_KEY] = !!started;
-  window[UI_BRIDGE_STOP_KEY] = typeof stopFn === 'function' ? stopFn : null;
+  try {
+    window[UI_BRIDGE_STARTED_KEY] = startedState;
+  } catch (_) {}
+  try {
+    window[UI_BRIDGE_STOP_KEY] = stopFnState;
+  } catch (_) {}
 }
 
 function readViteEnv(key) {

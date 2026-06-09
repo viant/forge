@@ -58,6 +58,23 @@ function getNodeByPath(nodes, path, selfReference) {
     return node;
 }
 
+function safeUniqueKey(getUniqueKeyValue, value) {
+    try {
+        const resolved = getUniqueKeyValue(value);
+        return resolved == null ? '' : String(resolved);
+    } catch (_) {
+        return '';
+    }
+}
+
+function stableSnapshotSignature(value) {
+    try {
+        return JSON.stringify(value ?? null);
+    } catch (_) {
+        return '';
+    }
+}
+
 
 /**
  * DataSource props:
@@ -92,7 +109,20 @@ export default function DataSource({context}) {
                 if (events.onFetch.isDefined() && records.length > 0) {
                     records = events.onFetch.execute({collection: records})
                 }
-                collection.value = records;
+                const currentCollection = Array.isArray(collection.peek()) ? collection.peek() : [];
+                const currentSelection = selection.peek() || {};
+                const nextSelected = dataSource.autoSelect === false
+                    ? null
+                    : (records?.length > 0 ? records[0] : null);
+                const nextRowIndex = nextSelected ? 0 : -1;
+                const collectionChanged = stableSnapshotSignature(currentCollection) !== stableSnapshotSignature(records);
+                const selectionChanged = (
+                    Number(currentSelection?.rowIndex ?? -1) !== nextRowIndex
+                    || safeUniqueKey(getUniqueKeyValue, currentSelection?.selected) !== safeUniqueKey(getUniqueKeyValue, nextSelected)
+                );
+                if (collectionChanged) {
+                    collection.value = records;
+                }
 
                 // ----------------------------------------------------------
                 // Auto-selection behaviour
@@ -100,20 +130,37 @@ export default function DataSource({context}) {
                 // unselected; otherwise (default) keep the legacy behaviour
                 // of picking the first record.
                 // ----------------------------------------------------------
-                if (dataSource.autoSelect === false) {
-                    setSelected({selected: null, rowIndex: -1});
-                } else {
-                    const selected = records?.length > 0 ? records[0] : null;
-                    const rowIndex = selected ? 0 : -1;
-                    setSelected({selected, rowIndex});
+                if (selectionChanged) {
+                    if (dataSource.autoSelect === false) {
+                        setSelected({selected: null, rowIndex: -1});
+                    } else {
+                        setSelected({selected: nextSelected, rowIndex: nextRowIndex});
+                    }
                 }
             } else {
-                collection.value = [];
-                setSelected({selected: null, rowIndex: -1})
+                const currentCollection = Array.isArray(collection.peek()) ? collection.peek() : [];
+                const currentSelection = selection.peek() || {};
+                if (currentCollection.length > 0) {
+                    collection.value = [];
+                }
+                if (
+                    Number(currentSelection?.rowIndex ?? -1) !== -1
+                    || currentSelection?.selected != null
+                ) {
+                    setSelected({selected: null, rowIndex: -1})
+                }
             }
         } catch (err) {
-            collection.value = [];
-            setSelected({selected: null, rowIndex: -1})
+            if ((Array.isArray(collection.peek()) ? collection.peek() : []).length > 0) {
+                collection.value = [];
+            }
+            const currentSelection = selection.peek() || {};
+            if (
+                Number(currentSelection?.rowIndex ?? -1) !== -1
+                || currentSelection?.selected != null
+            ) {
+                setSelected({selected: null, rowIndex: -1})
+            }
             setError(err);
         } finally {
             flagReadDone();

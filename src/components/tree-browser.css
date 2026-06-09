@@ -140,10 +140,7 @@
 
 .forge-lookup-dialog .bp6-dialog,
 .forge-lookup-dialog .bp5-dialog,
-.forge-lookup-dialog .bp4-dialog,
-.steward-lookup-dialog .bp6-dialog,
-.steward-lookup-dialog .bp5-dialog,
-.steward-lookup-dialog .bp4-dialog {
+.forge-lookup-dialog .bp4-dialog {
     background:
         linear-gradient(180deg, rgba(246, 252, 247, 0.98) 0%, rgba(236, 247, 239, 0.98) 100%);
     border: 1px solid rgba(102, 145, 115, 0.22);
@@ -154,148 +151,28 @@
 
 .forge-lookup-dialog .bp6-dialog-header,
 .forge-lookup-dialog .bp5-dialog-header,
-.forge-lookup-dialog .bp4-dialog-header,
-.steward-lookup-dialog .bp6-dialog-header,
-.steward-lookup-dialog .bp5-dialog-header,
-.steward-lookup-dialog .bp4-dialog-header {
+.forge-lookup-dialog .bp4-dialog-header {
     background: linear-gradient(135deg, #187a4f 0%, #0f633d 100%);
     border-bottom: 1px solid rgba(10, 72, 44, 0.85);
 }
 
 .forge-lookup-dialog .bp6-heading,
 .forge-lookup-dialog .bp5-heading,
-.forge-lookup-dialog .bp4-heading,
-.steward-lookup-dialog .bp6-heading,
-.steward-lookup-dialog .bp5-heading,
-.steward-lookup-dialog .bp4-heading {
+.forge-lookup-dialog .bp4-heading {
     color: #ffffff;
     letter-spacing: 0.01em;
 }
 
 .forge-lookup-dialog .bp6-dialog-header .bp6-button,
 .forge-lookup-dialog .bp5-dialog-header .bp5-button,
-.forge-lookup-dialog .bp4-dialog-header .bp4-button,
-.steward-lookup-dialog .bp6-dialog-header .bp6-button,
-.steward-lookup-dialog .bp5-dialog-header .bp5-button,
-.steward-lookup-dialog .bp4-dialog-header .bp4-button {
+.forge-lookup-dialog .bp4-dialog-header .bp4-button {
     color: #ffffff;
 }
 
 .forge-lookup-dialog .bp6-dialog-footer,
 .forge-lookup-dialog .bp5-dialog-footer,
-.forge-lookup-dialog .bp4-dialog-footer,
-.steward-lookup-dialog .bp6-dialog-footer,
-.steward-lookup-dialog .bp5-dialog-footer,
-.steward-lookup-dialog .bp4-dialog-footer {
+.forge-lookup-dialog .bp4-dialog-footer {
     background: #ffffff;
     border-top: 1px solid rgba(102, 145, 115, 0.18);
     box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.9) inset;
-}
-
-.steward-lookup-dialog__body {
-    background:
-        radial-gradient(circle at top right, rgba(179, 223, 188, 0.22), transparent 34%),
-        linear-gradient(180deg, rgba(247, 252, 248, 0.94), rgba(238, 247, 240, 0.94));
-}
-
-.steward-lookup-dialog__content {
-    border: 1px solid rgba(102, 145, 115, 0.16);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.7);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.steward-lookup-dialog .bp6-input-group .bp6-input,
-.steward-lookup-dialog .bp5-input-group .bp5-input,
-.steward-lookup-dialog .bp4-input-group .bp4-input {
-    background: rgba(255, 255, 255, 0.9);
-    border-color: rgba(117, 160, 128, 0.35);
-    color: #23402c;
-}
-
-.steward-lookup-dialog .bp6-input-group .bp6-input:focus,
-.steward-lookup-dialog .bp5-input-group .bp5-input:focus,
-.steward-lookup-dialog .bp4-input-group .bp4-input:focus {
-    box-shadow: 0 0 0 1px rgba(84, 130, 96, 0.35), 0 0 0 3px rgba(186, 225, 194, 0.35);
-}
-
-.steward-lookup-dialog .bp6-button.bp6-intent-primary,
-.steward-lookup-dialog .bp5-button.bp5-intent-primary,
-.steward-lookup-dialog .bp4-button.bp4-intent-primary {
-    background: linear-gradient(180deg, #79bb8c 0%, #5fa476 100%);
-    border-color: #4c8d62;
-    color: #ffffff;
-}
-
-.steward-lookup-dialog .bp6-button.bp6-intent-primary:hover,
-.steward-lookup-dialog .bp5-button.bp5-intent-primary:hover,
-.steward-lookup-dialog .bp4-button.bp4-intent-primary:hover {
-    background: linear-gradient(180deg, #6eb382 0%, #558f68 100%);
-    border-color: #447f58;
-}
-
-.steward-lookup-dialog .bp6-html-table,
-.steward-lookup-dialog .bp5-html-table,
-.steward-lookup-dialog .bp4-html-table,
-.steward-lookup-dialog .bp6-table-quadrant-body,
-.steward-lookup-dialog .bp5-table-quadrant-body,
-.steward-lookup-dialog .bp4-table-quadrant-body {
-    background: rgba(252, 255, 252, 0.94);
-}
-
-.steward-targeting-tree-browser {
-    background:
-        linear-gradient(180deg, rgba(252, 255, 252, 0.86), rgba(242, 249, 244, 0.86));
-    border-radius: 12px;
-}
-
-.steward-targeting-tree-browser .bp6-tree-node-list .bp6-tree-node-list,
-.steward-targeting-tree-browser .bp5-tree-node-list .bp5-tree-node-list,
-.steward-targeting-tree-browser .bp4-tree-node-list .bp4-tree-node-list {
-    border-left-color: rgba(88, 132, 100, 0.22);
-}
-
-.steward-targeting-tree-browser .bp6-tree-node-content,
-.steward-targeting-tree-browser .bp5-tree-node-content,
-.steward-targeting-tree-browser .bp4-tree-node-content {
-    background: rgba(255, 255, 255, 0.58);
-    border: 1px solid transparent;
-    transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
-}
-
-.steward-targeting-tree-browser .bp6-tree-node-content:hover,
-.steward-targeting-tree-browser .bp5-tree-node-content:hover,
-.steward-targeting-tree-browser .bp4-tree-node-content:hover {
-    background: rgba(218, 239, 223, 0.85);
-    border-color: rgba(104, 154, 116, 0.26);
-    transform: translateX(1px);
-}
-
-.steward-targeting-tree-browser .bp6-tree-node-caret svg,
-.steward-targeting-tree-browser .bp5-tree-node-caret svg,
-.steward-targeting-tree-browser .bp4-tree-node-caret svg {
-    fill: #5a8667;
-}
-
-.steward-targeting-tree-browser .forge-tree-browser-row.is-root .forge-tree-browser-label {
-    color: #21412b;
-}
-
-.steward-targeting-tree-browser .forge-tree-browser-row.is-branch.is-nested .forge-tree-browser-label {
-    color: #355742;
-}
-
-.steward-targeting-tree-browser .forge-tree-browser-row.is-leaf .forge-tree-browser-label {
-    color: #486353;
-}
-
-.steward-targeting-tree-browser .forge-tree-browser-row.is-root .forge-tree-browser-badge,
-.steward-targeting-tree-browser .forge-tree-browser-row.is-branch .forge-tree-browser-badge {
-    background: rgba(111, 168, 126, 0.16);
-    color: #2c6a3d;
-}
-
-.steward-targeting-tree-browser .forge-tree-browser-row.is-leaf .forge-tree-browser-badge {
-    background: rgba(159, 199, 168, 0.16);
-    color: #476654;
 }

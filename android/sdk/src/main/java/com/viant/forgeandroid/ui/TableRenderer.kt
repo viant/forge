@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -49,8 +50,10 @@ import kotlinx.coroutines.launch
 @Composable
 fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: TableDef) {
     val rows by context.collection.flow.collectAsState(initial = emptyList())
+    val form by context.form.flow.collectAsState(initial = context.form.peek())
     val selection by context.selection.flow.collectAsState(initial = com.viant.forgeandroid.runtime.SelectionState())
     val metrics by context.metrics.flow.collectAsState(initial = emptyMap())
+    val windowForm by context.window.windowFormSignal().flow.collectAsState(initial = context.window.peekWindowForm())
     val input by context.input.flow.collectAsState(initial = com.viant.forgeandroid.runtime.InputState())
     val coroutineScope = rememberCoroutineScope()
 
@@ -58,17 +61,24 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
         context.fetchCollection()
     }
 
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         table.toolbar?.let { tb ->
             TableToolbar(runtime, context, tb)
         }
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f, fill = true)
+        ) {
             val compact = maxWidth < 720.dp
             if (compact) {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     itemsIndexed(rows) { index, row ->
                         val isSelected = selection.rowIndex == index
-                        MobileTableCard(runtime, context, table, row, index, isSelected) {
+                        MobileTableCard(runtime, context, table, row, index, isSelected, form, metrics, windowForm) {
                             coroutineScope.launch { context.toggleSelection(row, index) }
                         }
                     }
@@ -77,7 +87,7 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                 val horizontalScroll = rememberScrollState()
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth(),
+                        .fillMaxSize(),
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(1.dp, Color(0xFFE7ECF3)),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -85,14 +95,17 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                 ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .fillMaxSize()
                             .horizontalScroll(horizontalScroll)
                     ) {
                         DesktopTableHeader(table)
-                        LazyColumn(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
                             itemsIndexed(rows) { index, row ->
                                 val isSelected = selection.rowIndex == index
-                                DesktopTableRow(runtime, context, table, row, index, isSelected) {
+                                DesktopTableRow(runtime, context, table, row, index, isSelected, form, metrics, windowForm) {
                                     coroutineScope.launch { context.toggleSelection(row, index) }
                                 }
                             }
@@ -136,9 +149,18 @@ private fun MobileTableCard(
     row: Map<String, Any?>,
     index: Int,
     isSelected: Boolean,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>,
+    windowForm: Map<String, Any?>,
     onToggleSelection: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
+    val openLink: (ResolvedLinkTarget) -> Unit = { linkTarget ->
+        when (linkTarget) {
+            is ExternalLinkTarget -> uriHandler.openUri(linkTarget.href)
+            is WindowLinkTarget -> openResolvedWindowLink(runtime, context.window, linkTarget)
+        }
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -152,16 +174,25 @@ private fun MobileTableCard(
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             displayColumns(table).forEachIndexed { fieldIndex, col ->
                 val key = col.id ?: col.name ?: return@forEachIndexed
-                val value = formatTableValue(row[key], col.format)
-                val linkUrl = resolveLinkUrl(row, col)
+                val value = formatTableValue(row[key], col)
+                val linkTarget = resolveColumnLinkTargetFromContext(
+                    col,
+                    LinkResolutionContext(
+                        row = row,
+                        value = row[key],
+                        form = form,
+                        metrics = metrics,
+                        windowForm = windowForm
+                    )
+                )
                 if (fieldIndex == 0) {
                     Text(
                         text = value.ifBlank { col.label ?: key },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (linkUrl != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                        textDecoration = if (linkUrl != null) TextDecoration.Underline else null,
-                        modifier = if (linkUrl != null) Modifier.clickable { uriHandler.openUri(linkUrl) } else Modifier
+                        color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                        textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
+                        modifier = if (linkTarget != null) Modifier.clickable { openLink(linkTarget) } else Modifier
                     )
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -173,9 +204,9 @@ private fun MobileTableCard(
                         Text(
                             text = value.ifBlank { "-" },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (linkUrl != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                            textDecoration = if (linkUrl != null) TextDecoration.Underline else null,
-                            modifier = if (linkUrl != null) Modifier.clickable { uriHandler.openUri(linkUrl) } else Modifier
+                            color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                            textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
+                            modifier = if (linkTarget != null) Modifier.clickable { openLink(linkTarget) } else Modifier
                         )
                     }
                 }
@@ -225,9 +256,18 @@ private fun DesktopTableRow(
     row: Map<String, Any?>,
     index: Int,
     isSelected: Boolean,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>,
+    windowForm: Map<String, Any?>,
     onToggleSelection: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
+    val openLink: (ResolvedLinkTarget) -> Unit = { linkTarget ->
+        when (linkTarget) {
+            is ExternalLinkTarget -> uriHandler.openUri(linkTarget.href)
+            is WindowLinkTarget -> openResolvedWindowLink(runtime, context.window, linkTarget)
+        }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -258,8 +298,18 @@ private fun DesktopTableRow(
                 }
                 else -> {
                     val key = col.id ?: col.name ?: ""
-                    val value = formatTableValue(row[key], col.format)
-                    ValueColumnCell(value = value, linkUrl = resolveLinkUrl(row, col), onOpenLink = uriHandler::openUri)
+                    val value = formatTableValue(row[key], col)
+                    val linkTarget = resolveColumnLinkTargetFromContext(
+                        col,
+                        LinkResolutionContext(
+                            row = row,
+                            value = row[key],
+                            form = form,
+                            metrics = metrics,
+                            windowForm = windowForm
+                        )
+                    )
+                    ValueColumnCell(value = value, linkTarget = linkTarget, onOpenLink = openLink)
                 }
             }
         }
@@ -310,20 +360,20 @@ private fun RowScope.HeaderColumnCell(text: String, weight: Float = 1f) {
 @Composable
 private fun RowScope.ValueColumnCell(
     value: String,
-    linkUrl: String? = null,
-    onOpenLink: ((String) -> Unit)? = null,
+    linkTarget: ResolvedLinkTarget? = null,
+    onOpenLink: ((ResolvedLinkTarget) -> Unit)? = null,
     weight: Float = 1f
 ) {
     Text(
         text = value.ifBlank { "-" },
         style = MaterialTheme.typography.bodyMedium,
-        color = if (linkUrl != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-        textDecoration = if (linkUrl != null) TextDecoration.Underline else null,
+        color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+        textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
         modifier = Modifier
             .weight(weight)
             .widthIn(min = 128.dp)
             .padding(end = 12.dp)
-            .then(if (linkUrl != null && onOpenLink != null) Modifier.clickable { onOpenLink(linkUrl) } else Modifier)
+            .then(if (linkTarget != null && onOpenLink != null) Modifier.clickable { onOpenLink(linkTarget) } else Modifier)
     )
 }
 
@@ -357,22 +407,11 @@ private fun executeRowAction(
     runtime.execute(execution, context, mapOf("row" to row, "rowIndex" to rowIndex))
 }
 
-private fun formatTableValue(value: Any?, format: String?): String {
+private fun formatTableValue(value: Any?, column: ColumnDef): String {
     if (value == null) {
-        return ""
+        return column.emptyText?.takeIf { it.isNotBlank() } ?: ""
     }
-    return formatDashboardValue(value, format)
-}
-
-private fun resolveLinkUrl(row: Map<String, Any?>, column: ColumnDef): String? {
-    if (column.type?.trim()?.lowercase() != "link") {
-        return null
-    }
-    val hrefField = column.link?.href?.trim().orEmpty()
-    if (hrefField.isEmpty()) {
-        return null
-    }
-    return row[hrefField]?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+    return formatDashboardValue(value, column.format)
 }
 
 @Composable

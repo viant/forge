@@ -85,8 +85,8 @@ assert.deepEqual(getDialogSignal('orderPerformance_1DialogworkItemPicker').peek(
   args: { page: 2 },
   props: { multiple: true, awaitResult: true },
 });
-assert.deepEqual(getInputSignal('orderPerformance_1DSprofile').peek(), { fetch: false, parameters: { AdOrderId: [2667545] } });
-assert.deepEqual(getControlSignal('orderPerformance_1DSprofile').peek(), { loading: false, error: null });
+assert.deepEqual(getInputSignal('orderPerformance_1DSprofile').peek(), { fetch: true, refresh: false, parameters: { AdOrderId: [2667545] } });
+assert.deepEqual(getControlSignal('orderPerformance_1DSprofile').peek(), { loading: false, error: null, stale: false });
 assert.deepEqual(getCollectionSignal('orderPerformance_1DSprofile').peek(), [{ date: '2026-05-15', spend: 120 }]);
 assert.deepEqual(getMetricsSignal('orderPerformance_1DSprofile').peek(), { spend: 120 });
 
