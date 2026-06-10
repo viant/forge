@@ -216,6 +216,8 @@ function resolveParameter(context, inWhere, location) {
             return resolveFromSelection(context, location);
         case 'form':
             return resolveFromValuesForm(context, location);
+        case 'dataSource':
+            return resolveFromLegacyDataSource(context, location);
         case 'windowForm':
             return resolveFromWindowForm(context, location);
         case 'metadata':
@@ -233,8 +235,57 @@ function resolveParameter(context, inWhere, location) {
         case 'const':
             return location;
         default:
-            throw new Error(`Unknown 'in' value: ${inWhere}`);
+            console.warn(`resolveParameters: unknown legacy 'in' value: ${inWhere}`, { location });
+            return undefined;
     }
+}
+
+function resolveLegacyLocationContext(context, location) {
+    const rawLocation = typeof location === 'string' ? location.trim() : '';
+    if (!rawLocation) {
+        return { sourceContext: context, sourcePath: rawLocation };
+    }
+
+    const dotIndex = rawLocation.indexOf('.');
+    if (dotIndex > 0) {
+        const possibleDataSourceRef = rawLocation.substring(0, dotIndex);
+        if (context.dataSources?.[possibleDataSourceRef]) {
+            return {
+                sourceContext: context.Context(possibleDataSourceRef),
+                sourcePath: rawLocation.substring(dotIndex + 1),
+            };
+        }
+    }
+
+    return { sourceContext: context, sourcePath: rawLocation };
+}
+
+function resolveFromLegacyDataSource(context, location) {
+    const { sourceContext, sourcePath } = resolveLegacyLocationContext(context, location);
+    const selected = sourceContext?.handlers?.dataSource?.peekSelection?.()?.selected;
+    const formData = sourceContext?.handlers?.dataSource?.peekFormData?.();
+    const filterData = sourceContext?.handlers?.dataSource?.peekFilter?.();
+    const inputData = sourceContext?.signals?.input?.peek?.();
+
+    const candidates = [selected, formData, filterData, inputData];
+    for (const candidate of candidates) {
+        if (!candidate) continue;
+        const resolved = sourcePath ? resolveSelector(candidate, sourcePath) : candidate;
+        if (resolved !== undefined) {
+            return resolved;
+        }
+    }
+
+    // Some older metadata points at a data-source ref directly.
+    if (sourcePath && context.dataSources?.[sourcePath]) {
+        const dataSourceContext = context.Context(sourcePath);
+        return dataSourceContext?.handlers?.dataSource?.peekSelection?.()?.selected
+            ?? dataSourceContext?.handlers?.dataSource?.peekFormData?.()
+            ?? dataSourceContext?.handlers?.dataSource?.peekFilter?.()
+            ?? undefined;
+    }
+
+    return undefined;
 }
 
 function resolveFromSelection(context, location) {
