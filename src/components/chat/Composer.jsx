@@ -621,6 +621,15 @@ export default function Composer({
         updateDraft("");
     };
 
+    const handleComposerKeyDown = (event) => {
+        if (!event) return;
+        if (event.key !== 'Enter') return;
+        if (event.shiftKey) return;
+        if (event.nativeEvent?.isComposing) return;
+        event.preventDefault();
+        handleSubmit(event);
+    };
+
     const handleAbort = (e) => {
         e.preventDefault();
         onAbort?.();
@@ -1210,6 +1219,7 @@ export default function Composer({
                 className={className}
                 placeholder="Type your message…"
                 disabled={disabled}
+                onKeyDown={handleComposerKeyDown}
                 onValidityChange={setInputInvalid}
                 onValueResolver={(resolver) => { inputValueResolverRef.current = resolver; }}
                 multiline
@@ -1230,6 +1240,7 @@ export default function Composer({
                 className={className}
                 style={style}
                 disabled={disabled}
+                onKeyDown={handleComposerKeyDown}
             />
         )
     );
