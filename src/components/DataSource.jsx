@@ -2,16 +2,16 @@
 import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
-import {isMapEquals} from "../utils";
+import {isMapEquals} from "../utils/index.js";
 import { extractData } from "./dataSourceExtract.js";
 import {
     findSelectionSignal,
 
-} from "../core";
+} from "../core/index.js";
 
 import {
     dataSourceEvents,
-} from "../hooks";
+} from "../hooks/index.js";
 
 import {useRef} from "react";
 

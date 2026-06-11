@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {Card, Section} from '@blueprintjs/core';
 import ControlRenderer from './ControlRenderer.jsx';
-import {useControlEvents} from "../hooks";
+import {useControlEvents} from "../hooks/index.js";
 import TablePanel from "./TablePanel.jsx";
 import FormPanel from "./FormPanel.jsx";
 import Chart from "./Chart.jsx";

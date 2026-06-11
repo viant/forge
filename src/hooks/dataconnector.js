@@ -1,4 +1,4 @@
-import {useSetting} from "../core";
+import {useSetting} from "../core/index.js";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
 import { resolvePagingValues, withPagingInputs } from "./paging.js";

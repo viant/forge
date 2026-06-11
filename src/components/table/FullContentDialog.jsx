@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dialog, Button } from "@blueprintjs/core";
-import PrettyJson from "../PrettyJson";
+import PrettyJson from "../PrettyJson.jsx";
 
 const JsonViewer = ({ content }) => {
     let parsed;

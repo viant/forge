@@ -5,7 +5,7 @@ import {
 } from '@blueprintjs/core';
 import Container from './Container';
 import {useSignals} from '@preact/signals-react/runtime';
-import {findBusSignal, findViewSignal} from "../core";
+import {findBusSignal, findViewSignal} from "../core/index.js";
 import {isContainerVisible, trackContainerVisibility} from "./visibleWhen.js";
 import {mergeSelectedTab, nextBusMessage} from './FormPanelState';
 

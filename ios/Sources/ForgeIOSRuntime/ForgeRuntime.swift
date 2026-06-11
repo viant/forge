@@ -380,6 +380,11 @@ public actor ForgeRuntime {
         return await dataSourceRuntime.collection(dataSourceID: dataSourceID)
     }
 
+    public func dataSourceControl(windowID: String, dataSourceRef: String) async -> ControlState {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        return await dataSourceRuntime.control(dataSourceID: dataSourceID)
+    }
+
     public func setDataSourceMetrics(windowID: String, dataSourceRef: String, values: [String: JSONValue]) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: values)

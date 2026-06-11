@@ -22,6 +22,41 @@ describe('mergeWindowFormValues', () => {
     });
   });
 
+  it('replacing a nested subtree should not preserve omitted nested keys', () => {
+    const previous = {
+      forecastingCubeBuilder: {
+        chartSpec: {
+          title: 'Area by Date and Channel',
+          type: 'area',
+          xField: 'eventDate',
+          yFields: ['avails'],
+          seriesField: 'channelV2',
+        },
+      },
+    };
+    const next = {
+      forecastingCubeBuilder: {
+        chartSpec: {
+          title: 'Avails by Date',
+          type: 'line',
+          xField: 'eventDate',
+          yFields: ['avails'],
+        },
+      },
+    };
+    expect(mergeWindowFormValues(previous, next)).toEqual({
+      forecastingCubeBuilder: {
+        chartSpec: {
+          title: 'Avails by Date',
+          type: 'line',
+          xField: 'eventDate',
+          yFields: ['avails'],
+          seriesField: 'channelV2',
+        },
+      },
+    });
+  });
+
   it('bumps a generic prefill revision for repeated semantic handoffs', () => {
     const first = withWindowFormPrefillRevision({}, {
       prefill: { dealId: 778899 },

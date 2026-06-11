@@ -9,6 +9,7 @@ import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, 
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from "./geoMapUtils.js";
+import { DashboardErrorBoundary } from "./dashboardErrorBoundary.js";
 import "./Dashboard.css";
 
 const panelStyle = {
@@ -846,14 +847,6 @@ export function DashboardTimeline({container, context, isActive}) {
         }
         : normalizedContainer;
 
-    if (!chartContainer.chart) {
-        return (
-            <Panel container={container}>
-                <div style={subtitleStyle}>Timeline blocks require `container.chart`.</div>
-            </Panel>
-        );
-    }
-
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
     const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
@@ -876,6 +869,14 @@ export function DashboardTimeline({container, context, isActive}) {
             selection,
         },
     }), [context, filteredCollection, control, selection]);
+
+    if (!chartContainer.chart) {
+        return (
+            <Panel container={container}>
+                <div style={subtitleStyle}>Timeline blocks require `container.chart`.</div>
+            </Panel>
+        );
+    }
 
     return (
         <Panel container={container}>
@@ -1404,34 +1405,6 @@ export function DashboardComposition({container, context, isActive}) {
     );
 }
 
-class DashboardErrorBoundary extends React.Component {
-    constructor(props) {
-        super(props);
-        this.state = {error: null};
-    }
-
-    static getDerivedStateFromError(error) {
-        return {error};
-    }
-
-    componentDidCatch(error, info) {
-        console.error('dashboard block render failed', this.props?.container?.id, error, info);
-    }
-
-    render() {
-        if (this.state.error) {
-            return (
-                <Panel container={this.props.container}>
-                    <div style={{...subtitleStyle, color: '#a82a2a'}}>
-                        Failed to render dashboard block{this.props.container?.title ? `: ${this.props.container.title}` : '.'}
-                    </div>
-                </Panel>
-            );
-        }
-        return this.props.children;
-    }
-}
-
 export function DashboardTable({container, context}) {
     const locale = getDashboardLocale(context);
     const {collection, loading, error} = useDataSourceState(context);
@@ -1661,5 +1634,13 @@ export function DashboardBlock({container, context, isActive, children}) {
             content = null;
             break;
     }
-    return <DashboardErrorBoundary container={container}>{content}</DashboardErrorBoundary>;
+    return (
+        <DashboardErrorBoundary
+            container={container}
+            wrapperComponent={Panel}
+            subtitleStyle={subtitleStyle}
+        >
+            {content}
+        </DashboardErrorBoundary>
+    );
 }

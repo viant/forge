@@ -1,13 +1,71 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Dialog, Icon } from "@blueprintjs/core";
+import { Button, Icon } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
-import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
-import { mergeWindowFormValues } from "../../hooks/dataSource.js";
-import { resolveKey, setSelector } from "../../utils/selector.js";
+import { resolveKey } from "../../utils/selector.js";
 import { formatDashboardValue } from "./dashboardUtils.js";
+import {
+    chartFamilyForType,
+    chartFamilyHelperText,
+    chartTypeLabel,
+    CARTESIAN_CHART_TYPES,
+    PER_SERIES_TYPE_CHOICES,
+    SINGLE_MEASURE_CATEGORY_TYPES,
+    supportsStackForSeries,
+} from "./reportBuilderChartRules.js";
+import {
+    formatCompactDateRangeSummary,
+    resolveCompactStatusText,
+    resolveCompactSummaryItems,
+} from "./reportBuilderCompactState.js";
+import {
+    buildReportBuilderActionModel,
+} from "./reportBuilderActionModel.js";
+import {
+    buildReportBuilderChartQueryRequest,
+    getReportBuilderChartDataPolicy,
+    resolveReportBuilderChartCollection,
+    resolveReportBuilderExportCollection,
+} from "./reportBuilderResultData.js";
+import {
+    hasStoredReportBuilderState,
+    loadStoredReportBuilderState,
+    persistStoredReportBuilderState,
+    replaceReportBuilderWindowState,
+    resolveLegacyReportBuilderStateStorageScopes,
+    resolveReportBuilderStateStorageScope,
+    resolveEffectiveReportBuilderState,
+    shouldHydrateStoredReportBuilderWindowState,
+    shouldPersistReportBuilderWindowState,
+} from "./reportBuilderPersistence.js";
+import {
+    applyReportBuilderRequestHook,
+    applyReportBuilderStateHook,
+    buildLookupHydrationJobs,
+    hydrateReportBuilderLookupLabels,
+    prefillSignature,
+    shouldDeferReportBuilderRequestForPrefill,
+    resolveReportBuilderHookHandler,
+    resolveReportBuilderLookupDescriptor,
+    resolveReportBuilderNotices,
+} from "./reportBuilderHooks.js";
+import {
+    InlineStaticFilterControl,
+    ReportBuilderChartDialog,
+    ReportBuilderChartQuickActions,
+    ReportBuilderCompactSheetTab,
+    ReportBuilderOverflowActions,
+    ReportBuilderResultState,
+    StaticFilterSection,
+} from "./reportBuilderComponents.jsx";
+import {
+    buildDynamicFamilyOptions,
+    buildDynamicFamilyRows,
+    DynamicFamilyGroup,
+    DynamicFilterGroup,
+} from "./reportBuilderDynamicFilters.jsx";
 import {
     applyReportBuilderComputedMeasures,
     addDynamicFilterRow,
@@ -18,9 +76,11 @@ import {
     buildReportBuilderDefaultChartSpecs,
     buildReportBuilderDefaultState,
     applyReportBuilderFilterAliases,
+    getReportBuilderQuickPresetPolicy,
     buildReportBuilderRequest,
     buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
+    prepareReportBuilderAutoChartApplication,
     getReportBuilderResultPanePosition,
     getSelectableReportBuilderMeasures,
     getReportBuilderSupportedChartTypes,
@@ -30,6 +90,7 @@ import {
     mergeReportBuilderState,
     normalizeDynamicGroupRows,
     normalizeReportBuilderChartSpec,
+    prepareReportBuilderChartApplication,
     projectManualSelection,
     projectLookupSelections,
     removeDynamicFilterRow,
@@ -54,95 +115,6 @@ function getLookupExtensionConfig(config = {}) {
     return {};
 }
 
-export function resolveReportBuilderNotices(config = {}, state = {}) {
-    const notices = Array.isArray(config?.notices) ? config.notices : [];
-    return notices.map((notice) => {
-        const sourcePath = String(notice?.sourcePath || "").trim();
-        const rawValue = sourcePath ? resolveKey(state, sourcePath) : undefined;
-        const items = Array.isArray(rawValue)
-            ? rawValue.filter((entry) => entry !== undefined && entry !== null && entry !== "").map((entry) => String(entry))
-            : [];
-        return {
-            id: String(notice?.id || "").trim(),
-            level: String(notice?.level || "info").trim().toLowerCase() || "info",
-            title: String(notice?.title || "").trim(),
-            description: String(notice?.description || "").trim(),
-            items,
-        };
-    }).filter((notice) => notice.id && notice.items.length > 0);
-}
-
-export function resolveReportBuilderHookHandler(builderContext, handlerName = "") {
-    const directName = String(handlerName || "").trim();
-    if (!directName || !builderContext?.lookupHandler) {
-        return null;
-    }
-    try {
-        return builderContext.lookupHandler(directName);
-    } catch (error) {
-        const namespace = String(builderContext?.metadata?.namespace || "").trim();
-        const namespacedName = namespace && !directName.startsWith(`${namespace}.`)
-            ? `${namespace}.${directName}`
-            : "";
-        if (!namespacedName) {
-            throw error;
-        }
-        return builderContext.lookupHandler(namespacedName);
-    }
-}
-
-function applyRequestHook(builderContext, config = {}, state = {}, request = {}) {
-    const handlerName = String(config?.hooks?.buildRequest || "").trim();
-    if (!handlerName || !builderContext?.lookupHandler) {
-        return applyReportBuilderFilterAliases(request);
-    }
-    try {
-        const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
-        const result = handler({
-            context: builderContext,
-            request,
-            state,
-            config,
-        });
-        return applyReportBuilderFilterAliases((result && typeof result === "object") ? result : request);
-    } catch (error) {
-        console.error("reportBuilder request hook failed", error);
-        return applyReportBuilderFilterAliases(request);
-    }
-}
-
-export function applyReportBuilderStateHook(builderContext, config = {}, state = {}, windowForm = {}) {
-    const handlerName = String(config?.hooks?.initializeState || "").trim();
-    if (!handlerName || !builderContext?.lookupHandler) {
-        return state;
-    }
-    try {
-        const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
-        const result = handler({
-            context: builderContext,
-            state,
-            config,
-            windowForm,
-        });
-        return (result && typeof result === "object") ? result : state;
-    } catch (error) {
-        console.error("reportBuilder state hook failed", error);
-        return state;
-    }
-}
-
-export function prefillSignature(windowForm = {}) {
-    const prefill = windowForm?.prefill;
-    if (!prefill || typeof prefill !== "object" || Array.isArray(prefill)) {
-        return "";
-    }
-    const revision = Number(windowForm?.__forge?.prefillRevision || 0);
-    return JSON.stringify({
-        revision: Number.isFinite(revision) ? revision : 0,
-        prefill,
-    });
-}
-
 function getBuilderStateKey(container = {}) {
     return String(container.stateKey || container.id || "reportBuilder").trim() || "reportBuilder";
 }
@@ -157,153 +129,6 @@ function dimensionById(config = {}, id = "") {
 
 function groupByOption(config = {}, value = "") {
     return (config?.groupBy?.options || []).find((entry) => String(entry?.value || "").trim() === String(value || "").trim()) || null;
-}
-
-function normalizeLookupFieldName(value = "") {
-    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function selectorLeafName(selector = "") {
-    const parts = String(selector || "").trim().split(".").map((entry) => entry.trim()).filter(Boolean);
-    return parts[parts.length - 1] || "";
-}
-
-function findDialogDefinition(builderContext, dialogId = "") {
-    const id = String(dialogId || "").trim();
-    if (!id) return null;
-    const dialogs = Array.isArray(builderContext?.metadata?.dialogs) ? builderContext.metadata.dialogs : [];
-    return dialogs.find((entry) => String(entry?.id || "").trim() === id) || null;
-}
-
-function inferLookupResolveInput(dialog = {}, filterDef = {}) {
-    const explicit = String(filterDef?.lookup?.resolveInput || dialog?.properties?.resolveInput || "").trim();
-    if (explicit) return explicit;
-    const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
-        ? dialog.properties.quickFilters
-        : (dialog?.properties?.quickFilter ? [dialog.properties.quickFilter] : []);
-    const fields = specs.map((spec) => String(spec?.field || spec?.id || "").trim()).filter(Boolean);
-    if (fields.length === 0) return "";
-    const valueKey = normalizeLookupFieldName(selectorLeafName(filterDef?.valueSelector || "value"));
-    const exact = fields.find((field) => normalizeLookupFieldName(field) === valueKey);
-    if (exact) return exact;
-    return fields.find((field) => normalizeLookupFieldName(field).endsWith("id")) || fields[0] || "";
-}
-
-function selectionNeedsLabelHydration(selection = {}) {
-    if (!selection || selection.value === undefined || selection.value === null || selection.value === "") {
-        return false;
-    }
-    const valueText = String(selection.value).trim();
-    const labelText = String(selection.label ?? "").trim();
-    return !labelText || labelText === valueText;
-}
-
-function buildLookupHydrationJobs(builderContext, config = {}, state = {}, resolveLookup) {
-    const jobs = [];
-    (config.dynamicFilterGroups || []).forEach((group) => {
-        const groupId = String(group?.id || "").trim();
-        if (!groupId) return;
-        (state?.dynamicGroups?.[groupId] || []).forEach((row) => {
-            const filterDef = (group.filters || []).find((entry) => String(entry?.id || "").trim() === String(row?.filterId || "").trim());
-            if (!filterDef) return;
-            const descriptor = resolveLookup?.(group, filterDef, row.id) || {};
-            const dialogId = String(descriptor?.dialogId || filterDef?.dialogId || filterDef?.lookup?.dialogId || "").trim();
-            const dialog = findDialogDefinition(builderContext, dialogId);
-            const dataSourceRef = String(descriptor?.dataSourceRef || filterDef?.lookup?.dataSource || dialog?.dataSourceRef || "").trim();
-            const resolveInput = inferLookupResolveInput(dialog, filterDef);
-            if (!dataSourceRef || !resolveInput) return;
-            (row.selections || []).forEach((selection, selectionIndex) => {
-                if (!selectionNeedsLabelHydration(selection)) return;
-                jobs.push({
-                    groupId,
-                    rowId: row.id,
-                    selectionIndex,
-                    value: selection.value,
-                    filterDef,
-                    dataSourceRef,
-                    resolveInput,
-                });
-            });
-        });
-    });
-    return jobs;
-}
-
-async function fetchLookupHydrationRecord(job) {
-    const response = await fetch(`/v1/api/datasources/${encodeURIComponent(job.dataSourceRef)}/fetch`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            inputs: {
-                [job.resolveInput]: job.value,
-            },
-        }),
-    });
-    if (!response.ok) {
-        throw new Error(`lookup label resolve failed: ${response.status} ${response.statusText}`);
-    }
-    const body = await response.json();
-    const rows = Array.isArray(body?.rows) ? body.rows : [];
-    return rows[0] || null;
-}
-
-async function hydrateReportBuilderLookupLabels(builderContext, config = {}, state = {}, resolveLookup) {
-    const jobs = buildLookupHydrationJobs(builderContext, config, state, resolveLookup);
-    if (jobs.length === 0) return null;
-    const next = JSON.parse(JSON.stringify(state || {}));
-    let changed = false;
-    for (const job of jobs) {
-        try {
-            const record = await fetchLookupHydrationRecord(job);
-            if (!record) continue;
-            const [projected] = projectLookupSelections(job.filterDef, record);
-            if (!projected || !projected.label || String(projected.label).trim() === String(job.value).trim()) {
-                continue;
-            }
-            const rows = next?.dynamicGroups?.[job.groupId] || [];
-            const row = rows.find((entry) => entry.id === job.rowId);
-            if (!row || !Array.isArray(row.selections) || !row.selections[job.selectionIndex]) {
-                continue;
-            }
-            row.selections[job.selectionIndex] = projected;
-            changed = true;
-        } catch (error) {
-            console.warn("reportBuilder lookup label hydration failed", error);
-        }
-    }
-    return changed ? next : null;
-}
-
-export function resolveReportBuilderLookupDescriptor(builderContext, config = {}, state = {}, group = {}, filterDef = {}, rowId = "") {
-    const base = filterDef?.lookup && typeof filterDef.lookup === "object"
-        ? { ...filterDef.lookup }
-        : {};
-    const handlerName = String(base?.hook || config?.hooks?.resolveLookup || "").trim();
-    if (!handlerName || !builderContext?.lookupHandler) {
-        return base;
-    }
-    try {
-        const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
-        const resolved = handler({
-            context: builderContext,
-            config,
-            state,
-            group,
-            filterDef,
-            rowId,
-        });
-        if (!resolved || typeof resolved !== "object" || Array.isArray(resolved)) {
-            return base;
-        }
-        return {
-            ...base,
-            ...resolved,
-        };
-    } catch (error) {
-        console.error("reportBuilder lookup hook failed", error);
-        return base;
-    }
 }
 
 function resolveMeasureSections(config = {}, measures = []) {
@@ -381,19 +206,12 @@ function countConfiguredDynamicSelections(rows = []) {
     ), 0);
 }
 
-function filterCategoryIcon(categoryId = "") {
-    switch (String(categoryId || "").trim()) {
-        case "channelIds":
-            return "layers";
-        case "scope":
-            return "target";
-        case "inventory":
-            return "box";
-        case "targeting":
-            return "diagram-tree";
-        default:
-            return "filter";
+function filterCategoryIcon(category = {}) {
+    if (typeof category === "string") {
+        return "filter";
     }
+    const explicit = String(category?.icon || "").trim();
+    return explicit || "filter";
 }
 
 function filterCategoryStateLabel({ active = false, configuredCount = 0 } = {}) {
@@ -477,7 +295,7 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
         chart: {
             type: config.result?.chartType || "line",
             xAxis: {
-                dataKey: resolveReportBuilderDimensionDisplayKey(xDimension) || "eventDate",
+                dataKey: resolveReportBuilderDimensionDisplayKey(xDimension) || xDimension?.key || xDimension?.id || "name",
                 tickFormat: xDimension?.tickFormat,
             },
             yAxis: {
@@ -506,28 +324,43 @@ function chartPresetStorageKey(storageScope = "") {
     return `${REPORT_BUILDER_CHART_PRESET_PREFIX}.${normalized}`;
 }
 
-function loadStoredChartPresets(storageScope = "") {
+function loadStoredChartPresets(storageScope = "", legacyScopes = []) {
     if (typeof window === "undefined" || !window.localStorage) {
         return [];
     }
     try {
-        const raw = window.localStorage.getItem(chartPresetStorageKey(storageScope));
-        if (!raw) {
-            return [];
+        const scopes = Array.from(new Set([storageScope, ...(Array.isArray(legacyScopes) ? legacyScopes : [legacyScopes])]
+            .map((entry) => String(entry || "").trim())));
+        if (scopes.length === 0) {
+            scopes.push("");
         }
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
+        for (const scope of scopes) {
+            const raw = window.localStorage.getItem(chartPresetStorageKey(scope));
+            if (!raw) {
+                continue;
+            }
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed;
+            }
+        }
+        return [];
     } catch (_) {
         return [];
     }
 }
 
-function persistStoredChartPresets(storageScope = "", presets = []) {
+function persistStoredChartPresets(storageScope = "", presets = [], legacyScopes = []) {
     if (typeof window === "undefined" || !window.localStorage) {
         return;
     }
     try {
         window.localStorage.setItem(chartPresetStorageKey(storageScope), JSON.stringify(presets));
+        Array.from(new Set((Array.isArray(legacyScopes) ? legacyScopes : [legacyScopes])
+            .map((entry) => String(entry || "").trim())
+            .filter((entry) => entry && entry !== String(storageScope || "").trim()))).forEach((scope) => {
+            window.localStorage.removeItem(chartPresetStorageKey(scope));
+        });
     } catch (_) {}
 }
 
@@ -556,49 +389,6 @@ function dedupeChartPresets(presets = []) {
 
 function upsertChartPreset(presets = [], nextPreset = null) {
     return dedupeChartPresets([nextPreset, ...normalizeArray(presets)]);
-}
-
-const CHART_TYPE_LABELS = {
-    line: "Line",
-    bar: "Bar",
-    area: "Area",
-    pie: "Pie",
-    donut: "Donut",
-    horizontal_bar: "Horizontal bar",
-    funnel_bar: "Funnel",
-};
-const CARTESIAN_CHART_TYPES = new Set(["line", "bar", "area"]);
-const CATEGORY_CHART_TYPES = new Set(["pie", "donut", "horizontal_bar", "funnel_bar"]);
-const SINGLE_MEASURE_CATEGORY_TYPES = new Set(["pie", "donut", "funnel_bar"]);
-const PER_SERIES_TYPE_CHOICES = ["line", "bar", "area"];
-
-function chartTypeLabel(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
-    return CHART_TYPE_LABELS[normalized] || normalized || "";
-}
-
-function chartFamilyOf(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
-    if (CARTESIAN_CHART_TYPES.has(normalized)) return "cartesian";
-    if (CATEGORY_CHART_TYPES.has(normalized)) return "category";
-    return null;
-}
-
-function chartFamilyHelperText(type = "") {
-    switch (String(type || "").trim().toLowerCase()) {
-        case "pie":
-        case "donut":
-            return "Pie and donut charts use one category dimension and a single measure to slice.";
-        case "horizontal_bar":
-            return "Horizontal bars compare a category against one or more measures.";
-        case "funnel_bar":
-            return "Funnel charts use one category dimension and a single measure ordered by value.";
-        case "line":
-        case "bar":
-        case "area":
-        default:
-            return "Pick a category for the X-axis, then one or more measures. Add a series dimension to split a single measure by group.";
-    }
 }
 
 function fieldLabelForError(field = "", { dimensions = [], measures = [] } = {}) {
@@ -681,18 +471,10 @@ function chartErrorMessage(error = {}, context = {}) {
     }
 }
 
-function supportsStackForSeries(chartType = "", perSeriesType = "") {
-    const base = String(chartType || "").trim().toLowerCase();
-    if (base === "horizontal_bar") return true;
-    if (!CARTESIAN_CHART_TYPES.has(base)) return false;
-    const effective = String(perSeriesType || base).trim().toLowerCase();
-    return effective === "bar" || effective === "area";
-}
-
 function sanitizeChartDraftPatch(currentDraft = {}, patch = {}) {
     const next = { ...(currentDraft || {}), ...(patch || {}) };
     const nextType = String(next.type || "").trim().toLowerCase();
-    const nextFamily = chartFamilyOf(nextType);
+    const nextFamily = chartFamilyForType(nextType);
     let nextY = Array.isArray(next.yFields) ? next.yFields.map((entry) => String(entry || "").trim()).filter(Boolean) : [];
     nextY = Array.from(new Set(nextY));
     if (SINGLE_MEASURE_CATEGORY_TYPES.has(nextType)) {
@@ -741,408 +523,6 @@ function sanitizeChartDraftPatch(currentDraft = {}, patch = {}) {
     return next;
 }
 
-function ReportBuilderChartDialog({
-    isOpen = false,
-    onClose,
-    draft,
-    onDraftChange,
-    onApply,
-    supportedTypes = [],
-    dimensions = [],
-    measures = [],
-    validation = { valid: false, errors: [] },
-}) {
-    const errors = Array.isArray(validation?.errors) ? validation.errors : [];
-    const errorByField = new Map();
-    errors.forEach((entry) => {
-        const field = String(entry?.field || "").trim();
-        if (!field || errorByField.has(field)) return;
-        errorByField.set(field, entry);
-    });
-    const hasYFieldsError = errors.some((entry) => String(entry?.field || "").startsWith("yFields"));
-    const draftType = String(draft?.type || supportedTypes[0] || "line").trim().toLowerCase();
-    const family = chartFamilyOf(draftType);
-    const isSingleMeasureCategory = SINGLE_MEASURE_CATEGORY_TYPES.has(draftType);
-    const xFieldValue = String(draft?.xField || "").trim();
-    const yFieldList = Array.isArray(draft?.yFields)
-        ? draft.yFields.map((entry) => String(entry || "").trim()).filter(Boolean)
-        : [];
-    const seriesFieldValue = String(draft?.seriesField || "").trim();
-    const seriesOptions = draft?.seriesOptions && typeof draft.seriesOptions === "object"
-        ? draft.seriesOptions
-        : {};
-    const seriesFieldAllowed = family === "cartesian";
-    const seriesFieldEnabled = seriesFieldAllowed && yFieldList.length <= 1;
-    const seriesOptionsVisible = (family === "cartesian" || draftType === "horizontal_bar")
-        && yFieldList.length > 1
-        && !seriesFieldValue;
-    const errorContext = { dimensions, measures };
-
-    const applyPatch = (patch) => {
-        const next = sanitizeChartDraftPatch(draft || {}, patch);
-        if (typeof onDraftChange === "function") {
-            onDraftChange(next);
-        }
-    };
-
-    const toggleMeasure = (measureKey) => {
-        const key = String(measureKey || "").trim();
-        if (!key) return;
-        if (isSingleMeasureCategory) {
-            applyPatch({ yFields: [key] });
-            return;
-        }
-        const has = yFieldList.includes(key);
-        const nextYFields = has ? yFieldList.filter((entry) => entry !== key) : [...yFieldList, key];
-        applyPatch({ yFields: nextYFields });
-    };
-
-    const setSeriesOption = (measureKey, optionPatch) => {
-        const key = String(measureKey || "").trim();
-        if (!key) return;
-        const previousOptions = draft?.seriesOptions && typeof draft.seriesOptions === "object" && !Array.isArray(draft.seriesOptions)
-            ? draft.seriesOptions
-            : {};
-        const previousEntry = previousOptions[key] && typeof previousOptions[key] === "object" ? previousOptions[key] : {};
-        const mergedEntry = { ...previousEntry, ...(optionPatch || {}) };
-        Object.keys(mergedEntry).forEach((entryKey) => {
-            const value = mergedEntry[entryKey];
-            if (value === "" || value === null || value === undefined) {
-                delete mergedEntry[entryKey];
-            }
-        });
-        const nextOptions = { ...previousOptions };
-        if (Object.keys(mergedEntry).length === 0) {
-            delete nextOptions[key];
-        } else {
-            nextOptions[key] = mergedEntry;
-        }
-        applyPatch({ seriesOptions: Object.keys(nextOptions).length > 0 ? nextOptions : null });
-    };
-
-    const renderMeasureChips = () => (
-        <div className={[
-            "forge-report-builder__chart-measure-chips",
-            hasYFieldsError ? "is-invalid" : "",
-        ].filter(Boolean).join(" ")}>
-            {measures.length === 0 ? (
-                <div className="forge-report-builder__chart-empty-hint">No measures available in the current table.</div>
-            ) : null}
-            {measures.map((entry) => {
-                const active = yFieldList.includes(entry.key);
-                return (
-                    <button
-                        key={entry.key}
-                        type="button"
-                        className={[
-                            "forge-report-builder__chart-measure-chip",
-                            active ? "is-active" : "",
-                        ].filter(Boolean).join(" ")}
-                        onClick={() => toggleMeasure(entry.key)}
-                        title={entry.label || entry.key}
-                    >
-                        <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>
-                            {active ? "✓" : ""}
-                        </span>
-                        <span>{entry.label || entry.key}</span>
-                    </button>
-                );
-            })}
-        </div>
-    );
-
-    const renderSeriesOptionsTable = () => {
-        const showRenderAs = family === "cartesian";
-        const showAxis = family === "cartesian";
-        const showStack = family === "cartesian" || draftType === "horizontal_bar";
-        return (
-            <div className="forge-report-builder__chart-series-options">
-                <div className="forge-report-builder__chart-series-options-header">
-                    <span className="forge-report-builder__chart-series-options-title">Per-measure options</span>
-                    <span className="forge-report-builder__chart-series-options-hint">
-                        Customize how each selected measure renders inside this combo chart.
-                    </span>
-                </div>
-                <table className="forge-report-builder__chart-series-options-table">
-                    <thead>
-                        <tr>
-                            <th>Measure</th>
-                            {showRenderAs ? <th>Render as</th> : null}
-                            {showAxis ? <th>Axis</th> : null}
-                            {showStack ? <th>Stack group</th> : null}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {yFieldList.map((measureKey) => {
-                            const measure = measures.find((entry) => entry.key === measureKey);
-                            const option = seriesOptions[measureKey] && typeof seriesOptions[measureKey] === "object"
-                                ? seriesOptions[measureKey]
-                                : {};
-                            const seriesType = String(option.type || "").trim();
-                            const axisValue = String(option.axis || "").trim();
-                            const stackId = typeof option.stackId === "string" ? option.stackId : "";
-                            const stackEnabled = showStack && supportsStackForSeries(draftType, seriesType);
-                            return (
-                                <tr key={measureKey}>
-                                    <td>{measure?.label || measureKey}</td>
-                                    {showRenderAs ? (
-                                        <td>
-                                            <select
-                                                className="forge-report-builder-select forge-report-builder-select--compact"
-                                                value={seriesType}
-                                                onChange={(event) => setSeriesOption(measureKey, { type: event.target.value || null })}
-                                            >
-                                                <option value="">Default ({chartTypeLabel(draftType)})</option>
-                                                {PER_SERIES_TYPE_CHOICES.map((option) => (
-                                                    <option key={option} value={option}>{chartTypeLabel(option)}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                    ) : null}
-                                    {showAxis ? (
-                                        <td>
-                                            <select
-                                                className="forge-report-builder-select forge-report-builder-select--compact"
-                                                value={axisValue || "left"}
-                                                onChange={(event) => setSeriesOption(measureKey, { axis: event.target.value })}
-                                            >
-                                                <option value="left">Left</option>
-                                                <option value="right">Right</option>
-                                            </select>
-                                        </td>
-                                    ) : null}
-                                    {showStack ? (
-                                        <td>
-                                            <input
-                                                type="text"
-                                                disabled={!stackEnabled}
-                                                className="forge-report-builder-select forge-report-builder-select--compact"
-                                                value={stackId}
-                                                placeholder={stackEnabled ? "Optional" : "n/a"}
-                                                onChange={(event) => setSeriesOption(measureKey, { stackId: event.target.value })}
-                                            />
-                                        </td>
-                                    ) : null}
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        );
-    };
-
-    return (
-        <Dialog
-            isOpen={isOpen}
-            onClose={onClose}
-            title="Create Chart"
-            style={{ width: "min(820px, calc(100vw - 48px))" }}
-        >
-            <div className="forge-report-builder__chart-dialog">
-                <div className="forge-report-builder__chart-dialog-grid">
-                    <label className="forge-report-builder__chart-field">
-                        <span>Title</span>
-                        <input
-                            type="text"
-                            className="forge-report-builder-select"
-                            value={draft?.title || ""}
-                            onChange={(event) => applyPatch({ title: event.target.value })}
-                            placeholder="Enter chart title"
-                        />
-                    </label>
-                    <label className="forge-report-builder__chart-field">
-                        <span>Chart Type</span>
-                        <select
-                            className={errorByField.has("type") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
-                            value={draftType}
-                            onChange={(event) => applyPatch({ type: event.target.value })}
-                        >
-                            {supportedTypes.map((entry) => (
-                                <option key={entry} value={entry}>{chartTypeLabel(entry)}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="forge-report-builder__chart-field">
-                        <span>{family === "category" ? "Category" : "X-axis"}</span>
-                        <select
-                            className={errorByField.has("xField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
-                            value={xFieldValue}
-                            onChange={(event) => applyPatch({ xField: event.target.value })}
-                        >
-                            <option value="">Select…</option>
-                            {dimensions.map((entry) => (
-                                <option key={entry.key} value={entry.key}>{entry.label}</option>
-                            ))}
-                        </select>
-                    </label>
-                    {seriesFieldAllowed ? (
-                        <label className="forge-report-builder__chart-field">
-                            <span>Series / Color</span>
-                            <select
-                                className={errorByField.has("seriesField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
-                                value={seriesFieldValue}
-                                onChange={(event) => applyPatch({ seriesField: event.target.value || null })}
-                                disabled={!seriesFieldEnabled}
-                                title={seriesFieldEnabled ? "" : "Available only when a single measure is selected."}
-                            >
-                                <option value="">None</option>
-                                {dimensions.filter((entry) => entry.key !== xFieldValue).map((entry) => (
-                                    <option key={entry.key} value={entry.key}>{entry.label}</option>
-                                ))}
-                            </select>
-                        </label>
-                    ) : <span />}
-                    <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
-                        <span>{isSingleMeasureCategory ? "Measure" : "Measures"}</span>
-                        {renderMeasureChips()}
-                    </div>
-                </div>
-                <p className="forge-report-builder__chart-dialog-hint">{chartFamilyHelperText(draftType)}</p>
-                {seriesOptionsVisible ? renderSeriesOptionsTable() : null}
-                {errors.length > 0 ? (
-                    <div className="forge-report-builder__chart-errors">
-                        {errors.map((entry, index) => (
-                            <div key={`${entry.field}_${entry.code}_${index}`} className="forge-report-builder__chart-error">
-                                {chartErrorMessage(entry, errorContext)}
-                            </div>
-                        ))}
-                    </div>
-                ) : null}
-            </div>
-            <div className="forge-report-builder__chart-dialog-actions">
-                <Button outlined onClick={onClose}>Cancel</Button>
-                <Button intent="primary" onClick={onApply} disabled={!validation?.valid}>Apply Chart</Button>
-            </div>
-        </Dialog>
-    );
-}
-
-function ReportBuilderChartTile({
-    title = "Chart",
-    description = "",
-    canCreate = false,
-    onCreate,
-    defaultChartSpecs = [],
-    onApplyDefault,
-    previousChartPresets = [],
-    selectedPreviousTitle = "",
-    onSelectPrevious,
-    onApplyPrevious,
-    previousDisabled = true,
-    warning = false,
-    onRemove,
-}) {
-    return (
-        <section className={warning ? "forge-report-builder__chart-tile is-warning" : "forge-report-builder__chart-tile"}>
-            <div className="forge-report-builder__chart-tile-copy">
-                <div className="forge-report-builder__chart-tile-eyebrow">{warning ? "Chart needs attention" : "Chart"}</div>
-                <h4>{title}</h4>
-                {description ? <p>{description}</p> : null}
-                <div className="forge-report-builder__chart-tile-helper">
-                    Only fields visible in the table can be charted.
-                </div>
-            </div>
-            <div className="forge-report-builder__chart-tile-actions">
-                <Button intent="primary" icon="add" disabled={!canCreate} onClick={onCreate}>
-                    Create Chart
-                </Button>
-                {defaultChartSpecs.length > 0 ? (
-                    <div className="forge-report-builder__chart-preset-list">
-                        {defaultChartSpecs.map((entry) => (
-                            <button
-                                key={`${entry.title}_${entry.type}_${entry.xField}`}
-                                type="button"
-                                className="forge-report-builder__chart-preset-button"
-                                onClick={() => onApplyDefault(entry)}
-                            >
-                                <span className="forge-report-builder__chart-preset-title">{entry.title}</span>
-                                <span className="forge-report-builder__chart-preset-meta">{entry.type}</span>
-                            </button>
-                        ))}
-                    </div>
-                ) : null}
-                <div className="forge-report-builder__chart-previous">
-                    <select
-                        className="forge-report-builder-select"
-                        value={selectedPreviousTitle}
-                        onChange={(event) => onSelectPrevious(event.target.value)}
-                    >
-                        <option value="">Previous</option>
-                        {previousChartPresets.map((preset) => (
-                            <option key={`${preset.title}_${preset.updatedAt}`} value={preset.title}>{preset.title}</option>
-                        ))}
-                    </select>
-                    <Button outlined disabled={previousDisabled} onClick={onApplyPrevious}>
-                        Apply
-                    </Button>
-                </div>
-                {warning && onRemove ? (
-                    <Button outlined intent="danger" onClick={onRemove}>Remove Chart</Button>
-                ) : null}
-            </div>
-        </section>
-    );
-}
-
-function ReportBuilderChartQuickActions({
-    canCreate = false,
-    onCreate,
-    quickOptions = [],
-    selectedQuickOption = "",
-    onSelectQuickOption,
-    onApplyQuickOption,
-    quickDisabled = true,
-}) {
-    if (!canCreate && quickOptions.length === 0) {
-        return null;
-    }
-    return (
-        <div className="forge-report-builder__chart-quick-actions">
-            <Button
-                small
-                outlined
-                icon="add"
-                disabled={!canCreate}
-                onClick={onCreate}
-            >
-                Create Chart
-            </Button>
-            {quickOptions.length > 0 ? (
-                <>
-                    <select
-                        className="forge-report-builder-select forge-report-builder-select--compact"
-                        value={selectedQuickOption}
-                        onChange={(event) => onSelectQuickOption(event.target.value)}
-                    >
-                        <option value="">Quick chart…</option>
-                        {quickOptions.map((option) => (
-                            <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                    </select>
-                    <Button small outlined disabled={quickDisabled} onClick={onApplyQuickOption}>
-                        Apply
-                    </Button>
-                </>
-            ) : null}
-        </div>
-    );
-}
-
-function collectOptionRows(rows = [], childKeys = ["children", "childNodes"], result = []) {
-    (rows || []).forEach((row) => {
-        if (!row || typeof row !== "object") return;
-        result.push(row);
-        childKeys.forEach((key) => {
-            const children = row?.[key];
-            if (Array.isArray(children) && children.length > 0) {
-                collectOptionRows(children, childKeys, result);
-            }
-        });
-    });
-    return result;
-}
-
 function normalizeArray(value) {
     if (Array.isArray(value)) {
         return value.filter((entry) => entry !== undefined && entry !== null && entry !== "");
@@ -1166,407 +546,6 @@ function nextDynamicRowId(rows = []) {
         }
     });
     return `row_${maxIndex + 1}`;
-}
-
-function resolveFilterOptions(filter = {}, collection = []) {
-    if (Array.isArray(filter.options) && filter.options.length > 0) {
-        return filter.options;
-    }
-    const childKeys = Array.isArray(filter.optionChildKeys) && filter.optionChildKeys.length > 0
-        ? filter.optionChildKeys
-        : ["children", "childNodes"];
-    const rows = collectOptionRows(collection, childKeys, []);
-    return rows
-        .map((row) => ({
-            value: resolveKey(row, filter.optionValueSelector || filter.valueSelector || filter.optionValueField || "id"),
-            label: resolveKey(row, filter.optionLabelSelector || filter.labelSelector || filter.optionLabelField || "name"),
-            icon: resolveKey(row, filter.optionIconSelector || filter.optionIconField || "icon"),
-        }))
-        .filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== "");
-}
-
-function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) {
-    useSignals();
-    const optionContext = filter.optionsDataSourceRef && typeof context?.Context === "function"
-        ? context.Context(filter.optionsDataSourceRef)
-        : null;
-    const optionCollection = optionContext?.signals?.collection?.value || [];
-
-    useEffect(() => {
-        if (!optionContext || filter.autoFetchOptions === false) {
-            return;
-        }
-        optionContext.handlers?.dataSource?.fetchCollection?.();
-    }, [optionContext, filter.autoFetchOptions]);
-
-    const options = useMemo(
-        () => resolveFilterOptions(filter, optionCollection || []),
-        [filter, optionCollection],
-    );
-    const activeValues = filter.multiple ? (Array.isArray(value) ? value : []) : [value];
-
-    if (filter.type === "dateRange") {
-        return (
-            <section className={[
-                "forge-report-builder__panel",
-                "forge-report-builder__panel--bottom",
-                "forge-report-builder__panel--date-range",
-                filter.required ? "forge-report-builder__panel--required" : "",
-            ].filter(Boolean).join(" ")}>
-                <div className="forge-report-builder__panel-headerline">
-                    <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
-                </div>
-                <div className="forge-report-builder__date-range">
-                    <input
-                        type="date"
-                        value={value?.start || ""}
-                        onChange={(event) => onDateRange("start", event.target.value)}
-                    />
-                    <span>to</span>
-                    <input
-                        type="date"
-                        value={value?.end || ""}
-                        onChange={(event) => onDateRange("end", event.target.value)}
-                    />
-                </div>
-            </section>
-        );
-    }
-
-    return (
-        <section className={[
-            "forge-report-builder__panel",
-            "forge-report-builder__panel--bottom",
-            filter.required ? "forge-report-builder__panel--required" : "",
-        ].filter(Boolean).join(" ")}>
-            <div className="forge-report-builder__panel-headerline">
-                <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
-            </div>
-            <div className={String(filter.id || "").trim() === "channelIds" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
-                {options.map((option) => {
-                    const active = activeValues.includes(option.value);
-                    return (
-                        <button
-                            key={String(option.value)}
-                            type="button"
-                            className={[
-                                "forge-report-builder-icon-button",
-                                String(filter.id || "").trim() === "channelIds" ? "forge-report-builder-icon-button--compact" : "",
-                                active ? "is-active" : "",
-                            ].filter(Boolean).join(" ")}
-                            onClick={() => onToggle(option.value)}
-                            title={option.label}
-                        >
-                            <span className="forge-report-builder-icon-button__icon">
-                                {option.icon ? <Icon icon={option.icon} size={18} /> : null}
-                            </span>
-                            <span className="forge-report-builder-icon-button__label">{option.label}</span>
-                        </button>
-                    );
-                })}
-            </div>
-        </section>
-    );
-}
-
-function DynamicFilterGroup({
-    group,
-    rows,
-    resolveLookup,
-    onAddRow,
-    onChangeFilter,
-    onPick,
-    onAddManualSelection,
-    onRemoveSelection,
-    onToggleEnabled,
-    onRemoveRow,
-}) {
-    const filters = Array.isArray(group.filters) ? group.filters : [];
-    const [manualDrafts, setManualDrafts] = useState({});
-
-    const renderAddLineButton = () => (
-        <button type="button" className="forge-report-builder-add-line-button" onClick={onAddRow}>
-            <span className="forge-report-builder-add-line-button__icon">
-                <Icon icon="add" size={13} />
-            </span>
-            <span>{group.addLabel || "Add line"}</span>
-        </button>
-    );
-
-    return (
-        <section className="forge-report-builder-dynamic-group">
-            <div className="forge-report-builder-dynamic-group__header">
-                <div>
-                    <h4>{group.label || group.id}</h4>
-                    {group.description ? <p>{group.description}</p> : null}
-                </div>
-                {renderAddLineButton()}
-            </div>
-            <div className="forge-report-builder-dynamic-group__rows">
-                {(rows || []).length === 0 ? (
-                    <div className="forge-report-builder-dynamic-group__empty">
-                        No filters added yet.
-                    </div>
-                ) : null}
-                {(rows || []).map((row) => {
-                    const selectedFilter = filters.find((entry) => String(entry?.id || "").trim() === String(row.filterId || "").trim()) || filters[0] || null;
-                    const lookup = resolveLookup?.(group, selectedFilter, row.id) || null;
-                    const placeholder = selectedFilter?.placeholder || selectedFilter?.label || "Select value";
-                    const dialogId = lookup?.dialogId || selectedFilter?.dialogId || selectedFilter?.lookup?.dialogId || "";
-                    const enabled = row?.enabled !== false;
-                    const allowManualEntry = selectedFilter?.manualEntry === true;
-                    const manualDraft = manualDrafts[row.id] || "";
-                    return (
-                        <div key={row.id} className={[
-                            "forge-report-builder-dynamic-row",
-                            enabled ? "" : "is-disabled",
-                        ].filter(Boolean).join(" ")} data-report-builder-row-id={row.id}>
-                            <div className="forge-report-builder-dynamic-row__controls">
-                                <select
-                                    className="forge-report-builder-select forge-report-builder-select--targeting-key"
-                                    value={row.filterId || ""}
-                                    onChange={(event) => onChangeFilter(row.id, event.target.value)}
-                                >
-                                    {filters.map((entry) => (
-                                        <option key={entry.id} value={entry.id}>
-                                            {entry.label || entry.id}
-                                        </option>
-                                    ))}
-                                </select>
-                                <LookupSelectionInput
-                                    selections={row.selections || []}
-                                    inputValue={manualDraft}
-                                    placeholder={allowManualEntry ? (selectedFilter?.manualPlaceholder || placeholder) : placeholder}
-                                    browseLabel={placeholder}
-                                    allowManualEntry={allowManualEntry}
-                                    disabled={!enabled}
-                                    onInputChange={(value) => setManualDrafts((current) => ({
-                                        ...current,
-                                        [row.id]: value,
-                                    }))}
-                                    onInputCommit={(value) => {
-                                        const added = onAddManualSelection(row.id, selectedFilter, value);
-                                        if (added) {
-                                            setManualDrafts((current) => ({
-                                                ...current,
-                                                [row.id]: "",
-                                            }));
-                                        }
-                                    }}
-                                    onBrowse={dialogId ? () => onPick(row.id, selectedFilter, lookup) : null}
-                                    onRemoveSelection={(index) => onRemoveSelection(row.id, index)}
-                                />
-                            </div>
-                            <div className="forge-report-builder-dynamic-row__actions">
-                                <button
-                                    type="button"
-                                    className={[
-                                        "forge-report-builder-row-toggle",
-                                        enabled ? "is-enabled" : "is-disabled",
-                                    ].join(" ")}
-                                    onClick={() => onToggleEnabled(row.id)}
-                                    aria-pressed={enabled}
-                                    title={enabled ? "Filter is active" : "Filter is off"}
-                                >
-                                    <Icon icon={enabled ? "eye-open" : "eye-off"} size={12} />
-                                    <span>{enabled ? "On" : "Off"}</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    className="forge-report-builder-remove-row"
-                                    onClick={() => onRemoveRow(row.id)}
-                                    aria-label="Remove filter row"
-                                >
-                                    ×
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </section>
-    );
-}
-
-function resolveFamilyOptionKey(filterDef = {}, fallbackId = "") {
-    const direct = String(filterDef?.targetingFeatureKey || "").trim();
-    if (direct) {
-        return direct;
-    }
-    const filterId = String(filterDef?.id || fallbackId || "").trim();
-    return filterId.replace(/^(include|exclude)/i, "");
-}
-
-function buildDynamicFamilyOptions(family = {}, dynamicFilterGroups = []) {
-    const includeGroup = dynamicFilterGroups.find((entry) => String(entry?.id || "").trim() === "include");
-    const excludeGroup = dynamicFilterGroups.find((entry) => String(entry?.id || "").trim() === "exclude");
-    const includeById = new Map(normalizeArray(includeGroup?.filters).map((entry) => [String(entry?.id || "").trim(), entry]));
-    const excludeById = new Map(normalizeArray(excludeGroup?.filters).map((entry) => [String(entry?.id || "").trim(), entry]));
-    const optionMap = new Map();
-
-    const register = (direction, filterId) => {
-        const keyId = String(filterId || "").trim();
-        if (!keyId) return;
-        const filterDef = direction === "include" ? includeById.get(keyId) : excludeById.get(keyId);
-        if (!filterDef) return;
-        const optionKey = resolveFamilyOptionKey(filterDef, keyId);
-        const existing = optionMap.get(optionKey) || {
-            key: optionKey,
-            label: String(filterDef?.label || optionKey).trim(),
-            includeFilter: null,
-            excludeFilter: null,
-        };
-        existing[direction === "include" ? "includeFilter" : "excludeFilter"] = filterDef;
-        if (!existing.label) {
-            existing.label = String(filterDef?.label || optionKey).trim();
-        }
-        optionMap.set(optionKey, existing);
-    };
-
-    normalizeArray(family.includeFilterIds).forEach((filterId) => register("include", filterId));
-    normalizeArray(family.excludeFilterIds).forEach((filterId) => register("exclude", filterId));
-
-    return Array.from(optionMap.values());
-}
-
-function buildDynamicFamilyRows(state = {}, family = {}, dynamicFilterGroups = []) {
-    const options = buildDynamicFamilyOptions(family, dynamicFilterGroups);
-    const includeRows = normalizeArray(state?.dynamicGroups?.include).filter((row) => normalizeArray(family.includeFilterIds).includes(String(row?.filterId || "").trim()));
-    const excludeRows = normalizeArray(state?.dynamicGroups?.exclude).filter((row) => normalizeArray(family.excludeFilterIds).includes(String(row?.filterId || "").trim()));
-    const enrich = (rows, direction) => rows.map((row) => {
-        const option = options.find((entry) => {
-            const target = direction === "include" ? entry.includeFilter : entry.excludeFilter;
-            return String(target?.id || "").trim() === String(row?.filterId || "").trim();
-        }) || null;
-        return {
-            ...row,
-            direction,
-            optionKey: option?.key || "",
-        };
-    });
-    return [...enrich(includeRows, "include"), ...enrich(excludeRows, "exclude")];
-}
-
-function DynamicFamilyGroup({
-    family,
-    rows,
-    options,
-    resolveLookup,
-    onAddRow,
-    onChangeFilter,
-    onChangeDirection,
-    onPick,
-    onAddManualSelection,
-    onRemoveSelection,
-    onToggleEnabled,
-    onRemoveRow,
-}) {
-    const [manualDrafts, setManualDrafts] = useState({});
-
-    return (
-        <section className="forge-report-builder-dynamic-group forge-report-builder-dynamic-group--family">
-            <div className="forge-report-builder-dynamic-group__header">
-                <div>
-                    <h4>{family.label}</h4>
-                    {family.description ? <p>{family.description}</p> : null}
-                </div>
-                <button type="button" className="forge-report-builder-add-line-button" onClick={onAddRow}>
-                    <span className="forge-report-builder-add-line-button__icon">
-                        <Icon icon="add" size={13} />
-                    </span>
-                    <span>Add line</span>
-                </button>
-            </div>
-            <div className="forge-report-builder-dynamic-group__rows">
-                {rows.map((row) => {
-                    const option = options.find((entry) => entry.key === row.optionKey) || options[0] || null;
-                    const effectiveOptionKey = row.optionKey || option?.key || "";
-                    const selectedFilter = row.direction === "exclude" ? option?.excludeFilter : option?.includeFilter;
-                    const fallbackFilter = selectedFilter || option?.includeFilter || option?.excludeFilter || null;
-                    const groupRef = { id: row.direction };
-                    const lookup = resolveLookup?.(groupRef, fallbackFilter, row.id) || null;
-                    const placeholder = fallbackFilter?.placeholder || fallbackFilter?.label || "Select value";
-                    const dialogId = lookup?.dialogId || fallbackFilter?.dialogId || fallbackFilter?.lookup?.dialogId || "";
-                    const enabled = row?.enabled !== false;
-                    const allowManualEntry = fallbackFilter?.manualEntry === true;
-                    const manualDraft = manualDrafts[row.id] || "";
-                    const canInclude = !!option?.includeFilter;
-                    const canExclude = !!option?.excludeFilter;
-                    return (
-                        <div key={row.id} className={["forge-report-builder-dynamic-row", enabled ? "" : "is-disabled"].filter(Boolean).join(" ")} data-report-builder-row-id={row.id}>
-                            <div className="forge-report-builder-dynamic-row__controls">
-                                <select
-                                    className="forge-report-builder-select forge-report-builder-select--targeting-key"
-                                    value={effectiveOptionKey}
-                                    onChange={(event) => onChangeFilter(row.id, row.direction, event.target.value)}
-                                >
-                                    {options.map((entry) => (
-                                        <option key={entry.key} value={entry.key}>{entry.label}</option>
-                                    ))}
-                                </select>
-                                <div className="forge-report-builder-direction-toggle" role="radiogroup" aria-label="Filter direction">
-                                    <button
-                                        type="button"
-                                        className={["forge-report-builder-direction-toggle__button", row.direction === "include" ? "is-active" : ""].filter(Boolean).join(" ")}
-                                        disabled={!canInclude}
-                                        aria-pressed={row.direction === "include"}
-                                        onClick={() => onChangeDirection(row.id, row.direction, effectiveOptionKey, "include")}
-                                    >
-                                        Include
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className={["forge-report-builder-direction-toggle__button", row.direction === "exclude" ? "is-active" : ""].filter(Boolean).join(" ")}
-                                        disabled={!canExclude}
-                                        aria-pressed={row.direction === "exclude"}
-                                        onClick={() => onChangeDirection(row.id, row.direction, effectiveOptionKey, "exclude")}
-                                    >
-                                        Exclude
-                                    </button>
-                                </div>
-                                <LookupSelectionInput
-                                    selections={row.selections || []}
-                                    inputValue={manualDraft}
-                                    placeholder={allowManualEntry ? (fallbackFilter?.manualPlaceholder || placeholder) : placeholder}
-                                    browseLabel={placeholder}
-                                    allowManualEntry={allowManualEntry}
-                                    disabled={!enabled}
-                                    onInputChange={(value) => setManualDrafts((current) => ({ ...current, [row.id]: value }))}
-                                    onInputCommit={(value) => {
-                                        const added = onAddManualSelection(row.id, row.direction, fallbackFilter, value);
-                                        if (added) {
-                                            setManualDrafts((current) => ({ ...current, [row.id]: "" }));
-                                        }
-                                    }}
-                                    onBrowse={dialogId ? () => onPick(row.id, row.direction, fallbackFilter, lookup) : null}
-                                    onRemoveSelection={(index) => onRemoveSelection(row.id, row.direction, index)}
-                                />
-                            </div>
-                            <div className="forge-report-builder-dynamic-row__actions">
-                                <button
-                                    type="button"
-                                    className={["forge-report-builder-row-toggle", enabled ? "is-enabled" : "is-disabled"].join(" ")}
-                                    onClick={() => onToggleEnabled(row.id, row.direction)}
-                                    aria-pressed={enabled}
-                                >
-                                    <Icon icon={enabled ? "eye-open" : "eye-off"} size={12} />
-                                    <span>{enabled ? "On" : "Off"}</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    className="forge-report-builder-remove-row"
-                                    onClick={() => onRemoveRow(row.id, row.direction)}
-                                    aria-label="Remove filter row"
-                                >
-                                    ×
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </section>
-    );
 }
 
 function resolveDynamicGroupLayout(config = {}, activeGroupIds = []) {
@@ -1622,28 +601,67 @@ export default function ReportBuilder({ container, context }) {
         ? context.Context(container.dataSourceRef)
         : context;
     const stateKey = useMemo(() => getBuilderStateKey(container), [container]);
+    const stateStorageScope = useMemo(() => resolveReportBuilderStateStorageScope({
+        stateKey,
+        windowId: builderContext?.identity?.windowId,
+        dataSourceRef: builderContext?.identity?.dataSourceRef || container?.dataSourceRef,
+        containerId: container?.id,
+    }), [builderContext?.identity?.dataSourceRef, builderContext?.identity?.windowId, container?.dataSourceRef, container?.id, stateKey]);
+    const legacyStateStorageScopes = useMemo(() => resolveLegacyReportBuilderStateStorageScopes({
+        stateKey,
+        stateStorageScope,
+    }), [stateKey, stateStorageScope]);
+    const legacyChartPresetScopes = useMemo(() => resolveLegacyReportBuilderStateStorageScopes({
+        stateKey,
+        stateStorageScope,
+    }), [stateKey, stateStorageScope]);
     const windowFormSignal = builderContext?.signals?.windowForm;
     const windowFormValue = windowFormSignal?.value || {};
     const persistedState = resolveKey(windowFormValue || {}, stateKey);
+    const locallyStoredState = useMemo(
+        () => loadStoredReportBuilderState(stateStorageScope, legacyStateStorageScopes),
+        [legacyStateStorageScopes, stateStorageScope],
+    );
+    const effectivePersistedState = useMemo(() => {
+        return resolveEffectiveReportBuilderState(persistedState, locallyStoredState);
+    }, [locallyStoredState, persistedState]);
     const currentPrefillSignature = prefillSignature(windowFormValue);
-    const state = useMemo(() => mergeReportBuilderState(config, persistedState), [config, persistedState]);
+    const state = useMemo(() => mergeReportBuilderState(config, effectivePersistedState), [config, effectivePersistedState]);
     const requestFingerprintRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
     const lastAutoCollapsedRunSequenceRef = useRef(0);
+    const lastAutoAppliedChartCycleRef = useRef("");
     const seededDefaultsRef = useRef(false);
     const appliedPrefillSignatureRef = useRef("");
     const hydrationFingerprintRef = useRef("");
+    const storedStateHydrationFingerprintRef = useRef("");
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [chartDialogOpen, setChartDialogOpen] = useState(false);
     const [chartDraft, setChartDraft] = useState(null);
+    const [chartQueryState, setChartQueryState] = useState({
+        fingerprint: "",
+        rows: [],
+        loading: false,
+        error: null,
+    });
     const [storedChartPresets, setStoredChartPresets] = useState([]);
-    const [selectedPreviousChartTitle, setSelectedPreviousChartTitle] = useState("");
     const [selectedQuickChartOption, setSelectedQuickChartOption] = useState("");
+    const [chartApplyFeedback, setChartApplyFeedback] = useState(null);
     const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
     const [manualRunSequence, setManualRunSequence] = useState(0);
     const [pendingScrollRowId, setPendingScrollRowId] = useState("");
     const builderRootRef = useRef(null);
     const leftRailRef = useRef(null);
+    const [builderWidth, setBuilderWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 0));
+    const [compactSheetOpen, setCompactSheetOpen] = useState(false);
+    const [compactSheetTab, setCompactSheetTab] = useState("scope");
+    const [compactChartSheetOpen, setCompactChartSheetOpen] = useState(false);
+
+    const compactBreakpoint = useMemo(() => {
+        const raw = Number(config?.layout?.compactBreakpoint || config?.compactBreakpoint || 820);
+        return Number.isFinite(raw) && raw > 0 ? raw : 820;
+    }, [config]);
+    const compactMode = builderWidth > 0 && builderWidth <= compactBreakpoint;
 
     const { collection = [], loading, error } = useDataSourceState(builderContext);
     const locale = context?.locale || "en-US";
@@ -1652,20 +670,84 @@ export default function ReportBuilder({ container, context }) {
         () => applyReportBuilderComputedMeasures(collection, config),
         [collection, config],
     );
+    const chartQueryCollection = useMemo(
+        () => applyReportBuilderComputedMeasures(chartQueryState.rows, config),
+        [chartQueryState.rows, config],
+    );
+    const replaceWindowFormBuilderState = React.useCallback((baseValues = {}, nextValue = null) => (
+        replaceReportBuilderWindowState(baseValues, stateKey, nextValue)
+    ), [stateKey]);
 
     const persistState = React.useCallback((next) => {
         const normalized = sanitizeReportBuilderState(config, next);
-        const payload = setSelector({}, stateKey, normalized);
-        if (windowFormSignal) {
-            windowFormSignal.value = mergeWindowFormValues(windowFormSignal.peek?.() || {}, payload);
+        persistStoredReportBuilderState(stateStorageScope, normalized, legacyStateStorageScopes);
+        const currentWindowPersisted = resolveKey(windowFormSignal?.peek?.() || {}, stateKey);
+        if (shouldPersistReportBuilderWindowState(currentWindowPersisted, normalized) === false) {
             return;
         }
-        builderContext?.handlers?.dataSource?.setWindowFormData?.({ values: payload });
-    }, [builderContext, config, stateKey, windowFormSignal]);
+        if (windowFormSignal) {
+            windowFormSignal.value = replaceWindowFormBuilderState(windowFormSignal.peek?.() || {}, normalized);
+            return;
+        }
+        const currentWindowForm = builderContext?.handlers?.dataSource?.getWindowFormData?.() || {};
+        builderContext?.handlers?.dataSource?.setWindowFormData?.({
+            values: replaceWindowFormBuilderState(currentWindowForm, normalized),
+            replace: true,
+            bumpPrefillRevision: false,
+        });
+    }, [builderContext, config, legacyStateStorageScopes, replaceWindowFormBuilderState, stateKey, stateStorageScope, windowFormSignal]);
+
+    useEffect(() => {
+        const node = builderRootRef.current;
+        if (!node) {
+            return;
+        }
+        const updateWidth = () => {
+            const nextWidth = Number(node.clientWidth || 0) || (typeof window !== "undefined" ? window.innerWidth : 0);
+            setBuilderWidth((current) => (current === nextWidth ? current : nextWidth));
+        };
+        updateWidth();
+        if (typeof ResizeObserver === "undefined") {
+            return;
+        }
+        const observer = new ResizeObserver(() => updateWidth());
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, []);
+
+    useEffect(() => {
+        if (compactMode) {
+            setFiltersDrawerOpen(false);
+            setSettingsOpen(false);
+            return;
+        }
+        setCompactSheetOpen(false);
+        setCompactChartSheetOpen(false);
+    }, [compactMode]);
 
     const resolveLookup = React.useCallback((group, filterDef, rowId = "") => (
         resolveReportBuilderLookupDescriptor(builderContext, config, state, group, filterDef, rowId)
     ), [builderContext, config, state]);
+    const currentRequest = useMemo(
+        () => applyReportBuilderRequestHook(builderContext, config, state, buildReportBuilderRequest(config, state)),
+        [builderContext, config, state],
+    );
+    const currentRequestFingerprint = useMemo(
+        () => JSON.stringify(currentRequest),
+        [currentRequest],
+    );
+    const chartDataPolicy = useMemo(
+        () => getReportBuilderChartDataPolicy(config),
+        [config],
+    );
+    const chartQueryRequest = useMemo(
+        () => buildReportBuilderChartQueryRequest(currentRequest, chartDataPolicy),
+        [chartDataPolicy, currentRequest],
+    );
+    const chartQueryFingerprint = useMemo(
+        () => (chartQueryRequest ? JSON.stringify(chartQueryRequest) : ""),
+        [chartQueryRequest],
+    );
 
     useEffect(() => {
         const jobs = buildLookupHydrationJobs(builderContext, config, state, resolveLookup);
@@ -1701,13 +783,12 @@ export default function ReportBuilder({ container, context }) {
         if (seededDefaultsRef.current) {
             return;
         }
-        const currentPersisted = resolveKey(windowFormSignal?.peek?.() || {}, stateKey);
-        if (currentPersisted && typeof currentPersisted === "object" && Object.keys(currentPersisted).length > 0) {
+        if (hasStoredReportBuilderState(effectivePersistedState)) {
             seededDefaultsRef.current = true;
             return;
         }
         seededDefaultsRef.current = true;
-        const defaults = mergeReportBuilderState(config, currentPersisted);
+        const defaults = mergeReportBuilderState(config, effectivePersistedState);
         const initialized = mergeReportBuilderState(
             config,
             applyReportBuilderStateHook(
@@ -1717,26 +798,33 @@ export default function ReportBuilder({ container, context }) {
                 windowFormValue,
             ),
         );
-        const payload = setSelector({}, stateKey, initialized);
         if (windowFormSignal) {
-            windowFormSignal.value = mergeWindowFormValues(windowFormSignal.peek?.() || {}, payload);
+            windowFormSignal.value = replaceWindowFormBuilderState(windowFormSignal.peek?.() || {}, initialized);
         } else {
-            builderContext?.handlers?.dataSource?.setWindowFormData?.({ values: payload });
+            const currentWindowForm = builderContext?.handlers?.dataSource?.getWindowFormData?.() || {};
+            builderContext?.handlers?.dataSource?.setWindowFormData?.({
+                values: replaceWindowFormBuilderState(currentWindowForm, initialized),
+                replace: true,
+                bumpPrefillRevision: false,
+            });
         }
-    }, [builderContext, config, stateKey, windowFormSignal, windowFormValue]);
+    }, [builderContext, config, effectivePersistedState, replaceWindowFormBuilderState, stateKey, windowFormSignal, windowFormValue]);
 
     useEffect(() => {
-        const currentPersisted = resolveKey(windowFormSignal?.peek?.() || {}, stateKey);
-        if (!currentPersisted || typeof currentPersisted !== "object" || Object.keys(currentPersisted).length === 0) {
+        if (!shouldHydrateStoredReportBuilderWindowState(persistedState, locallyStoredState)) {
             return;
         }
-        const persistedFingerprint = JSON.stringify(currentPersisted);
-        const stateFingerprint = JSON.stringify(state);
-        if (persistedFingerprint === stateFingerprint) {
+        const normalizedState = sanitizeReportBuilderState(config, state);
+        const hydrationFingerprint = JSON.stringify(normalizedState);
+        if (!hydrationFingerprint || storedStateHydrationFingerprintRef.current === hydrationFingerprint) {
             return;
         }
-        persistState(state);
-    }, [persistState, state, stateKey, windowFormSignal]);
+        storedStateHydrationFingerprintRef.current = hydrationFingerprint;
+        if (shouldPersistReportBuilderWindowState(persistedState, normalizedState) === false) {
+            return;
+        }
+        persistState(normalizedState);
+    }, [config, locallyStoredState, persistState, persistedState, state]);
 
     useEffect(() => {
         if (!currentPrefillSignature || appliedPrefillSignatureRef.current === currentPrefillSignature) {
@@ -1751,41 +839,40 @@ export default function ReportBuilder({ container, context }) {
                 windowFormValue,
             ),
         );
-        appliedPrefillSignatureRef.current = currentPrefillSignature;
         if (JSON.stringify(next) === JSON.stringify(state)) {
+            appliedPrefillSignatureRef.current = currentPrefillSignature;
             return;
         }
         persistState(next);
     }, [builderContext, config, currentPrefillSignature, persistState, state, windowFormValue]);
 
     useEffect(() => {
-        const request = applyRequestHook(
-            builderContext,
-            config,
-            state,
-            buildReportBuilderRequest(config, state),
-        );
-        const fingerprint = JSON.stringify(request);
-        if (!fingerprint || requestFingerprintRef.current === fingerprint) {
+        if (!currentRequestFingerprint || requestFingerprintRef.current === currentRequestFingerprint) {
             return;
         }
-        requestFingerprintRef.current = fingerprint;
+        if (shouldDeferReportBuilderRequestForPrefill({
+            currentPrefillSignature,
+            appliedPrefillSignature: appliedPrefillSignatureRef.current,
+        })) {
+            return;
+        }
+        requestFingerprintRef.current = currentRequestFingerprint;
         const inputSignal = builderContext?.signals?.input;
         const shouldFetch = config.request?.autoFetch !== false && canAutoFetchReportBuilder(config, state);
         if (inputSignal) {
             const previous = inputSignal.peek?.() || {};
             inputSignal.value = {
                 ...previous,
-                parameters: request,
+                parameters: currentRequest,
                 fetch: shouldFetch,
             };
             return;
         }
-        builderContext?.handlers?.dataSource?.setInputParameters?.(request);
+        builderContext?.handlers?.dataSource?.setInputParameters?.(currentRequest);
         if (shouldFetch) {
             builderContext?.handlers?.dataSource?.fetchCollection?.();
         }
-    }, [builderContext, config, state]);
+    }, [builderContext, config.request?.autoFetch, currentPrefillSignature, currentRequest, currentRequestFingerprint, state]);
 
     useEffect(() => {
         if (!pendingScrollRowId) {
@@ -1855,6 +942,7 @@ export default function ReportBuilder({ container, context }) {
     const chartDimensions = useMemo(() => chartFields.filter((entry) => entry.kind === "dimension"), [chartFields]);
     const chartMeasures = useMemo(() => chartFields.filter((entry) => entry.kind === "measure"), [chartFields]);
     const supportedChartTypes = useMemo(() => getReportBuilderSupportedChartTypes(config), [config]);
+    const quickPresetPolicy = useMemo(() => getReportBuilderQuickPresetPolicy(config), [config]);
     const resultPanePosition = useMemo(() => getReportBuilderResultPanePosition(config), [config]);
     const defaultChartSpecs = useMemo(() => buildReportBuilderDefaultChartSpecs(config, state), [config, state]);
     const chartSpecValidation = useMemo(
@@ -1865,22 +953,74 @@ export default function ReportBuilder({ container, context }) {
     const hasStaleChartSpec = !!state.chartSpec && isReportBuilderChartSpecStale(config, state.chartSpec, chartFields);
     const settingsHash = useMemo(() => buildReportBuilderSettingsHash(state), [state.selectedDimensions, state.selectedMeasures]);
     const chartContainer = useMemo(
-        () => (
-            explicitChartMode && hasValidChartSpec
-                ? buildExplicitReportBuilderChartContainer({ ...container, collection: computedCollection }, config, state, state.chartSpec)
-                : buildChartContainer({ ...container, collection: computedCollection }, config, state)
-        ),
-        [collection, computedCollection, container, config, explicitChartMode, hasValidChartSpec, state],
+        () => {
+            const collectionForChart = resolveReportBuilderChartCollection({
+                computedCollection,
+                chartCollection: chartQueryCollection,
+                policy: chartDataPolicy,
+            });
+            return explicitChartMode && hasValidChartSpec
+                ? buildExplicitReportBuilderChartContainer({ ...container, collection: collectionForChart }, config, state, state.chartSpec)
+                : buildChartContainer({ ...container, collection: collectionForChart }, config, state);
+        },
+        [chartDataPolicy, chartQueryCollection, computedCollection, container, config, explicitChartMode, hasValidChartSpec, state],
     );
-    const currentRequestFingerprint = useMemo(
-        () => JSON.stringify(buildReportBuilderRequest(config, state)),
-        [config, state],
-    );
+    const chartRenderKey = useMemo(() => JSON.stringify({
+        explicitChartMode,
+        chartSpec: explicitChartMode ? normalizeReportBuilderChartSpec(state.chartSpec) : null,
+        selectedDimensions: state.selectedDimensions,
+        selectedMeasures: state.selectedMeasures,
+        primaryMeasure: state.primaryMeasure,
+        groupBy: state.groupBy,
+        chartType: chartContainer?.chart?.type || "",
+        xDataKey: chartContainer?.chart?.xAxis?.dataKey || "",
+        seriesNameKey: chartContainer?.chart?.series?.nameKey || "",
+        seriesValueKey: chartContainer?.chart?.series?.valueKey || "",
+        seriesValues: Array.isArray(chartContainer?.chart?.series?.values)
+            ? chartContainer.chart.series.values.map((entry) => ({
+                value: entry?.value || "",
+                type: entry?.type || "",
+                axis: entry?.axis || "",
+                stackId: entry?.stackId || "",
+            }))
+            : [],
+    }), [
+        chartContainer?.chart?.series?.nameKey,
+        chartContainer?.chart?.series?.valueKey,
+        chartContainer?.chart?.type,
+        chartContainer?.chart?.xAxis?.dataKey,
+        chartContainer?.chart?.series?.values,
+        explicitChartMode,
+        state.chartSpec,
+        state.groupBy,
+        state.primaryMeasure,
+        state.selectedDimensions,
+        state.selectedMeasures,
+    ]);
     const hasMore = collectionInfo?.hasMore ?? (Array.isArray(collection) && collection.length >= state.pageSize);
     const readiness = useMemo(() => resolveReportBuilderReadiness(config, state), [config, state]);
     const canRunReport = readiness.canRun;
     const requiredStaticFilters = useMemo(() => staticFilters.filter((filter) => filter?.required), [staticFilters]);
     const optionalStaticFilters = useMemo(() => staticFilters.filter((filter) => !filter?.required), [staticFilters]);
+    const inlineToolbarRequiredFilters = useMemo(
+        () => requiredStaticFilters.filter((filter) => String(filter?.presentation || "").trim() === "inlineToolbar"),
+        [requiredStaticFilters],
+    );
+    const panelRequiredStaticFilters = useMemo(
+        () => requiredStaticFilters.filter((filter) => String(filter?.presentation || "").trim() !== "inlineToolbar"),
+        [requiredStaticFilters],
+    );
+    const compactRequiredStaticFilters = useMemo(() => {
+        const seen = new Set();
+        return [...inlineToolbarRequiredFilters, ...panelRequiredStaticFilters].filter((filter) => {
+            const key = String(filter?.id || filter?.field || "").trim();
+            if (!key || seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        });
+    }, [inlineToolbarRequiredFilters, panelRequiredStaticFilters]);
     const [filterPanels, setFilterPanels] = useState({ common: true, advanced: false });
     const [activeOptionalFilterKeys, setActiveOptionalFilterKeys] = useState([]);
     const [activeDynamicGroupIds, setActiveDynamicGroupIds] = useState([]);
@@ -1948,7 +1088,7 @@ export default function ReportBuilder({ container, context }) {
                                     title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
                                 >
                                     <span className="forge-report-builder__category-chip-icon">
-                                        <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                        <Icon icon={filterCategoryIcon(filter)} size={12} />
                                     </span>
                                     <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
                                     {configuredCount > 0 ? (
@@ -1979,7 +1119,7 @@ export default function ReportBuilder({ container, context }) {
                                     title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
                                 >
                                     <span className="forge-report-builder__category-chip-icon">
-                                        <Icon icon={filterCategoryIcon(group.id)} size={12} />
+                                        <Icon icon={filterCategoryIcon(group)} size={12} />
                                     </span>
                                     <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
                                     {configuredCount > 0 ? (
@@ -2017,7 +1157,7 @@ export default function ReportBuilder({ container, context }) {
                                     title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
                                 >
                                     <span className="forge-report-builder__category-chip-icon">
-                                        <Icon icon={filterCategoryIcon(filterKey)} size={12} />
+                                        <Icon icon={filterCategoryIcon(filter)} size={12} />
                                     </span>
                                     <span className="forge-report-builder__category-chip-label">{categoryLabel}</span>
                                     {configuredCount > 0 ? (
@@ -2047,7 +1187,7 @@ export default function ReportBuilder({ container, context }) {
                                     title={filterCategoryTitle(family.label, { active, configuredCount })}
                                 >
                                     <span className="forge-report-builder__category-chip-icon">
-                                        <Icon icon={filterCategoryIcon(family.id)} size={12} />
+                                        <Icon icon={filterCategoryIcon(family)} size={12} />
                                     </span>
                                     <span className="forge-report-builder__category-chip-label">{family.label}</span>
                                     {configuredCount > 0 ? (
@@ -2064,7 +1204,7 @@ export default function ReportBuilder({ container, context }) {
         </>
     );
 
-    const renderFilterBody = () => (
+    const renderFilterBody = ({ includeRequiredStaticFilters = true } = {}) => (
         <>
             {notices.length > 0 ? (
                 <div className="forge-report-builder__notices">
@@ -2081,22 +1221,24 @@ export default function ReportBuilder({ container, context }) {
                     ))}
                 </div>
             ) : null}
-            <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--static">
-                {requiredStaticFilters.map((filter) => {
-                    const filterKey = String(filter.id || filter.field || "").trim();
-                    const currentValue = state?.staticFilters?.[filterKey];
-                    return (
-                        <StaticFilterSection
-                            key={filterKey}
-                            filter={filter}
-                            context={builderContext}
-                            value={currentValue}
-                            onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
-                            onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
-                        />
-                    );
-                })}
-            </div>
+            {includeRequiredStaticFilters ? (
+                <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--static">
+                    {panelRequiredStaticFilters.map((filter) => {
+                        const filterKey = String(filter.id || filter.field || "").trim();
+                        const currentValue = state?.staticFilters?.[filterKey];
+                        return (
+                            <StaticFilterSection
+                                key={filterKey}
+                                filter={filter}
+                                context={builderContext}
+                                value={currentValue}
+                                onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
+                                onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
+                            />
+                        );
+                    })}
+                </div>
+            ) : null}
             {optionalStaticFilters
                 .filter((filter) => activeOptionalFilterKeys.includes(String(filter.id || filter.field || "").trim()))
                 .map((filter) => {
@@ -2248,54 +1390,454 @@ export default function ReportBuilder({ container, context }) {
             />
         );
     };
-    const runReport = React.useCallback(() => {
-        const request = applyRequestHook(
+
+    const renderSettingsControls = () => (
+        <>
+            {config.groupBy?.options?.length ? (
+                <div className="forge-report-builder__control-cluster">
+                    <label>Break down by</label>
+                    <select
+                        className="forge-report-builder-select"
+                        value={state.groupBy || ""}
+                        onChange={(event) => setGroupBy(event.target.value)}
+                    >
+                        <option value="">None</option>
+                        {config.groupBy.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label || option.value}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            ) : null}
+            {orderFields.length > 0 ? (
+                <div className="forge-report-builder__control-cluster">
+                    <label>Order by</label>
+                    <select
+                        className="forge-report-builder-select"
+                        value={state.orderField || ""}
+                        onChange={(event) => setOrderField(event.target.value)}
+                    >
+                        {orderFields.map((field) => (
+                            <option key={field.value || field.field} value={field.value || field.field}>
+                                {field.label || field.value || field.field}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        className="forge-report-builder-select"
+                        value={state.orderDir || "desc"}
+                        onChange={(event) => setOrderDir(event.target.value)}
+                    >
+                        <option value="asc">Ascending</option>
+                        <option value="desc">Descending</option>
+                    </select>
+                </div>
+            ) : null}
+            <div className="forge-report-builder__control-cluster">
+                <label>Page size</label>
+                <select
+                    className="forge-report-builder-select"
+                    value={state.pageSize}
+                    onChange={(event) => setPageSize(event.target.value)}
+                >
+                    {pageSizeOptions.map((value) => (
+                        <option key={value} value={value}>
+                            {value}
+                        </option>
+                    ))}
+                </select>
+            </div>
+        </>
+    );
+
+    const renderMeasureSections = () => (
+        <div className="forge-report-builder__measure-sections">
+            {measureSections.map((section) => (
+                <div key={section.id} className="forge-report-builder__measure-section">
+                    {section.label ? (
+                        <div className="forge-report-builder__measure-section-label">{section.label}</div>
+                    ) : null}
+                    <div className="forge-report-builder__measure-row">
+                        {section.measures.map((measure) => {
+                            const active = state.selectedMeasures.includes(measure.id);
+                            const primary = state.primaryMeasure === measure.id;
+                            return (
+                                <button
+                                    key={measure.id}
+                                    type="button"
+                                    className={[
+                                        "forge-report-builder__measure-pill",
+                                        active ? "is-active" : "",
+                                        primary ? "is-primary" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    onClick={() => (active ? setPrimaryMeasure(measure.id) : toggleMeasure(measure.id))}
+                                    onDoubleClick={() => setPrimaryMeasure(measure.id)}
+                                >
+                                    <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"} onClick={(event) => {
+                                        event.stopPropagation();
+                                        toggleMeasure(measure.id);
+                                    }}>{active ? "✓" : ""}</span>
+                                    <span>{measure.label || measure.id}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+
+    const renderMeasuresPanel = () => (
+        <section className="forge-report-builder__panel">
+            <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
+                <div className="forge-report-builder__panel-title">Measures</div>
+                <div className="forge-report-builder__panel-badge">
+                    {state.selectedMeasures.length} selected
+                </div>
+            </div>
+            {renderMeasureSections()}
+        </section>
+    );
+
+    const renderBreakdownPanel = ({ collapsible = true } = {}) => (
+        <section className="forge-report-builder__panel">
+            <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
+                <div className="forge-report-builder__panel-title">Breakdowns</div>
+                {collapsible ? (
+                    <button
+                        type="button"
+                        className="forge-report-builder__panel-toggle"
+                        onClick={() => setDimensionsCollapsed((current) => !current)}
+                        aria-expanded={!dimensionsCollapsed}
+                    >
+                        {dimensionsCollapsed ? "Show" : "Hide"}
+                    </button>
+                ) : null}
+            </div>
+            {(!collapsible || !dimensionsCollapsed) ? (
+                <div className="forge-report-builder__dimension-picker">
+                    <select
+                        className="forge-report-builder-select forge-report-builder-select--add"
+                        value=""
+                        onChange={(event) => {
+                            addDimension(event.target.value);
+                            event.target.value = "";
+                        }}
+                        disabled={availableDimensionDefs.length === 0}
+                    >
+                        <option value="">{availableDimensionDefs.length === 0 ? "All breakdowns added" : "Add breakdown..."}</option>
+                        {availableDimensionDefs.map((dimension) => (
+                            <option key={dimension.id} value={dimension.id}>
+                                {dimension.label || dimension.id}
+                            </option>
+                        ))}
+                    </select>
+                    {selectedDimensionDefs.length > 0 ? (
+                        <div className="forge-report-builder__dimension-selected" aria-label="Selected breakdowns">
+                            {selectedDimensionDefs.map((dimension) => {
+                                const removable = selectedDimensionDefs.length > 1;
+                                return (
+                                    <button
+                                        key={dimension.id}
+                                        type="button"
+                                        className="forge-report-builder__dimension-pill"
+                                        onClick={() => removeDimension(dimension.id)}
+                                        disabled={!removable}
+                                        title={removable ? `Remove ${dimension.label || dimension.id}` : dimension.label || dimension.id}
+                                    >
+                                        <span>{dimension.label || dimension.id}</span>
+                                        {removable ? <span aria-hidden="true">×</span> : null}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
+        </section>
+    );
+
+    const renderCompactHeader = () => (
+        <div className="forge-report-builder__compact-summary">
+            <div className="forge-report-builder__compact-summary-topline">
+                <div className="forge-report-builder__compact-summary-copy">
+                    <div className="forge-report-builder__shelf-label">{container.title || config.title || "Report Builder"}</div>
+                    <div className="forge-report-builder__compact-summary-status">{compactStatusText}</div>
+                </div>
+                {actionModel.compact.showHeaderViewToggle ? (
+                    <div className="forge-report-builder__view-toggle forge-report-builder__view-toggle--compact">
+                        {resultViewModes.map((mode) => (
+                            <button
+                                key={mode}
+                                type="button"
+                                className={state.viewMode === mode ? "is-active" : ""}
+                                onClick={() => setViewMode(mode)}
+                            >
+                                <Icon icon={mode === "table" ? "th" : "timeline-line-chart"} size={12} />
+                                {mode}
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+            {compactSummaryItems.length > 0 ? (
+                <div className="forge-report-builder__compact-summary-chips" aria-label="Current report summary">
+                    {compactSummaryItems.map((item) => (
+                        <span key={item} className="forge-report-builder__compact-summary-chip">{item}</span>
+                    ))}
+                </div>
+            ) : null}
+            {chartApplyFeedback?.message ? (
+                <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${chartApplyFeedback.level || "warning"}`}>
+                    {chartApplyFeedback.message}
+                </div>
+            ) : null}
+        </div>
+    );
+
+    const renderCompactSetupSheet = () => {
+        if (!compactMode || !compactSheetOpen) {
+            return null;
+        }
+        return (
+            <div className="forge-report-builder__compact-sheet-backdrop" onClick={closeCompactSheet}>
+                <div
+                    className="forge-report-builder__compact-sheet"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Report builder setup"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <div className="forge-report-builder__compact-sheet-header">
+                        <div>
+                            <div className="forge-report-builder__shelf-label">Setup</div>
+                            <div className="forge-report-builder__compact-sheet-title">{container.title || config.title || "Report Builder"}</div>
+                        </div>
+                        <button type="button" className="forge-report-builder__panel-toggle" onClick={closeCompactSheet}>
+                            Close
+                        </button>
+                    </div>
+                    <div className="forge-report-builder__compact-sheet-tabs">
+                        <ReportBuilderCompactSheetTab active={compactSheetTab === "scope"} icon="calendar" label="Scope" onClick={() => setCompactSheetTab("scope")} />
+                        <ReportBuilderCompactSheetTab active={compactSheetTab === "data"} icon="database" label="Data" onClick={() => setCompactSheetTab("data")} />
+                        <ReportBuilderCompactSheetTab active={compactSheetTab === "filters"} icon="filter" label="Filters" onClick={() => setCompactSheetTab("filters")} />
+                    </div>
+                    <div className="forge-report-builder__compact-sheet-body">
+                        {compactSheetTab === "scope" ? (
+                            <div className="forge-report-builder__compact-panel-stack">
+                                {compactRequiredStaticFilters.map((filter) => renderStaticFilterSection(filter))}
+                                <section className="forge-report-builder__panel forge-report-builder__panel--bottom">
+                                    <div className="forge-report-builder__panel-headerline">
+                                        <div className="forge-report-builder__panel-title">Options</div>
+                                    </div>
+                                    <div className="forge-report-builder__compact-control-grid">
+                                        {renderSettingsControls()}
+                                    </div>
+                                </section>
+                            </div>
+                        ) : null}
+                        {compactSheetTab === "data" ? (
+                            <div className="forge-report-builder__compact-panel-stack">
+                                <section className="forge-report-builder__panel forge-report-builder__panel--bottom">
+                                    <div className="forge-report-builder__panel-headerline">
+                                        <div className="forge-report-builder__panel-title">Measures</div>
+                                    </div>
+                                    {renderMeasureSections()}
+                                </section>
+                                {renderBreakdownPanel({ collapsible: false })}
+                            </div>
+                        ) : null}
+                        {compactSheetTab === "filters" ? (
+                            <div className="forge-report-builder__compact-panel-stack">
+                                <section className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static" aria-label="Filters">
+                                    <div className="forge-report-builder__bottom-header">
+                                        <div>
+                                            <div className="forge-report-builder__bottom-label">Filters</div>
+                                            <div className="forge-report-builder__bottom-description">
+                                                Refine optional filters and targeting while keeping the current result in view.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {renderFilterCategoryControls()}
+                                    {renderFilterBody({ includeRequiredStaticFilters: false })}
+                                </section>
+                            </div>
+                        ) : null}
+                    </div>
+                    <div className="forge-report-builder__compact-sheet-footer">
+                        <Button small outlined onClick={closeCompactSheet}>Done</Button>
+                        <Button
+                            small
+                            intent="primary"
+                            icon="play"
+                            className="forge-report-builder__run-button"
+                            disabled={!canRunReport || loading}
+                            onClick={() => {
+                                closeCompactSheet();
+                                runReport();
+                            }}
+                        >
+                            {loading ? "Running" : "Run"}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderCompactChartSheet = () => {
+        if (!compactMode || !compactChartSheetOpen) {
+            return null;
+        }
+        return (
+            <div className="forge-report-builder__compact-sheet-backdrop" onClick={closeCompactChartSheet}>
+                <div
+                    className="forge-report-builder__compact-sheet forge-report-builder__compact-sheet--chart"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Chart actions"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <div className="forge-report-builder__compact-sheet-header">
+                        <div>
+                            <div className="forge-report-builder__shelf-label">Chart</div>
+                            <div className="forge-report-builder__compact-sheet-title">
+                                {hasValidChartSpec ? (state.chartSpec?.title || "Chart") : "Create or apply a chart"}
+                            </div>
+                        </div>
+                        <button type="button" className="forge-report-builder__panel-toggle" onClick={closeCompactChartSheet}>
+                            Close
+                        </button>
+                    </div>
+                    <div className="forge-report-builder__compact-sheet-body forge-report-builder__compact-sheet-body--chart">
+                        {actionModel.compact.chartSheet.showQuickChartActions ? (
+                            <ReportBuilderChartQuickActions
+                                canCreate={canCreateChart}
+                                showCreateButton={!hasValidChartSpec}
+                                onCreate={() => {
+                                    closeCompactChartSheet();
+                                    openChartDialog(state.chartSpec);
+                                }}
+                                quickOptions={quickChartOptions}
+                                usePortal={false}
+                                onSelectQuickOption={(value) => {
+                                    setSelectedQuickChartOption(value);
+                                    setChartApplyFeedback(null);
+                                    if (value) {
+                                        applyQuickChart(value);
+                                        closeCompactChartSheet();
+                                    }
+                                }}
+                            />
+                        ) : null}
+                        {actionModel.compact.chartSheet.showEditChart || actionModel.compact.chartSheet.showRemoveChart ? (
+                            <div className="forge-report-builder__compact-chart-actions">
+                                {actionModel.compact.chartSheet.showEditChart ? (
+                                    <Button small outlined icon="edit" onClick={() => {
+                                        closeCompactChartSheet();
+                                        openChartDialog(state.chartSpec);
+                                    }}>
+                                        Edit Chart
+                                    </Button>
+                                ) : null}
+                                {actionModel.compact.chartSheet.showRemoveChart ? (
+                                    <Button small minimal intent="danger" icon="trash" onClick={removeChart}>
+                                        Remove Chart
+                                    </Button>
+                                ) : null}
+                            </div>
+                        ) : null}
+                        {actionModel.compact.chartSheet.showViewToggle || actionModel.compact.chartSheet.showExport ? (
+                            <div className="forge-report-builder__compact-chart-actions">
+                                {actionModel.compact.chartSheet.showViewToggle ? resultViewModes.map((mode) => (
+                                    <Button
+                                        key={mode}
+                                        small
+                                        outlined={state.viewMode !== mode}
+                                        intent={state.viewMode === mode ? "primary" : "none"}
+                                        icon={mode === "table" ? "th" : "timeline-line-chart"}
+                                        onClick={() => setViewMode(mode)}
+                                    >
+                                        {mode}
+                                    </Button>
+                                )) : null}
+                                {actionModel.compact.chartSheet.showExport ? (
+                                    <Button small outlined icon="download" disabled={!canShowResults} onClick={downloadCsv}>
+                                        Export
+                                    </Button>
+                                ) : null}
+                            </div>
+                        ) : actionModel.compact.chartSheet.showEmptyState ? (
+                            <div className="forge-report-builder__empty forge-report-builder__empty--compact">
+                                Run the report to preview chart output.
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderCompactBottomBar = () => {
+        if (!compactMode) {
+            return null;
+        }
+        return (
+            <div className="forge-report-builder__compact-action-bar" aria-label="Report builder actions">
+                {compactBottomBarActions.map((action) => (
+                    <button
+                        key={action.id}
+                        type="button"
+                        className={[
+                            "forge-report-builder__compact-action",
+                            action.tone === "primary" ? "forge-report-builder__compact-action--primary" : "",
+                        ].filter(Boolean).join(" ")}
+                        disabled={action.disabled}
+                        onClick={action.onClick}
+                    >
+                        <Icon icon={action.icon} size={14} />
+                        <span>{action.label}</span>
+                    </button>
+                ))}
+            </div>
+        );
+    };
+
+    const dispatchReportRequest = React.useCallback((nextState, { forceFetch = false, markManual = false } = {}) => {
+        const request = applyReportBuilderRequestHook(
             builderContext,
             config,
-            state,
-            buildReportBuilderRequest(config, state),
+            nextState,
+            buildReportBuilderRequest(config, nextState),
         );
         const fingerprint = JSON.stringify(request);
         requestFingerprintRef.current = fingerprint;
-        lastManualRunFingerprintRef.current = fingerprint;
-        setManualRunSequence((current) => current + 1);
+        if (markManual) {
+            lastManualRunFingerprintRef.current = fingerprint;
+        }
         const inputSignal = builderContext?.signals?.input;
         if (inputSignal) {
             const previous = inputSignal.peek?.() || {};
             inputSignal.value = {
                 ...previous,
                 parameters: request,
-                fetch: true,
+                fetch: forceFetch || config.request?.autoFetch !== false,
             };
-            return;
+            return { request, fingerprint };
         }
         builderContext?.handlers?.dataSource?.setInputParameters?.(request);
-        builderContext?.handlers?.dataSource?.fetchCollection?.();
-    }, [builderContext, config, state]);
-    const downloadCsv = React.useCallback(() => {
-        if (!Array.isArray(selectedColumns) || selectedColumns.length === 0 || !Array.isArray(computedCollection) || computedCollection.length === 0) {
-            return;
+        if (forceFetch || config.request?.autoFetch !== false) {
+            builderContext?.handlers?.dataSource?.fetchCollection?.();
         }
-        const lines = [selectedColumns.map((column) => escapeCsvCell(column.label || column.key)).join(",")];
-        computedCollection.forEach((row) => {
-            lines.push(selectedColumns.map((column) => {
-                const raw = resolveReportBuilderCellValue(row, column);
-                return escapeCsvCell(column.kind === "measure"
-                    ? formatDashboardValue(raw, column.format, locale)
-                    : raw);
-            }).join(","));
-        });
-        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        const ts = new Date().toISOString().replace(/[:.]/g, "-");
-        a.href = url;
-        a.download = `${String(container?.id || "report-builder").trim() || "report-builder"}-${ts}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, [computedCollection, container?.id, locale, selectedColumns]);
+        return { request, fingerprint };
+    }, [builderContext, config]);
+
+    const runReport = React.useCallback(() => {
+        setManualRunSequence((current) => current + 1);
+        setChartApplyFeedback(null);
+        dispatchReportRequest(state, { forceFetch: true, markManual: true });
+    }, [dispatchReportRequest, state]);
     const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
     const canShowResults = canRunReport && hasRows;
     const canCreateChart = chartDimensions.length > 0 && chartMeasures.length > 0 && supportedChartTypes.length > 0;
@@ -2307,25 +1849,48 @@ export default function ReportBuilder({ container, context }) {
         [chartFields, config, settingsHash, storedChartPresets],
     );
     const quickChartOptions = useMemo(() => {
-        const defaults = defaultChartSpecs.map((entry, index) => ({
-            value: `default:${index}`,
-            label: `${entry.title} (${entry.type})`,
-            kind: "default",
-            spec: entry,
-        }));
+        const defaults = defaultChartSpecs.map((entry, index) => {
+            const selectionPolicy = String(entry?.selectionPolicy || quickPresetPolicy.selectionPolicy || "").trim().toLowerCase() === "replace"
+                ? "replace"
+                : "merge";
+            const prepared = prepareReportBuilderChartApplication(config, state, entry, {
+                autoProvisionMissingDimensions: quickPresetPolicy.autoProvisionMissingDimensions,
+                forceAutoFetch: quickPresetPolicy.autoFetchOnSelect,
+                selectionPolicy,
+            });
+            const dependencyHint = prepared.requiresDimensionProvision
+                ? (
+                    prepared.autoProvisionMissingDimensions
+                        ? ` adds ${prepared.missingDimensionLabels.join(", ")}`
+                        : ` requires ${prepared.missingDimensionLabels.join(", ")}`
+                )
+                : "";
+            return {
+                value: `default:${index}`,
+                label: `${entry.title} (${entry.type})${dependencyHint ? ` —${dependencyHint}` : ""}`,
+                kind: "default",
+                group: String(entry.group || "").trim() || "Presets",
+                spec: entry,
+                prepared,
+            };
+        });
         const previous = compatiblePreviousChartPresets.map((entry, index) => ({
             value: `previous:${index}`,
             label: `${entry.title} (Previous)`,
             kind: "previous",
+            group: "Previous",
             spec: entry.chartSpec,
         }));
         return [...defaults, ...previous];
-    }, [defaultChartSpecs, compatiblePreviousChartPresets]);
+    }, [compatiblePreviousChartPresets, config, defaultChartSpecs, quickPresetPolicy.autoFetchOnSelect, quickPresetPolicy.autoProvisionMissingDimensions, quickPresetPolicy.selectionPolicy, state]);
     const hasCompletedCurrentRun = canRunReport
         && !loading
         && !error
         && lastManualRunFingerprintRef.current !== ""
         && lastManualRunFingerprintRef.current === currentRequestFingerprint;
+    const autoChartCycleKey = hasCompletedCurrentRun
+        ? `${currentRequestFingerprint}::${manualRunSequence}`
+        : "";
 
     useEffect(() => {
         if (!shouldAutoCollapseReportBuilderFilters({
@@ -2344,8 +1909,260 @@ export default function ReportBuilder({ container, context }) {
     }, [canShowResults, hasCompletedCurrentRun, manualRunSequence]);
 
     useEffect(() => {
-        setStoredChartPresets(loadStoredChartPresets(stateKey));
-    }, [stateKey]);
+        if (!explicitChartMode || state.chartSpec || !autoChartCycleKey) {
+            return;
+        }
+        if (lastAutoAppliedChartCycleRef.current === autoChartCycleKey) {
+            return;
+        }
+        const prepared = prepareReportBuilderAutoChartApplication(config, state);
+        lastAutoAppliedChartCycleRef.current = autoChartCycleKey;
+        if (!prepared?.nextState) {
+            return;
+        }
+        persistState(prepared.nextState);
+        setChartApplyFeedback(null);
+    }, [
+        autoChartCycleKey,
+        config,
+        explicitChartMode,
+        persistState,
+        state,
+    ]);
+
+    useEffect(() => {
+        setStoredChartPresets(loadStoredChartPresets(stateStorageScope, legacyChartPresetScopes));
+    }, [legacyChartPresetScopes, stateStorageScope]);
+
+    const compactStatusText = useMemo(() => resolveCompactStatusText({
+        loading,
+        error,
+        canShowResults,
+        explicitChartMode,
+        hasValidChartSpec,
+        viewMode: state.viewMode,
+        chartTitle: state.chartSpec?.title || "",
+        rowCount: computedCollection.length,
+        canRunReport,
+        readinessReason: readiness.reason,
+    }), [canRunReport, canShowResults, computedCollection.length, error, explicitChartMode, hasValidChartSpec, loading, readiness.reason, state.chartSpec, state.viewMode]);
+
+    const compactSummaryItems = useMemo(() => resolveCompactSummaryItems({
+        requiredStaticFilters: compactRequiredStaticFilters,
+        staticFilters: state.staticFilters,
+        selectedMeasures: state.selectedMeasures,
+        selectedDimensions: state.selectedDimensions,
+        totalActiveFilterCount,
+        hasValidChartSpec,
+        canShowResults,
+        viewMode: state.viewMode,
+    }), [canShowResults, compactRequiredStaticFilters, hasValidChartSpec, state.selectedDimensions, state.selectedMeasures, state.staticFilters, state.viewMode, totalActiveFilterCount]);
+
+    const showingChartView = !loading && !error && canShowResults && (
+        (explicitChartMode && hasValidChartSpec && state.viewMode === "chart")
+        || (!explicitChartMode && state.viewMode !== "table")
+    );
+
+    const showPagination = !showingChartView;
+
+    const desktopResultTitle = useMemo(() => {
+        if (showingChartView) {
+            const chartTitle = String(state.chartSpec?.title || "").trim();
+            if (chartTitle) {
+                return chartTitle;
+            }
+            const typeLabel = chartTypeLabel(state.chartSpec?.type || "");
+            return typeLabel ? `${typeLabel} chart` : "Chart results";
+        }
+        if (canShowResults) {
+            return "Table results";
+        }
+        return "Report results";
+    }, [canShowResults, showingChartView, state.chartSpec]);
+
+    const desktopResultDescription = useMemo(() => {
+        if (loading) {
+            return "Refreshing the current scope and preparing the latest results.";
+        }
+        if (error) {
+            return "The current result payload could not be rendered. Adjust the inputs or run again.";
+        }
+        if (showingChartView) {
+            return chartDataPolicy.mode === "fullQuery"
+                ? "Chart-first view for the active scope using the full query result set. Switch to the table when you need to inspect individual rows."
+                : "Chart-first view for the active scope. Switch to the table when you need to inspect individual rows.";
+        }
+        if (canShowResults) {
+            return "Table view for the active scope. Use chart actions to switch to a curated visual read of the same data.";
+        }
+        if (canRunReport) {
+            return "Run the current scope to preview results and unlock chart actions.";
+        }
+        if (readiness.reason === "scope") {
+            return "Choose the required scope before running the report.";
+        }
+        return "Complete the required filters before running the report.";
+    }, [canRunReport, canShowResults, chartDataPolicy.mode, error, loading, readiness.reason, showingChartView]);
+
+    const desktopResultMetaItems = useMemo(() => {
+        const items = [];
+        if (showingChartView && state.chartSpec?.type) {
+            const typeLabel = chartTypeLabel(state.chartSpec.type);
+            if (typeLabel) {
+                items.push(typeLabel);
+            }
+        }
+        if (state.selectedMeasures.length > 0) {
+            items.push(`${state.selectedMeasures.length} measure${state.selectedMeasures.length === 1 ? "" : "s"}`);
+        }
+        if (state.selectedDimensions.length > 0) {
+            items.push(`${state.selectedDimensions.length} breakdown${state.selectedDimensions.length === 1 ? "" : "s"}`);
+        }
+        if (totalActiveFilterCount > 0) {
+            items.push(`${totalActiveFilterCount} filter${totalActiveFilterCount === 1 ? "" : "s"}`);
+        }
+        if (canShowResults && computedCollection.length > 0) {
+            items.push(`${computedCollection.length} page row${computedCollection.length === 1 ? "" : "s"}`);
+        }
+        return items;
+    }, [canShowResults, computedCollection.length, showingChartView, state.chartSpec, state.selectedDimensions.length, state.selectedMeasures.length, totalActiveFilterCount]);
+
+    useEffect(() => {
+        if (chartDataPolicy.mode !== "fullQuery") {
+            setChartQueryState((current) => (
+                current.fingerprint || current.rows.length > 0 || current.error
+                    ? { fingerprint: "", rows: [], loading: false, error: null }
+                    : current
+            ));
+            return;
+        }
+        if (shouldDeferReportBuilderRequestForPrefill({
+            currentPrefillSignature,
+            appliedPrefillSignature: appliedPrefillSignatureRef.current,
+        })) {
+            return;
+        }
+        if (!showingChartView || !chartQueryRequest || !chartQueryFingerprint) {
+            return;
+        }
+        const fetchRecords = builderContext?.handlers?.dataSource?.fetchRecords;
+        if (typeof fetchRecords !== "function") {
+            setChartQueryState({
+                fingerprint: chartQueryFingerprint,
+                rows: [],
+                loading: false,
+                error: new Error("Chart data fetch is unavailable for full-query mode."),
+            });
+            return;
+        }
+        let cancelled = false;
+        setChartQueryState((current) => ({
+            fingerprint: chartQueryFingerprint,
+            rows: current.fingerprint === chartQueryFingerprint ? current.rows : [],
+            loading: true,
+            error: null,
+        }));
+        fetchRecords({ parameters: chartQueryRequest })
+            .then((body) => {
+                if (cancelled) {
+                    return;
+                }
+                setChartQueryState({
+                    fingerprint: chartQueryFingerprint,
+                    rows: Array.isArray(body?.rows) ? body.rows : [],
+                    loading: false,
+                    error: null,
+                });
+            })
+            .catch((fetchError) => {
+                if (cancelled) {
+                    return;
+                }
+                setChartQueryState((current) => ({
+                    fingerprint: chartQueryFingerprint,
+                    rows: current.fingerprint === chartQueryFingerprint ? current.rows : [],
+                    loading: false,
+                    error: fetchError,
+                }));
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [builderContext, chartDataPolicy.mode, chartQueryFingerprint, chartQueryRequest, currentPrefillSignature, manualRunSequence, showingChartView]);
+
+    const chartRenderCollection = useMemo(
+        () => resolveReportBuilderChartCollection({
+            computedCollection,
+            chartCollection: chartQueryCollection,
+            policy: chartDataPolicy,
+        }),
+        [chartDataPolicy, chartQueryCollection, computedCollection],
+    );
+    const exportCollection = useMemo(
+        () => resolveReportBuilderExportCollection({
+            computedCollection,
+            chartCollection: chartQueryCollection,
+            policy: chartDataPolicy,
+            showingChartView,
+        }),
+        [chartDataPolicy, chartQueryCollection, computedCollection, showingChartView],
+    );
+
+    const activeResultLoading = loading
+        || (chartDataPolicy.mode === "fullQuery" && showingChartView && chartQueryState.loading && chartRenderCollection.length === 0);
+    const activeResultError = error
+        || (chartDataPolicy.mode === "fullQuery" && showingChartView ? chartQueryState.error : null);
+    const reportBuilderStateMarker = useMemo(() => {
+        if (activeResultLoading) {
+            return "loading";
+        }
+        if (activeResultError) {
+            return "error";
+        }
+        if (!canShowResults) {
+            return canRunReport ? "ready" : "needs-input";
+        }
+        return showingChartView ? "chart" : "table";
+    }, [activeResultError, activeResultLoading, canRunReport, canShowResults, showingChartView]);
+
+    const downloadCsv = React.useCallback(() => {
+        if (!Array.isArray(selectedColumns) || selectedColumns.length === 0 || !Array.isArray(exportCollection) || exportCollection.length === 0) {
+            return;
+        }
+        const lines = [selectedColumns.map((column) => escapeCsvCell(column.label || column.key)).join(",")];
+        exportCollection.forEach((row) => {
+            lines.push(selectedColumns.map((column) => {
+                const raw = resolveReportBuilderCellValue(row, column);
+                return escapeCsvCell(column.kind === "measure"
+                    ? formatDashboardValue(raw, column.format, locale)
+                    : raw);
+            }).join(","));
+        });
+        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const ts = new Date().toISOString().replace(/[:.]/g, "-");
+        a.href = url;
+        a.download = `${String(container?.id || "report-builder").trim() || "report-builder"}-${ts}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, [container?.id, exportCollection, locale, selectedColumns]);
+
+    const openCompactSheet = React.useCallback((tab = "scope") => {
+        setCompactChartSheetOpen(false);
+        setCompactSheetTab(tab);
+        setCompactSheetOpen(true);
+    }, []);
+
+    const closeCompactSheet = React.useCallback(() => {
+        setCompactSheetOpen(false);
+    }, []);
+
+    const closeCompactChartSheet = React.useCallback(() => {
+        setCompactChartSheetOpen(false);
+    }, []);
 
     const toggleMeasure = (measureId) => {
         const id = String(measureId || "").trim();
@@ -2425,20 +2242,21 @@ export default function ReportBuilder({ container, context }) {
         });
     };
 
-    const saveChartPreset = React.useCallback((chartSpec) => {
+    const saveChartPreset = React.useCallback((chartSpec, options = {}) => {
         const normalized = normalizeReportBuilderChartSpec(chartSpec);
         if (!normalized) {
             return;
         }
+        const presetSettingsHash = String(options?.settingsHash || settingsHash || "").trim();
         const nextPresets = upsertChartPreset(storedChartPresets, {
             title: String(normalized.title || "Saved chart").trim() || "Saved chart",
-            settingsHash,
+            settingsHash: presetSettingsHash,
             chartSpec: normalized,
             updatedAt: Date.now(),
         });
         setStoredChartPresets(nextPresets);
-        persistStoredChartPresets(stateKey, nextPresets);
-    }, [settingsHash, stateKey, storedChartPresets]);
+        persistStoredChartPresets(stateStorageScope, nextPresets, legacyChartPresetScopes);
+    }, [legacyChartPresetScopes, settingsHash, stateStorageScope, storedChartPresets]);
 
     const applyChartSpec = React.useCallback((nextChartSpec, { savePreset = true } = {}) => {
         const normalized = normalizeReportBuilderChartSpec(nextChartSpec);
@@ -2451,6 +2269,7 @@ export default function ReportBuilder({ container, context }) {
             chartSpec: normalized,
             viewMode: "chart",
         });
+        setChartApplyFeedback(null);
         if (savePreset) {
             saveChartPreset(normalized);
         }
@@ -2463,47 +2282,135 @@ export default function ReportBuilder({ container, context }) {
             chartSpec: null,
             viewMode: "table",
         });
+        setChartApplyFeedback(null);
     }, [persistState, state]);
 
+    const actionModel = useMemo(() => buildReportBuilderActionModel({
+        viewModes,
+        explicitChartMode,
+        hasValidChartSpec,
+        canShowResults,
+        canRunReport,
+        loading,
+    }), [canRunReport, canShowResults, explicitChartMode, hasValidChartSpec, loading, viewModes]);
+
+    const resultViewModes = actionModel.resultModes;
+
+    const desktopResultOverflowActions = useMemo(() => (
+        actionModel.desktop.overflowActionIds.map((actionId) => {
+            if (actionId === "removeChart") {
+                return {
+                    text: "Remove chart",
+                    icon: "trash",
+                    intent: "danger",
+                    onClick: removeChart,
+                };
+            }
+            return null;
+        }).filter(Boolean)
+    ), [actionModel.desktop.overflowActionIds, removeChart]);
+
     const openChartDialog = React.useCallback((seed = null) => {
-        const nextDraft = buildDefaultReportBuilderChartSpec(config, state, seed || {});
+        const nextDraft = buildDefaultReportBuilderChartSpec(config, state, seed || {}, {
+            suggestSeriesField: true,
+        });
         if (!nextDraft) {
             return;
         }
+        setChartApplyFeedback(null);
         setChartDraft(nextDraft);
         setChartDialogOpen(true);
     }, [config, state]);
 
-    const applyPreviousChart = React.useCallback(() => {
-        if (!selectedPreviousChartTitle) {
+    const applyQuickChart = React.useCallback((quickOptionValue = "") => {
+        const optionValue = String(quickOptionValue || selectedQuickChartOption || "").trim();
+        if (!optionValue) {
             return;
         }
-        const preset = compatiblePreviousChartPresets.find((entry) => entry.title === selectedPreviousChartTitle);
-        if (!preset) {
-            return;
-        }
-        applyChartSpec(preset.chartSpec, { savePreset: false });
-    }, [applyChartSpec, compatiblePreviousChartPresets, selectedPreviousChartTitle]);
-
-    const applyQuickChart = React.useCallback(() => {
-        if (!selectedQuickChartOption) {
-            return;
-        }
-        const next = quickChartOptions.find((entry) => entry.value === selectedQuickChartOption);
+        const next = quickChartOptions.find((entry) => entry.value === optionValue);
         if (!next?.spec) {
+            setSelectedQuickChartOption("");
             return;
         }
-        applyChartSpec(next.spec);
-    }, [applyChartSpec, quickChartOptions, selectedQuickChartOption]);
+        if (next.kind !== "default") {
+            applyChartSpec(next.spec);
+            setSelectedQuickChartOption("");
+            return;
+        }
+        const selectionPolicy = String(next.spec?.selectionPolicy || quickPresetPolicy.selectionPolicy || "").trim().toLowerCase() === "replace"
+            ? "replace"
+            : "merge";
+        const prepared = next.prepared || prepareReportBuilderChartApplication(config, state, next.spec, {
+            autoProvisionMissingDimensions: quickPresetPolicy.autoProvisionMissingDimensions,
+            forceAutoFetch: quickPresetPolicy.autoFetchOnSelect,
+            selectionPolicy,
+        });
+        if (!prepared.canApply) {
+            setChartApplyFeedback({
+                level: prepared.reason === "missingDimensions" ? "warning" : "danger",
+                message: prepared.message || "This chart could not be applied.",
+            });
+            setSelectedQuickChartOption("");
+            return;
+        }
+        persistState(prepared.nextState);
+        if (prepared.shouldFetch) {
+            dispatchReportRequest(prepared.nextState, { forceFetch: true });
+        }
+        const changedParts = [];
+        if (prepared.measureSelectionChanged || prepared.primaryMeasureChanged) {
+            changedParts.push("measures");
+        }
+        if (prepared.dimensionSelectionChanged) {
+            changedParts.push("breakdowns");
+        }
+        const changedText = changedParts.length > 0 ? changedParts.join(" and ") : "chart settings";
+        setChartApplyFeedback(prepared.selectionChanged
+            ? {
+                level: "info",
+                message: prepared.shouldFetch
+                    ? `Applied this preset's required ${changedText}. Refreshing results.`
+                    : prepared.requiresManualRun
+                        ? `Applied this preset's required ${changedText}. Run to refresh results.`
+                        : `Applied this preset's required ${changedText}.`,
+                action: prepared.requiresManualRun ? "runReport" : "",
+            }
+            : null);
+        saveChartPreset(prepared.normalizedChartSpec, {
+            settingsHash: buildReportBuilderSettingsHash(prepared.nextState),
+        });
+        setSelectedQuickChartOption("");
+    }, [applyChartSpec, config, dispatchReportRequest, persistState, quickChartOptions, quickPresetPolicy.autoFetchOnSelect, quickPresetPolicy.autoProvisionMissingDimensions, quickPresetPolicy.selectionPolicy, saveChartPreset, selectedQuickChartOption, state]);
 
-    useEffect(() => {
-        if (!selectedPreviousChartTitle) {
-            return;
-        }
-        if (!compatiblePreviousChartPresets.some((entry) => entry.title === selectedPreviousChartTitle)) {
-            setSelectedPreviousChartTitle("");
-        }
-    }, [compatiblePreviousChartPresets, selectedPreviousChartTitle]);
+    const runCompactPrimaryAction = React.useCallback(() => {
+        closeCompactSheet();
+        closeCompactChartSheet();
+        runReport();
+    }, [closeCompactChartSheet, closeCompactSheet, runReport]);
+
+    const compactBottomBarActions = useMemo(() => (
+        actionModel.compact.bottomBar.map((action) => {
+            switch (action.id) {
+                case "setup":
+                    return {
+                        ...action,
+                        onClick: () => openCompactSheet("scope"),
+                    };
+                case "chart":
+                    return {
+                        ...action,
+                        onClick: () => setCompactChartSheetOpen(true),
+                    };
+                case "run":
+                    return {
+                        ...action,
+                        onClick: runCompactPrimaryAction,
+                    };
+                default:
+                    return null;
+            }
+        }).filter(Boolean)
+    ), [actionModel.compact.bottomBar, openCompactSheet, runCompactPrimaryAction]);
 
     const chartDraftValidation = useMemo(
         () => validateReportBuilderChartSpec(config, chartDraft, chartFields),
@@ -2944,291 +2851,223 @@ export default function ReportBuilder({ container, context }) {
     return (
         <div className={[
             "forge-report-builder",
+            compactMode ? "forge-report-builder--compact" : "",
+            compactSheetOpen || compactChartSheetOpen ? "forge-report-builder--compact-overlay-open" : "",
             useFilterDrawer ? "forge-report-builder--filters-drawer" : "",
             resultPanePosition === "left" ? "forge-report-builder--result-left" : "",
-        ].filter(Boolean).join(" ")} ref={builderRootRef}>
+        ].filter(Boolean).join(" ")}
+        ref={builderRootRef}
+        data-report-builder-state={reportBuilderStateMarker}
+        data-report-builder-view-mode={String(state.viewMode || "").trim() || "table"}
+        data-report-builder-chart-title={String(state.chartSpec?.title || "").trim()}
+        data-report-builder-chart-type={String(state.chartSpec?.type || "").trim()}
+        data-report-builder-compact={compactMode ? "true" : "false"}>
             <div className="forge-report-builder__top">
-                <div className="forge-report-builder__shelf">
-                    <div className="forge-report-builder__topline">
-                        <div className="forge-report-builder__toolbar forge-report-builder__toolbar--inline">
-                            <div className="forge-report-builder__settings-anchor">
-                                <button
-                                    type="button"
-                                    className="forge-report-builder__toolbar-button forge-report-builder__toolbar-button--icon"
-                                    aria-label="Performance metrics settings"
-                                    title="Report settings"
-                                    aria-expanded={settingsOpen}
-                                    onClick={() => setSettingsOpen((current) => !current)}
-                                >
-                                    <Icon icon="cog" size={14} />
-                                </button>
-                                {settingsOpen ? (
-                                    <div className="forge-report-builder__settings-popover">
-                                        {config.groupBy?.options?.length ? (
-                                            <div className="forge-report-builder__control-cluster">
-                                                <label>Break down by</label>
-                                                <select
-                                                    className="forge-report-builder-select"
-                                                    value={state.groupBy || ""}
-                                                    onChange={(event) => setGroupBy(event.target.value)}
-                                                >
-                                                    <option value="">None</option>
-                                                    {config.groupBy.options.map((option) => (
-                                                        <option key={option.value} value={option.value}>
-                                                            {option.label || option.value}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                {compactMode ? renderCompactHeader() : (
+                    <div className="forge-report-builder__shelf">
+                        <div className="forge-report-builder__topline">
+                            <div className="forge-report-builder__toolbar forge-report-builder__toolbar--inline">
+                                <div className="forge-report-builder__toolbar-group forge-report-builder__toolbar-group--execute">
+                                    <div className="forge-report-builder__settings-anchor">
+                                        <button
+                                            type="button"
+                                            className="forge-report-builder__toolbar-button forge-report-builder__toolbar-button--icon"
+                                            aria-label="Performance metrics settings"
+                                            title="Report settings"
+                                            aria-expanded={settingsOpen}
+                                            onClick={() => setSettingsOpen((current) => !current)}
+                                        >
+                                            <Icon icon="cog" size={14} />
+                                        </button>
+                                        {settingsOpen ? (
+                                            <div className="forge-report-builder__settings-popover">
+                                                {renderSettingsControls()}
                                             </div>
                                         ) : null}
-                                        {orderFields.length > 0 ? (
-                                            <div className="forge-report-builder__control-cluster">
-                                                <label>Order by</label>
-                                                <select
-                                                    className="forge-report-builder-select"
-                                                    value={state.orderField || ""}
-                                                    onChange={(event) => setOrderField(event.target.value)}
-                                                >
-                                                    {orderFields.map((field) => (
-                                                        <option key={field.value || field.field} value={field.value || field.field}>
-                                                            {field.label || field.value || field.field}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <select
-                                                    className="forge-report-builder-select"
-                                                    value={state.orderDir || "desc"}
-                                                    onChange={(event) => setOrderDir(event.target.value)}
-                                                >
-                                                    <option value="asc">Ascending</option>
-                                                    <option value="desc">Descending</option>
-                                                </select>
-                                            </div>
-                                        ) : null}
-                                        <div className="forge-report-builder__control-cluster">
-                                            <label>Page size</label>
-                                            <select
-                                                className="forge-report-builder-select"
-                                                value={state.pageSize}
-                                                onChange={(event) => setPageSize(event.target.value)}
-                                            >
-                                                {pageSizeOptions.map((value) => (
-                                                    <option key={value} value={value}>
-                                                        {value}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
+                                    </div>
+                                    <Button
+                                        small
+                                        intent="primary"
+                                        icon="play"
+                                        className="forge-report-builder__run-button"
+                                        disabled={!canRunReport || loading}
+                                        onClick={runReport}
+                                    >
+                                        Run
+                                    </Button>
+                                    <Button
+                                        small
+                                        outlined
+                                        icon="download"
+                                        disabled={!canShowResults}
+                                        onClick={downloadCsv}
+                                    >
+                                        Export
+                                    </Button>
+                                </div>
+                                {inlineToolbarRequiredFilters.length > 0 ? (
+                                    <div className="forge-report-builder__toolbar-divider" aria-hidden="true" />
+                                ) : null}
+                                {inlineToolbarRequiredFilters.length > 0 ? (
+                                    <div className="forge-report-builder__toolbar-group forge-report-builder__toolbar-group--scope">
+                                        {inlineToolbarRequiredFilters.map((filter) => {
+                                            const filterKey = String(filter.id || filter.field || "").trim();
+                                            const currentValue = state?.staticFilters?.[filterKey];
+                                            return (
+                                                <InlineStaticFilterControl
+                                                    key={`inline_${filterKey}`}
+                                                    filter={filter}
+                                                    value={currentValue}
+                                                    onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
+                                                    onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
+                                {hasFilterDrawerContent && useFilterDrawer ? (
+                                    <Button
+                                        small
+                                        outlined
+                                        icon="filter"
+                                        onClick={() => setFiltersDrawerOpen((current) => !current)}
+                                    >
+                                        {filtersDrawerOpen ? `Hide Filters${totalActiveFilterCount > 0 ? ` (${totalActiveFilterCount})` : ""}` : `Filters${totalActiveFilterCount > 0 ? ` (${totalActiveFilterCount})` : ""}`}
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="forge-report-builder__body">
+                {!compactMode ? (
+                    <aside className="forge-report-builder__left" ref={leftRailRef}>
+                        {renderMeasuresPanel()}
+                        {renderBreakdownPanel()}
+                        {useFilterRail ? renderFilterRailControls() : null}
+                        {!compactMode && useFilterRail && filterPanels.common ? (
+                            <section className="forge-report-builder__inline-filter-body" aria-label="Active filters">
+                                {renderFilterBody()}
+                            </section>
+                        ) : null}
+                        {useFilterDrawer && filtersDrawerOpen ? renderFiltersPanel() : null}
+                    </aside>
+                ) : null}
+
+                <main className="forge-report-builder__center">
+                    {!compactMode && config.showResultHeader !== false && config?.result?.showResultHeader !== false ? (
+                        <div className="forge-report-builder__result-header">
+                            <div className="forge-report-builder__result-header-copy">
+                                <div className="forge-report-builder__result-header-eyebrow">Results</div>
+                                <h3>{desktopResultTitle}</h3>
+                                <p>{desktopResultDescription}</p>
+                                {desktopResultMetaItems.length > 0 ? (
+                                    <div className="forge-report-builder__result-meta" aria-label="Current result summary">
+                                        {desktopResultMetaItems.map((item) => (
+                                            <span key={item} className="forge-report-builder__result-meta-chip">{item}</span>
+                                        ))}
                                     </div>
                                 ) : null}
                             </div>
-                            <Button
-                                small
-                                intent="primary"
-                                icon="play"
-                                className="forge-report-builder__run-button"
-                                disabled={!canRunReport || loading}
-                                onClick={runReport}
-                            >
-                                Run
-                            </Button>
-                            <Button
-                                small
-                                outlined
-                                icon="download"
-                                disabled={!canShowResults}
-                                onClick={downloadCsv}
-                            >
-                                CSV
-                            </Button>
-                            {hasFilterDrawerContent && useFilterDrawer ? (
-                                <Button
-                                    small
-                                    outlined
-                                    icon="filter"
-                                    onClick={() => setFiltersDrawerOpen((current) => !current)}
-                                >
-                                    {filtersDrawerOpen ? `Hide Filters${totalActiveFilterCount > 0 ? ` (${totalActiveFilterCount})` : ""}` : `Filters${totalActiveFilterCount > 0 ? ` (${totalActiveFilterCount})` : ""}`}
-                                </Button>
-                            ) : null}
-                            {explicitChartMode ? (
-                                <>
+                            <div className="forge-report-builder__result-header-actions">
+                                {actionModel.desktop.showQuickChartActions ? (
                                     <ReportBuilderChartQuickActions
                                         canCreate={canCreateChart}
+                                        showCreateButton={!hasValidChartSpec}
                                         onCreate={() => openChartDialog(state.chartSpec)}
                                         quickOptions={quickChartOptions}
-                                        selectedQuickOption={selectedQuickChartOption}
-                                        onSelectQuickOption={setSelectedQuickChartOption}
-                                        onApplyQuickOption={applyQuickChart}
-                                        quickDisabled={!selectedQuickChartOption}
+                                        onSelectQuickOption={(value) => {
+                                            setSelectedQuickChartOption(value);
+                                            setChartApplyFeedback(null);
+                                            if (value) {
+                                                applyQuickChart(value);
+                                            }
+                                        }}
                                     />
-                                    {hasValidChartSpec ? (
-                                        <>
-                                            <Button small outlined icon="edit" onClick={() => openChartDialog(state.chartSpec)}>
-                                                Edit Chart
-                                            </Button>
-                                            <Button small outlined intent="danger" icon="trash" onClick={removeChart}>
-                                                Remove Chart
-                                            </Button>
-                                            <div className="forge-report-builder__view-toggle">
-                                                {viewModes.filter((mode) => mode === "table" || mode === "chart").map((mode) => (
-                                                    <button
-                                                        key={mode}
-                                                        type="button"
-                                                        className={state.viewMode === mode ? "is-active" : ""}
-                                                        onClick={() => setViewMode(mode)}
-                                                    >
-                                                        <Icon icon={mode === "table" ? "th" : "timeline-line-chart"} size={12} />
-                                                        {mode}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </>
-                                    ) : null}
-                                </>
-                            ) : (
+                                ) : null}
+                                {actionModel.desktop.showEditChart ? (
+                                    <Button small outlined icon="edit" onClick={() => openChartDialog(state.chartSpec)}>
+                                        Edit Chart
+                                    </Button>
+                                ) : null}
                                 <div className="forge-report-builder__view-toggle">
-                                    {viewModes.map((mode) => (
+                                    {resultViewModes.map((mode) => (
                                         <button
                                             key={mode}
                                             type="button"
                                             className={state.viewMode === mode ? "is-active" : ""}
                                             onClick={() => setViewMode(mode)}
+                                            disabled={explicitChartMode && mode === "chart" && !hasValidChartSpec}
                                         >
                                             <Icon icon={mode === "table" ? "th" : "timeline-line-chart"} size={12} />
                                             {mode}
                                         </button>
                                     ))}
                                 </div>
-                            )}
-                        </div>
-                        <div className="forge-report-builder__measure-sections">
-                            {measureSections.map((section) => (
-                                <div key={section.id} className="forge-report-builder__measure-section">
-                                    {section.label ? (
-                                        <div className="forge-report-builder__measure-section-label">{section.label}</div>
-                                    ) : null}
-                                    <div className="forge-report-builder__measure-row">
-                                        {section.measures.map((measure) => {
-                                            const active = state.selectedMeasures.includes(measure.id);
-                                            const primary = state.primaryMeasure === measure.id;
-                                            return (
-                                                <button
-                                                    key={measure.id}
-                                                    type="button"
-                                                    className={[
-                                                        "forge-report-builder__measure-pill",
-                                                        active ? "is-active" : "",
-                                                        primary ? "is-primary" : "",
-                                                    ].filter(Boolean).join(" ")}
-                                                    onClick={() => (active ? setPrimaryMeasure(measure.id) : toggleMeasure(measure.id))}
-                                                    onDoubleClick={() => setPrimaryMeasure(measure.id)}
-                                                >
-                                                    <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"} onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        toggleMeasure(measure.id);
-                                                    }}>{active ? "✓" : ""}</span>
-                                                    <span>{measure.label || measure.id}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="forge-report-builder__body">
-                <aside className="forge-report-builder__left" ref={leftRailRef}>
-                    <section className="forge-report-builder__panel">
-                        <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
-                            <div className="forge-report-builder__panel-title">Breakdowns</div>
-                            <button
-                                type="button"
-                                className="forge-report-builder__panel-toggle"
-                                onClick={() => setDimensionsCollapsed((current) => !current)}
-                                aria-expanded={!dimensionsCollapsed}
-                            >
-                                {dimensionsCollapsed ? "Show" : "Hide"}
-                            </button>
-                        </div>
-                        {!dimensionsCollapsed ? (
-                            <div className="forge-report-builder__dimension-picker">
-                                <select
-                                    className="forge-report-builder-select forge-report-builder-select--add"
-                                    value=""
-                                    onChange={(event) => {
-                                        addDimension(event.target.value);
-                                        event.target.value = "";
-                                    }}
-                                    disabled={availableDimensionDefs.length === 0}
-                                >
-                                    <option value="">{availableDimensionDefs.length === 0 ? "All breakdowns added" : "Add breakdown..."}</option>
-                                    {availableDimensionDefs.map((dimension) => (
-                                        <option key={dimension.id} value={dimension.id}>
-                                            {dimension.label || dimension.id}
-                                        </option>
-                                    ))}
-                                </select>
-                                {selectedDimensionDefs.length > 0 ? (
-                                    <div className="forge-report-builder__dimension-selected" aria-label="Selected breakdowns">
-                                        {selectedDimensionDefs.map((dimension) => {
-                                            const removable = selectedDimensionDefs.length > 1;
-                                            return (
-                                                <button
-                                                    key={dimension.id}
-                                                    type="button"
-                                                    className="forge-report-builder__dimension-pill"
-                                                    onClick={() => removeDimension(dimension.id)}
-                                                    disabled={!removable}
-                                                    title={removable ? `Remove ${dimension.label || dimension.id}` : dimension.label || dimension.id}
-                                                >
-                                                    <span>{dimension.label || dimension.id}</span>
-                                                    {removable ? <span aria-hidden="true">×</span> : null}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                ) : null}
+                                <ReportBuilderOverflowActions actions={desktopResultOverflowActions} />
                             </div>
-                        ) : null}
-                    </section>
-                    {useFilterRail ? renderFilterRailControls() : null}
-                    {useFilterDrawer && filtersDrawerOpen ? renderFiltersPanel() : null}
-                </aside>
-
-                <main className="forge-report-builder__center">
-                    {config.showResultHeader !== false ? (
-                        <div className="forge-report-builder__result-header">
-                            <h3>{container.title || config.title || "Report Builder"}</h3>
+                        </div>
+                    ) : null}
+                    {chartApplyFeedback?.message ? (
+                        <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${chartApplyFeedback.level || "warning"}`}>
+                            <span>{chartApplyFeedback.message}</span>
+                            {chartApplyFeedback.action === "runReport" ? (
+                                <Button small minimal onClick={runReport}>Run now</Button>
+                            ) : null}
                         </div>
                     ) : null}
 
                     <div className="forge-report-builder__result-frame">
-                        {loading ? <div className="forge-report-builder__empty">Loading report data…</div> : null}
-                        {error ? <div className="forge-report-builder__empty is-error">{renderReportBuilderError(error)}</div> : null}
-                        {!loading && !error && !canShowResults ? (
-                            <div className="forge-report-builder__empty forge-report-builder__empty--compact">
-                                {canRunReport
-                                    ? (hasCompletedCurrentRun
-                                        ? "No rows returned for the current scope and date range."
-                                        : "Run the report to preview results.")
-                                    : readiness.reason === "scope"
-                                        ? "Choose an advertiser, campaign, ad order, or audience to preview results."
-                                        : "Set the required filters to preview results."}
-                            </div>
+                        {activeResultLoading ? (
+                            <ReportBuilderResultState
+                                icon="refresh"
+                                eyebrow="Loading"
+                                title="Refreshing report data"
+                                description="Preparing the latest result set for the current scope."
+                            />
                         ) : null}
-                        {!loading && !error && canShowResults && (
+                        {activeResultError ? (
+                            <ReportBuilderResultState
+                                tone="error"
+                                icon="warning-sign"
+                                eyebrow="Result error"
+                                title="We couldn't render these results"
+                                description={renderReportBuilderError(activeResultError)}
+                                actionLabel={canRunReport ? "Run again" : ""}
+                                onAction={canRunReport ? runReport : undefined}
+                            />
+                        ) : null}
+                        {!activeResultLoading && !activeResultError && !canShowResults ? (
+                            <ReportBuilderResultState
+                                icon={canRunReport ? (hasCompletedCurrentRun ? "search-around" : "play") : "filter-list"}
+                                eyebrow={canRunReport ? (hasCompletedCurrentRun ? "No rows returned" : "Ready to run") : "Scope required"}
+                                title={canRunReport
+                                    ? (hasCompletedCurrentRun ? "No rows matched the current scope" : "Run the report to preview results")
+                                    : readiness.reason === "scope"
+                                        ? "Choose the required scope"
+                                        : "Complete the required filters"}
+                                description={canRunReport
+                                    ? (hasCompletedCurrentRun
+                                        ? "Try widening the date range or adjusting the selected scope and filters."
+                                        : "Run the current setup to unlock table and chart analysis.")
+                                    : readiness.reason === "scope"
+                                        ? "Select an advertiser, campaign, ad order, or audience before running the report."
+                                        : "Set the remaining required filters before running the report."}
+                                actionLabel={canRunReport && !hasCompletedCurrentRun ? "Run report" : ""}
+                                onAction={canRunReport && !hasCompletedCurrentRun ? runReport : undefined}
+                            />
+                        ) : null}
+                        {!activeResultLoading && !activeResultError && canShowResults && (
                             (explicitChartMode && hasValidChartSpec && state.viewMode === "chart")
                             || (!explicitChartMode && state.viewMode !== "table")
                         ) ? (
                             <div className="forge-report-builder__chart-wrap">
-                                <Chart container={chartContainer} context={builderContext} embedded />
+                                <Chart key={chartRenderKey} container={chartContainer} context={builderContext} embedded />
                             </div>
                         ) : null}
-                        {!loading && !error && canShowResults && (
+                        {!activeResultLoading && !activeResultError && canShowResults && (
                             !explicitChartMode
                                 ? state.viewMode === "table"
                                 : (!hasValidChartSpec || hasStaleChartSpec || state.viewMode === "table")
@@ -3263,35 +3102,45 @@ export default function ReportBuilder({ container, context }) {
                                 </table>
                             </div>
                         ) : null}
-                        {!loading && !error && canShowResults && explicitChartMode && (!hasValidChartSpec || hasStaleChartSpec) ? (
-                            <div className="forge-report-builder__empty forge-report-builder__empty--chart-callout">
-                                {hasStaleChartSpec
+                        {!activeResultLoading && !activeResultError && canShowResults && explicitChartMode && (!hasValidChartSpec || hasStaleChartSpec) ? (
+                            <ReportBuilderResultState
+                                tone={hasStaleChartSpec ? "warning" : "neutral"}
+                                icon={hasStaleChartSpec ? "warning-sign" : "timeline-line-chart"}
+                                eyebrow={hasStaleChartSpec ? "Chart needs attention" : "Chart not configured"}
+                                title={hasStaleChartSpec ? "The current chart no longer matches this table" : "Build a chart from the current table"}
+                                description={hasStaleChartSpec
                                     ? (chartSpecValidation.errors || []).map((entry) => chartErrorMessage(entry, { dimensions: chartDimensions, measures: chartMeasures })).join(" ")
-                                    : "Use Create Chart next to Run to build a chart from the current table."}
-                            </div>
+                                    : (compactMode
+                                        ? "Use Chart in the bottom bar to build a chart from the current table."
+                                        : "Use the result header actions to create or apply a curated chart from the current table.")}
+                                actionLabel={!compactMode && canCreateChart ? (hasStaleChartSpec ? "Edit chart" : "Create chart") : ""}
+                                onAction={!compactMode && canCreateChart
+                                    ? () => openChartDialog(state.chartSpec)
+                                    : undefined}
+                            />
                         ) : null}
                     </div>
 
-                    <div className="forge-report-builder__pagination">
-                        <span>Page {state.page}</span>
-                        <div className="forge-report-builder__pagination-actions">
-                            <Button small outlined disabled={state.page <= 1} onClick={() => goToPage(state.page - 1)}>
-                                Previous
-                            </Button>
-                            <Button small outlined disabled={!hasMore} onClick={() => goToPage(state.page + 1)}>
-                                Next
-                            </Button>
+                    {showPagination ? (
+                        <div className="forge-report-builder__pagination">
+                            <span>Page {state.page}</span>
+                            <div className="forge-report-builder__pagination-actions">
+                                <Button small outlined disabled={state.page <= 1} onClick={() => goToPage(state.page - 1)}>
+                                    Previous
+                                </Button>
+                                <Button small outlined disabled={!hasMore} onClick={() => goToPage(state.page + 1)}>
+                                    Next
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                    {useFilterRail && filterPanels.common ? (
-                        <section className="forge-report-builder__inline-filter-body" aria-label="Active filters">
-                            {renderFilterBody()}
-                        </section>
                     ) : null}
+                    {renderCompactBottomBar()}
                 </main>
             </div>
 
-            {!useFilterDrawer && !useFilterRail ? renderFiltersPanel() : null}
+            {!compactMode && !useFilterDrawer && !useFilterRail ? renderFiltersPanel() : null}
+            {renderCompactSetupSheet()}
+            {renderCompactChartSheet()}
             <ReportBuilderChartDialog
                 isOpen={chartDialogOpen}
                 onClose={() => setChartDialogOpen(false)}
@@ -3306,6 +3155,8 @@ export default function ReportBuilder({ container, context }) {
                 dimensions={chartDimensions}
                 measures={chartMeasures}
                 validation={chartDraftValidation}
+                sanitizeDraftPatch={sanitizeChartDraftPatch}
+                renderChartError={chartErrorMessage}
             />
         </div>
     );

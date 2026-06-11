@@ -1,4 +1,13 @@
 import { resolveKey } from "../../utils/selector.js";
+import {
+    ALL_SUPPORTED_CHART_TYPES,
+    chartFamilyAllowsSeriesOptions,
+    chartFamilyForType,
+    CARTESIAN_CHART_TYPES,
+    isValidPerSeriesType,
+    SINGLE_MEASURE_CATEGORY_TYPES,
+    supportsStackIdForSeries,
+} from "./reportBuilderChartRules.js";
 
 function clone(value) {
     if (Array.isArray(value)) {
@@ -364,48 +373,11 @@ function normalizeStringArray(values = []) {
     return normalizeArray(values).map((entry) => String(entry || "").trim()).filter(Boolean);
 }
 
-const CARTESIAN_CHART_TYPES = ["line", "bar", "area"];
-const CATEGORY_CHART_TYPES = ["pie", "donut", "horizontal_bar", "funnel_bar"];
-const SINGLE_MEASURE_CATEGORY_TYPES = new Set(["pie", "donut", "funnel_bar"]);
-const ALL_SUPPORTED_CHART_TYPES = [...CARTESIAN_CHART_TYPES, ...CATEGORY_CHART_TYPES];
 const DEFAULT_CHART_PALETTE = [
     "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
     "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
     "#bcbd22", "#17becf",
 ];
-
-function chartFamilyForType(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
-    if (CARTESIAN_CHART_TYPES.includes(normalized)) return "cartesian";
-    if (CATEGORY_CHART_TYPES.includes(normalized)) return "category";
-    return null;
-}
-
-function chartFamilyAllowsSeriesOptions(type = "") {
-    const normalized = String(type || "").trim().toLowerCase();
-    if (chartFamilyForType(normalized) === "cartesian") return true;
-    return normalized === "horizontal_bar";
-}
-
-function isValidPerSeriesType(chartType = "", perSeriesType = "") {
-    const family = chartFamilyForType(chartType);
-    const normalized = String(perSeriesType || "").trim().toLowerCase();
-    if (!normalized) return true;
-    if (family === "cartesian") {
-        return CARTESIAN_CHART_TYPES.includes(normalized);
-    }
-    return false;
-}
-
-function supportsStackIdForSeries(chartType = "", perSeriesType = "") {
-    const family = chartFamilyForType(chartType);
-    const baseType = String(chartType || "").trim().toLowerCase();
-    const effectiveType = String(perSeriesType || baseType).trim().toLowerCase();
-    if (family === "cartesian") {
-        return effectiveType === "bar" || effectiveType === "area";
-    }
-    return baseType === "horizontal_bar";
-}
 
 function supportedChartTypeSet(config = {}) {
     const supported = normalizeStringArray(
@@ -651,6 +623,18 @@ export function resolveReportBuilderMeasure(config = {}, id = "") {
     ) || null;
 }
 
+export function resolveReportBuilderMeasureByField(config = {}, fieldKey = "") {
+    const target = String(fieldKey || "").trim();
+    if (!target) {
+        return null;
+    }
+    return getSelectableReportBuilderMeasures(config).find((entry) => {
+        const measureId = String(entry?.id || "").trim();
+        const valueKey = String(entry?.key || entry?.id || "").trim();
+        return target === measureId || target === valueKey;
+    }) || null;
+}
+
 export function buildReportBuilderChartFields(config = {}, state = {}) {
     return buildReportBuilderColumns(config, state).map((entry) => ({
         key: String(entry?.chartKey || entry?.displayKey || entry?.key || "").trim(),
@@ -795,7 +779,7 @@ export function buildReportBuilderSettingsHash(state = {}) {
     return `rb_${(hash >>> 0).toString(16)}`;
 }
 
-export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed = {}) {
+export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed = {}, options = {}) {
     const columns = buildReportBuilderChartFields(config, state);
     const dimensions = columns.filter((entry) => entry.kind === "dimension");
     const measures = columns.filter((entry) => entry.kind === "measure");
@@ -809,13 +793,18 @@ export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed
     const type = supportedChartTypeSet(config).has(normalizedSeed.type) ? normalizedSeed.type : getReportBuilderSupportedChartTypes(config)[0];
     const xField = normalizedSeed.xField || dimensions[0]?.key || null;
     const family = chartFamilyForType(type);
+    const suggestSeriesField = options?.suggestSeriesField === true;
     const seededYFields = Array.isArray(normalizedSeed.yFields) && normalizedSeed.yFields.length > 0
         ? normalizedSeed.yFields
         : (defaultYField ? [defaultYField] : []);
     const yFields = SINGLE_MEASURE_CATEGORY_TYPES.has(type) ? seededYFields.slice(0, 1) : seededYFields;
     const allowSeriesField = family === "cartesian" && yFields.length === 1;
     const seriesField = allowSeriesField
-        ? (normalizedSeed.seriesField || dimensions.find((entry) => entry.key !== xField)?.key || null)
+        ? (
+            normalizedSeed.seriesField
+            || (suggestSeriesField ? dimensions.find((entry) => entry.key !== xField)?.key : null)
+            || null
+        )
         : null;
     const allowSeriesOptions = chartFamilyAllowsSeriesOptions(type) && !seriesField;
     const seriesOptions = allowSeriesOptions ? normalizedSeed.seriesOptions : null;
@@ -838,9 +827,198 @@ export function buildReportBuilderDefaultChartSpecs(config = {}, state = {}) {
         }
         return {
             ...built,
+            group: String(entry?.group || "").trim(),
+            selectionPolicy: String(entry?.selectionPolicy || "").trim().toLowerCase() === "replace" ? "replace" : "",
             title: String(entry?.title || built.title || "").trim() || "Default chart",
         };
     }).filter(Boolean);
+}
+
+export function getReportBuilderQuickPresetPolicy(config = {}) {
+    const quickPresets = config?.result?.quickPresets;
+    const selectionPolicy = String(quickPresets?.selectionPolicy || "").trim().toLowerCase();
+    return {
+        autoProvisionMissingDimensions: quickPresets?.autoProvisionMissingDimensions === true,
+        autoFetchOnSelect: quickPresets?.autoFetchOnSelect === true,
+        selectionPolicy: selectionPolicy === "replace" ? "replace" : "merge",
+    };
+}
+
+export function getReportBuilderAutoChartPolicy(config = {}) {
+    const result = config?.result;
+    return {
+        autoApplyDefaultChartOnResult: result?.autoApplyDefaultChartOnResult === true,
+    };
+}
+
+export function resolveReportBuilderChartDependencies(config = {}, chartSpec = null) {
+    const normalized = normalizeReportBuilderChartSpec(chartSpec);
+    if (!normalized) {
+        return {
+            normalizedChartSpec: null,
+            dimensionIds: [],
+            dimensions: [],
+            measureIds: [],
+            measures: [],
+        };
+    }
+    const dimensions = [];
+    const seen = new Set();
+    [normalized.xField, normalized.seriesField].forEach((fieldKey) => {
+        const dimension = resolveReportBuilderDimensionByField(config, fieldKey);
+        const dimensionId = String(dimension?.id || "").trim();
+        if (!dimension || !dimensionId || seen.has(dimensionId)) {
+            return;
+        }
+        seen.add(dimensionId);
+        dimensions.push(dimension);
+    });
+    const measures = [];
+    const seenMeasures = new Set();
+    normalizeStringArray(normalized.yFields).forEach((fieldKey) => {
+        const measure = resolveReportBuilderMeasureByField(config, fieldKey);
+        const measureId = String(measure?.id || "").trim();
+        if (!measure || !measureId || seenMeasures.has(measureId)) {
+            return;
+        }
+        seenMeasures.add(measureId);
+        measures.push(measure);
+    });
+    return {
+        normalizedChartSpec: normalized,
+        dimensionIds: dimensions.map((entry) => String(entry?.id || "").trim()),
+        dimensions,
+        measureIds: measures.map((entry) => String(entry?.id || "").trim()),
+        measures,
+    };
+}
+
+export function prepareReportBuilderChartApplication(config = {}, state = {}, chartSpec = null, options = {}) {
+    const { normalizedChartSpec, dimensionIds, dimensions, measureIds, measures } = resolveReportBuilderChartDependencies(config, chartSpec);
+    const selectedDimensionIds = normalizeArray(state?.selectedDimensions)
+        .map((entry) => String(entry || "").trim())
+        .filter(Boolean);
+    const selectedMeasureIds = normalizeArray(state?.selectedMeasures)
+        .map((entry) => String(entry || "").trim())
+        .filter(Boolean);
+    const autoProvisionMissingDimensions = options?.autoProvisionMissingDimensions === true;
+    const autoProvisionMissingMeasures = options?.autoProvisionMissingMeasures !== false;
+    const selectionPolicy = String(options?.selectionPolicy || "").trim().toLowerCase() === "replace" ? "replace" : "merge";
+    const missingDimensionIds = dimensionIds.filter((entry) => !selectedDimensionIds.includes(entry));
+    const missingDimensions = dimensions.filter((entry) => missingDimensionIds.includes(String(entry?.id || "").trim()));
+    const missingMeasureIds = measureIds.filter((entry) => !selectedMeasureIds.includes(entry));
+    const missingMeasures = measures.filter((entry) => missingMeasureIds.includes(String(entry?.id || "").trim()));
+    const nextSelectedDimensions = selectionPolicy === "replace"
+        ? (dimensionIds.length > 0 ? [...dimensionIds] : selectedDimensionIds)
+        : (autoProvisionMissingDimensions
+            ? [...selectedDimensionIds, ...missingDimensionIds.filter((entry) => !selectedDimensionIds.includes(entry))]
+            : selectedDimensionIds);
+    const nextSelectedMeasures = selectionPolicy === "replace"
+        ? (measureIds.length > 0 ? [...measureIds] : selectedMeasureIds)
+        : (autoProvisionMissingMeasures
+            ? [...selectedMeasureIds, ...missingMeasureIds.filter((entry) => !selectedMeasureIds.includes(entry))]
+            : selectedMeasureIds);
+    const nextPrimaryMeasure = measureIds.length > 0
+        ? measureIds[0]
+        : (nextSelectedMeasures.includes(String(state?.primaryMeasure || "").trim()) ? String(state?.primaryMeasure || "").trim() : (nextSelectedMeasures[0] || ""));
+    const nextState = {
+        ...state,
+        selectedDimensions: nextSelectedDimensions,
+        selectedMeasures: nextSelectedMeasures,
+        primaryMeasure: nextPrimaryMeasure,
+        chartSpec: normalizedChartSpec,
+        viewMode: "chart",
+        page: 1,
+    };
+    const chartFields = buildReportBuilderChartFields(config, nextState);
+    const validation = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
+    const missingDimensionLabels = missingDimensions.map((entry) => String(entry?.label || entry?.id || "").trim()).filter(Boolean);
+    const missingDimensionLabel = missingDimensionLabels.join(", ");
+    const missingMeasureLabels = missingMeasures.map((entry) => String(entry?.label || entry?.id || "").trim()).filter(Boolean);
+    const dimensionSelectionChanged = JSON.stringify(nextSelectedDimensions) !== JSON.stringify(selectedDimensionIds);
+    const measureSelectionChanged = JSON.stringify(nextSelectedMeasures) !== JSON.stringify(selectedMeasureIds);
+    const primaryMeasureChanged = nextPrimaryMeasure !== String(state?.primaryMeasure || "").trim();
+    const selectionChanged = dimensionSelectionChanged || measureSelectionChanged || primaryMeasureChanged;
+    const forceAutoFetch = options?.forceAutoFetch === true;
+    const shouldFetch = (forceAutoFetch || config?.request?.autoFetch !== false) && canAutoFetchReportBuilder(config, nextState) && selectionChanged;
+    let reason = "";
+    let message = "";
+    if (!normalizedChartSpec) {
+        reason = "missingChartSpec";
+        message = "This chart preset is incomplete.";
+    } else if (missingDimensionIds.length > 0 && !autoProvisionMissingDimensions) {
+        reason = "missingDimensions";
+        message = missingDimensionLabel
+            ? `This chart needs the ${missingDimensionLabel} breakdown${missingDimensionLabels.length > 1 ? "s" : ""}.`
+            : "This chart needs an additional breakdown to render.";
+    } else if (!validation.valid) {
+        reason = "invalidChartSpec";
+        message = "This chart could not be applied with the current table fields.";
+    }
+    return {
+        normalizedChartSpec,
+        nextState,
+        chartFields,
+        validation,
+        autoProvisionMissingDimensions,
+        autoProvisionMissingMeasures,
+        selectionPolicy,
+        forceAutoFetch,
+        missingDimensionIds,
+        missingDimensionLabels,
+        missingDimensions,
+        missingMeasureIds,
+        missingMeasureLabels,
+        missingMeasures,
+        requiresDimensionProvision: missingDimensionIds.length > 0,
+        requiresMeasureProvision: missingMeasureIds.length > 0,
+        dimensionSelectionChanged,
+        measureSelectionChanged,
+        primaryMeasureChanged,
+        selectionChanged,
+        shouldFetch,
+        requiresManualRun: !shouldFetch && selectionChanged && canAutoFetchReportBuilder(config, nextState),
+        canApply: !!normalizedChartSpec && validation.valid,
+        reason,
+        message,
+    };
+}
+
+export function prepareReportBuilderAutoChartApplication(config = {}, state = {}) {
+    const policy = getReportBuilderAutoChartPolicy(config);
+    if (!policy.autoApplyDefaultChartOnResult) {
+        return null;
+    }
+
+    const candidates = [];
+    const directDefault = sanitizeChartSpecAgainstConfig(config, config?.result?.defaultChartSpec || null);
+    if (directDefault) {
+        candidates.push(directDefault);
+    }
+    buildReportBuilderDefaultChartSpecs(config, state).forEach((entry) => {
+        candidates.push(entry);
+    });
+
+    const seen = new Set();
+    for (const candidate of candidates) {
+        const normalized = normalizeReportBuilderChartSpec(candidate);
+        if (!normalized) {
+            continue;
+        }
+        const fingerprint = JSON.stringify(normalized);
+        if (!fingerprint || seen.has(fingerprint)) {
+            continue;
+        }
+        seen.add(fingerprint);
+        const prepared = prepareReportBuilderChartApplication(config, state, normalized, {
+            autoProvisionMissingDimensions: false,
+        });
+        if (!prepared.canApply || prepared.requiresDimensionProvision) {
+            continue;
+        }
+        return prepared;
+    }
+    return null;
 }
 
 function normalizeComputedMeasure(definition = {}) {
@@ -1320,7 +1498,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     const baseChart = {
         type: seriesType,
         xAxis: {
-            dataKey: xDisplayKey || "eventDate",
+            dataKey: xDisplayKey || reportBuilderDimensionValueKey(xField) || normalized.xField || "name",
             tickFormat: xField?.tickFormat,
         },
         yAxis: {

@@ -251,6 +251,7 @@ data class ReportBuilderResultDef(
     val viewModes: List<String> = emptyList(),
     val chartType: String? = null,
     val chartWizard: ReportBuilderChartWizardDef? = null,
+    val autoApplyDefaultChartOnResult: Boolean? = null,
     val defaultChartSpecs: List<ReportBuilderChartSpecDef> = emptyList()
 )
 

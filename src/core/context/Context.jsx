@@ -1,4 +1,4 @@
-import {useDataSourceHandlers} from "../../hooks";
+import {useDataSourceHandlers} from "../../hooks/index.js";
 import {
     getControlSignal,
     getCollectionInfoSignal,
@@ -13,9 +13,9 @@ import {
 } from "../store/signals.js";
 
 
-import {resolveHandler} from "../../actions";
-import {useDialogHandlers, useWindowHandlers} from "../../hooks";
-import {createDataConnector} from "../../hooks/dataconnector";
+import {resolveHandler} from "../../actions/index.js";
+import {useDialogHandlers, useWindowHandlers} from "../../hooks/index.js";
+import {createDataConnector} from "../../hooks/dataconnector.js";
 
 function resolveActionHandler(actions, handlers, name) {
     if (!actions) return null;

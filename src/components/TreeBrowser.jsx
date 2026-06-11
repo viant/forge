@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { NonIdealState, Tree, Tag } from '@blueprintjs/core';
 import { useSignalEffect } from '@preact/signals-react';
 import { buildTreeBrowserNodes } from './treeBrowserUtils.js';
-import { treeBrowserHandlers } from "../hooks";
+import { treeBrowserHandlers } from "../hooks/index.js";
 import { getLogger } from '../utils/logger.js';
 import { formatDataSourceError } from '../utils/dataSourceError.js';
 import './tree-browser.css';

@@ -4,6 +4,7 @@ dist/
 android/sample/
 android/app/
 android/mock-backend/
+output/
 
 # Logs and lock files
 *.log

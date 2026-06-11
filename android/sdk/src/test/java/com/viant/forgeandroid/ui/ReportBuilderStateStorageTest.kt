@@ -2,14 +2,19 @@ package com.viant.forgeandroid.ui
 
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
+import com.viant.forgeandroid.runtime.ReportBuilderChartSpecDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef
+import com.viant.forgeandroid.runtime.ReportBuilderDimensionDef
+import com.viant.forgeandroid.runtime.ReportBuilderMeasureDef
+import com.viant.forgeandroid.runtime.ReportBuilderResultDef
 import com.viant.forgeandroid.runtime.WindowMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class ReportBuilderStateStorageTest {
     @Test
@@ -106,5 +111,83 @@ class ReportBuilderStateStorageTest {
         assertEquals(listOf("Website", "Application"), includeRows.first().selections.map { it.label })
         assertEquals("Website,Application", legacyDynamicFilterValues(migrated)["includeSiteType"])
         assertEquals(listOf("includeSiteType"), legacyActiveDynamicFilterKeys(migrated))
+    }
+
+    @Test
+    fun resolveAutoAppliedReportBuilderChartSpecUsesFirstCompatiblePreset() {
+        val config = DashboardReportBuilderDef(
+            measures = listOf(
+                ReportBuilderMeasureDef(id = "avails", key = "avails"),
+                ReportBuilderMeasureDef(id = "hhUniqs", key = "hhUniqs")
+            ),
+            dimensions = listOf(
+                ReportBuilderDimensionDef(id = "eventDate", key = "eventDate"),
+                ReportBuilderDimensionDef(id = "channelV2", key = "channelV2"),
+                ReportBuilderDimensionDef(id = "siteType", key = "siteType")
+            ),
+            result = ReportBuilderResultDef(
+                chartCreationMode = "explicit",
+                autoApplyDefaultChartOnResult = true,
+                defaultChartSpecs = listOf(
+                    ReportBuilderChartSpecDef(
+                        title = "Needs extra dimension",
+                        type = "donut",
+                        xField = "siteType",
+                        yFields = listOf("avails")
+                    ),
+                    ReportBuilderChartSpecDef(
+                        title = "Unsupported multi measure",
+                        type = "bar",
+                        xField = "eventDate",
+                        yFields = listOf("avails", "hhUniqs")
+                    ),
+                    ReportBuilderChartSpecDef(
+                        title = "Compatible trend",
+                        type = "line",
+                        xField = "eventDate",
+                        yFields = listOf("avails"),
+                        seriesField = "channelV2"
+                    )
+                )
+            )
+        )
+
+        val resolved = resolveAutoAppliedReportBuilderChartSpec(
+            config = config,
+            selectedMeasures = listOf("avails"),
+            selectedDimensions = listOf("eventDate", "channelV2")
+        )
+
+        assertNotNull(resolved)
+        assertEquals("Compatible trend", resolved.title)
+        assertEquals("line", resolved.type)
+    }
+
+    @Test
+    fun resolveAutoAppliedReportBuilderChartSpecReturnsNullWhenDisabled() {
+        val config = DashboardReportBuilderDef(
+            measures = listOf(ReportBuilderMeasureDef(id = "avails", key = "avails")),
+            dimensions = listOf(ReportBuilderDimensionDef(id = "eventDate", key = "eventDate")),
+            result = ReportBuilderResultDef(
+                chartCreationMode = "explicit",
+                autoApplyDefaultChartOnResult = false,
+                defaultChartSpecs = listOf(
+                    ReportBuilderChartSpecDef(
+                        title = "Trend",
+                        type = "line",
+                        xField = "eventDate",
+                        yFields = listOf("avails")
+                    )
+                )
+            )
+        )
+
+        val resolved = resolveAutoAppliedReportBuilderChartSpec(
+            config = config,
+            selectedMeasures = listOf("avails"),
+            selectedDimensions = listOf("eventDate")
+        )
+
+        assertNull(resolved)
     }
 }

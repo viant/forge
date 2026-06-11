@@ -1011,6 +1011,7 @@ public struct ReportBuilderResultDef: Codable, Sendable {
     public let viewModes: [String]
     public let chartType: String?
     public let chartWizard: ReportBuilderChartWizardDef?
+    public let autoApplyDefaultChartOnResult: Bool?
     public let defaultChartSpecs: [ReportBuilderChartSpecDef]
 
     enum CodingKeys: String, CodingKey {
@@ -1019,6 +1020,7 @@ public struct ReportBuilderResultDef: Codable, Sendable {
         case viewModes
         case chartType
         case chartWizard
+        case autoApplyDefaultChartOnResult
         case defaultChartSpecs
     }
 
@@ -1028,6 +1030,7 @@ public struct ReportBuilderResultDef: Codable, Sendable {
         viewModes: [String] = [],
         chartType: String? = nil,
         chartWizard: ReportBuilderChartWizardDef? = nil,
+        autoApplyDefaultChartOnResult: Bool? = nil,
         defaultChartSpecs: [ReportBuilderChartSpecDef] = []
     ) {
         self.chartCreationMode = chartCreationMode
@@ -1035,6 +1038,7 @@ public struct ReportBuilderResultDef: Codable, Sendable {
         self.viewModes = viewModes
         self.chartType = chartType
         self.chartWizard = chartWizard
+        self.autoApplyDefaultChartOnResult = autoApplyDefaultChartOnResult
         self.defaultChartSpecs = defaultChartSpecs
     }
 
@@ -1045,6 +1049,7 @@ public struct ReportBuilderResultDef: Codable, Sendable {
         viewModes = try container.decodeIfPresent([String].self, forKey: .viewModes) ?? []
         chartType = try container.decodeIfPresent(String.self, forKey: .chartType)
         chartWizard = try container.decodeIfPresent(ReportBuilderChartWizardDef.self, forKey: .chartWizard)
+        autoApplyDefaultChartOnResult = try container.decodeIfPresent(Bool.self, forKey: .autoApplyDefaultChartOnResult)
         defaultChartSpecs = try container.decodeIfPresent([ReportBuilderChartSpecDef].self, forKey: .defaultChartSpecs) ?? []
     }
 }

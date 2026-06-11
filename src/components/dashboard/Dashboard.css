@@ -1210,7 +1210,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    justify-content: flex-end;
+    justify-content: flex-start;
     flex: 1 1 auto;
 }
 
@@ -1230,7 +1230,7 @@
 }
 
 .forge-report-builder__measure-section-label {
-    align-self: flex-end;
+    align-self: flex-start;
     color: #5f6b7c;
     font-size: 10px;
     font-weight: 800;
@@ -1320,10 +1320,25 @@
 
 .forge-report-builder__result-header {
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 8px;
-    min-height: 28px;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 72px;
+}
+
+.forge-report-builder__result-header-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.forge-report-builder__result-header-eyebrow {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #738694;
 }
 
 .forge-report-builder__result-header h3 {
@@ -1340,6 +1355,37 @@
     max-width: 720px;
 }
 
+.forge-report-builder__result-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.forge-report-builder__result-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #f3f7fb;
+    border: 1px solid #d8e2ea;
+    color: #486072;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.forge-report-builder__result-header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+
 .forge-report-builder__toolbar {
     display: inline-flex;
     align-items: center;
@@ -1354,18 +1400,173 @@
 }
 
 .forge-report-builder__toolbar--inline {
+    display: flex;
+    width: 100%;
     flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
     justify-content: flex-start;
     padding: 3px 5px;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(15, 30, 50, 0.04);
 }
 
+.forge-report-builder__toolbar-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.forge-report-builder__toolbar-group--chart {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.forge-report-builder__toolbar-group--chart .forge-report-builder__chart-quick-actions {
+    flex: 1 1 auto;
+}
+
+.forge-report-builder__toolbar-divider {
+    width: 1px;
+    height: 22px;
+    background: #d8dee8;
+    flex: 0 0 auto;
+}
+
+.forge-report-builder__chart-inline-notice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e3d4b8;
+    background: #fff8ee;
+    color: #8a5d00;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.forge-report-builder__chart-inline-notice--info {
+    border-color: #c7d6ea;
+    background: #f5f9ff;
+    color: #2d5a9e;
+}
+
+.forge-report-builder__chart-inline-notice--danger {
+    border-color: #e8c1ba;
+    background: #fff4f2;
+    color: #a82a2a;
+}
+
+.forge-report-builder__overflow-button.bp6-button {
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 999px;
+    border: 1px solid #d8e2eb;
+    background: #ffffff;
+    color: #556476;
+    box-shadow: 0 4px 10px rgba(15, 30, 50, 0.06);
+}
+
+.forge-report-builder__overflow-button.bp6-button:hover,
+.forge-report-builder__overflow-button.bp6-button:focus-visible {
+    border-color: #bfd0df;
+    background: #f8fbfd;
+    color: #30404d;
+}
+
 .forge-report-builder__chart-quick-actions {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     margin-left: 2px;
+    min-width: 0;
+}
+
+.forge-report-builder__chart-menu {
+    min-width: 260px;
+    max-width: 420px;
+}
+
+.forge-report-builder__chart-action-button.bp6-button {
+    min-height: 36px;
+    padding: 0 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 120ms ease, box-shadow 120ms ease, background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.forge-report-builder__chart-action-button.bp6-button .bp6-icon {
+    margin-right: 0;
+}
+
+.forge-report-builder__chart-action-button--create.bp6-button {
+    background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+    border: 1px solid #1d4ed8;
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.26);
+}
+
+.forge-report-builder__chart-action-button--create.bp6-button:hover,
+.forge-report-builder__chart-action-button--create.bp6-button:focus-visible {
+    background: linear-gradient(180deg, #2c6cf0 0%, #1c45be 100%);
+    border-color: #1c45be;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 22px rgba(37, 99, 235, 0.32);
+}
+
+.forge-report-builder__chart-action-button--quick.bp6-button {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    box-shadow: 0 4px 10px rgba(29, 78, 216, 0.10);
+}
+
+.forge-report-builder__chart-action-button--quick.bp6-button:hover,
+.forge-report-builder__chart-action-button--quick.bp6-button:focus-visible {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1e40af;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(29, 78, 216, 0.16);
+}
+
+.forge-report-builder__chart-action-button.bp6-button.bp6-disabled,
+.forge-report-builder__chart-action-button.bp6-button[disabled] {
+    box-shadow: none;
+    transform: none;
+}
+
+.forge-report-builder__inline-filter-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 1px solid #d8dee8;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+}
+
+.forge-report-builder__inline-filter-control--date-range {
+    padding: 6px 10px;
+}
+
+.forge-report-builder__inline-filter-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #5f6b7c;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
 }
 
 .forge-report-builder__toolbar-button {
@@ -1428,6 +1629,10 @@
     border-radius: 999px;
     background: #f1f4f8;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.forge-report-builder__view-toggle--toolbar {
+    margin-left: auto;
 }
 
 .forge-report-builder__controls {
@@ -1507,117 +1712,14 @@
 .forge-report-builder__result-frame {
     min-height: 0;
     flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     border: 1px solid #dbe5ec;
     border-radius: 18px;
     background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-    padding: 10px;
-    overflow: auto;
-}
-
-.forge-report-builder__chart-tile {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 14px;
-    margin-bottom: 12px;
     padding: 14px;
-    border: 1px solid #d8e4ec;
-    border-radius: 16px;
-    background: linear-gradient(180deg, #f9fbfe 0%, #f3f8fc 100%);
-}
-
-.forge-report-builder__chart-tile.is-warning {
-    border-color: #ebd6c0;
-    background: linear-gradient(180deg, #fffaf4 0%, #fff4e7 100%);
-}
-
-.forge-report-builder__chart-tile-copy {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.forge-report-builder__chart-tile-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    margin-bottom: 6px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #738694;
-}
-
-.forge-report-builder__chart-tile-copy h4 {
-    margin: 0;
-    font-size: 14px;
-    color: #182026;
-}
-
-.forge-report-builder__chart-tile-copy p {
-    margin: 6px 0 0;
-    font-size: 12px;
-    line-height: 1.45;
-    color: #4c6172;
-    max-width: 70ch;
-}
-
-.forge-report-builder__chart-tile-helper {
-    margin-top: 8px;
-    font-size: 11px;
-    color: #738694;
-}
-
-.forge-report-builder__chart-tile-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-    min-width: 220px;
-}
-
-.forge-report-builder__chart-preset-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.forge-report-builder__chart-preset-button {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    width: 100%;
-    padding: 9px 10px;
-    border: 1px solid #d6e1e9;
-    border-radius: 10px;
-    background: #ffffff;
-    color: #30404d;
-    cursor: pointer;
-}
-
-.forge-report-builder__chart-preset-button:hover,
-.forge-report-builder__chart-preset-button:focus-visible {
-    border-color: #b8cddb;
-    outline: 0;
-    box-shadow: 0 0 0 3px rgba(47,109,225,0.12);
-}
-
-.forge-report-builder__chart-preset-title {
-    font-size: 12px;
-    font-weight: 600;
-}
-
-.forge-report-builder__chart-preset-meta {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #738694;
-}
-
-.forge-report-builder__chart-previous {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    overflow: auto;
 }
 
 .forge-report-builder__chart-dialog {
@@ -1781,7 +1883,7 @@
 }
 
 .forge-report-builder__chart-wrap {
-    min-height: 240px;
+    min-height: 320px;
     height: 100%;
     flex: 1 1 auto;
 }
@@ -2342,6 +2444,10 @@
     gap: 8px;
 }
 
+.forge-report-builder__date-range--inline {
+    grid-template-columns: minmax(12ch, 14ch) auto minmax(12ch, 14ch);
+}
+
 .forge-report-builder__date-range input {
     min-height: 32px;
     min-width: 0;
@@ -2552,6 +2658,358 @@
     background: rgba(253, 236, 234, 0.6);
 }
 
+.forge-report-builder__result-state {
+    min-height: 164px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 18px 20px;
+    border: 1px dashed #c8d4df;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #fdfefe 0%, #f5f9fc 100%);
+}
+
+.forge-report-builder__result-state--warning {
+    border-color: #e7d3a8;
+    background: linear-gradient(180deg, #fffdf7 0%, #fff7e8 100%);
+}
+
+.forge-report-builder__result-state--error {
+    border-color: rgba(168, 42, 42, 0.24);
+    background: linear-gradient(180deg, #fff8f7 0%, #fff1ef 100%);
+}
+
+.forge-report-builder__result-state-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    background: #eef4ff;
+    color: #1d4ed8;
+    flex: 0 0 auto;
+}
+
+.forge-report-builder__result-state--warning .forge-report-builder__result-state-icon {
+    background: #fff0d8;
+    color: #a16207;
+}
+
+.forge-report-builder__result-state--error .forge-report-builder__result-state-icon {
+    background: #fdecea;
+    color: #b42318;
+}
+
+.forge-report-builder__result-state-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.forge-report-builder__result-state-eyebrow {
+    margin-bottom: 8px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #738694;
+}
+
+.forge-report-builder__result-state-copy h4 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: #182026;
+}
+
+.forge-report-builder__result-state-copy p {
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #4c6172;
+    max-width: 64ch;
+}
+
+.forge-report-builder__result-state--error .forge-report-builder__result-state-copy p {
+    color: #8e2b1a;
+}
+
+.forge-report-builder.forge-report-builder--compact {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+        "top"
+        "center";
+    padding: 0 0 calc(100px + env(safe-area-inset-bottom, 0px));
+    overflow: visible;
+}
+
+.forge-report-builder--compact .forge-report-builder__top {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+}
+
+.forge-report-builder__compact-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid #d9e2ea;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 253, 0.98) 100%);
+    box-shadow: 0 12px 28px rgba(15, 30, 50, 0.08);
+    backdrop-filter: blur(14px);
+}
+
+.forge-report-builder__compact-summary-topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.forge-report-builder__compact-summary-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.forge-report-builder__compact-summary-copy .forge-report-builder__shelf-label {
+    margin-bottom: 0;
+}
+
+.forge-report-builder__compact-summary-status {
+    font-size: 12px;
+    line-height: 1.3;
+    color: #405064;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.forge-report-builder__compact-summary-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+}
+
+.forge-report-builder__compact-summary-chips::-webkit-scrollbar {
+    display: none;
+}
+
+.forge-report-builder__compact-summary-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #1f5db8;
+    border: 1px solid #d2dff8;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    flex: 0 0 auto;
+}
+
+.forge-report-builder__view-toggle--compact {
+    flex: 0 0 auto;
+}
+
+.forge-report-builder--compact .forge-report-builder__center {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 10px 10px 12px;
+}
+
+.forge-report-builder--compact .forge-report-builder__result-frame {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+}
+
+.forge-report-builder--compact .forge-report-builder__chart-wrap {
+    min-height: 280px;
+    height: auto;
+}
+
+.forge-report-builder__compact-sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 28;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    background: rgba(15, 23, 42, 0.24);
+    backdrop-filter: blur(4px);
+}
+
+.forge-report-builder__compact-sheet {
+    width: min(760px, 100%);
+    max-height: calc(100vh - 24px - env(safe-area-inset-top, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: hidden;
+    padding: 14px;
+    border: 1px solid #d9e2ea;
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbfe 100%);
+    box-shadow: 0 24px 56px rgba(15, 30, 50, 0.22);
+}
+
+.forge-report-builder__compact-sheet--chart {
+    width: min(640px, 100%);
+}
+
+.forge-report-builder__compact-sheet-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.forge-report-builder__compact-sheet-header .forge-report-builder__shelf-label {
+    margin-bottom: 6px;
+}
+
+.forge-report-builder__compact-sheet-title {
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: #182026;
+}
+
+.forge-report-builder__compact-sheet-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.forge-report-builder__compact-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid #d6e1ea;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #556476;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.forge-report-builder__compact-tab.is-active {
+    border-color: #2f6de1;
+    background: #eef4ff;
+    color: #133c7a;
+    box-shadow: 0 8px 16px rgba(47, 109, 225, 0.14);
+}
+
+.forge-report-builder__compact-sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    overflow: auto;
+    padding-bottom: 2px;
+}
+
+.forge-report-builder__compact-sheet-body--chart {
+    gap: 10px;
+}
+
+.forge-report-builder__compact-panel-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.forge-report-builder__compact-control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 10px;
+}
+
+.forge-report-builder__compact-chart-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.forge-report-builder__compact-sheet-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 4px;
+}
+
+.forge-report-builder__compact-action-bar {
+    position: sticky;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 18;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+    padding: 8px;
+    border: 1px solid #d8e2eb;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 16px 30px rgba(15, 30, 50, 0.16);
+    backdrop-filter: blur(16px);
+}
+
+.forge-report-builder__compact-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    border: 1px solid #d8e2eb;
+    border-radius: 14px;
+    background: #ffffff;
+    color: #30404d;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.forge-report-builder__compact-action--primary {
+    border-color: #d07a12;
+    background: linear-gradient(180deg, #f2a23a 0%, #e18814 100%);
+    color: #ffffff;
+    box-shadow: 0 10px 18px rgba(225, 136, 20, 0.22);
+}
+
+.forge-report-builder--compact .forge-report-builder__chart-inline-notice {
+    margin-top: 0;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.forge-report-builder__compact-action:disabled,
+.forge-report-builder__compact-action--primary:disabled {
+    opacity: 0.62;
+    cursor: default;
+    box-shadow: none;
+}
+
 @media (max-width: 980px) {
     .forge-report-builder {
         grid-template-columns: 1fr;
@@ -2602,5 +3060,33 @@
 
     .forge-report-builder__date-range {
         grid-template-columns: 1fr;
+    }
+
+    .forge-report-builder__compact-summary-topline {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .forge-report-builder__compact-action-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .forge-report-builder__compact-action--primary {
+        grid-column: 1 / -1;
+    }
+
+    .forge-report-builder__result-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .forge-report-builder__result-header-actions {
+        margin-left: 0;
+        justify-content: flex-start;
+    }
+
+    .forge-report-builder__result-state {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }
