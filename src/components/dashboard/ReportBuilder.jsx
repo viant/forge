@@ -1302,10 +1302,11 @@ export default function ReportBuilder({ container, context }) {
         </aside>
     );
 
-    const renderFiltersPanel = () => (
+    const renderFiltersPanel = ({ forceBody = false, showCloseAction = false, overlay = false, onClose = null } = {}) => (
         <aside className={[
             "forge-report-builder__bottom",
             useFilterDrawer ? "forge-report-builder__bottom--drawer" : "",
+            overlay ? "forge-report-builder__bottom--overlay" : "",
         ].filter(Boolean).join(" ")} aria-label={useFilterDrawer ? "Filters drawer" : "Filters"}>
             <section className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static" aria-label="Filters">
                 <div className="forge-report-builder__bottom-header">
@@ -1320,15 +1321,15 @@ export default function ReportBuilder({ container, context }) {
                             <span>{totalActiveFilterCount} active</span>
                             <span>{filterPanels.common ? "Hide Body" : "Show Body"}</span>
                         </button>
-                        {useFilterDrawer ? (
-                            <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => setFiltersDrawerOpen(false)}>
+                        {useFilterDrawer || showCloseAction ? (
+                            <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => (typeof onClose === "function" ? onClose() : setFiltersDrawerOpen(false))}>
                                 <span>Close</span>
                             </button>
                         ) : null}
                     </div>
                 </div>
                 {renderFilterCategoryControls()}
-                {!useFilterRail && filterPanels.common ? renderFilterBody() : null}
+                {filterPanels.common && (!useFilterRail || forceBody) ? renderFilterBody() : null}
             </section>
         </aside>
     );
@@ -2854,6 +2855,7 @@ export default function ReportBuilder({ container, context }) {
             compactMode ? "forge-report-builder--compact" : "",
             compactSheetOpen || compactChartSheetOpen ? "forge-report-builder--compact-overlay-open" : "",
             useFilterDrawer ? "forge-report-builder--filters-drawer" : "",
+            (!compactMode && useFilterRail && filterPanels.common) ? "forge-report-builder--filter-overlay-open" : "",
             resultPanePosition === "left" ? "forge-report-builder--result-left" : "",
         ].filter(Boolean).join(" ")}
         ref={builderRootRef}
@@ -2947,16 +2949,27 @@ export default function ReportBuilder({ container, context }) {
                         {renderMeasuresPanel()}
                         {renderBreakdownPanel()}
                         {useFilterRail ? renderFilterRailControls() : null}
-                        {!compactMode && useFilterRail && filterPanels.common ? (
-                            <section className="forge-report-builder__inline-filter-body" aria-label="Active filters">
-                                {renderFilterBody()}
-                            </section>
-                        ) : null}
                         {useFilterDrawer && filtersDrawerOpen ? renderFiltersPanel() : null}
                     </aside>
                 ) : null}
 
                 <main className="forge-report-builder__center">
+                    {!compactMode && useFilterRail && filterPanels.common ? (
+                        <div className="forge-report-builder__overlay-shell">
+                            <button
+                                type="button"
+                                className="forge-report-builder__overlay-backdrop"
+                                aria-label="Close filters drawer"
+                                onClick={() => setFilterPanels((current) => ({ ...current, common: false }))}
+                            />
+                            {renderFiltersPanel({
+                                forceBody: true,
+                                showCloseAction: true,
+                                overlay: true,
+                                onClose: () => setFilterPanels((current) => ({ ...current, common: false })),
+                            })}
+                        </div>
+                    ) : null}
                     {!compactMode && config.showResultHeader !== false && config?.result?.showResultHeader !== false ? (
                         <div className="forge-report-builder__result-header">
                             <div className="forge-report-builder__result-header-copy">
@@ -2988,7 +3001,13 @@ export default function ReportBuilder({ container, context }) {
                                     />
                                 ) : null}
                                 {actionModel.desktop.showEditChart ? (
-                                    <Button small outlined icon="edit" onClick={() => openChartDialog(state.chartSpec)}>
+                                    <Button
+                                        small
+                                        outlined
+                                        icon="edit"
+                                        className="forge-report-builder__chart-action-button forge-report-builder__chart-action-button--edit"
+                                        onClick={() => openChartDialog(state.chartSpec)}
+                                    >
                                         Edit Chart
                                     </Button>
                                 ) : null}
