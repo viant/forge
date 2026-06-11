@@ -1312,6 +1312,7 @@
     flex-direction: column;
     gap: 12px;
     flex: 1 1 auto;
+    position: relative;
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior: contain;
@@ -1538,6 +1539,22 @@
     color: #1e40af;
     transform: translateY(-1px);
     box-shadow: 0 8px 18px rgba(29, 78, 216, 0.16);
+}
+
+.forge-report-builder__chart-action-button--edit.bp6-button {
+    background: #f8fbff;
+    border: 1px solid #d7e0eb;
+    color: #344355;
+    box-shadow: 0 4px 10px rgba(15, 30, 50, 0.08);
+}
+
+.forge-report-builder__chart-action-button--edit.bp6-button:hover,
+.forge-report-builder__chart-action-button--edit.bp6-button:focus-visible {
+    background: #eef4f8;
+    border-color: #bcc9d8;
+    color: #1f2f44;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15, 30, 50, 0.12);
 }
 
 .forge-report-builder__chart-action-button.bp6-button.bp6-disabled,
@@ -2042,6 +2059,27 @@
     display: none;
 }
 
+.forge-report-builder__bottom--overlay {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(440px, calc(100% - 28px));
+    max-width: 42vw;
+    z-index: 7;
+    display: flex;
+    pointer-events: auto;
+    padding: 12px 0 12px 12px;
+    box-sizing: border-box;
+}
+
+.forge-report-builder__bottom--overlay .forge-report-builder__bottom-group {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    overflow: auto;
+    overscroll-behavior: contain;
+    box-shadow: 0 20px 44px rgba(15, 30, 50, 0.16);
+}
+
 .forge-report-builder__left > .forge-report-builder__bottom--rail,
 .forge-report-builder__bottom--rail {
     flex: 1 1 auto;
@@ -2050,6 +2088,23 @@
 
 .forge-report-builder--filters-open .forge-report-builder__bottom--drawer {
     display: flex;
+}
+
+.forge-report-builder__overlay-shell {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    pointer-events: none;
+}
+
+.forge-report-builder__overlay-backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: linear-gradient(90deg, rgba(235, 241, 247, 0.42) 0%, rgba(235, 241, 247, 0.14) 24%, rgba(255, 255, 255, 0) 58%);
+    backdrop-filter: blur(2px);
+    cursor: pointer;
+    pointer-events: auto;
 }
 
 .forge-report-builder__bottom-group {
