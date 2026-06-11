@@ -1,8 +1,13 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Button, Card } from '@blueprintjs/core';
-import { signal } from '@preact/signals-react';
+import { signal, useSignalEffect } from '@preact/signals-react';
 
 import ReportBuilder from '../../components/dashboard/ReportBuilder.jsx';
+import {
+  resolveLegacyReportBuilderStateStorageScopes,
+  reportBuilderStateStorageKey,
+  resolveReportBuilderStateStorageScope,
+} from '../../components/dashboard/reportBuilderPersistence.js';
 
 const BASE_ROWS = [
   { eventDate: '2026-05-01', channelV2: 'Display', agegroupId: '18-24', country: 'US', avails: 18000, hhUniqs: 7400 },
@@ -34,9 +39,51 @@ const RAW_ROWS = BASE_ROWS.map((row, index) => ({
   deal: row.channelV2 === 'CTV' ? 'Premium OTT Deal' : 'Open Exchange',
   deviceType: index % 2 === 0 ? 'Mobile' : 'CTV',
   region: row.country === 'US' ? 'NA' : 'CA',
+  channelsFilter: row.channelV2,
+  scopeFilter: row.country === 'US' ? 'national' : 'regional',
+  inventoryFilter: row.channelV2 === 'CTV' ? 'premium' : 'open',
+  targetingFilter: row.country === 'US' ? 'audience' : 'geo',
+  publisherFilter: row.country === 'US' ? 'Acme Media' : 'North Star Media',
+  advertiserFilter: row.country === 'US' ? 'Northwind Health' : 'Maple Retail',
+  campaignFilter: row.agegroupId === '18-24' ? 'Prospect Sprint' : 'Family Reach',
+  deviceFilter: index % 2 === 0 ? 'Mobile' : 'CTV',
 }));
 
+const FILTER_FIELD_ALIASES = {
+  channelsFilter: 'channelsFilter',
+  scopeFilter: 'scopeFilter',
+  inventoryFilter: 'inventoryFilter',
+  targetingFilter: 'targetingFilter',
+  publisherFilter: 'publisherFilter',
+  advertiserFilter: 'advertiserFilter',
+  campaignFilter: 'campaignFilter',
+  deviceFilter: 'deviceFilter',
+};
+
+function applyRequestFilters(rows, request = {}) {
+  const filters = request?.filters || {};
+  const from = String(filters?.from || '').trim();
+  const to = String(filters?.to || '').trim();
+  return rows.filter((row) => {
+    if (from && String(row?.eventDate || '').trim() < from) {
+      return false;
+    }
+    if (to && String(row?.eventDate || '').trim() > to) {
+      return false;
+    }
+    return Object.entries(FILTER_FIELD_ALIASES).every(([filterId, fieldName]) => {
+      const selected = filters?.[filterId];
+      if (selected === undefined || selected === null || selected === '' || (Array.isArray(selected) && selected.length === 0)) {
+        return true;
+      }
+      const allowed = Array.isArray(selected) ? selected : [selected];
+      return allowed.map((entry) => String(entry || '').trim()).includes(String(row?.[fieldName] || '').trim());
+    });
+  });
+}
+
 function aggregateRows(rows, request = {}) {
+  const filteredRows = applyRequestFilters(rows, request);
   const dimensions = Object.entries(request.dimensions || {})
     .filter(([, enabled]) => enabled)
     .map(([key]) => key);
@@ -45,7 +92,7 @@ function aggregateRows(rows, request = {}) {
     .map(([key]) => key);
   const grouped = new Map();
 
-  rows.forEach((row) => {
+  filteredRows.forEach((row) => {
     const bucket = JSON.stringify(dimensions.map((key) => row[key]));
     const existing = grouped.get(bucket) || {};
     dimensions.forEach((key) => {
@@ -75,11 +122,42 @@ function aggregateRows(rows, request = {}) {
   };
 }
 
+function ensurePreviewMetrics() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const current = window.__REPORT_BUILDER_PREVIEW__;
+  if (current && typeof current === 'object') {
+    return current;
+  }
+  const next = {
+    fetchCollectionCount: 0,
+    fetchRecordsCount: 0,
+    windowFormChangeCount: 0,
+    inputSignalChangeCount: 0,
+    currentWindowFormJSON: '{}',
+    currentInputJSON: '{}',
+    lastWindowFormJSON: undefined,
+    lastInputJSON: undefined,
+    resetCounters() {
+      this.fetchCollectionCount = 0;
+      this.fetchRecordsCount = 0;
+      this.windowFormChangeCount = 0;
+      this.inputSignalChangeCount = 0;
+      this.lastWindowFormJSON = this.currentWindowFormJSON;
+      this.lastInputJSON = this.currentInputJSON;
+    },
+  };
+  window.__REPORT_BUILDER_PREVIEW__ = next;
+  return next;
+}
+
 function createDemoContext() {
   const collection = signal([]);
   const control = signal({ loading: false, error: null });
   const windowForm = signal({});
   const collectionInfo = signal({ hasMore: false });
+  const input = signal({ parameters: {} });
   const ctx = {
     locale: 'en-US',
     identity: {
@@ -92,11 +170,16 @@ function createDemoContext() {
       control,
       windowForm,
       collectionInfo,
+      input,
     },
   };
 
   const fetchCollection = () => {
-    const request = windowForm.peek()?.demoReportBuilder?.lastRequest || {};
+    const metrics = ensurePreviewMetrics();
+    if (metrics) {
+      metrics.fetchCollectionCount += 1;
+    }
+    const request = input.peek()?.parameters || {};
     control.value = { loading: true, error: null };
     const { rows, hasMore } = aggregateRows(RAW_ROWS, request);
     collection.value = rows;
@@ -113,15 +196,18 @@ function createDemoContext() {
         };
       },
       setInputParameters(request) {
-        const current = windowForm.peek() || {};
-        const currentBuilder = current.demoReportBuilder || {};
-        windowForm.value = {
-          ...current,
-          demoReportBuilder: {
-            ...currentBuilder,
-            lastRequest: request,
-          },
+        input.value = {
+          ...input.peek(),
+          parameters: request,
         };
+      },
+      async fetchRecords({ parameters } = {}) {
+        const metrics = ensurePreviewMetrics();
+        if (metrics) {
+          metrics.fetchRecordsCount += 1;
+        }
+        const { rows, hasMore } = aggregateRows(RAW_ROWS, parameters || {});
+        return { rows, hasMore };
       },
       fetchCollection,
     },
@@ -244,9 +330,17 @@ const container = {
         },
       ],
       result: {
+        showResultHeader: true,
         chartCreationMode: 'explicit',
+        autoApplyDefaultChartOnResult: true,
         defaultMode: 'table',
         viewModes: ['table', 'chart'],
+        chartDataMode: 'fullQuery',
+        chartRowLimit: 1000,
+        quickPresets: {
+          autoFetchOnSelect: true,
+          selectionPolicy: 'replace',
+        },
         chartWizard: {
           supportedTypes: ['line', 'bar', 'area', 'pie', 'donut', 'horizontal_bar', 'funnel_bar'],
         },
@@ -314,8 +408,82 @@ const container = {
   },
 };
 
+const DEMO_STATE_STORAGE_SCOPE = resolveReportBuilderStateStorageScope({
+  stateKey: container.stateKey,
+  windowId: 'demoReportBuilderWindow',
+  dataSourceRef: 'demoReportSource',
+  containerId: container.id,
+});
+const DEMO_LEGACY_STORAGE_SCOPES = resolveLegacyReportBuilderStateStorageScopes({
+  stateKey: container.stateKey,
+  stateStorageScope: DEMO_STATE_STORAGE_SCOPE,
+});
+const DEMO_CHART_PRESET_STORAGE_KEY = `reportBuilder.chartPresets.${DEMO_STATE_STORAGE_SCOPE}`;
+const DEMO_LEGACY_CHART_PRESET_STORAGE_KEYS = DEMO_LEGACY_STORAGE_SCOPES.map((scope) => `reportBuilder.chartPresets.${scope}`);
+
 export default function ReportBuilderPreview() {
   const context = useMemo(() => createDemoContext(), []);
+  const lastHandledFetchInputRef = useRef(null);
+  const lastObservedWindowFormJSONRef = useRef(undefined);
+  const lastObservedInputJSONRef = useRef(undefined);
+
+  if (typeof window !== 'undefined') {
+    ensurePreviewMetrics();
+  }
+
+  useSignalEffect(() => {
+    const metrics = ensurePreviewMetrics();
+    if (!metrics) {
+      return;
+    }
+    const current = JSON.stringify(context?.signals?.windowForm?.value || {});
+    metrics.currentWindowFormJSON = current;
+    if (lastObservedWindowFormJSONRef.current === undefined) {
+      lastObservedWindowFormJSONRef.current = current;
+      if (metrics.lastWindowFormJSON === undefined) {
+        metrics.lastWindowFormJSON = current;
+      }
+      return;
+    }
+    if (lastObservedWindowFormJSONRef.current !== current) {
+      metrics.windowFormChangeCount += 1;
+      metrics.lastWindowFormJSON = current;
+      lastObservedWindowFormJSONRef.current = current;
+    }
+  });
+
+  useSignalEffect(() => {
+    const metrics = ensurePreviewMetrics();
+    if (!metrics) {
+      return;
+    }
+    const current = JSON.stringify(context?.signals?.input?.value || {});
+    metrics.currentInputJSON = current;
+    if (lastObservedInputJSONRef.current === undefined) {
+      lastObservedInputJSONRef.current = current;
+      if (metrics.lastInputJSON === undefined) {
+        metrics.lastInputJSON = current;
+      }
+      return;
+    }
+    if (lastObservedInputJSONRef.current !== current) {
+      metrics.inputSignalChangeCount += 1;
+      metrics.lastInputJSON = current;
+      lastObservedInputJSONRef.current = current;
+    }
+  });
+
+  useSignalEffect(() => {
+    const inputState = context?.signals?.input?.value;
+    if (!inputState?.fetch) {
+      return;
+    }
+    if (lastHandledFetchInputRef.current === inputState) {
+      return;
+    }
+    lastHandledFetchInputRef.current = inputState;
+    context?.handlers?.dataSource?.fetchCollection?.();
+  });
 
   return (
     <div style={{ padding: '28px' }}>
@@ -336,12 +504,15 @@ export default function ReportBuilderPreview() {
               icon="trash"
               onClick={() => {
                 if (typeof window !== 'undefined' && window.localStorage) {
-                  window.localStorage.removeItem('reportBuilder.chartPresets.demoReportBuilder');
+                  window.localStorage.removeItem(reportBuilderStateStorageKey(DEMO_STATE_STORAGE_SCOPE));
+                  DEMO_LEGACY_STORAGE_SCOPES.forEach((scope) => window.localStorage.removeItem(reportBuilderStateStorageKey(scope)));
+                  window.localStorage.removeItem(DEMO_CHART_PRESET_STORAGE_KEY);
+                  DEMO_LEGACY_CHART_PRESET_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
                   window.location.reload();
                 }
               }}
             >
-              Clear Saved Charts
+              Reset Preview
             </Button>
           </div>
         </Card>

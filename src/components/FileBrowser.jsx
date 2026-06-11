@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {Tree} from '@blueprintjs/core';
 import { SoftBlock } from './SoftSkeleton.jsx';
 import {useSignalEffect} from '@preact/signals-react';
-import { fileBrowserHandlers} from "../hooks";
+import { fileBrowserHandlers} from "../hooks/index.js";
 
 
 // Helper function to get node at a specific path

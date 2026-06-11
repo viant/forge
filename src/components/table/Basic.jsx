@@ -10,7 +10,7 @@ import FilterDialog from "./FilterDialog.jsx";
 import SettingsDialog from "./SettingsDialog.jsx";
 import "./Basic.css";
 import Toolbar from "./basic/Toolbar.jsx";
-import FullContentDialog from "./FullContentDialog";
+import FullContentDialog from "./FullContentDialog.jsx";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "./formattingRules.js";
 import {resolveTableCellText, resolveTableLink} from "../../utils/tableLink.js";
 import {resolveKey} from "../../utils/selector.js";

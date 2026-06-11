@@ -8,10 +8,10 @@ import Composer     from "./chat/Composer.jsx";
 import MessageCard  from "./chat/MessageCard.jsx";
 import FormRenderer from "./FormRenderer.jsx";
 
-import { useSetting } from "../core";
+import { useSetting } from "../core/index.js";
 import { useSignalEffect } from '@preact/signals-react';
 
-import { chatHandlers } from "../hooks";
+import { chatHandlers } from "../hooks/index.js";
 import { useEffect, useRef } from "react";
 import {
     BugBeetle,

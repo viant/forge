@@ -1237,6 +1237,69 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(reportBuilder.result?.defaultChartSpecs.first?.yFields, [])
     }
 
+    func testWindowMetadataDecodesReportBuilderAutoApplyDefaultChartFlag() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "forecastingCubeBuilder",
+              "dataSourceRef": "forecasting_cube_report",
+              "reportBuilder": {
+                "result": {
+                  "chartCreationMode": "explicit",
+                  "autoApplyDefaultChartOnResult": true,
+                  "defaultChartSpecs": [
+                    { "title": "Trend", "type": "line", "xField": "eventDate", "yFields": ["avails"] }
+                  ]
+                }
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let reportBuilder = try XCTUnwrap(
+            metadata.view?.content?.containers.first?.dashboard?.reportBuilder
+        )
+
+        XCTAssertEqual(reportBuilder.result?.autoApplyDefaultChartOnResult, true)
+    }
+
+    func testResolveAutoAppliedReportBuilderChartSpecUsesFirstCompatiblePreset() throws {
+        let config = DashboardReportBuilderDef(
+            measures: [
+                ReportBuilderMeasureDef(id: "avails", key: "avails", label: "Avails", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil),
+                ReportBuilderMeasureDef(id: "hhUniqs", key: "hhUniqs", label: "HH Uniques", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ],
+            dimensions: [
+                ReportBuilderDimensionDef(id: "eventDate", key: "eventDate", label: "Date", format: nil, paramPath: nil, defaultValue: nil, chartAxis: nil, hidden: nil),
+                ReportBuilderDimensionDef(id: "channelV2", key: "channelV2", label: "Channel", format: nil, paramPath: nil, defaultValue: nil, chartAxis: nil, hidden: nil),
+                ReportBuilderDimensionDef(id: "siteType", key: "siteType", label: "Site Type", format: nil, paramPath: nil, defaultValue: nil, chartAxis: nil, hidden: nil)
+            ],
+            result: ReportBuilderResultDef(
+                chartCreationMode: "explicit",
+                autoApplyDefaultChartOnResult: true,
+                defaultChartSpecs: [
+                    ReportBuilderChartSpecDef(title: "Needs extra dimension", type: "bar", xField: "siteType", yFields: ["avails"], seriesField: nil),
+                    ReportBuilderChartSpecDef(title: "Unsupported donut", type: "donut", xField: "eventDate", yFields: ["avails"], seriesField: nil),
+                    ReportBuilderChartSpecDef(title: "Unsupported multi-measure", type: "bar", xField: "eventDate", yFields: ["avails", "hhUniqs"], seriesField: nil),
+                    ReportBuilderChartSpecDef(title: "Compatible trend", type: "line", xField: "eventDate", yFields: ["avails"], seriesField: "channelV2")
+                ]
+            )
+        )
+
+        let resolved = ReportBuilderRenderer.resolveAutoAppliedReportBuilderChartSpec(
+            config: config,
+            selectedMeasures: ["avails"],
+            selectedDimensions: ["eventDate", "channelV2"]
+        )
+
+        XCTAssertEqual(resolved?.title, "Compatible trend")
+        XCTAssertEqual(resolved?.type, "line")
+    }
+
     func testWindowMetadataDecodesDynamicFilterAdvancedFields() throws {
         let payload = """
         {

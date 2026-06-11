@@ -1,7 +1,7 @@
 // useGenericDataSourceHandlers.js
 import {
     getInputSignal,
-} from "../core";
+} from "../core/store/signals.js";
 import {resolveSelector, setSelector} from "../utils/selector.js";
 
 import {arrayEquals} from "../utils/equal.js";
@@ -658,8 +658,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             return true;
         } catch (err) {
             setError(err);
-            // Add caller info for easier debugging
-            console.error('handleSave error', { ds: identity?.dataSourceRef, caller, err });
+            console.error('handleSave error', { ds: identity?.dataSourceRef, err });
             return false;
         } finally {
             setLoading(false);
@@ -790,14 +789,16 @@ const setFormData = ({values = {}, parameters = {}}) => {
     formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
 }
 
-const setWindowFormData = ({values = {}, parameters = {}}) => {
+const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpPrefillRevision = true} = {}) => {
     const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
     if (signals.windowForm) {
         const previousValues = signals.windowForm.peek?.() || {};
-        signals.windowForm.value = mergeWindowFormValues(
-            previousValues,
-            withWindowFormPrefillRevision(previousValues, nextValues),
-        );
+        const nextWindowFormValues = bumpPrefillRevision
+            ? withWindowFormPrefillRevision(previousValues, nextValues)
+            : nextValues;
+        signals.windowForm.value = replace
+            ? nextWindowFormValues
+            : mergeWindowFormValues(previousValues, nextWindowFormValues);
     }
     return true;
 }
@@ -931,6 +932,19 @@ const setWindowFormData = ({values = {}, parameters = {}}) => {
         input.value =newValue
     };
 
+    const fetchRecords = async (props = {}) => {
+        const {
+            filter = {},
+            parameters = {},
+            page = null,
+        } = props || {};
+        return connector.get({
+            filter,
+            page,
+            inputParameters: parameters,
+        });
+    };
+
 
     const refreshSelected = () => {
         const snapshot = peekSelection();
@@ -991,6 +1005,7 @@ const setWindowFormData = ({values = {}, parameters = {}}) => {
         getFilter,
         peekFilter,
         fetchCollection,
+        fetchRecords,
         refreshSelected,
         refreshSelection,
         getCollection,

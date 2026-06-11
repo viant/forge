@@ -25,6 +25,8 @@ public struct ReportBuilderRenderer: View {
     @State private var windowFormValues: [String: JSONValue] = [:]
     @State private var appliedPrefillSignature = ""
     @State private var requestBridgeGeneration = 0
+    @State private var completedRequestSignature = ""
+    @State private var lastAutoAppliedRequestSignature = ""
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, config: DashboardReportBuilderDef) {
         self.runtime = runtime
@@ -59,6 +61,23 @@ public struct ReportBuilderRenderer: View {
         }
         .onChange(of: settingsHash) {
             refreshStoredPresets()
+        }
+        .onChange(of: completedRequestSignature) {
+            guard explicitChartMode,
+                  config.result?.autoApplyDefaultChartOnResult == true,
+                  chartSpec == nil,
+                  !aggregatedRows.isEmpty,
+                  !completedRequestSignature.isEmpty,
+                  completedRequestSignature != lastAutoAppliedRequestSignature,
+                  let autoChart = Self.resolveAutoAppliedReportBuilderChartSpec(
+                    config: config,
+                    selectedMeasures: selectedMeasures,
+                    selectedDimensions: selectedDimensions
+                  ) else {
+                return
+            }
+            applyChart(autoChart, persist: false)
+            lastAutoAppliedRequestSignature = completedRequestSignature
         }
         .task(id: requestBridgeGeneration) {
             guard restoredStoredState else { return }
@@ -873,6 +892,10 @@ public struct ReportBuilderRenderer: View {
             dataSourceRef: resolvedDataSourceRef
         )
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        let control = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        if control.error == nil {
+            completedRequestSignature = requestSignature
+        }
     }
 
     @MainActor
@@ -1125,6 +1148,50 @@ public struct ReportBuilderRenderer: View {
             yFields: spec.yFields.filter { !$0.isEmpty },
             seriesField: spec.seriesField?.isEmpty == false ? spec.seriesField : nil
         )
+    }
+
+    internal static func resolveAutoAppliedReportBuilderChartSpec(
+        config: DashboardReportBuilderDef,
+        selectedMeasures: [String],
+        selectedDimensions: [String]
+    ) -> ReportBuilderChartSpecDef? {
+        guard config.result?.autoApplyDefaultChartOnResult == true else {
+            return nil
+        }
+        let supportedTypes: Set<String> = ["line", "bar", "area"]
+        let selectedMeasureSet = Set(
+            selectedMeasures
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )
+        let selectedDimensionSet = Set(
+            selectedDimensions
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        )
+        for candidate in config.result?.defaultChartSpecs ?? [] {
+            let normalized = normalize(candidate)
+            let type = (normalized.type ?? "line").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard supportedTypes.contains(type) else { continue }
+            guard let xField = normalized.xField?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !xField.isEmpty,
+                  selectedDimensionSet.contains(xField) else {
+                continue
+            }
+            let yFields = normalized.yFields
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            guard yFields.count == 1, yFields.allSatisfy(selectedMeasureSet.contains) else {
+                continue
+            }
+            if let seriesField = normalized.seriesField?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !seriesField.isEmpty,
+               !selectedDimensionSet.contains(seriesField) {
+                continue
+            }
+            return normalized
+        }
+        return nil
     }
 
     private static func aggregateRows(rows: [[String: JSONValue]], dimensions: [String], measures: [String]) -> [[String: JSONValue]] {

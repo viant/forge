@@ -184,6 +184,7 @@ fun ReportBuilderRenderer(
         return
     }
     val rows by context.collection.flow.collectAsState(initial = emptyList())
+    val control by context.control.flow.collectAsState(initial = context.control.peek())
     LaunchedEffect(dataSourceRef) {
         context.fetchCollection()
     }
@@ -192,16 +193,20 @@ fun ReportBuilderRenderer(
 
     val visibleMeasures = remember(config) { config.measures.filter { it.hidden != true } }
     val visibleDimensions = remember(config) { config.dimensions.filter { it.hidden != true } }
+    val explicitChartMode = remember(config) { config.result?.chartCreationMode == "explicit" }
     var selectedMeasures by remember(config) { mutableStateOf(defaultMeasureKeys(visibleMeasures)) }
     var selectedDimensions by remember(config) { mutableStateOf(defaultDimensionKeys(visibleDimensions)) }
     var chartSpec by remember { mutableStateOf<ReportBuilderChartSpecDef?>(null) }
-    var viewMode by remember(config) { mutableStateOf(if (config.result?.chartCreationMode == "explicit") "table" else (config.result?.defaultMode ?: "chart")) }
+    var viewMode by remember(config) { mutableStateOf(if (explicitChartMode) "table" else (config.result?.defaultMode ?: "chart")) }
     var previousMenuExpanded by remember { mutableStateOf(false) }
     var staticFilters by remember(config) { mutableStateOf(defaultStaticFilters(config.staticFilters)) }
     var dynamicGroups by remember(config) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicRowState>>()) }
     var dynamicFilterDrafts by remember(config) { mutableStateOf(emptyMap<String, String>()) }
     var restoredStoredState by remember(config, window.windowId) { mutableStateOf(false) }
     var appliedPrefillSignature by remember(config, window.windowId) { mutableStateOf("") }
+    var pendingAutoChartRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
+    var lastAutoAppliedChartRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
+    var lastObservedChartLoading by remember(config, window.windowId) { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
     val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
@@ -261,6 +266,7 @@ fun ReportBuilderRenderer(
         mutableStateOf(loadStoredPresets(preferences, container.id ?: "reportBuilder").filter { it.settingsHash == settingsHash })
     }
     val currentPrefillSignature = remember(windowForm) { reportBuilderPrefillSignature(windowForm) }
+    val requestSignature = remember(requestPayload) { JsonUtil.anyToElement(requestPayload).toString() }
 
     val filteredRows = remember(rows, staticFilters, config.staticFilters) {
         applyStaticFilters(rows, config.staticFilters, staticFilters)
@@ -356,6 +362,54 @@ fun ReportBuilderRenderer(
             saveStoredPresets(preferences, container.id ?: "reportBuilder", updated)
             storedPresets = updated.filter { it.settingsHash == settingsHash }
         }
+    }
+
+    LaunchedEffect(restoredStoredState, explicitChartMode, config.result?.autoApplyDefaultChartOnResult, requestSignature) {
+        if (!restoredStoredState || !explicitChartMode || config.result?.autoApplyDefaultChartOnResult != true) {
+            return@LaunchedEffect
+        }
+        if (requestSignature.isBlank()) {
+            return@LaunchedEffect
+        }
+        pendingAutoChartRequestSignature = requestSignature
+    }
+
+    LaunchedEffect(
+        restoredStoredState,
+        explicitChartMode,
+        config.result?.autoApplyDefaultChartOnResult,
+        control.loading,
+        control.error,
+        requestSignature,
+        pendingAutoChartRequestSignature,
+        chartSpec,
+        aggregatedRows,
+        selectedMeasures,
+        selectedDimensions,
+    ) {
+        val completedFetch = lastObservedChartLoading && !control.loading && control.error.isNullOrBlank()
+        lastObservedChartLoading = control.loading
+        if (!restoredStoredState || !explicitChartMode || config.result?.autoApplyDefaultChartOnResult != true || !completedFetch) {
+            return@LaunchedEffect
+        }
+        if (chartSpec != null || aggregatedRows.isEmpty()) {
+            pendingAutoChartRequestSignature = ""
+            return@LaunchedEffect
+        }
+        if (pendingAutoChartRequestSignature != requestSignature || lastAutoAppliedChartRequestSignature == requestSignature) {
+            return@LaunchedEffect
+        }
+        val autoChartSpec = resolveAutoAppliedReportBuilderChartSpec(
+            config = config,
+            selectedMeasures = selectedMeasures,
+            selectedDimensions = selectedDimensions,
+        )
+        pendingAutoChartRequestSignature = ""
+        if (autoChartSpec == null) {
+            return@LaunchedEffect
+        }
+        applyChart(autoChartSpec, persist = false)
+        lastAutoAppliedChartRequestSignature = requestSignature
     }
 
     ReportBuilderPanel(container) {
@@ -1558,6 +1612,46 @@ private fun quickChartSpec(
         yFields = listOf(yField),
         seriesField = seriesField
     )
+}
+
+private val REPORT_BUILDER_AUTO_APPLY_SUPPORTED_CHART_TYPES = setOf("line", "bar", "area", "pie", "donut")
+
+internal fun resolveAutoAppliedReportBuilderChartSpec(
+    config: DashboardReportBuilderDef,
+    selectedMeasures: List<String>,
+    selectedDimensions: List<String>
+): ReportBuilderChartSpecDef? {
+    val result = config.result ?: return null
+    if (result.autoApplyDefaultChartOnResult != true) {
+        return null
+    }
+    val selectedMeasureSet = selectedMeasures.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    val selectedDimensionSet = selectedDimensions.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    return result.defaultChartSpecs
+        .asSequence()
+        .map(::normalizeChartSpec)
+        .firstOrNull { spec ->
+            val type = (spec.type ?: "line").trim().lowercase()
+            if (type !in REPORT_BUILDER_AUTO_APPLY_SUPPORTED_CHART_TYPES) {
+                return@firstOrNull false
+            }
+            val xField = spec.xField?.trim().orEmpty()
+            if (xField.isEmpty() || xField !in selectedDimensionSet) {
+                return@firstOrNull false
+            }
+            val yFields = spec.yFields.map { it.trim() }.filter { it.isNotEmpty() }
+            if (yFields.size != 1 || yFields.any { it !in selectedMeasureSet }) {
+                return@firstOrNull false
+            }
+            val seriesField = spec.seriesField?.trim().orEmpty()
+            if (seriesField.isNotEmpty() && seriesField !in selectedDimensionSet) {
+                return@firstOrNull false
+            }
+            if (type in setOf("pie", "donut") && seriesField.isNotEmpty()) {
+                return@firstOrNull false
+            }
+            true
+        }
 }
 
 private fun generatedTitle(

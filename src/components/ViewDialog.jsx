@@ -4,8 +4,8 @@ import LayoutRenderer from './LayoutRenderer';
 import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
 import {useSignalEffect, useSignals} from '@preact/signals-react/runtime';
-import {dialogHandlers} from "../hooks";
-import {resolveTemplate} from "../utils";
+import {dialogHandlers} from "../hooks/index.js";
+import {resolveTemplate} from "../utils/index.js";
 import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
 

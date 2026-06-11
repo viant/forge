@@ -25,8 +25,17 @@ import {
     Legend,
     ResponsiveContainer,
 } from "recharts";
-import {format} from "date-fns";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
+import {
+    aggregateDirectSeriesData,
+    buildPieChartData,
+    fillMissingTemporalBuckets,
+    formatTimestamp,
+    readChartDataValue,
+    resolveChartBodyState,
+    resolveVisibleChartState,
+    transformData,
+} from "./chartData.js";
 import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
 import { SoftBlock } from "./SoftSkeleton.jsx";
 import { resolveSelector } from "../utils/selector.js";
@@ -93,68 +102,6 @@ function useMeasuredContainer() {
     }, []);
 
     return [ref, size];
-}
-
-// Function to transform rawData into chartData
-export function transformData(rawData, chart, valueKey) {
-    const {xAxis, series} = chart;
-    const groupedData = {};
-    const keysSet = new Set();
-
-    rawData.forEach((item) => {
-        const seriesName = item[series.nameKey];
-        const timestamp = item[xAxis.dataKey];
-        const value = item[valueKey]; // Use dynamic valueKey
-        keysSet.add(seriesName);
-
-        if (!groupedData[timestamp]) {
-            groupedData[timestamp] = {[xAxis.dataKey]: timestamp};
-        }
-
-        groupedData[timestamp][seriesName] = value;
-    });
-
-    // Convert grouped data into an array and sort by timestamp
-    const data = Object.values(groupedData).sort(
-        (a, b) => new Date(a[xAxis.dataKey]) - new Date(b[xAxis.dataKey])
-    );
-    const keys = Array.from(keysSet);
-    return {data, keys};
-}
-
-export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDefinitions = []) {
-    const key = String(xAxisKey || "").trim();
-    if (!key || !Array.isArray(rawData) || rawData.length === 0) {
-        return Array.isArray(rawData) ? rawData : [];
-    }
-    const valueKeys = (Array.isArray(seriesDefinitions) ? seriesDefinitions : [])
-        .map((entry) => String(entry?.value || "").trim())
-        .filter(Boolean);
-    if (valueKeys.length === 0) {
-        return rawData;
-    }
-    const grouped = new Map();
-    rawData.forEach((row) => {
-        const bucketKey = row?.[key];
-        if (bucketKey == null || bucketKey === "") {
-            return;
-        }
-        const existing = grouped.get(bucketKey) || { [key]: bucketKey };
-        valueKeys.forEach((valueKey) => {
-            const numeric = Number(row?.[valueKey]);
-            if (!Number.isFinite(numeric)) {
-                if (!(valueKey in existing) && row?.[valueKey] !== undefined) {
-                    existing[valueKey] = row[valueKey];
-                }
-                return;
-            }
-            existing[valueKey] = Number(existing[valueKey] || 0) + numeric;
-        });
-        grouped.set(bucketKey, existing);
-    });
-    return Array.from(grouped.values()).sort(
-        (left, right) => new Date(left?.[key]) - new Date(right?.[key]),
-    );
 }
 
 function isDirectSeriesChart(chart = {}) {
@@ -259,17 +206,6 @@ function normalizeSelectorLookupKey(value) {
     return String(value);
 }
 
-export function formatTimestamp(timestamp, fmt = "MM/dd") {
-    if (timestamp === null || timestamp === undefined || timestamp === "") {
-        return "";
-    }
-    const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) {
-        return String(timestamp);
-    }
-    return format(date, fmt);
-}
-
 function resolveMappedConfigValue(baseContext, entry = {}, valueKey = "", defaultSource = "windowForm") {
     const selector = String(entry?.[`${valueKey}Selector`] || "").trim();
     const mapping = entry?.[`${valueKey}s`];
@@ -345,91 +281,11 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-function fillMissingTemporalBuckets(chartData = [], xAxisKey = "", seriesDefinitions = [], step = "") {
-    const rows = Array.isArray(chartData) ? chartData : [];
-    const key = String(xAxisKey || "").trim();
-    const interval = String(step || "").trim().toLowerCase();
-    if (rows.length === 0 || key === "" || interval !== "day") {
-        return rows;
-    }
-    const dated = rows
-        .map((row) => {
-            const raw = row?.[key];
-            const parsed = new Date(raw);
-            if (Number.isNaN(parsed.getTime())) {
-                return null;
-            }
-            const normalized = new Date(parsed);
-            normalized.setHours(0, 0, 0, 0);
-            return { row, date: normalized };
-        })
-        .filter(Boolean);
-    if (dated.length === 0) {
-        return rows;
-    }
-    dated.sort((left, right) => left.date - right.date);
-    const byDay = new Map(
-        dated.map((entry) => [entry.date.toISOString(), entry.row]),
-    );
-    const template = dated[0].row || {};
-    const seriesKeys = (Array.isArray(seriesDefinitions) ? seriesDefinitions : [])
-        .map((entry) => String(entry?.value || "").trim())
-        .filter(Boolean);
-    const result = [];
-    const cursor = new Date(dated[0].date);
-    const end = dated[dated.length - 1].date;
-    while (cursor <= end) {
-        const bucketKey = cursor.toISOString();
-        const existing = byDay.get(bucketKey);
-        if (existing) {
-            result.push(existing);
-        } else {
-            const nextRow = {[key]: bucketKey};
-            Object.keys(template).forEach((field) => {
-                if (field === key || seriesKeys.includes(field)) {
-                    return;
-                }
-                nextRow[field] = template[field];
-            });
-            seriesKeys.forEach((seriesKey) => {
-                nextRow[seriesKey] = 0;
-            });
-            result.push(nextRow);
-        }
-        cursor.setDate(cursor.getDate() + 1);
-    }
-    return result;
-}
-
-export function resolveVisibleChartState({ chartData = [], availableDataKeys = [], yAxisLabel = "", loading = false, error = null, previousState = null, sourceKey = "" } = {}) {
-    const currentRows = Array.isArray(chartData) ? chartData : [];
-    const currentKeys = Array.isArray(availableDataKeys) ? availableDataKeys : [];
-    const previousRows = Array.isArray(previousState?.chartData) ? previousState.chartData : [];
-    const previousKeys = Array.isArray(previousState?.availableDataKeys) ? previousState.availableDataKeys : [];
-    const sameSourceKey = String(previousState?.sourceKey || "") === String(sourceKey || "");
-    const canReusePrevious = loading && !error && sameSourceKey && currentRows.length === 0 && previousRows.length > 0;
-    if (canReusePrevious) {
-        return {
-            chartData: previousRows,
-            availableDataKeys: previousKeys,
-            yAxisLabel: String(previousState?.yAxisLabel || "").trim(),
-            staleWhileLoading: true,
-        };
-    }
-    return {
-        chartData: currentRows,
-        availableDataKeys: currentKeys,
-        yAxisLabel,
-        staleWhileLoading: false,
-    };
-}
-
 const Chart = ({container, context, isActive = true, embedded = false}) => {
     useSignals();
     const log = getLogger('chart');
     const {chart} = container;
     const [chartRef, chartSize] = useMeasuredContainer();
-    const [chartReady, setChartReady] = useState(false);
 
     // Extract chart configuration
     const {
@@ -518,11 +374,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = (effectiveCollection || []).map((row) => ({
-                name: row[nameKey] ?? "unknown",
-                value: Number(row[valueKey]) || 0,
-                _raw: row,
-            })).filter((row) => row.value > 0);
+            const rows = buildPieChartData(effectiveCollection || [], nameKey, valueKey);
             return {
                 chartData: rows,
                 availableDataKeys: rows.map((row) => row.name),
@@ -586,15 +438,6 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 : nextSelection.selectedDataKeys;
         });
     }, [availableDataKeys]);
-
-    useEffect(() => {
-        if (viewMode !== "chart" || chartSize.width <= 0 || chartSize.height <= 0) {
-            setChartReady(false);
-            return undefined;
-        }
-        setChartReady(true);
-        return undefined;
-    }, [viewMode, chartSize.width, chartSize.height]);
 
     useEffect(() => {
         if (embedded && viewMode !== "chart") {
@@ -801,7 +644,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             220,
             Math.max(
                 110,
-                ...normalizedChartData.map((row) => String(row?.[categoryKey] ?? "").length * 6 + 20)
+                ...normalizedChartData.map((row) => String(readChartDataValue(row, categoryKey) ?? "").length * 6 + 20)
             )
         );
         const barSize = embedded ? 10 : 12;
@@ -900,7 +743,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             const headerLen = String(key || "").length;
             let maxLen = headerLen;
             chartData.forEach((row) => {
-                const len = String(row?.[key] ?? "").length;
+                const len = String(readChartDataValue(row, key) ?? "").length;
                 if (len > maxLen) maxLen = len;
             });
             const w = Math.max(110, Math.min(420, maxLen * 8 + 28));
@@ -926,7 +769,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         const cols = visibleColumns.length ? visibleColumns : allTableColumns;
         const lines = [cols.map(escapeCsvCell).join(",")];
         chartData.forEach((row) => {
-            lines.push(cols.map((c) => escapeCsvCell(row?.[c])).join(","));
+            lines.push(cols.map((c) => escapeCsvCell(readChartDataValue(row, c))).join(","));
         });
         const blob = new Blob(["\ufeff" + lines.join("\n")], {type: "text/csv;charset=utf-8"});
         const url = URL.createObjectURL(blob);
@@ -945,7 +788,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             key={columnKey}
             columnHeaderCellRenderer={() => <BpColumnHeaderCell name={columnKey}/>}
             cellRenderer={(rowIndex) => {
-                const raw = chartData[rowIndex]?.[columnKey] ?? "";
+                const raw = readChartDataValue(chartData[rowIndex], columnKey) ?? "";
                 const text = String(raw);
                 const isLong = text.length > 120;
                 const display = isLong ? `${text.slice(0, 120)}…` : text;
@@ -970,6 +813,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         ? container.id
         : undefined;
 
+    const hasUnderlyingChartRows = isPieChart ? chartData.length > 0 : normalizedChartData.length > 0;
     const canRenderChartSelection = isPieChart ? pieFilteredData.length > 0 : selectedSeriesDefinitions.length > 0;
     const hasChartRows = isPieChart ? pieFilteredData.length > 0 : normalizedChartData.length > 0;
     const hasRenderableSeriesValues = isPieChart
@@ -984,6 +828,15 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         && hasResolvedMetricsPayload;
     const emptyChartMessage = resolveEmptyChartMessage(chartMetrics);
     const showSeriesSelectionControls = !showResolvedEmptyStateWhileLoading;
+    const { showSelectionMessage, showEmptyDataMessage } = resolveChartBodyState({
+        loading,
+        error,
+        hasUnderlyingChartRows,
+        canRenderChartSelection,
+        hasChartRows,
+        hasRenderableSeriesValues,
+        showResolvedEmptyStateWhileLoading,
+    });
 
     const renderSeriesSelectionControls = ({compact = false} = {}) => (
         <div
@@ -1052,7 +905,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         : normalizeChartExtent(width, "100%");
     const resolvedHeight = isHorizontalBar
         ? normalizeChartExtent(height, embedded ? 320 : 260)
-        : normalizeChartExtent(height, embedded ? (canRenderChartSelection ? 380 : 160) : 240);
+        : normalizeChartExtent(height, embedded ? 380 : 240);
     const resolvedMinHeight = (() => {
         if (typeof resolvedHeight === 'number') {
             return resolvedHeight;
@@ -1072,6 +925,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         margin: isHorizontalBar ? "0 auto" : undefined,
         position: "relative",
     };
+    const chartCanRenderViewport = chartSize.width > 0 && chartSize.height > 0;
     return (
         <div
             style={{width: resolvedWidth, minWidth: 0, display: "flex", flexDirection: "column", gap: 8, position: "relative"}}
@@ -1202,22 +1056,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                                 Loading chart…
                             </div>
                         </div>
-                    ) : !canRenderChartSelection && !loading && !error ? (
-                        <div
-                            style={{
-                                height: "100%",
-                                minHeight: embedded ? 110 : 180,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                textAlign: "center",
-                                color: "#7d8da1",
-                                fontSize: 12,
-                            }}
-                        >
-                            Select at least one series to render the chart.
-                        </div>
-                    ) : (!hasChartRows || !hasRenderableSeriesValues) && (!loading || showResolvedEmptyStateWhileLoading) && !error ? (
+                    ) : showEmptyDataMessage ? (
                         <div
                             style={{
                                 height: "100%",
@@ -1232,7 +1071,22 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                         >
                             {emptyChartMessage}
                         </div>
-                    ) : chartReady && chartSize.width > 0 && chartSize.height > 0 ? (
+                    ) : showSelectionMessage ? (
+                        <div
+                            style={{
+                                height: "100%",
+                                minHeight: embedded ? 110 : 180,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                textAlign: "center",
+                                color: "#7d8da1",
+                                fontSize: 12,
+                            }}
+                        >
+                            Select at least one series to render the chart.
+                        </div>
+                    ) : chartCanRenderViewport ? (
                         <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
                             {isPieChart
                                 ? pieChart

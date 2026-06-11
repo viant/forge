@@ -8,10 +8,12 @@ import {
     buildReportBuilderChartFields,
     buildReportBuilderDefaultState,
     buildReportBuilderDefaultChartSpecs,
+    getReportBuilderQuickPresetPolicy,
     buildReportBuilderRequest,
     getReportBuilderResultPanePosition,
     buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
+    prepareReportBuilderAutoChartApplication,
     getSelectableReportBuilderMeasures,
     getReportBuilderSupportedChartTypes,
     getVisibleReportBuilderDimensions,
@@ -19,6 +21,7 @@ import {
     isReportBuilderChartSpecStale,
     mergeReportBuilderState,
     normalizeReportBuilderChartSpec,
+    prepareReportBuilderChartApplication,
     projectLookupSelection,
     projectLookupSelections,
     projectManualSelection,
@@ -198,6 +201,9 @@ const explicitChartConfig = {
         ...config.result,
         chartCreationMode: "explicit",
         resultPanePosition: "left",
+        quickPresets: {
+            autoProvisionMissingDimensions: true,
+        },
         chartWizard: {
             supportedTypes: ["line", "bar", "area"],
         },
@@ -214,6 +220,16 @@ const explicitChartConfig = {
 };
 assert.equal(isExplicitReportBuilderChartMode(explicitChartConfig), true);
 assert.equal(getReportBuilderResultPanePosition(explicitChartConfig), "left");
+assert.deepEqual(getReportBuilderQuickPresetPolicy(config), {
+    autoProvisionMissingDimensions: false,
+    autoFetchOnSelect: false,
+    selectionPolicy: "merge",
+});
+assert.deepEqual(getReportBuilderQuickPresetPolicy(explicitChartConfig), {
+    autoProvisionMissingDimensions: true,
+    autoFetchOnSelect: false,
+    selectionPolicy: "merge",
+});
 
 const merged = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend", "impressions"],
@@ -390,6 +406,19 @@ assert.deepEqual(defaultChartSpec, {
     type: "line",
     xField: "eventDate",
     yFields: ["impressions"],
+});
+
+const suggestedChartSpec = buildDefaultReportBuilderChartSpec(config, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "impressions",
+}, {}, {
+    suggestSeriesField: true,
+});
+assert.deepEqual(suggestedChartSpec, {
+    type: "line",
+    xField: "eventDate",
+    yFields: ["impressions"],
     seriesField: "siteType",
 });
 
@@ -401,6 +430,8 @@ assert.deepEqual(
     }),
     [
         {
+            group: "",
+            selectionPolicy: "",
             title: "Spend by Date",
             type: "line",
             xField: "eventDate",
@@ -409,6 +440,51 @@ assert.deepEqual(
         },
     ],
 );
+
+const groupedDefaultChartSpecs = buildReportBuilderDefaultChartSpecs({
+    ...explicitChartConfig,
+    result: {
+        ...explicitChartConfig.result,
+        defaultChartSpecs: [
+            {
+                title: "Spend by Date",
+                group: "Overview",
+                type: "line",
+                xField: "eventDate",
+                yFields: ["totalSpend"],
+                seriesField: "siteType",
+            },
+        ],
+    },
+}, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "totalSpend",
+});
+assert.equal(groupedDefaultChartSpecs[0].group, "Overview");
+assert.equal(groupedDefaultChartSpecs[0].selectionPolicy, "");
+
+const selectionPolicyChartSpecs = buildReportBuilderDefaultChartSpecs({
+    ...explicitChartConfig,
+    result: {
+        ...explicitChartConfig.result,
+        defaultChartSpecs: [
+            {
+                title: "Spend by Date",
+                group: "Overview",
+                type: "line",
+                xField: "eventDate",
+                yFields: ["totalSpend"],
+                selectionPolicy: "replace",
+            },
+        ],
+    },
+}, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "totalSpend",
+});
+assert.equal(selectionPolicyChartSpecs[0].selectionPolicy, "replace");
 
 const settingsHashA = buildReportBuilderSettingsHash({
     selectedDimensions: ["eventDate", "siteType"],
@@ -524,6 +600,15 @@ const displayChartSpec = buildDefaultReportBuilderChartSpec(displayConfig, {
     primaryMeasure: "totalSpend",
 });
 assert.equal(displayChartSpec.xField, "channel.channel");
+assert.equal(displayChartSpec.seriesField, undefined);
+const suggestedDisplayChartSpec = buildDefaultReportBuilderChartSpec(displayConfig, {
+    selectedDimensions: ["channelId", "eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+}, {}, {
+    suggestSeriesField: true,
+});
+assert.equal(suggestedDisplayChartSpec.seriesField, "eventDate");
 const displayContainer = buildExplicitReportBuilderChartContainer(
     { dataSourceRef: "report_source", collection: [] },
     displayConfig,
@@ -538,6 +623,155 @@ const displayContainer = buildExplicitReportBuilderChartContainer(
     },
 );
 assert.equal(displayContainer.chart.xAxis.dataKey, "channel.channel");
+
+const blockedQuickApply = prepareReportBuilderChartApplication(displayConfig, {
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+}, {
+    type: "donut",
+    xField: "channel.channel",
+    yFields: ["totalSpend"],
+}, {
+    autoProvisionMissingDimensions: false,
+});
+assert.equal(blockedQuickApply.canApply, false);
+assert.equal(blockedQuickApply.reason, "missingDimensions");
+assert.deepEqual(blockedQuickApply.missingDimensionLabels, ["channelId"]);
+
+const autoProvisionedQuickApply = prepareReportBuilderChartApplication(displayConfig, {
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    page: 3,
+    staticFilters: {
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+}, {
+    type: "donut",
+    xField: "channel.channel",
+    yFields: ["totalSpend"],
+}, {
+    autoProvisionMissingDimensions: true,
+});
+assert.equal(autoProvisionedQuickApply.canApply, true);
+assert.equal(autoProvisionedQuickApply.reason, "");
+assert.deepEqual(autoProvisionedQuickApply.nextState.selectedDimensions, ["eventDate", "channelId"]);
+assert.equal(autoProvisionedQuickApply.nextState.page, 1);
+assert.equal(autoProvisionedQuickApply.shouldFetch, true);
+assert.equal(autoProvisionedQuickApply.requiresManualRun, false);
+
+const manualRunQuickApply = prepareReportBuilderChartApplication({
+    ...displayConfig,
+    request: {
+        autoFetch: false,
+    },
+}, {
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    staticFilters: {
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+}, {
+    type: "donut",
+    xField: "channel.channel",
+    yFields: ["totalSpend"],
+}, {
+    autoProvisionMissingDimensions: true,
+});
+assert.equal(manualRunQuickApply.canApply, true);
+assert.equal(manualRunQuickApply.shouldFetch, false);
+assert.equal(manualRunQuickApply.requiresManualRun, true);
+
+const replaceSelectionQuickApply = prepareReportBuilderChartApplication({
+    ...displayConfig,
+    request: {
+        autoFetch: false,
+    },
+}, {
+    selectedDimensions: ["eventDate", "channelId"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "impressions",
+    staticFilters: {
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+}, {
+    type: "donut",
+    xField: "channel.channel",
+    yFields: ["totalSpend"],
+}, {
+    autoProvisionMissingDimensions: true,
+    selectionPolicy: "replace",
+});
+assert.equal(replaceSelectionQuickApply.canApply, true);
+assert.deepEqual(replaceSelectionQuickApply.nextState.selectedDimensions, ["channelId"]);
+assert.deepEqual(replaceSelectionQuickApply.nextState.selectedMeasures, ["totalSpend"]);
+assert.equal(replaceSelectionQuickApply.nextState.primaryMeasure, "totalSpend");
+assert.equal(replaceSelectionQuickApply.selectionPolicy, "replace");
+assert.equal(replaceSelectionQuickApply.measureSelectionChanged, true);
+assert.equal(replaceSelectionQuickApply.dimensionSelectionChanged, true);
+assert.equal(replaceSelectionQuickApply.requiresManualRun, true);
+
+const autoFetchOnSelectQuickApply = prepareReportBuilderChartApplication({
+    ...displayConfig,
+    request: {
+        autoFetch: false,
+    },
+}, {
+    selectedDimensions: ["eventDate", "channelId"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "impressions",
+    staticFilters: {
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+}, {
+    type: "donut",
+    xField: "channel.channel",
+    yFields: ["totalSpend"],
+}, {
+    autoProvisionMissingDimensions: true,
+    forceAutoFetch: true,
+    selectionPolicy: "replace",
+});
+assert.equal(autoFetchOnSelectQuickApply.shouldFetch, true);
+assert.equal(autoFetchOnSelectQuickApply.requiresManualRun, false);
+
+const autoChartApply = prepareReportBuilderAutoChartApplication({
+    ...displayConfig,
+    result: {
+        ...displayConfig.result,
+        autoApplyDefaultChartOnResult: true,
+        defaultChartSpecs: [
+            {
+                title: "Needs channel",
+                type: "donut",
+                xField: "channel.channel",
+                yFields: ["totalSpend"],
+            },
+            {
+                title: "Spend by date",
+                type: "line",
+                xField: "eventDate",
+                yFields: ["totalSpend"],
+            },
+        ],
+    },
+}, {
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+});
+assert.equal(autoChartApply?.normalizedChartSpec?.title, "Spend by date");
+assert.equal(autoChartApply?.nextState?.viewMode, "chart");
+assert.equal(autoChartApply?.requiresDimensionProvision, false);
+
+const disabledAutoChartApply = prepareReportBuilderAutoChartApplication(displayConfig, {
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+});
+assert.equal(disabledAutoChartApply, null);
 
 const familyDraftConfig = {
     dynamicFilterGroups: [
