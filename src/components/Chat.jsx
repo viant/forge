@@ -166,6 +166,48 @@ function hasActiveTurnLifecycle(context = null) {
     return !!String(chatState?.runningTurnId || chatState?.activeStreamTurnId || '').trim();
 }
 
+function normalizeUploadPrepareResult(result = null) {
+    if (!result || typeof result !== 'object') return {};
+    if (result.fields && typeof result.fields === 'object' && !Array.isArray(result.fields)) {
+        return result.fields;
+    }
+    if (result.extraFields && typeof result.extraFields === 'object' && !Array.isArray(result.extraFields)) {
+        return result.extraFields;
+    }
+    return result;
+}
+
+function attachmentConversationId(attachment = null) {
+    const raw = String(attachment?.uri || attachment?.url || '').trim();
+    if (!raw) return '';
+    try {
+        return String(new URL(raw, window.location?.origin || 'http://localhost').searchParams.get('conversationId') || '').trim();
+    } catch (_) {
+        return '';
+    }
+}
+
+const COMPOSER_DRAFTS_KEY = 'forge.composerDrafts.v1';
+const COMPOSER_PREFILL_EVENT = 'forge:composer-prefill';
+
+function preserveDraftForConversation(conversationId = '', draft = '') {
+    const id = String(conversationId || '').trim();
+    const text = String(draft || '');
+    if (!id || !text.trim() || typeof window === 'undefined') return;
+    try {
+        const raw = window.sessionStorage?.getItem(COMPOSER_DRAFTS_KEY) || '{}';
+        const map = JSON.parse(raw);
+        const next = map && typeof map === 'object' && !Array.isArray(map) ? map : {};
+        if (!String(next[id] || '').trim()) {
+            next[id] = text;
+            window.sessionStorage?.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(next));
+        }
+        window.dispatchEvent(new CustomEvent(COMPOSER_PREFILL_EVENT, {
+            detail: { conversationId: id, prompt: text },
+        }));
+    } catch (_) {}
+}
+
 export default function Chat({
     context,
     container = {},
@@ -328,6 +370,10 @@ export default function Chat({
     const uploadField = chatCfg.uploadField || 'upload';
     const uploader = useUpload(uploadCfg);
     const announcedDone = useRef(new Set());
+    const clearPendingAttachments = useCallback(() => {
+        setPendingAttachments([]);
+        try { handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: [] }); } catch (_) {}
+    }, [handlers, uploadField]);
 
     // ---------------------------------------------------------------------
     // 🔎  Compute abort visibility via abortVisible { selector, when }
@@ -359,6 +405,10 @@ export default function Chat({
             const conversationId = String(event?.detail?.id || '').trim();
             if (!conversationId) {
                 setComposerDraft('');
+                clearPendingAttachments();
+                try { uploader.reset(); } catch (_) {}
+                announcedDone.current = new Set();
+                batchIdsRef.current = new Set();
             }
         };
         if (typeof window !== 'undefined') {
@@ -369,7 +419,7 @@ export default function Chat({
                 window.removeEventListener('forge:conversation-active', handleConversationActive);
             }
         };
-    }, []);
+    }, [clearPendingAttachments, uploader]);
 
     // Track usage data (tokens/cost) for compact display in the composer.
     useSignalEffect(() => {
@@ -510,6 +560,20 @@ export default function Chat({
     const backendConversationRunning = !!conversationSnapshot?.running;
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
     const queuedCountValue = conversationSnapshot?.queuedCount;
+
+    useEffect(() => {
+        setPendingAttachments(prev => {
+            if (!Array.isArray(prev) || prev.length === 0) return prev;
+            if (!conversationID) return prev;
+            const next = prev.filter((attachment) => {
+                const attachmentConvID = attachmentConversationId(attachment);
+                return !attachmentConvID || attachmentConvID === conversationID;
+            });
+            if (next.length === prev.length) return prev;
+            try { handlers?.dataSource?.setFormField?.({ item: { id: uploadField, bindingPath: uploadField }, value: next }); } catch (_) {}
+            return next;
+        });
+    }, [conversationID, handlers, uploadField]);
 
     const usageSummary = buildUsageSummary(usageSnapshot);
     const usageTooltip = buildUsageTooltip(usageSnapshot);
@@ -666,9 +730,23 @@ export default function Chat({
         }
     };
 
-    const startUploads = (files) => {
+    const startUploads = async (files) => {
         if (!files || files.length === 0) return;
-        const ids = uploader.start(files, {});
+        const draftBeforeUpload = String(composerDraft || '');
+        let extraFields = {};
+        if (events.onUploadPrepare?.isDefined?.()) {
+            try {
+                extraFields = normalizeUploadPrepareResult(await events.onUploadPrepare.execute({
+                    context,
+                    files: Array.from(files),
+                }));
+            } catch (err) {
+                console.error('[forge][chat] upload prepare failed', err);
+                return;
+            }
+        }
+        preserveDraftForConversation(extraFields?.conversationId || extraFields?.conversationID, draftBeforeUpload);
+        const ids = uploader.start(files, extraFields);
         if (Array.isArray(ids)) {
             ids.forEach(id => batchIdsRef.current.add(id));
         }
@@ -683,18 +761,26 @@ export default function Chat({
 
         const newAttachments = newlyDone.map(u => {
             const resp = u.response;
-            // Try to extract uri/url from server response; fallback to object URL
-            let url = resp?.uri || resp?.url || (resp?.item ? resp.item.uri : null);
-            if (!url) {
-                try { url = URL.createObjectURL(u.file); } catch (_) {}
-            }
-            return {
-                name: u.name,
-                url,
-                size: u.size,
-                mediaType: u.type,
+            const uri = resp?.uri || resp?.url || (resp?.item ? resp.item.uri : null);
+            const name = resp?.name || resp?.filename || u.name;
+            const size = Number(resp?.size || resp?.sizeBytes || u.size || 0) || undefined;
+            const mime = resp?.mime || resp?.mimeType || resp?.contentType || u.type || undefined;
+            const attachment = {
+                id: resp?.id || resp?.fileId || undefined,
+                name,
+                uri,
+                size,
+                mime,
             };
-        });
+            if (u.file) {
+                Object.defineProperty(attachment, 'file', {
+                    value: u.file,
+                    enumerable: false,
+                    configurable: true,
+                });
+            }
+            return attachment;
+        }).filter((item) => !!item.uri);
         if (newAttachments.length > 0) {
             setPendingAttachments(prev => {
                 const next = [...prev, ...newAttachments];
