@@ -1,0 +1,128 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.replaceSemanticValidationBehaviors && window.__REPORT_BUILDER_PREVIEW__.replaceSemanticValidationBehaviors([{ match: { modelRef: 'model://steward/performance/ad_delivery@v1', entity: 'line_delivery', dimensions: ['event_date', 'channel', 'age_group'], measures: ['available_impressions', 'household_uniques'] }, delayMs: 1200, error: 'Semantic provider unavailable.' }]);"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Performance metrics settings"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "BREAK DOWN BY",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select",
+      "index": 0,
+      "value": "agegroupId"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Validating the semantic selection against the provider.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic validation: Semantic provider unavailable.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Resolve semantic selection issues"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const runButtons = Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run'); return runButtons.length === 1 && runButtons[0].disabled === true; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select",
+      "index": 0,
+      "value": ""
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const text = document.body?.innerText || document.body?.textContent || ''; const runButtons = Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run'); return !text.includes('Semantic validation: Semantic provider unavailable.') && !text.includes('Resolve semantic selection issues') && runButtons.length === 1 && runButtons[0].disabled === false; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.replaceSemanticValidationBehaviors && window.__REPORT_BUILDER_PREVIEW__.replaceSemanticValidationBehaviors([{ match: { modelRef: 'model://steward/performance/ad_delivery@v1', entity: 'line_delivery', dimensions: ['event_date', 'channel', 'age_group'], measures: ['available_impressions', 'household_uniques'] }, delayMs: 1500, error: 'Semantic provider unavailable.' }]);"
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select",
+      "index": 0,
+      "value": "agegroupId"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Validating the semantic selection against the provider.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select",
+      "index": 0,
+      "value": ""
+    },
+    {
+      "type": "wait",
+      "ms": 1800
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Semantic validation: Semantic provider unavailable."
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Resolve semantic selection issues"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const text = document.body?.innerText || document.body?.textContent || ''; const runButtons = Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run'); return !text.includes('Validating the semantic selection against the provider.') && runButtons.length === 1 && runButtons[0].disabled === false; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-error-proof.png",
+      "fullPage": true
+    }
+  ]
+}

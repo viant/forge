@@ -8,24 +8,31 @@ import {
     buildReportBuilderChartFields,
     buildReportBuilderDefaultState,
     buildReportBuilderDefaultChartSpecs,
+    buildReportBuilderDefaultTablePresets,
+    buildReportBuilderQuickViewOptions,
     getReportBuilderQuickPresetPolicy,
     buildReportBuilderRequest,
     getReportBuilderResultPanePosition,
     buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
+    clearReportBuilderGroupByWhenMissing,
     prepareReportBuilderAutoChartApplication,
     getSelectableReportBuilderMeasures,
     getReportBuilderSupportedChartTypes,
+    getTableCalculationReportBuilderMeasures,
     getVisibleReportBuilderDimensions,
     isExplicitReportBuilderChartMode,
     isReportBuilderChartSpecStale,
     mergeReportBuilderState,
     normalizeReportBuilderChartSpec,
     prepareReportBuilderChartApplication,
+    prepareReportBuilderTableCalculationApplication,
+    prepareReportBuilderTablePresetApplication,
     projectLookupSelection,
     projectLookupSelections,
     projectManualSelection,
     resolveReportBuilderReadiness,
+    resolveReportBuilderRailFilterState,
     sanitizeReportBuilderState,
     shouldAutoCollapseReportBuilderFilters,
     validateReportBuilderChartSpec,
@@ -117,6 +124,35 @@ const config = {
     },
 };
 
+const semanticMappedConfig = {
+    ...config,
+    measures: config.measures.map((measure) => {
+        if (measure.id === "totalSpend") {
+            return { ...measure, semanticRef: "spend" };
+        }
+        if (measure.id === "impressions") {
+            return { ...measure, semanticRef: "impressions" };
+        }
+        return measure;
+    }),
+    dimensions: config.dimensions.map((dimension) => {
+        if (dimension.id === "eventDate") {
+            return { ...dimension, semanticRef: "event_date" };
+        }
+        if (dimension.id === "channelId") {
+            return { ...dimension, semanticRef: "channel" };
+        }
+        return dimension;
+    }),
+    binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date"],
+        selectedMeasures: ["spend"],
+    },
+};
+
 const defaults = buildReportBuilderDefaultState(config);
 assert.deepEqual(defaults.selectedMeasures, ["totalSpend"]);
 assert.deepEqual(defaults.selectedDimensions.sort(), ["eventDate", "siteType"].sort());
@@ -147,18 +183,114 @@ assert.equal(shouldAutoCollapseReportBuilderFilters({
     manualRunSequence: 2,
     collapsedRunSequence: 1,
 }), false);
+assert.deepEqual(
+    resolveReportBuilderRailFilterState({
+        panelOpen: false,
+        canShowResults: true,
+        manualRunSequence: 0,
+        seededRequestFingerprint: "{\"request\":\"seeded\"}",
+        collapsedSeededFingerprint: "",
+    }),
+    {
+        panelOpen: false,
+        showRailCategories: true,
+        showOverlayBody: false,
+        shouldAutoCollapseSeededPanel: false,
+    },
+);
+assert.deepEqual(
+    resolveReportBuilderRailFilterState({
+        panelOpen: true,
+        canShowResults: true,
+        manualRunSequence: 0,
+        seededRequestFingerprint: "{\"request\":\"seeded\"}",
+        collapsedSeededFingerprint: "",
+    }),
+    {
+        panelOpen: true,
+        showRailCategories: false,
+        showOverlayBody: true,
+        shouldAutoCollapseSeededPanel: true,
+    },
+);
+assert.equal(
+    resolveReportBuilderRailFilterState({
+        panelOpen: true,
+        canShowResults: true,
+        manualRunSequence: 1,
+        seededRequestFingerprint: "{\"request\":\"seeded\"}",
+        collapsedSeededFingerprint: "",
+    }).shouldAutoCollapseSeededPanel,
+    false,
+);
+assert.equal(
+    resolveReportBuilderRailFilterState({
+        panelOpen: true,
+        canShowResults: false,
+        manualRunSequence: 0,
+        seededRequestFingerprint: "{\"request\":\"seeded\"}",
+        collapsedSeededFingerprint: "",
+    }).shouldAutoCollapseSeededPanel,
+    false,
+);
+assert.equal(
+    resolveReportBuilderRailFilterState({
+        panelOpen: true,
+        canShowResults: true,
+        manualRunSequence: 0,
+        seededRequestFingerprint: "{\"request\":\"seeded\"}",
+        collapsedSeededFingerprint: "{\"request\":\"seeded\"}",
+    }).shouldAutoCollapseSeededPanel,
+    false,
+);
 assert.deepEqual(defaults.staticFilters.dateRange, { start: "2026-04-01", end: "2026-04-30" });
 assert.equal(defaults.page, 1);
 assert.equal(defaults.pageSize, 50);
 assert.equal(defaults.orderField, "eventDate");
 assert.equal(defaults.orderDir, "asc");
+assert.equal(defaults.binding, null);
+assert.deepEqual(defaults.localCalculatedFields, []);
+assert.deepEqual(defaults.localTableCalculations, []);
 assert.deepEqual(
     getSelectableReportBuilderMeasures(config).map((entry) => entry.id),
     ["totalSpend", "impressions", "clicks", "ctr"],
 );
 assert.deepEqual(
+    getSelectableReportBuilderMeasures({
+        ...config,
+        calculatedFields: [{
+            id: "forecastLift",
+            key: "forecastLift",
+            label: "Forecast Lift",
+            dataType: "number",
+            expr: "if(channelId = 'CTV', totalSpend, null)",
+        }],
+    }).map((entry) => entry.id),
+    ["totalSpend", "impressions", "clicks", "forecastLift", "ctr"],
+);
+assert.deepEqual(
     getVisibleReportBuilderDimensions(config).map((entry) => entry.id),
     ["eventDate", "channelId", "siteType"],
+);
+assert.notEqual(
+    buildReportBuilderSettingsHash({
+        selectedDimensions: ["eventDate"],
+        selectedMeasures: ["totalSpend"],
+        localCalculatedFields: [],
+        localTableCalculations: [],
+    }),
+    buildReportBuilderSettingsHash({
+        selectedDimensions: ["eventDate"],
+        selectedMeasures: ["totalSpend"],
+        localCalculatedFields: [{
+            id: "forecastLift",
+            key: "forecastLift",
+            label: "Forecast Lift",
+            dataType: "number",
+            expr: "if(channelId = 'CTV', totalSpend, null)",
+        }],
+        localTableCalculations: [],
+    }),
 );
 
 const relativeDefaults = buildReportBuilderDefaultState({
@@ -188,12 +320,39 @@ const startLast3 = new Date(relativeDefaultsLast3.staticFilters.dateRange.start)
 const endLast3 = new Date(relativeDefaultsLast3.staticFilters.dateRange.end);
 assert.equal(Math.round((endLast3 - startLast3) / 86400000), 2);
 
+const semanticDefaultState = buildReportBuilderDefaultState(semanticMappedConfig);
+assert.deepEqual(semanticDefaultState.selectedMeasures, ["totalSpend"]);
+assert.deepEqual(semanticDefaultState.selectedDimensions, ["eventDate"]);
+assert.deepEqual(semanticDefaultState.binding, {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date"],
+    selectedMeasures: ["spend"],
+});
+
 assert.equal(isExplicitReportBuilderChartMode(config), false);
 assert.deepEqual(
     getReportBuilderSupportedChartTypes(config),
     ["line", "bar", "area", "pie", "donut", "horizontal_bar", "funnel_bar"],
 );
 assert.equal(getReportBuilderResultPanePosition(config), "right");
+assert.equal(
+    buildReportBuilderSettingsHash({ selectedDimensions: ["eventDate"], selectedMeasures: ["totalSpend"] }),
+    buildReportBuilderSettingsHash({ selectedDimensions: ["eventDate"], selectedMeasures: ["totalSpend"], binding: null }),
+);
+assert.notEqual(
+    buildReportBuilderSettingsHash({ selectedDimensions: ["eventDate"], selectedMeasures: ["totalSpend"] }),
+    buildReportBuilderSettingsHash({
+        selectedDimensions: ["eventDate"],
+        selectedMeasures: ["totalSpend"],
+        binding: {
+            mode: "semantic",
+            modelRef: "model://steward/performance/ad_delivery@v1",
+            entity: "line_delivery",
+        },
+    }),
+);
 
 const explicitChartConfig = {
     ...config,
@@ -210,6 +369,11 @@ const explicitChartConfig = {
         defaultChartSpecs: [
             {
                 title: "Spend by Date",
+                group: "Chart Stories",
+                groupDescription: "Narrative story charts for split trends and channel movement.",
+                eyebrow: "Visual Story",
+                accentTone: "delivery",
+                highlights: ["Split by Site Type", "Trend View", "Full Query"],
                 type: "line",
                 xField: "eventDate",
                 yFields: ["totalSpend"],
@@ -230,6 +394,573 @@ assert.deepEqual(getReportBuilderQuickPresetPolicy(explicitChartConfig), {
     autoFetchOnSelect: false,
     selectionPolicy: "merge",
 });
+
+const tablePresetConfig = {
+    ...explicitChartConfig,
+    result: {
+        ...explicitChartConfig.result,
+        defaultTablePresets: [
+            {
+                title: "Delivery Grid",
+                groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
+                eyebrow: "Metrics Panel",
+                accentTone: "delivery",
+                highlights: ["Selected Dates", "Market Context", "Export Ready"],
+                dimensions: ["eventDate", "channelId"],
+                measures: ["totalSpend", "impressions"],
+                columns: [
+                    { key: "eventDate", label: "Date" },
+                    {
+                        key: "channelId",
+                        label: "Channel",
+                        cellVisual: {
+                            kind: "badge",
+                            rules: [
+                                { value: "display", tone: "info", label: "Display" },
+                            ],
+                        },
+                    },
+                    {
+                        key: "totalSpend",
+                        label: "Spend",
+                        format: "currency",
+                        cellVisual: {
+                            kind: "dataBar",
+                            range: { mode: "columnMax" },
+                            palette: ["#dbeafe", "#2563eb"],
+                        },
+                    },
+                ],
+                orderField: "totalSpend",
+                orderDir: "desc",
+                pageSize: 25,
+            },
+            {
+                title: "Reach Grid",
+                groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
+                eyebrow: "Household Metrics",
+                accentTone: "household",
+                highlights: ["Reach Priority", "Market Rollup", "Export Ready"],
+                dimensions: ["channelId", "eventDate"],
+                measures: ["impressions", "totalSpend"],
+                primaryMeasure: "impressions",
+                orderField: "impressions",
+                orderDir: "desc",
+                pageSize: 20,
+            },
+        ],
+    },
+};
+assert.deepEqual(buildReportBuilderDefaultTablePresets(tablePresetConfig, defaults), [
+    {
+        id: "tablePreset_1",
+        title: "Delivery Grid",
+        group: "Tables",
+        groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
+        description: "",
+        eyebrow: "Metrics Panel",
+        accentTone: "delivery",
+        highlights: ["Selected Dates", "Market Context", "Export Ready"],
+        columns: [
+            {
+                key: "eventDate",
+                label: "Date",
+            },
+            {
+                key: "channelId",
+                label: "Channel",
+                cellVisual: {
+                    kind: "badge",
+                    rules: [
+                        { value: "display", tone: "info", label: "Display" },
+                    ],
+                },
+            },
+            {
+                key: "totalSpend",
+                label: "Spend",
+                format: "currency",
+                cellVisual: {
+                    kind: "dataBar",
+                    range: { mode: "columnMax" },
+                    palette: ["#dbeafe", "#2563eb"],
+                },
+            },
+        ],
+        selectionPolicy: "replace",
+        dimensions: ["eventDate", "channelId"],
+        measures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 25,
+        clearChart: true,
+        viewMode: "table",
+    },
+    {
+        id: "tablePreset_2",
+        title: "Reach Grid",
+        group: "Tables",
+        groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
+        description: "",
+        eyebrow: "Household Metrics",
+        accentTone: "household",
+        highlights: ["Reach Priority", "Market Rollup", "Export Ready"],
+        selectionPolicy: "replace",
+        dimensions: ["channelId", "eventDate"],
+        measures: ["impressions", "totalSpend"],
+        primaryMeasure: "impressions",
+        orderField: "impressions",
+        orderDir: "desc",
+        pageSize: 20,
+        clearChart: true,
+        viewMode: "table",
+    },
+]);
+
+const preparedTablePreset = prepareReportBuilderTablePresetApplication(
+    tablePresetConfig,
+    {
+        ...defaults,
+        selectedMeasures: ["clicks"],
+        selectedDimensions: ["siteType"],
+        primaryMeasure: "clicks",
+        viewMode: "chart",
+        chartSpec: { type: "line", xField: "eventDate", yFields: ["clicks"] },
+        orderField: "eventDate",
+        orderDir: "asc",
+        pageSize: 50,
+    },
+    buildReportBuilderDefaultTablePresets(tablePresetConfig, defaults)[0],
+    { forceAutoFetch: true, selectionPolicy: "replace" },
+);
+assert.equal(preparedTablePreset.canApply, true);
+assert.deepEqual(preparedTablePreset.nextState.selectedDimensions, ["eventDate", "channelId"]);
+assert.deepEqual(preparedTablePreset.nextState.selectedMeasures, ["totalSpend", "impressions"]);
+assert.equal(preparedTablePreset.nextState.primaryMeasure, "totalSpend");
+assert.equal(preparedTablePreset.nextState.viewMode, "table");
+assert.equal(preparedTablePreset.nextState.chartSpec, null);
+assert.deepEqual(preparedTablePreset.nextState.activeTablePreset, {
+    id: "tablePreset_1",
+    title: "Delivery Grid",
+    eyebrow: "Metrics Panel",
+    accentTone: "delivery",
+    highlights: ["Selected Dates", "Market Context", "Export Ready"],
+    columns: [
+        {
+            key: "eventDate",
+            label: "Date",
+        },
+        {
+            key: "channelId",
+            label: "Channel",
+            cellVisual: {
+                kind: "badge",
+                rules: [
+                    { value: "display", tone: "info", label: "Display" },
+                ],
+            },
+        },
+        {
+            key: "totalSpend",
+            label: "Spend",
+            format: "currency",
+            cellVisual: {
+                kind: "dataBar",
+                range: { mode: "columnMax" },
+                palette: ["#dbeafe", "#2563eb"],
+            },
+        },
+    ],
+    dimensions: ["eventDate", "channelId"],
+    measures: ["totalSpend", "impressions"],
+    primaryMeasure: "totalSpend",
+    orderField: "totalSpend",
+    orderDir: "desc",
+    pageSize: 25,
+    clearChart: true,
+});
+assert.deepEqual(preparedTablePreset.nextState.lastTablePreset, {
+    id: "tablePreset_1",
+    title: "Delivery Grid",
+    eyebrow: "Metrics Panel",
+    accentTone: "delivery",
+    highlights: ["Selected Dates", "Market Context", "Export Ready"],
+    columns: [
+        {
+            key: "eventDate",
+            label: "Date",
+        },
+        {
+            key: "channelId",
+            label: "Channel",
+            cellVisual: {
+                kind: "badge",
+                rules: [
+                    { value: "display", tone: "info", label: "Display" },
+                ],
+            },
+        },
+        {
+            key: "totalSpend",
+            label: "Spend",
+            format: "currency",
+            cellVisual: {
+                kind: "dataBar",
+                range: { mode: "columnMax" },
+                palette: ["#dbeafe", "#2563eb"],
+            },
+        },
+    ],
+    dimensions: ["eventDate", "channelId"],
+    measures: ["totalSpend", "impressions"],
+    primaryMeasure: "totalSpend",
+    orderField: "totalSpend",
+    orderDir: "desc",
+    pageSize: 25,
+    clearChart: true,
+});
+assert.equal(preparedTablePreset.nextState.orderField, "totalSpend");
+assert.equal(preparedTablePreset.nextState.orderDir, "desc");
+assert.equal(preparedTablePreset.nextState.pageSize, 25);
+assert.equal(preparedTablePreset.shouldFetch, true);
+
+const preparedTablePresetWithLocalDerivedMeasures = prepareReportBuilderTablePresetApplication(
+    tablePresetConfig,
+    {
+        ...defaults,
+        selectedMeasures: ["clicks", "ctr", "localReachRate", "localReachShare"],
+        selectedDimensions: ["siteType"],
+        primaryMeasure: "localReachRate",
+        localCalculatedFields: [
+            {
+                id: "localReachRate",
+                key: "localReachRate",
+                label: "Local Reach Rate",
+                kind: "rowCalc",
+                expr: "clicks / impressions * 100",
+                format: "percent",
+            },
+        ],
+        localTableCalculations: [
+            {
+                id: "localReachShare",
+                key: "localReachShare",
+                label: "Local Reach Share",
+                kind: "tableCalc",
+                compute: {
+                    type: "percentOfTotal",
+                    sourceField: "impressions",
+                    partitionBy: ["channelId"],
+                    scale: 100,
+                    decimals: 1,
+                },
+            },
+        ],
+        viewMode: "chart",
+        chartSpec: { type: "line", xField: "eventDate", yFields: ["localReachRate"] },
+        orderField: "eventDate",
+        orderDir: "asc",
+    },
+    {
+        id: "localReachSnapshot",
+        title: "Local Reach Snapshot",
+        dimensions: ["eventDate"],
+        measures: ["totalSpend"],
+        primaryMeasure: "totalSpend",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 50,
+        selectionPolicy: "replace",
+        clearChart: true,
+    },
+    { forceAutoFetch: true, selectionPolicy: "replace" },
+);
+assert.equal(preparedTablePresetWithLocalDerivedMeasures.canApply, true);
+assert.deepEqual(preparedTablePresetWithLocalDerivedMeasures.nextState.selectedMeasures, [
+    "totalSpend",
+    "localReachRate",
+    "localReachShare",
+]);
+assert.deepEqual(preparedTablePresetWithLocalDerivedMeasures.nextState.selectedDimensions, [
+    "eventDate",
+    "channelId",
+]);
+assert.equal(preparedTablePresetWithLocalDerivedMeasures.nextState.selectedMeasures.includes("ctr"), false);
+assert.equal(preparedTablePresetWithLocalDerivedMeasures.nextState.activeTablePreset?.title, "Local Reach Snapshot");
+
+const persistedLocalDerivedActiveTablePreset = mergeReportBuilderState(
+    tablePresetConfig,
+    preparedTablePresetWithLocalDerivedMeasures.nextState,
+);
+assert.deepEqual(persistedLocalDerivedActiveTablePreset.selectedMeasures, [
+    "totalSpend",
+    "localReachRate",
+    "localReachShare",
+]);
+assert.deepEqual(persistedLocalDerivedActiveTablePreset.selectedDimensions, [
+    "eventDate",
+    "channelId",
+]);
+assert.deepEqual(persistedLocalDerivedActiveTablePreset.localCalculatedFields, [
+    {
+        id: "localReachRate",
+        key: "localReachRate",
+        label: "Local Reach Rate",
+        kind: "rowCalc",
+        dataType: "number",
+        dependencies: ["clicks", "impressions"],
+        expr: "clicks / impressions * 100",
+        format: "percent",
+    },
+]);
+assert.deepEqual(persistedLocalDerivedActiveTablePreset.localTableCalculations, [
+    {
+        id: "localReachShare",
+        key: "localReachShare",
+        label: "Local Reach Share",
+        kind: "tableCalc",
+        dataType: "number",
+        dependencies: ["impressions", "channelId"],
+        compute: {
+            type: "percentOfTotal",
+            sourceField: "impressions",
+            partitionBy: ["channelId"],
+            scale: 100,
+            decimals: 1,
+        },
+    },
+]);
+assert.equal(persistedLocalDerivedActiveTablePreset.activeTablePreset?.title, "Local Reach Snapshot");
+
+const sanitizedLocalDerivedActiveTablePreset = sanitizeReportBuilderState(
+    tablePresetConfig,
+    preparedTablePresetWithLocalDerivedMeasures.nextState,
+);
+assert.equal(sanitizedLocalDerivedActiveTablePreset.activeTablePreset?.title, "Local Reach Snapshot");
+
+const invalidTablePreset = prepareReportBuilderTablePresetApplication(
+    tablePresetConfig,
+    defaults,
+    {
+        title: "Broken Grid",
+        dimensions: ["missingDimension"],
+        measures: ["totalSpend"],
+        clearChart: true,
+        selectionPolicy: "replace",
+    },
+);
+assert.equal(invalidTablePreset.canApply, false);
+assert.equal(invalidTablePreset.reason, "missingFields");
+assert.match(invalidTablePreset.message, /unavailable breakdowns missingDimension/);
+
+const persistedActiveTablePreset = mergeReportBuilderState(tablePresetConfig, {
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "totalSpend",
+    selectedDimensions: ["eventDate", "channelId"],
+    groupBy: "",
+    orderField: "totalSpend",
+    orderDir: "desc",
+    pageSize: 25,
+    activeTablePreset: {
+        id: "tablePreset_1",
+        title: "Delivery Grid",
+        eyebrow: "Metrics Panel",
+        accentTone: "delivery",
+        highlights: ["Selected Dates", "Market Context", "Export Ready"],
+        dimensions: ["eventDate", "channelId"],
+        measures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 25,
+    },
+    lastTablePreset: {
+        id: "tablePreset_1",
+        title: "Delivery Grid",
+        eyebrow: "Metrics Panel",
+        accentTone: "delivery",
+        highlights: ["Selected Dates", "Market Context", "Export Ready"],
+        dimensions: ["eventDate", "channelId"],
+        measures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 25,
+    },
+});
+assert.equal(persistedActiveTablePreset.activeTablePreset?.title, "Delivery Grid");
+assert.equal(persistedActiveTablePreset.lastTablePreset?.title, "Delivery Grid");
+
+const sanitizedInactiveTablePreset = sanitizeReportBuilderState(tablePresetConfig, {
+    selectedMeasures: ["totalSpend", "clicks"],
+    primaryMeasure: "totalSpend",
+    selectedDimensions: ["eventDate", "channelId"],
+    groupBy: "",
+    orderField: "totalSpend",
+    orderDir: "desc",
+    pageSize: 25,
+    activeTablePreset: {
+        id: "tablePreset_1",
+        title: "Delivery Grid",
+        eyebrow: "Metrics Panel",
+        accentTone: "delivery",
+        highlights: ["Selected Dates", "Market Context", "Export Ready"],
+        dimensions: ["eventDate", "channelId"],
+        measures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 25,
+    },
+});
+assert.equal(sanitizedInactiveTablePreset.activeTablePreset, null);
+assert.equal(sanitizedInactiveTablePreset.lastTablePreset?.title, "Delivery Grid");
+
+const reactivatedTablePreset = sanitizeReportBuilderState(tablePresetConfig, {
+    selectedMeasures: ["totalSpend", "impressions"],
+    primaryMeasure: "totalSpend",
+    selectedDimensions: ["eventDate", "channelId"],
+    groupBy: "",
+    orderField: "totalSpend",
+    orderDir: "desc",
+    pageSize: 25,
+    lastTablePreset: {
+        id: "tablePreset_1",
+        title: "Delivery Grid",
+        dimensions: ["eventDate", "channelId"],
+        measures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 25,
+    },
+});
+assert.equal(reactivatedTablePreset.activeTablePreset?.title, "Delivery Grid");
+
+const quickViewOptions = buildReportBuilderQuickViewOptions({
+    config: tablePresetConfig,
+    state: {
+        ...defaults,
+        selectedMeasures: ["totalSpend", "clicks"],
+        selectedDimensions: ["eventDate", "channelId"],
+        primaryMeasure: "totalSpend",
+        viewMode: "chart",
+        chartSpec: { type: "line", xField: "eventDate", yFields: ["clicks"] },
+        groupBy: "",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 25,
+    },
+    quickPresetPolicy: {
+        autoProvisionMissingDimensions: true,
+        autoFetchOnSelect: false,
+        selectionPolicy: "merge",
+    },
+    defaultTablePresets: buildReportBuilderDefaultTablePresets(tablePresetConfig, defaults),
+    modifiedTablePreset: {
+        id: "tablePreset_1",
+        title: "Delivery Grid",
+        description: "Table-first delivery preset with market context, descending avails sort, and export-ready columns.",
+        eyebrow: "Metrics Panel",
+        accentTone: "delivery",
+        highlights: ["Selected Dates", "Market Context", "Export Ready"],
+        dimensions: ["eventDate", "channelId"],
+        measures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        orderField: "totalSpend",
+        orderDir: "desc",
+        pageSize: 25,
+        clearChart: true,
+    },
+    defaultChartSpecs: buildReportBuilderDefaultChartSpecs({
+        ...explicitChartConfig,
+        result: {
+            ...explicitChartConfig.result,
+            defaultChartSpecs: [
+                ...explicitChartConfig.result.defaultChartSpecs,
+                {
+                    title: "Spend + Impressions by Date",
+                    group: "KPI Blends",
+                    groupDescription: "Blended KPI charts for volume and reach comparisons.",
+                    eyebrow: "KPI Blend",
+                    accentTone: "household",
+                    highlights: ["Dual Axis", "Reach + Volume", "Full Query"],
+                    type: "bar",
+                    xField: "eventDate",
+                    yFields: ["totalSpend", "impressions"],
+                },
+            ],
+        },
+    }, defaults),
+    previousChartPresets: [
+        {
+            title: "Saved Trend",
+            chartSpec: { type: "line", xField: "eventDate", yFields: ["totalSpend"] },
+        },
+    ],
+});
+assert.equal(quickViewOptions[0].prepared.nextState.chartSpec, null);
+assert.deepEqual(
+    quickViewOptions.map((entry) => ({
+        label: entry.label,
+        group: entry.group,
+        groupDescription: entry.groupDescription || "",
+        eyebrow: entry.eyebrow || "",
+        metaItems: entry.metaItems || [],
+        description: entry.description,
+    })),
+    [
+        {
+            label: "Delivery Grid (Modified)",
+            group: "Modified Table",
+            groupDescription: "",
+            eyebrow: "Metrics Panel",
+            metaItems: ["Selected Dates", "Market Context", "Export Ready"],
+            description: "Modified table preset. Reapply the last named table preset after custom table changes.",
+        },
+        {
+            label: "Delivery Grid",
+            group: "Tables",
+            groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
+            eyebrow: "Metrics Panel",
+            metaItems: ["Selected Dates", "Market Context", "Export Ready"],
+            description: "Table-first preset with curated columns, sort order, and export-ready grid semantics.",
+        },
+        {
+            label: "Reach Grid",
+            group: "Tables",
+            groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
+            eyebrow: "Household Metrics",
+            metaItems: ["Reach Priority", "Market Rollup", "Export Ready"],
+            description: "Table-first preset with curated columns, sort order, and export-ready grid semantics.",
+        },
+        {
+            label: "Spend by Date",
+            group: "Chart Stories",
+            groupDescription: "Narrative story charts for split trends and channel movement.",
+            eyebrow: "Visual Story",
+            metaItems: ["Split by Site Type", "Trend View", "Full Query"],
+            description: "Chart preset (line) — adds siteType",
+        },
+        {
+            label: "Spend + Impressions by Date",
+            group: "KPI Blends",
+            groupDescription: "Blended KPI charts for volume and reach comparisons.",
+            eyebrow: "KPI Blend",
+            metaItems: ["Dual Axis", "Reach + Volume", "Full Query"],
+            description: "Chart preset (bar) for a curated visual read of the current table.",
+        },
+        {
+            label: "Saved Trend",
+            group: "Previous",
+            groupDescription: "",
+            eyebrow: "",
+            metaItems: [],
+            description: "Previous chart preset for this field set.",
+        },
+    ],
+);
 
 const merged = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend", "impressions"],
@@ -270,6 +1001,165 @@ assert.equal(request.timeoutMs, 120000);
 assert.deepEqual(request.orderBy, ["totalSpend desc"]);
 assert.equal(canAutoFetchReportBuilder(config, merged), true);
 assert.deepEqual(resolveReportBuilderReadiness(config, merged), { canRun: true, reason: "" });
+
+const semanticRequestState = mergeReportBuilderState(semanticMappedConfig, {
+    selectedMeasures: ["totalSpend", "impressions"],
+    selectedDimensions: ["eventDate"],
+    staticFilters: {
+        channelIds: [1, 2],
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+});
+assert.deepEqual(buildReportBuilderRequest(semanticMappedConfig, semanticRequestState).semanticSelection, {
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selection: {
+        dimensions: ["event_date", "channel"],
+        measures: ["spend", "impressions"],
+    },
+    refinements: [],
+    parameters: {},
+});
+
+const mergedSemanticBinding = mergeReportBuilderState({
+    ...config,
+    binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+    },
+}, {
+    binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date"],
+        selectedMeasures: ["spend"],
+    },
+});
+assert.deepEqual(mergedSemanticBinding.binding, {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date"],
+    selectedMeasures: ["spend"],
+});
+
+const mergedSemanticConfigOverride = mergeReportBuilderState({
+    ...semanticMappedConfig,
+    binding: {
+        ...semanticMappedConfig.binding,
+        modelRef: "model://steward/performance/ad_delivery@v2",
+    },
+}, {
+    binding: semanticMappedConfig.binding,
+});
+assert.deepEqual(mergedSemanticConfigOverride.binding, {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v2",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date"],
+    selectedMeasures: ["spend"],
+});
+
+const mergedSemanticFallback = mergeReportBuilderState({
+    ...config,
+    binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+    },
+}, {
+    binding: {
+        mode: "semantic",
+        modelRef: "not-a-ref",
+        entity: "line_delivery",
+    },
+});
+assert.deepEqual(mergedSemanticFallback.binding, {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: [],
+    selectedMeasures: [],
+});
+
+const semanticPersistedPreviewConfig = {
+    measures: [
+        { id: "avails", paramPath: "measures.avails", default: true, semanticRef: "available_impressions" },
+        { id: "hhUniqs", paramPath: "measures.hhUniqs", default: true, semanticRef: "household_uniques" },
+    ],
+    dimensions: [
+        { id: "eventDate", paramPath: "dimensions.eventDate", default: true, chartAxis: true, semanticRef: "event_date" },
+        { id: "channelId", paramPath: "dimensions.channelId", default: true, semanticRef: "channel" },
+        { id: "agegroupId", paramPath: "dimensions.agegroupId", semanticRef: "age_group" },
+    ],
+    groupBy: {
+        options: [
+            { value: "channelId", label: "Channel", dimensionId: "channelId" },
+            { value: "agegroupId", label: "Audience Age Group", dimensionId: "agegroupId" },
+        ],
+    },
+    staticFilters: [
+        {
+            id: "dateRange",
+            type: "dateRange",
+            required: true,
+            startParamPath: "filters.from",
+            endParamPath: "filters.to",
+            default: { start: "2026-05-01", end: "2026-05-04" },
+        },
+    ],
+    request: {
+        limit: 50,
+    },
+    binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date", "channel"],
+        selectedMeasures: ["available_impressions", "household_uniques"],
+    },
+};
+const mergedSemanticPersistedPreviewState = mergeReportBuilderState(semanticPersistedPreviewConfig, {
+    selectedMeasures: ["avails", "hhUniqs"],
+    selectedDimensions: ["eventDate", "channelId"],
+    groupBy: "agegroupId",
+    binding: semanticPersistedPreviewConfig.binding,
+    staticFilters: {
+        dateRange: {
+            start: "2026-05-01",
+            end: "2026-05-04",
+        },
+    },
+});
+assert.equal(mergedSemanticPersistedPreviewState.groupBy, "agegroupId");
+assert.deepEqual(mergedSemanticPersistedPreviewState.binding, semanticPersistedPreviewConfig.binding);
+assert.deepEqual(
+    buildReportBuilderRequest(semanticPersistedPreviewConfig, mergedSemanticPersistedPreviewState).semanticSelection,
+    {
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selection: {
+            dimensions: ["event_date", "channel", "age_group"],
+            measures: ["available_impressions", "household_uniques"],
+        },
+        refinements: [],
+        parameters: {},
+    },
+);
+assert.equal(
+    sanitizeReportBuilderState(semanticPersistedPreviewConfig, mergedSemanticPersistedPreviewState).groupBy,
+    "agegroupId",
+);
+assert.equal(
+    clearReportBuilderGroupByWhenMissing(semanticPersistedPreviewConfig, "agegroupId", ["eventDate", "channelId"]),
+    "",
+);
+assert.equal(
+    clearReportBuilderGroupByWhenMissing(semanticPersistedPreviewConfig, "agegroupId", ["eventDate", "agegroupId"]),
+    "agegroupId",
+);
 
 const disabledDynamicRowState = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend"],
@@ -313,6 +1203,384 @@ assert.deepEqual(
         { eventDate: "2026-05-02", clicks: 0, impressions: 0, ctr: 0 },
     ],
 );
+
+const expressionComputedConfig = {
+    ...config,
+    calculatedFields: [
+        {
+            id: "forecastLift",
+            key: "forecastLift",
+            label: "Forecast Lift",
+            dataType: "number",
+            expr: "if(channelId = 'CTV', totalSpend, null)",
+        },
+    ],
+};
+const expressionComputedRequest = buildReportBuilderRequest(expressionComputedConfig, mergeReportBuilderState(expressionComputedConfig, {
+    selectedMeasures: ["forecastLift"],
+    selectedDimensions: ["eventDate"],
+}));
+assert.equal(expressionComputedRequest.measures.totalSpend, true);
+assert.equal(expressionComputedRequest.dimensions.channelId, true);
+assert.deepEqual(
+    applyReportBuilderComputedMeasures([
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 140 },
+    ], expressionComputedConfig),
+    [
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100, ctr: 0, forecastLift: null },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 140, ctr: 0, forecastLift: 140 },
+    ],
+);
+
+const localExpressionState = mergeReportBuilderState(config, {
+    localCalculatedFields: [
+        {
+            id: "forecastLift",
+            key: "forecastLift",
+            label: "Forecast Lift",
+            dataType: "number",
+            expr: "if(channelId = 'CTV', totalSpend, null)",
+        },
+    ],
+    selectedMeasures: ["forecastLift"],
+    primaryMeasure: "forecastLift",
+    selectedDimensions: ["eventDate"],
+    chartSpec: {
+        title: "Forecast Lift by Date",
+        type: "line",
+        xField: "eventDate",
+        yFields: ["forecastLift"],
+    },
+});
+assert.deepEqual(localExpressionState.localCalculatedFields, [
+    {
+        id: "forecastLift",
+        key: "forecastLift",
+        kind: "rowCalc",
+        label: "Forecast Lift",
+        dataType: "number",
+        dependencies: ["channelId", "totalSpend"],
+        expr: "if(channelId = 'CTV', totalSpend, null)",
+    },
+]);
+assert.equal(localExpressionState.chartSpec.yFields[0], "forecastLift");
+const localExpressionRequest = buildReportBuilderRequest(config, localExpressionState);
+assert.equal(localExpressionRequest.measures.totalSpend, true);
+assert.equal(localExpressionRequest.dimensions.channelId, true);
+assert.equal(localExpressionRequest.measures.forecastLift, undefined);
+
+const localTableCalculationState = mergeReportBuilderState(config, {
+    localTableCalculations: [
+        {
+            id: "reachShare",
+            key: "reachShare",
+            label: "Reach Share",
+            compute: {
+                type: "percentOfTotal",
+                sourceField: "impressions",
+                partitionBy: ["channelId"],
+                scale: 100,
+                decimals: 1,
+            },
+        },
+    ],
+    selectedMeasures: ["reachShare"],
+    primaryMeasure: "reachShare",
+    selectedDimensions: ["eventDate"],
+    chartSpec: {
+        title: "Reach Share by Date",
+        type: "line",
+        xField: "eventDate",
+        yFields: ["reachShare"],
+    },
+});
+assert.deepEqual(localTableCalculationState.localTableCalculations, [
+    {
+        id: "reachShare",
+        key: "reachShare",
+        kind: "tableCalc",
+        label: "Reach Share",
+        dataType: "number",
+        dependencies: ["impressions", "channelId"],
+        compute: {
+            type: "percentOfTotal",
+            sourceField: "impressions",
+            partitionBy: ["channelId"],
+            scale: 100,
+            decimals: 1,
+        },
+    },
+]);
+const localTableCalculationRequest = buildReportBuilderRequest(config, localTableCalculationState);
+assert.equal(localTableCalculationRequest.measures.impressions, true);
+assert.equal(localTableCalculationRequest.dimensions.channelId, true);
+assert.equal(localTableCalculationRequest.measures.reachShare, undefined);
+assert.equal(localTableCalculationState.chartSpec.yFields[0], "reachShare");
+
+const inferredComputedConfig = {
+    ...config,
+    computedMeasures: [
+        {
+            id: "reachRate",
+            key: "reachRate",
+            compute: {
+                type: "ratio",
+                numerator: "impressions",
+                denominator: "clicks",
+                scale: 100,
+                decimals: 2,
+            },
+        },
+    ],
+};
+const inferredComputedRequest = buildReportBuilderRequest(inferredComputedConfig, mergeReportBuilderState(inferredComputedConfig, {
+    selectedMeasures: ["reachRate"],
+}));
+assert.equal(inferredComputedRequest.measures.impressions, true);
+assert.equal(inferredComputedRequest.measures.clicks, true);
+
+const tableCalcConfig = {
+    ...config,
+    tableCalculations: [
+        {
+            id: "reachShare",
+            key: "reachShare",
+            compute: {
+                type: "percentOfTotal",
+                sourceField: "impressions",
+                partitionBy: ["channelId"],
+                scale: 100,
+                decimals: 1,
+            },
+        },
+    ],
+};
+const tableCalcRequest = buildReportBuilderRequest(tableCalcConfig, mergeReportBuilderState(tableCalcConfig, {
+    selectedMeasures: ["reachShare"],
+    selectedDimensions: ["eventDate"],
+}));
+assert.equal(tableCalcRequest.measures.impressions, true);
+assert.equal(tableCalcRequest.dimensions.channelId, true);
+assert.deepEqual(
+    applyReportBuilderComputedMeasures([
+        { eventDate: "2026-05-01", channelId: "Display", impressions: 100 },
+        { eventDate: "2026-05-02", channelId: "Display", impressions: 300 },
+        { eventDate: "2026-05-01", channelId: "CTV", impressions: 80 },
+        { eventDate: "2026-05-02", channelId: "CTV", impressions: 120 },
+    ], tableCalcConfig),
+    [
+        { eventDate: "2026-05-01", channelId: "Display", impressions: 100, ctr: 0, reachShare: 25 },
+        { eventDate: "2026-05-02", channelId: "Display", impressions: 300, ctr: 0, reachShare: 75 },
+        { eventDate: "2026-05-01", channelId: "CTV", impressions: 80, ctr: 0, reachShare: 40 },
+        { eventDate: "2026-05-02", channelId: "CTV", impressions: 120, ctr: 0, reachShare: 60 },
+    ],
+);
+
+const deltaTableCalcConfig = {
+    ...config,
+    tableCalculations: [
+        {
+            id: "spendDelta",
+            key: "spendDelta",
+            compute: {
+                type: "deltaFromPrevious",
+                sourceField: "totalSpend",
+                partitionBy: ["channelId"],
+                orderBy: [
+                    { field: "eventDate", direction: "asc" },
+                ],
+            },
+        },
+    ],
+};
+const deltaTableCalcRequest = buildReportBuilderRequest(deltaTableCalcConfig, mergeReportBuilderState(deltaTableCalcConfig, {
+    selectedMeasures: ["spendDelta"],
+    selectedDimensions: ["eventDate"],
+}));
+assert.equal(deltaTableCalcRequest.measures.totalSpend, true);
+assert.equal(deltaTableCalcRequest.dimensions.channelId, true);
+assert.deepEqual(
+    applyReportBuilderComputedMeasures([
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140 },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90 },
+    ], deltaTableCalcConfig),
+    [
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100, ctr: 0, spendDelta: 0 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140, ctr: 0, spendDelta: 40 },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80, ctr: 0, spendDelta: 0 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90, ctr: 0, spendDelta: 10 },
+    ],
+);
+
+const runningTableCalcConfig = {
+    ...config,
+    tableCalculations: [
+        {
+            id: "runningSpend",
+            key: "runningSpend",
+            compute: {
+                type: "runningTotal",
+                sourceField: "totalSpend",
+                partitionBy: ["channelId"],
+                orderBy: [
+                    { field: "eventDate", direction: "asc" },
+                ],
+            },
+        },
+    ],
+};
+const runningTableCalcRequest = buildReportBuilderRequest(runningTableCalcConfig, mergeReportBuilderState(runningTableCalcConfig, {
+    selectedMeasures: ["runningSpend"],
+    selectedDimensions: ["eventDate"],
+}));
+assert.equal(runningTableCalcRequest.measures.totalSpend, true);
+assert.equal(runningTableCalcRequest.dimensions.channelId, true);
+assert.deepEqual(
+    applyReportBuilderComputedMeasures([
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140 },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90 },
+    ], runningTableCalcConfig),
+    [
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100, ctr: 0, runningSpend: 100 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140, ctr: 0, runningSpend: 240 },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80, ctr: 0, runningSpend: 80 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90, ctr: 0, runningSpend: 170 },
+    ],
+);
+
+const movingAverageTableCalcConfig = {
+    ...config,
+    tableCalculations: [
+        {
+            id: "avgSpend",
+            key: "avgSpend",
+            compute: {
+                type: "movingAverage",
+                sourceField: "totalSpend",
+                partitionBy: ["channelId"],
+                orderBy: [
+                    { field: "eventDate", direction: "asc" },
+                ],
+                windowSize: 2,
+                decimals: 1,
+            },
+        },
+    ],
+};
+const movingAverageTableCalcRequest = buildReportBuilderRequest(movingAverageTableCalcConfig, mergeReportBuilderState(movingAverageTableCalcConfig, {
+    selectedMeasures: ["avgSpend"],
+    selectedDimensions: ["eventDate"],
+}));
+assert.equal(movingAverageTableCalcRequest.measures.totalSpend, true);
+assert.equal(movingAverageTableCalcRequest.dimensions.channelId, true);
+assert.deepEqual(
+    applyReportBuilderComputedMeasures([
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140 },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90 },
+    ], movingAverageTableCalcConfig),
+    [
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100, ctr: 0, avgSpend: 100 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140, ctr: 0, avgSpend: 120 },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80, ctr: 0, avgSpend: 80 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90, ctr: 0, avgSpend: 85 },
+    ],
+);
+
+const rankTableCalcConfig = {
+    ...config,
+    tableCalculations: [
+        {
+            id: "spendRank",
+            key: "spendRank",
+            compute: {
+                type: "rank",
+                sourceField: "totalSpend",
+                partitionBy: ["channelId"],
+                orderBy: [
+                    { field: "totalSpend", direction: "desc" },
+                    { field: "eventDate", direction: "asc" },
+                ],
+            },
+        },
+    ],
+};
+const rankTableCalcRequest = buildReportBuilderRequest(rankTableCalcConfig, mergeReportBuilderState(rankTableCalcConfig, {
+    selectedMeasures: ["spendRank"],
+    selectedDimensions: ["eventDate"],
+}));
+assert.equal(rankTableCalcRequest.measures.totalSpend, true);
+assert.equal(rankTableCalcRequest.dimensions.channelId, true);
+assert.deepEqual(
+    getTableCalculationReportBuilderMeasures(rankTableCalcConfig).map((entry) => entry.id),
+    ["spendRank"],
+);
+assert.deepEqual(
+    applyReportBuilderComputedMeasures([
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140 },
+        { eventDate: "2026-05-03", channelId: "Display", totalSpend: 140 },
+        { eventDate: "2026-05-04", channelId: "Display", totalSpend: null },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90 },
+    ], rankTableCalcConfig),
+    [
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100, ctr: 0, spendRank: 2 },
+        { eventDate: "2026-05-02", channelId: "Display", totalSpend: 140, ctr: 0, spendRank: 1 },
+        { eventDate: "2026-05-03", channelId: "Display", totalSpend: 140, ctr: 0, spendRank: 1 },
+        { eventDate: "2026-05-04", channelId: "Display", totalSpend: null, ctr: 0, spendRank: null },
+        { eventDate: "2026-05-01", channelId: "CTV", totalSpend: 80, ctr: 0, spendRank: 2 },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 90, ctr: 0, spendRank: 1 },
+    ],
+);
+
+const preparedRankTableCalculation = prepareReportBuilderTableCalculationApplication(rankTableCalcConfig, mergeReportBuilderState(rankTableCalcConfig, {
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    selectedDimensions: ["eventDate"],
+    viewMode: "chart",
+}), "spendRank", {
+    forceAutoFetch: true,
+    switchToTable: true,
+});
+assert.equal(preparedRankTableCalculation.canApply, true);
+assert.equal(preparedRankTableCalculation.requiresDimensionProvision, true);
+assert.deepEqual(preparedRankTableCalculation.requiredDimensionIds, ["channelId", "eventDate"]);
+assert.deepEqual(preparedRankTableCalculation.nextState.selectedMeasures, ["totalSpend", "spendRank"]);
+assert.deepEqual(preparedRankTableCalculation.nextState.selectedDimensions, ["eventDate", "channelId"]);
+assert.equal(preparedRankTableCalculation.nextState.primaryMeasure, "spendRank");
+assert.equal(preparedRankTableCalculation.nextState.viewMode, "table");
+assert.equal(preparedRankTableCalculation.shouldFetch, true);
+
+const invalidPreparedTableCalculation = prepareReportBuilderTableCalculationApplication({
+    ...config,
+    tableCalculations: [
+        {
+            id: "brokenRank",
+            key: "brokenRank",
+            compute: {
+                type: "rank",
+                sourceField: "totalSpend",
+                orderBy: [
+                    { field: "totalSpend", direction: "desc" },
+                    { field: "missingBreakdown", direction: "asc" },
+                ],
+            },
+        },
+    ],
+}, mergeReportBuilderState(config, {
+    selectedMeasures: ["totalSpend"],
+    selectedDimensions: ["eventDate"],
+}), "brokenRank");
+assert.equal(invalidPreparedTableCalculation.canApply, false);
+assert.equal(invalidPreparedTableCalculation.reason, "missingDimensions");
+assert.match(invalidPreparedTableCalculation.message, /missingBreakdown/);
 
 const missingDate = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend"],
@@ -430,9 +1698,13 @@ assert.deepEqual(
     }),
     [
         {
-            group: "",
+            group: "Chart Stories",
+            groupDescription: "Narrative story charts for split trends and channel movement.",
             selectionPolicy: "",
             title: "Spend by Date",
+            eyebrow: "Visual Story",
+            accentTone: "delivery",
+            highlights: ["Split by Site Type", "Trend View", "Full Query"],
             type: "line",
             xField: "eventDate",
             yFields: ["totalSpend"],
@@ -449,6 +1721,10 @@ const groupedDefaultChartSpecs = buildReportBuilderDefaultChartSpecs({
             {
                 title: "Spend by Date",
                 group: "Overview",
+                groupDescription: "Narrative story charts for split trends and channel movement.",
+                eyebrow: "Visual Story",
+                accentTone: "delivery",
+                highlights: ["Split by Site Type", "Trend View", "Full Query"],
                 type: "line",
                 xField: "eventDate",
                 yFields: ["totalSpend"],
@@ -463,6 +1739,10 @@ const groupedDefaultChartSpecs = buildReportBuilderDefaultChartSpecs({
 });
 assert.equal(groupedDefaultChartSpecs[0].group, "Overview");
 assert.equal(groupedDefaultChartSpecs[0].selectionPolicy, "");
+assert.equal(groupedDefaultChartSpecs[0].groupDescription, "Narrative story charts for split trends and channel movement.");
+assert.equal(groupedDefaultChartSpecs[0].eyebrow, "Visual Story");
+assert.equal(groupedDefaultChartSpecs[0].accentTone, "delivery");
+assert.deepEqual(groupedDefaultChartSpecs[0].highlights, ["Split by Site Type", "Trend View", "Full Query"]);
 
 const selectionPolicyChartSpecs = buildReportBuilderDefaultChartSpecs({
     ...explicitChartConfig,
@@ -554,6 +1834,34 @@ assert.deepEqual(
     buildReportBuilderColumns(displayConfig, {
         selectedDimensions: ["channelId", "eventDate"],
         selectedMeasures: ["totalSpend"],
+        activeTablePreset: {
+            id: "tablePreset_1",
+            title: "Delivery Grid",
+            dimensions: ["channelId", "eventDate"],
+            measures: ["totalSpend"],
+            columns: [
+                {
+                    key: "channelId",
+                    label: "Channel",
+                    cellVisual: {
+                        kind: "badge",
+                        rules: [
+                            { value: "display", tone: "info", label: "Display" },
+                        ],
+                    },
+                },
+                {
+                    key: "totalSpend",
+                    label: "Spend",
+                    format: "currency",
+                    cellVisual: {
+                        kind: "dataBar",
+                        range: { mode: "columnMax" },
+                        palette: ["#dbeafe", "#2563eb"],
+                    },
+                },
+            ],
+        },
     }),
     [
         {
@@ -561,9 +1869,15 @@ assert.deepEqual(
             sourceKey: "channelId",
             displayKey: "channel.channel",
             chartKey: "channel.channel",
-            label: "channelId",
+            label: "Channel",
             kind: "dimension",
             format: undefined,
+            cellVisual: {
+                kind: "badge",
+                rules: [
+                    { value: "display", tone: "info", label: "Display" },
+                ],
+            },
         },
         {
             key: "eventDate",
@@ -576,10 +1890,15 @@ assert.deepEqual(
         },
         {
             key: "totalSpend",
-            label: "totalSpend",
+            label: "Spend",
             kind: "measure",
-            format: undefined,
+            format: "currency",
             align: "right",
+            cellVisual: {
+                kind: "dataBar",
+                range: { mode: "columnMax" },
+                palette: ["#dbeafe", "#2563eb"],
+            },
         },
     ],
 );
@@ -693,6 +2012,7 @@ const replaceSelectionQuickApply = prepareReportBuilderChartApplication({
     selectedDimensions: ["eventDate", "channelId"],
     selectedMeasures: ["totalSpend", "impressions"],
     primaryMeasure: "impressions",
+    groupBy: "channelId",
     staticFilters: {
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -708,9 +2028,14 @@ assert.equal(replaceSelectionQuickApply.canApply, true);
 assert.deepEqual(replaceSelectionQuickApply.nextState.selectedDimensions, ["channelId"]);
 assert.deepEqual(replaceSelectionQuickApply.nextState.selectedMeasures, ["totalSpend"]);
 assert.equal(replaceSelectionQuickApply.nextState.primaryMeasure, "totalSpend");
+assert.equal(replaceSelectionQuickApply.nextState.groupBy, "");
+assert.equal(replaceSelectionQuickApply.nextState.orderField, "totalSpend");
+assert.equal(replaceSelectionQuickApply.nextState.orderDir, "desc");
 assert.equal(replaceSelectionQuickApply.selectionPolicy, "replace");
 assert.equal(replaceSelectionQuickApply.measureSelectionChanged, true);
 assert.equal(replaceSelectionQuickApply.dimensionSelectionChanged, true);
+assert.equal(replaceSelectionQuickApply.groupByChanged, true);
+assert.equal(replaceSelectionQuickApply.orderChanged, true);
 assert.equal(replaceSelectionQuickApply.requiresManualRun, true);
 
 const autoFetchOnSelectQuickApply = prepareReportBuilderChartApplication({
@@ -736,6 +2061,28 @@ const autoFetchOnSelectQuickApply = prepareReportBuilderChartApplication({
 });
 assert.equal(autoFetchOnSelectQuickApply.shouldFetch, true);
 assert.equal(autoFetchOnSelectQuickApply.requiresManualRun, false);
+
+const groupedQuickApply = prepareReportBuilderChartApplication(config, {
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    groupBy: "channelId",
+    staticFilters: {
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+}, {
+    type: "line",
+    xField: "eventDate",
+    yFields: ["totalSpend"],
+    seriesField: "siteType",
+}, {
+    autoProvisionMissingDimensions: true,
+    selectionPolicy: "replace",
+});
+assert.equal(groupedQuickApply.canApply, true);
+assert.deepEqual(groupedQuickApply.nextState.selectedDimensions, ["eventDate", "siteType"]);
+assert.equal(groupedQuickApply.nextState.groupBy, "siteType");
+assert.equal(groupedQuickApply.groupByChanged, true);
 
 const autoChartApply = prepareReportBuilderAutoChartApplication({
     ...displayConfig,
@@ -772,6 +2119,19 @@ const disabledAutoChartApply = prepareReportBuilderAutoChartApplication(displayC
     primaryMeasure: "totalSpend",
 });
 assert.equal(disabledAutoChartApply, null);
+
+const sanitizedInvalidOrderState = sanitizeReportBuilderState(displayConfig, {
+    selectedDimensions: ["channelId"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    orderField: "eventDate",
+    orderDir: "asc",
+    staticFilters: {
+        dateRange: { start: "2026-05-01", end: "2026-05-31" },
+    },
+});
+assert.equal(sanitizedInvalidOrderState.orderField, "totalSpend");
+assert.equal(sanitizedInvalidOrderState.orderDir, "desc");
 
 const familyDraftConfig = {
     dynamicFilterGroups: [
@@ -1210,6 +2570,15 @@ const sanitizedDisabledRows = sanitizeReportBuilderState(config, {
     },
 });
 assert.equal(sanitizedDisabledRows.dynamicGroups.scope[0].enabled, false);
+
+const sanitizedSemanticBinding = sanitizeReportBuilderState(config, {
+    binding: {
+        mode: "semantic",
+        modelRef: "not-a-ref",
+        entity: "line_delivery",
+    },
+});
+assert.equal(sanitizedSemanticBinding.binding, null);
 
 const sanitizedInvalidManualId = sanitizeReportBuilderState(config, {
     dynamicGroups: {

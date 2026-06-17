@@ -13,6 +13,7 @@ export const DASHBOARD_BLOCK_KINDS = [
   'dashboard.badges',
   'dashboard.table',
   'dashboard.report',
+  'dashboard.reportRuntime',
   'dashboard.detail',
 ];
 
@@ -42,6 +43,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
     },
     report: { $ref: '#/$defs/reportConfig' },
     dashboard: { $ref: '#/$defs/dashboardConfig' },
+    reportRuntime: { $ref: '#/$defs/reportRuntimeConfig' },
     containers: {
       type: 'array',
       items: { $ref: '#/$defs/block' },
@@ -104,6 +106,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
         geo: { $ref: '#/$defs/geoConfig' },
         dashboard: { $ref: '#/$defs/dashboardConfig' },
         report: { $ref: '#/$defs/reportConfig' },
+        reportRuntime: { $ref: '#/$defs/reportRuntimeConfig' },
         containers: {
           type: 'array',
           items: { $ref: '#/$defs/block' },
@@ -215,6 +218,7 @@ export const DASHBOARD_METADATA_SCHEMA = {
             },
           },
         },
+        reportRuntime: { $ref: '#/$defs/reportRuntimeConfig' },
         badges: {
           type: 'object',
           additionalProperties: true,
@@ -232,6 +236,36 @@ export const DASHBOARD_METADATA_SCHEMA = {
             density: { type: 'string' },
             formattingRules: { type: 'array', items: { type: 'object', additionalProperties: true } },
             rowActions: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+      },
+    },
+    reportRuntimeConfig: {
+      type: 'object',
+      additionalProperties: true,
+      properties: {
+        reportSpec: {
+          type: 'object',
+          additionalProperties: true,
+        },
+        reportFill: {
+          type: 'object',
+          additionalProperties: true,
+        },
+        locale: { type: 'string' },
+        hostIntent: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            intentKind: { enum: ['detailTarget'] },
+            title: { type: 'string' },
+            description: { type: 'string' },
+            targetRef: { type: 'string' },
+            navigationMode: { type: 'string' },
+            parameters: {
+              type: 'object',
+              additionalProperties: true,
+            },
           },
         },
       },

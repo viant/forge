@@ -112,9 +112,7 @@ class ReportBuilderRequestPayloadTest {
             hookInvoker = { _, _ -> null }
         )
 
-        val input = payload["input"] as? Map<*, *>
-        val query = input?.get("query") as? Map<*, *>
-        val siteTypes = query?.get("filters") as? Map<*, *>
+        val siteTypes = payload["filters"] as? Map<*, *>
         val includeSiteType = siteTypes?.get("includeSiteType") as? List<*>
 
         assertEquals(listOf("Website", "Application"), includeSiteType)
@@ -140,13 +138,11 @@ class ReportBuilderRequestPayloadTest {
                 assertEquals("Analytics.reportBuilderHooks.buildRequest", functionName)
                 val state = props["state"] as? JsonObject
                 assertTrue(state != null)
-                mapOf("input" to mapOf("query" to mapOf("hooked" to true)))
+                mapOf("hooked" to true)
             }
         )
 
-        val input = payload["input"] as? Map<*, *>
-        val query = input?.get("query") as? Map<*, *>
-        assertEquals(true, query?.get("hooked"))
+        assertEquals(true, payload["hooked"])
     }
 
     @Test

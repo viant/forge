@@ -1,0 +1,92 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create or apply a chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelector",
+      "selector": ".forge-report-builder__chart-action-button--quick"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": "[role=\"menuitem\"]",
+      "text": "Delivery Grid",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Delivery Grid",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "METRICS PANEL",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Selected Dates",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Market Context",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Export Ready",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-compact-delivery-grid.png",
+      "fullPage": true
+    }
+  ]
+}

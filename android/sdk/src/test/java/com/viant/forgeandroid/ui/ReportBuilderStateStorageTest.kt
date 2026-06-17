@@ -8,6 +8,7 @@ import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef
 import com.viant.forgeandroid.runtime.ReportBuilderDimensionDef
 import com.viant.forgeandroid.runtime.ReportBuilderMeasureDef
 import com.viant.forgeandroid.runtime.ReportBuilderResultDef
+import com.viant.forgeandroid.runtime.ReportBuilderStaticFilterDef
 import com.viant.forgeandroid.runtime.WindowMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,82 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class ReportBuilderStateStorageTest {
+    @Test
+    fun shouldAutoCollapseReportBuilderFiltersOnlyOncePerCompletedResult() {
+        assertEquals(
+            true,
+            shouldAutoCollapseReportBuilderFilters(
+                hasRows = true,
+                completedRequestSignature = """{"filters":{"country":["US"]}}""",
+                lastCollapsedRequestSignature = ""
+            )
+        )
+        assertEquals(
+            false,
+            shouldAutoCollapseReportBuilderFilters(
+                hasRows = true,
+                completedRequestSignature = """{"filters":{"country":["US"]}}""",
+                lastCollapsedRequestSignature = """{"filters":{"country":["US"]}}"""
+            )
+        )
+        assertEquals(
+            false,
+            shouldAutoCollapseReportBuilderFilters(
+                hasRows = false,
+                completedRequestSignature = """{"filters":{"country":["US"]}}""",
+                lastCollapsedRequestSignature = ""
+            )
+        )
+        assertEquals(
+            false,
+            shouldAutoCollapseReportBuilderFilters(
+                hasRows = true,
+                completedRequestSignature = "",
+                lastCollapsedRequestSignature = ""
+            )
+        )
+    }
+
+    @Test
+    fun activeReportBuilderFilterCountMatchesConfiguredValues() {
+        val filters = listOf(
+            ReportBuilderStaticFilterDef(id = "dateRange", type = "dateRange"),
+            ReportBuilderStaticFilterDef(id = "channels", multiple = true),
+            ReportBuilderStaticFilterDef(id = "empty", multiple = true)
+        )
+        val count = activeReportBuilderFilterCount(
+            staticFilters = filters,
+            staticState = mapOf(
+                "dateRange" to mapOf("start" to "2026-06-03", "end" to ""),
+                "channels" to listOf("display", "audio"),
+                "empty" to emptyList<String>()
+            ),
+            dynamicGroups = mapOf(
+                "include" to listOf(
+                    ReportBuilderDynamicRowState(
+                        id = "row-1",
+                        filterId = "publisher",
+                        enabled = true,
+                        selections = listOf(
+                            ReportBuilderDynamicSelectionState(
+                                value = kotlinx.serialization.json.JsonPrimitive("rubicon"),
+                                label = "Rubicon"
+                            )
+                        )
+                    ),
+                    ReportBuilderDynamicRowState(
+                        id = "row-2",
+                        filterId = "publisher",
+                        enabled = true,
+                        selections = emptyList()
+                    )
+                )
+            )
+        )
+
+        assertEquals(4, count)
+    }
+
     @Test
     fun persistStoredStateToWindowFormUsesNestedStateKey() {
         val runtime = ForgeRuntime(

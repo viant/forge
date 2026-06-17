@@ -1,0 +1,146 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').includes('Household Uniques'))); if (!button) { throw new Error('Household Uniques measure button not found.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Local Draft",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 11.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare list response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "List ReportDocuments response: 7 entries",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "forecastingQ3"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Selected entry: Forecasting Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get request"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument request: Forecasting Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "getReportDocumentRequest",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"getReportDocumentRequest\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"reportId\": \"forecastingQ3\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "\"document\": {"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Hide get request"
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "\"kind\": \"getReportDocumentRequest\""
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-get-report-document-request.png",
+      "fullPage": true
+    }
+  ]
+}

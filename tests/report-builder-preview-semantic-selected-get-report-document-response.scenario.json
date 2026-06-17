@@ -1,0 +1,276 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__measure-pill",
+      "text": "Reach Rate",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Local Draft",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 11.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare list response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "List ReportDocuments response:",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "forecastingArchive"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Selected entry: Forecasting Archive",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Prepare the getReportDocument request for the selected list entry before expanding a response.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get request"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"getReportDocumentRequest\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Only entries backed by a local ReportDocument payload can be expanded locally.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "\"kind\": \"getReportDocumentResponse\""
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "forecastingQ3"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Selected entry: Forecasting Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Prepare the getReportDocument request for the selected list entry before expanding a response.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "\"kind\": \"getReportDocumentResponse\""
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get request"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"getReportDocumentRequest\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Forecasting Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"getReportDocumentResponse\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"documentVersion\": 4",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"reportId\": \"forecastingQ3\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"document\": {",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Hide get response"
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "\"kind\": \"getReportDocumentResponse\""
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "demoReportBuilder"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Selected entry: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Prepare the getReportDocument request for the selected list entry before expanding a response.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "\"kind\": \"getReportDocumentResponse\""
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get request"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"getReportDocumentRequest\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"getReportDocumentResponse\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"reportId\": \"demoReportBuilder\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"document\": {",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-selected-get-report-document-response.png",
+      "fullPage": true
+    }
+  ]
+}

@@ -1,0 +1,134 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } window.__artifactDownloadCapture = { filename: '', payload: '', mimeType: '' }; const originalCreate = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__artifactDownloadCapture.mimeType = blob.type || ''; blob.text().then((text) => { window.__artifactDownloadCapture.payload = text; }); return originalCreate(blob); }; const originalClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() { window.__artifactDownloadCapture.filename = this.download || ''; return originalClick.call(this); }; })()"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Fork from here"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Exploration Session.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare list response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "List ReportDocuments response: 7 entries",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "forecastingArchive"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Check reopen compatibility"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopen diagnostic: Forecasting Archive",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Historical Snapshot",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Archived report entry used for reopen compatibility diagnostics.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Download reopen diagnostic"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.filename === 'Forecasting Archive-reopen-diagnostic.json'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.mimeType.includes('application/json')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.payload.includes('\"kind\": \"reportBuilder.reopenDiagnostic\"')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-diagnostic-download-metadata.png",
+      "fullPage": true
+    }
+  ]
+}

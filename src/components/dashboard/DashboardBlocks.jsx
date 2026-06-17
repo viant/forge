@@ -3,14 +3,18 @@ import {useSignalEffect} from '@preact/signals-react';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
-import {resolveTableLink} from "../../utils/tableLink.js";
 import ReportBuilder from "./ReportBuilder.jsx";
 import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate, publishDashboardSelection, shouldShowDashboardKPIContext} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
-import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "../table/formattingRules.js";
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from "./geoMapUtils.js";
+import ReportRuntime from "./ReportRuntime.jsx";
+import { resolveDashboardReportRuntimeHandlers } from "./dashboardReportRuntimeHandlers.js";
+import DashboardTableContent from "./DashboardTableContent.jsx";
+import { dashboardStatusTone, isDashboardStatusValue, titleizeDashboardKey, toneColors } from "./dashboardVisualUtils.jsx";
 import { DashboardErrorBoundary } from "./dashboardErrorBoundary.js";
 import "./Dashboard.css";
+
+const EMPTY_REPORT_RUNTIME_SPEC = {};
 
 const panelStyle = {
     width: '100%',
@@ -52,13 +56,6 @@ const sectionRuleStyle = {
 
 const metricCardAccent = ['#137cbd', '#0f9960', '#d9822b', '#8f3985', '#c23030'];
 
-const toneColors = {
-    info: {background: '#ebf1f5', border: '#ced9e0', text: '#30404d'},
-    warning: {background: '#fff5d6', border: '#f5c542', text: '#8a5d00'},
-    danger: {background: '#fdecea', border: '#db3737', text: '#a82a2a'},
-    success: {background: '#eef8f0', border: '#0f9960', text: '#0a6640'},
-};
-
 function useMetrics(context) {
     const metricsSignal = context?.signals?.metrics;
     const [metrics, setMetrics] = useState(metricsSignal?.peek() || {});
@@ -84,15 +81,6 @@ function getDashboardLocale(context) {
     return context?.locale || context?.metadata?.view?.content?.locale || 'en-US';
 }
 
-function titleizeDashboardKey(value = '') {
-    return String(value || '')
-        .replace(/[_-]+/g, ' ')
-        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .replace(/\b\w/g, (match) => match.toUpperCase());
-}
-
 function deltaTone(delta, positiveIsUp = true) {
     if (delta == null || Number.isNaN(Number(delta)) || Number(delta) === 0) {
         return toneColors.info;
@@ -100,90 +88,6 @@ function deltaTone(delta, positiveIsUp = true) {
     const isPositive = Number(delta) > 0;
     const isGood = positiveIsUp ? isPositive : !isPositive;
     return isGood ? toneColors.success : toneColors.danger;
-}
-
-function isDashboardStatusValue(value = '') {
-    const normalized = String(value || '').trim().toLowerCase();
-    return [
-        'behind',
-        'ahead',
-        'on_track',
-        'on track',
-        'underpacing',
-        'overpacing',
-        'healthy',
-        'warning',
-        'watch',
-        'critical',
-        'active',
-        'inactive',
-    ].includes(normalized);
-}
-
-function dashboardStatusTone(value = '') {
-    const normalized = String(value || '').trim().toLowerCase();
-    if (normalized === 'ahead' || normalized === 'on_track' || normalized === 'on track' || normalized === 'healthy' || normalized === 'active') {
-        return toneColors.success;
-    }
-    if (normalized === 'behind' || normalized === 'underpacing' || normalized === 'critical' || normalized === 'inactive') {
-        return toneColors.danger;
-    }
-    return toneColors.warning;
-}
-
-function renderDashboardTableCell(cell, row, column, locale, context) {
-    const link = resolveTableLink({row, column, value: cell});
-    if (link) {
-        if (link.kind === 'window') {
-            return (
-                <button
-                    type="button"
-                    title={link.title || link.text}
-                    className="forge-dashboard-table-link"
-                    style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
-                    onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        context?.handlers?.window?.openTarget?.({ target: link, context });
-                    }}
-                >
-                    {link.text}
-                </button>
-            );
-        }
-        return (
-            <a
-                href={link.href}
-                target={link.target}
-                rel={link.rel}
-                title={link.title || link.text}
-                className="forge-dashboard-table-link"
-                onClick={(event) => event.stopPropagation()}
-            >
-                {link.text}
-            </a>
-        );
-    }
-    const formatOptions = {
-        timeZone: column?.timeZone || (column?.timeZoneSelector ? resolveKey(row, column.timeZoneSelector) : undefined),
-    };
-    if (typeof cell === 'number' || column?.format === 'date' || column?.format === 'dateTime' || column?.format === 'wallClockHour' || column?.format === 'wallClockDate') {
-        return formatDashboardValue(cell, column?.format, locale, formatOptions);
-    }
-    const text = String(cell ?? '-');
-    if (isDashboardStatusValue(text)) {
-        const tone = dashboardStatusTone(text);
-        return (
-            <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
-                {text.replace(/_/g, ' ')}
-            </span>
-        );
-    }
-    return (
-        <span className="forge-dashboard-table-cell-text" title={text}>
-            {text}
-        </span>
-    );
 }
 
 function Panel({container, children, actions = null}) {
@@ -1299,6 +1203,38 @@ export function DashboardReport({container, context}) {
     );
 }
 
+function getDashboardReportRuntimeConfig(container = {}) {
+    const direct = container?.reportRuntime;
+    if (direct && typeof direct === 'object' && !Array.isArray(direct)) {
+        return direct;
+    }
+    const nested = container?.dashboard?.reportRuntime;
+    if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+        return nested;
+    }
+    return {};
+}
+
+export function DashboardReportRuntime({container, context}) {
+    const config = getDashboardReportRuntimeConfig(container);
+    const reportSpec = config.reportSpec || EMPTY_REPORT_RUNTIME_SPEC;
+    const runtimeHandlers = useMemo(() => resolveDashboardReportRuntimeHandlers({
+        context,
+        reportSpec,
+    }), [context?.handlers?.reportRuntime, context?.handlers?.semanticModel, reportSpec]);
+    return (
+        <ReportRuntime
+            reportSpec={reportSpec}
+            reportFill={config.reportFill || {}}
+            title={config.title || container?.title || ""}
+            subtitle={config.subtitle || container?.subtitle || ""}
+            locale={config.locale || getDashboardLocale(context)}
+            hostIntent={config.hostIntent || null}
+            runtimeHandlers={runtimeHandlers}
+        />
+    );
+}
+
 export function DashboardDetail({container, context, children}) {
     const visibleChildren = React.Children.toArray(children).filter((child) => {
         if (!React.isValidElement(child)) {
@@ -1406,172 +1342,14 @@ export function DashboardComposition({container, context, isActive}) {
 }
 
 export function DashboardTable({container, context}) {
-    const locale = getDashboardLocale(context);
-    const {collection, loading, error} = useDataSourceState(context);
-    const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
-    const dashboardSelectionSignal = context?.dashboardKey ? getDashboardSelectionSignal(context.dashboardKey) : null;
-    const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
-    const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
-    const limit = container.dashboard?.table?.limit || container.limit || 200;
-    const [quickFilter, setQuickFilter] = useState("");
-    const quickFilterEnabled = container.dashboard?.table?.quickFilter === true || container.quickFilter === true;
-    const density = container.dashboard?.table?.density || container.density || "comfortable";
-    const rowActions = container.dashboard?.table?.rowActions || container.rowActions || [];
-    const formattingRules = useMemo(
-        () => normalizeRuleList(container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || container.formattingRules || []),
-        [container.dashboard?.table?.formattingRules, container.dashboard?.table?.formatting, container.formattingRules]
-    );
-
-    const rawColumns = container.dashboard?.table?.columns || container.columns || [];
-    const normalizedColumns = useMemo(() => rawColumns.map((col) => {
-        if (typeof col === 'string') {
-            return {key: col, label: titleizeDashboardKey(col)};
-        }
-        const key = String(col?.key || col?.field || col?.id || '').trim();
-        return {key, label: col?.label || titleizeDashboardKey(key), format: col?.format, align: col?.align, type: col?.type, link: col?.link};
-    }).filter((col) => !!col.key), [rawColumns]);
-
-    const filteredCollection = useMemo(() => {
-        const afterFilters = applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters);
-        return applyDashboardSelectionToCollection(afterFilters, container.selectionBindings, dashboardSelection);
-    }, [collection, container.filterBindings, container.selectionBindings, dashboardFilters, dashboardSelection]);
-
-    const quickFilteredCollection = useMemo(() => {
-        const query = quickFilter.trim().toLowerCase();
-        if (!query) return filteredCollection;
-        return filteredCollection.filter((row) => normalizedColumns.some((col) => {
-            const value = resolveKey(row, col.key);
-            const link = resolveTableLink({row, column: col, value});
-            const candidate = link ? link.text : value;
-            return String(candidate ?? '').toLowerCase().includes(query);
-        }));
-    }, [filteredCollection, normalizedColumns, quickFilter]);
-
-    const [sortKey, setSortKey] = useState(null);
-    const [sortDir, setSortDir] = useState('asc');
-
-    const sortedRows = useMemo(() => {
-        const rows = quickFilteredCollection.slice(0, limit);
-        if (!sortKey) return rows;
-        const sortColumn = normalizedColumns.find((col) => col.key === sortKey);
-        return [...rows].sort((a, b) => {
-            const avRaw = resolveKey(a, sortKey);
-            const bvRaw = resolveKey(b, sortKey);
-            const avLink = resolveTableLink({row: a, column: sortColumn, value: avRaw});
-            const bvLink = resolveTableLink({row: b, column: sortColumn, value: bvRaw});
-            const av = avLink ? avLink.text : avRaw;
-            const bv = bvLink ? bvLink.text : bvRaw;
-            const an = Number(av);
-            const bn = Number(bv);
-            const numeric = Number.isFinite(an) && Number.isFinite(bn);
-            const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
-            return sortDir === 'desc' ? -cmp : cmp;
-        });
-    }, [quickFilteredCollection, limit, normalizedColumns, sortKey, sortDir]);
-
-    const handleSort = (key) => {
-        if (sortKey === key) {
-            setSortDir((prev) => prev === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortKey(key);
-            setSortDir('asc');
-        }
-    };
-
-    const handleRowAction = (action, row, rowIndex) => {
-        publishDashboardSelection({
-            context,
-            dimension: action.dimension || action.field || normalizedColumns[0]?.key,
-            entityKey: action.field ? resolveKey(row, action.field) : resolveKey(row, normalizedColumns[0]?.key),
-            selected: row,
-            sourceBlockId: container.id,
-        });
-        if (action.handler && typeof context?.lookupHandler === 'function') {
-            const fn = context.lookupHandler(action.handler);
-            if (typeof fn === 'function') {
-                fn({execution: action, context, item: row, rowIndex});
-            }
-        }
-    };
-
     return (
         <Panel container={container}>
-            {loading ? <div style={subtitleStyle}>Loading…</div> : null}
-            {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
-            {!loading && sortedRows.length === 0 ? <div style={subtitleStyle}>No data.</div> : null}
-            {quickFilterEnabled ? (
-                <div className="forge-dashboard-table-tools">
-                    <input
-                        type="search"
-                        className="forge-dashboard-search"
-                        value={quickFilter}
-                        placeholder="Quick filter rows..."
-                        onChange={(event) => setQuickFilter(event.target.value)}
-                    />
-                    <span style={subtitleStyle}>{sortedRows.length} rows</span>
-                </div>
-            ) : null}
-            {sortedRows.length > 0 ? (
-                <div className="forge-dashboard-table-wrap">
-                    <table className={density === "compact" ? "forge-dashboard-table forge-dashboard-table--compact" : "forge-dashboard-table"}>
-                        <thead>
-                        <tr>
-                            {normalizedColumns.map((col) => {
-                                const active = sortKey === col.key;
-                                const arrow = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-                                return (
-                                    <th
-                                        key={col.key}
-                                        onClick={() => handleSort(col.key)}
-                                        style={{textAlign: col.align || 'left', color: active ? '#2367d1' : undefined, cursor: 'pointer', userSelect: 'none'}}
-                                    >
-                                        {col.label}{arrow}
-                                    </th>
-                                );
-                            })}
-                            {rowActions.length > 0 ? <th style={{textAlign: 'right'}}>Actions</th> : null}
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {sortedRows.map((row, index) => {
-                            const rowRules = matchingRules(row, formattingRules, "row");
-                            const rowStyle = mergeStyles(rowRules);
-                            const rowClassName = mergeClassNames(rowRules);
-                            return (
-                                <tr key={index} className={rowClassName} style={rowStyle}>
-                                    {normalizedColumns.map((col, ci) => {
-                                        const cellRules = matchingRules(row, formattingRules, "cell", col.key);
-                                        const cellStyle = {...rowStyle, ...mergeStyles(cellRules), textAlign: col.align || 'left'};
-                                        const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(" ");
-                                        return (
-                                            <td key={`${index}-${ci}`} className={cellClassName} style={cellStyle}>
-                                                {renderDashboardTableCell(resolveKey(row, col.key), row, col, locale, context)}
-                                            </td>
-                                        );
-                                    })}
-                                    {rowActions.length > 0 ? (
-                                        <td style={{textAlign: 'right'}}>
-                                            <div style={{display: 'inline-flex', gap: 6}}>
-                                                {rowActions.map((action) => (
-                                                    <button
-                                                        key={action.id || action.label}
-                                                        type="button"
-                                                        className="forge-dashboard-row-action"
-                                                        onClick={() => handleRowAction(action, row, index)}
-                                                    >
-                                                        {action.label || action.id || 'Action'}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </td>
-                                    ) : null}
-                                </tr>
-                            );
-                        })}
-                        </tbody>
-                    </table>
-                </div>
-            ) : null}
+            <DashboardTableContent
+                container={container}
+                context={context}
+                locale={getDashboardLocale(context)}
+                subtitleStyle={subtitleStyle}
+            />
         </Panel>
     );
 }
@@ -1620,6 +1398,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.report':
             content = <DashboardReport container={container} context={context}/>;
+            break;
+        case 'dashboard.reportRuntime':
+            content = <DashboardReportRuntime container={container} context={context}/>;
             break;
         case 'dashboard.reportBuilder':
             content = <ReportBuilder container={container} context={context}/>;

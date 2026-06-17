@@ -6,6 +6,34 @@ function normalizeChartKey(key = "") {
     return String(key || "").trim();
 }
 
+export { normalizeChartKey };
+
+export function resolveChartLoadingState({
+    loading = false,
+    collectionOverride = null,
+} = {}) {
+    if (!loading) {
+        return false;
+    }
+    const overrideRows = Array.isArray(collectionOverride) ? collectionOverride : [];
+    return overrideRows.length === 0;
+}
+
+function attachChartSelectionRowsMetadata(target, initialValue) {
+    if (!target || typeof target !== "object") {
+        return target;
+    }
+    if (!Object.prototype.hasOwnProperty.call(target, "__chartSelectionRows")) {
+        Object.defineProperty(target, "__chartSelectionRows", {
+            value: initialValue,
+            enumerable: false,
+            writable: true,
+            configurable: true,
+        });
+    }
+    return target;
+}
+
 export function readChartDataValue(row, key) {
     const normalizedKey = normalizeChartKey(key);
     if (!normalizedKey || row == null) {
@@ -47,10 +75,17 @@ export function transformData(rawData, chart, valueKey) {
         keysSet.add(normalizedSeriesName);
 
         if (!groupedData[timestamp]) {
-            groupedData[timestamp] = seedChartBucket(xAxisKey, timestamp);
+            groupedData[timestamp] = attachChartSelectionRowsMetadata(
+                seedChartBucket(xAxisKey, timestamp),
+                {},
+            );
         }
 
         groupedData[timestamp][normalizedSeriesName] = value;
+        groupedData[timestamp].__chartSelectionRows[normalizedSeriesName] = [
+            ...((groupedData[timestamp].__chartSelectionRows[normalizedSeriesName]) || []),
+            item,
+        ];
     });
 
     const data = Object.values(groupedData).sort(
@@ -77,7 +112,10 @@ export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDef
         if (bucketKey == null || bucketKey === "") {
             return;
         }
-        const existing = grouped.get(bucketKey) || seedChartBucket(key, bucketKey);
+        const existing = grouped.get(bucketKey) || attachChartSelectionRowsMetadata(
+            seedChartBucket(key, bucketKey),
+            [],
+        );
         valueKeys.forEach((valueKey) => {
             const rawValue = readChartDataValue(row, valueKey);
             const numeric = Number(rawValue);
@@ -89,6 +127,7 @@ export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDef
             }
             existing[valueKey] = Number(existing[valueKey] || 0) + numeric;
         });
+        existing.__chartSelectionRows.push(row);
         grouped.set(bucketKey, existing);
     });
     return Array.from(grouped.values()).sort(
@@ -110,8 +149,9 @@ export function buildPieChartData(rawData = [], nameKey = "", valueKey = "") {
         if (!Number.isFinite(numericValue)) {
             return;
         }
-        const existing = grouped.get(category) || { name: category, value: 0 };
+        const existing = grouped.get(category) || attachChartSelectionRowsMetadata({ name: category, value: 0 }, []);
         existing.value += numericValue;
+        existing.__chartSelectionRows.push(row);
         grouped.set(category, existing);
     });
     return Array.from(grouped.values()).filter((row) => row.value > 0);

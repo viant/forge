@@ -1,0 +1,144 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery"
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Failed to render dashboard block"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Table results",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Table view",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "!(document.body?.innerText || '').includes('Refreshing report data')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-desktop-proof.png"
+    },
+    {
+      "type": "setViewport",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "type": "wait",
+      "ms": 1200
+    },
+    {
+      "type": "assertText",
+      "text": "Setup"
+    },
+    {
+      "type": "assertText",
+      "text": "Chart"
+    },
+    {
+      "type": "assertText",
+      "text": "Run"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Setup",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "BREAK DOWN BY",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertText",
+      "text": "Scope"
+    },
+    {
+      "type": "assertText",
+      "text": "Data"
+    },
+    {
+      "type": "assertText",
+      "text": "Filters"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Close"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create or apply a chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertText",
+      "text": "Create Chart"
+    },
+    {
+      "type": "assertText",
+      "text": "Quick view"
+    },
+    {
+      "type": "assertText",
+      "text": "Export"
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-compact-chart-sheet-proof.png",
+      "fullPage": true
+    }
+  ]
+}

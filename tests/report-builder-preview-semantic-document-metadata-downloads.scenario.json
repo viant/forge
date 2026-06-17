@@ -1,0 +1,208 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } window.__artifactDownloadCapture = { filename: '', payload: '', mimeType: '', payloadReady: false }; const originalCreate = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__artifactDownloadCapture.mimeType = blob.type || ''; window.__artifactDownloadCapture.payload = ''; window.__artifactDownloadCapture.payloadReady = false; blob.text().then((text) => { window.__artifactDownloadCapture.payload = text; window.__artifactDownloadCapture.payloadReady = true; }); return originalCreate(blob); }; const originalClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() { window.__artifactDownloadCapture.filename = this.download || ''; return originalClick.call(this); }; return true; })()"
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Report document title\"]",
+      "value": "Executive Snapshot"
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Report document subtitle\"]",
+      "value": "Weekly Rollup"
+    },
+    {
+      "type": "fillSelector",
+      "selector": "textarea[aria-label=\"Report document description\"]",
+      "value": "Authored payload metadata visibility."
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').includes('Household Uniques'))); if (!button) { throw new Error('Household Uniques measure button not found.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Local Draft",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Executive Snapshot",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Executive Snapshot",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare create payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create ReportDocument payload: Executive Snapshot",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Download create payload"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.filename === 'Executive Snapshot-create-report-document.json'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.mimeType.includes('application/json')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.payloadReady === true",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.payload.includes('\"kind\": \"createReportDocumentPayload\"') && window.__artifactDownloadCapture.payload.includes('\"title\": \"Executive Snapshot\"') && window.__artifactDownloadCapture.payload.includes('Weekly Rollup')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Expected version\"]",
+      "value": "7"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using expected version 7.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare update payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Update ReportDocument payload: Executive Snapshot",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Download update payload"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.filename === 'Executive Snapshot-update-report-document-v7.json'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.payloadReady === true",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.payload.includes('\"kind\": \"updateReportDocumentPayload\"') && window.__artifactDownloadCapture.payload.includes('\"title\": \"Executive Snapshot\"') && window.__artifactDownloadCapture.payload.includes('Weekly Rollup')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Current version\"]",
+      "value": "9"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Current version 9 conflicts with expected version 7.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare conflict diagnostic"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Update conflict diagnostic: Executive Snapshot",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Download conflict diagnostic"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.payloadReady === true",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.payload.includes('\"kind\": \"updateReportDocumentConflictDiagnostic\"') && window.__artifactDownloadCapture.payload.includes('\"reportId\": \"demoReportBuilder\"')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.filename === 'Executive Snapshot-update-conflict-v7-current-v9.json'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-document-metadata-downloads.png",
+      "fullPage": true
+    }
+  ]
+}

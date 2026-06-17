@@ -1,0 +1,1753 @@
+{
+  "raw": {
+    "reportSpec": {
+      "version": 1,
+      "kind": "reportSpec",
+      "source": {
+        "kind": "dashboard.reportBuilder",
+        "containerId": "performanceBuilder",
+        "stateKey": "performanceBuilder",
+        "dataSourceRef": "demoReportSource"
+      },
+      "title": "Performance Report",
+      "parameters": {
+        "viewMode": "chart",
+        "groupBy": "channelId",
+        "pageSize": 25,
+        "orderField": "totalSpend",
+        "orderDir": "desc"
+      },
+      "layoutIntent": {
+        "kind": "single",
+        "resultPanePosition": "left",
+        "blockOrder": [
+          "primaryTable",
+          "primaryChart"
+        ]
+      },
+      "refinements": [],
+      "calculatedFields": [],
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "request": {
+            "measures": {
+              "totalSpend": true,
+              "impressions": true
+            },
+            "dimensions": {
+              "eventDate": true,
+              "channelId": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04",
+              "from": "2026-05-01",
+              "to": "2026-05-04"
+            },
+            "limit": 25,
+            "offset": 0,
+            "timeoutMs": 120000,
+            "orderBy": [
+              "totalSpend desc"
+            ]
+          }
+        }
+      ],
+      "blocks": [
+        {
+          "id": "primaryTable",
+          "kind": "tableBlock",
+          "datasetRef": "primary",
+          "columns": [
+            {
+              "key": "eventDate",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate",
+              "label": "Date",
+              "kind": "dimension",
+              "format": "date"
+            },
+            {
+              "key": "channelId",
+              "sourceKey": "channelId",
+              "displayKey": "channelId",
+              "label": "Channel",
+              "kind": "dimension",
+              "runtimeFilterable": true
+            },
+            {
+              "key": "totalSpend",
+              "sourceKey": "totalSpend",
+              "displayKey": "totalSpend",
+              "label": "Spend",
+              "kind": "measure",
+              "format": "currency",
+              "align": "right"
+            },
+            {
+              "key": "impressions",
+              "sourceKey": "impressions",
+              "displayKey": "impressions",
+              "label": "Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            }
+          ]
+        },
+        {
+          "id": "primaryChart",
+          "kind": "chartBlock",
+          "datasetRef": "primary",
+          "chartSpec": {
+            "title": "Manual Spend Trend",
+            "type": "line",
+            "xField": "eventDate",
+            "yFields": [
+              "totalSpend"
+            ],
+            "seriesField": "channelId"
+          },
+          "chartModel": {
+            "type": "line",
+            "xAxis": {
+              "dataKey": "eventDate"
+            },
+            "yAxis": {
+              "format": "currency"
+            },
+            "series": {
+              "nameKey": "channelId",
+              "valueKey": "totalSpend",
+              "values": [
+                {
+                  "value": "totalSpend",
+                  "label": "Spend",
+                  "color": "#1f77b4",
+                  "format": "currency",
+                  "type": "line"
+                }
+              ],
+              "palette": [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "reportFill": {
+      "version": 1,
+      "kind": "reportFill",
+      "specVersion": 1,
+      "specHash": "fnv1a:0546cf00",
+      "source": {
+        "kind": "dashboard.reportBuilder",
+        "containerId": "performanceBuilder",
+        "stateKey": "performanceBuilder",
+        "dataSourceRef": "demoReportSource"
+      },
+      "parameters": {
+        "viewMode": "chart",
+        "groupBy": "channelId",
+        "pageSize": 25,
+        "orderField": "totalSpend",
+        "orderDir": "desc"
+      },
+      "refinements": [],
+      "calculatedFields": [],
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "request": {
+            "measures": {
+              "totalSpend": true,
+              "impressions": true
+            },
+            "dimensions": {
+              "eventDate": true,
+              "channelId": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04",
+              "from": "2026-05-01",
+              "to": "2026-05-04"
+            },
+            "limit": 25,
+            "offset": 0,
+            "timeoutMs": 120000,
+            "orderBy": [
+              "totalSpend desc"
+            ]
+          },
+          "provenance": {
+            "requestHash": "fnv1a:74ae9f49",
+            "rowCount": 2,
+            "truncated": false,
+            "hasMore": false,
+            "diagnostics": []
+          },
+          "rows": [
+            {
+              "eventDate": "2026-05-01",
+              "channelId": "Display",
+              "totalSpend": 40400,
+              "impressions": 16500
+            },
+            {
+              "eventDate": "2026-05-01",
+              "channelId": "CTV",
+              "totalSpend": 34300,
+              "impressions": 14700
+            }
+          ]
+        }
+      ],
+      "blocks": [
+        {
+          "id": "primaryTable",
+          "kind": "tableBlock",
+          "datasetRef": "primary",
+          "columns": [
+            {
+              "key": "eventDate",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate",
+              "label": "Date",
+              "kind": "dimension",
+              "format": "date"
+            },
+            {
+              "key": "channelId",
+              "sourceKey": "channelId",
+              "displayKey": "channelId",
+              "label": "Channel",
+              "kind": "dimension",
+              "runtimeFilterable": true
+            },
+            {
+              "key": "totalSpend",
+              "sourceKey": "totalSpend",
+              "displayKey": "totalSpend",
+              "label": "Spend",
+              "kind": "measure",
+              "format": "currency",
+              "align": "right"
+            },
+            {
+              "key": "impressions",
+              "sourceKey": "impressions",
+              "displayKey": "impressions",
+              "label": "Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            }
+          ],
+          "content": {
+            "columns": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "label": "Date",
+                "kind": "dimension",
+                "format": "date"
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "kind": "dimension",
+                "runtimeFilterable": true
+              },
+              {
+                "key": "totalSpend",
+                "sourceKey": "totalSpend",
+                "displayKey": "totalSpend",
+                "label": "Spend",
+                "kind": "measure",
+                "format": "currency",
+                "align": "right"
+              },
+              {
+                "key": "impressions",
+                "sourceKey": "impressions",
+                "displayKey": "impressions",
+                "label": "Impressions",
+                "kind": "measure",
+                "format": "compactNumber",
+                "align": "right"
+              }
+            ],
+            "rowCount": 2,
+            "resolvedRows": [
+              {
+                "rowIndex": 0,
+                "cells": [
+                  {
+                    "key": "eventDate",
+                    "sourceKey": "eventDate",
+                    "displayKey": "eventDate",
+                    "value": "2026-05-01",
+                    "displayValue": "2026-05-01",
+                    "visualState": null
+                  },
+                  {
+                    "key": "channelId",
+                    "sourceKey": "channelId",
+                    "displayKey": "channelId",
+                    "value": "Display",
+                    "displayValue": "Display",
+                    "visualState": null
+                  },
+                  {
+                    "key": "totalSpend",
+                    "sourceKey": "totalSpend",
+                    "displayKey": "totalSpend",
+                    "value": 40400,
+                    "displayValue": 40400,
+                    "visualState": null
+                  },
+                  {
+                    "key": "impressions",
+                    "sourceKey": "impressions",
+                    "displayKey": "impressions",
+                    "value": 16500,
+                    "displayValue": 16500,
+                    "visualState": null
+                  }
+                ]
+              },
+              {
+                "rowIndex": 1,
+                "cells": [
+                  {
+                    "key": "eventDate",
+                    "sourceKey": "eventDate",
+                    "displayKey": "eventDate",
+                    "value": "2026-05-01",
+                    "displayValue": "2026-05-01",
+                    "visualState": null
+                  },
+                  {
+                    "key": "channelId",
+                    "sourceKey": "channelId",
+                    "displayKey": "channelId",
+                    "value": "CTV",
+                    "displayValue": "CTV",
+                    "visualState": null
+                  },
+                  {
+                    "key": "totalSpend",
+                    "sourceKey": "totalSpend",
+                    "displayKey": "totalSpend",
+                    "value": 34300,
+                    "displayValue": 34300,
+                    "visualState": null
+                  },
+                  {
+                    "key": "impressions",
+                    "sourceKey": "impressions",
+                    "displayKey": "impressions",
+                    "value": 14700,
+                    "displayValue": 14700,
+                    "visualState": null
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "primaryChart",
+          "kind": "chartBlock",
+          "datasetRef": "primary",
+          "chartSpec": {
+            "title": "Manual Spend Trend",
+            "type": "line",
+            "xField": "eventDate",
+            "yFields": [
+              "totalSpend"
+            ],
+            "seriesField": "channelId"
+          },
+          "chartModel": {
+            "type": "line",
+            "xAxis": {
+              "dataKey": "eventDate"
+            },
+            "yAxis": {
+              "format": "currency"
+            },
+            "series": {
+              "nameKey": "channelId",
+              "valueKey": "totalSpend",
+              "values": [
+                {
+                  "value": "totalSpend",
+                  "label": "Spend",
+                  "color": "#1f77b4",
+                  "format": "currency",
+                  "type": "line"
+                }
+              ],
+              "palette": [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf"
+              ]
+            }
+          },
+          "content": {
+            "chartSpec": {
+              "title": "Manual Spend Trend",
+              "type": "line",
+              "xField": "eventDate",
+              "yFields": [
+                "totalSpend"
+              ],
+              "seriesField": "channelId"
+            },
+            "chartModel": {
+              "type": "line",
+              "xAxis": {
+                "dataKey": "eventDate"
+              },
+              "yAxis": {
+                "format": "currency"
+              },
+              "series": {
+                "nameKey": "channelId",
+                "valueKey": "totalSpend",
+                "values": [
+                  {
+                    "value": "totalSpend",
+                    "label": "Spend",
+                    "color": "#1f77b4",
+                    "format": "currency",
+                    "type": "line"
+                  }
+                ],
+                "palette": [
+                  "#1f77b4",
+                  "#ff7f0e",
+                  "#2ca02c",
+                  "#d62728",
+                  "#9467bd",
+                  "#8c564b",
+                  "#e377c2",
+                  "#7f7f7f",
+                  "#bcbd22",
+                  "#17becf"
+                ]
+              }
+            },
+            "rowCount": 2,
+            "resolvedChart": {
+              "kind": "groupedSeries",
+              "type": "line",
+              "xAxisKey": "eventDate",
+              "nameKey": "channelId",
+              "valueKey": "totalSpend",
+              "rows": [
+                {
+                  "eventDate": "2026-05-01",
+                  "Display": 40400,
+                  "CTV": 34300
+                }
+              ],
+              "seriesKeys": [
+                "Display",
+                "CTV"
+              ]
+            }
+          }
+        }
+      ],
+      "diagnostics": []
+    }
+  },
+  "semantic": {
+    "reportSpec": {
+      "version": 1,
+      "kind": "reportSpec",
+      "source": {
+        "kind": "dashboard.reportBuilder",
+        "containerId": "semanticPerformanceBuilder",
+        "stateKey": "semanticPerformanceBuilder",
+        "dataSourceRef": "demoReportSource"
+      },
+      "title": "Semantic Performance Report",
+      "binding": {
+        "mode": "semantic",
+        "modelRef": "model://steward/performance/ad_delivery@v1",
+        "entity": "line_delivery",
+        "selectedDimensions": [
+          "event_date",
+          "channel"
+        ],
+        "selectedMeasures": [
+          "spend",
+          "impressions"
+        ]
+      },
+      "parameters": {
+        "viewMode": "chart",
+        "groupBy": "",
+        "pageSize": 50,
+        "orderField": "eventDate",
+        "orderDir": "asc"
+      },
+      "layoutIntent": {
+        "kind": "single",
+        "resultPanePosition": "left",
+        "blockOrder": [
+          "primaryTable",
+          "primaryChart"
+        ]
+      },
+      "refinements": [],
+      "calculatedFields": [],
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "request": {
+            "measures": {
+              "totalSpend": true,
+              "impressions": true
+            },
+            "dimensions": {
+              "eventDate": true,
+              "channelId": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04",
+              "from": "2026-05-01",
+              "to": "2026-05-04"
+            },
+            "semanticSelection": {
+              "modelRef": "model://steward/performance/ad_delivery@v1",
+              "entity": "line_delivery",
+              "selection": {
+                "dimensions": [
+                  "event_date",
+                  "channel"
+                ],
+                "measures": [
+                  "spend",
+                  "impressions"
+                ]
+              },
+              "refinements": [],
+              "parameters": {}
+            },
+            "limit": 50,
+            "offset": 0,
+            "timeoutMs": 120000,
+            "orderBy": [
+              "eventDate asc"
+            ]
+          }
+        }
+      ],
+      "blocks": [
+        {
+          "id": "primaryTable",
+          "kind": "tableBlock",
+          "datasetRef": "primary",
+          "columns": [
+            {
+              "key": "eventDate",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate",
+              "label": "Delivery Date",
+              "kind": "dimension",
+              "format": "date"
+            },
+            {
+              "key": "channelId",
+              "sourceKey": "channelId",
+              "displayKey": "channelId",
+              "label": "Channel",
+              "kind": "dimension",
+              "runtimeFilterable": true
+            },
+            {
+              "key": "totalSpend",
+              "sourceKey": "totalSpend",
+              "displayKey": "totalSpend",
+              "label": "Available Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            },
+            {
+              "key": "impressions",
+              "sourceKey": "impressions",
+              "displayKey": "impressions",
+              "label": "Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            }
+          ]
+        },
+        {
+          "id": "primaryChart",
+          "kind": "chartBlock",
+          "datasetRef": "primary",
+          "chartSpec": {
+            "title": "Semantic Spend by Date",
+            "type": "line",
+            "xField": "eventDate",
+            "yFields": [
+              "totalSpend"
+            ]
+          },
+          "chartModel": {
+            "type": "line",
+            "xAxis": {
+              "dataKey": "eventDate"
+            },
+            "yAxis": {
+              "format": "compactNumber"
+            },
+            "series": {
+              "values": [
+                {
+                  "value": "totalSpend",
+                  "label": "Available Impressions",
+                  "color": "#1f77b4",
+                  "format": "compactNumber",
+                  "type": "line"
+                }
+              ],
+              "palette": [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "reportFill": {
+      "version": 1,
+      "kind": "reportFill",
+      "specVersion": 1,
+      "specHash": "fnv1a:5f804d9a",
+      "source": {
+        "kind": "dashboard.reportBuilder",
+        "containerId": "semanticPerformanceBuilder",
+        "stateKey": "semanticPerformanceBuilder",
+        "dataSourceRef": "demoReportSource"
+      },
+      "parameters": {
+        "viewMode": "chart",
+        "groupBy": "",
+        "pageSize": 50,
+        "orderField": "eventDate",
+        "orderDir": "asc"
+      },
+      "refinements": [],
+      "calculatedFields": [],
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "request": {
+            "measures": {
+              "totalSpend": true,
+              "impressions": true
+            },
+            "dimensions": {
+              "eventDate": true,
+              "channelId": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04",
+              "from": "2026-05-01",
+              "to": "2026-05-04"
+            },
+            "semanticSelection": {
+              "modelRef": "model://steward/performance/ad_delivery@v1",
+              "entity": "line_delivery",
+              "selection": {
+                "dimensions": [
+                  "event_date",
+                  "channel"
+                ],
+                "measures": [
+                  "spend",
+                  "impressions"
+                ]
+              },
+              "refinements": [],
+              "parameters": {}
+            },
+            "limit": 50,
+            "offset": 0,
+            "timeoutMs": 120000,
+            "orderBy": [
+              "eventDate asc"
+            ]
+          },
+          "provenance": {
+            "requestHash": "fnv1a:5cc68e29",
+            "rowCount": 2,
+            "truncated": true,
+            "hasMore": true,
+            "diagnostics": [
+              {
+                "code": "truncated",
+                "severity": "warning",
+                "message": "Results truncated to preview row limit."
+              }
+            ]
+          },
+          "rows": [
+            {
+              "eventDate": "2026-05-01",
+              "channelId": "Display",
+              "totalSpend": 40400,
+              "impressions": 16500
+            },
+            {
+              "eventDate": "2026-05-01",
+              "channelId": "CTV",
+              "totalSpend": 34300,
+              "impressions": 14700
+            }
+          ]
+        }
+      ],
+      "blocks": [
+        {
+          "id": "primaryTable",
+          "kind": "tableBlock",
+          "datasetRef": "primary",
+          "columns": [
+            {
+              "key": "eventDate",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate",
+              "label": "Delivery Date",
+              "kind": "dimension",
+              "format": "date"
+            },
+            {
+              "key": "channelId",
+              "sourceKey": "channelId",
+              "displayKey": "channelId",
+              "label": "Channel",
+              "kind": "dimension",
+              "runtimeFilterable": true
+            },
+            {
+              "key": "totalSpend",
+              "sourceKey": "totalSpend",
+              "displayKey": "totalSpend",
+              "label": "Available Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            },
+            {
+              "key": "impressions",
+              "sourceKey": "impressions",
+              "displayKey": "impressions",
+              "label": "Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            }
+          ],
+          "content": {
+            "columns": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "label": "Delivery Date",
+                "kind": "dimension",
+                "format": "date"
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "kind": "dimension",
+                "runtimeFilterable": true
+              },
+              {
+                "key": "totalSpend",
+                "sourceKey": "totalSpend",
+                "displayKey": "totalSpend",
+                "label": "Available Impressions",
+                "kind": "measure",
+                "format": "compactNumber",
+                "align": "right"
+              },
+              {
+                "key": "impressions",
+                "sourceKey": "impressions",
+                "displayKey": "impressions",
+                "label": "Impressions",
+                "kind": "measure",
+                "format": "compactNumber",
+                "align": "right"
+              }
+            ],
+            "rowCount": 2,
+            "resolvedRows": [
+              {
+                "rowIndex": 0,
+                "cells": [
+                  {
+                    "key": "eventDate",
+                    "sourceKey": "eventDate",
+                    "displayKey": "eventDate",
+                    "value": "2026-05-01",
+                    "displayValue": "2026-05-01",
+                    "visualState": null
+                  },
+                  {
+                    "key": "channelId",
+                    "sourceKey": "channelId",
+                    "displayKey": "channelId",
+                    "value": "Display",
+                    "displayValue": "Display",
+                    "visualState": null
+                  },
+                  {
+                    "key": "totalSpend",
+                    "sourceKey": "totalSpend",
+                    "displayKey": "totalSpend",
+                    "value": 40400,
+                    "displayValue": 40400,
+                    "visualState": null
+                  },
+                  {
+                    "key": "impressions",
+                    "sourceKey": "impressions",
+                    "displayKey": "impressions",
+                    "value": 16500,
+                    "displayValue": 16500,
+                    "visualState": null
+                  }
+                ]
+              },
+              {
+                "rowIndex": 1,
+                "cells": [
+                  {
+                    "key": "eventDate",
+                    "sourceKey": "eventDate",
+                    "displayKey": "eventDate",
+                    "value": "2026-05-01",
+                    "displayValue": "2026-05-01",
+                    "visualState": null
+                  },
+                  {
+                    "key": "channelId",
+                    "sourceKey": "channelId",
+                    "displayKey": "channelId",
+                    "value": "CTV",
+                    "displayValue": "CTV",
+                    "visualState": null
+                  },
+                  {
+                    "key": "totalSpend",
+                    "sourceKey": "totalSpend",
+                    "displayKey": "totalSpend",
+                    "value": 34300,
+                    "displayValue": 34300,
+                    "visualState": null
+                  },
+                  {
+                    "key": "impressions",
+                    "sourceKey": "impressions",
+                    "displayKey": "impressions",
+                    "value": 14700,
+                    "displayValue": 14700,
+                    "visualState": null
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "primaryChart",
+          "kind": "chartBlock",
+          "datasetRef": "primary",
+          "chartSpec": {
+            "title": "Semantic Spend by Date",
+            "type": "line",
+            "xField": "eventDate",
+            "yFields": [
+              "totalSpend"
+            ]
+          },
+          "chartModel": {
+            "type": "line",
+            "xAxis": {
+              "dataKey": "eventDate"
+            },
+            "yAxis": {
+              "format": "compactNumber"
+            },
+            "series": {
+              "values": [
+                {
+                  "value": "totalSpend",
+                  "label": "Available Impressions",
+                  "color": "#1f77b4",
+                  "format": "compactNumber",
+                  "type": "line"
+                }
+              ],
+              "palette": [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf"
+              ]
+            }
+          },
+          "content": {
+            "chartSpec": {
+              "title": "Semantic Spend by Date",
+              "type": "line",
+              "xField": "eventDate",
+              "yFields": [
+                "totalSpend"
+              ]
+            },
+            "chartModel": {
+              "type": "line",
+              "xAxis": {
+                "dataKey": "eventDate"
+              },
+              "yAxis": {
+                "format": "compactNumber"
+              },
+              "series": {
+                "values": [
+                  {
+                    "value": "totalSpend",
+                    "label": "Available Impressions",
+                    "color": "#1f77b4",
+                    "format": "compactNumber",
+                    "type": "line"
+                  }
+                ],
+                "palette": [
+                  "#1f77b4",
+                  "#ff7f0e",
+                  "#2ca02c",
+                  "#d62728",
+                  "#9467bd",
+                  "#8c564b",
+                  "#e377c2",
+                  "#7f7f7f",
+                  "#bcbd22",
+                  "#17becf"
+                ]
+              }
+            },
+            "rowCount": 2,
+            "resolvedChart": {
+              "kind": "directSeries",
+              "type": "line",
+              "xAxisKey": "eventDate",
+              "seriesKeys": [
+                "totalSpend"
+              ],
+              "rows": [
+                {
+                  "eventDate": "2026-05-01",
+                  "totalSpend": 74700
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "diagnostics": [
+        {
+          "code": "truncated",
+          "severity": "warning",
+          "message": "Results truncated to preview row limit."
+        }
+      ]
+    }
+  },
+  "geo": {
+    "reportSpec": {
+      "version": 1,
+      "kind": "reportSpec",
+      "source": {
+        "kind": "dashboard.reportBuilder",
+        "containerId": "performanceBuilder",
+        "stateKey": "performanceBuilder",
+        "dataSourceRef": "demoReportSource"
+      },
+      "title": "Performance Report",
+      "parameters": {
+        "viewMode": "chart",
+        "groupBy": "channelId",
+        "pageSize": 25,
+        "orderField": "totalSpend",
+        "orderDir": "desc"
+      },
+      "layoutIntent": {
+        "kind": "single",
+        "resultPanePosition": "left",
+        "blockOrder": [
+          "primaryTable",
+          "primaryChart",
+          "stateGeo"
+        ],
+        "items": [
+          {
+            "blockId": "primaryTable"
+          },
+          {
+            "blockId": "primaryChart"
+          },
+          {
+            "blockId": "stateGeo"
+          }
+        ]
+      },
+      "refinements": [],
+      "calculatedFields": [],
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "request": {
+            "measures": {
+              "totalSpend": true,
+              "impressions": true
+            },
+            "dimensions": {
+              "eventDate": true,
+              "channelId": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04",
+              "from": "2026-05-01",
+              "to": "2026-05-04"
+            },
+            "limit": 25,
+            "offset": 0,
+            "timeoutMs": 120000,
+            "orderBy": [
+              "totalSpend desc"
+            ]
+          }
+        }
+      ],
+      "blocks": [
+        {
+          "id": "primaryTable",
+          "kind": "tableBlock",
+          "datasetRef": "primary",
+          "columns": [
+            {
+              "key": "eventDate",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate",
+              "label": "Date",
+              "kind": "dimension",
+              "format": "date"
+            },
+            {
+              "key": "channelId",
+              "sourceKey": "channelId",
+              "displayKey": "channelId",
+              "label": "Channel",
+              "kind": "dimension",
+              "runtimeFilterable": true
+            },
+            {
+              "key": "totalSpend",
+              "sourceKey": "totalSpend",
+              "displayKey": "totalSpend",
+              "label": "Spend",
+              "kind": "measure",
+              "format": "currency",
+              "align": "right"
+            },
+            {
+              "key": "impressions",
+              "sourceKey": "impressions",
+              "displayKey": "impressions",
+              "label": "Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            }
+          ]
+        },
+        {
+          "id": "primaryChart",
+          "kind": "chartBlock",
+          "datasetRef": "primary",
+          "chartSpec": {
+            "title": "Manual Spend Trend",
+            "type": "line",
+            "xField": "eventDate",
+            "yFields": [
+              "totalSpend"
+            ],
+            "seriesField": "channelId"
+          },
+          "chartModel": {
+            "type": "line",
+            "xAxis": {
+              "dataKey": "eventDate"
+            },
+            "yAxis": {
+              "format": "currency"
+            },
+            "series": {
+              "nameKey": "channelId",
+              "valueKey": "totalSpend",
+              "values": [
+                {
+                  "value": "totalSpend",
+                  "label": "Spend",
+                  "color": "#1f77b4",
+                  "format": "currency",
+                  "type": "line"
+                }
+              ],
+              "palette": [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf"
+              ]
+            }
+          }
+        },
+        {
+          "id": "stateGeo",
+          "kind": "geoMapBlock",
+          "title": "State Performance",
+          "datasetRef": "primary",
+          "geo": {
+            "key": "stateCode",
+            "labelKey": "stateName",
+            "metric": {
+              "key": "spend",
+              "label": "Spend",
+              "format": "currency"
+            },
+            "aggregate": "sum",
+            "color": {
+              "field": "status",
+              "rules": [
+                {
+                  "value": "critical",
+                  "label": "Critical",
+                  "color": "#db3737"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "dateRange",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      }
+    },
+    "reportFill": {
+      "version": 1,
+      "kind": "reportFill",
+      "specVersion": 1,
+      "specHash": "fnv1a:481f8ec6",
+      "source": {
+        "kind": "dashboard.reportBuilder",
+        "containerId": "performanceBuilder",
+        "stateKey": "performanceBuilder",
+        "dataSourceRef": "demoReportSource"
+      },
+      "parameters": {
+        "viewMode": "chart",
+        "groupBy": "channelId",
+        "pageSize": 25,
+        "orderField": "totalSpend",
+        "orderDir": "desc"
+      },
+      "refinements": [],
+      "calculatedFields": [],
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "request": {
+            "measures": {
+              "totalSpend": true,
+              "impressions": true
+            },
+            "dimensions": {
+              "eventDate": true,
+              "channelId": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04",
+              "from": "2026-05-01",
+              "to": "2026-05-04"
+            },
+            "limit": 25,
+            "offset": 0,
+            "timeoutMs": 120000,
+            "orderBy": [
+              "totalSpend desc"
+            ]
+          },
+          "provenance": {
+            "requestHash": "fnv1a:74ae9f49",
+            "rowCount": 3,
+            "truncated": false,
+            "hasMore": false,
+            "diagnostics": []
+          },
+          "rows": [
+            {
+              "eventDate": "2026-05-01",
+              "channelId": "Display",
+              "totalSpend": 100,
+              "impressions": 50,
+              "stateCode": "CA",
+              "stateName": "California",
+              "spend": 100,
+              "status": "critical"
+            },
+            {
+              "eventDate": "2026-05-02",
+              "channelId": "Display",
+              "totalSpend": 40,
+              "impressions": 20,
+              "stateCode": "CA",
+              "stateName": "California",
+              "spend": 40,
+              "status": "critical"
+            },
+            {
+              "eventDate": "2026-05-01",
+              "channelId": "CTV",
+              "totalSpend": 80,
+              "impressions": 30,
+              "stateCode": "WA",
+              "stateName": "Washington",
+              "spend": 80,
+              "status": "healthy"
+            }
+          ]
+        }
+      ],
+      "blocks": [
+        {
+          "id": "primaryTable",
+          "kind": "tableBlock",
+          "datasetRef": "primary",
+          "columns": [
+            {
+              "key": "eventDate",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate",
+              "label": "Date",
+              "kind": "dimension",
+              "format": "date"
+            },
+            {
+              "key": "channelId",
+              "sourceKey": "channelId",
+              "displayKey": "channelId",
+              "label": "Channel",
+              "kind": "dimension",
+              "runtimeFilterable": true
+            },
+            {
+              "key": "totalSpend",
+              "sourceKey": "totalSpend",
+              "displayKey": "totalSpend",
+              "label": "Spend",
+              "kind": "measure",
+              "format": "currency",
+              "align": "right"
+            },
+            {
+              "key": "impressions",
+              "sourceKey": "impressions",
+              "displayKey": "impressions",
+              "label": "Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            }
+          ],
+          "content": {
+            "columns": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "label": "Date",
+                "kind": "dimension",
+                "format": "date"
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "label": "Channel",
+                "kind": "dimension",
+                "runtimeFilterable": true
+              },
+              {
+                "key": "totalSpend",
+                "sourceKey": "totalSpend",
+                "displayKey": "totalSpend",
+                "label": "Spend",
+                "kind": "measure",
+                "format": "currency",
+                "align": "right"
+              },
+              {
+                "key": "impressions",
+                "sourceKey": "impressions",
+                "displayKey": "impressions",
+                "label": "Impressions",
+                "kind": "measure",
+                "format": "compactNumber",
+                "align": "right"
+              }
+            ],
+            "rowCount": 3,
+            "resolvedRows": [
+              {
+                "rowIndex": 0,
+                "cells": [
+                  {
+                    "key": "eventDate",
+                    "sourceKey": "eventDate",
+                    "displayKey": "eventDate",
+                    "value": "2026-05-01",
+                    "displayValue": "2026-05-01",
+                    "visualState": null
+                  },
+                  {
+                    "key": "channelId",
+                    "sourceKey": "channelId",
+                    "displayKey": "channelId",
+                    "value": "Display",
+                    "displayValue": "Display",
+                    "visualState": null
+                  },
+                  {
+                    "key": "totalSpend",
+                    "sourceKey": "totalSpend",
+                    "displayKey": "totalSpend",
+                    "value": 100,
+                    "displayValue": 100,
+                    "visualState": null
+                  },
+                  {
+                    "key": "impressions",
+                    "sourceKey": "impressions",
+                    "displayKey": "impressions",
+                    "value": 50,
+                    "displayValue": 50,
+                    "visualState": null
+                  }
+                ]
+              },
+              {
+                "rowIndex": 1,
+                "cells": [
+                  {
+                    "key": "eventDate",
+                    "sourceKey": "eventDate",
+                    "displayKey": "eventDate",
+                    "value": "2026-05-02",
+                    "displayValue": "2026-05-02",
+                    "visualState": null
+                  },
+                  {
+                    "key": "channelId",
+                    "sourceKey": "channelId",
+                    "displayKey": "channelId",
+                    "value": "Display",
+                    "displayValue": "Display",
+                    "visualState": null
+                  },
+                  {
+                    "key": "totalSpend",
+                    "sourceKey": "totalSpend",
+                    "displayKey": "totalSpend",
+                    "value": 40,
+                    "displayValue": 40,
+                    "visualState": null
+                  },
+                  {
+                    "key": "impressions",
+                    "sourceKey": "impressions",
+                    "displayKey": "impressions",
+                    "value": 20,
+                    "displayValue": 20,
+                    "visualState": null
+                  }
+                ]
+              },
+              {
+                "rowIndex": 2,
+                "cells": [
+                  {
+                    "key": "eventDate",
+                    "sourceKey": "eventDate",
+                    "displayKey": "eventDate",
+                    "value": "2026-05-01",
+                    "displayValue": "2026-05-01",
+                    "visualState": null
+                  },
+                  {
+                    "key": "channelId",
+                    "sourceKey": "channelId",
+                    "displayKey": "channelId",
+                    "value": "CTV",
+                    "displayValue": "CTV",
+                    "visualState": null
+                  },
+                  {
+                    "key": "totalSpend",
+                    "sourceKey": "totalSpend",
+                    "displayKey": "totalSpend",
+                    "value": 80,
+                    "displayValue": 80,
+                    "visualState": null
+                  },
+                  {
+                    "key": "impressions",
+                    "sourceKey": "impressions",
+                    "displayKey": "impressions",
+                    "value": 30,
+                    "displayValue": 30,
+                    "visualState": null
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "primaryChart",
+          "kind": "chartBlock",
+          "datasetRef": "primary",
+          "chartSpec": {
+            "title": "Manual Spend Trend",
+            "type": "line",
+            "xField": "eventDate",
+            "yFields": [
+              "totalSpend"
+            ],
+            "seriesField": "channelId"
+          },
+          "chartModel": {
+            "type": "line",
+            "xAxis": {
+              "dataKey": "eventDate"
+            },
+            "yAxis": {
+              "format": "currency"
+            },
+            "series": {
+              "nameKey": "channelId",
+              "valueKey": "totalSpend",
+              "values": [
+                {
+                  "value": "totalSpend",
+                  "label": "Spend",
+                  "color": "#1f77b4",
+                  "format": "currency",
+                  "type": "line"
+                }
+              ],
+              "palette": [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf"
+              ]
+            }
+          },
+          "content": {
+            "chartSpec": {
+              "title": "Manual Spend Trend",
+              "type": "line",
+              "xField": "eventDate",
+              "yFields": [
+                "totalSpend"
+              ],
+              "seriesField": "channelId"
+            },
+            "chartModel": {
+              "type": "line",
+              "xAxis": {
+                "dataKey": "eventDate"
+              },
+              "yAxis": {
+                "format": "currency"
+              },
+              "series": {
+                "nameKey": "channelId",
+                "valueKey": "totalSpend",
+                "values": [
+                  {
+                    "value": "totalSpend",
+                    "label": "Spend",
+                    "color": "#1f77b4",
+                    "format": "currency",
+                    "type": "line"
+                  }
+                ],
+                "palette": [
+                  "#1f77b4",
+                  "#ff7f0e",
+                  "#2ca02c",
+                  "#d62728",
+                  "#9467bd",
+                  "#8c564b",
+                  "#e377c2",
+                  "#7f7f7f",
+                  "#bcbd22",
+                  "#17becf"
+                ]
+              }
+            },
+            "rowCount": 3,
+            "resolvedChart": {
+              "kind": "groupedSeries",
+              "type": "line",
+              "xAxisKey": "eventDate",
+              "nameKey": "channelId",
+              "valueKey": "totalSpend",
+              "rows": [
+                {
+                  "eventDate": "2026-05-01",
+                  "Display": 100,
+                  "CTV": 80
+                },
+                {
+                  "eventDate": "2026-05-02",
+                  "Display": 40
+                }
+              ],
+              "seriesKeys": [
+                "Display",
+                "CTV"
+              ]
+            }
+          }
+        },
+        {
+          "id": "stateGeo",
+          "kind": "geoMapBlock",
+          "title": "State Performance",
+          "datasetRef": "primary",
+          "geo": {
+            "key": "stateCode",
+            "labelKey": "stateName",
+            "metric": {
+              "key": "spend",
+              "label": "Spend",
+              "format": "currency"
+            },
+            "aggregate": "sum",
+            "color": {
+              "field": "status",
+              "rules": [
+                {
+                  "value": "critical",
+                  "label": "Critical",
+                  "color": "#db3737"
+                }
+              ]
+            }
+          },
+          "content": {
+            "geo": {
+              "key": "stateCode",
+              "labelKey": "stateName",
+              "metric": {
+                "key": "spend",
+                "label": "Spend",
+                "format": "currency"
+              },
+              "aggregate": "sum",
+              "color": {
+                "field": "status",
+                "rules": [
+                  {
+                    "value": "critical",
+                    "label": "Critical",
+                    "color": "#db3737"
+                  }
+                ]
+              }
+            },
+            "rowCount": 3,
+            "resolvedGeo": {
+              "shape": "us-states",
+              "keyField": "stateCode",
+              "labelField": "stateName",
+              "metricKey": "spend",
+              "metricLabel": "Spend",
+              "format": "currency",
+              "aggregate": "sum",
+              "regions": [
+                {
+                  "key": "CA",
+                  "label": "California",
+                  "rawValue": 140,
+                  "displayValue": "$140",
+                  "color": "#db3737",
+                  "statusColor": "#db3737",
+                  "statusLabel": "Critical",
+                  "rowCount": 2
+                },
+                {
+                  "key": "WA",
+                  "label": "Washington",
+                  "rawValue": 80,
+                  "displayValue": "$80",
+                  "color": "#d9f0ea",
+                  "statusColor": "",
+                  "statusLabel": "",
+                  "rowCount": 1
+                }
+              ],
+              "ranking": [
+                {
+                  "key": "CA",
+                  "label": "California",
+                  "rawValue": 140,
+                  "displayValue": "$140",
+                  "color": "#db3737",
+                  "statusColor": "#db3737",
+                  "statusLabel": "Critical",
+                  "rowCount": 2
+                },
+                {
+                  "key": "WA",
+                  "label": "Washington",
+                  "rawValue": 80,
+                  "displayValue": "$80",
+                  "color": "#d9f0ea",
+                  "statusColor": "",
+                  "statusLabel": "",
+                  "rowCount": 1
+                }
+              ],
+              "activeRegion": {
+                "key": "CA",
+                "label": "California",
+                "rawValue": 140,
+                "displayValue": "$140",
+                "color": "#db3737",
+                "statusColor": "#db3737",
+                "statusLabel": "Critical",
+                "rowCount": 2
+              },
+              "summary": {
+                "regionCount": 2,
+                "totalValue": "$220",
+                "topKey": "CA"
+              },
+              "legend": {
+                "rules": [
+                  {
+                    "color": "#db3737",
+                    "label": "Critical"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "diagnostics": []
+    }
+  }
+}

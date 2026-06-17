@@ -1,0 +1,77 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    { "type": "goto", "url": "/report-builder-preview.html" },
+    { "type": "waitForDomContains", "text": "Semantic Report Builder Preview", "timeoutMs": 60000 },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    { "type": "reload" },
+    { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } window.__artifactDownloadCapture = { filename: '', payload: '', mimeType: '' }; const originalCreate = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__artifactDownloadCapture.mimeType = blob.type || ''; blob.text().then((text) => { window.__artifactDownloadCapture.payload = text; }); return originalCreate(blob); }; const originalClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() { window.__artifactDownloadCapture.filename = this.download || ''; return originalClick.call(this); }; })()"
+    },
+    { "type": "clickRole", "role": "button", "name": "Fork from here" },
+    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Save artifact" },
+    { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare report payload" },
+    { "type": "waitForDomContains", "text": "Saved report payload: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "fillSelector", "selector": "input[aria-label=\"Document version\"]", "value": "11" },
+    { "type": "waitForDomContains", "text": "Using document version 11.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare list response" },
+    { "type": "waitForDomContains", "text": "List ReportDocuments response: 7 entries", "timeoutMs": 60000 },
+    { "type": "selectSelector", "selector": "select[aria-label=\"List response entry\"]", "value": "forecastingLocationsTopMarketsQ3" },
+    { "type": "clickRole", "role": "button", "name": "Prepare get request" },
+    { "type": "waitForDomContains", "text": "\"reportId\": \"forecastingLocationsTopMarketsQ3\"", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare selected get response" },
+    { "type": "waitForDomContains", "text": "Get ReportDocument response: Forecasting Locations Top Markets Q3", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Reopen in builder" },
+    { "type": "waitForDomContains", "text": "Reopened ReportDocument Forecasting Locations Top Markets Q3 for editing.", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const reopened = Array.from(document.querySelectorAll('.forge-report-builder__chart-inline-notice')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Reopened ReportDocument: Forecasting Locations Top Markets Q3')); if (!reopened) { return false; } const text = reopened.innerText || reopened.textContent || ''; return text.includes('Review export') || text.includes('Inspect export'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const reopened = Array.from(document.querySelectorAll('.forge-report-builder__chart-inline-notice')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Reopened ReportDocument: Forecasting Locations Top Markets Q3')); if (!reopened) { throw new Error('Reopened section not found.'); } const button = Array.from(reopened.querySelectorAll('button')).find((entry) => { const text = (entry.innerText || entry.textContent || '').trim(); return text === 'Inspect export' || text === 'Review export'; }); if (!button) { throw new Error('Inspect export button not found in reopened section.'); } button.click(); return true; })()"
+    },
+    { "type": "waitForDomContains", "text": "\"kind\": \"reportExportRequest\"", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "\"reportPrint\": {", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "\"kind\": \"reportPrint\"", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "\"format\": \"pdf\"", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "\"title\": \"Forecasting Locations Top Markets Q3\"", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "\"id\": \"bookmark.primaryChart\"", "timeoutMs": 60000 },
+    {
+      "type": "eval",
+      "expression": "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Reopened export request summary\"]')).find(Boolean); if (!summary) { throw new Error('Reopened export request summary not found.'); } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const button = Array.from(container.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Download export request')); if (!button) { throw new Error('Download export request button not found.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.filename === 'Forecasting Locations Top Markets Q3-savedPayload-pdf-export-request.json'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.mimeType.includes('application/json') && window.__artifactDownloadCapture.payload.includes('\"kind\": \"reportExportRequest\"') && window.__artifactDownloadCapture.payload.includes('\"kind\": \"reportPrint\"') && window.__artifactDownloadCapture.payload.includes('\"id\": \"bookmark.primaryChart\"')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-report-document-location-chart-export-request.png",
+      "fullPage": true
+    }
+  ]
+}

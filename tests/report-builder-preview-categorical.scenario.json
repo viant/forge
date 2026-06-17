@@ -1,0 +1,152 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create or apply a chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelector",
+      "selector": ".forge-report-builder__chart-action-button--quick"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": "[role=\"menuitem\"]",
+      "text": "Chart preset (pie)",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Showing Avails by Channel.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForChartRender",
+      "selector": ".recharts-wrapper",
+      "minMarks": 3,
+      "minSectors": 2,
+      "minVisibleSectors": 2,
+      "minSectorWidth": 80,
+      "minSectorHeight": 60,
+      "minWidth": 300,
+      "minHeight": 180,
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-pie-proof.png"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "clickSelector",
+      "selector": ".forge-report-builder__chart-action-button--quick"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": "[role=\"menuitem\"]",
+      "text": "Chart preset (donut)",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Showing HH Uniques by Country.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForChartRender",
+      "selector": ".recharts-wrapper",
+      "minMarks": 3,
+      "minSectors": 2,
+      "minVisibleSectors": 2,
+      "minSectorWidth": 80,
+      "minSectorHeight": 60,
+      "minWidth": 300,
+      "minHeight": 180,
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-donut-proof.png"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "clickSelector",
+      "selector": ".forge-report-builder__chart-action-button--quick"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": "[role=\"menuitem\"]",
+      "text": "Chart preset (horizontal_bar)",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Audience Age Group is not supported for this semantic selection in the demo provider.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Household Uniques cannot be combined with Audience Age Group in this demo semantic provider."
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Resolve semantic selection issues"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const runButtons = Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run'); return runButtons.length === 1 && runButtons[0].disabled === true; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-horizontal-proof.png"
+    }
+  ]
+}

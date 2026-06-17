@@ -5,6 +5,7 @@ import { useSignals } from "@preact/signals-react/runtime";
 import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { resolveKey } from "../../utils/selector.js";
+import { REPORT_BUILDER_TABLE_CALC_FUNCTIONS } from "./reportBuilderCalculatedFieldAuthoring.js";
 import {
     chartFamilyForType,
     chartFamilyHelperText,
@@ -324,12 +325,978 @@ export function ReportBuilderChartDialog({
     );
 }
 
+const CALCULATED_FIELD_DATA_TYPES = [
+    { value: "number", label: "Number" },
+    { value: "string", label: "String" },
+    { value: "boolean", label: "Boolean" },
+];
+
+const CALCULATED_FIELD_FORMATS = [
+    { value: "", label: "Default" },
+    { value: "number", label: "Number" },
+    { value: "compactNumber", label: "Compact number" },
+    { value: "currency", label: "Currency" },
+    { value: "percent", label: "Percent" },
+];
+
+export function ReportBuilderCalculatedFieldDialog({
+    isOpen = false,
+    onClose,
+    draft = null,
+    onDraftChange,
+    onApply,
+    validation = { valid: false, errors: [] },
+    availableFields = [],
+    isEditing = false,
+}) {
+    const errors = Array.isArray(validation?.errors) ? validation.errors : [];
+    const errorByField = new Map();
+    errors.forEach((entry) => {
+        const field = String(entry?.field || "").trim();
+        if (!field || errorByField.has(field)) {
+            return;
+        }
+        errorByField.set(field, entry);
+    });
+
+    const setDraftPatch = (patch = {}) => {
+        if (typeof onDraftChange !== "function") {
+            return;
+        }
+        onDraftChange({
+            ...(draft || {}),
+            ...(patch || {}),
+        });
+    };
+
+    return (
+        <Dialog
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isEditing ? "Edit Calculated Field" : "Add Calculated Field"}
+            style={{ width: "min(760px, calc(100vw - 48px))" }}
+        >
+            <div className="forge-report-builder__chart-dialog">
+                <div className="forge-report-builder__chart-dialog-grid">
+                    <label className="forge-report-builder__chart-field">
+                        <span>Field ID</span>
+                        <input
+                            type="text"
+                            name="tableCalcId"
+                            disabled={isEditing}
+                            className={errorByField.has("id") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.id || ""}
+                            onChange={(event) => setDraftPatch({ id: event.target.value, key: event.target.value })}
+                            placeholder="forecastLift"
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Label</span>
+                        <input
+                            type="text"
+                            name="tableCalcLabel"
+                            className={errorByField.has("label") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.label || ""}
+                            onChange={(event) => setDraftPatch({ label: event.target.value })}
+                            placeholder="Forecast Lift"
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Data type</span>
+                        <select
+                            className={errorByField.has("dataType") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.dataType || "number"}
+                            onChange={(event) => setDraftPatch({ dataType: event.target.value })}
+                        >
+                            {CALCULATED_FIELD_DATA_TYPES.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Format</span>
+                        <select
+                            className="forge-report-builder-select"
+                            value={draft?.format || ""}
+                            onChange={(event) => setDraftPatch({ format: event.target.value })}
+                        >
+                            {CALCULATED_FIELD_FORMATS.map((option) => (
+                                <option key={option.value || "default"} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                        <span>Expression</span>
+                        <textarea
+                            className={errorByField.has("expr") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
+                            value={draft?.expr || ""}
+                            onChange={(event) => setDraftPatch({ expr: event.target.value })}
+                            placeholder="if(impressions = 0, null, round((clicks / impressions) * 100, 2))"
+                            rows={4}
+                        />
+                    </label>
+                </div>
+                <div className="forge-report-builder__calculated-field-hint">
+                    <strong>Supported:</strong> arithmetic, comparisons, <code>and/or/not</code>, <code>if</code>, <code>case</code>, <code>coalesce</code>, <code>isNull</code>, <code>nullIf</code>, <code>abs</code>, <code>round</code>, <code>floor</code>, <code>ceil</code>, <code>min/max</code>, <code>least/greatest</code>, <code>concat</code>, <code>lower</code>, <code>upper</code>.
+                </div>
+                <div className="forge-report-builder__calculated-field-reference-list">
+                    <div className="forge-report-builder__calculated-field-reference-header">
+                        Available field IDs
+                    </div>
+                    <div className="forge-report-builder__calculated-field-reference-items">
+                        {availableFields.length === 0 ? (
+                            <span className="forge-report-builder__calculated-field-reference-empty">No fields available.</span>
+                        ) : availableFields.map((field) => (
+                            <span key={`${field.kind}:${field.id}`} className="forge-report-builder__calculated-field-reference-chip">
+                                <strong>{field.id}</strong>
+                                <span>{field.label}</span>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+                {errors.length > 0 ? (
+                    <div className="forge-report-builder__chart-errors">
+                        {errors.map((entry, index) => (
+                            <div key={`${entry.field}_${entry.code}_${index}`} className="forge-report-builder__chart-error">
+                                {entry.message}
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+            <div className="forge-report-builder__chart-dialog-actions">
+                <Button outlined onClick={onClose}>Cancel</Button>
+                <Button intent="primary" onClick={onApply} disabled={!validation?.valid}>
+                    {isEditing ? "Apply Changes" : "Add Field"}
+                </Button>
+            </div>
+        </Dialog>
+    );
+}
+
+export function ReportBuilderTableCalculationDialog({
+    isOpen = false,
+    onClose,
+    draft = null,
+    onDraftChange,
+    onApply,
+    validation = { valid: false, errors: [] },
+    fieldOptions = { sourceFields: [], orderFields: [], partitionDimensions: [] },
+    isEditing = false,
+}) {
+    const errors = Array.isArray(validation?.errors) ? validation.errors : [];
+    const errorByField = new Map();
+    errors.forEach((entry) => {
+        const field = String(entry?.field || "").trim();
+        if (!field || errorByField.has(field)) {
+            return;
+        }
+        errorByField.set(field, entry);
+    });
+    const setDraftPatch = (patch = {}) => {
+        if (typeof onDraftChange !== "function") {
+            return;
+        }
+        onDraftChange({
+            ...(draft || {}),
+            ...(patch || {}),
+        });
+    };
+    const functionId = String(draft?.functionId || "").trim();
+    const functionMeta = REPORT_BUILDER_TABLE_CALC_FUNCTIONS.find((entry) => entry.value === functionId) || null;
+    const partitionBy = Array.isArray(draft?.partitionBy)
+        ? draft.partitionBy.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const togglePartitionDimension = (dimensionId = "") => {
+        const nextId = String(dimensionId || "").trim();
+        if (!nextId) {
+            return;
+        }
+        const nextValues = partitionBy.includes(nextId)
+            ? partitionBy.filter((entry) => entry !== nextId)
+            : [...partitionBy, nextId];
+        setDraftPatch({ partitionBy: nextValues });
+    };
+
+    return (
+        <Dialog
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isEditing ? "Edit Table Calculation" : "Add Table Calculation"}
+            style={{ width: "min(760px, calc(100vw - 48px))" }}
+        >
+            <div className="forge-report-builder__chart-dialog">
+                <div className="forge-report-builder__chart-dialog-grid">
+                    <label className="forge-report-builder__chart-field">
+                        <span>Field ID</span>
+                        <input
+                            name="tableCalcId"
+                            type="text"
+                            disabled={isEditing}
+                            className={errorByField.has("id") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.id || ""}
+                            onChange={(event) => setDraftPatch({ id: event.target.value, key: event.target.value })}
+                            placeholder="runningAvails"
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Label</span>
+                        <input
+                            name="tableCalcLabel"
+                            type="text"
+                            className={errorByField.has("label") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.label || ""}
+                            onChange={(event) => setDraftPatch({ label: event.target.value })}
+                            placeholder="Running Avails"
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Function</span>
+                        <select
+                            name="tableCalcFunction"
+                            className={errorByField.has("functionId") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={functionId}
+                            onChange={(event) => setDraftPatch({ functionId: event.target.value })}
+                        >
+                            <option value="">Select…</option>
+                            {REPORT_BUILDER_TABLE_CALC_FUNCTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Format</span>
+                        <select
+                            name="tableCalcFormat"
+                            className="forge-report-builder-select"
+                            value={draft?.format || ""}
+                            onChange={(event) => setDraftPatch({ format: event.target.value })}
+                        >
+                            {CALCULATED_FIELD_FORMATS.map((option) => (
+                                <option key={option.value || "default"} value={option.value}>{option.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Source Field</span>
+                        <select
+                            name="tableCalcSourceField"
+                            className={errorByField.has("sourceField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.sourceField || ""}
+                            onChange={(event) => setDraftPatch({ sourceField: event.target.value })}
+                        >
+                            <option value="">Select…</option>
+                            {(fieldOptions?.sourceFields || []).map((entry) => (
+                                <option key={entry.id} value={entry.id}>{entry.label}</option>
+                            ))}
+                        </select>
+                    </label>
+                    {functionMeta?.requiresOrder ? (
+                        <label className="forge-report-builder__chart-field">
+                            <span>Order By</span>
+                            <select
+                                name="tableCalcOrderByField"
+                                className={errorByField.has("orderByField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                value={draft?.orderByField || ""}
+                                onChange={(event) => setDraftPatch({ orderByField: event.target.value })}
+                            >
+                                <option value="">Select…</option>
+                                {(fieldOptions?.orderFields || []).map((entry) => (
+                                    <option key={entry.id} value={entry.id}>{entry.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                    ) : null}
+                    {functionMeta?.requiresOrder || functionMeta?.supportsRankDirection ? (
+                        <label className="forge-report-builder__chart-field">
+                            <span>{functionId === "rank" ? "Rank Direction" : "Order Direction"}</span>
+                            <select
+                                name="tableCalcOrderDir"
+                                className="forge-report-builder-select"
+                                value={draft?.orderDir || (functionId === "rank" ? "desc" : "asc")}
+                                onChange={(event) => setDraftPatch({ orderDir: event.target.value })}
+                            >
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                        </label>
+                    ) : null}
+                    {functionMeta?.supportsTieBreaker ? (
+                        <label className="forge-report-builder__chart-field">
+                            <span>Tie-breaker</span>
+                            <select
+                                name="tableCalcTieBreakerField"
+                                className={errorByField.has("tieBreakerField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                value={draft?.tieBreakerField || ""}
+                                onChange={(event) => setDraftPatch({ tieBreakerField: event.target.value })}
+                            >
+                                <option value="">None</option>
+                                {(fieldOptions?.orderFields || []).map((entry) => (
+                                    <option key={entry.id} value={entry.id}>{entry.label}</option>
+                                ))}
+                            </select>
+                        </label>
+                    ) : null}
+                    {functionMeta?.requiresWindowSize ? (
+                        <label className="forge-report-builder__chart-field">
+                            <span>Window Size</span>
+                            <input
+                                type="number"
+                                name="tableCalcWindowSize"
+                                min="1"
+                                className={errorByField.has("windowSize") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                value={draft?.windowSize || ""}
+                                onChange={(event) => setDraftPatch({ windowSize: event.target.value })}
+                                placeholder="3"
+                            />
+                        </label>
+                    ) : null}
+                    {functionMeta?.supportsDecimals ? (
+                        <label className="forge-report-builder__chart-field">
+                            <span>Decimals</span>
+                            <input
+                                type="number"
+                                name="tableCalcDecimals"
+                                min="0"
+                                className={errorByField.has("decimals") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                value={draft?.decimals || ""}
+                                onChange={(event) => setDraftPatch({ decimals: event.target.value })}
+                                placeholder={functionId === "percentOfTotal" ? "1" : "2"}
+                            />
+                        </label>
+                    ) : null}
+                    <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                        <span>Partition By</span>
+                        <div className={errorByField.has("partitionBy") ? "forge-report-builder__chart-measure-chips is-invalid" : "forge-report-builder__chart-measure-chips"}>
+                            {(fieldOptions?.partitionDimensions || []).length === 0 ? (
+                                <div className="forge-report-builder__chart-empty-hint">No dimensions available.</div>
+                            ) : (fieldOptions?.partitionDimensions || []).map((entry) => {
+                                const active = partitionBy.includes(entry.id);
+                                return (
+                                    <button
+                                        key={entry.id}
+                                        type="button"
+                                        className={[
+                                            "forge-report-builder__chart-measure-chip",
+                                            active ? "is-active" : "",
+                                        ].filter(Boolean).join(" ")}
+                                        onClick={() => togglePartitionDimension(entry.id)}
+                                    >
+                                        <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>
+                                            {active ? "✓" : ""}
+                                        </span>
+                                        <span>{entry.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+                <div className="forge-report-builder__calculated-field-hint">
+                    <strong>Supported:</strong> percent of total, running total, rank, delta from previous, and moving average over the current result grid only.
+                </div>
+                {errors.length > 0 ? (
+                    <div className="forge-report-builder__chart-errors">
+                        {errors.map((entry, index) => (
+                            <div key={`${entry.field}_${entry.code}_${index}`} className="forge-report-builder__chart-error">
+                                {entry.message}
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+            <div className="forge-report-builder__chart-dialog-actions">
+                <Button outlined onClick={onClose}>Cancel</Button>
+                <Button intent="primary" onClick={onApply} disabled={!validation?.valid}>
+                    {isEditing ? "Apply Changes" : "Add Table Calculation"}
+                </Button>
+            </div>
+        </Dialog>
+    );
+}
+
+export function ReportBuilderDocumentBlockDialog({
+    isOpen = false,
+    onClose,
+    draft = null,
+    onDraftChange,
+    onApply,
+    validation = { valid: false, errors: [] },
+    valueFieldOptions = [],
+    secondaryFieldOptions = [],
+    tableColumnOptions = [],
+    scopeParamOptions = [],
+    isEditing = false,
+}) {
+    const refinementBarActionOptions = [
+        { value: "remove", label: "Remove individual refinements" },
+        { value: "clearAll", label: "Clear all refinements" },
+        { value: "undo", label: "Undo refinement changes" },
+        { value: "redo", label: "Redo refinement changes" },
+    ];
+    const geoAggregateOptions = [
+        { value: "sum", label: "Sum" },
+        { value: "avg", label: "Average" },
+        { value: "min", label: "Minimum" },
+        { value: "max", label: "Maximum" },
+        { value: "first", label: "First value" },
+    ];
+    const geoShapeOptions = [
+        { value: "us-states", label: "US states" },
+        { value: "us-state-tiles", label: "US state tiles" },
+    ];
+    const errors = Array.isArray(validation?.errors) ? validation.errors : [];
+    const errorByField = new Map();
+    errors.forEach((entry) => {
+        const field = String(entry?.field || "").trim();
+        if (!field || errorByField.has(field)) {
+            return;
+        }
+        errorByField.set(field, entry);
+    });
+    const normalizedKind = String(draft?.kind || "markdownBlock").trim() || "markdownBlock";
+    const isFilterBarBlock = normalizedKind === "filterBarBlock";
+    const isRefinementBarBlock = normalizedKind === "refinementBarBlock";
+    const isGeoMapBlock = normalizedKind === "geoMapBlock";
+    const isKpiBlock = normalizedKind === "kpiBlock";
+    const isTableBlock = normalizedKind === "tableBlock";
+    const geo = draft?.geo && typeof draft.geo === "object" && !Array.isArray(draft.geo)
+        ? draft.geo
+        : {};
+    const geoMetric = geo?.metric && typeof geo.metric === "object" && !Array.isArray(geo.metric)
+        ? geo.metric
+        : {};
+    const geoDimensionOptions = tableColumnOptions.filter((option) => String(option?.kind || "").trim() === "dimension");
+    const geoMetricOptions = tableColumnOptions.filter((option) => String(option?.kind || "").trim() === "measure");
+    const setDraftPatch = (patch = {}) => {
+        if (typeof onDraftChange !== "function") {
+            return;
+        }
+        onDraftChange({
+            ...(draft || {}),
+            ...(patch || {}),
+        });
+    };
+    const applyValueField = (value = "") => {
+        const normalizedValue = String(value || "").trim();
+        const matched = (Array.isArray(valueFieldOptions) ? valueFieldOptions : [])
+            .find((option) => String(option?.value || "").trim() === normalizedValue);
+        setDraftPatch({
+            valueField: normalizedValue,
+            valueLabel: matched?.label || normalizedValue,
+        });
+    };
+    const applySecondaryField = (value = "") => {
+        const normalizedValue = String(value || "").trim();
+        const matched = (Array.isArray(secondaryFieldOptions) ? secondaryFieldOptions : [])
+            .find((option) => String(option?.value || "").trim() === normalizedValue);
+        setDraftPatch({
+            secondaryField: normalizedValue,
+            secondaryLabel: normalizedValue ? (matched?.label || normalizedValue) : "",
+        });
+    };
+    const selectedColumnKeys = Array.isArray(draft?.columnKeys)
+        ? draft.columnKeys.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const selectedParamIds = Array.isArray(draft?.paramIds)
+        ? draft.paramIds.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const selectedRefinementActionKinds = Array.isArray(draft?.actionKinds)
+        ? draft.actionKinds.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const columnVisualKinds = draft?.columnVisualKinds && typeof draft.columnVisualKinds === "object" && !Array.isArray(draft.columnVisualKinds)
+        ? draft.columnVisualKinds
+        : {};
+    const columnVisualRuleTexts = draft?.columnVisualRuleTexts && typeof draft.columnVisualRuleTexts === "object" && !Array.isArray(draft.columnVisualRuleTexts)
+        ? draft.columnVisualRuleTexts
+        : {};
+    const toggleColumnKey = (columnKey = "") => {
+        const normalizedColumnKey = String(columnKey || "").trim();
+        if (!normalizedColumnKey) {
+            return;
+        }
+        const nextKeys = selectedColumnKeys.includes(normalizedColumnKey)
+            ? selectedColumnKeys.filter((entry) => entry !== normalizedColumnKey)
+            : [...selectedColumnKeys, normalizedColumnKey];
+        setDraftPatch({ columnKeys: nextKeys });
+    };
+    const toggleScopeParam = (paramId = "") => {
+        const normalizedParamId = String(paramId || "").trim();
+        if (!normalizedParamId) {
+            return;
+        }
+        const nextParamIds = selectedParamIds.includes(normalizedParamId)
+            ? selectedParamIds.filter((entry) => entry !== normalizedParamId)
+            : [...selectedParamIds, normalizedParamId];
+        setDraftPatch({ paramIds: nextParamIds });
+    };
+    const toggleRefinementActionKind = (actionKind = "") => {
+        const normalizedActionKind = String(actionKind || "").trim();
+        if (!normalizedActionKind) {
+            return;
+        }
+        const nextActionKinds = selectedRefinementActionKinds.includes(normalizedActionKind)
+            ? selectedRefinementActionKinds.filter((entry) => entry !== normalizedActionKind)
+            : [...selectedRefinementActionKinds, normalizedActionKind];
+        setDraftPatch({ actionKinds: nextActionKinds });
+    };
+    const setColumnVisualKind = (columnKey = "", visualKind = "") => {
+        const normalizedColumnKey = String(columnKey || "").trim();
+        if (!normalizedColumnKey) {
+            return;
+        }
+        const nextVisualKinds = {
+            ...columnVisualKinds,
+        };
+        const normalizedVisualKind = String(visualKind || "").trim();
+        if (!normalizedVisualKind) {
+            delete nextVisualKinds[normalizedColumnKey];
+        } else {
+            nextVisualKinds[normalizedColumnKey] = normalizedVisualKind;
+        }
+        setDraftPatch({ columnVisualKinds: nextVisualKinds });
+    };
+    const setColumnVisualRuleText = (columnKey = "", rulesText = "") => {
+        const normalizedColumnKey = String(columnKey || "").trim();
+        if (!normalizedColumnKey) {
+            return;
+        }
+        const nextRuleTexts = {
+            ...columnVisualRuleTexts,
+        };
+        const normalizedRulesText = String(rulesText || "");
+        if (!normalizedRulesText.trim()) {
+            delete nextRuleTexts[normalizedColumnKey];
+        } else {
+            nextRuleTexts[normalizedColumnKey] = normalizedRulesText;
+        }
+        setDraftPatch({ columnVisualRuleTexts: nextRuleTexts });
+    };
+    const setGeoPatch = (patch = {}) => {
+        const nextGeo = {
+            ...(geo || {}),
+            ...(patch || {}),
+        };
+        setDraftPatch({ geo: nextGeo });
+    };
+    const setGeoMetricPatch = (patch = {}) => {
+        setGeoPatch({
+            metric: {
+                ...(geoMetric || {}),
+                ...(patch || {}),
+            },
+        });
+    };
+    const applyGeoMetricField = (value = "") => {
+        const normalizedValue = String(value || "").trim();
+        const matched = geoMetricOptions.find((option) => String(option?.key || "").trim() === normalizedValue);
+        setGeoMetricPatch({
+            key: normalizedValue,
+            label: matched?.label || normalizedValue,
+            format: matched?.format === "compactNumber" ? "compact" : matched?.format || undefined,
+        });
+    };
+    return (
+        <Dialog
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isEditing
+                ? (isFilterBarBlock
+                    ? "Edit Filter Bar Block"
+                    : isRefinementBarBlock
+                        ? "Edit Refinement Bar Block"
+                        : isGeoMapBlock
+                            ? "Edit Geo Map Block"
+                        : isKpiBlock
+                            ? "Edit KPI Block"
+                            : isTableBlock
+                                ? "Edit Table Block"
+                                : "Edit Narrative Block")
+                : (isFilterBarBlock
+                    ? "Add Filter Bar Block"
+                    : isRefinementBarBlock
+                        ? "Add Refinement Bar Block"
+                        : isGeoMapBlock
+                            ? "Add Geo Map Block"
+                        : isKpiBlock
+                            ? "Add KPI Block"
+                            : isTableBlock
+                                ? "Add Table Block"
+                                : "Add Narrative Block")}
+            style={{ width: "min(720px, calc(100vw - 48px))" }}
+        >
+            <div className="forge-report-builder__chart-dialog">
+                <div className="forge-report-builder__chart-dialog-grid">
+                    <label className="forge-report-builder__chart-field">
+                        <span>Block type</span>
+                        <input
+                            type="text"
+                            disabled
+                            className="forge-report-builder-select"
+                            value={isFilterBarBlock
+                                ? "Filter bar"
+                                : isRefinementBarBlock
+                                    ? "Refinement bar"
+                                    : isGeoMapBlock
+                                        ? "Geo map"
+                                    : isKpiBlock
+                                        ? "KPI"
+                                        : isTableBlock
+                                            ? "Table"
+                                            : "Narrative"}
+                            readOnly
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Title</span>
+                        <input
+                            type="text"
+                            className={errorByField.has("title") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.title || ""}
+                            onChange={(event) => setDraftPatch({ title: event.target.value })}
+                            placeholder={isFilterBarBlock
+                                ? "Report Scope"
+                                : isRefinementBarBlock
+                                    ? "Active Refinements"
+                                    : isGeoMapBlock
+                                        ? "Geo Map"
+                                    : isKpiBlock
+                                        ? "Headline KPI"
+                                        : isTableBlock
+                                            ? "Detail Table"
+                                            : "Narrative"}
+                        />
+                    </label>
+                    {isFilterBarBlock ? (
+                        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                            <span>Shared scope parameters</span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                {scopeParamOptions.length === 0 ? (
+                                    <span style={{ fontSize: 12, color: "#5f6b7c" }}>No shared scope parameters are configured in the current builder.</span>
+                                ) : scopeParamOptions.map((option) => {
+                                    const selected = selectedParamIds.includes(option.value);
+                                    return (
+                                        <button
+                                            key={option.value}
+                                            type="button"
+                                            className={[
+                                                "forge-report-builder__dimension-pill",
+                                                selected ? "is-active" : "",
+                                            ].filter(Boolean).join(" ")}
+                                            onClick={() => toggleScopeParam(option.value)}
+                                            style={{ cursor: "pointer", width: "fit-content" }}
+                                        >
+                                            <span className="forge-report-builder__pill-copy">
+                                                <span className="forge-report-builder__pill-text">{option.label}</span>
+                                            </span>
+                                            {option.required ? <span className="forge-report-builder__result-meta-chip">Required</span> : null}
+                                            {selected ? <span aria-hidden="true">✓</span> : null}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : isRefinementBarBlock ? (
+                        <>
+                            <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Available actions</span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                    {refinementBarActionOptions.map((option) => {
+                                        const selected = selectedRefinementActionKinds.includes(option.value);
+                                        return (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                className={[
+                                                    "forge-report-builder__dimension-pill",
+                                                    selected ? "is-active" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                onClick={() => toggleRefinementActionKind(option.value)}
+                                                style={{ cursor: "pointer", width: "fit-content" }}
+                                            >
+                                                <span className="forge-report-builder__pill-copy">
+                                                    <span className="forge-report-builder__pill-text">{option.label}</span>
+                                                </span>
+                                                {selected ? <span aria-hidden="true">✓</span> : null}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Empty state label</span>
+                                <input
+                                    type="text"
+                                    className="forge-report-builder-select"
+                                    value={draft?.emptyLabel || ""}
+                                    onChange={(event) => setDraftPatch({ emptyLabel: event.target.value })}
+                                    placeholder="No active refinements"
+                                />
+                            </label>
+                        </>
+                    ) : isGeoMapBlock ? (
+                        <>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Shape</span>
+                                <select
+                                    className={errorByField.has("geo.shape") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={geo?.shape || "us-states"}
+                                    onChange={(event) => setGeoPatch({ shape: event.target.value })}
+                                >
+                                    {geoShapeOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Key field</span>
+                                <select
+                                    className={errorByField.has("geo.key") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={geo?.key || ""}
+                                    onChange={(event) => setGeoPatch({ key: event.target.value })}
+                                >
+                                    <option value="">{geoDimensionOptions.length === 0 ? "No available breakdowns" : "Select breakdown..."}</option>
+                                    {geoDimensionOptions.map((option) => (
+                                        <option key={option.key} value={option.key}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Label field</span>
+                                <select
+                                    className={errorByField.has("geo.labelKey") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={geo?.labelKey || ""}
+                                    onChange={(event) => setGeoPatch({ labelKey: event.target.value || undefined })}
+                                >
+                                    <option value="">Use key</option>
+                                    {geoDimensionOptions.map((option) => (
+                                        <option key={option.key} value={option.key}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Metric</span>
+                                <select
+                                    className={errorByField.has("geo.metric.key") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={geoMetric?.key || ""}
+                                    onChange={(event) => applyGeoMetricField(event.target.value)}
+                                >
+                                    <option value="">{geoMetricOptions.length === 0 ? "No available measures" : "Select measure..."}</option>
+                                    {geoMetricOptions.map((option) => (
+                                        <option key={option.key} value={option.key}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Metric label</span>
+                                <input
+                                    type="text"
+                                    className="forge-report-builder-select"
+                                    value={geoMetric?.label || ""}
+                                    onChange={(event) => setGeoMetricPatch({ label: event.target.value })}
+                                    placeholder="Available Impressions"
+                                />
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Aggregate</span>
+                                <select
+                                    className={errorByField.has("geo.aggregate") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={geo?.aggregate || "sum"}
+                                    onChange={(event) => setGeoPatch({ aggregate: event.target.value })}
+                                >
+                                    {geoAggregateOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                        </>
+                    ) : isKpiBlock ? (
+                        <>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Value field</span>
+                                <select
+                                    className={errorByField.has("valueField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={draft?.valueField || ""}
+                                    onChange={(event) => applyValueField(event.target.value)}
+                                >
+                                    <option value="">{valueFieldOptions.length === 0 ? "No available measures" : "Select measure..."}</option>
+                                    {valueFieldOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Value label</span>
+                                <input
+                                    type="text"
+                                    className="forge-report-builder-select"
+                                    value={draft?.valueLabel || ""}
+                                    onChange={(event) => setDraftPatch({ valueLabel: event.target.value })}
+                                    placeholder="Available Impressions"
+                                />
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Secondary field</span>
+                                <select
+                                    className={errorByField.has("secondaryField") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={draft?.secondaryField || ""}
+                                    onChange={(event) => applySecondaryField(event.target.value)}
+                                >
+                                    <option value="">None</option>
+                                    {secondaryFieldOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Secondary label</span>
+                                <input
+                                    type="text"
+                                    className="forge-report-builder-select"
+                                    value={draft?.secondaryLabel || ""}
+                                    onChange={(event) => setDraftPatch({ secondaryLabel: event.target.value })}
+                                    placeholder="Channel"
+                                    disabled={!draft?.secondaryField}
+                                />
+                            </label>
+                            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Description</span>
+                                <input
+                                    type="text"
+                                    className="forge-report-builder-select"
+                                    value={draft?.description || ""}
+                                    onChange={(event) => setDraftPatch({ description: event.target.value })}
+                                    placeholder="Highlights the current lead KPI for this report."
+                                />
+                            </label>
+                            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Empty state label</span>
+                                <input
+                                    type="text"
+                                    className="forge-report-builder-select"
+                                    value={draft?.emptyLabel || ""}
+                                    onChange={(event) => setDraftPatch({ emptyLabel: event.target.value })}
+                                    placeholder="No KPI value available."
+                                />
+                            </label>
+                        </>
+                    ) : isTableBlock ? (
+                        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                            <span>Columns</span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                {tableColumnOptions.length === 0 ? (
+                                    <span style={{ fontSize: 12, color: "#5f6b7c" }}>No available breakdowns or measures are configured for this builder.</span>
+                                ) : tableColumnOptions.map((option) => {
+                                    const selected = selectedColumnKeys.includes(option.key);
+                                    const optionKind = String(option.kind || "").trim();
+                                    const canShowDataBar = optionKind === "measure";
+                                    const canShowBadge = optionKind === "dimension";
+                                    const canShowTone = optionKind === "dimension";
+                                    const visualKind = String(columnVisualKinds[option.key] || "");
+                                    return (
+                                        <div key={option.key} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                            <button
+                                                type="button"
+                                                className={[
+                                                    "forge-report-builder__dimension-pill",
+                                                    selected ? "is-active" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                onClick={() => toggleColumnKey(option.key)}
+                                                style={{ cursor: "pointer" }}
+                                            >
+                                                <span className="forge-report-builder__pill-copy">
+                                                    <span className="forge-report-builder__pill-text">{option.label}</span>
+                                                </span>
+                                                {selected ? <span aria-hidden="true">✓</span> : null}
+                                            </button>
+                                            {selected && (canShowDataBar || canShowBadge || canShowTone) ? (
+                                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#486579" }}>
+                                                    <span>Visual</span>
+                                                    <select
+                                                        aria-label={`Visual for ${option.label}`}
+                                                        className="forge-report-builder-select"
+                                                        value={visualKind}
+                                                        onChange={(event) => setColumnVisualKind(option.key, event.target.value)}
+                                                    >
+                                                        <option value="">None</option>
+                                                        {canShowDataBar ? <option value="dataBar">Data bar</option> : null}
+                                                        {canShowBadge ? <option value="badge">Badge</option> : null}
+                                                        {canShowTone ? <option value="tone">Tone</option> : null}
+                                                    </select>
+                                                </label>
+                                            ) : null}
+                                            {selected && (visualKind === "badge" || visualKind === "tone") ? (
+                                                <label style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                                                    <span style={{ fontSize: 12, color: "#486579" }}>{visualKind === "tone" ? "Tone rules" : "Badge rules"}</span>
+                                                    <textarea
+                                                        aria-label={`${visualKind === "tone" ? "Tone" : "Badge"} rules for ${option.label}`}
+                                                        className={errorByField.has("columnVisualRuleTexts") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
+                                                        value={String(columnVisualRuleTexts[option.key] || "")}
+                                                        onChange={(event) => setColumnVisualRuleText(option.key, event.target.value)}
+                                                        rows={4}
+                                                        placeholder={'[\n  { "value": "Display", "tone": "info", "label": "Display" }\n]'}
+                                                    />
+                                                </label>
+                                            ) : null}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : (
+                        <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                            <span>Markdown</span>
+                            <textarea
+                                className={errorByField.has("markdown") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
+                                value={draft?.markdown || ""}
+                                onChange={(event) => setDraftPatch({ markdown: event.target.value })}
+                                placeholder={"## Narrative\nAdd authored report context."}
+                                rows={5}
+                            />
+                        </label>
+                    )}
+                </div>
+                <div className="forge-report-builder__calculated-field-hint">
+                    {isFilterBarBlock
+                        ? <><strong>Filter bar blocks</strong> project the current shared scope parameters into the authored report contract and runtime preview.</>
+                        : isRefinementBarBlock
+                            ? <><strong>Refinement bar blocks</strong> expose the current drill and keep/exclude trail using the authored report runtime contract.</>
+                            : isGeoMapBlock
+                                ? <><strong>Geo map blocks</strong> project one available breakdown and one available measure into the authored report geo contract and runtime preview.</>
+                        : isKpiBlock
+                        ? <><strong>KPI blocks</strong> bind to the current available measures and optional available breakdowns.</>
+                        : isTableBlock
+                            ? <><strong>Table blocks</strong> project the current available breakdowns and measures into an authored comparison table. Available measure columns can opt into a generic data bar visual.</>
+                        : <><strong>Narrative blocks</strong> travel through the same authored ReportDocument, ReportSpec, and ReportFill pipeline as the primary builder content.</>}
+                </div>
+                {errors.length > 0 ? (
+                    <div className="forge-report-builder__chart-errors">
+                        {errors.map((entry, index) => (
+                            <div key={`${entry.field}_${entry.code}_${index}`} className="forge-report-builder__chart-error">
+                                {entry.message}
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+            <div className="forge-report-builder__chart-dialog-actions">
+                <Button outlined onClick={onClose}>Cancel</Button>
+                <Button intent="primary" onClick={onApply} disabled={!validation?.valid}>
+                    {isEditing ? "Apply Changes" : "Add Block"}
+                </Button>
+            </div>
+        </Dialog>
+    );
+}
+
 export function ReportBuilderChartQuickActions({
     canCreate = false,
     showCreateButton = true,
     onCreate,
     quickOptions = [],
     onSelectQuickOption,
+    buttonLabel = "Quick chart",
+    buttonIcon = "timeline-line-chart",
     usePortal = true,
 }) {
     if (!canCreate && quickOptions.length === 0) {
@@ -338,9 +1305,15 @@ export function ReportBuilderChartQuickActions({
     const groupedOptions = quickOptions.reduce((acc, option) => {
         const group = String(option?.group || "").trim() || "Other";
         if (!acc[group]) {
-            acc[group] = [];
+            acc[group] = {
+                description: "",
+                options: [],
+            };
         }
-        acc[group].push(option);
+        if (!acc[group].description) {
+            acc[group].description = String(option?.groupDescription || "").trim();
+        }
+        acc[group].options.push(option);
         return acc;
     }, {});
     return (
@@ -362,17 +1335,49 @@ export function ReportBuilderChartQuickActions({
                     placement="bottom-start"
                     content={(
                         <Menu className="forge-report-builder__chart-menu">
-                            {Object.entries(groupedOptions).map(([group, options], groupIndex) => (
+                            {Object.entries(groupedOptions).map(([group, grouped], groupIndex) => (
                                 <React.Fragment key={group}>
                                     {groupIndex > 0 ? <MenuDivider title={group} /> : null}
                                     {groupIndex === 0 ? <MenuDivider title={group} /> : null}
-                                    {options.map((option) => (
-                                        <MenuItem
-                                            key={option.value}
-                                            text={option.label}
-                                            onClick={() => onSelectQuickOption(option.value)}
-                                        />
-                                    ))}
+                                    {grouped.description ? (
+                                        <div className="forge-report-builder__quick-group-description">
+                                            {grouped.description}
+                                        </div>
+                                    ) : null}
+                                    {grouped.options.map((option) => {
+                                        const hasPresetMetadata = !!option.eyebrow || (Array.isArray(option.metaItems) && option.metaItems.length > 0);
+                                        return (
+                                            <MenuItem
+                                                key={option.value}
+                                                text={(
+                                                    <div
+                                                        className={[
+                                                            "forge-report-builder__quick-option",
+                                                            option.kind === "table" ? "forge-report-builder__quick-option--table" : "",
+                                                            hasPresetMetadata ? "forge-report-builder__quick-option--featured" : "",
+                                                            option.accentTone ? `forge-report-builder__quick-option--${option.accentTone}` : "",
+                                                        ].filter(Boolean).join(" ")}
+                                                    >
+                                                        {option.eyebrow ? (
+                                                            <div className="forge-report-builder__quick-option-eyebrow">{option.eyebrow}</div>
+                                                        ) : null}
+                                                        <div className="forge-report-builder__quick-option-title">{option.label}</div>
+                                                        {option.description ? (
+                                                            <div className="forge-report-builder__quick-option-description">{option.description}</div>
+                                                        ) : null}
+                                                        {Array.isArray(option.metaItems) && option.metaItems.length > 0 ? (
+                                                            <div className="forge-report-builder__quick-option-highlights">
+                                                                {option.metaItems.map((item) => (
+                                                                    <span key={item} className="forge-report-builder__quick-option-highlight">{item}</span>
+                                                                ))}
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                                onClick={() => onSelectQuickOption(option.value)}
+                                            />
+                                        );
+                                    })}
                                 </React.Fragment>
                             ))}
                         </Menu>
@@ -381,10 +1386,10 @@ export function ReportBuilderChartQuickActions({
                     <Button
                         small
                         className="forge-report-builder__chart-action-button forge-report-builder__chart-action-button--quick"
-                        icon="timeline-line-chart"
+                        icon={buttonIcon}
                         rightIcon="caret-down"
                     >
-                        Quick chart
+                        {buttonLabel}
                     </Button>
                 </Popover>
             ) : null}

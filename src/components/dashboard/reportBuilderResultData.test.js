@@ -62,8 +62,29 @@ assert.deepEqual(
         computedCollection: [{ value: 1 }],
         chartCollection: [{ value: 2 }],
         policy: { mode: "fullQuery" },
+        chartQueryLoading: false,
     }),
     [{ value: 2 }],
+);
+
+assert.deepEqual(
+    resolveReportBuilderChartCollection({
+        computedCollection: [{ value: 1 }],
+        chartCollection: [],
+        policy: { mode: "fullQuery" },
+        chartQueryLoading: true,
+    }),
+    [{ value: 1 }],
+);
+
+assert.deepEqual(
+    resolveReportBuilderChartCollection({
+        computedCollection: [{ value: 1 }],
+        chartCollection: [],
+        policy: { mode: "fullQuery" },
+        chartQueryLoading: false,
+    }),
+    [],
 );
 
 assert.deepEqual(
