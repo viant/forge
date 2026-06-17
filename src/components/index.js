@@ -18,6 +18,7 @@ export { default as Terminal } from './Terminal.jsx';
 export { default as CompactFeedList } from './feed/CompactFeedList.jsx';
 export { default as LookupSelectionInput } from './lookup/LookupSelectionInput.jsx';
 export { DashboardBlock } from './dashboard/DashboardBlocks.jsx';
+export { default as ReportRuntime } from './dashboard/ReportRuntime.jsx';
 export {
     normalizeString,
     normalizeBool,

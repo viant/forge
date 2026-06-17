@@ -1,0 +1,129 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    { "type": "goto", "url": "/report-builder-preview.html" },
+    { "type": "waitForDomContains", "text": "Semantic Report Builder Preview", "timeoutMs": 60000 },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    { "type": "reload" },
+    { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.patchSeededSavedReportPayload !== 'function') { return false; } const patched = api.patchSeededSavedReportPayload('forecastingTrendQ3', { compileState: { status: 'invalid', diagnostics: [ { code: 'documentBlockChartInvalid', severity: 'error', blockId: 'primaryChart', path: 'reportDocument.blocks.primaryChart.chartSpec.xField', message: 'Primary Chart is no longer compatible with the current builder selection.', suggestedFix: 'Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder.' } ] } }); return !!patched && patched.compileState && patched.compileState.status === 'invalid'; })()",
+      "timeoutMs": 60000
+    },
+    { "type": "clickRole", "role": "button", "name": "Fork from here" },
+    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Save artifact" },
+    { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare report payload" },
+    { "type": "waitForDomContains", "text": "Saved report payload: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "fillSelector", "selector": "input[aria-label=\"Document version\"]", "value": "11" },
+    { "type": "waitForDomContains", "text": "Using document version 11.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare list response" },
+    { "type": "waitForDomContains", "text": "List ReportDocuments response: 7 entries", "timeoutMs": 60000 },
+    { "type": "selectSelector", "selector": "select[aria-label=\"List response entry\"]", "value": "forecastingTrendQ3" },
+    { "type": "waitForDomContains", "text": "INVALID", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare get request" },
+    { "type": "waitForDomContains", "text": "\"reportId\": \"forecastingTrendQ3\"", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare selected get response" },
+    { "type": "waitForDomContains", "text": "Get ReportDocument response: Forecasting Trend Q3", "timeoutMs": 60000 },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.replaceDetailTargetBehaviors && window.__REPORT_BUILDER_PREVIEW__.replaceDetailTargetBehaviors([{ match: { targetRef: 'target://steward/performance/channel-detail' }, error: 'Detail target resolution failed.' }]);"
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.patchBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.patchBuilderState({ selectedDimensions: ['eventDate'], viewMode: 'table', chartSpec: null })"
+    },
+    { "type": "clickRole", "role": "button", "name": "Reopen in builder" },
+    { "type": "waitForDomContains", "text": "Reopened ReportDocument Forecasting Trend Q3 for editing.", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Reopened compile diagnostics", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Primary Chart is no longer compatible with the current builder selection.", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder.", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "documentBlockChartInvalid", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Block primaryChart", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "reportDocument.blocks.primaryChart.chartSpec.xField", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelectorAll('.forge-report-builder__runtime-preview .forge-chart-legend-action').length >= 2",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { document.querySelector('.forge-report-builder__runtime-preview .forge-chart-legend-action')?.click(); })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('Display') && text.includes('Show channel details'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-chart-action",
+      "text": "Show channel details",
+      "index": 0
+    },
+    { "type": "waitForDomContains", "text": "Runtime Diagnostics", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Primary Chart is no longer compatible with the current builder selection.') && text.includes('Failed to resolve detail target target://steward/performance/channel-detail. Detail target resolution failed.') && document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel') != null && !text.includes('Resolved detail target'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-host-intent') == null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.clearDetailTargetBehaviors && window.__REPORT_BUILDER_PREVIEW__.clearDetailTargetBehaviors()"
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const legends = document.querySelectorAll('.forge-report-builder__runtime-preview .forge-chart-legend-action'); legends[1]?.click(); })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('CTV') && text.includes('Show channel details'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-chart-action",
+      "text": "Show channel details",
+      "index": 0
+    },
+    { "type": "waitForDomContains", "text": "Resolved detail target", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Primary Chart is no longer compatible with the current builder selection.') && text.includes('target://steward/performance/channel-detail') && text.includes('CTV') && !text.includes('Detail target resolution failed.') && !text.includes('Failed to resolve detail target'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-host-intent') != null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-report-document-chart-detail-actionable-diagnostics.png",
+      "fullPage": true
+    }
+  ]
+}

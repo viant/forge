@@ -1,0 +1,82 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    { "type": "goto", "url": "/report-builder-preview.html" },
+    { "type": "waitForDomContains", "text": "Semantic Report Builder Preview", "timeoutMs": 60000 },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    { "type": "reload" },
+    { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } window.__artifactDownloadCapture = { filename: '', payload: '', mimeType: '' }; const originalCreate = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__artifactDownloadCapture.mimeType = blob.type || ''; blob.text().then((text) => { window.__artifactDownloadCapture.payload = text; }); return originalCreate(blob); }; const originalClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() { window.__artifactDownloadCapture.filename = this.download || ''; return originalClick.call(this); }; })()"
+    },
+    { "type": "clickRole", "role": "button", "name": "Fork from here" },
+    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Save artifact" },
+    { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare report payload" },
+    { "type": "waitForDomContains", "text": "Saved report payload: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "fillSelector", "selector": "input[aria-label=\"Document version\"]", "value": "11" },
+    { "type": "waitForDomContains", "text": "Using document version 11.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare list response" },
+    { "type": "waitForDomContains", "text": "List ReportDocuments response: 7 entries", "timeoutMs": 60000 },
+    { "type": "selectSelector", "selector": "select[aria-label=\"List response entry\"]", "value": "forecastingLocationsTopMarketsQ3" },
+    { "type": "waitForDomContains", "text": "Selected entry: Forecasting Locations Top Markets Q3", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Selected entry: Forecasting Locations Top Markets Q3') && text.includes('Template: Forecast Location Brief'); })()",
+      "timeoutMs": 60000
+    },
+    { "type": "clickRole", "role": "button", "name": "Prepare get request" },
+    { "type": "waitForDomContains", "text": "\"reportId\": \"forecastingLocationsTopMarketsQ3\"", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare selected get response" },
+    { "type": "waitForDomContains", "text": "Get ReportDocument response: Forecasting Locations Top Markets Q3", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Reopen in builder" },
+    { "type": "waitForDomContains", "text": "Reopened ReportDocument Forecasting Locations Top Markets Q3 for editing.", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const reopened = Array.from(document.querySelectorAll('.forge-report-builder__chart-inline-notice')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Reopened ReportDocument: Forecasting Locations Top Markets Q3')); if (!reopened) { return false; } const text = reopened.innerText || reopened.textContent || ''; return text.includes('Review export') || text.includes('Inspect export'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const reopened = Array.from(document.querySelectorAll('.forge-report-builder__chart-inline-notice')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Reopened ReportDocument: Forecasting Locations Top Markets Q3')); if (!reopened) { throw new Error('Reopened section not found.'); } const button = Array.from(reopened.querySelectorAll('button')).find((entry) => { const text = (entry.innerText || entry.textContent || '').trim(); return text === 'Inspect export' || text === 'Review export'; }); if (!button) { throw new Error('Inspect export button not found in reopened section.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Reopened export request summary\"]')).find(Boolean); if (!summary) { return false; } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const pre = container?.querySelector('pre'); if (!pre) { return false; } try { const parsed = JSON.parse(pre.textContent || '{}'); const reportPrint = parsed?.reportPrint; if (!reportPrint) { return false; } const pages = Array.isArray(reportPrint.pages) ? reportPrint.pages : []; const pageOne = pages.find((page) => page?.number === 1); const pageTwo = pages.find((page) => page?.number === 2); const pageOneElements = Array.isArray(pageOne?.elements) ? pageOne.elements : []; const pageTwoElements = Array.isArray(pageTwo?.elements) ? pageTwo.elements : []; const scope = pageOneElements.find((element) => element?.id === 'scopeFilters__title_0'); const table = pageOneElements.find((element) => element?.id === 'primaryTable__title_0'); const narrative = pageTwoElements.find((element) => element?.id === 'narrativeIntro__title_0'); const kpi = pageTwoElements.find((element) => element?.id === 'headlineKpi__title_0'); const diagnostics = Array.isArray(reportPrint?.diagnostics) ? reportPrint.diagnostics : []; return reportPrint.pageGeometry?.width === 792 && reportPrint.pageGeometry?.height === 612 && pages.length === 2 && !diagnostics.some((entry) => entry?.code === 'unsupportedReportPrintLayoutSize') && scope?.box?.x === 36 && scope?.box?.y === 84 && table?.box?.x === 36 && table?.box?.y === 196 && narrative?.box?.x === 36 && narrative?.box?.y === 424 && narrative?.box?.width === 348 && kpi?.box?.x === 408 && kpi?.box?.y === 424 && kpi?.box?.width === 348; } catch (_) { return false; } })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Reopened export request summary\"]')).find(Boolean); if (!summary) { throw new Error('Reopened export request summary not found.'); } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const button = Array.from(container.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Download export request')); if (!button) { throw new Error('Download export request button not found.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.filename === 'Forecasting Locations Top Markets Q3-savedPayload-pdf-export-request.json'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const raw = window.__artifactDownloadCapture?.payload || ''; if (!raw) { return false; } try { const parsed = JSON.parse(raw); const reportPrint = parsed?.reportPrint; const pages = Array.isArray(reportPrint?.pages) ? reportPrint.pages : []; const pageOne = pages.find((page) => page?.number === 1); const pageTwo = pages.find((page) => page?.number === 2); const pageOneElements = Array.isArray(pageOne?.elements) ? pageOne.elements : []; const pageTwoElements = Array.isArray(pageTwo?.elements) ? pageTwo.elements : []; const scope = pageOneElements.find((element) => element?.id === 'scopeFilters__title_0'); const table = pageOneElements.find((element) => element?.id === 'primaryTable__title_0'); const narrative = pageTwoElements.find((element) => element?.id === 'narrativeIntro__title_0'); const kpi = pageTwoElements.find((element) => element?.id === 'headlineKpi__title_0'); const diagnostics = Array.isArray(reportPrint?.diagnostics) ? reportPrint.diagnostics : []; return reportPrint?.pageGeometry?.width === 792 && reportPrint?.pageGeometry?.height === 612 && pages.length === 2 && !diagnostics.some((entry) => entry?.code === 'unsupportedReportPrintLayoutSize') && scope?.box?.x === 36 && scope?.box?.y === 84 && table?.box?.x === 36 && table?.box?.y === 196 && narrative?.box?.x === 36 && narrative?.box?.y === 424 && narrative?.box?.width === 348 && kpi?.box?.x === 408 && kpi?.box?.y === 424 && kpi?.box?.width === 348; } catch (_) { return false; } })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-forecast-location-template-export-geometry.png",
+      "fullPage": true
+    }
+  ]
+}

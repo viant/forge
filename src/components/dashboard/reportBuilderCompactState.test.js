@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 
 import {
     formatCompactDateRangeSummary,
+    resolveResultIdentityChip,
     resolveCompactStatusText,
     resolveCompactSummaryItems,
+    resolveTablePresetTransitionText,
 } from "./reportBuilderCompactState.js";
 
 assert.equal(formatCompactDateRangeSummary({}), "");
@@ -15,6 +17,54 @@ assert.equal(
 
 assert.equal(resolveCompactStatusText({ loading: true }), "Refreshing report data.");
 assert.equal(resolveCompactStatusText({ error: "boom" }), "Report refresh failed.");
+assert.equal(
+    resolveTablePresetTransitionText({
+        canShowResults: true,
+        activeTablePresetTitle: "Delivery Grid",
+    }),
+    "Showing Delivery Grid.",
+);
+assert.equal(
+    resolveTablePresetTransitionText({
+        modifiedTablePresetTitle: "Delivery Grid",
+    }),
+    "Modified from Delivery Grid.",
+);
+assert.equal(
+    resolveTablePresetTransitionText({
+        readinessReason: "semantic",
+        readinessMessage: "Validating the semantic selection against the provider.",
+        activeTablePresetTitle: "Delivery Grid",
+    }),
+    "Validating the semantic selection against the provider.",
+);
+assert.equal(
+    resolveResultIdentityChip({
+        showingChartView: true,
+        canShowResults: true,
+    }),
+    "Chart view",
+);
+assert.equal(
+    resolveResultIdentityChip({
+        canShowResults: true,
+        activeTablePresetTitle: "Delivery Grid",
+    }),
+    "Delivery Grid",
+);
+assert.equal(
+    resolveResultIdentityChip({
+        modifiedTablePresetTitle: "Delivery Grid",
+    }),
+    "Modified from Delivery Grid",
+);
+assert.equal(
+    resolveResultIdentityChip({
+        canShowResults: true,
+    }),
+    "Table view",
+);
+
 assert.equal(
     resolveCompactStatusText({
         canShowResults: true,
@@ -32,7 +82,28 @@ assert.equal(
     }),
     "Showing 2 rows.",
 );
+assert.equal(
+    resolveCompactStatusText({
+        canShowResults: true,
+        activeTablePresetTitle: "Delivery Grid",
+    }),
+    "Showing Delivery Grid.",
+);
+assert.equal(
+    resolveCompactStatusText({
+        canRunReport: true,
+        modifiedTablePresetTitle: "Delivery Grid",
+    }),
+    "Modified from Delivery Grid.",
+);
 assert.equal(resolveCompactStatusText({ canRunReport: true }), "Ready to run the report.");
+assert.equal(
+    resolveCompactStatusText({
+        readinessReason: "semantic",
+        readinessMessage: "Mapped measures are required before this semantic report can run.",
+    }),
+    "Mapped measures are required before this semantic report can run.",
+);
 assert.equal(resolveCompactStatusText({ readinessReason: "scope" }), "Choose a scope to continue.");
 assert.equal(resolveCompactStatusText({}), "Set the required filters to continue.");
 
@@ -47,25 +118,39 @@ assert.deepEqual(
         viewMode: "chart",
     }),
     [
+        "Chart view",
         "2026-06-01 to 2026-06-07",
         "2 measures",
         "1 breakdown",
         "3 filters",
-        "Chart view",
     ],
 );
 
 assert.deepEqual(
     resolveCompactSummaryItems({
+        activeTablePresetTitle: "Delivery Grid",
         selectedMeasures: ["avails"],
         selectedDimensions: ["eventDate"],
         canShowResults: true,
         viewMode: "table",
     }),
     [
+        "Delivery Grid",
         "1 measure",
         "1 breakdown",
-        "Table view",
+    ],
+);
+
+assert.deepEqual(
+    resolveCompactSummaryItems({
+        modifiedTablePresetTitle: "Delivery Grid",
+        selectedMeasures: ["avails"],
+        selectedDimensions: ["eventDate"],
+    }),
+    [
+        "Modified from Delivery Grid",
+        "1 measure",
+        "1 breakdown",
     ],
 );
 

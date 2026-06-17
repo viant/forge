@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // TargetSpec declares where a metadata node applies.
@@ -671,6 +672,9 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 		if dashboard.VisibleWhen == nil {
 			dashboard.VisibleWhen = compact.VisibleWhen
 		}
+		if isDashboardContainerKind(c.Kind) {
+			c.VisibleWhen = nil
+		}
 	}
 	if compact.Report != nil {
 		c.ensureDashboard().ReportOptions = compact.Report
@@ -818,7 +822,7 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 //	metric: ...
 //
 // New metadata should prefer the grouped form under Container.dashboard, but
-// these aliases remain encoded at the container level for backward
+// these aliases remain accepted at the container level for backward
 // compatibility and concise hand-written YAML.
 type dashboardCompactAliases struct {
 	VisibleWhen *DashboardCondition     `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
@@ -842,6 +846,10 @@ type dashboardCompactAliases struct {
 	Density         string                   `json:"density,omitempty" yaml:"density,omitempty"`
 	FormattingRules []TableFormattingRule    `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
 	RowActions      []DashboardTableAction   `json:"rowActions,omitempty" yaml:"rowActions,omitempty"`
+}
+
+func isDashboardContainerKind(kind string) bool {
+	return strings.HasPrefix(strings.TrimSpace(kind), "dashboard.")
 }
 
 type DashboardReportOptions struct {

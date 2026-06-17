@@ -207,6 +207,9 @@ fun ReportBuilderRenderer(
     var pendingAutoChartRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
     var lastAutoAppliedChartRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
     var lastObservedChartLoading by remember(config, window.windowId) { mutableStateOf(false) }
+    var filtersExpanded by remember(config, window.windowId) { mutableStateOf(true) }
+    var lastObservedFilterLoading by remember(config, window.windowId) { mutableStateOf(false) }
+    var lastAutoCollapsedRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
     val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
@@ -274,6 +277,10 @@ fun ReportBuilderRenderer(
     val aggregatedRows = remember(filteredRows, selectedDimensions, selectedMeasures) {
         aggregateRows(filteredRows, selectedDimensions, selectedMeasures)
     }
+    val activeFilterCount = remember(config.staticFilters, staticFilters, dynamicGroups) {
+        activeReportBuilderFilterCount(config.staticFilters, staticFilters, dynamicGroups)
+    }
+    val hasFilterControls = config.staticFilters.isNotEmpty() || config.dynamicFilterGroups.isNotEmpty() || config.dynamicFilterFamilies.isNotEmpty()
 
     val currentChartSpec = chartSpec
     val chartRows = remember(aggregatedRows, currentChartSpec) {
@@ -412,6 +419,23 @@ fun ReportBuilderRenderer(
         lastAutoAppliedChartRequestSignature = requestSignature
     }
 
+    LaunchedEffect(restoredStoredState, control.loading, control.error, requestSignature, rows) {
+        val completedFetch = lastObservedFilterLoading && !control.loading && control.error.isNullOrBlank()
+        lastObservedFilterLoading = control.loading
+        if (!restoredStoredState || !completedFetch) {
+            return@LaunchedEffect
+        }
+        if (shouldAutoCollapseReportBuilderFilters(
+                hasRows = rows.isNotEmpty(),
+                completedRequestSignature = requestSignature,
+                lastCollapsedRequestSignature = lastAutoCollapsedRequestSignature
+            )
+        ) {
+            lastAutoCollapsedRequestSignature = requestSignature
+            filtersExpanded = false
+        }
+    }
+
     ReportBuilderPanel(container) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ChipSection(
@@ -438,135 +462,144 @@ fun ReportBuilderRenderer(
                     }
                 }
             )
-            StaticFilterSection(config.staticFilters, staticFilters) { key, value ->
-                staticFilters = staticFilters.toMutableMap().apply { put(key, value) }
+            if (hasFilterControls) {
+                ReportBuilderFilterSummary(
+                    activeFilterCount = activeFilterCount,
+                    expanded = filtersExpanded,
+                    onToggle = { filtersExpanded = !filtersExpanded }
+                )
             }
-            DynamicFilterBridgeSection(
-                groups = config.dynamicFilterGroups,
-                families = config.dynamicFilterFamilies,
-                unifiedFamilyRows = config.unifiedFamilyRows,
-                rowsByGroupId = dynamicGroups,
-                drafts = dynamicFilterDrafts,
-                isLookupAvailable = { groupId, filter ->
-                    lookupDescriptors[reportBuilderLookupDescriptorKey(groupId, filter)] != null
-                },
-                onAddRow = { groupId, filterId ->
-                    val row = ReportBuilderDynamicRowState(
-                        id = java.util.UUID.randomUUID().toString(),
-                        filterId = filterId,
-                        enabled = true
-                    )
-                    dynamicGroups = dynamicGroups.toMutableMap().apply {
-                        put(groupId, this[groupId].orEmpty() + row)
-                    }
-                },
-                onChangeFilter = { groupId, rowId, filterId ->
-                    dynamicGroups = dynamicGroups.toMutableMap().apply {
-                        put(groupId, this[groupId].orEmpty().map { row ->
-                            if (row.id == rowId) row.copy(filterId = filterId, selections = emptyList()) else row
-                        })
-                    }
-                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
-                },
-                onToggleEnabled = { groupId, rowId ->
-                    dynamicGroups = dynamicGroups.toMutableMap().apply {
-                        put(groupId, this[groupId].orEmpty().map { row ->
-                            if (row.id == rowId) row.copy(enabled = !row.enabled) else row
-                        })
-                    }
-                },
-                onRemoveRow = { groupId, rowId ->
-                    dynamicGroups = dynamicGroups.toMutableMap().apply {
-                        put(groupId, this[groupId].orEmpty().filterNot { it.id == rowId })
-                    }
-                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
-                },
-                onMoveRow = { fromGroupId, rowId, toGroupId, filterId, resetSelections ->
-                    val row = dynamicGroups[fromGroupId].orEmpty().firstOrNull { it.id == rowId }
-                    if (row != null) {
+            if (filtersExpanded) {
+                StaticFilterSection(config.staticFilters, staticFilters) { key, value ->
+                    staticFilters = staticFilters.toMutableMap().apply { put(key, value) }
+                }
+                DynamicFilterBridgeSection(
+                    groups = config.dynamicFilterGroups,
+                    families = config.dynamicFilterFamilies,
+                    unifiedFamilyRows = config.unifiedFamilyRows,
+                    rowsByGroupId = dynamicGroups,
+                    drafts = dynamicFilterDrafts,
+                    isLookupAvailable = { groupId, filter ->
+                        lookupDescriptors[reportBuilderLookupDescriptorKey(groupId, filter)] != null
+                    },
+                    onAddRow = { groupId, filterId ->
+                        val row = ReportBuilderDynamicRowState(
+                            id = java.util.UUID.randomUUID().toString(),
+                            filterId = filterId,
+                            enabled = true
+                        )
                         dynamicGroups = dynamicGroups.toMutableMap().apply {
-                            put(fromGroupId, this[fromGroupId].orEmpty().filterNot { it.id == rowId })
-                            put(
-                                toGroupId,
-                                this[toGroupId].orEmpty() + row.copy(
-                                    filterId = filterId,
-                                    selections = if (resetSelections) emptyList() else row.selections
-                                )
-                            )
+                            put(groupId, this[groupId].orEmpty() + row)
                         }
-                        if (resetSelections) {
-                            dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
-                        }
-                    }
-                },
-                onDraftChange = { rowId, value ->
-                    dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(rowId, value) }
-                },
-                onAddManualSelection = { groupId, rowId, filter ->
-                    val selection = projectManualDynamicSelection(filter, dynamicFilterDrafts[rowId].orEmpty())
-                    if (selection != null) {
+                    },
+                    onChangeFilter = { groupId, rowId, filterId ->
                         dynamicGroups = dynamicGroups.toMutableMap().apply {
                             put(groupId, this[groupId].orEmpty().map { row ->
-                                if (row.id == rowId) {
-                                    row.copy(
-                                        selections = (row.selections + selection)
-                                            .distinctBy { dynamicSelectionValueKey(it.value) }
-                                    )
-                                } else {
-                                    row
-                                }
+                                if (row.id == rowId) row.copy(filterId = filterId, selections = emptyList()) else row
                             })
                         }
-                        dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(rowId, "") }
-                    }
-                },
-                onRemoveSelection = { groupId, rowId, selection ->
-                    dynamicGroups = dynamicGroups.toMutableMap().apply {
-                        put(groupId, this[groupId].orEmpty().map { row ->
-                            if (row.id == rowId) row.copy(selections = row.selections.filterNot { it == selection }) else row
-                        })
-                    }
-                },
-                onPickSelection = { groupId, rowId, filter ->
-                    coroutineScope.launch {
-                        val descriptor = lookupDescriptors[reportBuilderLookupDescriptorKey(groupId, filter)]
-                            ?: withContext(Dispatchers.Default) {
-                                lookupDescriptorForWindow(
-                                    window = window,
-                                    config = config,
-                                    hookState = hookState,
-                                    groupId = groupId,
-                                    filter = filter
+                        dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
+                    },
+                    onToggleEnabled = { groupId, rowId ->
+                        dynamicGroups = dynamicGroups.toMutableMap().apply {
+                            put(groupId, this[groupId].orEmpty().map { row ->
+                                if (row.id == rowId) row.copy(enabled = !row.enabled) else row
+                            })
+                        }
+                    },
+                    onRemoveRow = { groupId, rowId ->
+                        dynamicGroups = dynamicGroups.toMutableMap().apply {
+                            put(groupId, this[groupId].orEmpty().filterNot { it.id == rowId })
+                        }
+                        dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
+                    },
+                    onMoveRow = { fromGroupId, rowId, toGroupId, filterId, resetSelections ->
+                        val row = dynamicGroups[fromGroupId].orEmpty().firstOrNull { it.id == rowId }
+                        if (row != null) {
+                            dynamicGroups = dynamicGroups.toMutableMap().apply {
+                                put(fromGroupId, this[fromGroupId].orEmpty().filterNot { it.id == rowId })
+                                put(
+                                    toGroupId,
+                                    this[toGroupId].orEmpty() + row.copy(
+                                        filterId = filterId,
+                                        selections = if (resetSelections) emptyList() else row.selections
+                                    )
                                 )
                             }
-                            ?: return@launch
-                        val payload = runtime.openDialogAwaitResult(
-                            windowId = window.windowId,
-                            dialogId = descriptor.dialogId,
-                            parameters = descriptor.parameters,
-                            selectionMode = descriptor.selectionMode
-                        ) ?: return@launch
-                        val projected = projectLookupSelections(filter, payload)
-                        if (projected.isEmpty()) return@launch
+                            if (resetSelections) {
+                                dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { remove(rowId) }
+                            }
+                        }
+                    },
+                    onDraftChange = { rowId, value ->
+                        dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(rowId, value) }
+                    },
+                    onAddManualSelection = { groupId, rowId, filter ->
+                        val selection = projectManualDynamicSelection(filter, dynamicFilterDrafts[rowId].orEmpty())
+                        if (selection != null) {
+                            dynamicGroups = dynamicGroups.toMutableMap().apply {
+                                put(groupId, this[groupId].orEmpty().map { row ->
+                                    if (row.id == rowId) {
+                                        row.copy(
+                                            selections = (row.selections + selection)
+                                                .distinctBy { dynamicSelectionValueKey(it.value) }
+                                        )
+                                    } else {
+                                        row
+                                    }
+                                })
+                            }
+                            dynamicFilterDrafts = dynamicFilterDrafts.toMutableMap().apply { put(rowId, "") }
+                        }
+                    },
+                    onRemoveSelection = { groupId, rowId, selection ->
                         dynamicGroups = dynamicGroups.toMutableMap().apply {
                             put(groupId, this[groupId].orEmpty().map { row ->
-                                if (row.id == rowId) {
-                                    row.copy(
-                                        selections = if (filter.multiple == false) {
-                                            listOf(projected.first())
-                                        } else {
-                                            (row.selections + projected)
-                                                .distinctBy { dynamicSelectionValueKey(it.value) }
-                                        }
-                                    )
-                                } else {
-                                    row
-                                }
+                                if (row.id == rowId) row.copy(selections = row.selections.filterNot { it == selection }) else row
                             })
                         }
+                    },
+                    onPickSelection = { groupId, rowId, filter ->
+                        coroutineScope.launch {
+                            val descriptor = lookupDescriptors[reportBuilderLookupDescriptorKey(groupId, filter)]
+                                ?: withContext(Dispatchers.Default) {
+                                    lookupDescriptorForWindow(
+                                        window = window,
+                                        config = config,
+                                        hookState = hookState,
+                                        groupId = groupId,
+                                        filter = filter
+                                    )
+                                }
+                                ?: return@launch
+                            val payload = runtime.openDialogAwaitResult(
+                                windowId = window.windowId,
+                                dialogId = descriptor.dialogId,
+                                parameters = descriptor.parameters,
+                                selectionMode = descriptor.selectionMode
+                            ) ?: return@launch
+                            val projected = projectLookupSelections(filter, payload)
+                            if (projected.isEmpty()) return@launch
+                            dynamicGroups = dynamicGroups.toMutableMap().apply {
+                                put(groupId, this[groupId].orEmpty().map { row ->
+                                    if (row.id == rowId) {
+                                        row.copy(
+                                            selections = if (filter.multiple == false) {
+                                                listOf(projected.first())
+                                            } else {
+                                                (row.selections + projected)
+                                                    .distinctBy { dynamicSelectionValueKey(it.value) }
+                                            }
+                                        )
+                                    } else {
+                                        row
+                                    }
+                                })
+                            }
+                        }
                     }
-                }
-            )
+                )
+            }
 
             if (config.result?.chartCreationMode == "explicit" && chartSpec == null) {
                 ChartTile(
@@ -1217,6 +1250,31 @@ private fun LookupSelectionControl(
 }
 
 @Composable
+private fun ReportBuilderFilterSummary(
+    activeFilterCount: Int,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text("Filters", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                "$activeFilterCount active",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF6A7280)
+            )
+        }
+        OutlinedButton(onClick = onToggle) {
+            Text(if (expanded) "Hide Body" else "Show Body")
+        }
+    }
+}
+
+@Composable
 private fun StaticFilterSection(
     filters: List<ReportBuilderStaticFilterDef>,
     state: Map<String, Any?>,
@@ -1769,7 +1827,7 @@ internal fun buildReportBuilderRequestPayload(
             setNestedValue(request, filter.paramPath ?: "filters.$filterKey", mapped)
         }
     }
-    val baseRequest = if (request.isEmpty()) emptyMap() else mapOf("input" to mapOf("query" to request))
+    val baseRequest = request.toMap()
     val hookName = config.hooks?.buildRequest?.trim().orEmpty()
     if (hookName.isBlank()) {
         return baseRequest
@@ -2268,6 +2326,46 @@ private fun applyStaticFilters(
                 selected.contains(value)
             }
         }
+    }
+}
+
+internal fun shouldAutoCollapseReportBuilderFilters(
+    hasRows: Boolean,
+    completedRequestSignature: String,
+    lastCollapsedRequestSignature: String
+): Boolean {
+    val signature = completedRequestSignature.trim()
+    return hasRows && signature.isNotEmpty() && signature != lastCollapsedRequestSignature
+}
+
+internal fun activeReportBuilderFilterCount(
+    staticFilters: List<ReportBuilderStaticFilterDef>,
+    staticState: Map<String, Any?>,
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
+): Int {
+    val staticCount = staticFilters.sumOf { filter ->
+        val key = filter.id?.trim().orEmpty()
+        if (key.isEmpty()) 0 else configuredStaticFilterCount(filter, staticState[key])
+    }
+    val dynamicCount = dynamicGroups.values.sumOf { rows ->
+        rows.count { row -> row.selections.isNotEmpty() }
+    }
+    return staticCount + dynamicCount
+}
+
+private fun configuredStaticFilterCount(filter: ReportBuilderStaticFilterDef, value: Any?): Int {
+    val type = (filter.type ?: "").trim().lowercase()
+    if (type == "daterange") {
+        val range = value as? Map<*, *> ?: return 0
+        val start = range["start"]?.toString().orEmpty()
+        val end = range["end"]?.toString().orEmpty()
+        return if (start.isBlank() && end.isBlank()) 0 else 1
+    }
+    return when (value) {
+        null -> 0
+        is List<*> -> value.count { it != null && it.toString().isNotBlank() }
+        is Array<*> -> value.count { it != null && it.toString().isNotBlank() }
+        else -> if (value.toString().isBlank()) 0 else 1
     }
 }
 

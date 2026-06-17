@@ -1,0 +1,188 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Close"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Add table",
+      "exact": true
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Add Table Block",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[placeholder=\"Detail Table\"]",
+      "value": "Comparison Table"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Add Block"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Comparison Table added to the report document.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Edit Comparison Table"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Edit Table Block",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const dialog = Array.from(document.querySelectorAll('[role=\"dialog\"]')).find((node) => ((node.innerText || node.textContent || '').includes('Edit Table Block'))); if (!dialog) { throw new Error('Edit Table Block dialog not found.'); } const select = dialog.querySelector('select[aria-label=\"Visual for Channel\"]'); if (!select) { throw new Error('Channel visual select not found.'); } select.value = 'tone'; select.dispatchEvent(new Event('change', { bubbles: true })); })()"
+    },
+    {
+      "type": "fillSelector",
+      "selector": "textarea[aria-label=\"Tone rules for Channel\"]",
+      "value": "[\n  { \"value\": \"Display\", \"tone\": \"info\", \"label\": \"Display\" },\n  { \"value\": \"CTV\", \"tone\": \"warning\", \"label\": \"CTV\" }\n]"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Apply Changes"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Comparison Table updated.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Channel tone'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Fork from here"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Exploration Session.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"tone\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"tone\": \"warning\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"value\": \"CTV\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 11.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Prepare get response')); if (!button) { throw new Error('Prepare get response button not found.'); } button.click(); })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Reopen in builder')); if (!button) { throw new Error('Reopen in builder button not found.'); } button.click(); })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument Report Builder Demo for editing.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Channel tone'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-runtime-table-panel')); return panels.some((panel) => { const text = panel.innerText || panel.textContent || ''; return text.includes('Available Impressions') && text.includes('Display') && text.includes('CTV'); }); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-authored-table-tone-save-reopen.png",
+      "fullPage": true
+    }
+  ]
+}

@@ -3,6 +3,44 @@ import XCTest
 @testable import ForgeIOSUI
 
 final class ForgeIOSTests: XCTestCase {
+    func testReportBuilderDynamicRowDecodeUsesModelDefaults() throws {
+        let data = Data("""
+        {
+          "filterId": "includeDealsPmp"
+        }
+        """.utf8)
+
+        let row = try JSONDecoder().decode(ReportBuilderDynamicRowState.self, from: data)
+
+        XCTAssertFalse(row.id.isEmpty)
+        XCTAssertEqual(row.filterId, "includeDealsPmp")
+        XCTAssertTrue(row.enabled)
+        XCTAssertTrue(row.selections.isEmpty)
+    }
+
+    func testReportBuilderFiltersAutoCollapseOncePerCompletedResult() {
+        XCTAssertTrue(shouldAutoCollapseReportBuilderFilters(
+            hasRows: true,
+            completedRequestSignature: #"{"filters":{"country":["US"]}}"#,
+            lastCollapsedRequestSignature: ""
+        ))
+        XCTAssertFalse(shouldAutoCollapseReportBuilderFilters(
+            hasRows: true,
+            completedRequestSignature: #"{"filters":{"country":["US"]}}"#,
+            lastCollapsedRequestSignature: #"{"filters":{"country":["US"]}}"#
+        ))
+        XCTAssertFalse(shouldAutoCollapseReportBuilderFilters(
+            hasRows: false,
+            completedRequestSignature: #"{"filters":{"country":["US"]}}"#,
+            lastCollapsedRequestSignature: ""
+        ))
+        XCTAssertFalse(shouldAutoCollapseReportBuilderFilters(
+            hasRows: true,
+            completedRequestSignature: "",
+            lastCollapsedRequestSignature: ""
+        ))
+    }
+
     func testActionHookRuntimeInvokesPureCollectionHook() throws {
         let code = """
         (() => ({
@@ -1243,8 +1281,8 @@ final class ForgeIOSTests: XCTestCase {
           "view": {
             "content": {
               "kind": "dashboard.reportBuilder",
-              "id": "forecastingCubeBuilder",
-              "dataSourceRef": "forecasting_cube_report",
+              "id": "metricsCubeBuilder",
+              "dataSourceRef": "metrics_cube_report",
               "reportBuilder": {
                 "result": {
                   "chartCreationMode": "explicit",

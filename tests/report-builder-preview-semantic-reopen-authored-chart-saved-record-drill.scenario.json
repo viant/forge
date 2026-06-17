@@ -1,0 +1,194 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Fork from here"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Exploration Session.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "12"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 12.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.appendSeededSavedReportPayloadRecord !== 'function') { throw new Error('appendSeededSavedReportPayloadRecord API not available.'); } const appended = api.appendSeededSavedReportPayloadRecord({ reportId: 'authoredChannelChartQ3Preview', title: 'Authored Channel Chart Preview', artifactId: 'authored_channel_chart_q3_preview', documentVersion: 12, savedAt: 9750, baseState: { selectedMeasures: ['avails'], primaryMeasure: 'avails', selectedDimensions: ['channelV2'], viewMode: 'chart', chartSpec: { title: 'Inventory · Top Channels', type: 'horizontal_bar', xField: 'channelV2', yFields: ['avails'] }, orderField: 'avails', orderDir: 'desc', pageSize: 50, staticFilters: { dateRange: { start: '2026-05-01', end: '2026-05-04' } }, binding: { mode: 'semantic', modelRef: 'model://steward/performance/ad_delivery@v1', entity: 'line_delivery', selectedDimensions: ['event_date', 'channel', 'country_code'], selectedMeasures: ['available_impressions'] }, reportDocumentBlocks: [{ id: 'channelDetailChart', kind: 'chartBlock', title: 'Channel Detail Chart', datasetRef: 'primary', chartSpec: { title: 'Channel Detail Chart', type: 'horizontal_bar', xField: 'channelV2', yFields: ['avails'] } }], reportDocumentLayout: { type: 'stack', items: [{ blockId: 'primaryBuilder' }, { blockId: 'channelDetailChart' }] } } }); if (!appended || appended.savedReportPayload?.reportDocument?.id !== 'authoredChannelChartQ3Preview') { throw new Error('Authored chart saved-record append failed.'); } return true; })()"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare list response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "List ReportDocuments response:",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "authoredChannelChartQ3Preview"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get request"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"reportId\": \"authoredChannelChartQ3Preview\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Authored Channel Chart Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Reopen in builder"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument Authored Channel Chart Preview for editing.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'chart' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions[0] === 'channelV2' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec?.title === 'Inventory · Top Channels' && !window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')); const panel = panels.find((entry) => ((entry.innerText || entry.textContent || '')).includes('Channel Detail Chart')); return !!panel && panel.querySelectorAll('.recharts-rectangle, .recharts-bar-rectangle').length >= 1; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')); const panel = panels.find((entry) => ((entry.innerText || entry.textContent || '')).includes('Channel Detail Chart')); if (!panel) { throw new Error('Channel Detail Chart runtime panel not found.'); } const mark = panel.querySelector('.recharts-rectangle, .recharts-bar-rectangle'); if (!mark) { throw new Error('Channel Detail Chart mark not found.'); } mark.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); mark.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); mark.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Channel Detail Chart')); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('Display') && text.includes('Drill to Market'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Channel Detail Chart')); if (!panel) { throw new Error('Channel Detail Chart runtime panel not found.'); } const action = Array.from(panel.querySelectorAll('.forge-report-runtime-chart-action')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Drill to Market')); if (!action) { throw new Error('Channel Detail Chart drill action not found.'); } action.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const root = document.querySelector('.forge-report-builder__runtime-preview'); const text = root?.innerText || root?.textContent || ''; return text.includes('Drill to Market = Display'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel'); const headers = panel?.querySelectorAll('th') || []; const labels = Array.from(headers).map((entry) => (entry.innerText || entry.textContent || '').trim()); return labels.includes('Market') && !labels.includes('Channel'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument: Authored Channel Chart Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel') != null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const root = document.querySelector('.forge-report-builder__runtime-preview'); const text = root?.innerText || root?.textContent || ''; return text.includes('Drill to Market = Display'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel'); const headers = panel?.querySelectorAll('th') || []; const labels = Array.from(headers).map((entry) => (entry.innerText || entry.textContent || '').trim()); return labels.includes('Market') && !labels.includes('Channel'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-authored-chart-saved-record-drill.png",
+      "fullPage": true
+    }
+  ]
+}

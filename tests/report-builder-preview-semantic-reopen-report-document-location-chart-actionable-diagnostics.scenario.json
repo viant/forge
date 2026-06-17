@@ -1,0 +1,77 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    { "type": "goto", "url": "/report-builder-preview.html" },
+    { "type": "waitForDomContains", "text": "Semantic Report Builder Preview", "timeoutMs": 60000 },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    { "type": "reload" },
+    { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.patchSeededSavedReportPayload !== 'function') { return false; } const patched = api.patchSeededSavedReportPayload('forecastingLocationsTopMarketsQ3', { compileState: { status: 'invalid', diagnostics: [ { code: 'semanticGovernance', severity: 'warning', message: 'Market • Deprecated' }, { code: 'documentBlockChartInvalid', severity: 'error', blockId: 'primaryChart', path: 'reportDocument.blocks.primaryChart.chartSpec.xField', message: 'Primary Chart is no longer compatible with the current builder selection.', suggestedFix: 'Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder.' } ] } }); return !!patched && patched.compileState && patched.compileState.status === 'invalid'; })()",
+      "timeoutMs": 60000
+    },
+    { "type": "clickRole", "role": "button", "name": "Fork from here" },
+    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Save artifact" },
+    { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare report payload" },
+    { "type": "waitForDomContains", "text": "Saved report payload: Report Builder Demo", "timeoutMs": 60000 },
+    { "type": "fillSelector", "selector": "input[aria-label=\"Document version\"]", "value": "11" },
+    { "type": "waitForDomContains", "text": "Using document version 11.", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare list response" },
+    { "type": "waitForDomContains", "text": "List ReportDocuments response: 7 entries", "timeoutMs": 60000 },
+    { "type": "selectSelector", "selector": "select[aria-label=\"List response entry\"]", "value": "forecastingLocationsTopMarketsQ3" },
+    { "type": "waitForDomContains", "text": "INVALID", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare get request" },
+    { "type": "waitForDomContains", "text": "\"reportId\": \"forecastingLocationsTopMarketsQ3\"", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Prepare selected get response" },
+    { "type": "waitForDomContains", "text": "Get ReportDocument response: Forecasting Locations Top Markets Q3", "timeoutMs": 60000 },
+    { "type": "clickRole", "role": "button", "name": "Reopen in builder" },
+    { "type": "waitForDomContains", "text": "Reopened ReportDocument Forecasting Locations Top Markets Q3 for editing.", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Reopened ReportDocument: Forecasting Locations Top Markets Q3", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Template: Forecast Location Brief", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Reopened compile diagnostics", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Primary Chart is no longer compatible with the current builder selection.", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder.", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "documentBlockChartInvalid", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Block primaryChart", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "reportDocument.blocks.primaryChart.chartSpec.xField", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Runtime Diagnostics", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const state = window.__REPORT_BUILDER_PREVIEW__?.getBuilderState?.(); return state?.reportDocumentReopenSession?.reopenedCompileState?.status === 'invalid'; })()",
+      "timeoutMs": 60000
+    },
+    { "type": "reload" },
+    { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Reopened ReportDocument: Forecasting Locations Top Markets Q3", "timeoutMs": 60000 },
+    { "type": "waitForDomContains", "text": "Primary Chart is no longer compatible with the current builder selection.", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const state = window.__REPORT_BUILDER_PREVIEW__?.getBuilderState?.(); return state?.reportDocumentReopenSession?.reopenedCompileState?.status === 'invalid'; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-report-document-location-chart-actionable-diagnostics.png",
+      "fullPage": true
+    }
+  ]
+}

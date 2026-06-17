@@ -1,0 +1,109 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create or apply a chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.resetCounters && window.__REPORT_BUILDER_PREVIEW__.resetCounters();"
+    },
+    {
+      "type": "clickSelector",
+      "selector": ".forge-report-builder__chart-action-button--quick"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": "[role=\"menuitem\"]",
+      "text": "HH Uniques by Country",
+      "index": 0,
+      "force": true
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Showing HH Uniques by Country.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "CHART VIEW",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Applied this preset's required measures and breakdowns. Validating the semantic selection against the provider."
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Showing HH Uniques by Country."
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Failed to render dashboard block"
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Resolve semantic selection issues"
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Semantic validation: Semantic provider unavailable."
+    },
+    {
+      "type": "wait",
+      "ms": 1200
+    },
+    {
+      "type": "waitForEval",
+      "expression": "Boolean(window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.validateSelectionCount >= 1)",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "Boolean(window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.windowFormChangeCount >= 1 && window.__REPORT_BUILDER_PREVIEW__.inputSignalChangeCount >= 1 && window.__REPORT_BUILDER_PREVIEW__.fetchCollectionCount >= 1 && window.__REPORT_BUILDER_PREVIEW__.fetchRecordsCount >= 1)",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-transition-proof.png"
+    }
+  ]
+}

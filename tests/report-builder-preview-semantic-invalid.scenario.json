@@ -1,0 +1,79 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Setup",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "BREAK DOWN BY",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select",
+      "index": 0,
+      "value": "agegroupId"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic provider diagnostics",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Audience Age Group is not supported for this semantic selection in the demo provider."
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Household Uniques cannot be combined with Audience Age Group in this demo semantic provider."
+    },
+    {
+      "type": "assertDomContains",
+      "text": "Resolve semantic selection issues"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run').length >= 2 && Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run').every((button) => button.disabled === true)",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-invalid-proof.png",
+      "fullPage": true
+    }
+  ]
+}

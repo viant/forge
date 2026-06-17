@@ -31,12 +31,20 @@ import {
     buildPieChartData,
     fillMissingTemporalBuckets,
     formatTimestamp,
+    normalizeChartKey,
     readChartDataValue,
     resolveChartBodyState,
+    resolveChartLoadingState,
     resolveVisibleChartState,
     transformData,
 } from "./chartData.js";
 import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
+import {
+    collectChartLegendSelectionRows,
+    normalizeChartDatumSelection,
+    normalizeChartLegendSelection,
+    normalizeChartSeriesDatumSelection,
+} from "./chartSelectionModel.js";
 import { SoftBlock } from "./SoftSkeleton.jsx";
 import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
@@ -281,7 +289,7 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-const Chart = ({container, context, isActive = true, embedded = false}) => {
+const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null}) => {
     useSignals();
     const log = getLogger('chart');
     const {chart} = container;
@@ -359,7 +367,12 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const resolvedTickFormat = resolveMappedConfigValue(context, xAxis, "tickFormat", "windowForm");
     const { collection, loading, error } = useDataSourceState(chartContext);
     const chartMetrics = chartContext?.signals?.metrics?.value || {};
-    const effectiveCollection = Array.isArray(container?.collection) ? container.collection : collection;
+    const collectionOverride = Array.isArray(container?.collection) ? container.collection : null;
+    const effectiveCollection = collectionOverride || collection;
+    const effectiveLoading = resolveChartLoadingState({
+        loading,
+        collectionOverride,
+    });
     const chartSourceKey = useMemo(() => {
         const dataSourceId = String(chartContext?.identity?.dataSourceId || chartContext?.identity?.dataSourceRef || "");
         const inputSnapshot = chartContext?.signals?.input?.peek?.() || {};
@@ -404,7 +417,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         chartData: prepared.chartData,
         availableDataKeys: prepared.availableDataKeys,
         yAxisLabel: prepared.yAxisLabel,
-        loading,
+        loading: effectiveLoading,
         error,
         sourceKey: chartSourceKey,
         previousState: lastRenderableStateRef.current,
@@ -416,7 +429,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const staleWhileLoading = visibleState.staleWhileLoading;
 
     useEffect(() => {
-        if (!loading && !error && Array.isArray(prepared.chartData) && prepared.chartData.length > 0) {
+        if (!effectiveLoading && !error && Array.isArray(prepared.chartData) && prepared.chartData.length > 0) {
             lastRenderableStateRef.current = {
                 chartData: prepared.chartData,
                 availableDataKeys: prepared.availableDataKeys,
@@ -424,7 +437,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 sourceKey: chartSourceKey,
             };
         }
-    }, [prepared.chartData, prepared.availableDataKeys, prepared.yAxisLabel, loading, error, chartSourceKey]);
+    }, [prepared.chartData, prepared.availableDataKeys, prepared.yAxisLabel, effectiveLoading, error, chartSourceKey]);
 
     useEffect(() => {
         setSelectedDataKeys((previousKeys) => {
@@ -503,6 +516,9 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         };
     }), [availableDataKeys, palette, seriesDefinitions]);
 
+    const interactiveDatumSelection = typeof onDatumSelect === "function";
+    const interactiveLegendSelection = typeof onLegendItemSelect === "function";
+
     const selectedSeriesDefinitions = directSeriesChart
         ? seriesDefinitions.filter((entry) => selectedDataKeys.includes(entry.value))
         : selectedDataKeys.map((dataKey, index) => ({
@@ -513,6 +529,104 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             axis: "left",
             color: palette[index % Math.max(palette.length, 1)] || "#137cbd",
         }));
+
+    const emitDatumSelection = React.useCallback((event) => {
+        if (!interactiveDatumSelection) {
+            return;
+        }
+        const selection = normalizeChartDatumSelection({
+            event,
+            chart,
+            xAxisDataKey: normalizeChartKey(xAxis?.dataKey || "name"),
+        });
+        if (!selection) {
+            return;
+        }
+        onDatumSelect(selection);
+    }, [interactiveDatumSelection, onDatumSelect, chart, xAxis?.dataKey]);
+
+    const emitLegendSelection = React.useCallback((entry) => {
+        if (!interactiveLegendSelection) {
+            return;
+        }
+        const legendSeriesKey = String(entry?.value || entry?.dataKey || entry?.payload?.value || entry?.payload?.dataKey || "").trim();
+        const selection = normalizeChartLegendSelection({
+            entry,
+            selectionRows: collectChartLegendSelectionRows(chartData, legendSeriesKey),
+        });
+        if (!selection) {
+            return;
+        }
+        onLegendItemSelect(selection);
+    }, [chartData, interactiveLegendSelection, onLegendItemSelect]);
+
+    const emitSeriesDatumSelection = React.useCallback((seriesKey, event) => {
+        if (!interactiveDatumSelection) {
+            return;
+        }
+        const selection = normalizeChartSeriesDatumSelection({
+            event,
+            seriesKey,
+            xAxisDataKey: normalizeChartKey(xAxis?.dataKey || "name"),
+            chartRows: chartData,
+        });
+        if (!selection) {
+            return;
+        }
+        onDatumSelect(selection);
+    }, [chartData, interactiveDatumSelection, onDatumSelect, xAxis?.dataKey]);
+
+    const interactiveLegendContent = interactiveLegendSelection ? ((legendPropsInput = {}) => {
+        const payload = Array.isArray(legendPropsInput?.payload) ? legendPropsInput.payload : [];
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    justifyContent: "center",
+                    paddingTop: embedded ? 0 : 6,
+                }}
+            >
+                {payload.map((entry, index) => {
+                    const label = String(entry?.value || entry?.dataKey || `Series ${index + 1}`);
+                    const color = entry?.color || entry?.payload?.color || palette[index % Math.max(palette.length, 1)] || "#137cbd";
+                    return (
+                        <button
+                            key={`${label}-${index}`}
+                            type="button"
+                            className="forge-chart-legend-action"
+                            onClick={() => emitLegendSelection(entry)}
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                border: "1px solid #d8e1e8",
+                                background: "#ffffff",
+                                color: "#30404d",
+                                borderRadius: 999,
+                                padding: "4px 10px",
+                                cursor: "pointer",
+                                fontSize: 11,
+                                fontWeight: 600,
+                            }}
+                        >
+                            <span
+                                aria-hidden="true"
+                                style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: "999px",
+                                    background: color,
+                                }}
+                            />
+                            <span>{label}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        );
+    }) : null;
 
     const sharedChartChildren = (
         <>
@@ -572,7 +686,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 }}
                 contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
             />
-            {showChartLegend ? <Legend {...legendProps}/> : null}
+            {showChartLegend ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})}/> : null}
             {selectedSeriesDefinitions.map((entry, index) => {
                 const commonProps = {
                     dataKey: entry.value,
@@ -587,12 +701,12 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 };
 
                 if (entry.type === "bar") {
-                    return <Bar key={entry.value} {...commonProps} stackId={entry.stackId} />;
+                    return <Bar key={entry.value} {...commonProps} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})} />;
                 }
                 if (entry.type === "area") {
-                    return <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+                    return <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={embedded || interactiveDatumSelection ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})} />;
                 }
-                return <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={embedded ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} />;
+                return <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={embedded || interactiveDatumSelection ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})} />;
             })}
         </>
     );
@@ -673,9 +787,15 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                     formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
                     contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
                 />
-                {selectedSeriesDefinitions.length > 1 ? <Legend {...legendProps} /> : null}
+                {selectedSeriesDefinitions.length > 1 ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})} /> : null}
                 {selectedSeriesDefinitions.length === 1 ? (
-                    <Bar dataKey={primarySeries.value} name={primarySeries.name || primarySeries.label} fill={primarySeries.color} barSize={barSize}>
+                    <Bar
+                        dataKey={primarySeries.value}
+                        name={primarySeries.name || primarySeries.label}
+                        fill={primarySeries.color}
+                        barSize={barSize}
+                        {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(primarySeries.value, payload) } : {})}
+                    >
                         {normalizedChartData.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={activePalette[index % activePalette.length]} />
                         ))}
@@ -689,6 +809,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                             fill={entry.color}
                             barSize={barSize}
                             stackId={type === "funnel_bar" ? undefined : entry.stackId}
+                            {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}
                         />
                     ))
                 )}
@@ -713,6 +834,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
                 data={pieFilteredData}
                 dataKey="value"
                 nameKey="name"
+                {...(interactiveDatumSelection ? { onClick: emitDatumSelection } : {})}
                 cx="50%"
                 cy="50%"
                 innerRadius={pieInnerRadius}
@@ -732,6 +854,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
             {showChartLegend ? (
                 <Legend
                     {...(embedded ? {wrapperStyle: {fontSize: "11px"}, iconSize: 10} : {})}
+                    {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})}
                 />
             ) : null}
         </PieChart>
@@ -821,7 +944,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => Number.isFinite(Number(row?.[entry.value]))));
     const hasResolvedMetricsPayload = chartMetrics && typeof chartMetrics === 'object' && Object.keys(chartMetrics).length > 0;
     const showResolvedEmptyStateWhileLoading =
-        loading
+        effectiveLoading
         && !staleWhileLoading
         && !error
         && !hasChartRows
@@ -829,7 +952,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
     const emptyChartMessage = resolveEmptyChartMessage(chartMetrics);
     const showSeriesSelectionControls = !showResolvedEmptyStateWhileLoading;
     const { showSelectionMessage, showEmptyDataMessage } = resolveChartBodyState({
-        loading,
+        loading: effectiveLoading,
         error,
         hasUnderlyingChartRows,
         canRenderChartSelection,
@@ -930,7 +1053,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
         <div
             style={{width: resolvedWidth, minWidth: 0, display: "flex", flexDirection: "column", gap: 8, position: "relative"}}
             data-dashboard-chart-id={chartExportId}
-            data-chart-loading={loading ? "true" : "false"}
+            data-chart-loading={effectiveLoading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
         >
             {showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
@@ -1022,7 +1145,7 @@ const Chart = ({container, context, isActive = true, embedded = false}) => {
 
             {viewMode === "chart" ? (
                 <div ref={chartRef} style={chartViewportStyle}>
-                    {loading && !staleWhileLoading && !showResolvedEmptyStateWhileLoading && !error ? (
+                    {effectiveLoading && !staleWhileLoading && !showResolvedEmptyStateWhileLoading && !error ? (
                         <div
                             style={{
                                 height: "100%",

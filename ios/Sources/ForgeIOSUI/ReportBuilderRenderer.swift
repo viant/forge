@@ -27,6 +27,8 @@ public struct ReportBuilderRenderer: View {
     @State private var requestBridgeGeneration = 0
     @State private var completedRequestSignature = ""
     @State private var lastAutoAppliedRequestSignature = ""
+    @State private var filtersExpanded = true
+    @State private var lastAutoCollapsedRequestSignature = ""
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, config: DashboardReportBuilderDef) {
         self.runtime = runtime
@@ -63,6 +65,7 @@ public struct ReportBuilderRenderer: View {
             refreshStoredPresets()
         }
         .onChange(of: completedRequestSignature) {
+            autoCollapseFiltersAfterCompletedResult()
             guard explicitChartMode,
                   config.result?.autoApplyDefaultChartOnResult == true,
                   chartSpec == nil,
@@ -89,8 +92,9 @@ public struct ReportBuilderRenderer: View {
         ReportBuilderLayoutView(
             measuresSection: measuresSection,
             dimensionsSection: dimensionsSection,
-            staticFiltersSection: staticFiltersSectionView,
-            dynamicFiltersSection: dynamicFiltersSectionView,
+            filterSummarySection: filterSummarySectionView,
+            staticFiltersSection: filtersExpanded ? staticFiltersSectionView : AnyView(EmptyView()),
+            dynamicFiltersSection: filtersExpanded ? dynamicFiltersSectionView : AnyView(EmptyView()),
             chartCreationSection: chartCreationSectionView,
             chartModeSection: chartModeSectionView,
             resultSection: resultSectionView
@@ -345,6 +349,62 @@ public struct ReportBuilderRenderer: View {
 
     private var resultSectionView: AnyView {
         AnyView(resultSection)
+    }
+
+    private var filterSummarySectionView: AnyView {
+        AnyView(filterSummarySection)
+    }
+
+    @ViewBuilder
+    private var filterSummarySection: some View {
+        if hasFilterControls {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Filters")
+                        .font(.subheadline.weight(.semibold))
+                    Text(filterSummaryText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button {
+                    filtersExpanded.toggle()
+                } label: {
+                    Label(filtersExpanded ? "Hide Body" : "Show Body", systemImage: filtersExpanded ? "chevron.up" : "slider.horizontal.3")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    private var hasFilterControls: Bool {
+        !config.staticFilters.isEmpty
+            || !config.dynamicFilterGroups.isEmpty
+            || !config.dynamicFilterFamilies.isEmpty
+    }
+
+    private var filterSummaryText: String {
+        let count = activeFilterCount
+        if count == 0 {
+            return filtersExpanded ? "No active filters" : "No active filters hidden"
+        }
+        return "\(count) active\(filtersExpanded ? "" : " hidden")"
+    }
+
+    private var activeFilterCount: Int {
+        let staticCount = config.staticFilters.reduce(0) { total, filter in
+            total + Self.countConfiguredStaticFilter(filter: filter, value: staticFilters[filter.identityKey])
+        }
+        let dynamicCount = dynamicGroups.values
+            .flatMap { $0 }
+            .filter { $0.enabled }
+            .reduce(0) { total, row in
+                total + max(1, row.selections.count)
+            }
+        return staticCount + dynamicCount
     }
 
     @ViewBuilder
@@ -770,8 +830,13 @@ public struct ReportBuilderRenderer: View {
             "config": Self.jsonValue(from: config)
         ])
         guard let result = invokeHook(functionName: hookName, props: props),
-              let data = try? JSONEncoder().encode(result),
-              let next = try? JSONDecoder().decode(StoredReportBuilderState.self, from: data) else {
+              let data = try? JSONEncoder().encode(result) else {
+            return
+        }
+        let next: StoredReportBuilderState
+        do {
+            next = try JSONDecoder().decode(StoredReportBuilderState.self, from: data)
+        } catch {
             return
         }
         apply(restored: next)
@@ -896,6 +961,18 @@ public struct ReportBuilderRenderer: View {
         if control.error == nil {
             completedRequestSignature = requestSignature
         }
+    }
+
+    private func autoCollapseFiltersAfterCompletedResult() {
+        guard shouldAutoCollapseReportBuilderFilters(
+            hasRows: !rows.isEmpty,
+            completedRequestSignature: completedRequestSignature,
+            lastCollapsedRequestSignature: lastAutoCollapsedRequestSignature
+        ) else {
+            return
+        }
+        lastAutoCollapsedRequestSignature = completedRequestSignature
+        filtersExpanded = false
     }
 
     @MainActor
@@ -1140,6 +1217,15 @@ public struct ReportBuilderRenderer: View {
         }
     }
 
+    private static func countConfiguredStaticFilter(filter: ReportBuilderStaticFilterDef, value: ReportBuilderStaticFilterValue?) -> Int {
+        guard let value else { return 0 }
+        let type = (filter.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if type == "daterange" {
+            return value.startValue.isEmpty && value.endValue.isEmpty ? 0 : 1
+        }
+        return value.listValue.count
+    }
+
     private static func normalize(_ spec: ReportBuilderChartSpecDef) -> ReportBuilderChartSpecDef {
         ReportBuilderChartSpecDef(
             title: spec.title,
@@ -1276,7 +1362,7 @@ public struct ReportBuilderRenderer: View {
         for (path, values) in dynamicAggregates {
             setNestedValue(&request, path: path, value: .array(uniqueDynamicValues(values)))
         }
-        return request.isEmpty ? [:] : ["input": .object(["query": .object(request)])]
+        return request
     }
 
     private static func coerceDynamicFilterValue(
@@ -1663,6 +1749,18 @@ private struct StoredReportBuilderChartPreset: Codable, Sendable {
     let updatedAt: TimeInterval
 }
 
+internal func shouldAutoCollapseReportBuilderFilters(
+    hasRows: Bool,
+    completedRequestSignature: String,
+    lastCollapsedRequestSignature: String
+) -> Bool {
+    let completed = completedRequestSignature.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard hasRows, !completed.isEmpty else {
+        return false
+    }
+    return completed != lastCollapsedRequestSignature.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 private struct StoredReportBuilderState: Codable, Sendable {
     let selectedMeasures: [String]
     let selectedDimensions: [String]
@@ -1679,6 +1777,13 @@ struct ReportBuilderDynamicRowState: Codable, Sendable, Identifiable, Equatable 
     let enabled: Bool
     let selections: [ReportBuilderDynamicSelectionState]
 
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case filterId
+        case enabled
+        case selections
+    }
+
     init(
         id: String = UUID().uuidString,
         filterId: String,
@@ -1689,6 +1794,22 @@ struct ReportBuilderDynamicRowState: Codable, Sendable, Identifiable, Equatable 
         self.filterId = filterId
         self.enabled = enabled
         self.selections = selections
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        self.filterId = try container.decode(String.self, forKey: .filterId)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        self.selections = try container.decodeIfPresent([ReportBuilderDynamicSelectionState].self, forKey: .selections) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(filterId, forKey: .filterId)
+        try container.encode(enabled, forKey: .enabled)
+        try container.encode(selections, forKey: .selections)
     }
 }
 

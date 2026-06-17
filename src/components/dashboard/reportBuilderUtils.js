@@ -1,4 +1,22 @@
 import { resolveKey } from "../../utils/selector.js";
+import { normalizeSemanticBinding, validateSemanticBinding } from "../../semantic/modelValidation.js";
+import {
+    applyReportCalculatedFields,
+    normalizeReportCalculatedFields,
+} from "../../reporting/calculatedFieldModel.js";
+import { normalizeReportTableBlockColumn } from "../../reporting/tableVisualSpec.js";
+import {
+    buildReportBuilderCalculatedFieldConfig,
+    normalizeReportBuilderLocalCalculatedFields,
+    normalizeReportBuilderLocalTableCalculations,
+} from "./reportBuilderCalculatedFieldAuthoring.js";
+import {
+    normalizeReportBuilderExplorationState,
+} from "./reportBuilderExplorationSession.js";
+import {
+    buildReportBuilderSemanticSelection,
+    resolveReportBuilderSemanticSelections,
+} from "./reportBuilderSemantic.js";
 import {
     ALL_SUPPORTED_CHART_TYPES,
     chartFamilyAllowsSeriesOptions,
@@ -66,6 +84,30 @@ export function shouldAutoCollapseReportBuilderFilters({
         && runSequence !== lastCollapsed;
 }
 
+export function resolveReportBuilderRailFilterState({
+    panelOpen = false,
+    canShowResults = false,
+    manualRunSequence = 0,
+    seededRequestFingerprint = "",
+    collapsedSeededFingerprint = "",
+} = {}) {
+    const open = !!panelOpen;
+    const runSequence = Number(manualRunSequence || 0);
+    const requestFingerprint = String(seededRequestFingerprint || "").trim();
+    const lastCollapsedFingerprint = String(collapsedSeededFingerprint || "").trim();
+    return {
+        panelOpen: open,
+        showRailCategories: !open,
+        showOverlayBody: open,
+        shouldAutoCollapseSeededPanel: open
+            && !!canShowResults
+            && Number.isFinite(runSequence)
+            && runSequence === 0
+            && requestFingerprint !== ""
+            && requestFingerprint !== lastCollapsedFingerprint,
+    };
+}
+
 function formatDateISO(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -120,6 +162,64 @@ function defaultSelectedIds(items = [], fallbackCount = 1) {
         .slice(0, fallbackCount)
         .map((item) => String(item?.id || "").trim())
         .filter(Boolean);
+}
+
+function resolveSelectedDerivedMeasureIds(state = {}) {
+    const currentMeasures = normalizeStringArray(state?.selectedMeasures);
+    if (currentMeasures.length === 0) {
+        return [];
+    }
+    const localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(state?.localCalculatedFields);
+    const localTableCalculations = normalizeReportBuilderLocalTableCalculations(state?.localTableCalculations);
+    const derivedMeasureIds = new Set(
+        normalizeReportCalculatedFields([
+            ...localCalculatedFields,
+            ...localTableCalculations,
+        ])
+            .map((field) => String(field?.id || field?.key || "").trim())
+            .filter(Boolean),
+    );
+    return currentMeasures.filter((id) => derivedMeasureIds.has(id));
+}
+
+function appendPreservedDerivedSelections(config = {}, state = {}, {
+    selectedMeasures = [],
+    selectedDimensions = [],
+} = {}) {
+    const nextSelectedMeasures = [...normalizeStringArray(selectedMeasures)];
+    const nextSelectedDimensions = [...normalizeStringArray(selectedDimensions)];
+    const derivedMeasureIds = resolveSelectedDerivedMeasureIds(state);
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const localTableCalculationIds = new Set(
+        normalizeReportBuilderLocalTableCalculations(state?.localTableCalculations)
+            .map((entry) => String(entry?.id || entry?.key || "").trim())
+            .filter(Boolean),
+    );
+    const tableCalculationIndex = new Map(
+        getNormalizedTableCalculationMeasures(effectiveConfig)
+            .filter((entry) => localTableCalculationIds.has(String(entry?.id || "").trim()))
+            .map((entry) => [String(entry?.id || "").trim(), entry])
+            .filter(([id]) => !!id),
+    );
+    derivedMeasureIds.forEach((measureId) => {
+        if (!nextSelectedMeasures.includes(measureId)) {
+            nextSelectedMeasures.push(measureId);
+        }
+        const tableCalculation = tableCalculationIndex.get(measureId);
+        if (!tableCalculation) {
+            return;
+        }
+        const { requiredDimensionIds } = resolveReportBuilderTableCalculationDimensionRequirements(effectiveConfig, tableCalculation);
+        normalizeStringArray(requiredDimensionIds).forEach((dimensionId) => {
+            if (!nextSelectedDimensions.includes(dimensionId)) {
+                nextSelectedDimensions.push(dimensionId);
+            }
+        });
+    });
+    return {
+        selectedMeasures: nextSelectedMeasures,
+        selectedDimensions: nextSelectedDimensions,
+    };
 }
 
 function defaultStaticFilterValue(filter = {}) {
@@ -373,6 +473,12 @@ function normalizeStringArray(values = []) {
     return normalizeArray(values).map((entry) => String(entry || "").trim()).filter(Boolean);
 }
 
+function normalizeTablePresetColumns(columns = []) {
+    return normalizeArray(columns)
+        .map((entry) => normalizeReportTableBlockColumn(typeof entry === "string" ? { key: entry } : entry))
+        .filter(Boolean);
+}
+
 const DEFAULT_CHART_PALETTE = [
     "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728",
     "#9467bd", "#8c564b", "#e377c2", "#7f7f7f",
@@ -410,18 +516,77 @@ export function getVisibleReportBuilderMeasures(config = {}) {
 }
 
 export function getComputedReportBuilderMeasures(config = {}) {
-    return normalizeArray(config.computedMeasures).filter((entry) => isVisibleField(entry));
+    return [
+        ...normalizeArray(config.calculatedFields),
+        ...normalizeArray(config.computedMeasures),
+    ].filter((entry) => isVisibleField(entry));
+}
+
+export function getTableCalculationReportBuilderMeasures(config = {}) {
+    return normalizeArray(config.tableCalculations).filter((entry) => isVisibleField(entry));
 }
 
 export function getSelectableReportBuilderMeasures(config = {}) {
     return [
         ...getVisibleReportBuilderMeasures(config),
         ...getComputedReportBuilderMeasures(config),
+        ...getTableCalculationReportBuilderMeasures(config),
     ];
 }
 
 export function getVisibleReportBuilderDimensions(config = {}) {
     return normalizeArray(config.dimensions).filter((entry) => isVisibleField(entry));
+}
+
+function getNormalizedTableCalculationMeasures(config = {}) {
+    return normalizeReportCalculatedFields(getTableCalculationReportBuilderMeasures(config))
+        .filter((entry) => entry?.kind === "tableCalc");
+}
+
+function getNormalizedReportBuilderCalculatedFields(config = {}) {
+    return normalizeReportCalculatedFields([
+        ...getComputedReportBuilderMeasures(config),
+        ...getTableCalculationReportBuilderMeasures(config),
+    ]);
+}
+
+function resolveReportBuilderTableCalculationDimensionRequirements(config = {}, definition = null) {
+    const compute = definition?.compute || {};
+    const sourceField = String(compute?.sourceField || "").trim();
+    const fieldKeys = Array.from(new Set([
+        ...normalizeArray(compute.partitionBy),
+        ...normalizeArray(compute.orderBy).map((entry) => entry?.field),
+    ].map((entry) => String(entry || "").trim()).filter(Boolean)));
+    const requiredDimensions = [];
+    const requiredDimensionIds = [];
+    const requiredDimensionLabels = [];
+    const missingDimensionFields = [];
+    const seenDimensionIds = new Set();
+
+    fieldKeys.forEach((fieldKey) => {
+        const dimension = resolveReportBuilderDimensionByField(config, fieldKey);
+        const dimensionId = String(dimension?.id || "").trim();
+        if (dimension && dimensionId) {
+            if (!seenDimensionIds.has(dimensionId)) {
+                seenDimensionIds.add(dimensionId);
+                requiredDimensions.push(dimension);
+                requiredDimensionIds.push(dimensionId);
+                requiredDimensionLabels.push(String(dimension?.label || dimensionId).trim());
+            }
+            return;
+        }
+        if (fieldKey === sourceField || resolveReportBuilderMeasureByField(config, fieldKey)) {
+            return;
+        }
+        missingDimensionFields.push(fieldKey);
+    });
+
+    return {
+        requiredDimensions,
+        requiredDimensionIds,
+        requiredDimensionLabels,
+        missingDimensionFields,
+    };
 }
 
 function reportBuilderDimensionValueKey(entry = {}) {
@@ -491,6 +656,9 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         return null;
     }
     const title = String(chartSpec.title || "").trim();
+    const eyebrow = String(chartSpec.eyebrow || "").trim();
+    const accentTone = String(chartSpec.accentTone || "").trim();
+    const highlights = normalizeStringArray(chartSpec.highlights);
     const type = String(chartSpec.type || "").trim().toLowerCase() || "line";
     const xField = normalizeChartSpecValue(chartSpec.xField);
     const yFields = normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
@@ -498,6 +666,9 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     return {
         ...(title ? { title } : {}),
+        ...(eyebrow ? { eyebrow } : {}),
+        ...(accentTone ? { accentTone } : {}),
+        ...(highlights.length > 0 ? { highlights } : {}),
         type,
         xField,
         yFields: Array.from(new Set(yFields)),
@@ -635,6 +806,133 @@ export function resolveReportBuilderMeasureByField(config = {}, fieldKey = "") {
     }) || null;
 }
 
+function resolveReportBuilderOrderFieldEntries(config = {}) {
+    return normalizeArray(config?.result?.orderFields || config?.orderFields);
+}
+
+export function clearReportBuilderGroupByWhenMissing(config = {}, groupBy = "", selectedDimensions = []) {
+    const normalizedGroupBy = String(groupBy || "").trim();
+    if (!normalizedGroupBy) {
+        return "";
+    }
+    const normalizedSelectedDimensions = normalizeArray(selectedDimensions)
+        .map((entry) => String(entry || "").trim())
+        .filter(Boolean);
+    const groupByOptions = normalizeArray(config?.groupBy?.options);
+    const groupByDimensionId = String(
+        groupByOptions.find((entry) => String(entry?.value || "").trim() === normalizedGroupBy)?.dimensionId
+        || normalizedGroupBy,
+    ).trim();
+    return normalizedSelectedDimensions.includes(groupByDimensionId) ? normalizedGroupBy : "";
+}
+
+function resolveReportBuilderOrderFieldToken(entry = {}) {
+    return String(entry?.value || entry?.field || "").trim();
+}
+
+function resolveReportBuilderOrderFieldEntry(config = {}, orderField = "") {
+    const target = String(orderField || "").trim();
+    if (!target) {
+        return null;
+    }
+    return resolveReportBuilderOrderFieldEntries(config).find((entry) => resolveReportBuilderOrderFieldToken(entry) === target) || null;
+}
+
+function isReportBuilderOrderFieldCompatible(config = {}, state = {}, orderField = "") {
+    const entry = resolveReportBuilderOrderFieldEntry(config, orderField);
+    if (!entry) {
+        return false;
+    }
+    const target = resolveReportBuilderOrderFieldToken(entry);
+    if (!target) {
+        return false;
+    }
+    const selectedDimensions = normalizeArray(state?.selectedDimensions).map((value) => String(value || "").trim()).filter(Boolean);
+    const selectedMeasures = normalizeArray(state?.selectedMeasures).map((value) => String(value || "").trim()).filter(Boolean);
+    const dimension = resolveReportBuilderDimensionByField(config, target);
+    if (dimension) {
+        return selectedDimensions.includes(String(dimension?.id || "").trim());
+    }
+    const measure = resolveReportBuilderMeasureByField(config, target);
+    if (measure) {
+        return selectedMeasures.includes(String(measure?.id || "").trim());
+    }
+    return true;
+}
+
+function resolveReportBuilderOrderFieldForTarget(config = {}, target = "") {
+    const normalizedTarget = String(target || "").trim();
+    if (!normalizedTarget) {
+        return "";
+    }
+    const targetDimension = resolveReportBuilderDimensionByField(config, normalizedTarget);
+    const targetMeasure = resolveReportBuilderMeasureByField(config, normalizedTarget);
+    const match = resolveReportBuilderOrderFieldEntries(config).find((entry) => {
+        const entryTarget = resolveReportBuilderOrderFieldToken(entry);
+        if (!entryTarget) {
+            return false;
+        }
+        if (entryTarget === normalizedTarget) {
+            return true;
+        }
+        const entryDimension = resolveReportBuilderDimensionByField(config, entryTarget);
+        if (entryDimension && targetDimension) {
+            return String(entryDimension?.id || "").trim() === String(targetDimension?.id || "").trim();
+        }
+        const entryMeasure = resolveReportBuilderMeasureByField(config, entryTarget);
+        if (entryMeasure && targetMeasure) {
+            return String(entryMeasure?.id || "").trim() === String(targetMeasure?.id || "").trim();
+        }
+        return false;
+    });
+    return resolveReportBuilderOrderFieldToken(match);
+}
+
+function normalizeReportBuilderOrderDirection(value = "") {
+    return String(value || "").trim().toLowerCase() === "asc" ? "asc" : "desc";
+}
+
+function normalizeReportBuilderOrderState(config = {}, state = {}, defaults = {}) {
+    const orderEntries = resolveReportBuilderOrderFieldEntries(config);
+    if (orderEntries.length === 0) {
+        return {
+            orderField: "",
+            orderDir: normalizeReportBuilderOrderDirection(state?.orderDir || defaults?.orderDir || "desc"),
+        };
+    }
+    const currentOrderField = String(state?.orderField || "").trim();
+    if (currentOrderField && isReportBuilderOrderFieldCompatible(config, state, currentOrderField)) {
+        const currentEntry = resolveReportBuilderOrderFieldEntry(config, currentOrderField);
+        return {
+            orderField: resolveReportBuilderOrderFieldToken(currentEntry),
+            orderDir: normalizeReportBuilderOrderDirection(state?.orderDir || currentEntry?.defaultDirection || defaults?.orderDir || "desc"),
+        };
+    }
+    const fallbackTargets = [
+        String(defaults?.orderField || "").trim(),
+        ...normalizeArray(state?.selectedMeasures).map((value) => String(value || "").trim()),
+        ...normalizeArray(state?.selectedDimensions).map((value) => String(value || "").trim()),
+    ];
+    for (const target of fallbackTargets) {
+        const fallbackField = resolveReportBuilderOrderFieldForTarget(config, target);
+        if (!fallbackField) {
+            continue;
+        }
+        if (!isReportBuilderOrderFieldCompatible(config, state, fallbackField)) {
+            continue;
+        }
+        const fallbackEntry = resolveReportBuilderOrderFieldEntry(config, fallbackField);
+        return {
+            orderField: fallbackField,
+            orderDir: normalizeReportBuilderOrderDirection(fallbackEntry?.defaultDirection || defaults?.orderDir || state?.orderDir || "desc"),
+        };
+    }
+    return {
+        orderField: "",
+        orderDir: normalizeReportBuilderOrderDirection(state?.orderDir || defaults?.orderDir || "desc"),
+    };
+}
+
 export function buildReportBuilderChartFields(config = {}, state = {}) {
     return buildReportBuilderColumns(config, state).map((entry) => ({
         key: String(entry?.chartKey || entry?.displayKey || entry?.key || "").trim(),
@@ -767,9 +1065,13 @@ export function isReportBuilderChartSpecStale(config = {}, chartSpec = null, col
 }
 
 export function buildReportBuilderSettingsHash(state = {}) {
+    const binding = normalizeSemanticBinding(state?.binding);
     const signature = JSON.stringify({
+        ...(binding ? { binding } : {}),
         dimensions: normalizeStringArray(state?.selectedDimensions),
         measures: normalizeStringArray(state?.selectedMeasures),
+        localCalculatedFields: normalizeReportBuilderLocalCalculatedFields(state?.localCalculatedFields),
+        localTableCalculations: normalizeReportBuilderLocalTableCalculations(state?.localTableCalculations),
     });
     let hash = 5381;
     for (let i = 0; i < signature.length; i += 1) {
@@ -777,6 +1079,165 @@ export function buildReportBuilderSettingsHash(state = {}) {
         hash &= 0xffffffff;
     }
     return `rb_${(hash >>> 0).toString(16)}`;
+}
+
+function resolveValidSemanticBinding(binding = null) {
+    const normalized = normalizeSemanticBinding(binding);
+    if (!normalized) {
+        return null;
+    }
+    const validation = validateSemanticBinding(normalized);
+    return validation.valid ? validation.normalizedBinding : null;
+}
+
+function normalizeActiveTablePreset(preset = null) {
+    if (!preset || typeof preset !== "object" || Array.isArray(preset)) {
+        return null;
+    }
+    const id = String(preset.id || "").trim();
+    const title = String(preset.title || "").trim();
+    const eyebrow = String(preset.eyebrow || "").trim();
+    const accentTone = String(preset.accentTone || "").trim();
+    const highlights = normalizeStringArray(preset.highlights);
+    const dimensions = normalizeStringArray(preset.dimensions);
+    const measures = normalizeStringArray(preset.measures);
+    const columns = normalizeTablePresetColumns(preset.columns);
+    if (!id || !title || (dimensions.length === 0 && measures.length === 0)) {
+        return null;
+    }
+    const groupBy = String(preset.groupBy || "").trim();
+    const primaryMeasure = String(preset.primaryMeasure || measures[0] || "").trim();
+    const orderField = String(preset.orderField || "").trim();
+    const orderDir = String(preset.orderDir || "").trim().toLowerCase() === "asc" ? "asc" : "desc";
+    const pageSize = Math.max(1, Number(preset.pageSize || 0) || 0) || null;
+    const description = String(preset.description || "").trim();
+    return {
+        id,
+        title,
+        ...(description ? { description } : {}),
+        ...(eyebrow ? { eyebrow } : {}),
+        ...(accentTone ? { accentTone } : {}),
+        ...(highlights.length > 0 ? { highlights } : {}),
+        dimensions,
+        measures,
+        ...(columns.length > 0 ? { columns } : {}),
+        ...(primaryMeasure ? { primaryMeasure } : {}),
+        ...(groupBy ? { groupBy } : {}),
+        ...(orderField ? { orderField } : {}),
+        ...(pageSize ? { pageSize } : {}),
+        ...(typeof preset?.clearChart === "boolean" ? { clearChart: preset.clearChart } : {}),
+        orderDir,
+    };
+}
+
+function resolveLocalDerivedPresetMeasureIds(preset = null, state = {}) {
+    const normalizedPreset = normalizeActiveTablePreset(preset);
+    const presetMeasureIds = new Set(normalizedPreset?.measures || []);
+    return new Set(
+        resolveSelectedDerivedMeasureIds(state)
+            .filter((id) => !presetMeasureIds.has(id)),
+    );
+}
+
+function resolveLocalDerivedPresetDimensionIds(config = {}, preset = null, state = {}) {
+    const normalizedPreset = normalizeActiveTablePreset(preset);
+    if (!normalizedPreset) {
+        return new Set();
+    }
+    const presetDimensionIds = new Set(normalizedPreset.dimensions);
+    const selectedLocalDerivedMeasureIds = new Set(resolveSelectedDerivedMeasureIds(state));
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const mergedLocalTableCalculations = getNormalizedTableCalculationMeasures(effectiveConfig)
+        .filter((entry) => selectedLocalDerivedMeasureIds.has(String(entry?.id || "").trim()));
+    const extraDimensionIds = new Set();
+    mergedLocalTableCalculations.forEach((tableCalculation) => {
+        const { requiredDimensionIds } = resolveReportBuilderTableCalculationDimensionRequirements(effectiveConfig, tableCalculation);
+        normalizeStringArray(requiredDimensionIds).forEach((dimensionId) => {
+            if (!presetDimensionIds.has(dimensionId)) {
+                extraDimensionIds.add(dimensionId);
+            }
+        });
+    });
+    return extraDimensionIds;
+}
+
+function reconcileActiveTablePresetState(config = {}, state = {}) {
+    const next = {
+        ...state,
+        activeTablePreset: normalizeActiveTablePreset(state?.activeTablePreset),
+        lastTablePreset: normalizeActiveTablePreset(state?.lastTablePreset),
+    };
+    if (next.activeTablePreset && matchesActiveTablePreset(config, next, next.activeTablePreset)) {
+        next.lastTablePreset = next.activeTablePreset;
+        return next;
+    }
+    if (next.activeTablePreset && !matchesActiveTablePreset(config, next, next.activeTablePreset)) {
+        next.lastTablePreset = next.activeTablePreset;
+        next.activeTablePreset = null;
+        return next;
+    }
+    if (!next.activeTablePreset && next.lastTablePreset && matchesActiveTablePreset(config, next, next.lastTablePreset)) {
+        next.activeTablePreset = next.lastTablePreset;
+    }
+    return next;
+}
+
+function matchesActiveTablePreset(config = {}, state = {}, preset = null) {
+    const normalizedPreset = normalizeActiveTablePreset(preset);
+    if (!normalizedPreset) {
+        return false;
+    }
+    const ignoredSelectedMeasureIds = resolveLocalDerivedPresetMeasureIds(normalizedPreset, state);
+    const ignoredSelectedDimensionIds = resolveLocalDerivedPresetDimensionIds(config, normalizedPreset, state);
+    const comparableSelectedDimensions = normalizeStringArray(state?.selectedDimensions)
+        .filter((id) => !ignoredSelectedDimensionIds.has(id));
+    const comparableSelectedMeasures = normalizeStringArray(state?.selectedMeasures)
+        .filter((id) => !ignoredSelectedMeasureIds.has(id));
+    if (JSON.stringify(comparableSelectedDimensions) !== JSON.stringify(normalizedPreset.dimensions)) {
+        return false;
+    }
+    if (JSON.stringify(comparableSelectedMeasures) !== JSON.stringify(normalizedPreset.measures)) {
+        return false;
+    }
+    if (String(state?.primaryMeasure || "").trim() !== String(normalizedPreset.primaryMeasure || "").trim()) {
+        return false;
+    }
+    if (String(state?.groupBy || "").trim() !== String(normalizedPreset.groupBy || "").trim()) {
+        return false;
+    }
+    if (String(normalizedPreset.orderField || "").trim()) {
+        if (String(state?.orderField || "").trim() !== normalizedPreset.orderField) {
+            return false;
+        }
+        if (String(state?.orderDir || "").trim().toLowerCase() !== normalizedPreset.orderDir) {
+            return false;
+        }
+    }
+    if (normalizedPreset.pageSize && Number(state?.pageSize || 0) !== normalizedPreset.pageSize) {
+        return false;
+    }
+    return true;
+}
+
+function resolveMergedSemanticBinding(configBinding = null, persistedBinding = null) {
+    const normalizedConfig = resolveValidSemanticBinding(configBinding);
+    const normalizedPersisted = resolveValidSemanticBinding(persistedBinding);
+    if (!normalizedPersisted) {
+        return normalizedConfig;
+    }
+    if (!normalizedConfig) {
+        return normalizedPersisted;
+    }
+    if (normalizedConfig.mode !== normalizedPersisted.mode) {
+        return normalizedConfig;
+    }
+    if (normalizedConfig.mode === "semantic" && (
+        normalizedConfig.modelRef !== normalizedPersisted.modelRef
+        || normalizedConfig.entity !== normalizedPersisted.entity
+    )) {
+        return normalizedConfig;
+    }
+    return normalizedPersisted;
 }
 
 export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed = {}, options = {}) {
@@ -822,14 +1283,58 @@ export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed
 export function buildReportBuilderDefaultChartSpecs(config = {}, state = {}) {
     return normalizeArray(config?.result?.defaultChartSpecs).map((entry) => {
         const built = buildDefaultReportBuilderChartSpec(config, state, entry);
+        const eyebrow = String(entry?.eyebrow || "").trim();
+        const accentTone = String(entry?.accentTone || "").trim();
+        const highlights = normalizeStringArray(entry?.highlights);
+        const groupDescription = String(entry?.groupDescription || "").trim();
         if (!built) {
             return null;
         }
         return {
             ...built,
             group: String(entry?.group || "").trim(),
+            ...(groupDescription ? { groupDescription } : {}),
+            ...(eyebrow ? { eyebrow } : {}),
+            ...(accentTone ? { accentTone } : {}),
+            ...(highlights.length > 0 ? { highlights } : {}),
             selectionPolicy: String(entry?.selectionPolicy || "").trim().toLowerCase() === "replace" ? "replace" : "",
             title: String(entry?.title || built.title || "").trim() || "Default chart",
+        };
+    }).filter(Boolean);
+}
+
+export function buildReportBuilderDefaultTablePresets(config = {}, state = {}) {
+    return normalizeArray(config?.result?.defaultTablePresets).map((entry, index) => {
+        const dimensions = normalizeStringArray(entry?.dimensions);
+        const measures = normalizeStringArray(entry?.measures);
+        const columns = normalizeTablePresetColumns(entry?.columns);
+        const highlights = normalizeStringArray(entry?.highlights);
+        const eyebrow = String(entry?.eyebrow || "").trim();
+        const accentTone = String(entry?.accentTone || "").trim();
+        const groupDescription = String(entry?.groupDescription || "").trim();
+        if (dimensions.length === 0 && measures.length === 0) {
+            return null;
+        }
+        return {
+            id: String(entry?.id || `tablePreset_${index + 1}`).trim(),
+            title: String(entry?.title || "Table preset").trim() || "Table preset",
+            group: String(entry?.group || "Tables").trim() || "Tables",
+            ...(groupDescription ? { groupDescription } : {}),
+            description: String(entry?.description || "").trim(),
+            ...(eyebrow ? { eyebrow } : {}),
+            ...(accentTone ? { accentTone } : {}),
+            ...(highlights.length > 0 ? { highlights } : {}),
+            ...(columns.length > 0 ? { columns } : {}),
+            selectionPolicy: String(entry?.selectionPolicy || "").trim().toLowerCase() === "merge" ? "merge" : "replace",
+            dimensions,
+            measures,
+            primaryMeasure: String(entry?.primaryMeasure || measures[0] || "").trim(),
+            ...(String(entry?.groupBy || "").trim() ? { groupBy: String(entry?.groupBy || "").trim() } : {}),
+            orderField: String(entry?.orderField || "").trim(),
+            orderDir: String(entry?.orderDir || "").trim().toLowerCase() === "asc" ? "asc" : "desc",
+            pageSize: Math.max(1, Number(entry?.pageSize || 0) || 0) || null,
+            clearChart: entry?.clearChart !== false,
+            viewMode: "table",
         };
     }).filter(Boolean);
 }
@@ -842,6 +1347,124 @@ export function getReportBuilderQuickPresetPolicy(config = {}) {
         autoFetchOnSelect: quickPresets?.autoFetchOnSelect === true,
         selectionPolicy: selectionPolicy === "replace" ? "replace" : "merge",
     };
+}
+
+export function buildReportBuilderQuickViewOptions({
+    config = {},
+    state = {},
+    quickPresetPolicy = {},
+    defaultTablePresets = [],
+    modifiedTablePreset = null,
+    defaultChartSpecs = [],
+    previousChartPresets = [],
+} = {}) {
+    const buildTableQuickOptionMeta = (entry = {}) => {
+        const metaItems = normalizeStringArray(entry?.highlights);
+        if (metaItems.length > 0) {
+            return metaItems;
+        }
+        const derivedItems = [];
+        const dimensions = normalizeStringArray(entry?.dimensions);
+        const measures = normalizeStringArray(entry?.measures);
+        if (dimensions.length > 0) {
+            derivedItems.push(`${dimensions.length} breakdown${dimensions.length === 1 ? "" : "s"}`);
+        }
+        if (measures.length > 0) {
+            derivedItems.push(`${measures.length} measure${measures.length === 1 ? "" : "s"}`);
+        }
+        if (Number(entry?.pageSize || 0) > 0) {
+            derivedItems.push(`${Number(entry.pageSize)} rows`);
+        }
+        return derivedItems;
+    };
+
+    const tables = normalizeArray(defaultTablePresets).map((entry, index) => {
+        const prepared = prepareReportBuilderTablePresetApplication(config, state, entry, {
+            forceAutoFetch: quickPresetPolicy.autoFetchOnSelect,
+            selectionPolicy: entry.selectionPolicy || quickPresetPolicy.selectionPolicy,
+        });
+        const dependencyHint = prepared.canApply
+            ? ""
+            : (prepared.message ? ` — ${prepared.message}` : "");
+        return {
+            value: `table:${index}`,
+            label: String(entry?.title || "").trim(),
+            kind: "table",
+            group: String(entry?.group || "Tables").trim() || "Tables",
+            groupDescription: String(entry?.groupDescription || "").trim(),
+            spec: entry,
+            eyebrow: String(entry?.eyebrow || "").trim(),
+            accentTone: String(entry?.accentTone || "").trim(),
+            metaItems: buildTableQuickOptionMeta(entry),
+            description: dependencyHint
+                ? `${String(entry?.description || "Table preset").trim() || "Table preset"} ${dependencyHint.trim()}`
+                : (String(entry?.description || "").trim() || "Table-first preset with curated columns, sort order, and export-ready grid semantics."),
+            prepared,
+        };
+    });
+
+    const modifiedTable = modifiedTablePreset
+        ? [{
+            value: "table:modified",
+            label: `${String(modifiedTablePreset?.title || "").trim() || "Table preset"} (Modified)`,
+            kind: "table",
+            group: "Modified Table",
+            groupDescription: String(modifiedTablePreset?.groupDescription || "").trim(),
+            spec: modifiedTablePreset,
+            eyebrow: String(modifiedTablePreset?.eyebrow || "").trim(),
+            accentTone: String(modifiedTablePreset?.accentTone || "").trim(),
+            metaItems: buildTableQuickOptionMeta(modifiedTablePreset),
+            description: "Modified table preset. Reapply the last named table preset after custom table changes.",
+            prepared: prepareReportBuilderTablePresetApplication(config, state, modifiedTablePreset, {
+                forceAutoFetch: quickPresetPolicy.autoFetchOnSelect,
+                selectionPolicy: "replace",
+            }),
+        }]
+        : [];
+
+    const defaults = normalizeArray(defaultChartSpecs).map((entry, index) => {
+        const selectionPolicy = String(entry?.selectionPolicy || quickPresetPolicy.selectionPolicy || "").trim().toLowerCase() === "replace"
+            ? "replace"
+            : "merge";
+        const prepared = prepareReportBuilderChartApplication(config, state, entry, {
+            autoProvisionMissingDimensions: quickPresetPolicy.autoProvisionMissingDimensions,
+            forceAutoFetch: quickPresetPolicy.autoFetchOnSelect,
+            selectionPolicy,
+        });
+        const dependencyHint = prepared.requiresDimensionProvision
+            ? (
+                prepared.autoProvisionMissingDimensions
+                    ? ` adds ${prepared.missingDimensionLabels.join(", ")}`
+                    : ` requires ${prepared.missingDimensionLabels.join(", ")}`
+            )
+            : "";
+        return {
+            value: `default:${index}`,
+            label: String(entry?.title || "").trim(),
+            kind: "default",
+            group: String(entry?.group || "").trim() || "Presets",
+            groupDescription: String(entry?.groupDescription || "").trim(),
+            spec: entry,
+            eyebrow: String(entry?.eyebrow || "").trim(),
+            accentTone: String(entry?.accentTone || "").trim(),
+            metaItems: normalizeStringArray(entry?.highlights),
+            description: dependencyHint
+                ? `Chart preset (${entry.type}) — ${dependencyHint.trim()}`
+                : `Chart preset (${entry.type}) for a curated visual read of the current table.`,
+            prepared,
+        };
+    });
+
+    const previous = normalizeArray(previousChartPresets).map((entry, index) => ({
+        value: `previous:${index}`,
+        label: String(entry?.title || "").trim(),
+        kind: "previous",
+        group: "Previous",
+        spec: entry.chartSpec,
+        description: "Previous chart preset for this field set.",
+    }));
+
+    return [...modifiedTable, ...tables, ...defaults, ...previous];
 }
 
 export function getReportBuilderAutoChartPolicy(config = {}) {
@@ -894,7 +1517,8 @@ export function resolveReportBuilderChartDependencies(config = {}, chartSpec = n
 }
 
 export function prepareReportBuilderChartApplication(config = {}, state = {}, chartSpec = null, options = {}) {
-    const { normalizedChartSpec, dimensionIds, dimensions, measureIds, measures } = resolveReportBuilderChartDependencies(config, chartSpec);
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const { normalizedChartSpec, dimensionIds, dimensions, measureIds, measures } = resolveReportBuilderChartDependencies(effectiveConfig, chartSpec);
     const selectedDimensionIds = normalizeArray(state?.selectedDimensions)
         .map((entry) => String(entry || "").trim())
         .filter(Boolean);
@@ -908,39 +1532,64 @@ export function prepareReportBuilderChartApplication(config = {}, state = {}, ch
     const missingDimensions = dimensions.filter((entry) => missingDimensionIds.includes(String(entry?.id || "").trim()));
     const missingMeasureIds = measureIds.filter((entry) => !selectedMeasureIds.includes(entry));
     const missingMeasures = measures.filter((entry) => missingMeasureIds.includes(String(entry?.id || "").trim()));
-    const nextSelectedDimensions = selectionPolicy === "replace"
+    const baseSelectedDimensions = selectionPolicy === "replace"
         ? (dimensionIds.length > 0 ? [...dimensionIds] : selectedDimensionIds)
         : (autoProvisionMissingDimensions
             ? [...selectedDimensionIds, ...missingDimensionIds.filter((entry) => !selectedDimensionIds.includes(entry))]
             : selectedDimensionIds);
-    const nextSelectedMeasures = selectionPolicy === "replace"
+    const baseSelectedMeasures = selectionPolicy === "replace"
         ? (measureIds.length > 0 ? [...measureIds] : selectedMeasureIds)
         : (autoProvisionMissingMeasures
             ? [...selectedMeasureIds, ...missingMeasureIds.filter((entry) => !selectedMeasureIds.includes(entry))]
             : selectedMeasureIds);
+    const {
+        selectedDimensions: nextSelectedDimensions,
+        selectedMeasures: nextSelectedMeasures,
+    } = selectionPolicy === "replace"
+        ? appendPreservedDerivedSelections(config, state, {
+            selectedMeasures: baseSelectedMeasures,
+            selectedDimensions: baseSelectedDimensions,
+        })
+        : {
+            selectedDimensions: baseSelectedDimensions,
+            selectedMeasures: baseSelectedMeasures,
+        };
     const nextPrimaryMeasure = measureIds.length > 0
         ? measureIds[0]
         : (nextSelectedMeasures.includes(String(state?.primaryMeasure || "").trim()) ? String(state?.primaryMeasure || "").trim() : (nextSelectedMeasures[0] || ""));
+    const nextGroupBy = selectionPolicy === "replace"
+        ? String(
+            dimensions.find((entry) => String(entry?.id || "").trim() === String(normalizedChartSpec?.seriesField || "").trim())?.id
+            || ""
+        ).trim()
+        : String(state?.groupBy || "").trim();
     const nextState = {
         ...state,
         selectedDimensions: nextSelectedDimensions,
         selectedMeasures: nextSelectedMeasures,
         primaryMeasure: nextPrimaryMeasure,
+        groupBy: nextGroupBy,
         chartSpec: normalizedChartSpec,
         viewMode: "chart",
         page: 1,
     };
-    const chartFields = buildReportBuilderChartFields(config, nextState);
-    const validation = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
+    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, nextState, buildReportBuilderDefaultState(effectiveConfig));
+    nextState.orderField = normalizedOrder.orderField;
+    nextState.orderDir = normalizedOrder.orderDir;
+    const chartFields = buildReportBuilderChartFields(effectiveConfig, nextState);
+    const validation = validateReportBuilderChartSpec(effectiveConfig, normalizedChartSpec, chartFields);
     const missingDimensionLabels = missingDimensions.map((entry) => String(entry?.label || entry?.id || "").trim()).filter(Boolean);
     const missingDimensionLabel = missingDimensionLabels.join(", ");
     const missingMeasureLabels = missingMeasures.map((entry) => String(entry?.label || entry?.id || "").trim()).filter(Boolean);
     const dimensionSelectionChanged = JSON.stringify(nextSelectedDimensions) !== JSON.stringify(selectedDimensionIds);
     const measureSelectionChanged = JSON.stringify(nextSelectedMeasures) !== JSON.stringify(selectedMeasureIds);
     const primaryMeasureChanged = nextPrimaryMeasure !== String(state?.primaryMeasure || "").trim();
-    const selectionChanged = dimensionSelectionChanged || measureSelectionChanged || primaryMeasureChanged;
+    const groupByChanged = nextGroupBy !== String(state?.groupBy || "").trim();
+    const orderChanged = nextState.orderField !== String(state?.orderField || "").trim()
+        || nextState.orderDir !== normalizeReportBuilderOrderDirection(state?.orderDir || "");
+    const selectionChanged = dimensionSelectionChanged || measureSelectionChanged || primaryMeasureChanged || groupByChanged || orderChanged;
     const forceAutoFetch = options?.forceAutoFetch === true;
-    const shouldFetch = (forceAutoFetch || config?.request?.autoFetch !== false) && canAutoFetchReportBuilder(config, nextState) && selectionChanged;
+    const shouldFetch = (forceAutoFetch || effectiveConfig?.request?.autoFetch !== false) && canAutoFetchReportBuilder(effectiveConfig, nextState) && selectionChanged;
     let reason = "";
     let message = "";
     if (!normalizedChartSpec) {
@@ -975,9 +1624,11 @@ export function prepareReportBuilderChartApplication(config = {}, state = {}, ch
         dimensionSelectionChanged,
         measureSelectionChanged,
         primaryMeasureChanged,
+        groupByChanged,
+        orderChanged,
         selectionChanged,
         shouldFetch,
-        requiresManualRun: !shouldFetch && selectionChanged && canAutoFetchReportBuilder(config, nextState),
+        requiresManualRun: !shouldFetch && selectionChanged && canAutoFetchReportBuilder(effectiveConfig, nextState),
         canApply: !!normalizedChartSpec && validation.valid,
         reason,
         message,
@@ -1021,56 +1672,254 @@ export function prepareReportBuilderAutoChartApplication(config = {}, state = {}
     return null;
 }
 
-function normalizeComputedMeasure(definition = {}) {
-    if (!definition || typeof definition !== "object") {
-        return null;
+export function prepareReportBuilderTablePresetApplication(config = {}, state = {}, tablePreset = null, options = {}) {
+    const normalizedPreset = tablePreset && typeof tablePreset === "object" ? tablePreset : null;
+    if (!normalizedPreset) {
+        return {
+            normalizedPreset: null,
+            nextState: state,
+            canApply: false,
+            reason: "missingPreset",
+            message: "This table preset is incomplete.",
+            shouldFetch: false,
+            requiresManualRun: false,
+            selectionChanged: false,
+            dimensionSelectionChanged: false,
+            measureSelectionChanged: false,
+            primaryMeasureChanged: false,
+            orderChanged: false,
+            pageSizeChanged: false,
+            viewChanged: false,
+            missingDimensionIds: [],
+            missingMeasureIds: [],
+            missingDimensionLabels: [],
+            missingMeasureLabels: [],
+        };
     }
-    const compute = definition.compute || {};
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const dimensionDefs = getVisibleReportBuilderDimensions(effectiveConfig);
+    const measureDefs = getSelectableReportBuilderMeasures(effectiveConfig);
+    const dimensionIndex = new Map(dimensionDefs.map((entry) => [String(entry?.id || "").trim(), entry]));
+    const measureIndex = new Map(measureDefs.map((entry) => [String(entry?.id || "").trim(), entry]));
+    const requestedDimensions = normalizeStringArray(normalizedPreset.dimensions);
+    const requestedMeasures = normalizeStringArray(normalizedPreset.measures);
+    const missingDimensionIds = requestedDimensions.filter((id) => !dimensionIndex.has(id));
+    const missingMeasureIds = requestedMeasures.filter((id) => !measureIndex.has(id));
+    const missingDimensionLabels = missingDimensionIds.map((id) => id);
+    const missingMeasureLabels = missingMeasureIds.map((id) => id);
+    if (missingDimensionIds.length > 0 || missingMeasureIds.length > 0) {
+        const missingParts = [
+            missingDimensionLabels.length > 0 ? `breakdowns ${missingDimensionLabels.join(", ")}` : "",
+            missingMeasureLabels.length > 0 ? `measures ${missingMeasureLabels.join(", ")}` : "",
+        ].filter(Boolean);
+        return {
+            normalizedPreset,
+            nextState: state,
+            canApply: false,
+            reason: "missingFields",
+            message: `This table preset references unavailable ${missingParts.join(" and ")}.`,
+            shouldFetch: false,
+            requiresManualRun: false,
+            selectionChanged: false,
+            dimensionSelectionChanged: false,
+            measureSelectionChanged: false,
+            primaryMeasureChanged: false,
+            orderChanged: false,
+            pageSizeChanged: false,
+            viewChanged: false,
+            missingDimensionIds,
+            missingMeasureIds,
+            missingDimensionLabels,
+            missingMeasureLabels,
+        };
+    }
+    const selectionPolicy = String(options?.selectionPolicy || normalizedPreset.selectionPolicy || "").trim().toLowerCase() === "merge" ? "merge" : "replace";
+    const currentDimensions = normalizeStringArray(state?.selectedDimensions);
+    const currentMeasures = normalizeStringArray(state?.selectedMeasures);
+    const baseSelectedDimensions = selectionPolicy === "merge"
+        ? [...currentDimensions, ...requestedDimensions.filter((id) => !currentDimensions.includes(id))]
+        : (requestedDimensions.length > 0 ? requestedDimensions : currentDimensions);
+    const baseSelectedMeasures = selectionPolicy === "merge"
+        ? [...currentMeasures, ...requestedMeasures.filter((id) => !currentMeasures.includes(id))]
+        : (requestedMeasures.length > 0 ? requestedMeasures : currentMeasures);
+    const {
+        selectedDimensions: nextSelectedDimensions,
+        selectedMeasures: nextSelectedMeasures,
+    } = selectionPolicy === "replace"
+        ? appendPreservedDerivedSelections(config, state, {
+            selectedMeasures: baseSelectedMeasures,
+            selectedDimensions: baseSelectedDimensions,
+        })
+        : {
+            selectedDimensions: baseSelectedDimensions,
+            selectedMeasures: baseSelectedMeasures,
+        };
+    const nextPrimaryMeasure = nextSelectedMeasures.includes(String(normalizedPreset.primaryMeasure || "").trim())
+        ? String(normalizedPreset.primaryMeasure || "").trim()
+        : (nextSelectedMeasures[0] || String(state?.primaryMeasure || "").trim());
+    const nextState = {
+        ...state,
+        selectedDimensions: nextSelectedDimensions,
+        selectedMeasures: nextSelectedMeasures,
+        primaryMeasure: nextPrimaryMeasure,
+        viewMode: "table",
+        page: 1,
+        groupBy: String(normalizedPreset.groupBy || "").trim(),
+        ...(normalizedPreset.orderField ? { orderField: normalizedPreset.orderField } : {}),
+        ...(normalizedPreset.orderDir ? { orderDir: normalizedPreset.orderDir } : {}),
+        ...(normalizedPreset.pageSize ? { pageSize: normalizedPreset.pageSize } : {}),
+        ...(normalizedPreset.clearChart ? { chartSpec: null } : {}),
+        activeTablePreset: normalizeActiveTablePreset(normalizedPreset),
+        lastTablePreset: normalizeActiveTablePreset(normalizedPreset),
+    };
+    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, nextState, buildReportBuilderDefaultState(effectiveConfig));
+    nextState.orderField = normalizedOrder.orderField;
+    nextState.orderDir = normalizedOrder.orderDir;
+    const dimensionSelectionChanged = JSON.stringify(nextSelectedDimensions) !== JSON.stringify(currentDimensions);
+    const measureSelectionChanged = JSON.stringify(nextSelectedMeasures) !== JSON.stringify(currentMeasures);
+    const primaryMeasureChanged = nextPrimaryMeasure !== String(state?.primaryMeasure || "").trim();
+    const orderChanged = nextState.orderField !== String(state?.orderField || "").trim()
+        || nextState.orderDir !== normalizeReportBuilderOrderDirection(state?.orderDir || "");
+    const pageSizeChanged = !!normalizedPreset.pageSize && normalizedPreset.pageSize !== Number(state?.pageSize || 0);
+    const viewChanged = String(state?.viewMode || "").trim() !== "table";
+    const chartChanged = normalizedPreset.clearChart === true && !!state?.chartSpec;
+    const selectionChanged = dimensionSelectionChanged || measureSelectionChanged || primaryMeasureChanged || orderChanged || pageSizeChanged || viewChanged || chartChanged;
+    const forceAutoFetch = options?.forceAutoFetch === true;
+    const shouldFetch = (forceAutoFetch || effectiveConfig?.request?.autoFetch !== false) && canAutoFetchReportBuilder(effectiveConfig, nextState) && selectionChanged;
     return {
-        ...definition,
-        key: definition.key || definition.id,
-        dependencies: normalizeArray(definition.dependencies || compute.dependencies).map((entry) => String(entry).trim()).filter(Boolean),
-        compute,
+        normalizedPreset,
+        nextState,
+        canApply: true,
+        reason: "",
+        message: "",
+        shouldFetch,
+        requiresManualRun: !shouldFetch && selectionChanged && canAutoFetchReportBuilder(effectiveConfig, nextState),
+        selectionChanged,
+        dimensionSelectionChanged,
+        measureSelectionChanged,
+        primaryMeasureChanged,
+        orderChanged,
+        pageSizeChanged,
+        viewChanged,
+        missingDimensionIds,
+        missingMeasureIds,
+        missingDimensionLabels,
+        missingMeasureLabels,
+    };
+}
+
+export function prepareReportBuilderTableCalculationApplication(config = {}, state = {}, tableCalculationId = "", options = {}) {
+    const calculationId = String(tableCalculationId || "").trim();
+    const tableCalculation = getNormalizedTableCalculationMeasures(config)
+        .find((entry) => String(entry?.id || "").trim() === calculationId);
+    if (!tableCalculation) {
+        return {
+            tableCalculation: null,
+            nextState: state,
+            canApply: false,
+            reason: "missingTableCalculation",
+            message: "This table calculation is unavailable.",
+            shouldFetch: false,
+            requiresManualRun: false,
+            selectionChanged: false,
+            measureSelectionChanged: false,
+            dimensionSelectionChanged: false,
+            primaryMeasureChanged: false,
+            viewChanged: false,
+            pageChanged: false,
+            requiredDimensionIds: [],
+            requiredDimensionLabels: [],
+            missingDimensionFields: [],
+            requiresDimensionProvision: false,
+        };
+    }
+    const {
+        requiredDimensionIds,
+        requiredDimensionLabels,
+        missingDimensionFields,
+    } = resolveReportBuilderTableCalculationDimensionRequirements(config, tableCalculation);
+    if (missingDimensionFields.length > 0) {
+        return {
+            tableCalculation,
+            nextState: state,
+            canApply: false,
+            reason: "missingDimensions",
+            message: `This table calculation requires unavailable breakdowns ${missingDimensionFields.join(", ")}.`,
+            shouldFetch: false,
+            requiresManualRun: false,
+            selectionChanged: false,
+            measureSelectionChanged: false,
+            dimensionSelectionChanged: false,
+            primaryMeasureChanged: false,
+            viewChanged: false,
+            pageChanged: false,
+            requiredDimensionIds,
+            requiredDimensionLabels,
+            missingDimensionFields,
+            requiresDimensionProvision: false,
+        };
+    }
+    const currentMeasures = normalizeStringArray(state?.selectedMeasures);
+    const currentDimensions = normalizeStringArray(state?.selectedDimensions);
+    const nextSelectedMeasures = currentMeasures.includes(calculationId)
+        ? currentMeasures
+        : [...currentMeasures, calculationId];
+    const nextSelectedDimensions = [
+        ...currentDimensions,
+        ...requiredDimensionIds.filter((entry) => !currentDimensions.includes(entry)),
+    ];
+    const preservePrimaryMeasure = options?.preservePrimaryMeasure === true;
+    const nextPrimaryMeasure = preservePrimaryMeasure
+        && String(state?.primaryMeasure || "").trim()
+        && nextSelectedMeasures.includes(String(state?.primaryMeasure || "").trim())
+        ? String(state?.primaryMeasure || "").trim()
+        : calculationId;
+    const switchToTable = options?.switchToTable !== false;
+    const nextState = {
+        ...state,
+        selectedDimensions: nextSelectedDimensions,
+        selectedMeasures: nextSelectedMeasures,
+        primaryMeasure: nextPrimaryMeasure,
+        ...(switchToTable ? { viewMode: "table" } : {}),
+        page: 1,
+    };
+    const normalizedOrder = normalizeReportBuilderOrderState(config, nextState, buildReportBuilderDefaultState(config));
+    nextState.orderField = normalizedOrder.orderField;
+    nextState.orderDir = normalizedOrder.orderDir;
+    const measureSelectionChanged = JSON.stringify(nextSelectedMeasures) !== JSON.stringify(currentMeasures);
+    const dimensionSelectionChanged = JSON.stringify(nextSelectedDimensions) !== JSON.stringify(currentDimensions);
+    const primaryMeasureChanged = nextPrimaryMeasure !== String(state?.primaryMeasure || "").trim();
+    const orderChanged = nextState.orderField !== String(state?.orderField || "").trim()
+        || nextState.orderDir !== normalizeReportBuilderOrderDirection(state?.orderDir || "");
+    const viewChanged = switchToTable && String(state?.viewMode || "").trim() !== "table";
+    const pageChanged = Number(state?.page || 1) !== 1;
+    const selectionChanged = measureSelectionChanged || dimensionSelectionChanged || primaryMeasureChanged || orderChanged || viewChanged || pageChanged;
+    const forceAutoFetch = options?.forceAutoFetch === true;
+    const shouldFetch = (forceAutoFetch || config?.request?.autoFetch !== false) && canAutoFetchReportBuilder(config, nextState) && selectionChanged;
+    return {
+        tableCalculation,
+        nextState,
+        canApply: true,
+        reason: "",
+        message: "",
+        shouldFetch,
+        requiresManualRun: !shouldFetch && selectionChanged && canAutoFetchReportBuilder(config, nextState),
+        selectionChanged,
+        measureSelectionChanged,
+        dimensionSelectionChanged,
+        primaryMeasureChanged,
+        orderChanged,
+        viewChanged,
+        pageChanged,
+        requiredDimensionIds,
+        requiredDimensionLabels,
+        missingDimensionFields,
+        requiresDimensionProvision: requiredDimensionIds.some((entry) => !currentDimensions.includes(entry)),
     };
 }
 
 export function applyReportBuilderComputedMeasures(rows = [], config = {}) {
-    const computedMeasures = getComputedReportBuilderMeasures(config).map((entry) => normalizeComputedMeasure(entry)).filter(Boolean);
-    if (computedMeasures.length === 0) {
-        return Array.isArray(rows) ? rows : [];
-    }
-    return normalizeArray(rows).map((row) => {
-        const next = { ...(row || {}) };
-        computedMeasures.forEach((definition) => {
-            const outputKey = String(definition.key || definition.id || "").trim();
-            if (!outputKey) {
-                return;
-            }
-            const compute = definition.compute || {};
-            switch (String(compute.type || "").trim().toLowerCase()) {
-                case "ratio": {
-                    const numeratorKey = String(compute.numerator || "").trim();
-                    const denominatorKey = String(compute.denominator || "").trim();
-                    const numerator = Number(resolveKey(next, numeratorKey));
-                    const denominator = Number(resolveKey(next, denominatorKey));
-                    const scale = Number(compute.scale || 1);
-                    const decimals = Number.isFinite(Number(compute.decimals)) ? Number(compute.decimals) : null;
-                    let value = 0;
-                    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
-                        value = (numerator / denominator) * scale;
-                    }
-                    if (decimals != null) {
-                        value = Number(value.toFixed(decimals));
-                    }
-                    next[outputKey] = value;
-                    break;
-                }
-                default:
-                    break;
-            }
-        });
-        return next;
-    });
+    return applyReportCalculatedFields(rows, getNormalizedReportBuilderCalculatedFields(config));
 }
 
 export function buildReportBuilderDefaultState(config = {}) {
@@ -1079,12 +1928,19 @@ export function buildReportBuilderDefaultState(config = {}) {
     const staticFilters = normalizeArray(config.staticFilters);
     const dynamicFilterGroups = normalizeArray(config.dynamicFilterGroups);
 
-    const selectedMeasures = defaultSelectedIds(measures);
-    const selectedDimensions = defaultSelectedIds(
-        dimensions.filter((entry) => entry?.default || entry?.chartAxis || entry?.required),
-        0,
-    );
-    const dimensionFallback = selectedDimensions.length > 0 ? selectedDimensions : defaultSelectedIds(dimensions);
+    const semanticSelections = resolveReportBuilderSemanticSelections(config, config?.binding);
+    const selectedMeasures = semanticSelections?.hasExplicitMeasures
+        ? semanticSelections.selectedMeasures
+        : defaultSelectedIds(measures);
+    const selectedDimensions = semanticSelections?.hasExplicitDimensions
+        ? semanticSelections.selectedDimensions
+        : defaultSelectedIds(
+            dimensions.filter((entry) => entry?.default || entry?.chartAxis || entry?.required),
+            0,
+        );
+    const dimensionFallback = semanticSelections?.hasExplicitDimensions
+        ? selectedDimensions
+        : (selectedDimensions.length > 0 ? selectedDimensions : defaultSelectedIds(dimensions));
 
     const groupByDefault = String(config?.groupBy?.default || "").trim();
     const viewModes = normalizeArray(config?.result?.viewModes);
@@ -1112,10 +1968,14 @@ export function buildReportBuilderDefaultState(config = {}) {
     });
 
     const defaultChartSpec = sanitizeChartSpecAgainstConfig(config, config?.result?.defaultChartSpec || null);
-    return {
+    const defaultBinding = resolveValidSemanticBinding(config?.binding);
+    const baseState = {
         selectedMeasures,
         primaryMeasure: String(config?.primaryMeasure || selectedMeasures[0] || "").trim(),
         selectedDimensions: dimensionFallback,
+        binding: defaultBinding,
+        localCalculatedFields: normalizeReportBuilderLocalCalculatedFields(config?.localCalculatedFields),
+        localTableCalculations: normalizeReportBuilderLocalTableCalculations(config?.localTableCalculations),
         viewMode: isExplicitReportBuilderChartMode(config) && !defaultChartSpec ? "table" : defaultViewMode,
         chartSpec: defaultChartSpec,
         groupBy: groupByDefault,
@@ -1125,6 +1985,12 @@ export function buildReportBuilderDefaultState(config = {}) {
         orderDir: String(defaultOrder?.defaultDirection || "desc").trim().toLowerCase() || "desc",
         staticFilters: defaultStaticFilters,
         dynamicGroups: defaultDynamicGroups,
+    };
+    const normalizedOrder = normalizeReportBuilderOrderState(config, baseState, baseState);
+    return {
+        ...baseState,
+        orderField: normalizedOrder.orderField,
+        orderDir: normalizedOrder.orderDir,
     };
 }
 
@@ -1150,24 +2016,37 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
         next.dynamicGroups[groupId] = normalizeDynamicGroupRows(persistedRows, group);
     });
 
+    next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
+    next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
+    const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
+    Object.keys(next).forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
+            delete next[key];
+        }
+    });
+    Object.assign(next, normalizedExplorationState || {});
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, next);
     next.selectedMeasures = normalizeArray(next.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
     next.selectedDimensions = normalizeArray(next.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean);
+    next.binding = resolveMergedSemanticBinding(config?.binding, next.binding);
     next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures[0] || defaults.primaryMeasure || "").trim();
-    next.chartSpec = sanitizeChartSpecAgainstConfig(config, next.chartSpec);
+    next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
     next.viewMode = String(next.viewMode || defaults.viewMode || "chart").trim() || "chart";
-    next.groupBy = String(next.groupBy || defaults.groupBy || "").trim();
+    next.groupBy = next.groupBy === undefined || next.groupBy === null
+        ? String(defaults.groupBy || "").trim()
+        : String(next.groupBy).trim();
     next.page = Math.max(1, Number(next.page || defaults.page || 1) || 1);
     next.pageSize = Math.max(1, Number(next.pageSize || defaults.pageSize || 50) || 50);
-    next.orderField = String(next.orderField || defaults.orderField || "").trim();
-    next.orderDir = String(next.orderDir || defaults.orderDir || "desc").trim().toLowerCase() || "desc";
-
+    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, next, defaults);
+    next.orderField = normalizedOrder.orderField;
+    next.orderDir = normalizedOrder.orderDir;
     if (!next.selectedMeasures.includes(next.primaryMeasure)) {
         next.primaryMeasure = next.selectedMeasures[0] || "";
     }
-    if (isExplicitReportBuilderChartMode(config) && !next.chartSpec) {
+    if (isExplicitReportBuilderChartMode(effectiveConfig) && !next.chartSpec) {
         next.viewMode = "table";
     }
-    return next;
+    return reconcileActiveTablePresetState(config, next);
 }
 
 export function sanitizeReportBuilderState(config = {}, state = {}) {
@@ -1179,25 +2058,96 @@ export function sanitizeReportBuilderState(config = {}, state = {}) {
         dynamicGroups[groupId] = normalizeDynamicGroupRows(next?.dynamicGroups?.[groupId], group);
     });
     next.dynamicGroups = dynamicGroups;
-    next.chartSpec = sanitizeChartSpecAgainstConfig(config, next.chartSpec);
-    if (isExplicitReportBuilderChartMode(config) && !next.chartSpec) {
+    next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
+    next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
+    const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
+    Object.keys(next).forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
+            delete next[key];
+        }
+    });
+    Object.assign(next, normalizedExplorationState || {});
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, next);
+    next.binding = resolveMergedSemanticBinding(config?.binding, next.binding);
+    next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
+    next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures?.[0] || "").trim();
+    next.selectedMeasures = normalizeArray(next.selectedMeasures).map((entry) => String(entry || "").trim()).filter(Boolean);
+    next.selectedDimensions = normalizeArray(next.selectedDimensions).map((entry) => String(entry || "").trim()).filter(Boolean);
+    const normalizedOrder = normalizeReportBuilderOrderState(effectiveConfig, next, buildReportBuilderDefaultState(config));
+    next.orderField = normalizedOrder.orderField;
+    next.orderDir = normalizedOrder.orderDir;
+    if (isExplicitReportBuilderChartMode(effectiveConfig) && !next.chartSpec) {
         next.viewMode = "table";
     }
-    return next;
+    return reconcileActiveTablePresetState(config, next);
 }
 
 export function buildReportBuilderRequest(config = {}, state = {}) {
-    const requestConfig = config.request || {};
-    const resultConfig = config.result || {};
-    const measures = normalizeArray(config.measures);
-    const computedMeasures = normalizeArray(config.computedMeasures).map((entry) => normalizeComputedMeasure(entry)).filter(Boolean);
-    const dimensions = normalizeArray(config.dimensions);
-    const staticFilters = normalizeArray(config.staticFilters);
-    const dynamicFilterGroups = normalizeArray(config.dynamicFilterGroups);
-    const groupByOptions = normalizeArray(config?.groupBy?.options);
-    const orderFields = normalizeArray(resultConfig.orderFields || config.orderFields);
+    const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, state);
+    const requestConfig = effectiveConfig.request || {};
+    const resultConfig = effectiveConfig.result || {};
+    const measures = normalizeArray(effectiveConfig.measures);
+    const calculatedFields = getNormalizedReportBuilderCalculatedFields(effectiveConfig);
+    const dimensions = normalizeArray(effectiveConfig.dimensions);
+    const staticFilters = normalizeArray(effectiveConfig.staticFilters);
+    const dynamicFilterGroups = normalizeArray(effectiveConfig.dynamicFilterGroups);
+    const groupByOptions = normalizeArray(effectiveConfig?.groupBy?.options);
+    const orderFields = normalizeArray(resultConfig.orderFields || effectiveConfig.orderFields);
+    const resolveBaseMeasureByField = (fieldKey = "") => {
+        const target = String(fieldKey || "").trim();
+        if (!target) {
+            return null;
+        }
+        return measures.find((item) => {
+            const measureId = String(item?.id || "").trim();
+            const valueKey = String(item?.key || item?.id || "").trim();
+            return target === measureId || target === valueKey;
+        }) || null;
+    };
+
+    const calculatedFieldById = new Map();
+    calculatedFields.forEach((entry) => {
+        const aliases = [
+            String(entry?.id || "").trim(),
+            String(entry?.key || "").trim(),
+        ].filter(Boolean);
+        aliases.forEach((alias) => {
+            if (!calculatedFieldById.has(alias)) {
+                calculatedFieldById.set(alias, entry);
+            }
+        });
+    });
 
     let request = clone(requestConfig.baseParameters || {});
+
+    const selectedDimensionIds = new Set(
+        normalizeArray(state.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean),
+    );
+    const resolvedDependencyIds = new Set();
+    const enableFieldDependency = (fieldKey = "") => {
+        const target = String(fieldKey || "").trim();
+        if (!target || resolvedDependencyIds.has(target)) {
+            return;
+        }
+        resolvedDependencyIds.add(target);
+        const measure = resolveBaseMeasureByField(target);
+        if (measure) {
+            setNestedValue(request, measure.paramPath || `measures.${measure.id}`, true);
+            return;
+        }
+        const dimension = resolveReportBuilderDimensionByField(effectiveConfig, target);
+        const dimensionId = String(dimension?.id || "").trim();
+        if (dimension && dimensionId) {
+            selectedDimensionIds.add(dimensionId);
+            return;
+        }
+        const calculatedField = calculatedFieldById.get(target);
+        if (calculatedField) {
+            normalizeArray(calculatedField.dependencies).forEach((dependencyId) => {
+                enableFieldDependency(dependencyId);
+            });
+        }
+    };
 
     normalizeArray(state.selectedMeasures).forEach((id) => {
         const match = measures.find((item) => String(item?.id || "").trim() === String(id).trim());
@@ -1205,18 +2155,30 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
             setNestedValue(request, match.paramPath || `measures.${match.id}`, true);
             return;
         }
-        const computed = computedMeasures.find((item) => String(item?.id || "").trim() === String(id).trim());
-        if (!computed) return;
-        computed.dependencies.forEach((dependencyId) => {
-            const dependency = measures.find((item) => String(item?.id || "").trim() === String(dependencyId).trim());
-            if (!dependency) return;
-            setNestedValue(request, dependency.paramPath || `measures.${dependency.id}`, true);
+        const calculatedField = calculatedFieldById.get(String(id).trim());
+        if (!calculatedField) {
+            return;
+        }
+        normalizeArray(calculatedField.dependencies).forEach((dependencyId) => {
+            enableFieldDependency(dependencyId);
         });
     });
 
-    const selectedDimensionIds = new Set(
-        normalizeArray(state.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean),
-    );
+    getNormalizedTableCalculationMeasures(effectiveConfig)
+        .filter((definition) => normalizeArray(state.selectedMeasures).map((entry) => String(entry).trim()).includes(String(definition?.id || "").trim()))
+        .forEach((definition) => {
+            const compute = definition.compute || {};
+            [
+                ...(Array.isArray(compute.partitionBy) ? compute.partitionBy : []),
+                ...(Array.isArray(compute.orderBy) ? compute.orderBy.map((entry) => entry?.field) : []),
+            ].forEach((fieldKey) => {
+                const dimension = resolveReportBuilderDimensionByField(effectiveConfig, fieldKey);
+                const dimensionId = String(dimension?.id || "").trim();
+                if (dimensionId) {
+                    selectedDimensionIds.add(dimensionId);
+                }
+            });
+        });
     const groupByValue = String(state.groupBy || "").trim();
     if (groupByValue) {
         const groupByOption = groupByOptions.find((entry) => String(entry?.value || "").trim() === groupByValue);
@@ -1294,6 +2256,10 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     });
 
     request = applyReportBuilderFilterAliases(request);
+    const semanticSelection = buildReportBuilderSemanticSelection(effectiveConfig, state);
+    if (semanticSelection) {
+        request.semanticSelection = semanticSelection;
+    }
 
     const pageSize = Math.max(1, Number(state.pageSize || resultConfig.pageSize || requestConfig.limit || 50) || 50);
     const page = Math.max(1, Number(state.page || 1) || 1);
@@ -1429,11 +2395,28 @@ export function projectManualSelection(filterDef = {}, rawValue = "") {
 export function buildReportBuilderColumns(config = {}, state = {}) {
     const measures = getSelectableReportBuilderMeasures(config);
     const dimensions = normalizeArray(config.dimensions);
+    const activeTablePreset = state?.activeTablePreset && typeof state.activeTablePreset === "object" ? state.activeTablePreset : null;
+    const presetColumnIndex = new Map(
+        normalizeTablePresetColumns(activeTablePreset?.columns).map((column) => [String(column?.key || "").trim(), column]),
+    );
+    const applyPresetColumn = (column = {}) => {
+        const override = presetColumnIndex.get(String(column?.key || "").trim());
+        if (!override) {
+            return column;
+        }
+        return {
+            ...column,
+            ...(override.label ? { label: override.label } : {}),
+            ...(override.format ? { format: override.format } : {}),
+            ...(override.align ? { align: override.align } : {}),
+            ...(override.cellVisual ? { cellVisual: clone(override.cellVisual) } : {}),
+        };
+    };
 
     const selectedDimensions = normalizeArray(state.selectedDimensions)
         .map((id) => dimensions.find((entry) => String(entry?.id || "").trim() === String(id).trim()))
         .filter(Boolean)
-        .map((entry) => ({
+        .map((entry) => applyPresetColumn({
             key: reportBuilderDimensionValueKey(entry),
             sourceKey: reportBuilderDimensionValueKey(entry),
             displayKey: resolveReportBuilderDimensionDisplayKey(entry),
@@ -1441,12 +2424,15 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
             label: entry.label || entry.id,
             kind: "dimension",
             format: entry.format,
+            ...(entry?.runtimeFilter && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter)
+                ? { runtimeFilterable: true }
+                : {}),
         }));
 
     const selectedMeasures = normalizeArray(state.selectedMeasures)
         .map((id) => measures.find((entry) => String(entry?.id || "").trim() === String(id).trim()))
         .filter(Boolean)
-        .map((entry) => ({
+        .map((entry) => applyPresetColumn({
             key: entry.key || entry.id,
             label: entry.label || entry.id,
             kind: "measure",

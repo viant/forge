@@ -1,0 +1,99 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.patchBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.patchBuilderState({ selectedMeasures: ['avails'], primaryMeasure: 'avails', selectedDimensions: ['eventDate', 'channelV2'], chartSpec: { title: 'Avails by Date and Channel', type: 'area', xField: 'eventDate', yFields: ['avails'], seriesField: 'channelV2', eyebrow: 'Visual Story', accentTone: 'delivery', highlights: ['Split by Channel', 'Trend View', 'Full Query'] }, viewMode: 'chart', staticFilters: { dateRange: { start: '2026-05-01', end: '2026-05-04' } } })"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Chart-first view for the active scope using the full query result set.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.lastFetchRequest && window.__REPORT_BUILDER_PREVIEW__.lastFetchRequest.type === 'chartQuery'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || !preview.replaceFetchBehaviors) { return false; } preview.__chartRetryBaseline = { errorCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'chartQuery' && entry.phase === 'error').length, successCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'chartQuery' && entry.phase === 'success').length }; return preview.replaceFetchBehaviors([{ match: { type: 'chartQuery' }, error: 'Chart query failed.' }]); })()"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Run",
+      "exact": true
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__chartRetryBaseline; if (!preview || !baseline) { return false; } const errorCount = (preview.fetchEventHistory || []).filter((entry) => entry.type === 'chartQuery' && entry.phase === 'error').length; return errorCount > baseline.errorCount; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.fetchBehaviors && window.__REPORT_BUILDER_PREVIEW__.fetchBehaviors.length === 0",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Run again",
+      "exact": true
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__chartRetryBaseline; if (!preview || !baseline) { return false; } const successCount = (preview.fetchEventHistory || []).filter((entry) => entry.type === 'chartQuery' && entry.phase === 'success').length; return successCount > baseline.successCount; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder')?.getAttribute('data-report-builder-state') === 'chart'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelectorAll('.forge-chart-legend-action').length >= 2",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-chart-query-retry.png",
+      "fullPage": true
+    }
+  ]
+}

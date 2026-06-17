@@ -5,6 +5,7 @@ import {
     buildPieChartData,
     formatTimestamp,
     resolveChartBodyState,
+    resolveChartLoadingState,
     resolveVisibleChartState,
     transformData,
 } from './chartData.js';
@@ -54,17 +55,30 @@ assert.deepEqual(resolveVisibleChartState({
     staleWhileLoading: false,
 });
 
-assert.deepEqual(aggregateDirectSeriesData([
+assert.equal(resolveChartLoadingState({
+    loading: true,
+    collectionOverride: [{ eventDate: '2026-05-14T00:00:00Z', spend: 10 }],
+}), false);
+
+assert.equal(resolveChartLoadingState({
+    loading: true,
+    collectionOverride: [],
+}), true);
+
+const directAggregated = aggregateDirectSeriesData([
     { eventDate: '2026-05-14T00:00:00Z', totalSpend: 10, impressions: 100, channelId: 1 },
     { eventDate: '2026-05-14T00:00:00Z', totalSpend: 7, impressions: 50, channelId: 6 },
     { eventDate: '2026-05-15T00:00:00Z', totalSpend: 3, impressions: 25, channelId: 1 },
 ], 'eventDate', [
     { value: 'totalSpend' },
     { value: 'impressions' },
-]), [
+]);
+assert.deepEqual(directAggregated, [
     { eventDate: '2026-05-14T00:00:00Z', totalSpend: 17, impressions: 150 },
     { eventDate: '2026-05-15T00:00:00Z', totalSpend: 3, impressions: 25 },
 ]);
+assert.equal(Array.isArray(directAggregated[0].__chartSelectionRows), true);
+assert.equal(directAggregated[0].__chartSelectionRows.length, 2);
 
 assert.deepEqual(aggregateDirectSeriesData([
     { channel: { channel: 'CTV' }, avails: 10 },
@@ -77,29 +91,36 @@ assert.deepEqual(aggregateDirectSeriesData([
     { channel: { channel: 'Audio' }, avails: 3 },
 ]);
 
-assert.deepEqual(transformData([
+const transformed = transformData([
     { eventDate: '2026-05-14T00:00:00Z', channel: { channel: 'CTV' }, avails: 10 },
     { eventDate: '2026-05-14T00:00:00Z', channel: { channel: 'Audio' }, avails: 5 },
     { eventDate: '2026-05-15T00:00:00Z', channel: { channel: 'CTV' }, avails: 8 },
 ], {
     xAxis: { dataKey: 'eventDate' },
     series: { nameKey: 'channel.channel' },
-}, 'avails'), {
+}, 'avails');
+assert.deepEqual(transformed, {
     data: [
         { eventDate: '2026-05-14T00:00:00Z', CTV: 10, Audio: 5 },
         { eventDate: '2026-05-15T00:00:00Z', CTV: 8 },
     ],
     keys: ['CTV', 'Audio'],
 });
+assert.equal(Array.isArray(transformed.data[0].__chartSelectionRows.CTV), true);
+assert.equal(transformed.data[0].__chartSelectionRows.CTV.length, 1);
+assert.equal(Array.isArray(transformed.data[0].__chartSelectionRows.Audio), true);
 
-assert.deepEqual(buildPieChartData([
+const pieData = buildPieChartData([
     { channel: { channel: 'CTV' }, avails: 10 },
     { channel: { channel: 'CTV' }, avails: 5 },
     { channel: { channel: 'Audio' }, avails: 3 },
-], 'channel.channel', 'avails'), [
+], 'channel.channel', 'avails');
+assert.deepEqual(pieData, [
     { name: 'CTV', value: 15 },
     { name: 'Audio', value: 3 },
 ]);
+assert.equal(Array.isArray(pieData[0].__chartSelectionRows), true);
+assert.equal(pieData[0].__chartSelectionRows.length, 2);
 
 assert.deepEqual(resolveChartBodyState({
     loading: true,

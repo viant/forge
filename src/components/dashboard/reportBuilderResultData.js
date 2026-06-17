@@ -24,9 +24,16 @@ export function resolveReportBuilderChartCollection({
     computedCollection = [],
     chartCollection = [],
     policy = {},
+    chartQueryLoading = false,
 } = {}) {
-    if (String(policy?.mode || "").trim() === "fullQuery" && Array.isArray(chartCollection)) {
-        return chartCollection;
+    if (String(policy?.mode || "").trim() === "fullQuery") {
+        if (Array.isArray(chartCollection) && chartCollection.length > 0) {
+            return chartCollection;
+        }
+        if (chartQueryLoading === true) {
+            return Array.isArray(computedCollection) ? computedCollection : [];
+        }
+        return Array.isArray(chartCollection) ? chartCollection : [];
     }
     return Array.isArray(computedCollection) ? computedCollection : [];
 }

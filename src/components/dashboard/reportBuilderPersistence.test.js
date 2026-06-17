@@ -132,6 +132,33 @@ assert.deepEqual(
 persistStoredReportBuilderState("", null);
 assert.equal(loadStoredReportBuilderState(""), null);
 
+const semanticPersistedState = {
+    selectedMeasures: ["avails", "hhUniqs"],
+    selectedDimensions: ["eventDate", "channelV2"],
+    groupBy: "agegroupId",
+    binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date", "channel"],
+        selectedMeasures: ["available_impressions", "household_uniques"],
+    },
+    staticFilters: {
+        dateRange: {
+            start: "2026-05-01",
+            end: "2026-05-04",
+        },
+    },
+    viewMode: "table",
+};
+persistStoredReportBuilderState("semanticPreviewWindow", semanticPersistedState);
+assert.deepEqual(
+    loadStoredReportBuilderState("semanticPreviewWindow"),
+    semanticPersistedState,
+);
+persistStoredReportBuilderState("semanticPreviewWindow", null);
+assert.equal(loadStoredReportBuilderState("semanticPreviewWindow"), null);
+
 assert.deepEqual(
     replaceReportBuilderWindowState(
         {

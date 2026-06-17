@@ -356,7 +356,7 @@ func registerTool[I any, O any](
 		}
 		if svc.UseTextField() {
 			b, _ := json.Marshal(out)
-			return &schema.CallToolResult{Content: []schema.CallToolResultContentElem{{Type: "text", Text: string(b)}}}, nil
+			return &schema.CallToolResult{Content: []schema.CallToolResultContentElem{schema.TextContent{Type: "text", Text: string(b)}}}, nil
 		}
 		return &schema.CallToolResult{StructuredContent: map[string]any{"result": out}}, nil
 	})

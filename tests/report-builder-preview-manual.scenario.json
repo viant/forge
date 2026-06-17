@@ -1,0 +1,246 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create or apply a chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelector",
+      "selector": ".forge-report-builder__chart-action-button--create"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create Chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": ".forge-report-builder__chart-dialog input[type=\"text\"]",
+      "index": 0,
+      "value": "Manual Line by Date and Channel",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": ".forge-report-builder__chart-dialog select",
+      "index": 0,
+      "value": "line",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": ".forge-report-builder__chart-dialog select",
+      "index": 1,
+      "value": "eventDate",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": ".forge-report-builder__chart-dialog select",
+      "index": 2,
+      "value": "channelV2",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Apply Chart"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Showing Manual Line by Date and Channel.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForChartRender",
+      "selector": ".recharts-wrapper",
+      "minMarks": 10,
+      "minPaths": 1,
+      "minCircles": 3,
+      "minWidth": 240,
+      "minHeight": 160,
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-manual-line-proof.png"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Edit Chart"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create Chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": ".forge-report-builder__chart-dialog input[type=\"text\"]",
+      "index": 0,
+      "value": "Manual Horizontal Bar by Channel",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": ".forge-report-builder__chart-dialog select",
+      "index": 0,
+      "value": "horizontal_bar",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": ".forge-report-builder__chart-dialog select",
+      "index": 1,
+      "value": "channelV2",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__chart-measure-chip",
+      "text": "Household Uniques",
+      "index": 0,
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Apply Chart"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Showing Manual Horizontal Bar by Channel.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForChartRender",
+      "selector": ".recharts-wrapper",
+      "minMarks": 8,
+      "minVisiblePaths": 1,
+      "minPathWidth": 20,
+      "minPathHeight": 3,
+      "minWidth": 240,
+      "minHeight": 160,
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-manual-horizontal-proof.png"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__compact-action",
+      "text": "Chart",
+      "index": 0
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Edit Chart"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create Chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": ".forge-report-builder__chart-dialog input[type=\"text\"]",
+      "index": 0,
+      "value": "Manual Donut by Channel",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": ".forge-report-builder__chart-dialog select",
+      "index": 0,
+      "value": "donut",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": ".forge-report-builder__chart-dialog select",
+      "index": 1,
+      "value": "channelV2",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__chart-measure-chip",
+      "text": "Available Impressions",
+      "index": 0,
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Apply Chart"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Showing Manual Donut by Channel.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForChartRender",
+      "selector": ".recharts-wrapper",
+      "minMarks": 3,
+      "minSectors": 2,
+      "minVisibleSectors": 2,
+      "minSectorWidth": 80,
+      "minSectorHeight": 60,
+      "minWidth": 240,
+      "minHeight": 160,
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-manual-donut-proof.png"
+    }
+  ]
+}

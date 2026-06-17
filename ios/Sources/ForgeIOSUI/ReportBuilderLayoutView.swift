@@ -3,6 +3,7 @@ import SwiftUI
 struct ReportBuilderLayoutView: View {
     let measuresSection: AnyView
     let dimensionsSection: AnyView
+    let filterSummarySection: AnyView
     let staticFiltersSection: AnyView
     let dynamicFiltersSection: AnyView
     let chartCreationSection: AnyView
@@ -13,6 +14,7 @@ struct ReportBuilderLayoutView: View {
         VStack(alignment: .leading, spacing: 12) {
             measuresSection
             dimensionsSection
+            filterSummarySection
             staticFiltersSection
             dynamicFiltersSection
             chartCreationSection

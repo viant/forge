@@ -1,0 +1,150 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Add chart"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Create Chart",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[placeholder=\"Enter chart title\"]",
+      "value": "Forecast Trend Block"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Apply Chart"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Forecast Trend Block added to the report document.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Fork from here"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Exploration Session.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 11.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Prepare get response')); if (!button) { throw new Error('Prepare get response button not found.'); } button.click(); })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Reopen in builder')); if (!button) { throw new Error('Reopen in builder button not found.'); } button.click(); })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument Report Builder Demo for editing.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')); const panel = panels.find((entry) => ((entry.innerText || entry.textContent || '')).includes('Forecast Trend Block')); return !!panel && panel.querySelectorAll('.forge-chart-legend-action').length >= 1; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')); const panel = panels.find((entry) => ((entry.innerText || entry.textContent || '')).includes('Forecast Trend Block')); if (!panel) { throw new Error('Forecast Trend Block runtime panel not found.'); } const action = Array.from(panel.querySelectorAll('.forge-chart-legend-action')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Display')) || panel.querySelector('.forge-chart-legend-action'); if (!action) { throw new Error('Forecast Trend Block legend action not found.'); } action.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Forecast Trend Block')); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('Display') && text.includes('Show channel details'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Forecast Trend Block')); if (!panel) { throw new Error('Forecast Trend Block runtime panel not found.'); } const action = Array.from(panel.querySelectorAll('.forge-report-runtime-chart-action')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Show channel details')); if (!action) { throw new Error('Forecast Trend Block detail action not found.'); } action.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-host-intent'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('target://steward/performance/channel-detail') && text.includes('channel') && text.includes('Display'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-authored-chart-save-reopen-detail.png",
+      "fullPage": true
+    }
+  ]
+}

@@ -1,0 +1,336 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } window.__artifactDownloadCapture = { filename: '', payload: '', mimeType: '' }; const originalCreate = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__artifactDownloadCapture.mimeType = blob.type || ''; blob.text().then((text) => { window.__artifactDownloadCapture.payload = text; }); return originalCreate(blob); }; const originalClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() { window.__artifactDownloadCapture.filename = this.download || ''; return originalClick.call(this); }; })()"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Fork from here"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Exploration Session.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 11.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare list response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "List ReportDocuments response:",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "forecastingTrendQ3"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get request"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"reportId\": \"forecastingTrendQ3\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Forecasting Trend Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; return !!preview && typeof preview.replaceDetailTargetBehaviors === 'function' && preview.replaceDetailTargetBehaviors([{ match: { targetRef: 'target://steward/performance/channel-detail' }, error: 'Detail target resolution failed.' }]) === 1; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.patchBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.patchBuilderState({ selectedDimensions: ['eventDate'], viewMode: 'table', chartSpec: null })"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions[0] === 'eventDate' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'table' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec == null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Reopen in builder"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument Forecasting Trend Q3 for editing.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'chart' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.includes('eventDate') && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.includes('channelV2') && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedMeasures) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedMeasures.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedMeasures[0] === 'avails' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec?.title === 'Avails by Date and Channel'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || !Array.isArray(preview.fetchEventHistory)) { return false; } const starts = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'start').length; const endings = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && (entry.phase === 'success' || entry.phase === 'error')).length; return starts > 0 && starts === endings; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.resetCounters !== 'function') { return false; } preview.resetCounters(); preview.__reopenedChartDetailErrorRecoveryToggleCacheBaseline = { startCount: preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'start').length, successCount: preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'success').length, requestCount: preview.fetchRequestHistory.filter((entry) => entry.type === 'chartQuery').length }; return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const baseline = window.__REPORT_BUILDER_PREVIEW__?.__reopenedChartDetailErrorRecoveryToggleCacheBaseline; return !!baseline && baseline.startCount === 0 && baseline.successCount === 0 && baseline.requestCount === 0; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const legends = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-chart-legend-action')).map((entry) => (entry.innerText || entry.textContent || '').trim()); return legends.length >= 2 && legends.includes('Display') && legends.includes('CTV'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__runtime-preview .forge-chart-legend-action",
+      "text": "Display",
+      "index": 0
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('Display') && text.includes('Show channel details'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-chart-action",
+      "text": "Show channel details",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Runtime Diagnostics",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-host-intent') == null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview'); const chartPanel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel'); const text = panel?.innerText || panel?.textContent || ''; return !!chartPanel && text.includes('Failed to resolve detail target target://steward/performance/channel-detail. Detail target resolution failed.') && !text.includes('Resolved detail target'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__reopenedChartDetailErrorRecoveryToggleCacheBaseline; if (!preview || !baseline) { return false; } const startCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'start').length; const successCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'success').length; const requestCount = preview.fetchRequestHistory.filter((entry) => entry.type === 'chartQuery').length; return startCount === baseline.startCount && successCount === baseline.successCount && requestCount === baseline.requestCount; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; return !!preview && typeof preview.clearDetailTargetBehaviors === 'function' && preview.clearDetailTargetBehaviors() === 0 && Array.isArray(preview.detailTargetBehaviors) && preview.detailTargetBehaviors.length === 0; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__runtime-preview .forge-chart-legend-action",
+      "text": "CTV",
+      "index": 0
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('CTV') && text.includes('Show channel details'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-chart-action",
+      "text": "Show channel details",
+      "index": 0
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Resolved detail target') && text.includes('target://steward/performance/channel-detail') && text.includes('CTV') && !text.includes('Detail target resolution failed.'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-host-intent') != null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__reopenedChartDetailErrorRecoveryToggleCacheBaseline; if (!preview || !baseline) { return false; } const startCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'start').length; const successCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'success').length; const requestCount = preview.fetchRequestHistory.filter((entry) => entry.type === 'chartQuery').length; return startCount === baseline.startCount && successCount === baseline.successCount && requestCount === baseline.requestCount; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__result-header .forge-report-builder__view-toggle button",
+      "text": "table",
+      "index": 0
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'table'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__result-header .forge-report-builder__view-toggle button",
+      "text": "chart",
+      "index": 0
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'chart'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const legends = Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-chart-legend-action')).map((entry) => (entry.innerText || entry.textContent || '').trim()); return legends.length >= 2 && legends.includes('Display') && legends.includes('CTV'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__reopenedChartDetailErrorRecoveryToggleCacheBaseline; if (!preview || !baseline) { return false; } const startCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'start').length; const successCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'success').length; const requestCount = preview.fetchRequestHistory.filter((entry) => entry.type === 'chartQuery').length; return startCount === baseline.startCount && successCount === baseline.successCount && requestCount === baseline.requestCount; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-host-intent') != null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Resolved detail target') && text.includes('target://steward/performance/channel-detail') && text.includes('CTV') && !text.includes('Detail target resolution failed.'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelector('.forge-report-builder')?.getAttribute('data-report-builder-state') === 'chart'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const reopened = Array.from(document.querySelectorAll('.forge-report-builder__chart-inline-notice')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Reopened ReportDocument: Forecasting Trend Q3')); if (!reopened) { return false; } const text = reopened.innerText || reopened.textContent || ''; return text.includes('Review export') || text.includes('Inspect export'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const reopened = Array.from(document.querySelectorAll('.forge-report-builder__chart-inline-notice')).find((entry) => ((entry.innerText || entry.textContent || '')).includes('Reopened ReportDocument: Forecasting Trend Q3')); if (!reopened) { throw new Error('Reopened section not found.'); } const button = Array.from(reopened.querySelectorAll('button')).find((entry) => { const text = (entry.innerText || entry.textContent || '').trim(); return text === 'Inspect export' || text === 'Review export'; }); if (!button) { throw new Error('Inspect export button not found in reopened section.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"reportExportRequest\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"title\": \"Forecasting Trend Q3\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"kind\": \"reportPrint\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"id\": \"bookmark.primaryChart\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__reopenedChartDetailErrorRecoveryToggleCacheBaseline; if (!preview || !baseline) { return false; } const startCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'start').length; const successCount = preview.fetchEventHistory.filter((entry) => entry.type === 'chartQuery' && entry.phase === 'success').length; const requestCount = preview.fetchRequestHistory.filter((entry) => entry.type === 'chartQuery').length; return startCount === baseline.startCount && successCount === baseline.successCount && requestCount === baseline.requestCount; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Reopened export request summary\"]')).find(Boolean); if (!summary) { throw new Error('Reopened export request summary not found.'); } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const button = Array.from(container.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Download export request')); if (!button) { throw new Error('Download export request button not found.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.filename === 'Forecasting Trend Q3-savedPayload-pdf-export-request.json'",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__artifactDownloadCapture && window.__artifactDownloadCapture.mimeType.includes('application/json') && window.__artifactDownloadCapture.payload.includes('\"kind\": \"reportExportRequest\"') && window.__artifactDownloadCapture.payload.includes('\"kind\": \"reportPrint\"') && window.__artifactDownloadCapture.payload.includes('\"title\": \"Forecasting Trend Q3\"') && window.__artifactDownloadCapture.payload.includes('\"id\": \"bookmark.primaryChart\"') && window.__artifactDownloadCapture.payload.includes('Avails by Date and Channel')",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-report-document-chart-detail-error-recovery-toggle-cache.png",
+      "fullPage": true
+    }
+  ]
+}

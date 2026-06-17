@@ -1,0 +1,159 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Close"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Add KPI"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Add KPI Block",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[placeholder=\"Headline KPI\"]",
+      "value": "Reach KPI"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Add Block"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reach KPI added to the report document.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const group = Array.from(document.querySelectorAll('.forge-report-builder__measure-pill-group')).find((node) => ((node.innerText || node.textContent || '').includes('Available Impressions'))); const toggle = group?.querySelector('.forge-report-builder__selector-box'); if (!toggle) { throw new Error('Available Impressions toggle not found.'); } toggle.click(); })()"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Authored Block Validation",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Fork from here"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Exploration Session.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 11.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Persisted compile warning:",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Reopen in builder"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument Report Builder Demo for editing.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened compile warning:",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Edit authored block kpiBlock"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Edit KPI Block",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-invalid-authored-report-response.png",
+      "fullPage": true
+    }
+  ]
+}
