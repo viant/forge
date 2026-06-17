@@ -212,7 +212,13 @@ export default function Composer({
 	        const targetId = String(conversationId || '').trim();
 	        const currentId = currentConversationIdFromLocation();
 	        if (targetId && currentId && targetId !== currentId) return;
-	        setDraft((prev) => prev && prev.trim() ? prev : String(prompt || ''));
+	        const next = String(prompt || '');
+	        setDraft((prev) => {
+	            if (prev && prev.trim()) return prev;
+	            draftRef.current = next;
+	            onDraftChange?.(next);
+	            return next;
+	        });
 	    };
 
 	    const restoreCurrentDraft = (conversationId = '') => {
@@ -220,7 +226,12 @@ export default function Composer({
 	        const moved = movePendingDraftToConversation(currentId);
 	        const restored = moved || consumeStoredDraft(currentId) || (!currentId ? consumeStoredDraft('__pending__') : '');
 	        if (restored) {
-	            setDraft((prev) => prev && prev.trim() ? prev : restored);
+	            setDraft((prev) => {
+	                if (prev && prev.trim()) return prev;
+	                draftRef.current = restored;
+	                onDraftChange?.(restored);
+	                return restored;
+	            });
 	        }
 	    };
 
@@ -612,9 +623,10 @@ export default function Composer({
         e.preventDefault();
         if (disabled) return; // Block submission while disabled
         const resolver = inputValueResolverRef.current;
-        const resolvedValue = typeof resolver === 'function' ? resolver() : draftRef.current;
-        const content = String(resolvedValue || '').trim();
-        if (!content) return;
+        const resolvedValue = typeof resolver === 'function' ? resolver() : '';
+        const content = String(resolvedValue || draftRef.current || '').trim();
+        const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+        if (!content && !hasAttachments) return;
         setHistoryOpen(false);
         storeDraftForConversation(currentConversationIdFromLocation(), '');
         onSubmit?.({ content, toolNames: selectedTools });

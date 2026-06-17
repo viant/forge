@@ -47,7 +47,14 @@ export default function useUpload(uploadConfig = {}) {
       const form = new FormData();
       // Use single-file field name for simpler server logic
       form.append('file', item.file, item.name);
-      Object.entries(extraFields || {}).forEach(([k, v]) => form.append(k, v));
+      form.append('name', item.name);
+      if (item.type) {
+        form.append('contentType', item.type);
+      }
+      Object.entries(extraFields || {}).forEach(([k, v]) => {
+        if (v === undefined || v === null) return;
+        form.append(k, v);
+      });
 
       const xhr = new XMLHttpRequest();
       xhrsRef.current[item.id] = xhr;
