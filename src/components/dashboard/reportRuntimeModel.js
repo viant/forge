@@ -68,6 +68,17 @@ function normalizeSemanticSummaryFields(fields = []) {
     .filter(Boolean);
 }
 
+function normalizeBindingSelectionFields(fields = []) {
+  return (Array.isArray(fields) ? fields : [])
+    .map((field) => normalizeString(field))
+    .filter(Boolean)
+    .map((field) => ({
+      id: field,
+      rawId: field,
+      label: field,
+    }));
+}
+
 function summarizeSemanticGovernance(fields = []) {
   return (Array.isArray(fields) ? fields : []).reduce((counts, field) => {
     const governance = field?.governance && typeof field.governance === "object" ? field.governance : {};
@@ -204,46 +215,92 @@ export function resolveReportRuntimeBindingSummary(reportSpec = {}) {
   const semanticSummary = reportSpec?.semanticSummary && typeof reportSpec.semanticSummary === "object" && !Array.isArray(reportSpec.semanticSummary)
     ? reportSpec.semanticSummary
     : null;
+  const binding = reportSpec?.binding;
+  const bindingSelectedDimensions = normalizeBindingSelectionFields(binding?.selectedDimensions);
+  const bindingSelectedMeasures = normalizeBindingSelectionFields(binding?.selectedMeasures);
   if (normalizeString(semanticSummary?.kind).toLowerCase() === "semantic") {
     const selectedDimensions = normalizeSemanticSummaryFields(semanticSummary?.selectedDimensions);
     const selectedMeasures = normalizeSemanticSummaryFields(semanticSummary?.selectedMeasures);
+    const resolvedSelectedDimensions = selectedDimensions.length > 0
+      ? selectedDimensions
+      : bindingSelectedDimensions;
+    const resolvedSelectedMeasures = selectedMeasures.length > 0
+      ? selectedMeasures
+      : bindingSelectedMeasures;
     return {
       kind: "semantic",
       title: "Semantic Binding",
-      modelRef: normalizeString(semanticSummary?.modelRef),
+      modelRef: normalizeString(semanticSummary?.modelRef || binding?.modelRef),
       modelLabel: normalizeString(semanticSummary?.modelLabel),
-      entity: normalizeString(semanticSummary?.entity),
+      ...(normalizeString(semanticSummary?.modelDescription) ? { modelDescription: normalizeString(semanticSummary?.modelDescription) } : {}),
+      entity: normalizeString(semanticSummary?.entity || binding?.entity),
       entityLabel: normalizeString(semanticSummary?.entityLabel),
-      dimensionCount: selectedDimensions.length,
-      measureCount: selectedMeasures.length,
-      selectedDimensions,
-      selectedMeasures,
+      ...(normalizeString(semanticSummary?.entityDescription) ? { entityDescription: normalizeString(semanticSummary?.entityDescription) } : {}),
+      dimensionCount: resolvedSelectedDimensions.length,
+      measureCount: resolvedSelectedMeasures.length,
+      selectedDimensions: resolvedSelectedDimensions,
+      selectedMeasures: resolvedSelectedMeasures,
       governanceCounts: summarizeSemanticGovernance([
-        ...selectedDimensions,
-        ...selectedMeasures,
+        ...resolvedSelectedDimensions,
+        ...resolvedSelectedMeasures,
       ]),
     };
   }
-  const binding = reportSpec?.binding;
   if (!binding || normalizeString(binding?.mode).toLowerCase() !== "semantic") {
     return null;
   }
-  const dimensions = Array.isArray(binding?.selectedDimensions) ? binding.selectedDimensions.filter(Boolean) : [];
-  const measures = Array.isArray(binding?.selectedMeasures) ? binding.selectedMeasures.filter(Boolean) : [];
+  const selectedDimensions = normalizeBindingSelectionFields(binding?.selectedDimensions);
+  const selectedMeasures = normalizeBindingSelectionFields(binding?.selectedMeasures);
   return {
     kind: "semantic",
     title: "Semantic Binding",
     modelRef: normalizeString(binding?.modelRef),
     entity: normalizeString(binding?.entity),
-    dimensionCount: dimensions.length,
-    measureCount: measures.length,
-    selectedDimensions: [],
-    selectedMeasures: [],
+    dimensionCount: selectedDimensions.length,
+    measureCount: selectedMeasures.length,
+    selectedDimensions,
+    selectedMeasures,
     governanceCounts: {
       draft: 0,
       deprecated: 0,
     },
   };
+}
+
+export function resolveReportRuntimeBindingSummaryChips(bindingSummary = null) {
+  if (!bindingSummary || typeof bindingSummary !== "object" || Array.isArray(bindingSummary)) {
+    return [];
+  }
+  const summarizeSelectedLabels = (title, fields = [], count = 0) => {
+    const labels = (Array.isArray(fields) ? fields : [])
+      .map((field) => normalizeString(field?.label))
+      .filter(Boolean);
+    if (labels.length === 0) {
+      return title === "Dimensions"
+        ? `${Number(count || 0)} dimensions`
+        : `${Number(count || 0)} measures`;
+    }
+    if (labels.length <= 2) {
+      return `${title} ${labels.join(", ")}`;
+    }
+    return `${title} ${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
+  };
+  return [
+    normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)
+      ? `Model ${normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)}`
+      : "",
+    normalizeString(bindingSummary.entityLabel || bindingSummary.entity)
+      ? `Entity ${normalizeString(bindingSummary.entityLabel || bindingSummary.entity)}`
+      : "",
+    summarizeSelectedLabels("Dimensions", bindingSummary.selectedDimensions, bindingSummary.dimensionCount),
+    summarizeSelectedLabels("Measures", bindingSummary.selectedMeasures, bindingSummary.measureCount),
+    Number(bindingSummary.governanceCounts?.deprecated || 0) > 0
+      ? `${Number(bindingSummary.governanceCounts.deprecated)} deprecated`
+      : "",
+    Number(bindingSummary.governanceCounts?.draft || 0) > 0
+      ? `${Number(bindingSummary.governanceCounts.draft)} draft`
+      : "",
+  ].filter(Boolean);
 }
 
 export function resolveReportRuntimeRefinementFields(reportSpec = {}, block = {}) {
@@ -306,7 +363,7 @@ export function resolveReportRuntimeChartActionFields(reportSpec = {}, block = {
   return next;
 }
 
-function resolveRuntimeFieldActionKey(blockId = "", valueKey = "") {
+export function resolveReportRuntimeFieldActionKey(blockId = "", valueKey = "") {
   return `${normalizeString(blockId)}:${normalizeString(valueKey)}`;
 }
 
@@ -321,8 +378,8 @@ export function buildReportRuntimeUnsupportedRefinementDiagnostics({
       if (field?.runtimeFilterable === true) {
         return null;
       }
-      const actions = Array.isArray(providerActionsByField.get(resolveRuntimeFieldActionKey(normalizedBlockId, field?.valueKey)))
-        ? providerActionsByField.get(resolveRuntimeFieldActionKey(normalizedBlockId, field?.valueKey))
+      const actions = Array.isArray(providerActionsByField.get(resolveReportRuntimeFieldActionKey(normalizedBlockId, field?.valueKey)))
+        ? providerActionsByField.get(resolveReportRuntimeFieldActionKey(normalizedBlockId, field?.valueKey))
         : [];
       const unsupportedKinds = Array.from(new Set(
         actions

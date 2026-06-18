@@ -20,15 +20,23 @@
     { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
     {
       "type": "eval",
-      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
     },
     {
       "type": "waitForEval",
       "expression": "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.patchSeededSavedReportPayload !== 'function') { return false; } const patched = api.patchSeededSavedReportPayload('forecastingLocationQ3', { compileState: { status: 'invalid', diagnostics: [ { code: 'semanticGovernance', severity: 'warning', message: 'Market • Deprecated' }, { code: 'documentBlockColumnUnavailable', severity: 'error', blockId: 'primaryTable', path: 'reportDocument.blocks.primaryTable.columns[0]', message: 'Primary Table references unavailable table column \"country\".', suggestedFix: 'Re-select the field in the builder or edit the table block to use one of the current selected dimensions or measures.' } ] } }); return !!patched && patched.compileState && patched.compileState.status === 'invalid'; })()",
       "timeoutMs": 60000
     },
-    { "type": "clickRole", "role": "button", "name": "Fork from here" },
-    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "waitForEval", "expression": "!((document.body?.innerText || document.body?.textContent || '').includes('Local Draft'))", "timeoutMs": 15000 },
+    { "type": "assertDomNotContains", "text": "Local Draft" },
+    { "type": "waitForEval", "expression": "Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim().includes('Reach Rate')))", "timeoutMs": 60000 },
+    { "type": "clickSelectorContains", "selector": ".forge-report-builder__measure-pill", "text": "Reach Rate", "index": 0 },
+    { "type": "waitForDomContains", "text": "Local Draft", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
     { "type": "clickRole", "role": "button", "name": "Save artifact" },
     { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
     { "type": "clickRole", "role": "button", "name": "Prepare report payload" },

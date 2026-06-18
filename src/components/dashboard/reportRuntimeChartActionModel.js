@@ -1,4 +1,5 @@
 import { resolveKey } from "../../utils/selector.js";
+import { resolveReportRuntimeFieldActionKey } from "./reportRuntimeModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -6,10 +7,6 @@ function normalizeString(value = "") {
 
 function supportsRuntimeRefinement(field = {}) {
   return field?.runtimeFilterable === true;
-}
-
-function resolveRuntimeFieldActionKey(blockId = "", valueKey = "") {
-  return `${normalizeString(blockId)}:${normalizeString(valueKey)}`;
 }
 
 function hasPresentValue(value) {
@@ -112,7 +109,7 @@ export function buildReportRuntimeChartActionDescriptors({
     if (value === undefined || value === null || value === "") {
       return [];
     }
-    const key = resolveRuntimeFieldActionKey(blockId, field?.valueKey);
+    const key = resolveReportRuntimeFieldActionKey(blockId, field?.valueKey);
     const providerActions = Array.isArray(providerActionsByField.get(key))
       ? providerActionsByField.get(key)
       : [];

@@ -35,6 +35,7 @@ import com.viant.forgeandroid.runtime.DashboardReportSectionDef
 import com.viant.forgeandroid.runtime.DashboardSelectionState
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.SelectorUtil
+import com.viant.forgeandroid.runtime.TableDef
 import com.viant.forgeandroid.runtime.WindowContext
 import com.viant.forgeandroid.runtime.dashboardFilterSignal
 import com.viant.forgeandroid.runtime.dashboardSelectionSignal
@@ -72,6 +73,17 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
             }
         }
         "dashboard.timeline" -> DashboardPanel(runtime, window, container) { DashboardTimelineBlock(window, container, dashboardRoot, filters) }
+        "dashboard.geoMap" -> DashboardPanel(runtime, window, container) { DashboardGeoMapBlock(container, metrics) }
+        "dashboard.chart", "dashboard.composition" -> DashboardPanel(runtime, window, container) {
+            val chart = container.chart
+            val dataSourceRef = container.dataSourceRef ?: dashboardRoot.dataSourceRef
+            val context = dataSourceRef?.let { window.contextOrNull(it) }
+            if (chart != null && context != null) {
+                ChartRenderer(context, chart)
+            } else {
+                Text("Dashboard chart requires chart configuration and data source.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         "dashboard.dimensions" -> DashboardPanel(runtime, window, container) {
             DashboardDimensionsBlock(window, container, dashboardRoot, filters, selection) { nextSelection ->
                 selectionSignal.set(nextSelection)
@@ -79,7 +91,18 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
         }
         "dashboard.status" -> DashboardPanel(runtime, window, container) { DashboardStatusBlock(container, metrics) }
         "dashboard.messages" -> DashboardPanel(runtime, window, container) { DashboardMessagesBlock(container, metrics, filters, selection) }
+        "dashboard.badges" -> DashboardPanel(runtime, window, container) { DashboardBadgesBlock(container, metrics, filters, selection) }
         "dashboard.report" -> DashboardPanel(runtime, window, container) { DashboardReportBlock(container, metrics, filters, selection) }
+        "dashboard.table" -> DashboardPanel(runtime, window, container) {
+            val table = container.table ?: container.columns.takeIf { it.isNotEmpty() }?.let { TableDef(columns = it) }
+            val dataSourceRef = container.dataSourceRef ?: dashboardRoot.dataSourceRef
+            val context = dataSourceRef?.let { window.contextOrNull(it) }
+            if (table != null && context != null) {
+                TableRenderer(runtime, context, table)
+            } else {
+                Text("Dashboard table requires columns and data source.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         "dashboard.reportBuilder" -> DashboardPanel(runtime, window, container) { ReportBuilderRenderer(runtime, window, container) }
         "dashboard.feed" -> DashboardPanel(runtime, window, container) { DashboardFeedBlock(window, container, dashboardRoot, filters) }
         "dashboard.detail" -> DashboardPanel(runtime, window, container) {
@@ -595,6 +618,63 @@ private fun DashboardMessagesBlock(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DashboardBadgesBlock(
+    container: ContainerDef,
+    metrics: Map<String, Any?>,
+    filters: Map<String, Any?>,
+    selection: DashboardSelectionState
+) {
+    val badges = container.dashboard?.badges?.items?.map {
+        Triple(it.label ?: it.id ?: "Badge", it.value.orEmpty(), it.tone ?: it.severity ?: "info") to it.visibleWhen
+    } ?: container.items.map {
+        Triple(it.label ?: it.title ?: it.id ?: "Badge", "", it.appearance ?: it.severity ?: "info") to it.visibleWhen
+    }
+    val visible = badges.filter { (_, condition) -> evaluateDashboardCondition(condition, metrics, filters, selection) }
+    if (visible.isEmpty()) {
+        Text("No active badges.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        return
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        visible.forEach { (badge, _) ->
+            val tone = severityTone(badge.third)
+            val text = if (badge.second.isBlank()) badge.first else "${badge.first}: ${badge.second}"
+            AssistChip(
+                onClick = {},
+                label = { Text(text, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                colors = AssistChipDefaults.assistChipColors(containerColor = tone.background, labelColor = tone.text),
+                border = BorderStroke(1.dp, tone.border)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardGeoMapBlock(container: ContainerDef, metrics: Map<String, Any?>) {
+    val metric = container.metric
+    val value = metric?.key?.let { SelectorUtil.resolve(metrics, it) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("Geo map", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(metric?.label ?: metric?.key ?: "Regional metric", style = MaterialTheme.typography.bodySmall, color = Color(0xFF6A7280))
+        value?.let {
+            Text(formatDashboardValue(it, metric?.format), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        }
+        Text("Rendered as a compact mobile geo summary.", style = MaterialTheme.typography.labelSmall, color = Color(0xFF6A7280))
     }
 }
 

@@ -60,6 +60,11 @@ function sanitizeFilenameSegment(value = "") {
     return normalizeString(value).replace(/[\\/:*?"<>|]+/g, "-");
 }
 
+function normalizePositiveInteger(value = 0) {
+    const numeric = Number(value);
+    return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 0;
+}
+
 export function resolveReportBuilderUpdateReportDocumentExpectedVersion(value = "") {
     const normalized = normalizeString(value);
     if (!/^[1-9]\d*$/.test(normalized)) {
@@ -82,6 +87,39 @@ export function buildReportBuilderUpdateReportDocumentExpectedVersionState(draft
                 ? "Expected version must be a positive integer."
                 : "Enter the saved document version to prepare an update payload.",
     };
+}
+
+export function resolveReportBuilderUpdateReportDocumentPayloadSeed(savedReportPayload = null, {
+    hydratedReportDocumentSession = null,
+    getReportDocumentResponse = null,
+} = {}) {
+    if (hydratedReportDocumentSession && getReportDocumentResponse && typeof getReportDocumentResponse === "object" && !Array.isArray(getReportDocumentResponse)) {
+        return cloneValue(getReportDocumentResponse);
+    }
+    const reportId = normalizeString(hydratedReportDocumentSession?.reportId);
+    const title = normalizeString(hydratedReportDocumentSession?.title || reportId || "Report") || "Report";
+    const documentVersion = normalizePositiveInteger(hydratedReportDocumentSession?.documentVersion);
+    const savedSource = hydratedReportDocumentSession?.savedSource && typeof hydratedReportDocumentSession.savedSource === "object" && !Array.isArray(hydratedReportDocumentSession.savedSource)
+        ? cloneValue(hydratedReportDocumentSession.savedSource)
+        : (hydratedReportDocumentSession?.source && typeof hydratedReportDocumentSession.source === "object" && !Array.isArray(hydratedReportDocumentSession.source)
+            ? cloneValue(hydratedReportDocumentSession.source)
+            : null);
+    if (reportId || savedSource) {
+        return {
+            version: 1,
+            kind: "getReportDocumentResponse",
+            ...(reportId ? { reportRef: { reportId } } : {}),
+            ...(documentVersion > 0 ? { documentVersion } : {}),
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                ...(reportId ? { id: reportId } : {}),
+                title,
+            },
+            ...(savedSource ? { source: savedSource } : {}),
+        };
+    }
+    return savedReportPayload;
 }
 
 export function buildReportBuilderUpdateReportDocumentPayload(savedReportPayload = null, {

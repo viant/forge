@@ -33,16 +33,36 @@
     },
     {
       "type": "eval",
-      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
     },
     {
-      "type": "clickRole",
-      "role": "button",
-      "name": "Fork from here"
+      "type": "waitForEval",
+      "expression": "!((document.body?.innerText || document.body?.textContent || '').includes('Local Draft'))",
+      "timeoutMs": 30000
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Local Draft"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Reach Rate'))",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__measure-pill",
+      "text": "Reach Rate",
+      "index": 0
     },
     {
       "type": "waitForDomContains",
-      "text": "Exploration Session.",
+      "text": "Local Draft",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
       "timeoutMs": 60000
     },
     {

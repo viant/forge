@@ -22,8 +22,9 @@
       "type": "eval",
       "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
     },
-    { "type": "clickRole", "role": "button", "name": "Fork from here" },
-    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "assertDomNotContains", "text": "Local Draft" },
+    { "type": "clickSelectorContains", "selector": ".forge-report-builder__measure-pill", "text": "Reach Rate", "index": 0 },
+    { "type": "waitForDomContains", "text": "Local Draft", "timeoutMs": 60000 },
     { "type": "clickRole", "role": "button", "name": "Save artifact" },
     { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
     { "type": "clickRole", "role": "button", "name": "Prepare report payload" },

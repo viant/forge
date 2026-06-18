@@ -1,0 +1,218 @@
+{
+  "baseUrl": "http://127.0.0.1:5175",
+  "viewport": {
+    "width": 1280,
+    "height": 960
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "/report-builder-preview.html"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic Report Builder Preview",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clearLocalStorage",
+      "keys": [
+        "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.state.demoReportBuilder",
+        "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
+        "reportBuilder.chartPresets.demoReportBuilder"
+      ]
+    },
+    {
+      "type": "reload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Local Draft"
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__measure-pill",
+      "text": "Reach Rate",
+      "index": 0
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Local Draft",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Save artifact"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved exploration artifact: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare report payload"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Saved report payload: Report Builder Demo",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "fillSelector",
+      "selector": "input[aria-label=\"Document version\"]",
+      "value": "11"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Using document version 11.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare list response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "List ReportDocuments response:",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "selectSelector",
+      "selector": "select[aria-label=\"List response entry\"]",
+      "value": "forecastingInventoryTopChannelsQ3"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Selected entry: Forecasting Inventory Top Channels Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare get request"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "\"reportId\": \"forecastingInventoryTopChannelsQ3\"",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Prepare selected get response"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Get ReportDocument response: Forecasting Inventory Top Channels Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.patchBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.patchBuilderState({ selectedDimensions: ['eventDate'], viewMode: 'table', chartSpec: null })"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions[0] === 'eventDate' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'table' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec == null",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.replaceRuntimeActionBehaviors && window.__REPORT_BUILDER_PREVIEW__.replaceRuntimeActionBehaviors([{ match: { blockKind: 'chartBlock', fieldRef: 'channelV2' }, delayMs: 200, error: 'Preview runtime action provider failed.' }])"
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Reopen in builder"
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument Forecasting Inventory Top Channels Q3 for editing.",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Reopened ReportDocument: Forecasting Inventory Top Channels Q3",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForDomContains",
+      "text": "Template: Forecast Inventory Brief",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "Array.from(document.querySelectorAll('.forge-report-runtime-chart-panel')).some((entry) => !entry.closest('.forge-report-builder__runtime-preview'))",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-runtime-chart-panel')).find((entry) => !entry.closest('.forge-report-builder__runtime-preview')); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Failed to load refinement actions for Channel.') && text.includes('Preview runtime action provider failed.'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => Array.from(document.querySelectorAll('button')).some((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Retry action provider') && !entry.closest('.forge-report-builder__runtime-preview')))()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.replaceRuntimeActionBehaviors && window.__REPORT_BUILDER_PREVIEW__.replaceRuntimeActionBehaviors([{ match: { blockKind: 'chartBlock', fieldRef: 'channelV2' }, delayMs: 1200, actions: [{ id: 'detail_channel', label: 'Show channel details', kind: 'detail', targetRef: 'target://steward/performance/channel-detail' }] }])"
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Retry action provider') && !entry.closest('.forge-report-builder__runtime-preview')); if (!button) { throw new Error('Retry action provider button not found in reopened inventory chart surface.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => Array.from(document.querySelectorAll('button')).some((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Retrying action provider') && !entry.closest('.forge-report-builder__runtime-preview')))()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-runtime-chart-panel')).find((entry) => !entry.closest('.forge-report-builder__runtime-preview')); const text = panel?.innerText || panel?.textContent || ''; return !text.includes('Failed to load refinement actions for Channel.') && !text.includes('Preview runtime action provider failed.'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-runtime-chart-panel')).find((entry) => !entry.closest('.forge-report-builder__runtime-preview')); const mark = panel?.querySelector('.recharts-bar-rectangle'); if (!mark) { throw new Error('Reopened inventory chart mark not found after retry.'); } mark.dispatchEvent(new MouseEvent('click', { bubbles: true })); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-runtime-chart-panel')).find((entry) => !entry.closest('.forge-report-builder__runtime-preview')); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Show channel details'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "eval",
+      "expression": "(() => { const panel = Array.from(document.querySelectorAll('.forge-report-runtime-chart-panel')).find((entry) => !entry.closest('.forge-report-builder__runtime-preview')); const button = Array.from(panel?.querySelectorAll('.forge-report-runtime-chart-action') || []).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Show channel details')); if (!button) { throw new Error('Show channel details action not found after provider retry.'); } button.click(); return true; })()"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-runtime-host-intent, .forge-report-runtime-chart-panel, .forge-report-runtime-table-panel')).filter((entry) => !entry.closest('.forge-report-builder__runtime-preview')); const text = panels.map((entry) => entry.innerText || entry.textContent || '').join(' '); return text.includes('target://steward/performance/channel-detail') && text.includes('Display'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "screenshot",
+      "file": "report-builder-preview-semantic-reopen-report-document-inventory-chart-action-provider-retry.png",
+      "fullPage": true
+    }
+  ]
+}

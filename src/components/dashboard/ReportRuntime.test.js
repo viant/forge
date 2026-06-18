@@ -24,13 +24,22 @@ const reportSpec = {
     kind: "semantic",
     modelRef: "model://steward/performance/ad_delivery@v1",
     modelLabel: "Ad Delivery",
+    modelDescription: "Governed reporting model for the report builder preview.",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
+    entityDescription: "Daily delivery grain approved for reporting.",
     selectedDimensions: [
+      {
+        id: "event_date",
+        rawId: "eventDate",
+        label: "Delivery Date",
+        description: "Daily delivery grain",
+      },
       {
         id: "channel",
         rawId: "channelV2",
         label: "Channel",
+        description: "Approved buying channel",
         governance: {
           status: "deprecated",
         },
@@ -41,9 +50,11 @@ const reportSpec = {
         id: "available_impressions",
         rawId: "avails",
         label: "Available Impressions",
+        description: "Certified available inventory",
         format: "compactNumber",
         governance: {
           status: "draft",
+          certification: "certified",
         },
       },
     ],
@@ -78,8 +89,18 @@ assert.ok(html.includes("Runtime Preview"));
 assert.ok(html.includes("Compiled authored report runtime surface."));
 assert.ok(html.includes("Model Ad Delivery"));
 assert.ok(html.includes("Entity Line Delivery"));
-assert.ok(html.includes("Dimensions Channel"));
+assert.ok(html.includes("Semantic Binding"));
+assert.ok(html.includes("Governed model and field selections compiled into this runtime artifact."));
+assert.ok(html.includes("Governed reporting model for the report builder preview."));
+assert.ok(html.includes("Daily delivery grain approved for reporting."));
+assert.ok(html.includes("Selected dimensions (2)"));
+assert.ok(html.includes("Delivery Date"));
+assert.ok(html.includes("Daily delivery grain"));
+assert.ok(html.includes("Dimensions Delivery Date, Channel"));
 assert.ok(html.includes("Measures Available Impressions"));
+assert.ok(html.includes("Selected measures (1)"));
+assert.ok(html.includes("Certified available inventory"));
+assert.ok(html.includes("Certified"));
 assert.ok(html.includes("1 deprecated"));
 assert.ok(html.includes("1 draft"));
 assert.ok(html.includes("Runtime Diagnostics"));
@@ -88,6 +109,371 @@ assert.ok(html.includes("Update the authored target mapping or remove the missin
 assert.ok(html.includes("semanticProviderDiagnostics"));
 assert.ok(html.includes("Block primaryChart"));
 assert.ok(html.includes("reportDocument.blocks.primaryChart.targetRef"));
+
+const bindingOnlyHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Binding Fallback Runtime",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date", "channel"],
+        selectedMeasures: ["available_impressions", "household_uniques"],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(bindingOnlyHtml.includes("Model model://steward/performance/ad_delivery@v1"));
+assert.ok(bindingOnlyHtml.includes("Entity line_delivery"));
+assert.ok(bindingOnlyHtml.includes("Semantic Binding"));
+assert.ok(bindingOnlyHtml.includes("Selected dimensions (2)"));
+assert.ok(bindingOnlyHtml.includes("Selected measures (2)"));
+assert.ok(bindingOnlyHtml.includes("Dimensions event_date, channel"));
+assert.ok(bindingOnlyHtml.includes("Measures available_impressions, household_uniques"));
+
+const emptySummaryBindingFallbackHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Binding Summary Fallback Runtime",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date", "channel"],
+        selectedMeasures: ["available_impressions", "household_uniques"],
+      },
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelLabel: "Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Line Delivery",
+        selectedDimensions: [],
+        selectedMeasures: [],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(emptySummaryBindingFallbackHtml.includes("Model Ad Delivery"));
+assert.ok(emptySummaryBindingFallbackHtml.includes("Entity Line Delivery"));
+assert.ok(emptySummaryBindingFallbackHtml.includes("Dimensions event_date, channel"));
+assert.ok(emptySummaryBindingFallbackHtml.includes("Measures available_impressions, household_uniques"));
+
+const mixedSummaryBindingFallbackHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Binding Mixed Fallback Runtime",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date", "channel"],
+        selectedMeasures: ["available_impressions", "household_uniques"],
+      },
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelLabel: "Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Line Delivery",
+        selectedDimensions: [
+          {
+            id: "channel",
+            rawId: "channelV2",
+            label: "Channel",
+            governance: {
+              status: "deprecated",
+            },
+          },
+        ],
+        selectedMeasures: [],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(mixedSummaryBindingFallbackHtml.includes("Model Ad Delivery"));
+assert.ok(mixedSummaryBindingFallbackHtml.includes("Entity Line Delivery"));
+assert.ok(mixedSummaryBindingFallbackHtml.includes("Dimensions Channel"));
+assert.ok(mixedSummaryBindingFallbackHtml.includes("Measures available_impressions, household_uniques"));
+assert.ok(mixedSummaryBindingFallbackHtml.includes("1 deprecated"));
+
+const mixedMeasureSummaryBindingFallbackHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Binding Mixed Measure Fallback Runtime",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date", "channel"],
+        selectedMeasures: ["available_impressions", "household_uniques"],
+      },
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelLabel: "Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Line Delivery",
+        selectedDimensions: [],
+        selectedMeasures: [
+          {
+            id: "available_impressions",
+            rawId: "avails",
+            label: "Available Impressions",
+            governance: {
+              status: "draft",
+            },
+          },
+        ],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(mixedMeasureSummaryBindingFallbackHtml.includes("Model Ad Delivery"));
+assert.ok(mixedMeasureSummaryBindingFallbackHtml.includes("Entity Line Delivery"));
+assert.ok(mixedMeasureSummaryBindingFallbackHtml.includes("Dimensions event_date, channel"));
+assert.ok(mixedMeasureSummaryBindingFallbackHtml.includes("Measures Available Impressions"));
+assert.ok(mixedMeasureSummaryBindingFallbackHtml.includes("1 draft"));
+
+const overflowBindingHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Binding Overflow Runtime",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      binding: {
+        mode: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        entity: "line_delivery",
+        selectedDimensions: ["event_date", "channel", "country_code"],
+        selectedMeasures: ["available_impressions", "household_uniques", "reach_rate"],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(overflowBindingHtml.includes("Dimensions event_date, channel +1"));
+assert.ok(overflowBindingHtml.includes("Measures available_impressions, household_uniques +1"));
+
+const overflowSemanticSummaryHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Semantic Summary Overflow Runtime",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelLabel: "Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Line Delivery",
+        selectedDimensions: [
+          {
+            id: "event_date",
+            rawId: "eventDate",
+            label: "Delivery Date",
+          },
+          {
+            id: "channel",
+            rawId: "channelV2",
+            label: "Channel",
+            governance: {
+              status: "deprecated",
+            },
+          },
+          {
+            id: "country_code",
+            rawId: "country",
+            label: "Market",
+            governance: {
+              status: "deprecated",
+            },
+          },
+        ],
+        selectedMeasures: [
+          {
+            id: "available_impressions",
+            rawId: "avails",
+            label: "Available Impressions",
+          },
+          {
+            id: "household_uniques",
+            rawId: "hhUniqs",
+            label: "Household Uniques",
+          },
+          {
+            id: "reach_rate",
+            rawId: "reachRate",
+            label: "Reach Rate",
+            governance: {
+              status: "draft",
+            },
+          },
+        ],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(overflowSemanticSummaryHtml.includes("Model Ad Delivery"));
+assert.ok(overflowSemanticSummaryHtml.includes("Entity Line Delivery"));
+assert.ok(overflowSemanticSummaryHtml.includes("Dimensions Delivery Date, Channel +1"));
+assert.ok(overflowSemanticSummaryHtml.includes("Measures Available Impressions, Household Uniques +1"));
+assert.ok(overflowSemanticSummaryHtml.includes("2 deprecated"));
+assert.ok(overflowSemanticSummaryHtml.includes("1 draft"));
+
+const overflowSemanticSummaryPlusTwoHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Semantic Summary Overflow Plus Two Runtime",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelLabel: "Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Line Delivery",
+        selectedDimensions: [
+          {
+            id: "event_date",
+            rawId: "eventDate",
+            label: "Delivery Date",
+          },
+          {
+            id: "channel",
+            rawId: "channelV2",
+            label: "Channel",
+            governance: {
+              status: "deprecated",
+            },
+          },
+          {
+            id: "country_code",
+            rawId: "country",
+            label: "Market",
+            governance: {
+              status: "deprecated",
+            },
+          },
+          {
+            id: "region",
+            rawId: "region",
+            label: "Region",
+          },
+        ],
+        selectedMeasures: [
+          {
+            id: "available_impressions",
+            rawId: "avails",
+            label: "Available Impressions",
+          },
+          {
+            id: "household_uniques",
+            rawId: "hhUniqs",
+            label: "Household Uniques",
+          },
+          {
+            id: "reach_rate",
+            rawId: "reachRate",
+            label: "Reach Rate",
+            governance: {
+              status: "draft",
+            },
+          },
+          {
+            id: "reach_share",
+            rawId: "reachShare",
+            label: "Reach Share",
+          },
+        ],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("Model Ad Delivery"));
+assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("Entity Line Delivery"));
+assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("Dimensions Delivery Date, Channel +2"));
+assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("Measures Available Impressions, Household Uniques +2"));
+assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("2 deprecated"));
+assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("1 draft"));
 
 const emptyRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -191,6 +577,224 @@ const unsupportedRefinementHtml = renderToStaticMarkup(
 );
 assert.ok(!unsupportedRefinementHtml.includes("runtimeRefinementUnsupported"));
 assert.ok(!unsupportedRefinementHtml.includes("Runtime refinement actions are unavailable for Age Group because no backend runtime filter mapping is declared."));
+
+const chartErrorHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Chart Error Runtime",
+      layoutIntent: {
+        blockOrder: ["primaryChart"],
+        items: [{ blockId: "primaryChart" }],
+      },
+      blocks: [
+        {
+          id: "primaryChart",
+          kind: "chartBlock",
+          datasetRef: "primary",
+          chartSpec: {
+            title: "Chart",
+            xField: "eventDate",
+            yFields: ["avails"],
+          },
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {
+            dimensions: {
+              eventDate: true,
+            },
+          },
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [
+        {
+          code: "actionProviderFailed",
+          severity: "warning",
+          blockId: "primaryChart",
+          path: "reportRuntime.blocks.primaryChart.actions.eventDate",
+          message: "Failed to load refinement actions for Date. Provider offline",
+          suggestedFix: "Retry the action provider or continue without runtime refinements for this block.",
+        },
+        {
+          code: "documentBlockChartInvalid",
+          severity: "error",
+          blockId: "primaryChart",
+          path: "reportDocument.blocks.primaryChart.chartSpec.xField",
+          message: "Primary Chart is no longer compatible with the current builder selection.",
+          suggestedFix: "Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder.",
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          rows: [{ eventDate: "2026-05-01", avails: 120000 }],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "primaryChart",
+          kind: "chartBlock",
+          datasetRef: "primary",
+          content: {
+            chartSpec: {
+              title: "Chart",
+              xField: "eventDate",
+              yFields: ["avails"],
+            },
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.equal((chartErrorHtml.match(/Primary Chart is no longer compatible with the current builder selection\./g) || []).length, 2);
+assert.equal((chartErrorHtml.match(/Failed to load refinement actions for Date\. Provider offline/g) || []).length, 2);
+assert.ok(chartErrorHtml.includes("Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder."));
+assert.ok(chartErrorHtml.includes("Retry the action provider or continue without runtime refinements for this block."));
+assert.equal((chartErrorHtml.match(/Retry action provider/g) || []).length, 2);
+assert.ok(chartErrorHtml.includes("Block primaryChart"));
+assert.ok(chartErrorHtml.includes("reportDocument.blocks.primaryChart.chartSpec.xField"));
+
+const blockWarningHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Provider Warning Runtime",
+      layoutIntent: {
+        blockOrder: ["primaryTable"],
+        items: [{ blockId: "primaryTable" }],
+      },
+      blocks: [
+        {
+          id: "primaryTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          columns: [
+            { key: "channelV2", sourceKey: "channelV2", displayKey: "channel.channel", label: "Channel", kind: "dimension" },
+          ],
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {
+            dimensions: {
+              channelV2: true,
+            },
+          },
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [
+        {
+          code: "actionProviderFailed",
+          severity: "warning",
+          blockId: "primaryTable",
+          path: "reportRuntime.blocks.primaryTable.actions.channelV2",
+          message: "Failed to load refinement actions for Channel. Provider offline",
+          suggestedFix: "Retry the action provider or continue without runtime refinements for this block.",
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          rows: [{ channelV2: "Display" }],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "primaryTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          content: {
+            columns: [
+              { key: "channelV2", sourceKey: "channelV2", displayKey: "channel.channel", label: "Channel", kind: "dimension" },
+            ],
+            resolvedRows: [{ channelV2: "Display" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.equal((blockWarningHtml.match(/Failed to load refinement actions for Channel\. Provider offline/g) || []).length, 2);
+assert.ok(blockWarningHtml.includes("Retry the action provider or continue without runtime refinements for this block."));
+assert.equal((blockWarningHtml.match(/Retry action provider/g) || []).length, 2);
+assert.ok(blockWarningHtml.includes("Block primaryTable"));
+assert.ok(blockWarningHtml.includes("reportRuntime.blocks.primaryTable.actions.channelV2"));
+
+const geoWarningHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Geo Warning Runtime",
+      layoutIntent: {
+        blockOrder: ["primaryGeo"],
+        items: [{ blockId: "primaryGeo" }],
+      },
+      blocks: [
+        {
+          id: "primaryGeo",
+          kind: "geoMapBlock",
+          title: "Geo Overview",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [
+        {
+          code: "actionProviderFailed",
+          severity: "warning",
+          blockId: "primaryGeo",
+          path: "reportRuntime.blocks.primaryGeo.actions.country",
+          message: "Failed to load refinement actions for Market. Provider offline",
+          suggestedFix: "Retry the action provider or continue without runtime refinements for this block.",
+        },
+      ],
+      datasets: [],
+      blocks: [
+        {
+          id: "primaryGeo",
+          kind: "geoMapBlock",
+          content: {
+            geo: {
+              shape: "us-states",
+              metric: {
+                label: "Available Impressions",
+              },
+            },
+            resolvedGeo: {
+              shape: "us-states",
+              metricLabel: "Available Impressions",
+              summary: {
+                regionCount: 0,
+                totalValue: "0",
+                topKey: "-",
+              },
+              regions: [],
+              ranking: [],
+            },
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.equal((geoWarningHtml.match(/Failed to load refinement actions for Market\. Provider offline/g) || []).length, 2);
+assert.ok(geoWarningHtml.includes("Retry the action provider or continue without runtime refinements for this block."));
+assert.equal((geoWarningHtml.match(/Retry action provider/g) || []).length, 2);
+assert.ok(geoWarningHtml.includes("Block primaryGeo"));
+assert.ok(geoWarningHtml.includes("reportRuntime.blocks.primaryGeo.actions.country"));
 
 function collectReactElements(node, predicate, matches = []) {
   if (node == null || typeof node === "string" || typeof node === "number" || typeof node === "boolean") {

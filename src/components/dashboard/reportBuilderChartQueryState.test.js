@@ -204,6 +204,33 @@ assert.deepEqual(resolveReportBuilderChartQueryStateTransition({
   deferForPrefill: false,
   showingChartView: true,
   hasRequest: true,
+  fingerprint: "chart::3",
+  requestKey: "chart::3::0",
+  fetchAvailable: false,
+  currentState: {
+    fingerprint: "chart::3",
+    requestKey: "chart::3::0",
+    rows: [],
+    loading: false,
+    error: new Error("Chart data fetch is unavailable for full-query mode."),
+  },
+  unavailableError: new Error("Chart data fetch is unavailable for full-query mode."),
+}), {
+  type: "noop",
+  nextState: {
+    fingerprint: "chart::3",
+    requestKey: "chart::3::0",
+    rows: [],
+    loading: false,
+    error: new Error("Chart data fetch is unavailable for full-query mode."),
+  },
+});
+
+assert.deepEqual(resolveReportBuilderChartQueryStateTransition({
+  mode: "fullQuery",
+  deferForPrefill: false,
+  showingChartView: true,
+  hasRequest: true,
   fingerprint: "chart::8",
   requestKey: "chart::8::1",
   fetchAvailable: true,
@@ -276,6 +303,32 @@ assert.deepEqual(resolveReportBuilderChartQueryStateTransition({
     fingerprint: "chart::5",
     requestKey: "chart::5::0",
     rows: [{ eventDate: "2026-05-01", avails: 12000 }],
+    loading: false,
+    error: null,
+  },
+});
+
+assert.deepEqual(resolveReportBuilderChartQueryStateTransition({
+  mode: "fullQuery",
+  deferForPrefill: false,
+  showingChartView: true,
+  hasRequest: true,
+  fingerprint: "chart::empty",
+  requestKey: "chart::empty::0",
+  fetchAvailable: true,
+  currentState: {
+    fingerprint: "chart::empty",
+    requestKey: "chart::empty::0",
+    rows: [],
+    loading: false,
+    error: null,
+  },
+}), {
+  type: "noop",
+  nextState: {
+    fingerprint: "chart::empty",
+    requestKey: "chart::empty::0",
+    rows: [],
     loading: false,
     error: null,
   },

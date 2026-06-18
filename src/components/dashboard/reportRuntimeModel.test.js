@@ -5,6 +5,7 @@ import {
   formatReportRuntimeScopeValue,
   buildReportRuntimeUnsupportedRefinementDiagnostics,
   resolveReportRuntimeChartActionFields,
+  resolveReportRuntimeBindingSummaryChips,
   resolveReportRuntimeBindingSummary,
   resolveReportRuntimeBlocks,
   resolveReportRuntimeDatasetRequest,
@@ -157,6 +158,460 @@ assert.deepEqual(resolveReportRuntimeBindingSummary(reportSpec), {
   governanceCounts: {
     draft: 1,
     deprecated: 1,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  binding: {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date", "channel"],
+    selectedMeasures: ["available_impressions", "household_uniques"],
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  entity: "line_delivery",
+  dimensionCount: 2,
+  measureCount: 2,
+  selectedDimensions: [
+    { id: "event_date", rawId: "event_date", label: "event_date" },
+    { id: "channel", rawId: "channel", label: "channel" },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "available_impressions", label: "available_impressions" },
+    { id: "household_uniques", rawId: "household_uniques", label: "household_uniques" },
+  ],
+  governanceCounts: {
+    draft: 0,
+    deprecated: 0,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  semanticSummary: {
+    kind: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelLabel: "Ad Delivery",
+    entity: "line_delivery",
+    entityLabel: "Line Delivery",
+    selectedDimensions: [
+      {
+        id: "event_date",
+        rawId: "eventDate",
+        label: "Delivery Date",
+      },
+      {
+        id: "channel",
+        rawId: "channelV2",
+        label: "Channel",
+        governance: {
+          status: "deprecated",
+        },
+      },
+      {
+        id: "country_code",
+        rawId: "country",
+        label: "Market",
+        governance: {
+          status: "deprecated",
+        },
+      },
+    ],
+    selectedMeasures: [
+      {
+        id: "available_impressions",
+        rawId: "avails",
+        label: "Available Impressions",
+        governance: {
+          status: "approved",
+          certification: "certified",
+        },
+      },
+      {
+        id: "household_uniques",
+        rawId: "hhUniqs",
+        label: "Household Uniques",
+      },
+      {
+        id: "reach_rate",
+        rawId: "reachRate",
+        label: "Reach Rate",
+        governance: {
+          status: "draft",
+        },
+      },
+    ],
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelLabel: "Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  dimensionCount: 3,
+  measureCount: 3,
+  selectedDimensions: [
+    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+    { id: "channel", rawId: "channelV2", label: "Channel", governance: { status: "deprecated" } },
+    { id: "country_code", rawId: "country", label: "Market", governance: { status: "deprecated" } },
+  ],
+  selectedMeasures: [
+    {
+      id: "available_impressions",
+      rawId: "avails",
+      label: "Available Impressions",
+      governance: {
+        status: "approved",
+        certification: "certified",
+      },
+    },
+    { id: "household_uniques", rawId: "hhUniqs", label: "Household Uniques" },
+    { id: "reach_rate", rawId: "reachRate", label: "Reach Rate", governance: { status: "draft" } },
+  ],
+  governanceCounts: {
+    draft: 1,
+    deprecated: 2,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
+  kind: "semantic",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelLabel: "Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  dimensionCount: 4,
+  measureCount: 4,
+  selectedDimensions: [
+    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+    { id: "channel", rawId: "channelV2", label: "Channel", governance: { status: "deprecated" } },
+    { id: "country_code", rawId: "country", label: "Market", governance: { status: "deprecated" } },
+    { id: "region", rawId: "region", label: "Region" },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+    { id: "household_uniques", rawId: "hhUniqs", label: "Household Uniques" },
+    { id: "reach_rate", rawId: "reachRate", label: "Reach Rate", governance: { status: "draft" } },
+    { id: "reach_share", rawId: "reachShare", label: "Reach Share" },
+  ],
+  governanceCounts: {
+    draft: 1,
+    deprecated: 2,
+  },
+}), [
+  "Model Ad Delivery",
+  "Entity Line Delivery",
+  "Dimensions Delivery Date, Channel +2",
+  "Measures Available Impressions, Household Uniques +2",
+  "2 deprecated",
+  "1 draft",
+]);
+
+assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
+  kind: "semantic",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  entity: "line_delivery",
+  dimensionCount: 0,
+  measureCount: 0,
+  selectedDimensions: [],
+  selectedMeasures: [],
+  governanceCounts: {
+    draft: 0,
+    deprecated: 0,
+  },
+}), [
+  "Model model://steward/performance/ad_delivery@v1",
+  "Entity line_delivery",
+  "0 dimensions",
+  "0 measures",
+]);
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  semanticSummary: {
+    kind: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelLabel: "Ad Delivery",
+    entity: "line_delivery",
+    entityLabel: "Line Delivery",
+    selectedDimensions: [
+      {
+        id: "event_date",
+        rawId: "eventDate",
+        label: "Delivery Date",
+      },
+      {
+        id: "channel",
+        rawId: "channelV2",
+        label: "Channel",
+        governance: {
+          status: "deprecated",
+        },
+      },
+      {
+        id: "country_code",
+        rawId: "country",
+        label: "Market",
+        governance: {
+          status: "deprecated",
+        },
+      },
+      {
+        id: "region",
+        rawId: "region",
+        label: "Region",
+      },
+    ],
+    selectedMeasures: [
+      {
+        id: "available_impressions",
+        rawId: "avails",
+        label: "Available Impressions",
+      },
+      {
+        id: "household_uniques",
+        rawId: "hhUniqs",
+        label: "Household Uniques",
+      },
+      {
+        id: "reach_rate",
+        rawId: "reachRate",
+        label: "Reach Rate",
+        governance: {
+          status: "draft",
+        },
+      },
+      {
+        id: "reach_share",
+        rawId: "reachShare",
+        label: "Reach Share",
+      },
+    ],
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelLabel: "Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  dimensionCount: 4,
+  measureCount: 4,
+  selectedDimensions: [
+    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+    { id: "channel", rawId: "channelV2", label: "Channel", governance: { status: "deprecated" } },
+    { id: "country_code", rawId: "country", label: "Market", governance: { status: "deprecated" } },
+    { id: "region", rawId: "region", label: "Region" },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+    { id: "household_uniques", rawId: "hhUniqs", label: "Household Uniques" },
+    { id: "reach_rate", rawId: "reachRate", label: "Reach Rate", governance: { status: "draft" } },
+    { id: "reach_share", rawId: "reachShare", label: "Reach Share" },
+  ],
+  governanceCounts: {
+    draft: 1,
+    deprecated: 2,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  binding: {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date", "channel"],
+    selectedMeasures: ["available_impressions", "household_uniques"],
+  },
+  semanticSummary: {
+    kind: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelLabel: "Ad Delivery",
+    entity: "line_delivery",
+    entityLabel: "Line Delivery",
+    selectedDimensions: [
+      {
+        id: "channel",
+        rawId: "channelV2",
+        label: "Channel",
+        governance: {
+          status: "deprecated",
+        },
+      },
+    ],
+    selectedMeasures: [],
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelLabel: "Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  dimensionCount: 1,
+  measureCount: 2,
+  selectedDimensions: [
+    {
+      id: "channel",
+      rawId: "channelV2",
+      label: "Channel",
+      governance: {
+        status: "deprecated",
+      },
+    },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "available_impressions", label: "available_impressions" },
+    { id: "household_uniques", rawId: "household_uniques", label: "household_uniques" },
+  ],
+  governanceCounts: {
+    draft: 0,
+    deprecated: 1,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  binding: {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date", "channel"],
+    selectedMeasures: ["available_impressions", "household_uniques"],
+  },
+  semanticSummary: {
+    kind: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelLabel: "Ad Delivery",
+    entity: "line_delivery",
+    entityLabel: "Line Delivery",
+    selectedDimensions: [],
+    selectedMeasures: [
+      {
+        id: "available_impressions",
+        rawId: "avails",
+        label: "Available Impressions",
+        governance: {
+          status: "draft",
+        },
+      },
+    ],
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelLabel: "Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  dimensionCount: 2,
+  measureCount: 1,
+  selectedDimensions: [
+    { id: "event_date", rawId: "event_date", label: "event_date" },
+    { id: "channel", rawId: "channel", label: "channel" },
+  ],
+  selectedMeasures: [
+    {
+      id: "available_impressions",
+      rawId: "avails",
+      label: "Available Impressions",
+      governance: {
+        status: "draft",
+      },
+    },
+  ],
+  governanceCounts: {
+    draft: 1,
+    deprecated: 0,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  binding: {
+    mode: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date", "channel"],
+    selectedMeasures: ["available_impressions", "household_uniques"],
+  },
+  semanticSummary: {
+    kind: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelLabel: "Ad Delivery",
+    entity: "line_delivery",
+    entityLabel: "Line Delivery",
+    selectedDimensions: [],
+    selectedMeasures: [],
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelLabel: "Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  dimensionCount: 2,
+  measureCount: 2,
+  selectedDimensions: [
+    { id: "event_date", rawId: "event_date", label: "event_date" },
+    { id: "channel", rawId: "channel", label: "channel" },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "available_impressions", label: "available_impressions" },
+    { id: "household_uniques", rawId: "household_uniques", label: "household_uniques" },
+  ],
+  governanceCounts: {
+    draft: 0,
+    deprecated: 0,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  semanticSummary: {
+    kind: "semantic",
+    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelLabel: "Ad Delivery",
+    modelDescription: "Governed reporting model for the report builder preview.",
+    entity: "line_delivery",
+    entityLabel: "Line Delivery",
+    entityDescription: "Daily delivery grain approved for reporting.",
+    selectedDimensions: [
+      {
+        id: "event_date",
+        rawId: "eventDate",
+        label: "Delivery Date",
+      },
+    ],
+    selectedMeasures: [
+      {
+        id: "available_impressions",
+        rawId: "avails",
+        label: "Available Impressions",
+      },
+    ],
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelLabel: "Ad Delivery",
+  modelDescription: "Governed reporting model for the report builder preview.",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  entityDescription: "Daily delivery grain approved for reporting.",
+  dimensionCount: 1,
+  measureCount: 1,
+  selectedDimensions: [
+    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+  ],
+  governanceCounts: {
+    draft: 0,
+    deprecated: 0,
   },
 });
 

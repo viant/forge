@@ -8,6 +8,7 @@ import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
 import com.viant.forgeandroid.runtime.ReportBuilderHooksDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef
+import com.viant.forgeandroid.runtime.ReportBuilderResultDef
 import com.viant.forgeandroid.runtime.WindowMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.JsonObject
@@ -143,6 +144,47 @@ class ReportBuilderRequestPayloadTest {
         )
 
         assertEquals(true, payload["hooked"])
+    }
+
+    @Test
+    fun applyReportBuilderChartDataPolicyAppliesFullQueryLimit() {
+        val request = applyReportBuilderChartDataPolicy(
+            config = DashboardReportBuilderDef(
+                result = ReportBuilderResultDef(
+                    chartDataMode = "fullQuery",
+                    chartRowLimit = 2500
+                )
+            ),
+            request = mapOf(
+                "limit" to 25,
+                "offset" to 50,
+                "filters" to mapOf("channelIds" to listOf(1))
+            )
+        )
+
+        assertEquals(2500, request["limit"])
+        assertEquals(0, request["offset"])
+        assertEquals(mapOf("channelIds" to listOf(1)), request["filters"])
+    }
+
+    @Test
+    fun applyReportBuilderChartDataPolicyKeepsCurrentPageRequest() {
+        val base = mapOf(
+            "limit" to 25,
+            "offset" to 50
+        )
+
+        val request = applyReportBuilderChartDataPolicy(
+            config = DashboardReportBuilderDef(
+                result = ReportBuilderResultDef(
+                    chartDataMode = "currentPage",
+                    chartDataLimit = 500
+                )
+            ),
+            request = base
+        )
+
+        assertEquals(base, request)
     }
 
     @Test

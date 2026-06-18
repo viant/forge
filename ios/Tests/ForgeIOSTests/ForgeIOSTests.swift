@@ -41,6 +41,194 @@ final class ForgeIOSTests: XCTestCase {
         ))
     }
 
+    func testReportBuilderChartDataPolicyAppliesFullQueryLimit() {
+        let config = DashboardReportBuilderDef(
+            result: ReportBuilderResultDef(
+                chartDataMode: "fullQuery",
+                chartRowLimit: 2500
+            )
+        )
+
+        let request = ReportBuilderRenderer.applyChartDataPolicy(
+            config: config,
+            request: [
+                "limit": .number(25),
+                "offset": .number(50),
+                "filters": .object(["channelIds": .array([.number(1)])])
+            ]
+        )
+
+        XCTAssertEqual(request["limit"], .number(2500))
+        XCTAssertEqual(request["offset"], .number(0))
+        XCTAssertEqual(request["filters"], .object(["channelIds": .array([.number(1)])]))
+    }
+
+    func testReportBuilderChartDataPolicyKeepsCurrentPageRequest() {
+        let request: [String: JSONValue] = [
+            "limit": .number(25),
+            "offset": .number(50)
+        ]
+
+        let resolved = ReportBuilderRenderer.applyChartDataPolicy(
+            config: DashboardReportBuilderDef(
+                result: ReportBuilderResultDef(
+                    chartDataMode: "currentPage",
+                    chartDataLimit: 500
+                )
+            ),
+            request: request
+        )
+
+        XCTAssertEqual(resolved, request)
+    }
+
+    func testWindowMetadataDecodesLatestReportBuilderFields() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "forecastingCubeBuilder",
+              "dataSourceRef": "forecasting_cube_report",
+              "reportBuilder": {
+                "filterPresentation": "rail",
+                "showFilterCategoryBar": true,
+                "hiddenDynamicGroupIds": ["scope"],
+                "notices": [
+                  { "id": "sample", "level": "info", "title": "Sample", "sourcePath": "metadata.notice" }
+                ],
+                "primaryMeasure": "avails",
+                "measureSections": [
+                  { "id": "delivery", "label": "Delivery" }
+                ],
+                "measures": [
+                  { "id": "avails", "key": "avails", "label": "Avails", "section": "delivery", "paramPath": "measures.avails" },
+                  { "id": "bids", "key": "bids", "label": "Bids", "paramPath": "measures.bids" }
+                ],
+                "computedMeasures": [
+                  {
+                    "id": "bidRate",
+                    "key": "bidRate",
+                    "label": "Bid Rate",
+                    "dependencies": ["bids", "avails"],
+                    "compute": { "type": "ratio", "numerator": "bids", "denominator": "avails", "scale": 100, "decimals": 1 }
+                  }
+                ],
+                "dimensions": [
+                  {
+                    "id": "channel",
+                    "key": "channelId",
+                    "displayKey": "channelName",
+                    "runtimeFilter": {
+                      "includeParamPath": "filters.includeChannelIds",
+                      "excludeParamPath": "filters.excludeChannelIds",
+                      "format": "number"
+                    }
+                  }
+                ],
+                "dynamicFilterFamilies": [
+                  { "id": "inventory", "label": "Inventory", "icon": "layers" }
+                ],
+                "forecastCategories": ["inventory", "location"],
+                "groupBy": {
+                  "default": "date",
+                  "options": [
+                    { "id": "date", "label": "Date", "dimensionId": "eventDate", "paramPath": "groupBy", "paramValue": "date" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let reportBuilder = try XCTUnwrap(
+            metadata.view?.content?.containers.first?.dashboard?.reportBuilder
+        )
+
+        XCTAssertEqual(reportBuilder.filterPresentation, "rail")
+        XCTAssertEqual(reportBuilder.showFilterCategoryBar, true)
+        XCTAssertEqual(reportBuilder.hiddenDynamicGroupIds, ["scope"])
+        XCTAssertEqual(reportBuilder.notices.first?.sourcePath, "metadata.notice")
+        XCTAssertEqual(reportBuilder.primaryMeasure, "avails")
+        XCTAssertEqual(reportBuilder.measureSections.first?.id, "delivery")
+        XCTAssertEqual(reportBuilder.computedMeasures.first?.dependencies, ["bids", "avails"])
+        XCTAssertEqual(reportBuilder.computedMeasures.first?.compute?.type, "ratio")
+        XCTAssertEqual(reportBuilder.computedMeasures.first?.compute?.scale, 100)
+        XCTAssertEqual(reportBuilder.dimensions.first?.displayKey, "channelName")
+        XCTAssertEqual(reportBuilder.dimensions.first?.runtimeFilter?.includeParamPath, "filters.includeChannelIds")
+        XCTAssertEqual(reportBuilder.dynamicFilterFamilies.first?.icon, "layers")
+        XCTAssertEqual(reportBuilder.forecastCategories, ["inventory", "location"])
+        XCTAssertEqual(reportBuilder.groupBy?.defaultValue, "date")
+        XCTAssertEqual(reportBuilder.groupBy?.options.first?.paramValue, .string("date"))
+    }
+
+    func testWindowMetadataDecodesCompactDashboardCompatibilityBlocks() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "containers": [
+                {
+                  "id": "dashboardRoot",
+                  "kind": "dashboard",
+                  "containers": [
+                    {
+                      "id": "table",
+                      "kind": "dashboard.table",
+                      "dataSourceRef": "summary_rows",
+                      "columns": ["lineId", "status"]
+                    },
+                    {
+                      "id": "composition",
+                      "kind": "dashboard.composition",
+                      "dataSourceRef": "summary_rows",
+                      "chart": {
+                        "type": "donut",
+                        "categoryKey": "channel",
+                        "valueField": "avails"
+                      }
+                    },
+                    {
+                      "id": "badges",
+                      "kind": "dashboard.badges",
+                      "badges": {
+                        "items": [
+                          { "id": "limited", "label": "Limited", "value": "2", "tone": "warning" }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "geo",
+                      "kind": "dashboard.geoMap",
+                      "geo": { "shape": "us-postal-code" },
+                      "metric": { "key": "avails", "label": "Avails", "format": "compact" }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let children = try XCTUnwrap(metadata.view?.content?.containers.first?.containers)
+        let table = try XCTUnwrap(children.first { $0.id == "table" })
+        let composition = try XCTUnwrap(children.first { $0.id == "composition" })
+        let badges = try XCTUnwrap(children.first { $0.id == "badges" })
+        let geo = try XCTUnwrap(children.first { $0.id == "geo" })
+
+        XCTAssertEqual(table.columns.map(\.id), ["lineId", "status"])
+        XCTAssertEqual(table.columns.map(\.label), ["lineId", "status"])
+        XCTAssertEqual(composition.chart?.xKey, "channel")
+        XCTAssertEqual(composition.chart?.valueKey, "avails")
+        XCTAssertEqual(badges.dashboard?.badges?.items.first?.tone, "warning")
+        XCTAssertEqual(geo.geo?.objectValue?["shape"], .string("us-postal-code"))
+        XCTAssertEqual(geo.metric?.key, "avails")
+    }
+
     func testActionHookRuntimeInvokesPureCollectionHook() throws {
         let code = """
         (() => ({
@@ -1286,6 +1474,9 @@ final class ForgeIOSTests: XCTestCase {
               "reportBuilder": {
                 "result": {
                   "chartCreationMode": "explicit",
+                  "chartDataMode": "fullQuery",
+                  "chartRowLimit": "2500",
+                  "chartDataLimit": 1000,
                   "autoApplyDefaultChartOnResult": true,
                   "defaultChartSpecs": [
                     { "title": "Trend", "type": "line", "xField": "eventDate", "yFields": ["avails"] }
@@ -1303,6 +1494,9 @@ final class ForgeIOSTests: XCTestCase {
         )
 
         XCTAssertEqual(reportBuilder.result?.autoApplyDefaultChartOnResult, true)
+        XCTAssertEqual(reportBuilder.result?.chartDataMode, "fullQuery")
+        XCTAssertEqual(reportBuilder.result?.chartRowLimit, 2500)
+        XCTAssertEqual(reportBuilder.result?.chartDataLimit, 1000)
     }
 
     func testResolveAutoAppliedReportBuilderChartSpecUsesFirstCompatiblePreset() throws {

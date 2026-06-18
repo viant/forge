@@ -20,15 +20,22 @@
     { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
     {
       "type": "eval",
-      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
     },
     {
       "type": "waitForEval",
       "expression": "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.patchSeededSavedReportPayload !== 'function') { return false; } const patched = api.patchSeededSavedReportPayload('forecastingTrendQ3', { compileState: { status: 'invalid', diagnostics: [ { code: 'documentBlockChartInvalid', severity: 'error', blockId: 'primaryChart', path: 'reportDocument.blocks.primaryChart.chartSpec.xField', message: 'Primary Chart is no longer compatible with the current builder selection.', suggestedFix: 'Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder.' } ] } }); return !!patched && patched.compileState && patched.compileState.status === 'invalid'; })()",
       "timeoutMs": 60000
     },
-    { "type": "clickRole", "role": "button", "name": "Fork from here" },
-    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "waitForEval", "expression": "!((document.body?.innerText || document.body?.textContent || '').includes('Local Draft'))", "timeoutMs": 5000 },
+    { "type": "assertDomNotContains", "text": "Local Draft" },
+    { "type": "clickSelectorContains", "selector": ".forge-report-builder__measure-pill", "text": "Reach Rate", "index": 0 },
+    { "type": "waitForDomContains", "text": "Local Draft", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
     { "type": "clickRole", "role": "button", "name": "Save artifact" },
     { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
     { "type": "clickRole", "role": "button", "name": "Prepare report payload" },
@@ -61,21 +68,12 @@
     { "type": "waitForDomContains", "text": "reportDocument.blocks.primaryChart.chartSpec.xField", "timeoutMs": 60000 },
     {
       "type": "waitForEval",
-      "expression": "document.querySelectorAll('.forge-report-builder__runtime-preview .forge-chart-legend-action').length >= 2",
-      "timeoutMs": 60000
-    },
-    {
-      "type": "eval",
-      "expression": "(() => { document.querySelector('.forge-report-builder__runtime-preview .forge-chart-legend-action')?.click(); })()"
-    },
-    {
-      "type": "waitForEval",
-      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('Display') && text.includes('Show channel details'); })()",
+      "expression": "document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel .forge-dashboard-row-action').length >= 2",
       "timeoutMs": 60000
     },
     {
       "type": "clickSelectorContains",
-      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-chart-action",
+      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-table-panel .forge-dashboard-row-action",
       "text": "Show channel details",
       "index": 0
     },
@@ -95,19 +93,10 @@
       "expression": "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.clearDetailTargetBehaviors && window.__REPORT_BUILDER_PREVIEW__.clearDetailTargetBehaviors()"
     },
     {
-      "type": "eval",
-      "expression": "(() => { const legends = document.querySelectorAll('.forge-report-builder__runtime-preview .forge-chart-legend-action'); legends[1]?.click(); })()"
-    },
-    {
-      "type": "waitForEval",
-      "expression": "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Selected value:') && text.includes('CTV') && text.includes('Show channel details'); })()",
-      "timeoutMs": 60000
-    },
-    {
       "type": "clickSelectorContains",
-      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-chart-action",
+      "selector": ".forge-report-builder__runtime-preview .forge-report-runtime-table-panel .forge-dashboard-row-action",
       "text": "Show channel details",
-      "index": 0
+      "index": 1
     },
     { "type": "waitForDomContains", "text": "Resolved detail target", "timeoutMs": 60000 },
     {
