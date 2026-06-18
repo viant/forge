@@ -82,6 +82,8 @@ data class ContainerDef(
     val viewModes: List<String> = emptyList(),
     val limit: Int? = null,
     val orderBy: String? = null,
+    val columns: List<ColumnDef> = emptyList(),
+    val geo: JsonElement? = null,
     val table: TableDef? = null,
     val treeBrowser: TreeBrowserDef? = null,
     val fileBrowser: FileBrowserDef? = null,
@@ -195,17 +197,27 @@ data class DashboardDef(
     val feed: DashboardFeedDef? = null,
     val report: DashboardReportDef? = null,
     val reportBuilder: DashboardReportBuilderDef? = null,
+    val badges: DashboardBadgesDef? = null,
     val detail: DashboardDetailDef? = null
 )
 
 @Serializable
 data class DashboardReportBuilderDef(
     val hooks: ReportBuilderHooksDef? = null,
+    val filterPresentation: String? = null,
+    val showFilterCategoryBar: Boolean? = null,
+    val hiddenDynamicGroupIds: List<String> = emptyList(),
+    val notices: List<ReportBuilderNoticeDef> = emptyList(),
+    val primaryMeasure: String? = null,
+    val measureSections: List<ReportBuilderMeasureSectionDef> = emptyList(),
     val measures: List<ReportBuilderMeasureDef> = emptyList(),
+    val computedMeasures: List<ReportBuilderMeasureDef> = emptyList(),
     val dimensions: List<ReportBuilderDimensionDef> = emptyList(),
     val staticFilters: List<ReportBuilderStaticFilterDef> = emptyList(),
     val dynamicFilterGroups: List<ReportBuilderDynamicFilterGroupDef> = emptyList(),
     val dynamicFilterFamilies: List<ReportBuilderDynamicFilterFamilyDef> = emptyList(),
+    val forecastCategories: List<String> = emptyList(),
+    val groupBy: ReportBuilderGroupByDef? = null,
     val unifiedFamilyRows: Boolean = false,
     val showResultHeader: Boolean? = null,
     val result: ReportBuilderResultDef? = null
@@ -219,29 +231,83 @@ data class ReportBuilderHooksDef(
 )
 
 @Serializable
+data class ReportBuilderNoticeDef(
+    val id: String? = null,
+    val level: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val sourcePath: String? = null
+)
+
+@Serializable
+data class ReportBuilderMeasureSectionDef(
+    val id: String? = null,
+    val label: String? = null
+)
+
+@Serializable
+data class ReportBuilderGroupByDef(
+    @SerialName("default")
+    val defaultValue: String? = null,
+    val options: List<ReportBuilderGroupByOptionDef> = emptyList()
+)
+
+@Serializable
+data class ReportBuilderGroupByOptionDef(
+    val id: String? = null,
+    val value: String? = null,
+    val label: String? = null,
+    val dimensionId: String? = null,
+    val paramPath: String? = null,
+    val paramValue: JsonElement? = null
+)
+
+@Serializable
 data class ReportBuilderMeasureDef(
     val id: String? = null,
     val key: String? = null,
     val label: String? = null,
+    val section: String? = null,
     val format: String? = null,
     val paramPath: String? = null,
     @SerialName("default")
     val defaultValue: Boolean? = null,
     val color: String? = null,
-    val hidden: Boolean? = null
+    val hidden: Boolean? = null,
+    val dependencies: List<String> = emptyList(),
+    val compute: ReportBuilderComputeDef? = null
+)
+
+@Serializable
+data class ReportBuilderComputeDef(
+    val type: String? = null,
+    val numerator: String? = null,
+    val denominator: String? = null,
+    val scale: Double? = null,
+    val decimals: Int? = null
 )
 
 @Serializable
 data class ReportBuilderDimensionDef(
     val id: String? = null,
     val key: String? = null,
+    val displayKey: String? = null,
     val label: String? = null,
     val format: String? = null,
     val paramPath: String? = null,
     @SerialName("default")
     val defaultValue: Boolean? = null,
     val chartAxis: Boolean? = null,
-    val hidden: Boolean? = null
+    val hidden: Boolean? = null,
+    val runtimeFilter: ReportBuilderRuntimeFilterDef? = null
+)
+
+@Serializable
+data class ReportBuilderRuntimeFilterDef(
+    val includeParamPath: String? = null,
+    val excludeParamPath: String? = null,
+    val format: String? = null,
+    val parentField: String? = null
 )
 
 @Serializable
@@ -250,6 +316,9 @@ data class ReportBuilderResultDef(
     val defaultMode: String? = null,
     val viewModes: List<String> = emptyList(),
     val chartType: String? = null,
+    val chartDataMode: String? = null,
+    val chartRowLimit: Int? = null,
+    val chartDataLimit: Int? = null,
     val chartWizard: ReportBuilderChartWizardDef? = null,
     val autoApplyDefaultChartOnResult: Boolean? = null,
     val defaultChartSpecs: List<ReportBuilderChartSpecDef> = emptyList()
@@ -324,6 +393,7 @@ data class ReportBuilderDynamicFilterDef(
 data class ReportBuilderDynamicFilterFamilyDef(
     val id: String? = null,
     val label: String? = null,
+    val icon: String? = null,
     val description: String? = null,
     val includeFilterIds: List<String> = emptyList(),
     val excludeFilterIds: List<String> = emptyList()
@@ -426,6 +496,21 @@ data class DashboardFieldDef(
 @Serializable
 data class DashboardMessagesDef(
     val items: List<DashboardMessageDef> = emptyList()
+)
+
+@Serializable
+data class DashboardBadgesDef(
+    val items: List<DashboardBadgeDef> = emptyList()
+)
+
+@Serializable
+data class DashboardBadgeDef(
+    val id: String? = null,
+    val label: String? = null,
+    val value: String? = null,
+    val tone: String? = null,
+    val severity: String? = null,
+    val visibleWhen: DashboardConditionDef? = null
 )
 
 @Serializable

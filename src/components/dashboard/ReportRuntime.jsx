@@ -6,10 +6,17 @@ import {
   formatReportRuntimeRefinement,
   formatReportRuntimeScopeValue,
   resolveReportRuntimeChartActionFields,
+  resolveReportRuntimeBindingSummaryChips,
   resolveReportRuntimeBindingSummary,
   resolveReportRuntimeRefinementFields,
   resolveReportRuntimePrimaryBlocks,
 } from "./reportRuntimeModel.js";
+import {
+  buildIdleReportRuntimeProviderActionsState,
+  buildPendingReportRuntimeProviderActionsState,
+  buildResolvedReportRuntimeProviderActionsState,
+  loadReportRuntimeProviderActions,
+} from "./reportRuntimeProviderActions.js";
 import { resolveReportRuntimeChartInteractionSupport } from "./reportRuntimeChartInteractions.js";
 import {
   buildReportRuntimeDiagnosticsViewModel,
@@ -121,10 +128,6 @@ function formatKpiValue(value) {
   return normalized || String(value);
 }
 
-function resolveRuntimeFieldActionKey(blockId = "", valueKey = "") {
-  return `${normalizeString(blockId)}:${normalizeString(valueKey)}`;
-}
-
 function ChartSelectionPanel({
   viewModel = null,
   onAction = null,
@@ -207,39 +210,10 @@ function ChartSelectionPanel({
 }
 
 function BindingChips({ bindingSummary = null }) {
-  if (!bindingSummary) {
+  const chips = resolveReportRuntimeBindingSummaryChips(bindingSummary);
+  if (chips.length === 0) {
     return null;
   }
-  const summarizeSelectedLabels = (title, fields = []) => {
-    const labels = (Array.isArray(fields) ? fields : [])
-      .map((field) => normalizeString(field?.label))
-      .filter(Boolean);
-    if (labels.length === 0) {
-      return title === "Dimensions"
-        ? `${bindingSummary.dimensionCount} dimensions`
-        : `${bindingSummary.measureCount} measures`;
-    }
-    if (labels.length <= 2) {
-      return `${title} ${labels.join(", ")}`;
-    }
-    return `${title} ${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
-  };
-  const chips = [
-    normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)
-      ? `Model ${normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)}`
-      : "",
-    normalizeString(bindingSummary.entityLabel || bindingSummary.entity)
-      ? `Entity ${normalizeString(bindingSummary.entityLabel || bindingSummary.entity)}`
-      : "",
-    summarizeSelectedLabels("Dimensions", bindingSummary.selectedDimensions),
-    summarizeSelectedLabels("Measures", bindingSummary.selectedMeasures),
-    Number(bindingSummary.governanceCounts?.deprecated || 0) > 0
-      ? `${Number(bindingSummary.governanceCounts.deprecated)} deprecated`
-      : "",
-    Number(bindingSummary.governanceCounts?.draft || 0) > 0
-      ? `${Number(bindingSummary.governanceCounts.draft)} draft`
-      : "",
-  ].filter(Boolean);
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
       {chips.map((chip, index) => (
@@ -265,7 +239,201 @@ function BindingChips({ bindingSummary = null }) {
   );
 }
 
-function DiagnosticsPanel({ diagnostics = [] }) {
+function BindingFieldGovernanceChips({ field = {} }) {
+  const governance = field?.governance && typeof field.governance === "object" && !Array.isArray(field.governance)
+    ? field.governance
+    : {};
+  const status = normalizeString(governance.status).toLowerCase();
+  const certification = normalizeString(governance.certification).toLowerCase();
+  const chips = [
+    status === "deprecated" ? { label: "Deprecated", tone: { background: "#fff1f0", border: "#f5c2c0", text: "#a82a2a" } } : null,
+    status === "draft" ? { label: "Draft", tone: { background: "#eef6ff", border: "#c9dcf8", text: "#21538f" } } : null,
+    certification ? {
+      label: certification.replace(/(^\w)|(_\w)/g, (match) => match.replace("_", " ").toUpperCase()),
+      tone: { background: "#edf7ee", border: "#cde5d1", text: "#2d6b3f" },
+    } : null,
+  ].filter(Boolean);
+  if (chips.length === 0) {
+    return null;
+  }
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {chips.map((chip) => (
+        <span
+          key={chip.label}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            borderRadius: 999,
+            padding: "3px 8px",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.03em",
+            textTransform: "uppercase",
+            background: chip.tone.background,
+            border: `1px solid ${chip.tone.border}`,
+            color: chip.tone.text,
+          }}
+        >
+          {chip.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function BindingFieldCard({ field = {} }) {
+  const label = normalizeString(field?.label || field?.id);
+  const rawId = normalizeString(field?.rawId);
+  const description = normalizeString(field?.description);
+  if (!label) {
+    return null;
+  }
+  return (
+    <div
+      style={{
+        border: "1px solid #dbe5ec",
+        borderRadius: 12,
+        background: "#ffffff",
+        padding: 10,
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#182026" }}>
+          {label}
+        </div>
+        {rawId ? (
+          <div style={{ fontSize: 11, color: "#5f6b7c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+            {rawId}
+          </div>
+        ) : null}
+        {description ? (
+          <div style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>
+            {description}
+          </div>
+        ) : null}
+      </div>
+      <BindingFieldGovernanceChips field={field} />
+    </div>
+  );
+}
+
+function BindingFieldGroup({ title = "", fields = [] }) {
+  const resolvedFields = Array.isArray(fields) ? fields.filter((field) => field && typeof field === "object") : [];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+        {title}
+      </div>
+      {resolvedFields.length > 0 ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+          {resolvedFields.map((field, index) => (
+            <BindingFieldCard
+              key={`${normalizeString(field?.id || field?.rawId || field?.label || "field")}:${index}`}
+              field={field}
+            />
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12, color: "#5f6b7c" }}>
+          No fields selected.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BindingMetadataCard({ label = "", value = "", description = "" }) {
+  const resolvedValue = normalizeString(value);
+  const resolvedDescription = normalizeString(description);
+  if (!resolvedValue && !resolvedDescription) {
+    return null;
+  }
+  return (
+    <div
+      style={{
+        border: "1px solid #dbe5ec",
+        borderRadius: 12,
+        background: "#ffffff",
+        padding: 12,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+        {label}
+      </div>
+      {resolvedValue ? (
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#182026" }}>
+          {resolvedValue}
+        </div>
+      ) : null}
+      {resolvedDescription ? (
+        <div style={{ fontSize: 11, lineHeight: 1.5, color: "#5f6b7c" }}>
+          {resolvedDescription}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function BindingDetailsPanel({ bindingSummary = null }) {
+  if (!bindingSummary || typeof bindingSummary !== "object" || Array.isArray(bindingSummary)) {
+    return null;
+  }
+  if (normalizeString(bindingSummary.kind).toLowerCase() !== "semantic") {
+    return null;
+  }
+  return (
+    <div
+      data-report-runtime-binding-panel="semantic"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        borderTop: "1px solid #e6edf3",
+        paddingTop: 14,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
+          {normalizeString(bindingSummary.title || "Semantic Binding")}
+        </div>
+        <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>
+          Governed model and field selections compiled into this runtime artifact.
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        <BindingMetadataCard
+          label="Model"
+          value={bindingSummary.modelLabel || bindingSummary.modelRef}
+          description={bindingSummary.modelDescription}
+        />
+        <BindingMetadataCard
+          label="Entity"
+          value={bindingSummary.entityLabel || bindingSummary.entity}
+          description={bindingSummary.entityDescription}
+        />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+        <BindingFieldGroup
+          title={`Selected dimensions (${Number(bindingSummary.dimensionCount || 0)})`}
+          fields={bindingSummary.selectedDimensions}
+        />
+        <BindingFieldGroup
+          title={`Selected measures (${Number(bindingSummary.measureCount || 0)})`}
+          fields={bindingSummary.selectedMeasures}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DiagnosticsPanel({ diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
   const viewModel = buildReportRuntimeDiagnosticsViewModel(diagnostics);
   if (!viewModel.hasDiagnostics) {
     return null;
@@ -305,6 +473,27 @@ function DiagnosticsPanel({ diagnostics = [] }) {
                 {diagnostic?.suggestedFix ? (
                   <div style={{ fontSize: 11, lineHeight: 1.5, color: tone.text }}>
                     {diagnostic.suggestedFix}
+                  </div>
+                ) : null}
+                {diagnostic?.code === "actionProviderFailed" && typeof onRetryProviderActions === "function" ? (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={onRetryProviderActions}
+                      disabled={providerActionsLoading}
+                      style={{
+                        border: `1px solid ${tone.border}`,
+                        background: providerActionsLoading ? "#f4f7fa" : "#ffffff",
+                        color: providerActionsLoading ? "#98a2b3" : tone.text,
+                        borderRadius: 999,
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: providerActionsLoading ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {providerActionsLoading ? "Retrying action provider" : "Retry action provider"}
+                    </button>
                   </div>
                 ) : null}
                 {diagnostic?.code || diagnostic?.blockId || diagnostic?.path ? (
@@ -366,6 +555,80 @@ function DiagnosticsPanel({ diagnostics = [] }) {
         })}
       </div>
     </RuntimePanel>
+  );
+}
+
+function BlockDiagnosticsCallout({ diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
+  const warningDiagnostics = buildReportRuntimeDiagnosticsViewModel(diagnostics).diagnostics
+    .filter((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() !== "error");
+  if (warningDiagnostics.length === 0) {
+    return null;
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+      {warningDiagnostics.map((diagnostic, index) => (
+        <div
+          key={`${normalizeString(diagnostic?.code || "diagnostic")}:${normalizeString(diagnostic?.path || "")}:${index}`}
+          style={{
+            border: "1px solid #d9b25f",
+            background: "#fff7e6",
+            borderRadius: 10,
+            padding: "10px 12px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          <div style={{ fontSize: 12, color: "#8a5d00", lineHeight: 1.5 }}>
+            {normalizeString(diagnostic?.message || "Runtime warning.")}
+          </div>
+          {normalizeString(diagnostic?.suggestedFix) ? (
+            <div style={{ fontSize: 11, color: "#8a5d00", lineHeight: 1.5 }}>
+              {normalizeString(diagnostic.suggestedFix)}
+            </div>
+          ) : null}
+          {diagnostic?.code === "actionProviderFailed" && typeof onRetryProviderActions === "function" ? (
+            <div>
+              <button
+                type="button"
+                onClick={onRetryProviderActions}
+                disabled={providerActionsLoading}
+                style={{
+                  border: "1px solid #d9b25f",
+                  background: providerActionsLoading ? "#f4f7fa" : "#ffffff",
+                  color: providerActionsLoading ? "#98a2b3" : "#8a5d00",
+                  borderRadius: 999,
+                  padding: "4px 10px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: providerActionsLoading ? "not-allowed" : "pointer",
+                }}
+              >
+                {providerActionsLoading ? "Retrying action provider" : "Retry action provider"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BlockErrorCallout({ diagnostic = null }) {
+  if (!diagnostic) {
+    return null;
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ fontSize: 12, color: "#a82a2a", lineHeight: 1.5 }}>
+        {diagnostic.message}
+      </div>
+      {normalizeString(diagnostic?.suggestedFix) ? (
+        <div style={{ fontSize: 11, color: "#8a5d00", lineHeight: 1.5 }}>
+          {normalizeString(diagnostic.suggestedFix)}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -485,7 +748,7 @@ function MarkdownBlock({ block = {} }) {
   );
 }
 
-function KpiBlock({ block = {}, diagnostics = [] }) {
+function KpiBlock({ block = {}, diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -503,17 +766,9 @@ function KpiBlock({ block = {}, diagnostics = [] }) {
       title={normalizeString(block?.title || content?.title || "KPI")}
       subtitle={normalizeString(content?.description)}
     >
+      <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       {invalidDiagnostic ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 12, color: "#a82a2a", lineHeight: 1.5 }}>
-            {invalidDiagnostic.message}
-          </div>
-          {invalidDiagnostic.suggestedFix ? (
-            <div style={{ fontSize: 11, color: "#8a5d00", lineHeight: 1.5 }}>
-              {invalidDiagnostic.suggestedFix}
-            </div>
-          ) : null}
-        </div>
+        <BlockErrorCallout diagnostic={invalidDiagnostic} />
       ) : rowCount === 0 || !hasPrimaryValue ? (
         <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
           {normalizeString(content?.emptyLabel || "No KPI value available.")}
@@ -542,7 +797,7 @@ function KpiBlock({ block = {}, diagnostics = [] }) {
   );
 }
 
-function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US" }) {
+function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false }) {
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
@@ -552,16 +807,8 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
         className="forge-report-runtime-table-panel"
         title={normalizeString(block?.title || "Table")}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 12, color: "#a82a2a", lineHeight: 1.5 }}>
-            {invalidDiagnostic.message}
-          </div>
-          {invalidDiagnostic.suggestedFix ? (
-            <div style={{ fontSize: 11, color: "#8a5d00", lineHeight: 1.5 }}>
-              {invalidDiagnostic.suggestedFix}
-            </div>
-          ) : null}
-        </div>
+        <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+        <BlockErrorCallout diagnostic={invalidDiagnostic} />
       </RuntimePanel>
     );
   }
@@ -583,6 +830,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       className="forge-report-runtime-table-panel"
       title={normalizeString(block?.title || "Table")}
     >
+      <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       <DashboardTableContent
         container={{
           id: block.id,
@@ -815,7 +1063,7 @@ function shouldRenderRefinementBarBlock(block = {}, runtimeHandlers = null) {
   return runtimeHandlers?.canUndoRefinements === true || runtimeHandlers?.canRedoRefinements === true;
 }
 
-function GeoMapBlock({ block = {} }) {
+function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -850,6 +1098,9 @@ function GeoMapBlock({ block = {} }) {
     ? legend.palette
     : DEFAULT_GEO_PALETTE;
   const hasData = ranking.length > 0;
+  const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
+    .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
+    || null;
 
   return (
     <RuntimePanel
@@ -859,7 +1110,10 @@ function GeoMapBlock({ block = {} }) {
         ? `${normalizeString(resolvedGeo?.metricLabel || geo?.metric?.label)} across ${shape}`
         : `Resolved geographic rollup (${shape})`}
     >
-      {!supportedShape ? (
+      <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+      {invalidDiagnostic ? (
+        <BlockErrorCallout diagnostic={invalidDiagnostic} />
+      ) : !supportedShape ? (
         <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
           Unsupported geo shape: {shape || "unknown"}.
         </div>
@@ -1042,12 +1296,15 @@ export default function ReportRuntime({
     [beforePrimary, primary, afterPrimary],
   );
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
-  const [providerActionsByField, setProviderActionsByField] = useState(new Map());
-  const [providerDiagnostics, setProviderDiagnostics] = useState([]);
+  const [providerActionState, setProviderActionState] = useState(() => buildIdleReportRuntimeProviderActionsState());
+  const [providerReloadSequence, setProviderReloadSequence] = useState(0);
   const drillMetadataProvider = useMemo(
     () => resolveReportRuntimeDrillMetadataProvider({ reportSpec, runtimeHandlers }),
     [reportSpec, runtimeHandlers],
   );
+  const retryProviderActions = () => {
+    setProviderReloadSequence((current) => current + 1);
+  };
 
   useEffect(() => {
     setSelectedChartSelectionsByBlock({});
@@ -1056,48 +1313,32 @@ export default function ReportRuntime({
   useEffect(() => {
     let cancelled = false;
     async function loadProviderActions() {
-      const provider = drillMetadataProvider;
-      if (!provider || typeof provider.listAvailableRefinements !== "function") {
-        if (!cancelled) {
-          setProviderActionsByField(new Map());
-          setProviderDiagnostics([]);
-        }
-        return;
-      }
-      const nextMap = new Map();
-      const nextDiagnostics = [];
-      const supportedBlocks = allRuntimeBlocks.filter((block) => ["tableBlock", "chartBlock"].includes(normalizeString(block?.kind)));
-      for (const block of supportedBlocks) {
-        const fields = normalizeString(block?.kind) === "chartBlock"
-          ? resolveReportRuntimeChartActionFields(reportSpec, block)
-          : resolveReportRuntimeRefinementFields(reportSpec, block);
-        for (const field of fields) {
-          try {
-            const actions = await provider.listAvailableRefinements(block.kind, field.valueKey, {
-              reportSpec,
-              block,
-            });
-            nextMap.set(resolveRuntimeFieldActionKey(block.id, field.valueKey), Array.isArray(actions) ? actions : []);
-          } catch (error) {
-            nextDiagnostics.push({
-              code: "actionProviderFailed",
-              severity: "warning",
-              message: `Failed to load refinement actions for ${field.label}. ${String(error?.message || error || "")}`.trim(),
-            });
-          }
-        }
-      }
+      setProviderActionState((current) => buildPendingReportRuntimeProviderActionsState(current));
+      const {
+        providerActionsByField: nextMap,
+        providerDiagnostics: nextDiagnostics,
+      } = await loadReportRuntimeProviderActions({
+        provider: drillMetadataProvider,
+        reportSpec,
+        blocks: allRuntimeBlocks,
+      });
       if (cancelled) {
         return;
       }
-      setProviderActionsByField(nextMap);
-      setProviderDiagnostics(nextDiagnostics);
+      setProviderActionState(buildResolvedReportRuntimeProviderActionsState({
+        providerActionsByField: nextMap,
+        providerDiagnostics: nextDiagnostics,
+      }));
     }
     loadProviderActions();
     return () => {
       cancelled = true;
     };
-  }, [drillMetadataProvider, allRuntimeBlocks, reportSpec]);
+  }, [drillMetadataProvider, allRuntimeBlocks, reportSpec, providerReloadSequence]);
+
+  const providerActionsByField = providerActionState.providerActionsByField;
+  const providerDiagnostics = providerActionState.providerDiagnostics;
+  const providerActionsLoading = providerActionState.loading === true;
 
   const runtimeDiagnostics = useMemo(() => ([
     ...(Array.isArray(reportFill?.diagnostics) ? reportFill.diagnostics : []),
@@ -1130,7 +1371,7 @@ export default function ReportRuntime({
       return <MarkdownBlock key={block.id} block={block} />;
     }
     if (kind === "kpiBlock") {
-      return <KpiBlock key={block.id} block={block} diagnostics={blockDiagnosticsIndex.get(normalizeString(block?.id)) || []} />;
+      return <KpiBlock key={block.id} block={block} diagnostics={blockDiagnosticsIndex.get(normalizeString(block?.id)) || []} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     if (kind === "filterBarBlock") {
       return <FilterBarBlock key={block.id} block={block} scopeParams={scopeParamIndex} />;
@@ -1153,11 +1394,29 @@ export default function ReportRuntime({
           providerActionsByField={providerActionsByField}
           runtimeHandlers={runtimeHandlers}
           locale={locale}
+          onRetryProviderActions={retryProviderActions}
+          providerActionsLoading={providerActionsLoading}
         />
       );
     }
     if (kind === "chartBlock") {
       const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || { id: block?.datasetRef, rows: [] };
+      const diagnostics = blockDiagnosticsIndex.get(normalizeString(block?.id)) || [];
+      const invalidDiagnostic = diagnostics
+        .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
+        || null;
+      if (invalidDiagnostic) {
+        return (
+          <RuntimePanel
+            className="forge-report-runtime-chart-panel"
+            key={block.id}
+            title={normalizeString(block?.title || block?.content?.chartSpec?.title || block?.chartSpec?.title || "Chart")}
+          >
+            <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
+            <BlockErrorCallout diagnostic={invalidDiagnostic} />
+          </RuntimePanel>
+        );
+      }
       const chartFields = resolveReportRuntimeChartActionFields(reportSpec, block);
       const selectedDatum = selectedChartSelectionsByBlock[normalizeString(block?.id)] || null;
       const chartSpec = block?.content?.chartSpec || block?.chartSpec || {};
@@ -1182,6 +1441,7 @@ export default function ReportRuntime({
           key={block.id}
           title={normalizeString(block?.title || block?.content?.chartSpec?.title || block?.chartSpec?.title || "Chart")}
         >
+          <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
           {chartModel ? (
             <Chart
               container={{
@@ -1211,7 +1471,7 @@ export default function ReportRuntime({
       );
     }
     if (kind === "geoMapBlock") {
-      return <GeoMapBlock key={block.id} block={block} />;
+      return <GeoMapBlock key={block.id} block={block} diagnostics={blockDiagnosticsIndex.get(normalizeString(block?.id)) || []} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     return <UnsupportedBlock key={block?.id || kind} block={block} />;
   };
@@ -1252,11 +1512,12 @@ export default function ReportRuntime({
         subtitle={normalizeString(subtitle)}
       >
         <BindingChips bindingSummary={bindingSummary} />
+        <BindingDetailsPanel bindingSummary={bindingSummary} />
       </RuntimePanel>
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
       <DiagnosticsPanel diagnostics={[
         ...runtimeDiagnostics,
-      ]} />
+      ]} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
       {renderLayoutBlockGrid(beforePrimary, "beforePrimary")}
       {primary.length > 0 ? (
         <div

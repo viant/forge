@@ -7,6 +7,7 @@ import {
     buildReportBuilderUpdateReportDocumentPayloadDownload,
     buildReportBuilderUpdateReportDocumentPayloadInspectorState,
     buildReportBuilderUpdateReportDocumentPayloadSummary,
+    resolveReportBuilderUpdateReportDocumentPayloadSeed,
     resolveReportBuilderUpdateReportDocumentExpectedVersion,
     serializeReportBuilderUpdateReportDocumentPayload,
 } from "./reportBuilderUpdateReportDocumentPayload.js";
@@ -378,5 +379,118 @@ assert.equal(buildReportBuilderUpdateReportDocumentPayloadSummary(null), null);
 assert.equal(serializeReportBuilderUpdateReportDocumentPayload(null), "");
 assert.equal(buildReportBuilderUpdateReportDocumentPayloadInspectorState(null), null);
 assert.equal(buildReportBuilderUpdateReportDocumentPayloadDownload(null), null);
+
+assert.deepEqual(resolveReportBuilderUpdateReportDocumentPayloadSeed(savedReportPayload, {
+    hydratedReportDocumentSession: {
+        reportId: "forecastingTrendQ3",
+        title: "Forecasting Trend Q3",
+        documentVersion: 6,
+        savedSource: {
+            kind: "reportBuilder.savedReportPayload",
+            payloadId: "rbreport_forecasting_q3_channel_trend",
+            sourceArtifactId: "forecasting_q3_channel_trend",
+        },
+    },
+    getReportDocumentResponse: null,
+}), {
+    version: 1,
+    kind: "getReportDocumentResponse",
+    reportRef: {
+        reportId: "forecastingTrendQ3",
+    },
+    documentVersion: 6,
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "forecastingTrendQ3",
+        title: "Forecasting Trend Q3",
+    },
+    source: {
+        kind: "reportBuilder.savedReportPayload",
+        payloadId: "rbreport_forecasting_q3_channel_trend",
+        sourceArtifactId: "forecasting_q3_channel_trend",
+    },
+});
+assert.deepEqual(resolveReportBuilderUpdateReportDocumentPayloadSeed(savedReportPayload, {
+    hydratedReportDocumentSession: {
+        reportId: "forecastingTrendQ3",
+        title: "Forecasting Trend Q3",
+    },
+    getReportDocumentResponse: {
+        version: 1,
+        kind: "getReportDocumentResponse",
+        reportRef: {
+            reportId: "forecastingTrendQ3",
+        },
+        document: {
+            version: 1,
+            kind: "reportDocument",
+            id: "forecastingTrendQ3",
+            title: "Forecasting Trend Q3",
+        },
+    },
+}), {
+    version: 1,
+    kind: "getReportDocumentResponse",
+    reportRef: {
+        reportId: "forecastingTrendQ3",
+    },
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "forecastingTrendQ3",
+        title: "Forecasting Trend Q3",
+    },
+});
+assert.deepEqual(resolveReportBuilderUpdateReportDocumentPayloadSeed(savedReportPayload, {
+    hydratedReportDocumentSession: null,
+    getReportDocumentResponse: {
+        version: 1,
+        kind: "getReportDocumentResponse",
+        reportRef: {
+            reportId: "forecastingTrendQ3",
+        },
+        document: {
+            version: 1,
+            kind: "reportDocument",
+            id: "forecastingTrendQ3",
+            title: "Forecasting Trend Q3",
+        },
+    },
+}), savedReportPayload);
+assert.deepEqual(resolveReportBuilderUpdateReportDocumentPayloadSeed(savedReportPayload, {
+    hydratedReportDocumentSession: null,
+    getReportDocumentResponse: null,
+}), savedReportPayload);
+assert.deepEqual(resolveReportBuilderUpdateReportDocumentPayloadSeed(savedReportPayload, {
+    hydratedReportDocumentSession: {
+        reportId: "forecastingTrendQ3",
+        title: "Forecasting Trend Q3",
+        documentVersion: 0,
+        source: {
+            kind: "reportBuilder.savedReportPayload",
+            payloadId: "rbreport_fallback_source",
+            sourceArtifactId: "fallback_source_artifact",
+        },
+    },
+    getReportDocumentResponse: null,
+}), {
+    version: 1,
+    kind: "getReportDocumentResponse",
+    reportRef: {
+        reportId: "forecastingTrendQ3",
+    },
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "forecastingTrendQ3",
+        title: "Forecasting Trend Q3",
+    },
+    source: {
+        kind: "reportBuilder.savedReportPayload",
+        payloadId: "rbreport_fallback_source",
+        sourceArtifactId: "fallback_source_artifact",
+    },
+});
 
 console.log("reportBuilderUpdateReportDocumentPayload ✓ adapts saved builder payloads into updateReportDocument requests with explicit expected versions");

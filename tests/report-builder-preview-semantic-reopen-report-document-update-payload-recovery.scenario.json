@@ -33,16 +33,36 @@
     },
     {
       "type": "eval",
-      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
     },
     {
-      "type": "clickRole",
-      "role": "button",
-      "name": "Fork from here"
+      "type": "waitForEval",
+      "expression": "!((document.body?.innerText || document.body?.textContent || '').includes('Local Draft'))",
+      "timeoutMs": 5000
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Local Draft"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim().includes('Reach Rate')))",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__measure-pill",
+      "text": "Reach Rate",
+      "index": 0
     },
     {
       "type": "waitForDomContains",
-      "text": "Exploration Session.",
+      "text": "Local Draft",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
       "timeoutMs": 60000
     },
     {
@@ -178,33 +198,14 @@
       "timeoutMs": 60000
     },
     {
-      "type": "waitForDomContains",
-      "text": "\"expectedVersion\": 6",
+      "type": "waitForEval",
+      "expression": "(() => { const summary = document.querySelector('[aria-label=\"Update ReportDocument payload summary\"]'); const text = summary?.innerText || summary?.textContent || ''; return text.includes('UPDATEREPORTDOCUMENTPAYLOAD') && text.includes('FORECASTINGTRENDQ3') && text.includes('V6'); })()",
       "timeoutMs": 60000
     },
     {
-      "type": "waitForDomContains",
-      "text": "\"viewMode\": \"table\"",
+      "type": "waitForEval",
+      "expression": "(() => { const summary = document.querySelector('[aria-label=\"Update ReportDocument payload summary\"]'); const container = summary?.closest('.forge-report-builder__chart-inline-notice'); const pre = container?.querySelector('.forge-report-builder__saved-artifact-json'); const text = pre?.innerText || pre?.textContent || ''; return text.includes('\"expectedVersion\": 6') && text.includes('\"viewMode\": \"table\"') && text.includes('\"semanticSummary\": {') && text.includes('\"modelLabel\": \"Ad Delivery\"') && text.includes('\"entityLabel\": \"Line Delivery\"'); })()",
       "timeoutMs": 60000
-    },
-    {
-      "type": "waitForDomContains",
-      "text": "\"semanticSummary\": {",
-      "timeoutMs": 60000
-    },
-    {
-      "type": "waitForDomContains",
-      "text": "\"modelLabel\": \"Ad Delivery\"",
-      "timeoutMs": 60000
-    },
-    {
-      "type": "waitForDomContains",
-      "text": "\"entityLabel\": \"Line Delivery\"",
-      "timeoutMs": 60000
-    },
-    {
-      "type": "assertDomNotContains",
-      "text": "\"viewMode\": \"chart\""
     },
     {
       "type": "screenshot",

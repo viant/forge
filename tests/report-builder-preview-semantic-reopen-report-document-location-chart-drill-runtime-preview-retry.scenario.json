@@ -33,16 +33,36 @@
     },
     {
       "type": "eval",
-      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
     },
     {
-      "type": "clickRole",
-      "role": "button",
-      "name": "Fork from here"
+      "type": "waitForEval",
+      "expression": "!((document.body?.innerText || document.body?.textContent || '').includes('Local Draft'))",
+      "timeoutMs": 30000
+    },
+    {
+      "type": "assertDomNotContains",
+      "text": "Local Draft"
+    },
+    {
+      "type": "waitForEval",
+      "expression": "Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Reach Rate'))",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickSelectorContains",
+      "selector": ".forge-report-builder__measure-pill",
+      "text": "Reach Rate",
+      "index": 0
     },
     {
       "type": "waitForDomContains",
-      "text": "Exploration Session.",
+      "text": "Local Draft",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
       "timeoutMs": 60000
     },
     {
@@ -136,7 +156,13 @@
     },
     {
       "type": "eval",
-      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || !preview.replaceFetchBehaviors) { return false; } preview.__locationDrillRetryBaseline = { errorCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'error').length, successCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'success').length }; return preview.replaceFetchBehaviors([{ match: { type: 'runtimePreview' }, error: 'Runtime preview fetch failed.' }]); })()"
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; return !!preview && (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'success').length > 0; })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel .forge-dashboard-row-action').length >= 1",
+      "timeoutMs": 60000
     },
     {
       "type": "clickSelectorContains",
@@ -146,12 +172,28 @@
     },
     {
       "type": "waitForEval",
-      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__locationDrillRetryBaseline; if (!preview || !baseline) { return false; } const errorCount = (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'error').length; return errorCount > baseline.errorCount; })()",
+      "expression": "Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-refinement-chip')).some((node) => (node.innerText || node.textContent || '').includes('Drill to Region ='))",
       "timeoutMs": 60000
     },
     {
-      "type": "waitForDomContains",
-      "text": "We couldn't compile these runtime results",
+      "type": "waitForEval",
+      "expression": "(() => { const headers = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel')?.querySelectorAll('th') || []; const labels = Array.from(headers).map((entry) => (entry.innerText || entry.textContent || '').trim()); return labels.includes('Region') && !labels.includes('Market'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || !preview.replaceFetchBehaviors) { return false; } preview.__locationDrillRetryBaseline = { errorCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'error').length, successCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'success').length }; return preview.replaceFetchBehaviors([{ match: { type: 'runtimePreview' }, error: 'Runtime preview fetch failed.' }]); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "clickRole",
+      "role": "button",
+      "name": "Run",
+      "exact": true
+    },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__locationDrillRetryBaseline; if (!preview || !baseline) { return false; } const errorCount = (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'error').length; return errorCount > baseline.errorCount; })()",
       "timeoutMs": 60000
     },
     {
@@ -182,17 +224,17 @@
     },
     {
       "type": "waitForEval",
-      "expression": "document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel') != null",
-      "timeoutMs": 60000
-    },
-    {
-      "type": "waitForEval",
       "expression": "Array.from(document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-refinement-chip')).some((node) => (node.innerText || node.textContent || '').includes('Drill to Region ='))",
       "timeoutMs": 60000
     },
     {
       "type": "waitForEval",
       "expression": "(() => { const headers = document.querySelector('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel')?.querySelectorAll('th') || []; const labels = Array.from(headers).map((entry) => (entry.innerText || entry.textContent || '').trim()); return labels.includes('Region') && !labels.includes('Market'); })()",
+      "timeoutMs": 60000
+    },
+    {
+      "type": "waitForEval",
+      "expression": "document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel .forge-dashboard-row-action').length >= 1",
       "timeoutMs": 60000
     },
     {

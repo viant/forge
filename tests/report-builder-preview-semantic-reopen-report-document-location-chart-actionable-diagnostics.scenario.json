@@ -20,15 +20,23 @@
     { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
     {
       "type": "eval",
-      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } })()"
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } return true; })()"
     },
     {
       "type": "waitForEval",
       "expression": "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.patchSeededSavedReportPayload !== 'function') { return false; } const patched = api.patchSeededSavedReportPayload('forecastingLocationsTopMarketsQ3', { compileState: { status: 'invalid', diagnostics: [ { code: 'semanticGovernance', severity: 'warning', message: 'Market • Deprecated' }, { code: 'documentBlockChartInvalid', severity: 'error', blockId: 'primaryChart', path: 'reportDocument.blocks.primaryChart.chartSpec.xField', message: 'Primary Chart is no longer compatible with the current builder selection.', suggestedFix: 'Edit the chart block to reselect the current breakdowns/measures or restore the missing chart fields in the builder.' } ] } }); return !!patched && patched.compileState && patched.compileState.status === 'invalid'; })()",
       "timeoutMs": 60000
     },
-    { "type": "clickRole", "role": "button", "name": "Fork from here" },
-    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "waitForEval", "expression": "!((document.body?.innerText || document.body?.textContent || '').includes('Local Draft'))", "timeoutMs": 15000 },
+    { "type": "assertDomNotContains", "text": "Local Draft" },
+    { "type": "waitForEval", "expression": "Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim().includes('Reach Rate')))", "timeoutMs": 60000 },
+    { "type": "clickSelectorContains", "selector": ".forge-report-builder__measure-pill", "text": "Reach Rate", "index": 0 },
+    { "type": "waitForDomContains", "text": "Local Draft", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
     { "type": "clickRole", "role": "button", "name": "Save artifact" },
     { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
     { "type": "clickRole", "role": "button", "name": "Prepare report payload" },

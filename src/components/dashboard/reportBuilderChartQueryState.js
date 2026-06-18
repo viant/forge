@@ -163,12 +163,9 @@ export function resolveReportBuilderChartQueryStateTransition({
     };
   }
   if (
-    normalizedCurrentState.requestKey === normalizedRequestKey
+    normalizedCurrentState.fingerprint === normalizedFingerprint
+    && normalizedCurrentState.requestKey === normalizedRequestKey
     && !normalizedCurrentState.loading
-    && (
-      normalizedCurrentState.rows.length > 0
-      || normalizedCurrentState.error
-    )
   ) {
     return {
       type: "noop",

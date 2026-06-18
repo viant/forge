@@ -1,11 +1,8 @@
 import { formatRefinementActionLabel } from "./reportRuntimeChartActionModel.js";
+import { resolveReportRuntimeFieldActionKey } from "./reportRuntimeModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
-}
-
-function resolveRuntimeFieldActionKey(blockId = "", valueKey = "") {
-  return `${normalizeString(blockId)}:${normalizeString(valueKey)}`;
 }
 
 function supportsRuntimeRefinement(field = {}) {
@@ -17,7 +14,7 @@ export function buildReportRuntimeTableActionDescriptors({
   field = {},
   providerActionsByField = new Map(),
 } = {}) {
-  const key = resolveRuntimeFieldActionKey(blockId, field?.valueKey);
+  const key = resolveReportRuntimeFieldActionKey(blockId, field?.valueKey);
   const providerActions = Array.isArray(providerActionsByField.get(key))
     ? providerActionsByField.get(key)
     : [];

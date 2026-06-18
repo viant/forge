@@ -20,10 +20,18 @@
     { "type": "waitForDomContains", "text": "Semantic binding: Ad Delivery • Entity: Line Delivery", "timeoutMs": 60000 },
     {
       "type": "eval",
-      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } window.__artifactDownloadCapture = { filename: '', payload: '', mimeType: '' }; const originalCreate = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__artifactDownloadCapture.mimeType = blob.type || ''; blob.text().then((text) => { window.__artifactDownloadCapture.payload = text; }); return originalCreate(blob); }; const originalClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() { window.__artifactDownloadCapture.filename = this.download || ''; return originalClick.call(this); }; })()"
+      "expression": "(() => { const close = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Close')); if (close) { close.click(); } window.__artifactDownloadCapture = { filename: '', payload: '', mimeType: '' }; const originalCreate = URL.createObjectURL.bind(URL); URL.createObjectURL = (blob) => { window.__artifactDownloadCapture.mimeType = blob.type || ''; blob.text().then((text) => { window.__artifactDownloadCapture.payload = text; }); return originalCreate(blob); }; const originalClick = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function() { window.__artifactDownloadCapture.filename = this.download || ''; return originalClick.call(this); }; return true; })()"
     },
-    { "type": "clickRole", "role": "button", "name": "Fork from here" },
-    { "type": "waitForDomContains", "text": "Exploration Session.", "timeoutMs": 60000 },
+    { "type": "waitForEval", "expression": "!((document.body?.innerText || document.body?.textContent || '').includes('Local Draft'))", "timeoutMs": 15000 },
+    { "type": "assertDomNotContains", "text": "Local Draft" },
+    { "type": "waitForEval", "expression": "Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim().includes('Reach Rate')))", "timeoutMs": 60000 },
+    { "type": "clickSelectorContains", "selector": ".forge-report-builder__measure-pill", "text": "Reach Rate", "index": 0 },
+    { "type": "waitForDomContains", "text": "Local Draft", "timeoutMs": 60000 },
+    {
+      "type": "waitForEval",
+      "expression": "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      "timeoutMs": 60000
+    },
     { "type": "clickRole", "role": "button", "name": "Save artifact" },
     { "type": "waitForDomContains", "text": "Saved exploration artifact: Report Builder Demo", "timeoutMs": 60000 },
     { "type": "clickRole", "role": "button", "name": "Prepare report payload" },

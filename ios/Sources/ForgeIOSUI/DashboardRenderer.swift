@@ -50,6 +50,19 @@ public struct DashboardRenderer: View {
                 return AnyView(dashboardPanel(container) {
                     timelineBlock(container)
                 })
+            case "dashboard.geoMap":
+                return AnyView(dashboardPanel(container) {
+                    geoMapBlock(container, metrics: metrics)
+                })
+            case "dashboard.chart", "dashboard.composition":
+                if let chart = container.chart {
+                    return AnyView(dashboardPanel(container) {
+                        ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
+                    })
+                }
+                return AnyView(dashboardPanel(container) {
+                    unsupportedBlock("dashboard chart block has no chart config")
+                })
             case "dashboard.dimensions":
                 return AnyView(dashboardPanel(container) {
                     dimensionsBlock(container)
@@ -62,9 +75,23 @@ public struct DashboardRenderer: View {
                 return AnyView(dashboardPanel(container) {
                     messagesBlock(container, metrics: metrics)
                 })
+            case "dashboard.badges":
+                return AnyView(dashboardPanel(container) {
+                    badgesBlock(container, metrics: metrics)
+                })
             case "dashboard.report":
                 return AnyView(dashboardPanel(container) {
                     reportBlock(container, metrics: metrics)
+                })
+            case "dashboard.table":
+                let table = container.table ?? (container.columns.isEmpty ? nil : TableDef(title: container.title, columns: container.columns))
+                if let table {
+                    return AnyView(dashboardPanel(container) {
+                        TableRenderer(runtime: runtime, window: window, container: container, table: table)
+                    })
+                }
+                return AnyView(dashboardPanel(container) {
+                    unsupportedBlock("dashboard table has no columns")
                 })
             case "dashboard.reportBuilder":
                 if let reportBuilder = container.dashboard?.reportBuilder {
@@ -332,6 +359,37 @@ public struct DashboardRenderer: View {
     }
 
     @ViewBuilder
+    private func geoMapBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
+        let metricLabel = container.metric?.label ?? container.metric?.key ?? "Metric"
+        let metricValue = container.metric?.key.flatMap { DashboardRuntime.resolveDashboardValue(source: nil, selector: $0, metrics: metrics) }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "map")
+                    .foregroundStyle(.secondary)
+                Text("Geo map")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if let metricValue {
+                    Text(DashboardRuntime.formatDashboardValue(metricValue, format: container.metric?.format))
+                        .font(.subheadline.monospacedDigit().weight(.semibold))
+                }
+            }
+            Text(metricLabel)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if let geo = container.geo?.objectValue,
+               let shape = geo["shape"]?.stringValue,
+               !shape.isEmpty {
+                Text(shape.replacingOccurrences(of: "-", with: " ").capitalized)
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.secondary.opacity(0.08)))
+            }
+        }
+    }
+
+    @ViewBuilder
     private func dimensionsBlock(_ container: ContainerDef) -> some View {
         let dimensions = container.dashboard?.dimensions
         let dimension = dimensions?.dimension ?? container.dimension
@@ -434,6 +492,50 @@ public struct DashboardRenderer: View {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(toneBackground(message.severity))
                     )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func badgesBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
+        let badgeItems = container.dashboard?.badges?.items.map {
+            DashboardBadgeDef(
+                id: $0.id,
+                label: $0.label,
+                value: $0.value,
+                tone: $0.tone,
+                severity: $0.severity,
+                visibleWhen: $0.visibleWhen
+            )
+        } ?? container.items.map {
+            DashboardBadgeDef(
+                id: $0.id,
+                label: $0.label ?? $0.title,
+                value: $0.value?.stringValue ?? $0.value?.intValue.map(String.init),
+                tone: $0.appearance,
+                severity: $0.severity,
+                visibleWhen: $0.visibleWhen
+            )
+        }
+        let visible = badgeItems.filter {
+            DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics)
+        }
+        if visible.isEmpty {
+            emptyDashboardState("No active badges.")
+        } else {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
+                ForEach(visible) { badge in
+                    let tone = badge.tone ?? badge.severity ?? "info"
+                    let label = badge.label ?? badge.id ?? "Badge"
+                    let value = badge.value ?? ""
+                    Text(value.isEmpty ? label : "\(label): \(value)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(toneColor(tone))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(toneBackground(tone)))
+                        .overlay(Capsule().stroke(toneBorder(tone), lineWidth: 1))
                 }
             }
         }

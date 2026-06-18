@@ -82,10 +82,15 @@ import {
     resolveReportBuilderExportCollection,
 } from "./reportBuilderResultData.js";
 import {
+    buildIdleReportBuilderChartQueryState,
     buildRejectedReportBuilderChartQueryState,
     buildResolvedReportBuilderChartQueryState,
     resolveReportBuilderChartQueryStateTransition,
 } from "./reportBuilderChartQueryState.js";
+import {
+    resolveReportBuilderChartQueryDispatchPlan,
+    resolveReportBuilderChartQuerySettlementPlan,
+} from "./reportBuilderChartQueryLifecycle.js";
 import {
     buildReportRuntimePreviewRequestKey,
     useReportRuntimePreviewRows,
@@ -249,6 +254,7 @@ import {
     buildReportBuilderCreateReportDocumentPayloadDownload,
     buildReportBuilderCreateReportDocumentPayloadInspectorState,
     buildReportBuilderCreateReportDocumentPayloadSummary,
+    resolveReportBuilderCreateReportDocumentPayloadSeed,
 } from "./reportBuilderCreateReportDocumentPayload.js";
 import {
     buildReportBuilderUpdateReportDocumentExpectedVersionState,
@@ -257,6 +263,7 @@ import {
     buildReportBuilderUpdateReportDocumentPayloadDownload,
     buildReportBuilderUpdateReportDocumentPayloadInspectorState,
     buildReportBuilderUpdateReportDocumentPayloadSummary,
+    resolveReportBuilderUpdateReportDocumentPayloadSeed,
 } from "./reportBuilderUpdateReportDocumentPayload.js";
 import {
     buildReportBuilderUpdateReportDocumentConflictDiagnostic,
@@ -278,6 +285,7 @@ import {
     buildReportBuilderListReportDocumentsResponseSummary,
     buildReportBuilderReportDocumentReadResponseInspectorState,
     buildReportBuilderReportDocumentReadResponseDownload,
+    resolveReportBuilderReportDocumentResponseSeed,
     serializeReportBuilderReportDocumentReadResponse,
 } from "./reportBuilderReportDocumentReadResponse.js";
 import {
@@ -1157,12 +1165,13 @@ export default function ReportBuilder({ container, context }) {
     const [tableCalculationDialogOpen, setTableCalculationDialogOpen] = useState(false);
     const [tableCalculationDraft, setTableCalculationDraft] = useState(() => buildReportBuilderTableCalculationDraft());
     const [editingTableCalculationId, setEditingTableCalculationId] = useState("");
-    const [chartQueryState, setChartQueryState] = useState({
-        fingerprint: "",
-        rows: [],
-        loading: false,
-        error: null,
-    });
+    const [chartQueryState, setChartQueryState] = useState(() => buildIdleReportBuilderChartQueryState());
+    // Keep the latest chart-query state available during render so the full-query
+    // fetch effect can avoid depending directly on state that it also mutates.
+    const chartQueryStateRef = useRef(chartQueryState);
+    chartQueryStateRef.current = chartQueryState;
+    const chartQueryInFlightRequestKeyRef = useRef("");
+    const chartQueryGenerationRef = useRef(0);
     const [storedChartPresets, setStoredChartPresets] = useState([]);
     const [selectedQuickChartOption, setSelectedQuickChartOption] = useState("");
     const [selectedBuilderChartSelection, setSelectedBuilderChartSelection] = useState(null);
@@ -1210,6 +1219,21 @@ export default function ReportBuilder({ container, context }) {
     const [compactSheetOpen, setCompactSheetOpen] = useState(false);
     const [compactSheetTab, setCompactSheetTab] = useState("scope");
     const [compactChartSheetOpen, setCompactChartSheetOpen] = useState(false);
+    const reportBuilderMountedRef = useRef(true);
+
+    useEffect(() => {
+        reportBuilderMountedRef.current = true;
+        chartQueryGenerationRef.current += 1;
+        chartQueryInFlightRequestKeyRef.current = "";
+        setChartQueryState((current) => (
+            current?.loading
+                ? buildIdleReportBuilderChartQueryState()
+                : current
+        ));
+        return () => {
+            reportBuilderMountedRef.current = false;
+        };
+    }, []);
 
     const compactBreakpoint = useMemo(() => {
         const raw = Number(config?.layout?.compactBreakpoint || config?.compactBreakpoint || 820);
@@ -1541,6 +1565,8 @@ export default function ReportBuilder({ container, context }) {
         () => (chartQueryFingerprint ? `${chartQueryFingerprint}::${manualRunSequence}` : ""),
         [chartQueryFingerprint, manualRunSequence],
     );
+    const currentChartQueryRequestKeyRef = useRef(chartQueryRequestKey);
+    currentChartQueryRequestKeyRef.current = chartQueryRequestKey;
     const runtimePreviewMetadata = useMemo(
         () => normalizeReportBuilderDrillMetadata(displayConfig),
         [displayConfig],
@@ -1919,19 +1945,22 @@ export default function ReportBuilder({ container, context }) {
     const hasValidChartSpec = !!state.chartSpec && chartSpecValidation.valid;
     const hasStaleChartSpec = !!state.chartSpec && isReportBuilderChartSpecStale(config, state.chartSpec, chartFields);
     const settingsHash = useMemo(() => buildReportBuilderSettingsHash(state), [state.binding, state.localCalculatedFields, state.localTableCalculations, state.selectedDimensions, state.selectedMeasures]);
+    const chartRenderCollection = useMemo(
+        () => resolveReportBuilderChartCollection({
+            computedCollection,
+            chartCollection: chartQueryCollection,
+            policy: chartDataPolicy,
+            chartQueryLoading: chartQueryState.loading,
+        }),
+        [chartDataPolicy, chartQueryCollection, chartQueryState.loading, computedCollection],
+    );
     const chartContainer = useMemo(
-        () => {
-            const collectionForChart = resolveReportBuilderChartCollection({
-                computedCollection,
-                chartCollection: chartQueryCollection,
-                policy: chartDataPolicy,
-                chartQueryLoading: chartQueryState.loading,
-            });
-            return explicitChartMode && hasValidChartSpec
-                ? buildExplicitReportBuilderChartContainer({ ...container, collection: collectionForChart }, displayConfig, state, state.chartSpec)
-                : buildChartContainer({ ...container, collection: collectionForChart }, displayConfig, state);
-        },
-        [chartDataPolicy, chartQueryCollection, computedCollection, container, displayConfig, explicitChartMode, hasValidChartSpec, state],
+        () => (
+            explicitChartMode && hasValidChartSpec
+                ? buildExplicitReportBuilderChartContainer({ ...container, collection: chartRenderCollection }, displayConfig, state, state.chartSpec)
+                : buildChartContainer({ ...container, collection: chartRenderCollection }, displayConfig, state)
+        ),
+        [chartRenderCollection, container, displayConfig, explicitChartMode, hasValidChartSpec, state],
     );
     const chartRenderKey = useMemo(() => JSON.stringify({
         explicitChartMode,
@@ -3971,6 +4000,10 @@ export default function ReportBuilder({ container, context }) {
             appliedPrefillSignature: appliedPrefillSignatureRef.current,
         });
         const fetchRecords = builderContext?.handlers?.dataSource?.fetchRecords;
+        // Intentionally read chartQueryState through a ref here. This effect owns
+        // the chart-query state writes, and depending directly on chartQueryState
+        // would cause the effect to re-trigger on its own loading/resolved/error
+        // transitions.
         const transition = resolveReportBuilderChartQueryStateTransition({
             mode: chartDataPolicy.mode,
             deferForPrefill,
@@ -3979,44 +4012,72 @@ export default function ReportBuilder({ container, context }) {
             fingerprint: chartQueryFingerprint,
             requestKey: chartQueryRequestKey,
             fetchAvailable: typeof fetchRecords === "function",
-            currentState: chartQueryState,
+            currentState: chartQueryStateRef.current,
             unavailableError: new Error("Chart data fetch is unavailable for full-query mode."),
         });
-        if (transition.type === "reset" || transition.type === "unavailable") {
-            setChartQueryState(transition.nextState);
+        const dispatchPlan = resolveReportBuilderChartQueryDispatchPlan({
+            transitionType: transition.type,
+            inFlightRequestKey: chartQueryInFlightRequestKeyRef.current,
+            requestKey: chartQueryRequestKey,
+            currentGeneration: chartQueryGenerationRef.current,
+        });
+        if (!dispatchPlan.applyState) {
             return;
         }
-        if (transition.type === "noop") {
-            return;
-        }
-        let cancelled = false;
+        chartQueryGenerationRef.current = dispatchPlan.nextGeneration;
+        chartQueryInFlightRequestKeyRef.current = dispatchPlan.nextInFlightRequestKey;
         setChartQueryState(transition.nextState);
+        if (!dispatchPlan.issueFetch) {
+            return;
+        }
+        const requestedChartQueryKey = chartQueryRequestKey;
+        const requestGeneration = dispatchPlan.requestGeneration;
         fetchRecords({ parameters: chartQueryRequest, requestKind: "chartQuery" })
             .then((body) => {
-                if (cancelled) {
+                const settlementPlan = resolveReportBuilderChartQuerySettlementPlan({
+                    mounted: reportBuilderMountedRef.current,
+                    currentRequestKey: currentChartQueryRequestKeyRef.current,
+                    requestedRequestKey: requestedChartQueryKey,
+                    currentGeneration: chartQueryGenerationRef.current,
+                    requestGeneration,
+                    inFlightRequestKey: chartQueryInFlightRequestKeyRef.current,
+                });
+                if (!settlementPlan.shouldApply) {
                     return;
                 }
                 setChartQueryState(buildResolvedReportBuilderChartQueryState({
                     fingerprint: chartQueryFingerprint,
-                    requestKey: chartQueryRequestKey,
+                    requestKey: requestedChartQueryKey,
                     rows: Array.isArray(body?.rows) ? body.rows : [],
                 }));
+                if (settlementPlan.shouldReleaseInFlight) {
+                    chartQueryInFlightRequestKeyRef.current = "";
+                }
             })
             .catch((fetchError) => {
-                if (cancelled) {
+                const settlementPlan = resolveReportBuilderChartQuerySettlementPlan({
+                    mounted: reportBuilderMountedRef.current,
+                    currentRequestKey: currentChartQueryRequestKeyRef.current,
+                    requestedRequestKey: requestedChartQueryKey,
+                    currentGeneration: chartQueryGenerationRef.current,
+                    requestGeneration,
+                    inFlightRequestKey: chartQueryInFlightRequestKeyRef.current,
+                });
+                if (!settlementPlan.shouldApply) {
                     return;
                 }
                 setChartQueryState((current) => buildRejectedReportBuilderChartQueryState({
                     fingerprint: chartQueryFingerprint,
-                    requestKey: chartQueryRequestKey,
+                    requestKey: requestedChartQueryKey,
                     currentState: current,
                     error: fetchError,
                 }));
+                if (settlementPlan.shouldReleaseInFlight) {
+                    chartQueryInFlightRequestKeyRef.current = "";
+                }
             });
-        return () => {
-            cancelled = true;
-        };
-    }, [builderContext, chartDataPolicy.mode, chartQueryFingerprint, chartQueryRequest, chartQueryRequestKey, chartQueryState, currentPrefillSignature, manualRunSequence, showingChartView]);
+        return undefined;
+    }, [builderContext, chartDataPolicy.mode, chartQueryFingerprint, chartQueryRequest, chartQueryRequestKey, currentPrefillSignature, manualRunSequence, showingChartView]);
     const compiledRuntimePreviewModel = useMemo(() => {
         return buildReportBuilderRuntimePreviewModel({
             container,
@@ -4211,15 +4272,6 @@ export default function ReportBuilder({ container, context }) {
         state,
     ]);
 
-    const chartRenderCollection = useMemo(
-        () => resolveReportBuilderChartCollection({
-            computedCollection,
-            chartCollection: chartQueryCollection,
-            policy: chartDataPolicy,
-            chartQueryLoading: chartQueryState.loading,
-        }),
-        [chartDataPolicy, chartQueryCollection, chartQueryState.loading, computedCollection],
-    );
     const exportCollection = useMemo(
         () => resolveReportBuilderExportCollection({
             computedCollection,
@@ -5440,9 +5492,10 @@ export default function ReportBuilder({ container, context }) {
             });
             return;
         }
-        const payloadSeed = hydratedReportDocumentSession && getReportDocumentResponse
-            ? getReportDocumentResponse
-            : savedReportPayload;
+        const payloadSeed = resolveReportBuilderCreateReportDocumentPayloadSeed(savedReportPayload, {
+            hydratedReportDocumentSession,
+            getReportDocumentResponse,
+        });
         const payload = hydratedReportDocumentSession
             ? buildReportBuilderCreateReportDocumentPayloadFromBuilderState(payloadSeed, {
                 container,
@@ -5495,9 +5548,10 @@ export default function ReportBuilder({ container, context }) {
         URL.revokeObjectURL(url);
     }, [createReportDocumentPayload]);
     const prepareGetReportDocumentResponse = React.useCallback(() => {
-        const payloadSeed = hydratedReportDocumentSession && getReportDocumentResponse
-            ? getReportDocumentResponse
-            : savedReportPayload;
+        const payloadSeed = resolveReportBuilderReportDocumentResponseSeed(savedReportPayload, {
+            hydratedReportDocumentSession,
+            getReportDocumentResponse,
+        });
         const response = hydratedReportDocumentSession
             ? buildReportBuilderGetReportDocumentResponseFromBuilderState(payloadSeed, {
                 container,
@@ -5650,9 +5704,10 @@ export default function ReportBuilder({ container, context }) {
         URL.revokeObjectURL(url);
     }, [reopenReportDocumentDiagnostic]);
     const prepareListReportDocumentsResponse = React.useCallback(() => {
-        const payloadSeed = hydratedReportDocumentSession && getReportDocumentResponse
-            ? getReportDocumentResponse
-            : savedReportPayload;
+        const payloadSeed = resolveReportBuilderReportDocumentResponseSeed(savedReportPayload, {
+            hydratedReportDocumentSession,
+            getReportDocumentResponse,
+        });
         const response = hydratedReportDocumentSession
             ? buildReportBuilderListReportDocumentsResponseFromBuilderState(payloadSeed, {
                 container,
@@ -5760,9 +5815,10 @@ export default function ReportBuilder({ container, context }) {
             });
             return;
         }
-        const payloadSeed = hydratedReportDocumentSession && getReportDocumentResponse
-            ? getReportDocumentResponse
-            : savedReportPayload;
+        const payloadSeed = resolveReportBuilderReportDocumentResponseSeed(savedReportPayload, {
+            hydratedReportDocumentSession,
+            getReportDocumentResponse,
+        });
         const response = hydratedReportDocumentSession
             ? (
                 buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState(
@@ -5824,9 +5880,10 @@ export default function ReportBuilder({ container, context }) {
             });
             return;
         }
-        const payloadSeed = hydratedReportDocumentSession && getReportDocumentResponse
-            ? getReportDocumentResponse
-            : savedReportPayload;
+        const payloadSeed = resolveReportBuilderReportDocumentResponseSeed(savedReportPayload, {
+            hydratedReportDocumentSession,
+            getReportDocumentResponse,
+        });
         const response = hydratedReportDocumentSession
             ? (
                 buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState(
@@ -5924,9 +5981,10 @@ export default function ReportBuilder({ container, context }) {
             });
             return;
         }
-        const payloadSeed = hydratedReportDocumentSession && getReportDocumentResponse
-            ? getReportDocumentResponse
-            : savedReportPayload;
+        const payloadSeed = resolveReportBuilderUpdateReportDocumentPayloadSeed(savedReportPayload, {
+            hydratedReportDocumentSession,
+            getReportDocumentResponse,
+        });
         const payload = hydratedReportDocumentSession
             ? buildReportBuilderUpdateReportDocumentPayloadFromBuilderState(payloadSeed, {
                 container,

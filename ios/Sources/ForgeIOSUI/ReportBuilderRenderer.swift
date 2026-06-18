@@ -130,11 +130,21 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var visibleMeasures: [ReportBuilderMeasureDef] {
-        config.measures.filter { $0.hidden != true }
+        allMeasures.filter { $0.hidden != true }
+    }
+
+    private var allMeasures: [ReportBuilderMeasureDef] {
+        config.measures + config.computedMeasures
     }
 
     private var visibleDimensions: [ReportBuilderDimensionDef] {
         config.dimensions.filter { $0.hidden != true }
+    }
+
+    private var visibleDynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef] {
+        let hidden = Set(config.hiddenDynamicGroupIds.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        guard !hidden.isEmpty else { return config.dynamicFilterGroups }
+        return config.dynamicFilterGroups.filter { !hidden.contains($0.identityKey) }
     }
 
     private var settingsHash: String {
@@ -201,7 +211,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var aggregatedRows: [[String: JSONValue]] {
-        Self.aggregateRows(rows: filteredRows, dimensions: selectedDimensions, measures: selectedMeasures)
+        Self.aggregateRows(rows: filteredRows, dimensions: selectedDimensions, measures: selectedMeasures, config: config)
     }
 
     private var filteredRows: [[String: JSONValue]] {
@@ -216,7 +226,10 @@ public struct ReportBuilderRenderer: View {
             staticFilters: staticFilters,
             dynamicGroups: dynamicGroups
         )
-        return applyBuildRequestHook(base)
+        return Self.applyChartDataPolicy(
+            config: config,
+            request: applyBuildRequestHook(base)
+        )
     }
 
     private var measuresSection: AnyView {
@@ -234,7 +247,7 @@ public struct ReportBuilderRenderer: View {
     private var dynamicFiltersSectionView: AnyView {
         AnyView(
             ReportBuilderDynamicFiltersView(
-                groups: config.dynamicFilterGroups,
+                groups: visibleDynamicFilterGroups,
                 families: config.dynamicFilterFamilies,
                 unifiedFamilyRows: config.unifiedFamilyRows,
                 rowsByGroupID: dynamicGroups,
@@ -1018,7 +1031,12 @@ public struct ReportBuilderRenderer: View {
 
     private func defaultMeasureKeys() -> [String] {
         let explicit = visibleMeasures.filter { $0.defaultValue == true }.map(\.identityKey)
-        return explicit.isEmpty ? visibleMeasures.first.map { [$0.identityKey] } ?? [] : explicit
+        if !explicit.isEmpty { return explicit }
+        let primary = (config.primaryMeasure ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !primary.isEmpty, visibleMeasures.contains(where: { $0.identityKey == primary }) {
+            return [primary]
+        }
+        return visibleMeasures.first.map { [$0.identityKey] } ?? []
     }
 
     private func defaultDimensionKeys() -> [String] {
@@ -1280,24 +1298,112 @@ public struct ReportBuilderRenderer: View {
         return nil
     }
 
-    private static func aggregateRows(rows: [[String: JSONValue]], dimensions: [String], measures: [String]) -> [[String: JSONValue]] {
+    internal static func applyChartDataPolicy(
+        config: DashboardReportBuilderDef,
+        request: [String: JSONValue]
+    ) -> [String: JSONValue] {
+        let mode = (config.result?.chartDataMode ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard mode == "fullquery" else {
+            return request
+        }
+        var next = request
+        let rawLimit = config.result?.chartRowLimit ?? config.result?.chartDataLimit ?? 1000
+        let rowLimit = max(1, rawLimit)
+        next["limit"] = .number(Double(rowLimit))
+        next["offset"] = .number(0)
+        return next
+    }
+
+    private static func aggregateRows(
+        rows: [[String: JSONValue]],
+        dimensions: [String],
+        measures: [String],
+        config: DashboardReportBuilderDef
+    ) -> [[String: JSONValue]] {
         var grouped: [String: [String: JSONValue]] = [:]
+        let dimensionByKey = Dictionary(uniqueKeysWithValues: config.dimensions.map { ($0.identityKey, $0) })
+        let measureByKey = Dictionary(uniqueKeysWithValues: (config.measures + config.computedMeasures).map { ($0.identityKey, $0) })
         for row in rows {
-            let bucket = dimensions.map { row[$0]?.stringLike ?? "" }.joined(separator: "||")
+            let bucket = dimensions.map { key in
+                let dimension = dimensionByKey[key]
+                return displayValue(row: row, dimension: dimension, key: key)?.stringLike ?? ""
+            }.joined(separator: "||")
             var existing = grouped[bucket] ?? [:]
             for key in dimensions {
-                if let value = row[key] { existing[key] = value }
+                let dimension = dimensionByKey[key]
+                if let value = displayValue(row: row, dimension: dimension, key: key) {
+                    existing[key] = value
+                }
             }
             for key in measures {
+                if measureByKey[key]?.compute != nil {
+                    continue
+                }
                 let current = existing[key]?.doubleLike ?? 0
-                let next = row[key]?.doubleLike ?? 0
+                let next = value(at: key, in: row)?.doubleLike ?? 0
                 existing[key] = .number(current + next)
             }
             grouped[bucket] = existing
         }
-        return grouped.values.sorted {
+        let withComputed = grouped.values.map { row in
+            applyComputedMeasures(row: row, measures: measures, config: config)
+        }
+        return withComputed.sorted {
             ($0[dimensions.first ?? ""]?.stringLike ?? "") < ($1[dimensions.first ?? ""]?.stringLike ?? "")
         }
+    }
+
+    private static func displayValue(row: [String: JSONValue], dimension: ReportBuilderDimensionDef?, key: String) -> JSONValue? {
+        if let displayKey = dimension?.displayKey?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !displayKey.isEmpty,
+           let value = value(at: displayKey, in: row) {
+            return value
+        }
+        return value(at: key, in: row)
+    }
+
+    private static func applyComputedMeasures(
+        row: [String: JSONValue],
+        measures: [String],
+        config: DashboardReportBuilderDef
+    ) -> [String: JSONValue] {
+        var next = row
+        for measure in config.computedMeasures where measures.contains(measure.identityKey) {
+            guard let compute = measure.compute,
+                  (compute.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "ratio",
+                  let numerator = compute.numerator,
+                  let denominator = compute.denominator else {
+                continue
+            }
+            let denom = next[denominator]?.doubleLike ?? 0
+            guard denom != 0 else { continue }
+            let scale = compute.scale ?? 1
+            var value = ((next[numerator]?.doubleLike ?? 0) / denom) * scale
+            if let decimals = compute.decimals {
+                let factor = pow(10.0, Double(max(0, decimals)))
+                value = (value * factor).rounded() / factor
+            }
+            next[measure.identityKey] = .number(value)
+        }
+        return next
+    }
+
+    private static func value(at path: String, in row: [String: JSONValue]) -> JSONValue? {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let direct = row[trimmed] {
+            return direct
+        }
+        let parts = trimmed.split(separator: ".").map(String.init)
+        guard parts.count > 1 else { return nil }
+        var current: JSONValue? = .object(row)
+        for part in parts {
+            current = current?.objectValue?[part]
+            if current == nil { return nil }
+        }
+        return current
     }
 
     private static func buildRequestPayload(
@@ -1308,9 +1414,27 @@ public struct ReportBuilderRenderer: View {
         dynamicGroups: [String: [ReportBuilderDynamicRowState]]
     ) -> [String: JSONValue] {
         var request: [String: JSONValue] = [:]
+        let allMeasures = config.measures + config.computedMeasures
         for key in selectedMeasures {
-            guard let measure = config.measures.first(where: { $0.identityKey == key }) else { continue }
-            setNestedValue(&request, path: measure.paramPath ?? "measures.\(key)", value: .bool(true))
+            guard let measure = allMeasures.first(where: { $0.identityKey == key }) else { continue }
+            let paramPath = measure.paramPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !paramPath.isEmpty {
+                setNestedValue(&request, path: paramPath, value: .bool(true))
+                continue
+            }
+            if measure.compute != nil {
+                for dependency in measure.dependencies where !dependency.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if let dep = config.measures.first(where: { $0.identityKey == dependency }),
+                       let depPath = dep.paramPath?.trimmingCharacters(in: .whitespacesAndNewlines),
+                       !depPath.isEmpty {
+                        setNestedValue(&request, path: depPath, value: .bool(true))
+                    } else {
+                        setNestedValue(&request, path: "measures.\(dependency)", value: .bool(true))
+                    }
+                }
+            } else {
+                setNestedValue(&request, path: "measures.\(key)", value: .bool(true))
+            }
         }
         for key in selectedDimensions {
             guard let dimension = config.dimensions.first(where: { $0.identityKey == key }) else { continue }

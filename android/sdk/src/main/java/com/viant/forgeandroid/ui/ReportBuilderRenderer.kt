@@ -85,6 +85,8 @@ import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.pow
+import kotlin.math.round
 
 private const val REPORT_BUILDER_PRESET_STORAGE = "forge_report_builder_presets"
 
@@ -191,10 +193,15 @@ fun ReportBuilderRenderer(
     val windowFormSignal = window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
 
-    val visibleMeasures = remember(config) { config.measures.filter { it.hidden != true } }
+    val allMeasures = remember(config) { config.measures + config.computedMeasures }
+    val visibleMeasures = remember(config) { allMeasures.filter { it.hidden != true } }
     val visibleDimensions = remember(config) { config.dimensions.filter { it.hidden != true } }
+    val visibleDynamicGroups = remember(config) {
+        val hidden = config.hiddenDynamicGroupIds.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        if (hidden.isEmpty()) config.dynamicFilterGroups else config.dynamicFilterGroups.filter { (it.id ?: it.label ?: "") !in hidden }
+    }
     val explicitChartMode = remember(config) { config.result?.chartCreationMode == "explicit" }
-    var selectedMeasures by remember(config) { mutableStateOf(defaultMeasureKeys(visibleMeasures)) }
+    var selectedMeasures by remember(config) { mutableStateOf(defaultMeasureKeys(visibleMeasures, config.primaryMeasure)) }
     var selectedDimensions by remember(config) { mutableStateOf(defaultDimensionKeys(visibleDimensions)) }
     var chartSpec by remember { mutableStateOf<ReportBuilderChartSpecDef?>(null) }
     var viewMode by remember(config) { mutableStateOf(if (explicitChartMode) "table" else (config.result?.defaultMode ?: "chart")) }
@@ -239,20 +246,23 @@ fun ReportBuilderRenderer(
     var lookupDescriptors by remember(config) { mutableStateOf<Map<String, ReportBuilderLookupDescriptor>>(emptyMap()) }
     LaunchedEffect(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, hookState) {
         requestPayload = withContext(Dispatchers.Default) {
-            buildReportBuilderRequestPayload(
+            applyReportBuilderChartDataPolicy(
                 config = config,
-                selectedMeasures = selectedMeasures,
-                selectedDimensions = selectedDimensions,
-                staticFilters = staticFilters,
-                dynamicGroups = dynamicGroups,
-                hookState = hookState,
-                hookInvoker = { functionName, props ->
-                    invokeReportBuilderWindowHook(
-                        window = window,
-                        functionName = functionName,
-                        props = props
-                    )
-                }
+                request = buildReportBuilderRequestPayload(
+                    config = config,
+                    selectedMeasures = selectedMeasures,
+                    selectedDimensions = selectedDimensions,
+                    staticFilters = staticFilters,
+                    dynamicGroups = dynamicGroups,
+                    hookState = hookState,
+                    hookInvoker = { functionName, props ->
+                        invokeReportBuilderWindowHook(
+                            window = window,
+                            functionName = functionName,
+                            props = props
+                        )
+                    }
+                )
             )
         }
     }
@@ -274,8 +284,8 @@ fun ReportBuilderRenderer(
     val filteredRows = remember(rows, staticFilters, config.staticFilters) {
         applyStaticFilters(rows, config.staticFilters, staticFilters)
     }
-    val aggregatedRows = remember(filteredRows, selectedDimensions, selectedMeasures) {
-        aggregateRows(filteredRows, selectedDimensions, selectedMeasures)
+    val aggregatedRows = remember(filteredRows, selectedDimensions, selectedMeasures, config) {
+        aggregateRows(filteredRows, selectedDimensions, selectedMeasures, config)
     }
     val activeFilterCount = remember(config.staticFilters, staticFilters, dynamicGroups) {
         activeReportBuilderFilterCount(config.staticFilters, staticFilters, dynamicGroups)
@@ -474,7 +484,7 @@ fun ReportBuilderRenderer(
                     staticFilters = staticFilters.toMutableMap().apply { put(key, value) }
                 }
                 DynamicFilterBridgeSection(
-                    groups = config.dynamicFilterGroups,
+                    groups = visibleDynamicGroups,
                     families = config.dynamicFilterFamilies,
                     unifiedFamilyRows = config.unifiedFamilyRows,
                     rowsByGroupId = dynamicGroups,
@@ -1599,9 +1609,14 @@ private fun SimpleReportTable(rows: List<AggregatedRow>, columns: List<String>) 
     }
 }
 
-private fun defaultMeasureKeys(measures: List<ReportBuilderMeasureDef>): List<String> {
+private fun defaultMeasureKeys(measures: List<ReportBuilderMeasureDef>, primaryMeasure: String? = null): List<String> {
     val explicit = measures.filter { it.defaultValue == true }.mapNotNull { reportBuilderMeasureKey(it).takeIf(String::isNotBlank) }
-    return if (explicit.isNotEmpty()) explicit else measures.firstNotNullOfOrNull { it.key ?: it.id }?.let(::listOf).orEmpty()
+    if (explicit.isNotEmpty()) return explicit
+    val primary = primaryMeasure?.trim().orEmpty()
+    if (primary.isNotEmpty() && measures.any { reportBuilderMeasureKey(it) == primary }) {
+        return listOf(primary)
+    }
+    return measures.firstNotNullOfOrNull { it.key ?: it.id }?.let(::listOf).orEmpty()
 }
 
 private fun defaultDimensionKeys(dimensions: List<ReportBuilderDimensionDef>): List<String> {
@@ -1640,18 +1655,66 @@ private fun reportBuilderDimensionLabel(dimension: ReportBuilderDimensionDef): S
 
 private fun toggleKey(current: List<String>, key: String): List<String> = if (current.contains(key)) current.filterNot { it == key } else current + key
 
-private fun aggregateRows(rows: List<Map<String, Any?>>, dimensions: List<String>, measures: List<String>): List<AggregatedRow> {
+private fun aggregateRows(
+    rows: List<Map<String, Any?>>,
+    dimensions: List<String>,
+    measures: List<String>,
+    config: DashboardReportBuilderDef
+): List<AggregatedRow> {
     val grouped = linkedMapOf<String, MutableMap<String, Any?>>()
+    val dimensionsByKey = config.dimensions.associateBy { reportBuilderDimensionKey(it) }
+    val measuresByKey = (config.measures + config.computedMeasures).associateBy { reportBuilderMeasureKey(it) }
     rows.forEach { row ->
-        val bucket = dimensions.joinToString("||") { row[it]?.toString().orEmpty() }
+        val bucket = dimensions.joinToString("||") { key ->
+            displayDimensionValue(row, dimensionsByKey[key], key)?.toString().orEmpty()
+        }
         val existing = grouped.getOrPut(bucket) { linkedMapOf() }
-        dimensions.forEach { existing[it] = row[it] }
+        dimensions.forEach { key -> existing[key] = displayDimensionValue(row, dimensionsByKey[key], key) }
         measures.forEach { key ->
-            val numeric = (row[key] as? Number)?.toDouble() ?: row[key]?.toString()?.toDoubleOrNull() ?: 0.0
+            if (measuresByKey[key]?.compute != null) {
+                return@forEach
+            }
+            val raw = SelectorUtil.resolve(row, key)
+            val numeric = (raw as? Number)?.toDouble() ?: raw?.toString()?.toDoubleOrNull() ?: 0.0
             existing[key] = ((existing[key] as? Double) ?: (existing[key] as? Number)?.toDouble() ?: 0.0) + numeric
         }
     }
-    return grouped.values.map { AggregatedRow(it) }
+    return grouped.values.map { AggregatedRow(applyComputedMeasures(it, measures, config)) }
+}
+
+private fun displayDimensionValue(row: Map<String, Any?>, dimension: ReportBuilderDimensionDef?, key: String): Any? {
+    val displayKey = dimension?.displayKey?.trim().orEmpty()
+    if (displayKey.isNotBlank()) {
+        SelectorUtil.resolve(row, displayKey)?.let { return it }
+    }
+    return SelectorUtil.resolve(row, key)
+}
+
+private fun applyComputedMeasures(
+    row: Map<String, Any?>,
+    measures: List<String>,
+    config: DashboardReportBuilderDef
+): Map<String, Any?> {
+    val next = row.toMutableMap()
+    config.computedMeasures
+        .filter { reportBuilderMeasureKey(it) in measures }
+        .forEach { measure ->
+            val compute = measure.compute ?: return@forEach
+            if (!compute.type.equals("ratio", ignoreCase = true)) return@forEach
+            val numerator = compute.numerator?.trim().orEmpty()
+            val denominator = compute.denominator?.trim().orEmpty()
+            if (numerator.isBlank() || denominator.isBlank()) return@forEach
+            val denom = (next[denominator] as? Number)?.toDouble() ?: next[denominator]?.toString()?.toDoubleOrNull() ?: 0.0
+            if (denom == 0.0) return@forEach
+            val rawNumerator = (next[numerator] as? Number)?.toDouble() ?: next[numerator]?.toString()?.toDoubleOrNull() ?: 0.0
+            var value = (rawNumerator / denom) * (compute.scale ?: 1.0)
+            compute.decimals?.let { decimals ->
+                val factor = 10.0.pow(maxOf(0, decimals).toDouble())
+                value = round(value * factor) / factor
+            }
+            next[reportBuilderMeasureKey(measure)] = value
+        }
+    return next
 }
 
 private fun quickChartSpec(
@@ -1779,9 +1842,20 @@ internal fun buildReportBuilderRequestPayload(
     hookInvoker: (String, JsonObject) -> Map<String, Any?>?
 ): Map<String, Any?> {
     val request = linkedMapOf<String, Any?>()
+    val allMeasures = config.measures + config.computedMeasures
     selectedMeasures.forEach { key ->
-        val measure = config.measures.firstOrNull { reportBuilderMeasureKey(it) == key } ?: return@forEach
-        setNestedValue(request, measure.paramPath ?: "measures.$key", true)
+        val measure = allMeasures.firstOrNull { reportBuilderMeasureKey(it) == key } ?: return@forEach
+        val paramPath = measure.paramPath?.trim().orEmpty()
+        if (paramPath.isNotBlank()) {
+            setNestedValue(request, paramPath, true)
+        } else if (measure.compute != null) {
+            measure.dependencies.map { it.trim() }.filter { it.isNotEmpty() }.forEach { dependency ->
+                val dependencyPath = config.measures.firstOrNull { reportBuilderMeasureKey(it) == dependency }?.paramPath?.trim().orEmpty()
+                setNestedValue(request, dependencyPath.ifBlank { "measures.$dependency" }, true)
+            }
+        } else {
+            setNestedValue(request, "measures.$key", true)
+        }
     }
     selectedDimensions.forEach { key ->
         val dimension = config.dimensions.firstOrNull { reportBuilderDimensionKey(it) == key } ?: return@forEach
@@ -1846,6 +1920,21 @@ internal fun buildReportBuilderRequestPayload(
         )
     ) ?: return baseRequest
     return if (hookResult.isEmpty()) baseRequest else hookResult
+}
+
+internal fun applyReportBuilderChartDataPolicy(
+    config: com.viant.forgeandroid.runtime.DashboardReportBuilderDef,
+    request: Map<String, Any?>
+): Map<String, Any?> {
+    val mode = (config.result?.chartDataMode ?: "").trim().lowercase()
+    if (mode != "fullquery") {
+        return request
+    }
+    val rowLimit = maxOf(1, config.result?.chartRowLimit ?: config.result?.chartDataLimit ?: 1000)
+    return request.toMutableMap().apply {
+        put("limit", rowLimit)
+        put("offset", 0)
+    }.toMap()
 }
 
 private fun normalizeDynamicFilterValue(

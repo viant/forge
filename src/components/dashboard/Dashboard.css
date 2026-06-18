@@ -2818,10 +2818,19 @@
     box-shadow: 0 20px 44px rgba(15, 30, 50, 0.16);
 }
 
-.forge-report-builder__left > .forge-report-builder__bottom--rail,
+.forge-report-builder__left > .forge-report-builder__bottom--rail {
+    flex: 0 0 auto;
+    min-height: auto;
+}
+
 .forge-report-builder__bottom--rail {
     flex: 1 1 auto;
     min-height: 0;
+}
+
+.forge-report-builder__left > .forge-report-builder__bottom--rail .forge-report-builder__bottom-group {
+    flex: 0 0 auto;
+    min-height: auto;
 }
 
 .forge-report-builder__left > .forge-report-builder__bottom--rail.forge-report-builder__bottom--rail-launcher,

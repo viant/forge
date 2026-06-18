@@ -44,7 +44,7 @@ import {
 } from './previewRuntimeInteractionSession.js';
 import { applyPreviewFetchBehavior } from './previewFetchBehaviors.js';
 import { applyPreviewDetailTargetBehavior } from './previewDetailTargetBehaviors.js';
-import { resolvePreviewRuntimeActions } from './previewRuntimeActionBehaviors.js';
+import { applyPreviewRuntimeActionBehavior } from './previewRuntimeActionBehaviors.js';
 import { buildPreviewAuthoredReport, buildPreviewAuthoredReportModel } from './previewAuthoredReport.js';
 import { buildPreviewReportDocumentTemplates } from './previewReportDocumentTemplates.js';
 import {
@@ -374,7 +374,7 @@ function createDemoSemanticModelHandler({ drillMetadata = {} } = {}) {
     async listAvailableRefinements(_blockKind = '', fieldRef = '') {
       const fallbackActions = await configBackedDrillProvider.listAvailableRefinements(_blockKind, fieldRef);
       const metrics = ensurePreviewMetrics();
-      return resolvePreviewRuntimeActions(metrics, _blockKind, fieldRef, fallbackActions);
+      return await applyPreviewRuntimeActionBehavior(metrics, _blockKind, fieldRef, fallbackActions);
     },
   };
 }
