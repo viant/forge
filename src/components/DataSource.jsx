@@ -2,8 +2,8 @@
 import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
-import {isMapEquals} from "../utils/index.js";
 import { extractData } from "./dataSourceExtract.js";
+import { resolveFetchPage, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
 import {
     findSelectionSignal,
 
@@ -84,7 +84,7 @@ export default function DataSource({context}) {
     useSignals();
     const log = getLogger('ds');
     try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
-    let prevFilter = {};
+    const prevFilterRef = useRef({});
     const prevQuerySig = useRef('');
 
     const {dataSource, signals, connector, handlers, identity} = context
@@ -409,7 +409,7 @@ export default function DataSource({context}) {
         } catch (_) {
         }
         const inputVal = input.value || {};
-        let {page, filter, parameters} = inputVal || {};
+        let {page, filter = {}, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
         if (!hasDeps) {
             setSelected({selected: null, rowIndex: -1});
@@ -441,11 +441,13 @@ export default function DataSource({context}) {
         setLoading(true);
         control.value = { ...control.peek(), error: null, stale: false };
         try {
-            // If filter changed, reset to first page
-            if (!isMapEquals(filter, prevFilter)) {
-                page = 1;
-            }
-            prevFilter = {...filter};
+            page = resolveFetchPage({
+                page,
+                filter,
+                previousFilter: prevFilterRef.current,
+                pagingEnabled,
+            });
+            prevFilterRef.current = snapshotFilter(filter);
 
             // 2) Merge into filter
             const finalFilter = {...filter};
@@ -492,9 +494,20 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = info;
+            collectionInfo.value = withFetchedPageInfo(info, page, pagingEnabled);
             metrics.value = stats;
             control.value = { ...control.peek(), error: null, stale: false };
+            if (pagingEnabled) {
+                const currentInput = input.peek() || {};
+                if (Number(currentInput.page || 1) !== Number(page || 1)) {
+                    input.value = {
+                        ...currentInput,
+                        page,
+                        fetch: false,
+                        refresh: false,
+                    };
+                }
+            }
 
             // Mark this signature as the latest successful fetch
             prevQuerySig.current = requestSig;
