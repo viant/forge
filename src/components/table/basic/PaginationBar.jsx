@@ -3,6 +3,7 @@
 import React, {useState} from "react";
 import {Button} from "@blueprintjs/core";
 import {useSignalEffect} from "@preact/signals-react";
+import { resolvePaginationState } from "./PaginationState.js";
 
 const buttonProperties = {
     'pagination.first': {label: "First Page", icon: "double-chevron-left"},
@@ -22,29 +23,18 @@ const PaginationBar = ({
 
     useSignalEffect(() => {
         const info = handlers.dataSource.getCollectionInfo();
+        const inputPage = handlers.dataSource.getPage?.();
         const isInactive = handlers.dataSource.isInactive();
+        const nextState = resolvePaginationState({
+            info,
+            inputPage,
+            fallbackPage: currentPage,
+            inactive: isInactive,
+        });
         setInactive(isInactive);
-
-        let newTotalPages = Number.isFinite(info?.pageCount) && info.pageCount > 0 ? info.pageCount : null;
-        let totalCount = Number.isFinite(info?.totalCount) && info.totalCount >= 0 ? info.totalCount : null;
-        if (isInactive) {
-            newTotalPages = null;
-            totalCount = null;
-        }
-
-        if (totalPages !== newTotalPages) {
-            setTotalPages(newTotalPages);
-            if (newTotalPages != null && currentPage > newTotalPages) {
-                setCurrentPage(newTotalPages);
-            }
-        }
-        setRecordCount(totalCount);
-
-        if (info?.page && info.page !== currentPage) {
-            setCurrentPage(info.page);
-        } else if (currentPage < 1) {
-            setCurrentPage(1);
-        }
+        setTotalPages(nextState.totalPages);
+        setRecordCount(nextState.recordCount);
+        setCurrentPage(nextState.currentPage);
     });
 
     const onFirstPage = () => {
