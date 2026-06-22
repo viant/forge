@@ -1329,21 +1329,22 @@ type Option struct {
 }
 
 type DataSource struct {
-	Service         *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
-	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
-	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
-	UniqueKey       []*UniqueKey                      `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
-	Parameters      []Parameter                       `json:"parameters" yaml:"parameters"`
-	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
-	Cardinality     string                            `json:"cardinality" yaml:"cardinality"`
-	Selectors       *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
-	SelectionMode   *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
-	Paging          *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
-	FilterSet       []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
-	AutoSelect      *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
-	AutoFetch       *bool                             `json:"autoFetch,omitempty" yaml:"autoFetch,omitempty"`
-	SelfReference   string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
+	Service                                 *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
+	DataSourceRef                           string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Target                                  *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides                         map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	UniqueKey                               []*UniqueKey                      `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
+	Parameters                              []Parameter                       `json:"parameters" yaml:"parameters"`
+	On                                      []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Cardinality                             string                            `json:"cardinality" yaml:"cardinality"`
+	Selectors                               *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
+	SelectionMode                           *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
+	Paging                                  *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
+	FilterSet                               []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
+	AutoSelect                              *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
+	AutoFetch                               *bool                             `json:"autoFetch,omitempty" yaml:"autoFetch,omitempty"`
+	PreserveParametersOnMissingDependencies *bool                             `json:"preserveParametersOnMissingDependencies,omitempty" yaml:"preserveParametersOnMissingDependencies,omitempty"`
+	SelfReference                           string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
 	// QuickFilterSet selects which filterSet should be rendered in the toolbar as quick filters.
 	// Accepts either a string (filterSet.name) or an integer index (0-based).
 	QuickFilterSet interface{} `json:"quickFilterSet,omitempty" yaml:"quickFilterSet,omitempty"`

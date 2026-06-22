@@ -75,7 +75,6 @@ function stableSnapshotSignature(value) {
     }
 }
 
-
 /**
  * DataSource props:
  *  - context
@@ -86,6 +85,7 @@ export default function DataSource({context}) {
     try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
     const prevFilterRef = useRef({});
     const prevQuerySig = useRef('');
+    const lastResolvedParametersRef = useRef({});
 
     const {dataSource, signals, connector, handlers, identity} = context
     const {paging, selectors} = dataSource;
@@ -302,11 +302,26 @@ export default function DataSource({context}) {
         let {refreshFilter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, refreshFilter)
         if (!hasDeps) {
-            flagReadDone()
-            setInactive(true);
+            const preservedParameters = lastResolvedParametersRef.current || {};
+            if (dataSource?.preserveParametersOnMissingDependencies === true && Object.keys(preservedParameters).length > 0) {
+                input.value = {
+                    ...input.peek(),
+                    parameters: {
+                        ...((input.peek() || {}).parameters || {}),
+                        ...preservedParameters,
+                    },
+                    fetch: false,
+                    refresh: false,
+                };
+                setInactive(false);
+            } else {
+                flagReadDone()
+                setInactive(true);
+            }
             return;
         } else {
             setInactive(false);
+            lastResolvedParametersRef.current = { ...(parameters || {}) };
         }
 
 
@@ -412,12 +427,28 @@ export default function DataSource({context}) {
         let {page, filter = {}, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
         if (!hasDeps) {
-            setSelected({selected: null, rowIndex: -1});
-            collection.value = [];
-            flagReadDone();
-            setInactive(true);
+            const preservedParameters = lastResolvedParametersRef.current || {};
+            if (dataSource?.preserveParametersOnMissingDependencies === true && Object.keys(preservedParameters).length > 0) {
+                input.value = {
+                    ...input.peek(),
+                    parameters: {
+                        ...((input.peek() || {}).parameters || {}),
+                        ...preservedParameters,
+                    },
+                    fetch: false,
+                    refresh: false,
+                };
+                setInactive(false);
+            } else {
+                setSelected({selected: null, rowIndex: -1});
+                collection.value = [];
+                flagReadDone();
+                setInactive(true);
+            }
             return;
         }
+        setInactive(false);
+        lastResolvedParametersRef.current = { ...(parameters || {}) };
 
         // ------------------------------------------------------------------
         // Compute the request signature (captures everything that influences
