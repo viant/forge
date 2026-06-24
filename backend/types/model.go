@@ -26,12 +26,12 @@ func (t *TargetSpec) UnmarshalJSON(data []byte) error {
 	}
 	var text string
 	if err := json.Unmarshal(data, &text); err == nil {
-		t.Platforms = []string{text}
+		t.Platforms = targetStringList([]string{text})
 		return nil
 	}
 	var list []string
 	if err := json.Unmarshal(data, &list); err == nil {
-		t.Platforms = append([]string(nil), list...)
+		t.Platforms = targetStringList(list)
 		return nil
 	}
 	type alias TargetSpec
@@ -40,18 +40,19 @@ func (t *TargetSpec) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("invalid target spec: %w", err)
 	}
 	*t = TargetSpec(expanded)
+	t.normalize()
 	return nil
 }
 
 func (t *TargetSpec) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var text string
 	if err := unmarshal(&text); err == nil {
-		t.Platforms = []string{text}
+		t.Platforms = targetStringList([]string{text})
 		return nil
 	}
 	var list []string
 	if err := unmarshal(&list); err == nil {
-		t.Platforms = append([]string(nil), list...)
+		t.Platforms = targetStringList(list)
 		return nil
 	}
 	type alias TargetSpec
@@ -60,7 +61,31 @@ func (t *TargetSpec) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return fmt.Errorf("invalid target spec: %w", err)
 	}
 	*t = TargetSpec(expanded)
+	t.normalize()
 	return nil
+}
+
+func (t *TargetSpec) normalize() {
+	if t == nil {
+		return
+	}
+	t.Platforms = targetStringList(t.Platforms)
+	t.ExcludePlatforms = targetStringList(t.ExcludePlatforms)
+	t.FormFactors = targetStringList(t.FormFactors)
+	t.Capabilities = targetStringList(t.Capabilities)
+}
+
+func targetStringList(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }
 
 type Chart struct {

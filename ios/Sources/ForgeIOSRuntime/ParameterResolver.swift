@@ -47,11 +47,44 @@ public enum ParameterResolver {
         context: ResolutionContext
     ) -> [String: JSONValue] {
         var resolved: [String: JSONValue] = [:]
-        for parameter in parameters where parameter.direction?.lowercased() != "out" {
+        for parameter in parameters where isCompact(parameter) {
+            guard !isOutbound(parameter) else { continue }
+            guard let from = parameter.from, let to = parameter.to else { continue }
+            let sourceParts = splitStoreReference(from)
+            let destinationParts = splitStoreReference(to)
+            let sourceDataSourceRef = sourceParts.dataSourceRef.isEmpty ? context.identityDataSourceRef : sourceParts.dataSourceRef
+            let destinationDataSourceRef = destinationParts.dataSourceRef.isEmpty ? context.identityDataSourceRef : destinationParts.dataSourceRef
+            guard !sourceDataSourceRef.isEmpty, !destinationDataSourceRef.isEmpty else { continue }
+            guard let value = readCompactValue(
+                context: context,
+                dataSourceRef: sourceDataSourceRef,
+                store: expandStore(sourceParts.store),
+                path: parameter.location?.stringValue ?? parameter.name
+            ) else {
+                continue
+            }
+            var dataSourceResult = resolved[destinationDataSourceRef]?.objectValue ?? [:]
+            writeCompactValue(
+                &dataSourceResult,
+                store: expandStore(destinationParts.store),
+                path: parameter.name,
+                value: value
+            )
+            resolved[destinationDataSourceRef] = .object(dataSourceResult)
+        }
+
+        for parameter in parameters where !isCompact(parameter) && !isOutbound(parameter) {
             let name = parameter.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { continue }
             guard let value = resolve(parameter: parameter, context: context) else { continue }
-            applyResolvedValue(&resolved, name: name, value: value)
+            let toDataSource = (parameter.to ?? parameter.kind ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if !toDataSource.isEmpty {
+                var dataSourceResult = resolved[toDataSource]?.objectValue ?? [:]
+                applyResolvedValue(&dataSourceResult, name: name, value: value)
+                resolved[toDataSource] = .object(dataSourceResult)
+            } else {
+                applyResolvedValue(&resolved, name: name, value: value)
+            }
         }
         return resolved
     }
@@ -81,10 +114,16 @@ public enum ParameterResolver {
             return resolveFromSelection(context: context, location: parameter.location?.stringValue)
         case "form":
             return resolveFromForm(context: context, location: parameter.location?.stringValue)
+        case "dataSource":
+            return resolveFromLegacyDataSource(context: context, location: parameter.location?.stringValue)
         case "windowForm":
             return resolveFromWindowForm(context: context, location: parameter.location?.stringValue)
         case "metadata":
             return resolveFromMetadata(context: context, location: parameter.location?.stringValue)
+        case "input":
+            return resolveFromInput(context: context, location: parameter.location?.stringValue)
+        case "filter":
+            return resolveFromFilter(context: context, location: parameter.location?.stringValue)
         case "filterSet":
             return resolveFromFilterSet(context: context, location: parameter.location?.stringValue)
         case "metrics":
@@ -101,6 +140,155 @@ public enum ParameterResolver {
             }
             return parameter.location
         }
+    }
+
+    private static func isCompact(_ parameter: ParameterDef) -> Bool {
+        guard let from = parameter.from,
+              let to = parameter.to else {
+            return false
+        }
+        return from.contains(":") && to.contains(":")
+    }
+
+    private static func isOutbound(_ parameter: ParameterDef) -> Bool {
+        if parameter.output == true {
+            return true
+        }
+        if parameter.direction?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "out" {
+            return true
+        }
+        return parameter.from?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasSuffix(":output") == true
+    }
+
+    private static func splitStoreReference(_ reference: String) -> (dataSourceRef: String, store: String) {
+        let parts = reference.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+        let dataSourceRef = parts.first.map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let store = parts.count > 1
+            ? String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            : ""
+        return (dataSourceRef, store)
+    }
+
+    private static func expandStore(_ rawStore: String) -> String {
+        switch rawStore.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "query":
+            return "input.query"
+        case "path":
+            return "input.path"
+        case "headers":
+            return "input.headers"
+        case "body":
+            return "input.body"
+        default:
+            return rawStore.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+    }
+
+    private static func readCompactValue(
+        context: ResolutionContext,
+        dataSourceRef: String,
+        store: String,
+        path: String?
+    ) -> JSONValue? {
+        let sourcePath = path?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        switch store {
+        case "form":
+            return readDataSourceObject(context: context, dataSourceRef: dataSourceRef, object: \.form, path: sourcePath)
+        case "selection":
+            return readSelection(context: context, dataSourceRef: dataSourceRef, path: sourcePath)
+        case "filter":
+            return readDataSourceObject(context: context, dataSourceRef: dataSourceRef, object: { $0.input.filter }, path: sourcePath)
+        case "metrics":
+            return readDataSourceObject(context: context, dataSourceRef: dataSourceRef, object: \.metrics, path: sourcePath)
+        case "windowform":
+            return sourcePath.isEmpty
+                ? .object(context.windowForm)
+                : jsonValue(any: SelectorUtil.resolve(jsonObjectAny(context.windowForm), selector: sourcePath))
+        case "input":
+            guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+            let input = inputObject(snapshot.input)
+            return sourcePath.isEmpty
+                ? .object(input)
+                : jsonValue(any: SelectorUtil.resolve(jsonObjectAny(input), selector: sourcePath))
+        default:
+            return nil
+        }
+    }
+
+    private static func readDataSourceObject(
+        context: ResolutionContext,
+        dataSourceRef: String,
+        object: (DataSourceSnapshot) -> [String: JSONValue],
+        path: String
+    ) -> JSONValue? {
+        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        let value = object(snapshot)
+        return path.isEmpty
+            ? .object(value)
+            : jsonValue(any: SelectorUtil.resolve(jsonObjectAny(value), selector: path))
+    }
+
+    private static func readSelection(
+        context: ResolutionContext,
+        dataSourceRef: String,
+        path: String
+    ) -> JSONValue? {
+        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        let selectionMode = (snapshot.selectionMode ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if selectionMode == "multi" {
+            if path.isEmpty {
+                return .array(snapshot.selection.selection.map(JSONValue.object))
+            }
+            return .array(snapshot.selection.selection.compactMap { row in
+                jsonValue(any: SelectorUtil.resolve(jsonObjectAny(row), selector: path))
+            })
+        }
+        guard let selected = snapshot.selection.selected else { return nil }
+        return path.isEmpty
+            ? .object(selected)
+            : jsonValue(any: SelectorUtil.resolve(jsonObjectAny(selected), selector: path))
+    }
+
+    private static func inputObject(_ input: InputState) -> [String: JSONValue] {
+        var object: [String: JSONValue] = [
+            "filter": .object(input.filter),
+            "parameters": .object(input.parameters),
+            "fetch": .bool(input.fetch),
+            "refresh": .bool(input.refresh)
+        ]
+        if let page = input.page {
+            object["page"] = .number(Double(page))
+        }
+        return object
+    }
+
+    private static func writeCompactValue(
+        _ dataSourceResult: inout [String: JSONValue],
+        store: String,
+        path: String,
+        value: JSONValue
+    ) {
+        let trimmedPath = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        if store == "input" {
+            var input = dataSourceResult["input"]?.objectValue ?? [:]
+            applyResolvedValue(&input, name: trimmedPath, value: value)
+            dataSourceResult["input"] = .object(input)
+            return
+        }
+        if store.hasPrefix("input.") {
+            let childStore = String(store.dropFirst("input.".count))
+            guard !childStore.isEmpty else { return }
+            var input = dataSourceResult["input"]?.objectValue ?? [:]
+            var child = input[childStore]?.objectValue ?? [:]
+            applyResolvedValue(&child, name: trimmedPath, value: value)
+            input[childStore] = .object(child)
+            dataSourceResult["input"] = .object(input)
+            return
+        }
+        var destination = dataSourceResult[store]?.objectValue ?? [:]
+        applyResolvedValue(&destination, name: trimmedPath, value: value)
+        dataSourceResult[store] = .object(destination)
     }
 
     private static func resolveFromSelection(
@@ -141,6 +329,28 @@ public enum ParameterResolver {
         return jsonValue(any: SelectorUtil.resolve(jsonObjectAny(snapshot.form), selector: fieldPath))
     }
 
+    private static func resolveFromLegacyDataSource(
+        context: ResolutionContext,
+        location: String?
+    ) -> JSONValue? {
+        let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
+        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        let candidates: [[String: JSONValue]?] = [
+            snapshot.selection.selected,
+            snapshot.form,
+            snapshot.input.filter,
+            inputObject(snapshot.input)
+        ]
+        for candidate in candidates {
+            guard let candidate,
+                  let value = readObjectValue(candidate, path: fieldPath) else {
+                continue
+            }
+            return value
+        }
+        return nil
+    }
+
     private static func resolveFromWindowForm(
         context: ResolutionContext,
         location: String?
@@ -162,6 +372,24 @@ public enum ParameterResolver {
             return jsonValue(from: metadata)
         }
         return jsonValue(any: SelectorUtil.resolve(metadata, selector: fieldPath))
+    }
+
+    private static func resolveFromInput(
+        context: ResolutionContext,
+        location: String?
+    ) -> JSONValue? {
+        let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
+        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        return readObjectValue(inputObject(snapshot.input), path: fieldPath)
+    }
+
+    private static func resolveFromFilter(
+        context: ResolutionContext,
+        location: String?
+    ) -> JSONValue? {
+        let (dataSourceRef, fieldPath) = resolveDataSourceRef(location: location, context: context)
+        guard let snapshot = context.dataSources[dataSourceRef] else { return nil }
+        return readObjectValue(snapshot.input.filter, path: fieldPath)
     }
 
     private static func resolveFromFilterSet(
@@ -186,6 +414,16 @@ public enum ParameterResolver {
             return .object(snapshot.metrics)
         }
         return jsonValue(any: SelectorUtil.resolve(jsonObjectAny(snapshot.metrics), selector: fieldPath))
+    }
+
+    private static func readObjectValue(_ object: [String: JSONValue], path: String) -> JSONValue? {
+        if path.isEmpty {
+            return .object(object)
+        }
+        guard let value = SelectorUtil.resolve(jsonObjectAny(object), selector: path) else {
+            return nil
+        }
+        return jsonValue(any: value)
     }
 
     private static func resolveDataSourceRef(

@@ -8,15 +8,19 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -27,14 +31,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.DataSourceContext
+import com.viant.forgeandroid.runtime.ExecutionDef
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.ItemDef
+import com.viant.forgeandroid.runtime.ParameterDef
 import com.viant.forgeandroid.runtime.SelectorUtil
+import com.viant.forgeandroid.runtime.valueKey
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
 @Composable
-fun FormRenderer(runtime: ForgeRuntime, context: DataSourceContext, items: List<ItemDef>) {
+fun FormRenderer(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    items: List<ItemDef>,
+    validationErrors: Map<String, String> = emptyMap()
+) {
     val visibleItems = items.filter(::shouldRenderItem)
     if (visibleItems.isEmpty()) return
 
@@ -51,7 +67,12 @@ fun FormRenderer(runtime: ForgeRuntime, context: DataSourceContext, items: List<
     } else {
         Column(modifier = Modifier.padding(8.dp)) {
             visibleItems.forEach { item ->
-                FormItemRenderer(runtime = runtime, context = context, item = item)
+                FormItemRenderer(
+                    runtime = runtime,
+                    context = context,
+                    item = item,
+                    validationErrors = validationErrors
+                )
             }
         }
     }
@@ -127,7 +148,8 @@ internal fun <T> StaticGrid(
 private fun FormItemRenderer(
     runtime: ForgeRuntime,
     context: DataSourceContext,
-    item: ItemDef
+    item: ItemDef,
+    validationErrors: Map<String, String>
 ) {
     val dataSourceContext = resolveItemDataSourceContext(context, item)
     val form by dataSourceContext.form.flow.collectAsState(initial = emptyMap())
@@ -141,8 +163,9 @@ private fun FormItemRenderer(
         }
     }
 
-    val key = item.dataField ?: item.bindingPath ?: item.id ?: return
+    val key = itemValueKey(item) ?: return
     val value = resolveItemValue(item, key, form, metrics, windowForm)
+    val validationError = validationErrors[key]
     when (item.type) {
                 "label" -> LabelItemCard(label = item.label ?: key, value = value)
                 "markdown" -> {
@@ -240,6 +263,35 @@ private fun FormItemRenderer(
                         minLines = 5
                     )
                 }
+                "lookup" -> {
+                    val lookup = item.properties["lookup"]
+                    val display = lookupDisplayValue(lookup, form, value)
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = value,
+                            onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
+                            label = { Text(item.label ?: key) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = 4.dp)
+                        )
+                        IconButton(
+                            onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
+                            enabled = lookupDialogId(lookup) != null,
+                            modifier = Modifier.padding(top = 8.dp)
+                        ) {
+                            Icon(Icons.Filled.Search, contentDescription = "Open lookup")
+                        }
+                    }
+                    if (!display.isNullOrBlank() && display != value) {
+                        Text(
+                            text = display,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                        )
+                    }
+                }
                 else -> {
                     OutlinedTextField(
                         value = value,
@@ -251,6 +303,14 @@ private fun FormItemRenderer(
                     )
                 }
             }
+    if (!validationError.isNullOrBlank()) {
+        Text(
+            text = validationError,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+        )
+    }
 }
 
 @Composable
@@ -263,7 +323,7 @@ private fun SummaryItemCard(
     val metrics by dataSourceContext.metrics.flow.collectAsState(initial = emptyMap())
     val windowFormSignal = dataSourceContext.window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
-    val key = item.dataField ?: item.bindingPath ?: item.id ?: return
+    val key = itemValueKey(item) ?: return
     val value = resolveItemValue(item, key, form, metrics, windowForm)
     LabelItemCard(label = item.label ?: key, value = value, emphasized = true)
 }
@@ -299,6 +359,117 @@ private fun LabelItemCard(
             )
         }
     }
+}
+
+private fun openLookup(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    item: ItemDef,
+    lookup: JsonElement?
+) {
+    val dialogId = lookupDialogId(lookup) ?: return
+    val execution = ExecutionDef(
+        handler = "window.openDialog",
+        args = listOf(dialogId),
+        parameters = lookupParameters(lookup)
+    )
+    runtime.execute(
+        execution,
+        context,
+        mapOf(
+            "windowId" to context.window.windowId,
+            "selectionMode" to if (lookupMultiple(lookup)) "multi" else "single",
+            "multiple" to lookupMultiple(lookup)
+        )
+    )
+}
+
+private fun lookupDialogId(lookup: JsonElement?): String? {
+    return ((lookup as? JsonObject)?.get("dialogId") as? JsonPrimitive)
+        ?.contentOrNull
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+}
+
+private fun lookupMultiple(lookup: JsonElement?): Boolean {
+    return ((lookup as? JsonObject)?.get("multiple") as? JsonPrimitive)?.booleanOrNull ?: false
+}
+
+private fun lookupParameters(lookup: JsonElement?): List<ParameterDef> {
+    val obj = lookup as? JsonObject ?: return emptyList()
+    val inputParams = lookupParameterArray(obj["inputs"]).mapNotNull { entry ->
+        val name = lookupString(entry["name"]) ?: lookupString(entry["location"]) ?: return@mapNotNull null
+        ParameterDef(
+            name = name,
+            input = "form",
+            location = lookupString(entry["location"]) ?: name
+        )
+    }
+    val outputParams = lookupParameterArray(obj["outputs"]).mapNotNull { entry ->
+        val name = lookupString(entry["name"]) ?: lookupString(entry["location"]) ?: return@mapNotNull null
+        ParameterDef(
+            name = name,
+            direction = "out",
+            output = true,
+            location = lookupString(entry["location"]) ?: name,
+            to = ":form"
+        )
+    }
+    return inputParams + outputParams
+}
+
+private fun lookupParameterArray(value: JsonElement?): List<JsonObject> {
+    return (value as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+}
+
+private fun lookupString(value: JsonElement?): String? {
+    return (value as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }
+}
+
+internal fun lookupDisplayValue(
+    lookup: JsonElement?,
+    form: Map<String, Any?>,
+    fallback: String = ""
+): String? {
+    val display = lookupString((lookup as? JsonObject)?.get("display")) ?: return null
+    var resolvedAnyPlaceholder = false
+    val rendered = interpolateLookupTemplate(display) { selector ->
+        val text = SelectorUtil.resolve(form, selector)?.toString().orEmpty()
+        if (text.isNotBlank()) {
+            resolvedAnyPlaceholder = true
+        }
+        text
+    }.trim()
+    if (rendered.isNotEmpty() && resolvedAnyPlaceholder) {
+        return rendered
+    }
+    return fallback.trim().takeIf { it.isNotEmpty() }
+}
+
+private fun interpolateLookupTemplate(template: String, resolve: (String) -> String): String {
+    val out = StringBuilder(template.length)
+    var index = 0
+    while (index < template.length) {
+        if (template.startsWith("\${", index)) {
+            val close = template.indexOf('}', startIndex = index + 2)
+            if (close >= 0) {
+                out.append(resolve(template.substring(index + 2, close).trim()))
+                index = close + 1
+                continue
+            }
+        }
+        if (template.startsWith("{{", index)) {
+            val close = template.indexOf("}}", startIndex = index + 2)
+            if (close >= 0) {
+                out.append(resolve(template.substring(index + 2, close).trim()))
+                index = close + 2
+                continue
+            }
+        }
+        out.append(template[index])
+        index += 1
+    }
+    return out.toString()
 }
 
 internal fun resolveItemDataSourceContext(
@@ -362,12 +533,17 @@ internal fun setScopedItemValue(
 }
 
 internal fun shouldRenderItem(item: ItemDef): Boolean {
-    return !(item.id ?: item.label ?: item.dataField ?: item.bindingPath).isNullOrBlank()
+    return listOf(item.id, item.label, item.dataField, item.bindingPath, item.field)
+        .any { !it.isNullOrBlank() }
 }
 
 internal fun isSummaryLabelItem(item: ItemDef): Boolean {
     val type = item.type?.trim()?.lowercase().orEmpty()
     return type.isEmpty() || type == "label"
+}
+
+internal fun itemValueKey(item: ItemDef): String? {
+    return item.valueKey()
 }
 
 @Composable

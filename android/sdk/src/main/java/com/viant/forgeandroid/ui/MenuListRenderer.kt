@@ -198,7 +198,8 @@ private fun TileList(
                 fontSize = 16.sp,
                 color = Color(0xFF111111)
             )
-            val subtitle = item.properties["subtitle"].asString()
+            val subtitle = item.subtitle?.trim()?.takeIf { it.isNotEmpty() }
+                ?: item.properties["subtitle"].asString()
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
@@ -247,7 +248,7 @@ private fun SummaryList(
                     } else {
                         androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
                     }
-                    val key = item.dataField ?: item.bindingPath ?: item.id ?: return@forEach
+                    val key = itemValueKey(item) ?: return@forEach
                     if (isItemVisible(item, form, metrics, windowForm, rows)) {
                         val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
                         SummaryCard(item.label ?: key, value)
@@ -278,7 +279,7 @@ private fun SummaryList(
                 } else {
                     androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
                 }
-                val key = item.dataField ?: item.bindingPath ?: item.id ?: return@StaticGrid
+                val key = itemValueKey(item) ?: return@StaticGrid
                 if (isItemVisible(item, form, metrics, windowForm, rows)) {
                     val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
                     SummaryCard(item.label ?: key, value)
@@ -319,7 +320,7 @@ private fun PlainList(
             if (!isItemVisible(item, form, metrics, windowForm, rows)) {
                 return@forEachIndexed
             }
-            val key = item.dataField ?: item.bindingPath ?: item.id ?: ""
+            val key = itemValueKey(item) ?: ""
             val value = if (key.isNotBlank()) resolveItemValue(item, key, form, metrics, windowForm, rows) else ""
             val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm, rows) else null
 
@@ -346,7 +347,8 @@ private fun PlainList(
                         color = if (item.type?.trim()?.lowercase() == "link") Color(0xFF175CD3) else Color(0xFF111111)
                     )
                 }
-                val subtitle = item.properties["subtitle"].asString()?.ifBlank { normalizeValue(value).ifBlank { null } }
+                val subtitle = item.subtitle?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: item.properties["subtitle"].asString()?.ifBlank { normalizeValue(value).ifBlank { null } }
                     ?: normalizeValue(value).ifBlank { null }
                 if (!subtitle.isNullOrBlank()) {
                     Text(
@@ -394,7 +396,7 @@ private fun InlineItem(
     if (!isItemVisible(item, form, metrics, windowForm, rows)) {
         return
     }
-    val key = item.dataField ?: item.bindingPath ?: item.id ?: ""
+    val key = itemValueKey(item) ?: ""
     val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm, rows) else null
     val value = normalizeValue(rawValue?.toString().orEmpty())
 

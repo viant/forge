@@ -30,40 +30,77 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.TableDef
+import com.viant.forgeandroid.runtime.formatDashboardValue
 import kotlinx.coroutines.launch
 
 @Composable
-fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: TableDef) {
-    val rows by context.collection.flow.collectAsState(initial = emptyList())
+fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: TableDef, rowsOverride: List<Map<String, Any?>>? = null) {
+    val datasourceRows by context.collection.flow.collectAsState(initial = emptyList())
+    val rows = rowsOverride ?: datasourceRows
     val form by context.form.flow.collectAsState(initial = context.form.peek())
     val selection by context.selection.flow.collectAsState(initial = com.viant.forgeandroid.runtime.SelectionState())
+    val control by context.control.flow.collectAsState(initial = context.control.peek())
     val metrics by context.metrics.flow.collectAsState(initial = emptyMap())
     val windowForm by context.window.windowFormSignal().flow.collectAsState(initial = context.window.peekWindowForm())
     val input by context.input.flow.collectAsState(initial = com.viant.forgeandroid.runtime.InputState())
     val coroutineScope = rememberCoroutineScope()
+    var sortColumnId by remember(table.columns) { mutableStateOf<String?>(null) }
+    var sortAscending by remember(table.columns) { mutableStateOf(true) }
+    val sortedRows = sortedTableRows(rows, sortColumnId, sortAscending)
+    val refreshFeedback = tableRefreshFeedback(control.loading, control.error)
 
-    LaunchedEffect(Unit) {
-        context.fetchCollection()
+    LaunchedEffect(rowsOverride) {
+        if (rowsOverride == null) {
+            context.fetchCollection()
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
         table.toolbar?.let { tb ->
             TableToolbar(runtime, context, tb)
+        }
+        if (tableRefreshControlVisible(context.dataSourceRef, rowsOverride != null)) {
+            Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                Button(
+                    onClick = {
+                        context.fetchCollection()
+                    },
+                    enabled = !refreshFeedback.busy
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Text(if (refreshFeedback.busy) "Refreshing" else "Refresh")
+                }
+                refreshFeedback.message?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
         }
         BoxWithConstraints(
             modifier = Modifier
@@ -72,14 +109,26 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
         ) {
             val compact = maxWidth < 720.dp
             if (compact) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    itemsIndexed(rows) { index, row ->
-                        val isSelected = selection.rowIndex == index
-                        MobileTableCard(runtime, context, table, row, index, isSelected, form, metrics, windowForm) {
-                            coroutineScope.launch { context.toggleSelection(row, index) }
+                Column(modifier = Modifier.fillMaxSize()) {
+                    CompactSortControls(table, sortColumnId, sortAscending) { columnId ->
+                        if (sortColumnId == columnId) {
+                            sortAscending = !sortAscending
+                        } else {
+                            sortColumnId = columnId
+                            sortAscending = true
+                        }
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f, fill = true),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        itemsIndexed(sortedRows) { _, indexed ->
+                            val row = indexed.row
+                            val rowIndex = indexed.originalIndex
+                            val isSelected = selection.rowIndex == rowIndex
+                            MobileTableCard(runtime, context, table, row, rowIndex, isSelected, form, metrics, windowForm) {
+                                coroutineScope.launch { context.toggleSelection(row, rowIndex) }
+                            }
                         }
                     }
                 }
@@ -98,15 +147,24 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                             .fillMaxSize()
                             .horizontalScroll(horizontalScroll)
                     ) {
-                        DesktopTableHeader(table)
+                        DesktopTableHeader(table, sortColumnId, sortAscending) { columnId ->
+                            if (sortColumnId == columnId) {
+                                sortAscending = !sortAscending
+                            } else {
+                                sortColumnId = columnId
+                                sortAscending = true
+                            }
+                        }
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(0.dp)
                         ) {
-                            itemsIndexed(rows) { index, row ->
-                                val isSelected = selection.rowIndex == index
-                                DesktopTableRow(runtime, context, table, row, index, isSelected, form, metrics, windowForm) {
-                                    coroutineScope.launch { context.toggleSelection(row, index) }
+                            itemsIndexed(sortedRows) { displayIndex, indexed ->
+                                val row = indexed.row
+                                val rowIndex = indexed.originalIndex
+                                val isSelected = selection.rowIndex == rowIndex
+                                DesktopTableRow(runtime, context, table, row, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
+                                    coroutineScope.launch { context.toggleSelection(row, rowIndex) }
                                 }
                             }
                         }
@@ -124,8 +182,60 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
     }
 }
 
+fun tableRefreshControlVisible(dataSourceRef: String, usesProvidedRows: Boolean): Boolean =
+    !usesProvidedRows && dataSourceRef.trim().isNotEmpty()
+
+data class TableRefreshFeedback(
+    val busy: Boolean,
+    val message: String?
+)
+
+fun tableRefreshFeedback(loading: Boolean, error: String?): TableRefreshFeedback =
+    TableRefreshFeedback(
+        busy = loading,
+        message = error?.trim()?.takeIf { it.isNotEmpty() }
+    )
+
 @Composable
-private fun DesktopTableHeader(table: TableDef) {
+private fun CompactSortControls(
+    table: TableDef,
+    sortColumnId: String?,
+    sortAscending: Boolean,
+    onSort: (String) -> Unit
+) {
+    val columns = displayColumns(table).filter { tableColumnSortable(it) && tableColumnKey(it) != null }
+    if (columns.isEmpty()) {
+        return
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(bottom = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        columns.forEach { column ->
+            val columnId = tableColumnKey(column) ?: return@forEach
+            AssistChip(
+                onClick = { onSort(columnId) },
+                label = {
+                    Text(sortableHeaderLabel(column.label ?: column.name ?: column.id.orEmpty(), columnId, sortColumnId, sortAscending))
+                },
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = if (columnId == sortColumnId) Color(0xFFE9F1FF) else Color(0xFFF2F5FA)
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun DesktopTableHeader(
+    table: TableDef,
+    sortColumnId: String?,
+    sortAscending: Boolean,
+    onSort: (String) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -133,7 +243,12 @@ private fun DesktopTableHeader(table: TableDef) {
             .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
         displayColumns(table).forEach { col ->
-            HeaderColumnCell(text = col.label ?: col.name ?: col.id.orEmpty())
+            val columnId = tableColumnKey(col)
+            HeaderColumnCell(
+                text = sortableHeaderLabel(col.label ?: col.name ?: col.id.orEmpty(), columnId, sortColumnId, sortAscending),
+                sortable = tableColumnSortable(col) && columnId != null,
+                onSort = columnId?.let { { onSort(it) } }
+            )
         }
         if (buttonColumns(table).isNotEmpty() || iconColumns(table).isNotEmpty()) {
             HeaderColumnCell(text = "Actions", weight = 0.8f)
@@ -164,6 +279,9 @@ private fun MobileTableCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .semantics {
+                contentDescription = tableRowAccessibilityLabel(table, row)
+            }
             .clickable(onClick = onToggleSelection),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) Color(0xFFF4F7FF) else Color.White
@@ -173,7 +291,7 @@ private fun MobileTableCard(
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             displayColumns(table).forEachIndexed { fieldIndex, col ->
-                val key = col.id ?: col.name ?: return@forEachIndexed
+                val key = tableColumnKey(col) ?: return@forEachIndexed
                 val value = formatTableValue(row[key], col)
                 val linkTarget = resolveColumnLinkTargetFromContext(
                     col,
@@ -255,6 +373,7 @@ private fun DesktopTableRow(
     table: TableDef,
     row: Map<String, Any?>,
     index: Int,
+    displayIndex: Int,
     isSelected: Boolean,
     form: Map<String, Any?>,
     metrics: Map<String, Any?>,
@@ -272,8 +391,11 @@ private fun DesktopTableRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (isSelected) Color(0xFFF4F7FF) else if (index.isEven()) Color.White else Color(0xFFFBFCFE)
+                if (isSelected) Color(0xFFF4F7FF) else if (displayIndex.isEven()) Color.White else Color(0xFFFBFCFE)
             )
+            .semantics {
+                contentDescription = tableRowAccessibilityLabel(table, row)
+            }
             .clickable(onClick = onToggleSelection)
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
@@ -297,7 +419,7 @@ private fun DesktopTableRow(
                     }
                 }
                 else -> {
-                    val key = col.id ?: col.name ?: ""
+                    val key = tableColumnKey(col) ?: ""
                     val value = formatTableValue(row[key], col)
                     val linkTarget = resolveColumnLinkTargetFromContext(
                         col,
@@ -344,7 +466,12 @@ private fun DesktopTableRow(
 }
 
 @Composable
-private fun RowScope.HeaderColumnCell(text: String, weight: Float = 1f) {
+private fun RowScope.HeaderColumnCell(
+    text: String,
+    weight: Float = 1f,
+    sortable: Boolean = false,
+    onSort: (() -> Unit)? = null
+) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
@@ -354,6 +481,7 @@ private fun RowScope.HeaderColumnCell(text: String, weight: Float = 1f) {
             .weight(weight)
             .widthIn(min = 128.dp)
             .padding(end = 12.dp)
+            .then(if (sortable && onSort != null) Modifier.clickable { onSort() } else Modifier)
     )
 }
 
@@ -412,6 +540,76 @@ private fun formatTableValue(value: Any?, column: ColumnDef): String {
         return column.emptyText?.takeIf { it.isNotBlank() } ?: ""
     }
     return formatDashboardValue(value, column.format)
+}
+
+internal fun tableRowAccessibilityLabel(
+    table: TableDef,
+    row: Map<String, Any?>,
+    limit: Int = 3
+): String {
+    return displayColumns(table)
+        .take(limit.coerceAtLeast(0))
+        .mapNotNull { column ->
+            val key = tableColumnKey(column) ?: return@mapNotNull null
+            val label = tableColumnLabel(column, key)
+            val value = formatTableValue(row[key], column).ifBlank { "-" }
+            "$label $value"
+        }
+        .joinToString(", ")
+}
+
+private fun tableColumnKey(column: ColumnDef): String? {
+    return column.id?.takeIf { it.isNotBlank() }
+        ?: column.name?.takeIf { it.isNotBlank() }
+        ?: column.key?.takeIf { it.isNotBlank() }
+}
+
+private fun tableColumnLabel(column: ColumnDef, key: String): String {
+    return column.label?.takeIf { it.isNotBlank() }
+        ?: column.name?.takeIf { it.isNotBlank() }
+        ?: key
+}
+
+internal data class IndexedTableRow(
+    val originalIndex: Int,
+    val row: Map<String, Any?>
+)
+
+internal fun sortedTableRows(
+    rows: List<Map<String, Any?>>,
+    sortColumnId: String?,
+    ascending: Boolean
+): List<IndexedTableRow> {
+    val indexed = rows.mapIndexed { index, row -> IndexedTableRow(index, row) }
+    val columnId = sortColumnId?.takeIf { it.isNotBlank() } ?: return indexed
+    return indexed.sortedWith { left, right ->
+        compareTableSortValues(
+            SelectorUtil.resolve(left.row, columnId),
+            SelectorUtil.resolve(right.row, columnId),
+            ascending
+        )
+    }
+}
+
+private fun compareTableSortValues(left: Any?, right: Any?, ascending: Boolean): Int {
+    val result = when {
+        left == null && right == null -> 0
+        left == null -> -1
+        right == null -> 1
+        left is Number && right is Number -> left.toDouble().compareTo(right.toDouble())
+        left is String && right is String -> left.compareTo(right, ignoreCase = true)
+        else -> left.toString().compareTo(right.toString(), ignoreCase = true)
+    }
+    return if (ascending) result else -result
+}
+
+private fun tableColumnSortable(column: ColumnDef): Boolean = column.sortable == true
+
+private fun sortableHeaderLabel(label: String, columnId: String?, sortColumnId: String?, ascending: Boolean): String {
+    if (columnId == null || columnId != sortColumnId) {
+        return label
+    }
+    return "$label ${if (ascending) "^" else "v"}"
 }
 
 @Composable

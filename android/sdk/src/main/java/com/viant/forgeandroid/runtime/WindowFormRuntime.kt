@@ -3,6 +3,10 @@ package com.viant.forgeandroid.runtime
 private const val WINDOW_FORM_META_KEY = "__forge"
 private const val WINDOW_FORM_PREFILL_KEY = "prefill"
 private const val WINDOW_FORM_PREFILL_REVISION_KEY = "prefillRevision"
+private const val WINDOW_FORM_REPLACE_KEY = "\$replace"
+private const val WINDOW_FORM_REPLACE_VALUE_KEY = "value"
+
+private data class WindowFormReplacement(val value: Any?)
 
 internal fun ForgeRuntime.windowFormValue(windowId: String): Map<String, Any?> {
     return windowContext(windowId).peekWindowForm()
@@ -52,7 +56,7 @@ private fun resolveInitialWindowFormValues(metadata: WindowMetadata): Map<String
                 .forEach { parameter ->
                     val name = parameter.name?.trim().orEmpty()
                     if (name.isNotBlank()) {
-                        initial[name] = parameter.location
+                        initial[name] = parameter.locationAny() ?: parameter.value?.let(JsonUtil::elementToAny)
                     }
                 }
         }
@@ -69,7 +73,7 @@ private fun collectInitialWindowFormItemValues(
     container.items
         .filter { it.scope?.trim() == "windowForm" }
         .forEach { item ->
-            val key = (item.bindingPath ?: item.dataField ?: item.id).orEmpty().trim()
+            val key = item.valueKey().orEmpty()
             val value = item.value?.let(JsonUtil::elementToAny)
             if (key.isBlank() || value == null) return@forEach
             initial[key] = value
@@ -85,6 +89,11 @@ private fun mergeWindowFormValues(
 ): Map<String, Any?> {
     val result = base.toMutableMap()
     override.forEach { (key, value) ->
+        val replacement = windowFormReplacementValue(value)
+        if (replacement != null) {
+            result[key] = replacement.value
+            return@forEach
+        }
         val current = JsonUtil.asStringMap(result[key])
         val next = JsonUtil.asStringMap(value)
         result[key] = if (current.isNotEmpty() && next.isNotEmpty()) {
@@ -94,6 +103,14 @@ private fun mergeWindowFormValues(
         }
     }
     return result
+}
+
+private fun windowFormReplacementValue(value: Any?): WindowFormReplacement? {
+    val objectValue = JsonUtil.asStringMap(value)
+    if (objectValue[WINDOW_FORM_REPLACE_KEY] != true) {
+        return null
+    }
+    return WindowFormReplacement(objectValue[WINDOW_FORM_REPLACE_VALUE_KEY])
 }
 
 private fun withWindowFormPrefillRevision(

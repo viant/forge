@@ -41,7 +41,7 @@ extension ForgeRuntime {
         await withCheckedContinuation { continuation in
             Task {
                 let key = "\(windowID)Dialog\(dialogID)"
-                await registerPendingDialogResult(key, continuation)
+                registerPendingDialogResult(key, continuation)
             }
         }
     }

@@ -3,8 +3,23 @@ package com.viant.forgeandroid.runtime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 
 @Serializable
 data class WindowMetadata(
@@ -69,6 +84,7 @@ data class ContainerDef(
     val section: SectionDef? = null,
     val toolbar: ToolbarDef? = null,
     val filterBindings: Map<String, String> = emptyMap(),
+    val selectionBindings: Map<String, String> = emptyMap(),
     val columnSpan: Int? = null,
     val rowSpan: Int? = null,
     val visibleWhen: DashboardConditionDef? = null,
@@ -82,6 +98,15 @@ data class ContainerDef(
     val viewModes: List<String> = emptyList(),
     val limit: Int? = null,
     val orderBy: String? = null,
+    val categoryKey: String? = null,
+    val valueKey: String? = null,
+    val nameKey: String? = null,
+    val format: String? = null,
+    val legendLimit: Int? = null,
+    val dateField: String? = null,
+    val timeKey: String? = null,
+    val chartType: String? = null,
+    val series: JsonElement? = null,
     val columns: List<ColumnDef> = emptyList(),
     val geo: JsonElement? = null,
     val table: TableDef? = null,
@@ -97,6 +122,7 @@ data class ContainerDef(
     val chat: ChatDef? = null,
     val schemaBasedForm: SchemaBasedFormDef? = null,
     val dashboard: DashboardDef? = null,
+    val reportRuntime: JsonElement? = null,
     val stateKey: String? = null,
     val actions: List<ActionDef> = emptyList(),
     val on: List<ExecutionDef> = emptyList(),
@@ -127,7 +153,8 @@ data class SchemaBasedFormDef(
     val dataSourceRef: String? = null,
     val fields: List<FormFieldDef> = emptyList(),
     val schema: JsonElement? = null,
-    val showSubmit: Boolean? = null
+    val showSubmit: Boolean? = null,
+    val on: List<ExecutionDef> = emptyList()
 )
 
 @Serializable
@@ -139,7 +166,8 @@ data class FormFieldDef(
     val enum: List<String> = emptyList(),
     val default: JsonElement? = null,
     val widget: String? = null,
-    val placeholder: String? = null
+    val placeholder: String? = null,
+    val lookup: JsonElement? = null
 )
 
 @Serializable
@@ -197,6 +225,7 @@ data class DashboardDef(
     val feed: DashboardFeedDef? = null,
     val report: DashboardReportDef? = null,
     val reportBuilder: DashboardReportBuilderDef? = null,
+    val reportRuntime: JsonElement? = null,
     val badges: DashboardBadgesDef? = null,
     val detail: DashboardDetailDef? = null
 )
@@ -216,7 +245,9 @@ data class DashboardReportBuilderDef(
     val staticFilters: List<ReportBuilderStaticFilterDef> = emptyList(),
     val dynamicFilterGroups: List<ReportBuilderDynamicFilterGroupDef> = emptyList(),
     val dynamicFilterFamilies: List<ReportBuilderDynamicFilterFamilyDef> = emptyList(),
-    val forecastCategories: List<String> = emptyList(),
+    @OptIn(ExperimentalSerializationApi::class)
+    @JsonNames("forecastCategories")
+    val resultCategories: List<String> = emptyList(),
     val groupBy: ReportBuilderGroupByDef? = null,
     val unifiedFamilyRows: Boolean = false,
     val showResultHeader: Boolean? = null,
@@ -366,6 +397,7 @@ data class ReportBuilderStaticFilterOptionDef(
 data class ReportBuilderDynamicFilterGroupDef(
     val id: String? = null,
     val label: String? = null,
+    val icon: String? = null,
     val description: String? = null,
     val filters: List<ReportBuilderDynamicFilterDef> = emptyList()
 )
@@ -401,7 +433,8 @@ data class ReportBuilderDynamicFilterFamilyDef(
 
 @Serializable
 data class DashboardSummaryDef(
-    val metrics: List<DashboardMetricDef> = emptyList()
+    val metrics: List<DashboardMetricDef> = emptyList(),
+    val items: List<DashboardMetricDef> = emptyList()
 )
 
 @Serializable
@@ -409,8 +442,12 @@ data class DashboardMetricDef(
     val id: String? = null,
     val label: String? = null,
     val selector: String? = null,
+    val field: String? = null,
+    val key: String? = null,
+    val valueField: String? = null,
     val format: String? = null,
-    val tone: String? = null
+    val tone: String? = null,
+    val value: JsonElement? = null
 )
 
 @Serializable
@@ -427,12 +464,15 @@ data class DashboardCompareItemDef(
     val format: String? = null,
     val deltaFormat: String? = null,
     val positiveIsUp: Boolean? = null,
-    val deltaLabel: String? = null
+    val deltaLabel: String? = null,
+    val currentLabel: String? = null,
+    val previousLabel: String? = null
 )
 
 @Serializable
 data class DashboardKPITableDef(
-    val rows: List<DashboardKPIRowDef> = emptyList()
+    val rows: List<DashboardKPIRowDef> = emptyList(),
+    val columns: List<ColumnDef> = emptyList()
 )
 
 @Serializable
@@ -455,6 +495,7 @@ data class DashboardFilterItemDef(
     val id: String? = null,
     val label: String? = null,
     val field: String? = null,
+    val type: String? = null,
     val multiple: Boolean? = null,
     val options: List<DashboardFilterOptionDef> = emptyList()
 )
@@ -518,6 +559,10 @@ data class DashboardMessageDef(
     val severity: String? = null,
     val title: String? = null,
     val body: String? = null,
+    val text: String? = null,
+    val field: String? = null,
+    val bodyField: String? = null,
+    val rowIndex: Int? = null,
     val visibleWhen: DashboardConditionDef? = null
 )
 
@@ -567,10 +612,31 @@ data class DashboardReportDef(
 data class DashboardReportSectionDef(
     val id: String? = null,
     val title: String? = null,
+    @Serializable(with = DashboardReportBodySerializer::class)
     val body: List<String> = emptyList(),
     val tone: String? = null,
     val visibleWhen: DashboardConditionDef? = null
 )
+
+object DashboardReportBodySerializer : KSerializer<List<String>> {
+    private val delegate = ListSerializer(String.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun deserialize(decoder: Decoder): List<String> {
+        val jsonDecoder = decoder as? JsonDecoder ?: return delegate.deserialize(decoder)
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonArray -> element.mapNotNull { item ->
+                (item as? JsonPrimitive)?.contentOrNull
+            }
+            is JsonPrimitive -> element.contentOrNull?.takeIf { it.isNotEmpty() }?.let { listOf(it) }.orEmpty()
+            else -> emptyList()
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: List<String>) {
+        delegate.serialize(encoder, value)
+    }
+}
 
 @Serializable
 data class DashboardDetailDef(
@@ -579,9 +645,13 @@ data class DashboardDetailDef(
 
 @Serializable
 data class TableDef(
+    val title: String? = null,
     val columns: List<ColumnDef> = emptyList(),
     val toolbar: ToolbarDef? = null,
     val on: List<ExecutionDef> = emptyList(),
+    val selectionField: String? = null,
+    val disabledField: String? = null,
+    val callback: JsonElement? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
@@ -606,6 +676,8 @@ data class TreeBrowserDef(
 
 @Serializable
 data class ChartDef(
+    val title: String? = null,
+    val dataSourceRef: String? = null,
     val xAxis: ChartAxisDef? = null,
     val yAxis: ChartAxisDef? = null,
     val series: ChartSeriesDef? = null,
@@ -616,7 +688,11 @@ data class ChartDef(
     val height: JsonElement? = null,
     val type: String? = null,
     val target: JsonElement? = null,
-    val targetOverrides: Map<String, JsonElement> = emptyMap()
+    val targetOverrides: Map<String, JsonElement> = emptyMap(),
+    val kind: String? = null,
+    val xKey: String? = null,
+    val valueKey: String? = null,
+    val nameKey: String? = null
 )
 
 @Serializable
@@ -626,7 +702,7 @@ data class ChartAxisDef(
     val tickFormat: String? = null
 )
 
-@Serializable
+@Serializable(with = ChartSeriesDefSerializer::class)
 data class ChartSeriesDef(
     val nameKey: String? = null,
     val valueKey: String? = null,
@@ -640,9 +716,79 @@ data class ChartValueOption(
     val value: String? = null
 )
 
+object ChartSeriesDefSerializer : KSerializer<ChartSeriesDef> {
+    override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): ChartSeriesDef {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("ChartSeriesDef can only be decoded from JSON")
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonArray -> ChartSeriesDef(
+                values = element.mapNotNull { item ->
+                    (item as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }?.let { value ->
+                        ChartValueOption(value = value)
+                    }
+                }
+            )
+            is JsonPrimitive -> element.contentOrNull?.takeIf { it.isNotBlank() }?.let { value ->
+                ChartSeriesDef(valueKey = value, values = listOf(ChartValueOption(value = value)))
+            } ?: ChartSeriesDef()
+            is JsonObject -> {
+                val values = (element["values"] as? JsonArray)?.mapNotNull { item ->
+                    when (item) {
+                        is JsonPrimitive -> item.contentOrNull?.takeIf { it.isNotBlank() }?.let { value ->
+                            ChartValueOption(value = value)
+                        }
+                        is JsonObject -> ChartValueOption(
+                            name = (item["name"] as? JsonPrimitive)?.contentOrNull,
+                            value = (item["value"] as? JsonPrimitive)?.contentOrNull
+                        ).takeIf { !it.value.isNullOrBlank() }
+                        else -> null
+                    }
+                }.orEmpty()
+                val valueKey = (element["valueKey"] as? JsonPrimitive)?.contentOrNull
+                ChartSeriesDef(
+                    nameKey = (element["nameKey"] as? JsonPrimitive)?.contentOrNull,
+                    valueKey = valueKey,
+                    palette = (element["palette"] as? JsonArray)?.mapNotNull {
+                        (it as? JsonPrimitive)?.contentOrNull
+                    }.orEmpty(),
+                    values = if (values.isNotEmpty()) {
+                        values
+                    } else {
+                        valueKey?.takeIf { it.isNotBlank() }?.let { listOf(ChartValueOption(value = it)) }.orEmpty()
+                    }
+                )
+            }
+            else -> ChartSeriesDef()
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ChartSeriesDef) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("ChartSeriesDef can only be encoded as JSON")
+        val obj = linkedMapOf<String, JsonElement>()
+        value.nameKey?.let { obj["nameKey"] = JsonPrimitive(it) }
+        value.valueKey?.let { obj["valueKey"] = JsonPrimitive(it) }
+        if (value.palette.isNotEmpty()) {
+            obj["palette"] = JsonArray(value.palette.map { JsonPrimitive(it) })
+        }
+        if (value.values.isNotEmpty()) {
+            obj["values"] = JsonArray(value.values.map { item ->
+                val entry = linkedMapOf<String, JsonElement>()
+                item.name?.let { entry["name"] = JsonPrimitive(it) }
+                item.value?.let { entry["value"] = JsonPrimitive(it) }
+                JsonObject(entry)
+            })
+        }
+        jsonEncoder.encodeJsonElement(JsonObject(obj))
+    }
+}
+
 @Serializable
 data class FileBrowserDef(
     val title: String? = null,
+    val dataSourceRef: String? = null,
     val folderOnly: Boolean? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
@@ -653,6 +799,8 @@ data class FileBrowserDef(
 data class EditorDef(
     val selector: EditorSelectorDef? = null,
     val style: Map<String, String> = emptyMap(),
+    val language: String? = null,
+    val value: String? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
@@ -700,10 +848,12 @@ data class ToolbarItemDef(
 data class ColumnDef(
     val id: String? = null,
     val name: String? = null,
+    val key: String? = null,
     val label: String? = null,
     val type: String? = null,
     val format: String? = null,
     val emptyText: String? = null,
+    val sortable: Boolean? = null,
     val link: LinkDef? = null,
     val width: Int? = null,
     val icon: String? = null,
@@ -747,8 +897,11 @@ data class ItemDef(
     val deltaFormat: String? = null,
     val positiveIsUp: Boolean? = null,
     val deltaLabel: String? = null,
+    val currentLabel: String? = null,
+    val previousLabel: String? = null,
     val type: String? = null,
     val field: String? = null,
+    val required: Boolean? = null,
     val multiple: Boolean? = null,
     val dataSourceRef: String? = null,
     val dataSourceRefSource: String? = null,
@@ -764,8 +917,16 @@ data class ItemDef(
     val properties: Map<String, JsonElement> = emptyMap(),
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
-    val targetOverrides: Map<String, JsonElement> = emptyMap()
+    val targetOverrides: Map<String, JsonElement> = emptyMap(),
+    val subtitle: String? = null
 )
+
+fun ItemDef.valueKey(): String? {
+    return dataField?.trim()?.takeIf { it.isNotEmpty() }
+        ?: bindingPath?.trim()?.takeIf { it.isNotEmpty() }
+        ?: field?.trim()?.takeIf { it.isNotEmpty() }
+        ?: id?.trim()?.takeIf { it.isNotEmpty() }
+}
 
 @Serializable
 data class OptionDef(
@@ -810,6 +971,8 @@ data class DataSourceDef(
     val paging: PagingDef? = null,
     val params: Map<String, String> = emptyMap(),
     val parameters: List<ParameterDef> = emptyList(),
+    val uri: String? = null,
+    val method: String? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
@@ -858,17 +1021,81 @@ data class ExecutionDef(
     val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
-@Serializable
+@Serializable(with = ParameterDefSerializer::class)
 data class ParameterDef(
     val name: String? = null,
     val kind: String? = null,
     @SerialName("in") val input: String? = null,
     val location: String? = null,
+    val locationValue: JsonElement? = null,
     val from: String? = null,
     val to: String? = null,
     val direction: String? = null,
-    val output: Boolean? = null
+    val output: Boolean? = null,
+    val value: JsonElement? = null,
+    val selector: String? = null
 )
+
+object ParameterDefSerializer : KSerializer<ParameterDef> {
+    override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): ParameterDef {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("ParameterDef can only be decoded from JSON")
+        val obj = jsonDecoder.decodeJsonElement() as? JsonObject
+            ?: throw SerializationException("ParameterDef must be a JSON object")
+        val locationElement = obj["location"]
+        return ParameterDef(
+            name = stringField(obj, "name"),
+            kind = stringField(obj, "kind"),
+            input = stringField(obj, "in"),
+            location = (locationElement as? JsonPrimitive)?.contentOrNull,
+            locationValue = locationElement,
+            from = stringField(obj, "from"),
+            to = stringField(obj, "to"),
+            direction = stringField(obj, "direction"),
+            output = boolField(obj, "output"),
+            value = obj["value"],
+            selector = stringField(obj, "selector")
+        )
+    }
+
+    override fun serialize(encoder: Encoder, value: ParameterDef) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("ParameterDef can only be encoded as JSON")
+        val obj = linkedMapOf<String, JsonElement>()
+        putString(obj, "name", value.name)
+        putString(obj, "kind", value.kind)
+        putString(obj, "in", value.input)
+        value.locationValue?.let { obj["location"] = it }
+            ?: value.location?.let { obj["location"] = JsonPrimitive(it) }
+        putString(obj, "from", value.from)
+        putString(obj, "to", value.to)
+        putString(obj, "direction", value.direction)
+        value.output?.let { obj["output"] = JsonPrimitive(it) }
+        value.value?.let { obj["value"] = it }
+        putString(obj, "selector", value.selector)
+        jsonEncoder.encodeJsonElement(JsonObject(obj))
+    }
+
+    private fun stringField(obj: JsonObject, key: String): String? =
+        (obj[key] as? JsonPrimitive)?.contentOrNull
+
+    private fun boolField(obj: JsonObject, key: String): Boolean? =
+        (obj[key] as? JsonPrimitive)?.booleanOrNull
+
+    private fun putString(obj: MutableMap<String, JsonElement>, key: String, value: String?) {
+        if (value != null) {
+            obj[key] = JsonPrimitive(value)
+        }
+    }
+}
+
+fun ParameterDef.locationElement(): JsonElement? =
+    locationValue ?: location?.let { JsonPrimitive(it) }
+
+fun ParameterDef.locationAny(): Any? =
+    locationElement()?.takeUnless { it is JsonNull }?.let(JsonUtil::elementToAny)
 
 @Serializable
 data class ChatDef(
@@ -937,7 +1164,8 @@ data class InputState(
 data class ControlState(
     val loading: Boolean = false,
     val error: String? = null,
-    val inactive: Boolean = false
+    val inactive: Boolean = false,
+    val resolved: Boolean = false
 )
 
 data class DialogState(

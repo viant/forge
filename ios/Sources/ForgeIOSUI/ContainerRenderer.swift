@@ -50,7 +50,12 @@ public struct ContainerRenderer: View {
         } else if effectiveContainer.schemaBasedForm != nil {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                SchemaBasedFormRenderer(container: effectiveContainer)
+                SchemaBasedFormRenderer(
+                    runtime: runtime,
+                    window: window,
+                    container: effectiveContainer,
+                    onSubmit: schemaFormSubmitHandler(for: effectiveContainer)
+                )
             }
         } else if let table = effectiveContainer.table {
             VStack(alignment: .leading, spacing: 12) {
@@ -63,25 +68,27 @@ public struct ContainerRenderer: View {
                 if !effectiveContainer.items.isEmpty {
                     MenuListRenderer(runtime: runtime, window: window, container: effectiveContainer, items: effectiveContainer.items)
                 }
-                ChartRenderer(runtime: runtime, window: window, container: effectiveContainer, chart: chart)
+                ChartTableModeRenderer(runtime: runtime, window: window, container: effectiveContainer, chart: chart)
             }
         } else if let treeBrowser = effectiveContainer.treeBrowser {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
                 TreeBrowserRenderer(runtime: runtime, window: window, container: effectiveContainer, treeBrowser: treeBrowser)
             }
+        } else if let fileBrowser = effectiveContainer.fileBrowser {
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                FileBrowserRenderer(runtime: runtime, window: window, container: effectiveContainer, fileBrowser: fileBrowser)
+            }
         } else if effectiveContainer.tabs != nil, !effectiveContainer.containers.isEmpty {
             TabsRenderer(runtime: runtime, window: window, container: effectiveContainer)
         } else if let editor = effectiveContainer.editor {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
-                EditorRenderer(runtime: runtime, window: window, editor: editor)
+                EditorRenderer(runtime: runtime, window: window, container: effectiveContainer, editor: editor)
             }
-        } else if effectiveContainer.kind == "chat" {
-            VStack(alignment: .leading, spacing: 12) {
-                titleBlock
-                ChatRenderer(runtime: runtime, window: window, container: effectiveContainer)
-            }
+        } else if effectiveContainer.kind == "chat" || effectiveContainer.chat != nil {
+            ChatRenderer(runtime: runtime, window: window, container: effectiveContainer)
         } else if !effectiveContainer.items.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
@@ -128,10 +135,15 @@ public struct ContainerRenderer: View {
             subtitle: container.subtitle,
             kind: container.kind,
             scrollMode: container.scrollMode,
+            role: container.role,
             dataSourceRef: inheritedDataSourceRef,
+            card: container.card,
+            section: container.section,
+            toolbar: container.toolbar,
             columnSpan: container.columnSpan,
             rowSpan: container.rowSpan,
             filterBindings: container.filterBindings,
+            selectionBindings: container.selectionBindings,
             visibleWhen: container.visibleWhen,
             metrics: container.metrics,
             checks: container.checks,
@@ -143,22 +155,72 @@ public struct ContainerRenderer: View {
             viewModes: container.viewModes,
             limit: container.limit,
             orderBy: container.orderBy,
+            categoryKey: container.categoryKey,
+            valueKey: container.valueKey,
+            nameKey: container.nameKey,
+            format: container.format,
+            legendLimit: container.legendLimit,
+            dateField: container.dateField,
+            timeKey: container.timeKey,
+            chartType: container.chartType,
+            series: container.series,
             containers: container.containers,
             selectFirst: container.selectFirst,
             layout: container.layout,
             stateKey: container.stateKey,
             schemaBasedForm: container.schemaBasedForm,
             dashboard: container.dashboard,
+            reportRuntime: container.reportRuntime,
             tabs: container.tabs,
             items: container.items,
             chart: container.chart,
             table: container.table,
+            columns: container.columns,
+            geo: container.geo,
             treeBrowser: container.treeBrowser,
+            fileBrowser: container.fileBrowser,
             editor: container.editor,
+            chat: container.chat,
+            terminal: container.terminal,
+            actions: container.actions,
+            on: container.on,
             fetchData: container.fetchData,
             target: container.target,
             targetOverrides: container.targetOverrides
         )
+    }
+
+    private func schemaFormSubmitHandler(for container: ContainerDef) -> (([String: JSONValue]) -> Void)? {
+        guard let runtime, let window, let form = container.schemaBasedForm else {
+            return nil
+        }
+        let executions = form.on.compactMap { eventExecution -> ExecutionDef? in
+            guard eventExecution.event?.trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased() == "submit" else {
+                return nil
+            }
+            return eventExecution.executionDef
+        }
+        guard !executions.isEmpty else {
+            return nil
+        }
+        let dataSourceRef = form.dataSourceRef ?? container.dataSourceRef ?? ""
+        return { payload in
+            Task {
+                let args: [String: JSONValue] = [
+                    "data": .object(payload),
+                    "payload": .object(payload),
+                    "form": .object(payload)
+                ]
+                for execution in executions {
+                    _ = await runtime.execute(
+                        execution,
+                        context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef),
+                        args: args
+                    )
+                }
+            }
+        }
     }
 
     private var nestedGridColumns: [GridItem] {

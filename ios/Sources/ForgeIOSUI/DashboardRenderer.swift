@@ -8,6 +8,10 @@ public struct DashboardRenderer: View {
     private let window: WindowContext?
     private let container: ContainerDef
     @State private var runtimeMetrics: [String: Any] = [:]
+    @State private var dashboardFilters: [String: JSONValue] = [:]
+    @State private var dashboardSelection = DashboardSelectionState()
+    @State private var dashboardCollections: [String: [[String: JSONValue]]] = [:]
+    @State private var dashboardDimensionsModes: [String: String] = [:]
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
         self.runtime = runtime
@@ -16,56 +20,127 @@ public struct DashboardRenderer: View {
     }
 
     public var body: some View {
-        dashboardBody(container)
+        dashboardBody(container, dashboardRoot: container)
             .task(id: runtimeMetricsTaskKey) {
-                await loadRuntimeMetrics()
+                await subscribeRuntimeMetrics()
+            }
+            .task(id: dashboardFiltersTaskKey) {
+                await subscribeDashboardFilters()
+            }
+            .task(id: dashboardSelectionTaskKey) {
+                await subscribeDashboardSelection()
+            }
+            .task(id: dashboardCollectionsTaskKey) {
+                await subscribeDashboardCollections()
             }
     }
 
-    private func dashboardBody(_ container: ContainerDef) -> AnyView {
+    private func dashboardBody(_ container: ContainerDef, dashboardRoot: ContainerDef) -> AnyView {
         let metrics = dashboardMetrics(container)
-        if !DashboardRuntime.evaluateDashboardCondition(container.dashboard?.visibleWhen ?? container.visibleWhen, metrics: metrics) {
+        if !DashboardRuntime.evaluateDashboardCondition(
+            container.dashboard?.visibleWhen ?? container.visibleWhen,
+            metrics: metrics,
+            filters: dashboardFilters.mapValues(dashboardJSONAny),
+            selection: dashboardSelection
+        ) {
             return AnyView(EmptyView())
         } else {
             switch container.kind?.trimmingCharacters(in: .whitespacesAndNewlines) {
             case "dashboard":
-                return dashboardRoot(container, metrics: metrics)
+                return dashboardRootBlock(container, metrics: metrics, dashboardRoot: dashboardRoot)
             case "dashboard.summary":
                 return AnyView(dashboardPanel(container) {
-                    summaryBlock(container, metrics: metrics)
+                    summaryBlock(container, metrics: metrics, dashboardRoot: dashboardRoot)
                 })
             case "dashboard.compare":
                 return AnyView(dashboardPanel(container) {
                     compareBlock(container, metrics: metrics)
                 })
             case "dashboard.kpiTable":
+                if let table = dashboardKPITable(container) {
+                    let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
+                    return AnyView(dashboardPanel(container) {
+                        TableRenderer(runtime: runtime, window: window, container: effectiveContainer, table: table)
+                    })
+                }
                 return AnyView(dashboardPanel(container) {
                     kpiTableBlock(container, metrics: metrics)
                 })
             case "dashboard.filters":
                 return AnyView(dashboardPanel(container) {
-                    filtersBlock(container)
+                    filtersBlock(container, filters: dashboardFilters, dashboardRoot: dashboardRoot)
                 })
             case "dashboard.timeline":
                 return AnyView(dashboardPanel(container) {
-                    timelineBlock(container)
+                    timelineBlock(
+                        container,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
                 })
             case "dashboard.geoMap":
                 return AnyView(dashboardPanel(container) {
-                    geoMapBlock(container, metrics: metrics)
+                    geoMapBlock(
+                        container,
+                        metrics: metrics,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
                 })
-            case "dashboard.chart", "dashboard.composition":
+            case "dashboard.chart":
                 if let chart = container.chart {
+                    let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
+                    let rows = dashboardChartRows(
+                        container,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
                     return AnyView(dashboardPanel(container) {
-                        ChartRenderer(runtime: runtime, window: window, container: container, chart: chart)
+                        ChartTableModeRenderer(
+                            runtime: runtime,
+                            window: window,
+                            container: effectiveContainer,
+                            chart: chart,
+                            rows: rows
+                        )
                     })
                 }
                 return AnyView(dashboardPanel(container) {
                     unsupportedBlock("dashboard chart block has no chart config")
                 })
+            case "dashboard.composition":
+                if let chart = DashboardRuntime.dashboardCompositionChart(container) {
+                    let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
+                    let rows = dashboardChartRows(
+                        container,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
+                    return AnyView(dashboardPanel(container) {
+                        ChartTableModeRenderer(
+                            runtime: runtime,
+                            window: window,
+                            container: effectiveContainer,
+                            chart: chart,
+                            rows: rows
+                        )
+                    })
+                }
+                return AnyView(dashboardPanel(container) {
+                    unsupportedBlock("dashboard composition block has no chart config")
+                })
             case "dashboard.dimensions":
                 return AnyView(dashboardPanel(container) {
-                    dimensionsBlock(container)
+                    dimensionsBlock(
+                        container,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
                 })
             case "dashboard.status":
                 return AnyView(dashboardPanel(container) {
@@ -73,21 +148,32 @@ public struct DashboardRenderer: View {
                 })
             case "dashboard.messages":
                 return AnyView(dashboardPanel(container) {
-                    messagesBlock(container, metrics: metrics)
+                    messagesBlock(
+                        container,
+                        metrics: metrics,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
                 })
             case "dashboard.badges":
                 return AnyView(dashboardPanel(container) {
-                    badgesBlock(container, metrics: metrics)
+                    badgesBlock(container, metrics: metrics, filters: dashboardFilters, selection: dashboardSelection)
                 })
             case "dashboard.report":
                 return AnyView(dashboardPanel(container) {
-                    reportBlock(container, metrics: metrics)
+                    reportBlock(container, metrics: metrics, filters: dashboardFilters, selection: dashboardSelection)
                 })
-            case "dashboard.table":
+            case "dashboard.reportRuntime":
+                return AnyView(dashboardPanel(container) {
+                    reportRuntimeBlock(container)
+                })
+            case "dashboard.table", "planner.table":
                 let table = container.table ?? (container.columns.isEmpty ? nil : TableDef(title: container.title, columns: container.columns))
                 if let table {
+                    let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
                     return AnyView(dashboardPanel(container) {
-                        TableRenderer(runtime: runtime, window: window, container: container, table: table)
+                        TableRenderer(runtime: runtime, window: window, container: effectiveContainer, table: table)
                     })
                 }
                 return AnyView(dashboardPanel(container) {
@@ -95,8 +181,9 @@ public struct DashboardRenderer: View {
                 })
             case "dashboard.reportBuilder":
                 if let reportBuilder = container.dashboard?.reportBuilder {
+                    let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
                     return AnyView(dashboardPanel(container) {
-                        ReportBuilderRenderer(runtime: runtime, window: window, container: container, config: reportBuilder)
+                        ReportBuilderRenderer(runtime: runtime, window: window, container: effectiveContainer, config: reportBuilder)
                     })
                 }
                 return AnyView(dashboardPanel(container) {
@@ -104,21 +191,33 @@ public struct DashboardRenderer: View {
                 })
             case "dashboard.feed":
                 return AnyView(dashboardPanel(container) {
-                    feedBlock(container, metrics: metrics)
+                    feedBlock(
+                        container,
+                        metrics: metrics,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
                 })
             case "dashboard.detail":
                 return AnyView(dashboardPanel(container) {
-                    detailBlock(container)
+                    detailBlock(
+                        container,
+                        metrics: metrics,
+                        filters: dashboardFilters,
+                        selection: dashboardSelection,
+                        dashboardRoot: dashboardRoot
+                    )
                 })
             default:
                 return AnyView(dashboardPanel(container) {
-                    unsupportedBlock(container.kind)
+                    unsupportedBlock(dashboardUnsupportedBlockMessage(container.kind))
                 })
             }
         }
     }
 
-    private func dashboardRoot(_ container: ContainerDef, metrics: [String: Any]) -> AnyView {
+    private func dashboardRootBlock(_ container: ContainerDef, metrics: [String: Any], dashboardRoot: ContainerDef) -> AnyView {
         AnyView(VStack(alignment: .leading, spacing: 12) {
             if let title = container.title, !title.isEmpty {
                 Text(title)
@@ -130,7 +229,7 @@ public struct DashboardRenderer: View {
                     .foregroundStyle(.secondary)
             }
             ForEach(container.containers) { child in
-                dashboardBody(child)
+                dashboardBody(child, dashboardRoot: dashboardRoot)
             }
             if container.containers.isEmpty {
                 unsupportedBlock("dashboard root has no child blocks")
@@ -173,12 +272,16 @@ public struct DashboardRenderer: View {
     }
 
     @ViewBuilder
-    private func summaryBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
-        let summaryMetrics = container.dashboard?.summary?.metrics ?? container.metrics
+    private func summaryBlock(_ container: ContainerDef, metrics: [String: Any], dashboardRoot: ContainerDef) -> some View {
+        let summaryMetrics = DashboardRuntime.dashboardSummaryMetrics(container)
         if summaryMetrics.isEmpty {
             unsupportedBlock("dashboard summary has no metrics")
         } else {
-            let cards = resolvedSummaryCards(summaryMetrics, metrics: metrics)
+            let cards = DashboardRuntime.resolvedDashboardSummaryCards(
+                container,
+                metrics: metrics,
+                source: dashboardSummarySource(container, dashboardRoot: dashboardRoot)
+            )
             VStack(alignment: .leading, spacing: 10) {
                 if cards.isEmpty {
                     emptyDashboardState("No summary data available for this view.")
@@ -189,13 +292,14 @@ public struct DashboardRenderer: View {
                         spacing: 10
                     ) {
                         ForEach(Array(cards.enumerated()), id: \.offset) { _, card in
+                            let tone = toneStyle(card.tone)
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(card.label)
                                     .font((isCompactPresentation ? Font.caption2 : .caption).weight(.medium))
-                                    .foregroundStyle(card.tone.text.opacity(0.8))
+                                    .foregroundStyle(tone.text.opacity(0.8))
                                 Text(card.displayValue)
                                     .font(summaryValueFont(for: card.displayValue).weight(.semibold))
-                                    .foregroundStyle(card.tone.text)
+                                    .foregroundStyle(tone.text)
                                     .lineLimit(3)
                                     .minimumScaleFactor(0.62)
                                     .allowsTightening(true)
@@ -206,11 +310,11 @@ public struct DashboardRenderer: View {
                             .padding(.vertical, isCompactPresentation ? 9 : (horizontalSizeClass == .regular ? 10 : 11))
                             .background(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .fill(card.tone.background)
+                                    .fill(tone.background)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14)
-                                    .stroke(card.tone.border, lineWidth: 1)
+                                    .stroke(tone.border, lineWidth: 1)
                             )
                         }
                     }
@@ -230,7 +334,7 @@ public struct DashboardRenderer: View {
 
     @ViewBuilder
     private func compareBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
-        let compareItems = container.dashboard?.compare?.items ?? []
+        let compareItems = dashboardCompareItems(container)
         if compareItems.isEmpty {
             unsupportedBlock("dashboard compare has no items")
         } else {
@@ -253,6 +357,26 @@ public struct DashboardRenderer: View {
                                 Text("\(delta >= 0 ? "+" : "")\(DashboardRuntime.formatDashboardValue(delta, format: item.deltaFormat ?? item.format))")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(toneColor(tone))
+                            }
+                        }
+                        if hasCompareContextLabels(item) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                if let currentLabel = item.currentLabel, !currentLabel.isEmpty {
+                                    Text(currentLabel)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            Capsule()
+                                                .fill(Color.secondary.opacity(0.10))
+                                        )
+                                }
+                                if let previousLabel = item.previousLabel, !previousLabel.isEmpty {
+                                    Text(previousLabel)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                         if let label = item.deltaLabel, !label.isEmpty {
@@ -304,64 +428,173 @@ public struct DashboardRenderer: View {
     }
 
     @ViewBuilder
-    private func filtersBlock(_ container: ContainerDef) -> some View {
-        let filters = container.dashboard?.filters?.items ?? []
-        if filters.isEmpty {
+    private func filtersBlock(
+        _ container: ContainerDef,
+        filters: [String: JSONValue],
+        dashboardRoot: ContainerDef
+    ) -> some View {
+        let filterItems = DashboardRuntime.dashboardFilterItems(container)
+        if filterItems.isEmpty {
             unsupportedBlock("dashboard filters have no items")
         } else {
             VStack(alignment: .leading, spacing: 12) {
-                ForEach(Array(filters.enumerated()), id: \.offset) { _, filter in
+                ForEach(Array(filterItems.enumerated()), id: \.offset) { _, filter in
+                    let field = DashboardRuntime.dashboardFilterKey(filter)
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(filter.label ?? filter.field ?? filter.id ?? "Filter")
+                        Text(filter.label ?? field ?? "Filter")
                             .font(.body.weight(.medium))
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        if filter.type == "dateRange" {
                             HStack(spacing: 8) {
-                                ForEach(Array(filter.options.enumerated()), id: \.offset) { _, option in
-                                    Text(option.label ?? option.value ?? "Option")
-                                        .font(.caption.weight(.medium))
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            Capsule()
-                                                .fill((option.defaultValue ?? false) ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.08))
+                                TextField(
+                                    "Start",
+                                    text: Binding(
+                                        get: { dashboardDateRangeValue(filters: filters, field: field, edge: "start") },
+                                        set: { value in
+                                            updateDashboardFilters(
+                                                DashboardRuntime.setDashboardDateRangeFilter(
+                                                    filters,
+                                                    item: filter,
+                                                    edge: "start",
+                                                    value: value
+                                                ),
+                                                dashboardRoot: dashboardRoot
+                                            )
+                                        }
+                                    )
+                                )
+                                .textFieldStyle(.roundedBorder)
+                                Text("to")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                TextField(
+                                    "End",
+                                    text: Binding(
+                                        get: { dashboardDateRangeValue(filters: filters, field: field, edge: "end") },
+                                        set: { value in
+                                            updateDashboardFilters(
+                                                DashboardRuntime.setDashboardDateRangeFilter(
+                                                    filters,
+                                                    item: filter,
+                                                    edge: "end",
+                                                    value: value
+                                                ),
+                                                dashboardRoot: dashboardRoot
+                                            )
+                                        }
+                                    )
+                                )
+                                .textFieldStyle(.roundedBorder)
+                            }
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(Array(filter.options.enumerated()), id: \.offset) { _, option in
+                                        let active = dashboardFilterOptionActive(
+                                            filters: filters,
+                                            field: field,
+                                            item: filter,
+                                            option: option
                                         )
+                                        Button {
+                                            updateDashboardFilters(
+                                                DashboardRuntime.toggleDashboardFilter(
+                                                    filters,
+                                                    item: filter,
+                                                    optionValue: option.value
+                                                ),
+                                                dashboardRoot: dashboardRoot
+                                            )
+                                        } label: {
+                                            Text(option.label ?? option.value ?? "Option")
+                                                .font(.caption.weight(.medium))
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 6)
+                                                .foregroundStyle(active ? Color.accentColor : Color.primary)
+                                                .background(
+                                                    Capsule()
+                                                        .fill(active ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.08))
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .disabled(option.value?.isEmpty ?? true)
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                Text("Filter state wiring still belongs in Forge signal/runtime plumbing.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    @ViewBuilder
-    private func timelineBlock(_ container: ContainerDef) -> some View {
-        let timeline = container.dashboard?.timeline
-        let modes = timeline?.viewModes ?? container.viewModes
-        VStack(alignment: .leading, spacing: 8) {
-            if !modes.isEmpty {
-                LabeledContent("View modes") {
-                    Text(modes.joined(separator: ", "))
-                }
-            }
-            if let selector = timeline?.annotations?.selector, !selector.isEmpty {
-                LabeledContent("Annotations") {
-                    Text(selector).foregroundStyle(.secondary)
-                }
-            }
-            Text("Timeline data rendering still depends on data-source and selection plumbing in Forge runtime.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private func dashboardDateRangeValue(filters: [String: JSONValue], field: String?, edge: String) -> String {
+        guard let field,
+              case .object(let range)? = filters[field],
+              case .string(let value)? = range[edge] else {
+            return ""
         }
+        return value
+    }
+
+    private func timelineBlock(
+        _ container: ContainerDef,
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> AnyView {
+        guard let chart = DashboardRuntime.dashboardTimelineChart(container) else {
+            return AnyView(unsupportedBlock("dashboard timeline has no chart config"))
+        }
+        guard let dataSourceRef = dashboardDataSourceRef(container, dashboardRoot: dashboardRoot) else {
+            return AnyView(ChartRenderer(runtime: runtime, window: window, container: container, chart: chart))
+        }
+        let rows = dashboardCollections[dataSourceRef] ?? []
+        let filtered = DashboardRuntime.applyDashboardFiltersToCollection(
+            rows,
+            filterBindings: container.filterBindings,
+            filters: filters
+        )
+        let selectedRows = DashboardRuntime.applyDashboardSelectionToCollection(
+            filtered,
+            selectionBindings: container.selectionBindings,
+            selection: selection
+        )
+        return AnyView(ChartRenderer(runtime: runtime, window: window, container: container, chart: chart, rows: selectedRows))
+    }
+
+    private func dashboardChartRows(
+        _ container: ContainerDef,
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> [[String: JSONValue]]? {
+        guard let dataSourceRef = dashboardDataSourceRef(container, dashboardRoot: dashboardRoot) else {
+            return nil
+        }
+        let rows = dashboardCollections[dataSourceRef] ?? []
+        let filtered = DashboardRuntime.applyDashboardFiltersToCollection(
+            rows,
+            filterBindings: container.filterBindings,
+            filters: filters
+        )
+        return DashboardRuntime.applyDashboardSelectionToCollection(
+            filtered,
+            selectionBindings: container.selectionBindings,
+            selection: selection
+        )
     }
 
     @ViewBuilder
-    private func geoMapBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
+    private func geoMapBlock(
+        _ container: ContainerDef,
+        metrics: [String: Any],
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> some View {
         let metricLabel = container.metric?.label ?? container.metric?.key ?? "Metric"
         let metricValue = container.metric?.key.flatMap { DashboardRuntime.resolveDashboardValue(source: nil, selector: $0, metrics: metrics) }
+        let rows = rankedGeoMapRows(container, filters: filters, selection: selection, dashboardRoot: dashboardRoot)
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "map")
@@ -386,44 +619,304 @@ public struct DashboardRenderer: View {
                     .padding(.vertical, 5)
                     .background(Capsule().fill(Color.secondary.opacity(0.08)))
             }
+            if rows.isEmpty {
+                Text("No regional rows available. Mobile renders geo maps as a compact summary until map geometry is available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(rows) { row in
+                        HStack(spacing: 10) {
+                            Text(row.rank.map { "#\($0)" } ?? row.regionCode)
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 42, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                geoMapRowLabel(row)
+                                if row.label != row.regionCode {
+                                    Text(row.regionCode)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Text(DashboardRuntime.formatDashboardValue(row.value, format: container.metric?.format))
+                                .font(.subheadline.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(toneColor(row.tone))
+                        }
+                        .padding(.vertical, 7)
+                        .padding(.horizontal, 10)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(toneBackground(row.tone)))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(toneBorder(row.tone), lineWidth: 1))
+                    }
+                    Text("Map geometry is not available in this native renderer; showing ranked regional fallback rows.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
     }
 
+    private func rankedGeoMapRows(
+        _ container: ContainerDef,
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> [DashboardGeoMapRow] {
+        guard let dataSourceRef = dashboardDataSourceRef(container, dashboardRoot: dashboardRoot) else {
+            return []
+        }
+        let rows = dashboardCollections[dataSourceRef] ?? []
+        let filtered = DashboardRuntime.applyDashboardFiltersToCollection(
+            rows,
+            filterBindings: container.filterBindings,
+            filters: filters
+        )
+        let selectedRows = DashboardRuntime.applyDashboardSelectionToCollection(
+            filtered,
+            selectionBindings: container.selectionBindings,
+            selection: selection
+        )
+        return DashboardRuntime.rankedDashboardGeoMapRows(
+            selectedRows,
+            metricKey: container.metric?.key,
+            limit: container.limit
+        )
+    }
+
     @ViewBuilder
-    private func dimensionsBlock(_ container: ContainerDef) -> some View {
+    private func geoMapRowLabel(_ row: DashboardGeoMapRow) -> some View {
+        if let url = geoMapURL(row.href) {
+            Link(destination: url) {
+                Text(row.label)
+                    .font(.subheadline.weight(.medium))
+                    .underline()
+            }
+        } else {
+            Text(row.label)
+                .font(.subheadline.weight(.medium))
+        }
+    }
+
+    private func geoMapURL(_ href: String?) -> URL? {
+        let trimmed = href?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+        return URL(string: trimmed)
+    }
+
+    private func dimensionsBlock(
+        _ container: ContainerDef,
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> AnyView {
         let dimensions = container.dashboard?.dimensions
         let dimension = dimensions?.dimension ?? container.dimension
         let metric = dimensions?.metric ?? container.metric
-        VStack(alignment: .leading, spacing: 8) {
-            if let dimension {
-                LabeledContent("Dimension") {
-                    Text(dimension.label ?? dimension.key ?? "Unnamed")
+        guard let dimensionKey = nonBlank(dimension?.key),
+              let metricKey = nonBlank(metric?.key) else {
+            return AnyView(unsupportedBlock("dashboard dimensions requires dimension and metric"))
+        }
+        let dataSourceRef = dashboardDataSourceRef(container, dashboardRoot: dashboardRoot)
+        let rows = dataSourceRef.flatMap { dashboardCollections[$0] } ?? []
+        let filtered = DashboardRuntime.applyDashboardFiltersToCollection(
+            rows,
+            filterBindings: container.filterBindings,
+            filters: filters
+        )
+        let selectedRows = DashboardRuntime.applyDashboardSelectionToCollection(
+            filtered,
+            selectionBindings: container.selectionBindings,
+            selection: selection
+        )
+        let ranked = DashboardRuntime.rankedDashboardDimensionRows(
+            selectedRows,
+            dimensionKey: dimensionKey,
+            metricKey: metricKey,
+            limit: dimensions?.limit ?? container.limit
+        )
+        if ranked.isEmpty {
+            return AnyView(emptyDashboardState("No dimension rows."))
+        }
+        let maxValue = max(ranked.map { $0.value }.max() ?? 1, 1)
+        let modes = dashboardDimensionsViewModes(for: container)
+        let modeKey = container.id ?? "\(dimensionKey):\(metricKey)"
+        let activeMode = resolvedChartTableViewMode(dashboardDimensionsModes[modeKey], modes: modes)
+        return AnyView(
+            VStack(alignment: .leading, spacing: 10) {
+                if modes.count > 1 {
+                    Picker("", selection: Binding(
+                        get: { activeMode },
+                        set: { dashboardDimensionsModes[modeKey] = $0 }
+                    )) {
+                        ForEach(modes, id: \.self) { mode in
+                            Text(chartTableModeLabel(mode)).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                if activeMode == "table" {
+                    dimensionsTable(
+                        ranked,
+                        dimensionKey: dimensionKey,
+                        metricKey: metricKey,
+                        metric: metric,
+                        container: container,
+                        dashboardRoot: dashboardRoot
+                    )
+                } else {
+                    dimensionsChart(
+                        ranked,
+                        dimension: dimension,
+                        dimensionKey: dimensionKey,
+                        metric: metric,
+                        container: container,
+                        maxValue: maxValue,
+                        dashboardRoot: dashboardRoot
+                    )
                 }
             }
-            if let metric {
-                LabeledContent("Metric") {
-                    Text(metric.label ?? metric.key ?? "Unnamed")
+            .onChange(of: modes) {
+                dashboardDimensionsModes[modeKey] = resolvedChartTableViewMode(dashboardDimensionsModes[modeKey], modes: modes)
+            }
+        )
+    }
+
+    @ViewBuilder
+    private func dimensionsTable(
+        _ ranked: [DashboardDimensionRow],
+        dimensionKey: String,
+        metricKey: String,
+        metric: DashboardFieldDef?,
+        container: ContainerDef,
+        dashboardRoot: ContainerDef
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("Dimension")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text(metric?.label ?? metricKey)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+
+            ForEach(Array(ranked.enumerated()), id: \.offset) { index, row in
+                let entity = row.entityKey ?? "-"
+                let selected = dashboardSelection.entityKey == row.entityKey
+                Button {
+                    let selection = DashboardSelectionState(
+                        dimension: dimensionKey,
+                        entityKey: row.entityKey,
+                        selected: DashboardRuntime.dashboardSelectionPayload(from: row.row),
+                        sourceBlockID: container.id
+                    )
+                    updateDashboardSelection(selection, dashboardRoot: dashboardRoot)
+                } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        Text(entity)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                        Spacer()
+                        Text(DashboardRuntime.formatDashboardValue(row.value, format: metric?.format))
+                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 9)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(selected ? Color.accentColor.opacity(0.1) : Color.clear)
+                }
+                .buttonStyle(.plain)
+
+                if index < ranked.count - 1 {
+                    Divider()
+                        .padding(.leading, 10)
                 }
             }
-            if let limit = dimensions?.limit ?? container.limit {
-                LabeledContent("Limit") {
-                    Text(String(limit))
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.secondary.opacity(0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func dimensionsChart(
+        _ ranked: [DashboardDimensionRow],
+        dimension: DashboardFieldDef?,
+        dimensionKey: String,
+        metric: DashboardFieldDef?,
+        container: ContainerDef,
+        maxValue: Double,
+        dashboardRoot: ContainerDef
+    ) -> some View {
+        ForEach(Array(ranked.enumerated()), id: \.offset) { _, row in
+            let entity = row.entityKey ?? "-"
+            let selected = dashboardSelection.entityKey == row.entityKey
+            let fillColor = selected ? Color.accentColor : Color.accentColor.opacity(0.72)
+            Button {
+                let selection = DashboardSelectionState(
+                    dimension: dimensionKey,
+                    entityKey: row.entityKey,
+                    selected: DashboardRuntime.dashboardSelectionPayload(from: row.row),
+                    sourceBlockID: container.id
+                )
+                updateDashboardSelection(selection, dashboardRoot: dashboardRoot)
+            } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entity)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            if let label = dimension?.label, label != entity {
+                                Text(label)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Text(DashboardRuntime.formatDashboardValue(row.value, format: metric?.format))
+                            .font(.subheadline.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                    }
+                    GeometryReader { proxy in
+                        let progressWidth = max(proxy.size.width * CGFloat(row.value / maxValue), 3)
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.secondary.opacity(0.14))
+                            Capsule()
+                                .fill(fillColor)
+                                .frame(width: progressWidth)
+                        }
+                    }
+                    .frame(height: 7)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(selected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(selected ? Color.accentColor.opacity(0.45) : Color.black.opacity(0.06), lineWidth: 1)
+                )
             }
-            if let orderBy = dimensions?.orderBy ?? container.orderBy, !orderBy.isEmpty {
-                LabeledContent("Order by") {
-                    Text(orderBy)
-                }
-            }
-            let modes = dimensions?.viewModes ?? container.viewModes
-            if !modes.isEmpty {
-                LabeledContent("View modes") {
-                    Text(modes.joined(separator: ", "))
-                }
-            }
-            Text("Selection and chart/table synchronization still belongs in Forge signals.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .buttonStyle(.plain)
         }
     }
 
@@ -436,7 +929,7 @@ public struct DashboardRenderer: View {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(checks) { check in
                     let value = DashboardRuntime.resolveDashboardValue(source: nil, selector: check.selector, metrics: metrics)
-                    let tone = tone(for: numericValue(value), config: check.tone)
+                    let tone = DashboardRuntime.dashboardToneName(value: value, tone: check.tone)
                     HStack(spacing: 12) {
                         Circle()
                             .fill(toneColor(tone))
@@ -459,7 +952,16 @@ public struct DashboardRenderer: View {
     }
 
     @ViewBuilder
-    private func messagesBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
+    private func messagesBlock(
+        _ container: ContainerDef,
+        metrics: [String: Any],
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> some View {
+        let filterValues = filters.mapValues(dashboardJSONAny)
+        let messageRows = dashboardDataSourceRef(container, dashboardRoot: dashboardRoot)
+            .flatMap { dashboardCollections[$0] } ?? []
         let messages = container.dashboard?.messages?.items ?? container.items.map {
             DashboardMessageDef(
                 severity: $0.severity,
@@ -469,7 +971,7 @@ public struct DashboardRenderer: View {
             )
         }
         let visibleMessages = messages.filter {
-            DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics)
+            DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics, filters: filterValues, selection: selection)
         }
         if visibleMessages.isEmpty {
             unsupportedBlock("dashboard messages have no visible items")
@@ -478,11 +980,12 @@ public struct DashboardRenderer: View {
                 ForEach(visibleMessages) { message in
                     VStack(alignment: .leading, spacing: 6) {
                         if let title = message.title, !title.isEmpty {
-                            Text(DashboardRuntime.interpolateDashboardTemplate(title, metrics: metrics))
+                            Text(DashboardRuntime.interpolateDashboardTemplate(title, metrics: metrics, filters: filterValues, selection: selection))
                                 .font(.body.weight(.semibold))
                         }
-                        if let body = message.body, !body.isEmpty {
-                            Text(DashboardRuntime.interpolateDashboardTemplate(body, metrics: metrics))
+                        if let body = dashboardMessageBody(message, rows: messageRows),
+                           !body.isEmpty {
+                            Text(DashboardRuntime.interpolateDashboardTemplate(body, metrics: metrics, filters: filterValues, selection: selection))
                                 .font(.subheadline)
                         }
                     }
@@ -497,8 +1000,29 @@ public struct DashboardRenderer: View {
         }
     }
 
+    private func dashboardMessageBody(_ message: DashboardMessageDef, rows: [[String: JSONValue]]) -> String? {
+        if let body = message.body, !body.isEmpty { return body }
+        if let text = message.text, !text.isEmpty { return text }
+        guard !rows.isEmpty else { return nil }
+        let rowIndex = max(message.rowIndex ?? 0, 0)
+        let row = rows.indices.contains(rowIndex) ? rows[rowIndex] : rows[0]
+        if let fieldValue = dashboardFeedText(row, selector: message.field) {
+            return fieldValue
+        }
+        if let bodyFieldValue = dashboardFeedText(row, selector: message.bodyField) {
+            return bodyFieldValue
+        }
+        return nil
+    }
+
     @ViewBuilder
-    private func badgesBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
+    private func badgesBlock(
+        _ container: ContainerDef,
+        metrics: [String: Any],
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState
+    ) -> some View {
+        let filterValues = filters.mapValues(dashboardJSONAny)
         let badgeItems = container.dashboard?.badges?.items.map {
             DashboardBadgeDef(
                 id: $0.id,
@@ -519,7 +1043,7 @@ public struct DashboardRenderer: View {
             )
         }
         let visible = badgeItems.filter {
-            DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics)
+            DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics, filters: filterValues, selection: selection)
         }
         if visible.isEmpty {
             emptyDashboardState("No active badges.")
@@ -527,8 +1051,18 @@ public struct DashboardRenderer: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 8) {
                 ForEach(visible) { badge in
                     let tone = badge.tone ?? badge.severity ?? "info"
-                    let label = badge.label ?? badge.id ?? "Badge"
-                    let value = badge.value ?? ""
+                    let label = DashboardRuntime.interpolateDashboardTemplate(
+                        badge.label ?? badge.id ?? "Badge",
+                        metrics: metrics,
+                        filters: filterValues,
+                        selection: selection
+                    )
+                    let value = DashboardRuntime.interpolateDashboardTemplate(
+                        badge.value ?? "",
+                        metrics: metrics,
+                        filters: filterValues,
+                        selection: selection
+                    )
                     Text(value.isEmpty ? label : "\(label): \(value)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(toneColor(tone))
@@ -542,10 +1076,16 @@ public struct DashboardRenderer: View {
     }
 
     @ViewBuilder
-    private func reportBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
+    private func reportBlock(
+        _ container: ContainerDef,
+        metrics: [String: Any],
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState
+    ) -> some View {
+        let filterValues = filters.mapValues(dashboardJSONAny)
         let sections = container.dashboard?.report?.sections ?? container.sections
         let visibleSections = sections.filter {
-            DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics)
+            DashboardRuntime.evaluateDashboardCondition($0.visibleWhen, metrics: metrics, filters: filterValues, selection: selection)
         }
         if visibleSections.isEmpty {
             unsupportedBlock("dashboard report has no visible sections")
@@ -553,10 +1093,15 @@ public struct DashboardRenderer: View {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(visibleSections) { section in
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(section.title ?? section.id ?? "Section")
+                        Text(DashboardRuntime.interpolateDashboardTemplate(
+                            section.title ?? section.id ?? "Section",
+                            metrics: metrics,
+                            filters: filterValues,
+                            selection: selection
+                        ))
                             .font(.body.weight(.semibold))
                         ForEach(Array(section.body.enumerated()), id: \.offset) { _, paragraph in
-                            Text(DashboardRuntime.interpolateDashboardTemplate(paragraph, metrics: metrics))
+                            Text(DashboardRuntime.interpolateDashboardTemplate(paragraph, metrics: metrics, filters: filterValues, selection: selection))
                                 .font(.subheadline)
                                 .foregroundStyle(.primary)
                         }
@@ -573,9 +1118,451 @@ public struct DashboardRenderer: View {
     }
 
     @ViewBuilder
-    private func feedBlock(_ container: ContainerDef, metrics: [String: Any]) -> some View {
+    private func reportRuntimeBlock(_ container: ContainerDef) -> some View {
+        let summary = DashboardRuntime.dashboardReportRuntimeSummary(container)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(summary.title ?? container.title ?? "Report runtime")
+                .font(.body.weight(.semibold))
+            if let subtitle = summary.subtitle {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text(summary.blockCount == 1 ? "1 report block" : "\(summary.blockCount) report blocks")
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+            let summaryDiagnostics = summary.diagnostics.filter { $0.blockID == nil }
+            if !summaryDiagnostics.isEmpty {
+                reportRuntimeDiagnosticsPreview(summaryDiagnostics)
+            }
+            ForEach(summary.blocks) { block in
+                reportRuntimeAuthoredBlock(block)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.secondary.opacity(0.06))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func reportRuntimeAuthoredBlock(_ block: DashboardReportRuntimeBlockSummary) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if !block.diagnostics.isEmpty {
+                reportRuntimeDiagnosticsPreview(block.diagnostics)
+            }
+            reportRuntimeAuthoredBlockBody(block)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func reportRuntimeAuthoredBlockBody(_ block: DashboardReportRuntimeBlockSummary) -> some View {
+        if block.kind == "markdownBlock", let markdown = block.markdown {
+            VStack(alignment: .leading, spacing: 6) {
+                if !block.title.isEmpty {
+                    Text(block.title)
+                        .font(.caption.weight(.semibold))
+                }
+                MarkdownRenderer(markdown: markdown)
+                    .font(.caption)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if block.kind == "kpiBlock", let kpi = block.kpi {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(block.title)
+                    .font(.caption.weight(.semibold))
+                if let description = kpi.description {
+                    Text(description)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if kpi.rowCount == 0 || kpi.valueText == nil {
+                    Text(kpi.emptyLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(kpi.valueLabel)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(kpi.valueText ?? "")
+                        .font(.title3.monospacedDigit().weight(.semibold))
+                    if let secondaryLabel = kpi.secondaryLabel,
+                       let secondaryValueText = kpi.secondaryValueText {
+                        Text("\(secondaryLabel): \(secondaryValueText)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else if block.kind == "filterBarBlock", let filterBar = block.filterBar {
+            reportRuntimeFilterBarPreview(filterBar)
+        } else if block.kind == "refinementBarBlock", let refinementBar = block.refinementBar {
+            reportRuntimeRefinementBarPreview(refinementBar)
+        } else if block.kind == "tableBlock", let table = block.table {
+            reportRuntimeTablePreview(block: block, table: table)
+        } else if block.kind == "chartBlock", let chart = block.chart {
+            ChartRenderer(
+                runtime: runtime,
+                window: window,
+                container: ContainerDef(
+                    id: block.id,
+                    title: block.title,
+                    kind: "dashboard.chart",
+                    dataSourceRef: chart.dataSourceRef
+                ),
+                chart: chart.chart,
+                rows: chart.rows,
+                reportRuntimeBlockID: block.id,
+                reportRuntimeActionFields: chart.actionFields,
+                reportRuntimeActionDescriptors: chart.actionDescriptors,
+                onReportRuntimeAction: executeReportRuntimeAction
+            )
+        } else if block.kind == "geoMapBlock", let geoMap = block.geoMap {
+            reportRuntimeGeoMapPreview(block: block, geoMap: geoMap)
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(block.kind)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                Text(block.title)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func reportRuntimeTablePreview(
+        block: DashboardReportRuntimeBlockSummary,
+        table: DashboardReportRuntimeTableValue
+    ) -> some View {
+        if table.columns.isEmpty {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(block.kind)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                Text(block.title)
+                    .font(.caption)
+                    .lineLimit(1)
+                    .foregroundStyle(.primary)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                TableRenderer(
+                    runtime: runtime,
+                    window: window,
+                    container: ContainerDef(
+                        id: block.id,
+                        title: block.title,
+                        kind: "dashboard.table",
+                        dataSourceRef: table.dataSourceRef
+                    ),
+                    table: TableDef(title: block.title, columns: table.columns),
+                    rows: table.rows
+                )
+                reportRuntimeTableActionStrip(block: block, table: table)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func reportRuntimeTableActionStrip(
+        block: DashboardReportRuntimeBlockSummary,
+        table: DashboardReportRuntimeTableValue
+    ) -> some View {
+        let rows = table.rows.prefix(6).enumerated().map { ($0.offset, $0.element) }
+        let rowActions = rows.compactMap { index, row -> (Int, String, [DashboardReportRuntimeActionExecution])? in
+            let executions = reportRuntimeTableActionExecutions(block: block, table: table, row: row)
+            guard !executions.isEmpty else { return nil }
+            return (index, reportRuntimeTableRowLabel(row: row, columns: table.columns), executions)
+        }
+        if !rowActions.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Row actions")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                ForEach(rowActions, id: \.0) { _, label, executions in
+                    HStack(spacing: 8) {
+                        Text(label)
+                            .font(.caption)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Menu {
+                            ForEach(executions) { execution in
+                                Button(execution.label) {
+                                    executeReportRuntimeAction(execution)
+                                }
+                            }
+                        } label: {
+                            Label("Actions", systemImage: "ellipsis.circle")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .menuStyle(.button)
+                        .controlSize(.small)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.forgeSecondarySystemBackground, in: RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                    )
+                }
+            }
+        }
+    }
+
+    private func reportRuntimeTableActionExecutions(
+        block: DashboardReportRuntimeBlockSummary,
+        table: DashboardReportRuntimeTableValue,
+        row: [String: JSONValue]
+    ) -> [DashboardReportRuntimeActionExecution] {
+        table.actionFields.flatMap { field in
+            let descriptors = table.actionDescriptors.filter { $0.fieldValueKey == field.valueKey }
+            return DashboardRuntime.dashboardReportRuntimeTableActionExecutions(
+                blockID: block.id,
+                descriptors: descriptors,
+                field: field,
+                item: row
+            )
+        }
+    }
+
+    private func reportRuntimeTableRowLabel(row: [String: JSONValue], columns: [ColumnDef]) -> String {
+        guard let column = columns.first else {
+            return "Row"
+        }
+        let key = column.id ?? column.name ?? column.key ?? column.label ?? ""
+        return DashboardRuntime.dashboardReportRuntimeValueText(row[key]) ?? column.label ?? column.name ?? column.id ?? "Row"
+    }
+
+    private func executeReportRuntimeAction(_ execution: DashboardReportRuntimeActionExecution) {
+        guard let runtime else { return }
+        let context = window.map {
+            ExecutionContext(windowID: $0.windowID, dataSourceRef: "")
+        }
+        let payload = DashboardRuntime.dashboardReportRuntimeActionExecutionPayload(execution)
+        Task {
+            _ = await runtime.execute(
+                ExecutionDef(action: "reportRuntime.executeAction"),
+                context: context,
+                args: ["execution": payload]
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func reportRuntimeDiagnosticsPreview(_ diagnostics: [DashboardReportRuntimeDiagnostic]) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            ForEach(diagnostics) { diagnostic in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(diagnostic.severity.uppercased())
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(toneColor(diagnostic.severity))
+                        Text(diagnostic.message)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let suggestedFix = diagnostic.suggestedFix {
+                        Text(suggestedFix)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    let details = [diagnostic.code, diagnostic.path].compactMap { $0 }.joined(separator: " · ")
+                    if !details.isEmpty {
+                        Text(details)
+                            .font(.caption2.monospaced())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .background(RoundedRectangle(cornerRadius: 8).fill(toneBackground(diagnostic.severity)))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(toneBorder(diagnostic.severity), lineWidth: 1))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func reportRuntimeFilterBarPreview(_ filterBar: DashboardReportRuntimeFilterBarValue) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(filterBar.title)
+                .font(.caption.weight(.semibold))
+            if filterBar.params.isEmpty {
+                Text("No shared scope parameters.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(filterBar.params) { param in
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(param.id)
+                                .font(.caption2.weight(.semibold))
+                            Text(param.valueText)
+                                .font(.caption.monospacedDigit())
+                        }
+                        if let description = param.description {
+                            Text(description)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(Color.secondary.opacity(0.07)))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func reportRuntimeRefinementBarPreview(_ refinementBar: DashboardReportRuntimeRefinementBarValue) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let title = refinementBar.title {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+            }
+            if refinementBar.refinements.isEmpty {
+                Text(refinementBar.emptyLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(refinementBar.refinements) { refinement in
+                    Text(refinement.label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 9)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                        .overlay(Capsule().stroke(Color.accentColor.opacity(0.18), lineWidth: 1))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func reportRuntimeGeoMapPreview(
+        block: DashboardReportRuntimeBlockSummary,
+        geoMap: DashboardReportRuntimeGeoMapValue
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "map")
+                    .foregroundStyle(.secondary)
+                Text(block.title)
+                    .font(.caption.weight(.semibold))
+                Spacer()
+                Text(geoMap.shape.replacingOccurrences(of: "-", with: " ").capitalized)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            Text(geoMap.metricLabel)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if geoMap.rows.isEmpty {
+                Text("No regional rows available.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(geoMap.rows.prefix(5)) { row in
+                    HStack(spacing: 8) {
+                        Text(row.rank.map { "#\($0)" } ?? row.regionCode)
+                            .font(.caption2.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 36, alignment: .leading)
+                        Text(row.label)
+                            .font(.caption.weight(.medium))
+                            .lineLimit(1)
+                        Spacer()
+                        Text(DashboardRuntime.formatDashboardValue(row.value, format: geoMap.metricFormat))
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                    }
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 8)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(toneBackground(row.tone)))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(toneBorder(row.tone), lineWidth: 1))
+                }
+                Text("Map geometry is not available in this native renderer; showing ranked regional fallback rows.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func feedBlock(
+        _ container: ContainerDef,
+        metrics: [String: Any],
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> some View {
         let fields = container.dashboard?.feed?.fields ?? container.fields
-        if container.items.isEmpty {
+        if let dataSourceRef = dashboardDataSourceRef(container, dashboardRoot: dashboardRoot) {
+            let rows = dashboardCollections[dataSourceRef] ?? []
+            let filteredRows = DashboardRuntime.applyDashboardFiltersToCollection(
+                rows,
+                filterBindings: container.filterBindings,
+                filters: filters
+            )
+            let items = DashboardRuntime.applyDashboardSelectionToCollection(
+                filteredRows,
+                selectionBindings: container.selectionBindings,
+                selection: selection
+            )
+            if items.isEmpty {
+                emptyDashboardState("No feed entries.")
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            if let timestamp = dashboardFeedText(item, selector: fields?.timestamp) {
+                                Text(timestamp)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let title = dashboardFeedText(item, selector: fields?.title) {
+                                Text(title)
+                                    .font(.body.weight(.medium))
+                            }
+                            if let body = dashboardFeedText(item, selector: fields?.body) {
+                                Text(body)
+                                    .font(.subheadline)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.secondary.opacity(0.08))
+                        )
+                    }
+                }
+            }
+        } else if container.items.isEmpty {
             unsupportedBlock("dashboard feed has no items")
         } else {
             VStack(alignment: .leading, spacing: 10) {
@@ -589,7 +1576,12 @@ public struct DashboardRenderer: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         } else if let body = fields?.body, !body.isEmpty {
-                            Text(DashboardRuntime.interpolateDashboardTemplate(body, metrics: metrics))
+                            Text(DashboardRuntime.interpolateDashboardTemplate(
+                                body,
+                                metrics: metrics,
+                                filters: filters.mapValues(dashboardJSONAny),
+                                selection: dashboardSelection
+                            ))
                                 .font(.subheadline)
                         }
                     }
@@ -604,13 +1596,28 @@ public struct DashboardRenderer: View {
         }
     }
 
-    private func detailBlock(_ container: ContainerDef) -> AnyView {
-        if container.containers.isEmpty {
-            return AnyView(unsupportedBlock("dashboard detail has no child blocks"))
+    private func detailBlock(
+        _ container: ContainerDef,
+        metrics: [String: Any],
+        filters: [String: JSONValue],
+        selection: DashboardSelectionState,
+        dashboardRoot: ContainerDef
+    ) -> AnyView {
+        let visibleChildren = DashboardRuntime.visibleDashboardDetailChildren(
+            container,
+            metrics: metrics,
+            filters: filters.mapValues(dashboardJSONAny),
+            selection: selection
+        )
+        if visibleChildren.isEmpty {
+            let message = container.containers.isEmpty
+                ? "dashboard detail has no child blocks"
+                : "dashboard detail has no visible child blocks"
+            return AnyView(unsupportedBlock(message))
         } else {
             return AnyView(VStack(alignment: .leading, spacing: 12) {
-                ForEach(container.containers) { child in
-                    dashboardBody(child)
+                ForEach(visibleChildren) { child in
+                    dashboardBody(child, dashboardRoot: dashboardRoot)
                 }
             })
         }
@@ -657,6 +1664,58 @@ public struct DashboardRenderer: View {
         return metrics
     }
 
+    private func dashboardSummarySource(_ container: ContainerDef, dashboardRoot: ContainerDef) -> [String: Any]? {
+        guard let dataSourceRef = dashboardDataSourceRef(container, dashboardRoot: dashboardRoot),
+              let row = dashboardCollections[dataSourceRef]?.first else {
+            return nil
+        }
+        return row.mapValues(dashboardJSONAny)
+    }
+
+    private func dashboardCompareItems(_ container: ContainerDef) -> [DashboardCompareItemDef] {
+        if let items = container.dashboard?.compare?.items, !items.isEmpty {
+            return items
+        }
+        return container.items.compactMap { item -> DashboardCompareItemDef? in
+            guard item.current != nil || item.previous != nil else {
+                return nil
+            }
+            return DashboardCompareItemDef(
+                id: item.id,
+                label: item.label,
+                current: item.current,
+                previous: item.previous,
+                format: item.format,
+                deltaFormat: item.deltaFormat,
+                positiveIsUp: item.positiveIsUp,
+                deltaLabel: item.deltaLabel,
+                currentLabel: item.currentLabel,
+                previousLabel: item.previousLabel
+            )
+        }
+    }
+
+    private func hasCompareContextLabels(_ item: DashboardCompareItemDef) -> Bool {
+        let current = item.currentLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let previous = item.previousLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !current.isEmpty || !previous.isEmpty
+    }
+
+    private func dashboardKPITable(_ container: ContainerDef) -> TableDef? {
+        let columns = nonEmptyColumns(container.dashboard?.kpiTable?.columns) ?? nonEmptyColumns(container.columns)
+        guard let columns else {
+            return nil
+        }
+        return TableDef(title: container.title, columns: columns)
+    }
+
+    private func nonEmptyColumns(_ columns: [ColumnDef]?) -> [ColumnDef]? {
+        guard let columns, !columns.isEmpty else {
+            return nil
+        }
+        return columns
+    }
+
     private var runtimeMetricsTaskKey: String {
         [
             window?.windowID ?? "",
@@ -665,33 +1724,195 @@ public struct DashboardRenderer: View {
         ].joined(separator: ":")
     }
 
-    private func loadRuntimeMetrics() async {
-        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
-            runtimeMetrics = [:]
+    private var dashboardFiltersTaskKey: String {
+        [
+            "dashboardFilters",
+            window?.windowID ?? "",
+            container.id ?? "",
+            container.dashboard?.key ?? ""
+        ].joined(separator: ":")
+    }
+
+    private var dashboardSelectionTaskKey: String {
+        [
+            "dashboardSelection",
+            window?.windowID ?? "",
+            container.id ?? "",
+            container.dashboard?.key ?? ""
+        ].joined(separator: ":")
+    }
+
+    private var dashboardCollectionsTaskKey: String {
+        [
+            "dashboardCollections",
+            window?.windowID ?? "",
+            dashboardDataSourceRefs(in: container).joined(separator: "|")
+        ].joined(separator: ":")
+    }
+
+    private func subscribeRuntimeMetrics() async {
+        guard let runtime, let window, let dataSourceRef = nonBlank(container.dataSourceRef) else {
+            await MainActor.run {
+                runtimeMetrics = [:]
+            }
             return
         }
-        let rawMetrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: dataSourceRef)
-        if !rawMetrics.isEmpty {
-            runtimeMetrics = rawMetrics.mapValues { $0.anyValueValue as Any }
-            return
+
+        let initial = await dashboardRuntimeMetricsSnapshot(runtime: runtime, window: window, dataSourceRef: dataSourceRef)
+        await MainActor.run {
+            runtimeMetrics = initial
         }
-        let rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
-        if let first = rows.first {
-            runtimeMetrics = first.mapValues { $0.anyValueValue as Any }
-        } else {
-            runtimeMetrics = [:]
+
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                let stream = await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: dataSourceRef)
+                for await next in stream {
+                    await MainActor.run {
+                        runtimeMetrics = dashboardMetricsFromJSON(next)
+                    }
+                }
+            }
+            group.addTask {
+                let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: dataSourceRef)
+                for await next in stream {
+                    let currentMetrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: dataSourceRef)
+                    guard currentMetrics.isEmpty else { continue }
+                    await MainActor.run {
+                        runtimeMetrics = next.first.map(dashboardMetricsFromJSON) ?? [:]
+                    }
+                }
+            }
+            await group.waitForAll()
         }
     }
 
-    private func tone(for value: Double, config: DashboardToneDef?) -> String {
-        guard let config else { return "neutral" }
-        if let threshold = config.dangerAbove, value >= threshold { return "danger" }
-        if let threshold = config.warningAbove, value >= threshold { return "warning" }
-        if let threshold = config.successAbove, value >= threshold { return "success" }
-        if let threshold = config.dangerBelow, value <= threshold { return "danger" }
-        if let threshold = config.warningBelow, value <= threshold { return "warning" }
-        if let threshold = config.successBelow, value <= threshold { return "success" }
-        return "neutral"
+    private func dashboardRuntimeMetricsSnapshot(
+        runtime: ForgeRuntime,
+        window: WindowContext,
+        dataSourceRef: String
+    ) async -> [String: Any] {
+        let rawMetrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        if !rawMetrics.isEmpty {
+            return dashboardMetricsFromJSON(rawMetrics)
+        }
+        let rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        if let first = rows.first {
+            return dashboardMetricsFromJSON(first)
+        }
+        return [:]
+    }
+
+    private func dashboardMetricsFromJSON(_ values: [String: JSONValue]) -> [String: Any] {
+        values.mapValues { $0.anyValueValue as Any }
+    }
+
+    private func subscribeDashboardFilters() async {
+        let defaults = DashboardRuntime.buildDashboardDefaultFilters(container)
+        guard let runtime, let window else {
+            await MainActor.run {
+                if dashboardFilters.isEmpty && !defaults.isEmpty {
+                    dashboardFilters = defaults
+                }
+            }
+            return
+        }
+
+        let current = await runtime.dashboardFilterState(windowID: window.windowID, container: container)
+        if current.isEmpty && !defaults.isEmpty {
+            await runtime.setDashboardFilters(windowID: window.windowID, container: container, filters: defaults)
+        }
+        let stream = await runtime.dashboardFilterUpdates(windowID: window.windowID, container: container)
+        for await next in stream {
+            await MainActor.run {
+                dashboardFilters = next
+            }
+        }
+    }
+
+    private func subscribeDashboardSelection() async {
+        guard let runtime, let window else {
+            await MainActor.run {
+                dashboardSelection = DashboardSelectionState()
+            }
+            return
+        }
+        let current = await runtime.dashboardSelectionState(windowID: window.windowID, container: container)
+        await MainActor.run {
+            dashboardSelection = current
+        }
+        let stream = await runtime.dashboardSelectionUpdates(windowID: window.windowID, container: container)
+        for await next in stream {
+            await MainActor.run {
+                dashboardSelection = next
+            }
+        }
+    }
+
+    private func updateDashboardSelection(_ selection: DashboardSelectionState, dashboardRoot: ContainerDef) {
+        dashboardSelection = selection
+        guard let runtime, let window else {
+            return
+        }
+        Task {
+            await runtime.setDashboardSelection(windowID: window.windowID, container: dashboardRoot, selection: selection)
+        }
+    }
+
+    private func subscribeDashboardCollections() async {
+        let refs = dashboardDataSourceRefs(in: container)
+        guard let runtime, let window, !refs.isEmpty else {
+            await MainActor.run {
+                dashboardCollections = [:]
+            }
+            return
+        }
+
+        var loaded: [String: [[String: JSONValue]]] = [:]
+        for ref in refs {
+            loaded[ref] = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+        }
+        await MainActor.run {
+            dashboardCollections = loaded
+        }
+
+        await withTaskGroup(of: Void.self) { group in
+            for ref in refs {
+                group.addTask {
+                    let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: ref)
+                    for await next in stream {
+                        await MainActor.run {
+                            dashboardCollections[ref] = next
+                        }
+                    }
+                }
+            }
+            await group.waitForAll()
+        }
+    }
+
+    private func updateDashboardFilters(_ next: [String: JSONValue], dashboardRoot: ContainerDef) {
+        dashboardFilters = next
+        guard let runtime, let window else { return }
+        Task {
+            await runtime.setDashboardFilters(windowID: window.windowID, container: dashboardRoot, filters: next)
+        }
+    }
+
+    private func dashboardFilterOptionActive(
+        filters: [String: JSONValue],
+        field: String?,
+        item: DashboardFilterItemDef,
+        option: DashboardFilterOptionDef
+    ) -> Bool {
+        guard let field, let optionValue = option.value else { return false }
+        if item.multiple == true {
+            return filters[field]?.arrayValue?.compactMap(\.stringValue).contains(optionValue) == true
+        }
+        return filters[field]?.stringValue == optionValue
+    }
+
+    private func dashboardJSONAny(_ value: JSONValue) -> Any {
+        value.anyValueValue as Any
     }
 
     private func toneColor(_ tone: String?) -> Color {
@@ -812,6 +2033,131 @@ public struct DashboardRenderer: View {
         let lowered = normalized.lowercased()
         return !["-", "—", "/", "n/a", "na", "null"].contains(lowered)
     }
+
+    private func dashboardDataSourceRef(_ container: ContainerDef, dashboardRoot: ContainerDef) -> String? {
+        nonBlank(container.dataSourceRef) ?? nonBlank(dashboardRoot.dataSourceRef)
+    }
+
+    private func dashboardDataSourceRefs(in root: ContainerDef) -> [String] {
+        var refs: [String] = []
+
+        func append(_ ref: String?) {
+            guard let ref = nonBlank(ref), !refs.contains(ref) else { return }
+            refs.append(ref)
+        }
+
+        append(root.dataSourceRef)
+
+        func collect(_ node: ContainerDef) {
+            append(node.dataSourceRef)
+            node.containers.forEach(collect)
+        }
+
+        collect(root)
+        return refs
+    }
+
+    private func dashboardFeedText(_ row: [String: JSONValue], selector: String?) -> String? {
+        guard let selector = nonBlank(selector),
+              let resolved = SelectorUtil.resolve(row.mapValues(dashboardFeedJSONAny), selector: selector) else {
+            return nil
+        }
+        let value: Any?
+        if let json = resolved as? JSONValue {
+            value = json.anyValueValue
+        } else {
+            value = resolved
+        }
+        guard let value else { return nil }
+        let text = String(describing: value).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? nil : text
+    }
+
+    private func dashboardFeedJSONAny(_ value: JSONValue) -> Any {
+        switch value {
+        case .string(let string):
+            return string
+        case .number(let number):
+            return number
+        case .bool(let bool):
+            return bool
+        case .array(let values):
+            return values.map(dashboardFeedJSONAny)
+        case .object(let object):
+            return object.mapValues(dashboardFeedJSONAny)
+        case .null:
+            return NSNull()
+        }
+    }
+
+    private func nonBlank(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+internal func dashboardContainerInheritingDataSource(
+    _ container: ContainerDef,
+    dashboardRoot: ContainerDef
+) -> ContainerDef {
+    guard dashboardNonBlank(container.dataSourceRef) == nil,
+          let inheritedDataSourceRef = dashboardNonBlank(dashboardRoot.dataSourceRef) else {
+        return container
+    }
+    return ContainerDef(
+        id: container.id,
+        title: container.title,
+        subtitle: container.subtitle,
+        kind: container.kind,
+        scrollMode: container.scrollMode,
+        dataSourceRef: inheritedDataSourceRef,
+        columnSpan: container.columnSpan,
+        rowSpan: container.rowSpan,
+        filterBindings: container.filterBindings,
+        visibleWhen: container.visibleWhen,
+        metrics: container.metrics,
+        checks: container.checks,
+        rows: container.rows,
+        sections: container.sections,
+        fields: container.fields,
+        dimension: container.dimension,
+        metric: container.metric,
+        viewModes: container.viewModes,
+        limit: container.limit,
+        orderBy: container.orderBy,
+        containers: container.containers,
+        selectFirst: container.selectFirst,
+        layout: container.layout,
+        stateKey: container.stateKey,
+        schemaBasedForm: container.schemaBasedForm,
+        dashboard: container.dashboard,
+        tabs: container.tabs,
+        items: container.items,
+        chart: container.chart,
+        table: container.table,
+        columns: container.columns,
+        geo: container.geo,
+        treeBrowser: container.treeBrowser,
+        fileBrowser: container.fileBrowser,
+        editor: container.editor,
+        fetchData: container.fetchData,
+        target: container.target,
+        targetOverrides: container.targetOverrides
+    )
+}
+
+private func dashboardNonBlank(_ value: String?) -> String? {
+    guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+        return nil
+    }
+    return trimmed
+}
+
+func dashboardUnsupportedBlockMessage(_ kind: String?) -> String {
+    guard let normalized = dashboardNonBlank(kind) else {
+        return "Unsupported dashboard block"
+    }
+    return "Unsupported dashboard block: \(normalized)"
 }
 
 private struct DashboardCardTone {

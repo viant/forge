@@ -49,7 +49,7 @@ internal fun resolveColumnLinkTargetFromContext(
     val link = column.link ?: return null
     val windowKey = link.windowKey?.trim().orEmpty()
     val kind = link.kind?.trim()?.lowercase().orEmpty()
-    val fallbackTitle = context.value?.toString()?.trim().orEmpty()
+    val fallbackTitle = linkDisplayString(context.value).trim()
         .ifBlank { column.label?.trim().orEmpty() }
         .ifBlank { windowKey }
         .ifBlank { "Open" }
@@ -70,7 +70,7 @@ internal fun resolveColumnLinkTargetFromContext(
     if (hrefSelector.isEmpty()) {
         return null
     }
-    val href = SelectorUtil.resolve(context.row, hrefSelector)?.toString()?.trim().orEmpty()
+    val href = linkDisplayString(SelectorUtil.resolve(context.row, hrefSelector)).trim()
     if (href.isEmpty()) {
         return null
     }
@@ -102,7 +102,7 @@ internal fun resolveLinkWindowTitleFromContext(
             source = source.ifBlank { "row" },
             selector = selector,
             context = context
-        )?.toString()?.trim().orEmpty()
+        )?.let(::linkDisplayString)?.trim().orEmpty()
         if (resolved.isNotEmpty()) {
             return resolved
         }
@@ -219,10 +219,31 @@ private fun renderLinkTemplate(
         if (selector.isEmpty() || holderMap == null) {
             ""
         } else {
-            SelectorUtil.resolve(holderMap, selector)?.toString().orEmpty()
+            linkDisplayString(SelectorUtil.resolve(holderMap, selector))
         }
     }.replace(Regex("\\s{2,}"), " ").trim()
 }
+
+internal fun linkDisplayString(value: Any?): String {
+    return when (value) {
+        null -> "—"
+        is String -> value
+        is Boolean -> if (value) "true" else "false"
+        is Float -> numberDisplayString(value.toDouble())
+        is Double -> numberDisplayString(value)
+        is Number -> value.toString()
+        is Map<*, *> -> value.entries
+            .filter { it.key is String }
+            .sortedBy { it.key as String }
+            .joinToString(", ") { (key, entryValue) -> "$key: ${linkDisplayString(entryValue)}" }
+        is Iterable<*> -> value.joinToString(", ") { linkDisplayString(it) }
+        is Array<*> -> value.joinToString(", ") { linkDisplayString(it) }
+        else -> value.toString()
+    }
+}
+
+private fun numberDisplayString(value: Double): String =
+    if (value.isFinite() && value % 1.0 == 0.0) value.toLong().toString() else value.toString()
 
 private fun jsonElementToLinkAny(value: JsonElement): Any? {
     return when (value) {
@@ -247,4 +268,4 @@ private fun JsonElement?.asString(): String? {
     return (this as? JsonPrimitive)?.contentOrNull
 }
 
-private val LINK_TEMPLATE_REGEX = Regex("\\{\\{\\s*([^}]+?)\\s*}}")
+private val LINK_TEMPLATE_REGEX = Regex("\\{\\{\\s*([^}]+?)\\s*\\}\\}")

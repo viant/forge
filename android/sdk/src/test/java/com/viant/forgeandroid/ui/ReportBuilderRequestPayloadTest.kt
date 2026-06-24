@@ -239,13 +239,13 @@ class ReportBuilderRequestPayloadTest {
             values = fallback,
             windowForm = mapOf(
                 "prefill" to mapOf(
-                    "includeRecordIds" to listOf(70731)
+                    "includeRecordIds" to listOf(1001)
                 )
             )
         )
 
         val row = next.dynamicGroups["include"]?.firstOrNull()
         assertEquals("includeRecordIds", row?.filterId)
-        assertEquals(JsonPrimitive(70731), row?.selections?.firstOrNull()?.value)
+        assertEquals(JsonPrimitive(1001), row?.selections?.firstOrNull()?.value)
     }
 }

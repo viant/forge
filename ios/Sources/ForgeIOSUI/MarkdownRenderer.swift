@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 public struct MarkdownRenderer: View {
     private let markdown: String
@@ -19,6 +24,8 @@ public struct MarkdownRenderer: View {
                     }
                 case .mermaid(let source):
                     MermaidRenderer(source: source)
+                case .code(let language, let body):
+                    MarkdownCodeBlock(language: language, code: body)
                 }
             }
         }
@@ -29,6 +36,22 @@ public struct MarkdownRenderer: View {
 enum MarkdownBlock: Equatable {
     case markdown(String)
     case mermaid(String)
+    case code(language: String, body: String)
+}
+
+internal enum MarkdownCodeHighlightKind: Equatable {
+    case plain
+    case keyword
+    case literal
+    case string
+    case number
+    case comment
+    case punctuation
+}
+
+internal struct MarkdownCodeHighlightRun: Equatable {
+    let text: String
+    let kind: MarkdownCodeHighlightKind
 }
 
 struct MermaidFlowchart: Equatable {
@@ -150,6 +173,45 @@ private struct MermaidRenderer: View {
         }
         .padding(12)
         .background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+private struct MarkdownCodeBlock: View {
+    let language: String
+    let code: String
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                if !language.isEmpty {
+                    Text(language.uppercased())
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Button {
+                    writeMarkdownCodeToPasteboard(code)
+                    copied = true
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                }
+                .buttonStyle(.borderless)
+                .font(.caption.weight(.semibold))
+                .accessibilityLabel(markdownCodeCopyAccessibilityLabel(language: language))
+            }
+            ScrollView(.horizontal, showsIndicators: true) {
+                Text(markdownCodeHighlightedAttributedString(language: language, body: code.isEmpty ? " " : code))
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(markdownCodeAccessibilityLabel(language: language, body: code))
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -348,11 +410,11 @@ internal func parseMarkdownBlocks(_ source: String) -> [MarkdownBlock] {
 
     func flushFence() {
         let body = fenceBuffer.joined(separator: "\n")
-        let language = fenceLanguage?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let language = normalizedMarkdownFenceLanguage(fenceLanguage)
         if language == "mermaid" || FenceDescriptors.detect(body) != nil {
             blocks.append(.mermaid(body))
         } else {
-            blocks.append(.markdown("```\(fenceLanguage ?? "")\n\(body)\n```"))
+            blocks.append(.code(language: language, body: body))
         }
         fenceLanguage = nil
         fenceBuffer.removeAll()
@@ -385,6 +447,263 @@ internal func parseMarkdownBlocks(_ source: String) -> [MarkdownBlock] {
     }
 
     return blocks.isEmpty ? [.markdown(source)] : blocks
+}
+
+internal func normalizedMarkdownFenceLanguage(_ rawValue: String?) -> String {
+    (rawValue ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+}
+
+internal func markdownCodeAccessibilityLabel(language: String, body: String) -> String {
+    let cleanLanguage = normalizedMarkdownFenceLanguage(language)
+    let lineCount = body.isEmpty ? 0 : body.split(separator: "\n", omittingEmptySubsequences: false).count
+    let lineLabel = lineCount == 1 ? "1 line" : "\(lineCount) lines"
+    if cleanLanguage.isEmpty {
+        return "Code block, \(lineLabel)"
+    }
+    return "\(cleanLanguage) code block, \(lineLabel)"
+}
+
+internal func markdownCodeCopyAccessibilityLabel(language: String) -> String {
+    let cleanLanguage = normalizedMarkdownFenceLanguage(language)
+    if cleanLanguage.isEmpty {
+        return "Copy code block"
+    }
+    return "Copy \(cleanLanguage) code block"
+}
+
+internal func markdownCodeHighlightRuns(language: String, body: String) -> [MarkdownCodeHighlightRun] {
+    guard !body.isEmpty else { return [] }
+    let cleanLanguage = normalizedMarkdownFenceLanguage(language)
+    let keywordSet = markdownCodeKeywords(for: cleanLanguage)
+    let literalSet: Set<String> = ["true", "false", "null", "nil", "none"]
+    let characters = Array(body)
+    var runs: [MarkdownCodeHighlightRun] = []
+    var index = 0
+
+    func append(_ text: String, _ kind: MarkdownCodeHighlightKind) {
+        guard !text.isEmpty else { return }
+        if let last = runs.last, last.kind == kind {
+            runs[runs.count - 1] = MarkdownCodeHighlightRun(text: last.text + text, kind: kind)
+        } else {
+            runs.append(MarkdownCodeHighlightRun(text: text, kind: kind))
+        }
+    }
+
+    func string(from start: Int, to end: Int) -> String {
+        guard start < end else { return "" }
+        return String(characters[start..<end])
+    }
+
+    while index < characters.count {
+        let current = characters[index]
+        if current.isWhitespaceOrNewline {
+            let start = index
+            while index < characters.count, characters[index].isWhitespaceOrNewline {
+                index += 1
+            }
+            append(string(from: start, to: index), .plain)
+            continue
+        }
+        if current == "/" && index + 1 < characters.count && characters[index + 1] == "/" {
+            let start = index
+            index += 2
+            while index < characters.count, characters[index] != "\n" {
+                index += 1
+            }
+            append(string(from: start, to: index), .comment)
+            continue
+        }
+        if current == "-" && index + 1 < characters.count && characters[index + 1] == "-" {
+            let start = index
+            index += 2
+            while index < characters.count, characters[index] != "\n" {
+                index += 1
+            }
+            append(string(from: start, to: index), .comment)
+            continue
+        }
+        if current == "#" && cleanLanguage != "json" {
+            let start = index
+            index += 1
+            while index < characters.count, characters[index] != "\n" {
+                index += 1
+            }
+            append(string(from: start, to: index), .comment)
+            continue
+        }
+        if current == "\"" || current == "'" {
+            let quote = current
+            let start = index
+            index += 1
+            var escaped = false
+            while index < characters.count {
+                let value = characters[index]
+                index += 1
+                if escaped {
+                    escaped = false
+                    continue
+                }
+                if value == "\\" {
+                    escaped = true
+                    continue
+                }
+                if value == quote {
+                    break
+                }
+            }
+            append(string(from: start, to: index), .string)
+            continue
+        }
+        if current.isNumberStart(next: index + 1 < characters.count ? characters[index + 1] : nil) {
+            let start = index
+            index += 1
+            while index < characters.count, characters[index].isNumberContinuation {
+                index += 1
+            }
+            append(string(from: start, to: index), .number)
+            continue
+        }
+        if current.isIdentifierStart {
+            let start = index
+            index += 1
+            while index < characters.count, characters[index].isIdentifierContinuation {
+                index += 1
+            }
+            let value = string(from: start, to: index)
+            let lowercased = value.lowercased()
+            if literalSet.contains(lowercased) {
+                append(value, .literal)
+            } else if keywordSet.contains(lowercased) {
+                append(value, .keyword)
+            } else {
+                append(value, .plain)
+            }
+            continue
+        }
+        if current.isCodePunctuation {
+            append(String(current), .punctuation)
+        } else {
+            append(String(current), .plain)
+        }
+        index += 1
+    }
+
+    return runs
+}
+
+private func markdownCodeHighlightedAttributedString(language: String, body: String) -> AttributedString {
+    var attributed = AttributedString()
+    for run in markdownCodeHighlightRuns(language: language, body: body) {
+        var chunk = AttributedString(run.text)
+        chunk.foregroundColor = markdownCodeHighlightColor(run.kind)
+        attributed += chunk
+    }
+    return attributed
+}
+
+private func markdownCodeHighlightColor(_ kind: MarkdownCodeHighlightKind) -> Color {
+    switch kind {
+    case .plain:
+        return .primary
+    case .keyword:
+        return .blue
+    case .literal:
+        return .purple
+    case .string:
+        return .green
+    case .number:
+        return .orange
+    case .comment:
+        return .secondary
+    case .punctuation:
+        return .secondary
+    }
+}
+
+private func markdownCodeKeywords(for language: String) -> Set<String> {
+    switch language {
+    case "swift":
+        return [
+            "actor", "as", "associatedtype", "await", "case", "catch", "class", "continue", "default", "defer",
+            "do", "else", "enum", "extension", "for", "func", "guard", "if", "import", "in", "init", "let",
+            "private", "public", "return", "self", "static", "struct", "switch", "throw", "throws", "try",
+            "var", "while"
+        ]
+    case "kotlin", "kt", "java":
+        return [
+            "as", "break", "catch", "class", "continue", "data", "else", "false", "for", "fun", "if", "import",
+            "in", "interface", "is", "null", "object", "override", "package", "private", "public", "return",
+            "sealed", "suspend", "true", "try", "val", "var", "when", "while"
+        ]
+    case "javascript", "js", "typescript", "ts", "jsx", "tsx":
+        return [
+            "async", "await", "break", "case", "catch", "class", "const", "continue", "default", "else",
+            "export", "extends", "finally", "for", "from", "function", "if", "import", "let", "new", "return",
+            "switch", "throw", "try", "typeof", "var", "while", "yield"
+        ]
+    case "sql":
+        return [
+            "and", "as", "asc", "by", "case", "desc", "else", "end", "from", "group", "having", "in", "inner",
+            "insert", "join", "left", "limit", "not", "null", "on", "or", "order", "outer", "right", "select",
+            "then", "union", "update", "when", "where", "with"
+        ]
+    case "json":
+        return []
+    default:
+        return [
+            "and", "async", "await", "case", "class", "const", "else", "enum", "false", "for", "func",
+            "function", "if", "import", "let", "null", "return", "select", "struct", "true", "var", "where"
+        ]
+    }
+}
+
+private func writeMarkdownCodeToPasteboard(_ value: String) {
+    #if os(iOS)
+    UIPasteboard.general.string = value
+    #elseif os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(value, forType: .string)
+    #else
+    _ = value
+    #endif
+}
+
+private extension Character {
+    var isWhitespaceOrNewline: Bool {
+        unicodeScalars.allSatisfy { CharacterSet.whitespacesAndNewlines.contains($0) }
+    }
+
+    var isIdentifierStart: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        return scalar == "_" || CharacterSet.letters.contains(scalar)
+    }
+
+    var isIdentifierContinuation: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        return scalar == "_" || CharacterSet.letters.contains(scalar) || CharacterSet.decimalDigits.contains(scalar)
+    }
+
+    var isNumberContinuation: Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        return CharacterSet.decimalDigits.contains(scalar) || self == "." || self == "_" || self == "e" || self == "E" || self == "-"
+    }
+
+    var isCodePunctuation: Bool {
+        "{}[]():,.;=+-*/<>!&|?".contains(self)
+    }
+
+    func isNumberStart(next: Character?) -> Bool {
+        guard let scalar = unicodeScalars.first else { return false }
+        if CharacterSet.decimalDigits.contains(scalar) {
+            return true
+        }
+        if self == "-", let nextScalar = next?.unicodeScalars.first {
+            return CharacterSet.decimalDigits.contains(nextScalar)
+        }
+        return false
+    }
 }
 
 internal func parseMermaidDiagram(_ source: String) -> MermaidDiagram? {

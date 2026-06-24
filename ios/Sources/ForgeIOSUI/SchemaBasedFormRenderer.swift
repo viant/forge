@@ -2,6 +2,8 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct SchemaBasedFormRenderer: View {
+    private let runtime: ForgeRuntime?
+    private let window: WindowContext?
     private let container: ContainerDef
     /// Called with the current payload whenever any field value changes.
     /// Use this to track live form state without requiring a submit action.
@@ -13,11 +15,17 @@ public struct SchemaBasedFormRenderer: View {
 
     @State private var formValues: [String: String] = [:]
     @State private var multiSelectValues: [String: Set<String>] = [:]
+    @State private var dynamicFormState: [String: JSONValue] = [:]
+    @State private var validationErrors: [String: String] = [:]
 
-    public init(container: ContainerDef,
+    public init(runtime: ForgeRuntime? = nil,
+                window: WindowContext? = nil,
+                container: ContainerDef,
                 seedValues: [String: JSONValue]? = nil,
                 onChange: (([String: JSONValue]) -> Void)? = nil,
                 onSubmit: (([String: JSONValue]) -> Void)? = nil) {
+        self.runtime = runtime
+        self.window = window
         self.container = container
         self.seedValues = seedValues
         self.onChange = onChange
@@ -50,13 +58,19 @@ public struct SchemaBasedFormRenderer: View {
             if container.schemaBasedForm?.showSubmit != false,
                !fields.isEmpty,
                let onSubmit {
-                Button("Submit") { onSubmit(buildPayload(fields: fields)) }
+                Button("Submit") { submit(fields: fields, onSubmit: onSubmit) }
                     .buttonStyle(.borderedProminent)
             }
         }
         .padding()
         .task(id: fields.map(\.id).joined(separator: "|")) {
             applySeeds(fields)
+        }
+        .task(id: schemaFormDataSourceRef ?? "") {
+            await observeDynamicSchemaFormState()
+        }
+        .onChange(of: dynamicFormState) { _, _ in
+            applyDatasourceValues(fields)
         }
         // Propagate changes whenever formValues or multiSelectValues changes.
         .onChange(of: formValues) { _, _ in notifyChange() }
@@ -67,7 +81,30 @@ public struct SchemaBasedFormRenderer: View {
 
     private var resolvedFields: [ResolvedSchemaField] {
         guard let form = container.schemaBasedForm else { return [] }
-        return SchemaFormRuntime.resolvedFields(for: form)
+        return SchemaFormRuntime.resolvedFields(for: form, formState: dynamicFormState)
+    }
+
+    private var schemaFormDataSourceRef: String? {
+        guard let form = container.schemaBasedForm else { return nil }
+        return form.dataSourceRef ?? container.dataSourceRef
+    }
+
+    private func observeDynamicSchemaFormState() async {
+        guard let runtime, let window, let ref = schemaFormDataSourceRef else {
+            return
+        }
+
+        let current = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
+        await MainActor.run {
+            dynamicFormState = current
+        }
+
+        let stream = await runtime.dataSourceFormUpdates(windowID: window.windowID, dataSourceRef: ref)
+        for await next in stream {
+            await MainActor.run {
+                dynamicFormState = next
+            }
+        }
     }
 
     // MARK: - Field rendering
@@ -133,6 +170,30 @@ public struct SchemaBasedFormRenderer: View {
                     .frame(minHeight: 140)
                     .padding(8)
                     .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.quaternary))
+            case .lookup:
+                let display = lookupDisplay(for: field)
+                HStack(spacing: 8) {
+                    TextField(field.placeholder ?? field.key, text: binding(for: field.key))
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        openLookup(field)
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                            .accessibilityLabel("Open lookup")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(lookupDialogID(field.lookup) == nil)
+                }
+                if let display {
+                    Text(display)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let message = validationErrors[field.key] {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.red)
             }
         }
     }
@@ -151,6 +212,10 @@ public struct SchemaBasedFormRenderer: View {
                 applyValue(seed, for: field)
                 continue
             }
+            if let current = dynamicFormState[field.key] {
+                applyValue(current, for: field)
+                continue
+            }
             // Schema default fallback
             switch field.type {
             case .multiSelect:
@@ -163,6 +228,14 @@ public struct SchemaBasedFormRenderer: View {
                 let display = SchemaFormRuntime.displayValue(for: field.defaultValue)
                 if !display.isEmpty { formValues[field.key] = display }
             }
+        }
+    }
+
+    private func applyDatasourceValues(_ fields: [ResolvedSchemaField]) {
+        guard !dynamicFormState.isEmpty else { return }
+        for field in fields {
+            guard let value = dynamicFormState[field.key] else { continue }
+            applyValue(value, for: field)
         }
     }
 
@@ -203,10 +276,98 @@ public struct SchemaBasedFormRenderer: View {
         onChange(buildPayload(fields: resolvedFields))
     }
 
+    private func submit(fields: [ResolvedSchemaField], onSubmit: ([String: JSONValue]) -> Void) {
+        let payload = buildPayload(fields: fields)
+        let errors = SchemaFormRuntime.validationErrors(fields: fields, payload: payload)
+        validationErrors = errors
+        guard errors.isEmpty else { return }
+        onSubmit(payload)
+    }
+
+    private func openLookup(_ field: ResolvedSchemaField) {
+        guard let runtime, let window, let dialogID = lookupDialogID(field.lookup) else {
+            return
+        }
+        let dataSourceRef = schemaFormDataSourceRef ?? container.dataSourceRef ?? ""
+        let parameters = lookupParameters(field.lookup)
+        let execution = ExecutionDef(
+            action: "window.openDialog",
+            args: [dialogID],
+            parameters: parameters
+        )
+        Task {
+            _ = await runtime.execute(
+                execution,
+                context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef),
+                args: [
+                    "windowId": .string(window.windowID),
+                    "selectionMode": .string(lookupMultiple(field.lookup) ? "multi" : "single"),
+                    "multiple": .bool(lookupMultiple(field.lookup))
+                ]
+            )
+        }
+    }
+
+    private func lookupDisplay(for field: ResolvedSchemaField) -> String? {
+        let fallback = formValues[field.key] ?? ""
+        guard let display = SchemaFormRuntime.lookupDisplayValue(
+            for: field,
+            formState: dynamicFormState,
+            fallback: fallback
+        ) else {
+            return nil
+        }
+        if display == fallback {
+            return nil
+        }
+        return display
+    }
+
     private func toggleMultiSelect(_ option: String, for key: String) {
         var current = multiSelectValues[key, default: []]
         if current.contains(option) { current.remove(option) } else { current.insert(option) }
         multiSelectValues[key] = current
         formValues[key] = current.sorted().joined(separator: ", ")
     }
+}
+
+private func lookupDialogID(_ lookup: JSONValue?) -> String? {
+    let dialogID = lookup?.objectValue?["dialogId"]?.stringValue?
+        .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return dialogID.isEmpty ? nil : dialogID
+}
+
+private func lookupMultiple(_ lookup: JSONValue?) -> Bool {
+    lookup?.objectValue?["multiple"]?.boolValue ?? false
+}
+
+private func lookupParameters(_ lookup: JSONValue?) -> [ParameterDef] {
+    guard let object = lookup?.objectValue else { return [] }
+    let inputs = object["inputs"]?.arrayValue ?? []
+    let outputs = object["outputs"]?.arrayValue ?? []
+    var parameters: [ParameterDef] = inputs.compactMap { value in
+        guard let entry = value.objectValue else { return nil }
+        let name = lookupString(entry["name"]) ?? lookupString(entry["location"]) ?? ""
+        guard !name.isEmpty else { return nil }
+        return ParameterDef(
+            name: name,
+            input: "form",
+            location: .string(lookupString(entry["location"]) ?? name)
+        )
+    }
+    parameters += outputs.compactMap { value in
+        guard let entry = value.objectValue else { return nil }
+        let name = lookupString(entry["name"]) ?? lookupString(entry["location"]) ?? ""
+        guard !name.isEmpty else { return nil }
+        return ParameterDef(
+            name: name,
+            direction: "out",
+            location: .string(lookupString(entry["location"]) ?? name)
+        )
+    }
+    return parameters
+}
+
+private func lookupString(_ value: JSONValue?) -> String? {
+    value?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
 }

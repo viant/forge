@@ -51,6 +51,34 @@ extension ForgeRuntime {
         return await signal.stream()
     }
 
+    public func dataSourceInputState(
+        windowID: String,
+        dataSourceRef: String
+    ) async -> InputState {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        return await dataSourceRuntime.input(dataSourceID: dataSourceID)
+    }
+
+    public func dataSourceInputUpdates(
+        windowID: String,
+        dataSourceRef: String
+    ) async -> AsyncStream<InputState> {
+        let signal = await signals.input(
+            dataSourceID: WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        )
+        return await signal.stream()
+    }
+
+    public func dataSourceControlUpdates(
+        windowID: String,
+        dataSourceRef: String
+    ) async -> AsyncStream<ControlState> {
+        let signal = await signals.control(
+            dataSourceID: WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        )
+        return await signal.stream()
+    }
+
     public func setDataSourceFilter(
         windowID: String,
         dataSourceRef: String,
@@ -59,7 +87,11 @@ extension ForgeRuntime {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setFilter(dataSourceID: dataSourceID, filter: filter)
         let signal = await signals.input(dataSourceID: dataSourceID)
-        await signal.set(await dataSourceRuntime.input(dataSourceID: dataSourceID))
+        let next = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        await signal.set(next)
+        if next.fetch {
+            await refreshDataSourceCollection(windowID: windowID, dataSourceRef: dataSourceRef)
+        }
     }
 
     public func windowFormUpdates(windowID: String) async -> AsyncStream<[String: JSONValue]> {

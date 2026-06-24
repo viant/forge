@@ -129,11 +129,24 @@ fun ContainerRenderer(
                 ?: effectiveDataSourceRef
             val dsContext = dsRef?.let(window::contextOrNull)
             if (dsContext != null) {
-                SchemaBasedFormRenderer(runtime, dsContext, container)
+                val submitExecutions = schemaFormSubmitExecutions(container.schemaBasedForm)
+                SchemaBasedFormRenderer(
+                    runtime = runtime,
+                    context = dsContext,
+                    container = container,
+                    onSubmit = submitExecutions.takeIf { it.isNotEmpty() }?.let { executions ->
+                        { payload ->
+                            val args = schemaFormSubmitArgs(payload)
+                            executions.forEach { execution ->
+                                runtime.execute(execution, dsContext, args)
+                            }
+                        }
+                    }
+                )
                 return@Column
             }
         }
-        if (container.table != null && effectiveDataSourceRef.isNotBlank()) {
+        if (container.table != null && container.chart == null && effectiveDataSourceRef.isNotBlank()) {
             WithContainerDataSource(
                 window = window,
                 dataSourceRef = effectiveDataSourceRef,
@@ -167,13 +180,15 @@ fun ContainerRenderer(
             }
         }
 
-        if (container.fileBrowser != null && effectiveDataSourceRef.isNotBlank()) {
+        val fileBrowser = container.fileBrowser
+        val fileBrowserDataSourceRef = fileBrowser?.dataSourceRef ?: effectiveDataSourceRef
+        if (fileBrowser != null && fileBrowserDataSourceRef.isNotBlank()) {
             WithContainerDataSource(
                 window = window,
-                dataSourceRef = effectiveDataSourceRef,
+                dataSourceRef = fileBrowserDataSourceRef,
                 fetchData = container.fetchData
             ) { dsContext ->
-                FileBrowserRenderer(runtime, dsContext, container.fileBrowser)
+                FileBrowserRenderer(runtime, dsContext, fileBrowser)
             }
         }
 
@@ -187,7 +202,7 @@ fun ContainerRenderer(
                     if (container.items.isNotEmpty()) {
                         FormRenderer(runtime, dsContext, container.items)
                     }
-                    ChartRenderer(dsContext, container.chart)
+                    ChartTableModeRenderer(runtime, dsContext, container, container.chart)
                 }
             }
         }
@@ -312,6 +327,21 @@ private fun resolveContainerItemsContext(
     return candidates.firstNotNullOfOrNull(window::contextOrNull)
 }
 
+internal fun schemaFormSubmitExecutions(form: com.viant.forgeandroid.runtime.SchemaBasedFormDef): List<com.viant.forgeandroid.runtime.ExecutionDef> {
+    return form.on.filter { execution ->
+        execution.event?.trim()?.equals("submit", ignoreCase = true) == true &&
+            !execution.handler.isNullOrBlank()
+    }
+}
+
+internal fun schemaFormSubmitArgs(payload: Map<String, Any?>): Map<String, Any?> {
+    return mapOf(
+        "data" to payload,
+        "payload" to payload,
+        "form" to payload
+    )
+}
+
 private fun resolveContainerVisibilityContext(
     window: WindowContext,
     container: ContainerDef,
@@ -361,13 +391,14 @@ private fun WithContainerDataSource(
     content(dsContext)
 }
 
-private fun resolveChartDataSourceRef(
+internal fun resolveChartDataSourceRef(
     windowForm: Map<String, Any?>,
     container: ContainerDef,
     inheritedDataSourceRef: String? = null
 ): String? {
     container.dataSourceRef?.takeIf { it.isNotBlank() }?.let { return it }
     val chart = container.chart ?: return null
+    chart.dataSourceRef?.takeIf { it.isNotBlank() }?.let { return it }
     if (chart.dataSourceRefs.isEmpty()) {
         return inheritedDataSourceRef?.takeIf { it.isNotBlank() }
     }

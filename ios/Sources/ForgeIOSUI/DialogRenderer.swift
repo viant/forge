@@ -339,10 +339,6 @@ private struct WindowDialogHost: View {
             parameters: scopedArgs,
             fetch: true
         )
-        await runtime.refreshDataSourceCollection(
-            windowID: window.windowID,
-            dataSourceRef: dialogDataSourceRef
-        )
     }
 
     private var initialFetchSignature: String {
@@ -375,10 +371,6 @@ private struct WindowDialogHost: View {
             windowID: window.windowID,
             dataSourceRef: dialogDataSourceRef,
             filter: filter
-        )
-        await runtime.refreshDataSourceCollection(
-            windowID: window.windowID,
-            dataSourceRef: dialogDataSourceRef
         )
     }
 

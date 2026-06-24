@@ -39,6 +39,14 @@ class ReportBuilderStateStorageTest {
         assertEquals(
             false,
             shouldAutoCollapseReportBuilderFilters(
+                hasRows = true,
+                completedRequestSignature = """ {"filters":{"country":["US"]}} """,
+                lastCollapsedRequestSignature = """{"filters":{"country":["US"]}}"""
+            )
+        )
+        assertEquals(
+            false,
+            shouldAutoCollapseReportBuilderFilters(
                 hasRows = false,
                 completedRequestSignature = """{"filters":{"country":["US"]}}""",
                 lastCollapsedRequestSignature = ""

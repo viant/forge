@@ -29,6 +29,8 @@ public struct ReportBuilderRenderer: View {
     @State private var lastAutoAppliedRequestSignature = ""
     @State private var filtersExpanded = true
     @State private var lastAutoCollapsedRequestSignature = ""
+    @State private var hasResolvedRows = false
+    @State private var dataSourceControlState = ControlState()
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, config: DashboardReportBuilderDef) {
         self.runtime = runtime
@@ -41,6 +43,12 @@ public struct ReportBuilderRenderer: View {
         layoutView
         .task(id: taskKey) {
             await loadRows()
+        }
+        .task(id: taskKey) {
+            await observeDataSourceRows()
+        }
+        .task(id: taskKey) {
+            await observeDataSourceControl()
         }
         .task(id: hydrationTaskKey) {
             await hydrateInitialStateIfNeeded()
@@ -715,10 +723,32 @@ public struct ReportBuilderRenderer: View {
     @ViewBuilder
     private func chartView(spec: ReportBuilderChartSpecDef) -> some View {
         let points = Self.chartPoints(from: aggregatedRows, spec: spec)
-        if points.isEmpty {
-            Text("No chart data")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+        if let feedback = reportBuilderChartStateFeedback(
+            control: dataSourceControlState,
+            hasResolvedRows: hasResolvedRows,
+            hasChartValues: !points.isEmpty
+        ) {
+            VStack(spacing: 8) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(feedback.isError ? Color.red.opacity(0.75) : Color.secondary.opacity(0.7))
+                Text(feedback.message)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(feedback.isError ? .red : .secondary)
+                if let detail = feedback.detail {
+                    Text(detail)
+                        .font(.caption2)
+                        .foregroundStyle(feedback.isError ? .red.opacity(0.85) : .secondary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 220)
+            .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.black.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+            )
         } else {
             Chart(points) { point in
                 switch (spec.type ?? "line").lowercased() {
@@ -749,9 +779,49 @@ public struct ReportBuilderRenderer: View {
     private func loadRows() async {
         guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
             rows = []
+            hasResolvedRows = true
+            dataSourceControlState = ControlState()
             return
         }
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        dataSourceControlState = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        hasResolvedRows = true
+    }
+
+    private func observeDataSourceRows() async {
+        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+            await MainActor.run {
+                rows = []
+                hasResolvedRows = true
+            }
+            return
+        }
+        let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        for await next in stream {
+            await MainActor.run {
+                rows = next
+                hasResolvedRows = true
+            }
+        }
+    }
+
+    private func observeDataSourceControl() async {
+        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+            await MainActor.run {
+                dataSourceControlState = ControlState()
+            }
+            return
+        }
+        let initialControl = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        await MainActor.run {
+            dataSourceControlState = initialControl
+        }
+        let stream = await runtime.dataSourceControlUpdates(windowID: window.windowID, dataSourceRef: dataSourceRef)
+        for await next in stream {
+            await MainActor.run {
+                dataSourceControlState = next
+            }
+        }
     }
 
     @MainActor
@@ -965,12 +1035,10 @@ public struct ReportBuilderRenderer: View {
             parameters: requestPayload,
             fetch: true
         )
-        await runtime.refreshDataSourceCollection(
-            windowID: window.windowID,
-            dataSourceRef: resolvedDataSourceRef
-        )
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
         let control = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        dataSourceControlState = control
+        hasResolvedRows = true
         if control.error == nil {
             completedRequestSignature = requestSignature
         }
@@ -1883,6 +1951,19 @@ internal func shouldAutoCollapseReportBuilderFilters(
         return false
     }
     return completed != lastCollapsedRequestSignature.trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+internal func reportBuilderChartStateFeedback(
+    control: ControlState,
+    hasResolvedRows: Bool,
+    hasChartValues: Bool
+) -> ChartDataStateFeedback? {
+    chartDataStateFeedback(
+        loading: control.loading,
+        error: control.error,
+        hasResolvedRows: hasResolvedRows,
+        hasChartValues: hasChartValues
+    )
 }
 
 private struct StoredReportBuilderState: Codable, Sendable {
