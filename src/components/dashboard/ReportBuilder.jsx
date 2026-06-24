@@ -320,6 +320,9 @@ import {
     buildReportBuilderSavedReportState,
 } from "./reportBuilderSavedReportState.js";
 import {
+    matchesReportBuilderSavedReportRecordSource,
+} from "./reportBuilderSavedReportRecords.js";
+import {
     projectReportBuilderLifecycleEnvelopeState,
 } from "./reportBuilderLifecycleSharedArtifactReconciliation.js";
 import {
@@ -5497,9 +5500,7 @@ export default function ReportBuilder({ container, context }) {
             && !!reopenedSavedRecord
             && !!selectedListEntrySavedRecord
             && normalizeString(selectedListEntrySavedRecord?.reportId) === normalizeString(hydratedReportDocumentSession?.reportId)
-            && normalizeString(selectedListEntrySavedRecord?.source?.kind) === normalizeString(reopenedSavedRecord?.source?.kind)
-            && normalizeString(selectedListEntrySavedRecord?.sourceIdentity?.sourceArtifactId || selectedListEntrySavedRecord?.source?.sourceArtifactId)
-                === normalizeString(reopenedSavedRecord?.sourceIdentity?.sourceArtifactId || reopenedSavedRecord?.source?.sourceArtifactId);
+            && matchesReportBuilderSavedReportRecordSource(selectedListEntrySavedRecord, reopenedSavedRecord);
         if (!selectedMatchesReopened || !selectedListEntryExportSeed || !runtimePreviewArtifact) {
             return selectedListEntrySavedRecordExportRequest;
         }

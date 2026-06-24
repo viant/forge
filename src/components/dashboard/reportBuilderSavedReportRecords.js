@@ -207,3 +207,32 @@ export function resolveReportBuilderSavedReportRecordBySource(records = null, so
         .sort((left, right) => Number(right?.exportable === true) - Number(left?.exportable === true))[0]
         || null;
 }
+
+export function matchesReportBuilderSavedReportRecordSource(left = null, right = null) {
+    const leftIdentity = normalizeReportBuilderSavedPayloadSourceIdentity(left?.source || left);
+    const rightIdentity = normalizeReportBuilderSavedPayloadSourceIdentity(right?.source || right);
+    if (!leftIdentity || !rightIdentity) {
+        return false;
+    }
+    if (!matchesReportBuilderSavedPayloadSourceIdentity(leftIdentity, rightIdentity)) {
+        return false;
+    }
+    const leftReportId = normalizeString(
+        left?.reportId
+        || leftIdentity?.reportId
+        || left?.reportRef?.reportId
+        || left?.document?.id
+        || left?.reportDocument?.id,
+    );
+    const rightReportId = normalizeString(
+        right?.reportId
+        || rightIdentity?.reportId
+        || right?.reportRef?.reportId
+        || right?.document?.id
+        || right?.reportDocument?.id,
+    );
+    if (leftReportId && rightReportId && leftReportId !== rightReportId) {
+        return false;
+    }
+    return true;
+}
