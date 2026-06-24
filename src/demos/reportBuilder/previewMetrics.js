@@ -12,6 +12,7 @@ import { attachPreviewDetailTargetBehaviorApi } from "./previewDetailTargetBehav
 import { attachPreviewRuntimeActionBehaviorApi } from "./previewRuntimeActionBehaviors.js";
 import { attachPreviewFetchBehaviorApi } from "./previewFetchBehaviors.js";
 import { attachPreviewExportBehaviorApi } from "./previewExportBehaviors.js";
+import { attachPreviewLifecycleBehaviorApi } from "./previewLifecycleBehaviors.js";
 
 function resolveStorage(windowLike = null, explicitStorage = undefined) {
   if (explicitStorage !== undefined) {
@@ -41,6 +42,7 @@ export function createReportBuilderPreviewMetrics({ storage = null } = {}) {
     runtimeActionBehaviors: [],
     fetchBehaviors: [],
     exportBehaviors: [],
+    lifecycleBehaviors: [],
     resetCounters() {
       this.fetchCollectionCount = 0;
       this.fetchRecordsCount = 0;
@@ -56,11 +58,13 @@ export function createReportBuilderPreviewMetrics({ storage = null } = {}) {
     },
   };
   const previewMetrics = attachPreviewFetchBehaviorApi(
-    attachPreviewExportBehaviorApi(
-      attachPreviewRuntimeActionBehaviorApi(
-        attachPreviewDetailTargetBehaviorApi(
-          attachPreviewSemanticValidationBehaviorApi(
-            attachPreviewSemanticModelBehaviorApi(next),
+    attachPreviewLifecycleBehaviorApi(
+      attachPreviewExportBehaviorApi(
+        attachPreviewRuntimeActionBehaviorApi(
+          attachPreviewDetailTargetBehaviorApi(
+            attachPreviewSemanticValidationBehaviorApi(
+              attachPreviewSemanticModelBehaviorApi(next),
+            ),
           ),
         ),
       ),

@@ -1,9 +1,13 @@
-function normalizeKeys(keys = []) {
+export function normalizeKeys(keys = []) {
     return Array.isArray(keys)
         ? keys
             .map((key) => String(key ?? "").trim())
             .filter((key, index, values) => key && values.indexOf(key) === index)
         : [];
+}
+
+export function createKeyListSignature(keys = []) {
+    return normalizeKeys(keys).join("\u0001");
 }
 
 export function reconcileSelectedDataKeys(selectedDataKeys = [], availableDataKeys = [], options = {}) {
@@ -52,4 +56,18 @@ export function toggleSelectedDataKey(selectedDataKeys = [], dataKey = "") {
         return selected.filter((key) => key !== normalizedKey);
     }
     return [...selected, normalizedKey];
+}
+
+export function reconcileVisibleColumns(visibleColumns = [], allTableColumns = []) {
+    const current = normalizeKeys(visibleColumns);
+    const all = normalizeKeys(allTableColumns);
+    const keep = current.filter((key) => all.includes(key));
+    const add = all.filter((key) => !keep.includes(key));
+    const next = keep.length > 0 || add.length > 0
+        ? [...keep, ...add]
+        : [...all];
+    if (current.length === next.length && current.every((key, index) => key === next[index])) {
+        return visibleColumns;
+    }
+    return next;
 }

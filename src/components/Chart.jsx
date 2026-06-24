@@ -38,7 +38,13 @@ import {
     resolveVisibleChartState,
     transformData,
 } from "./chartData.js";
-import { reconcileSelectedDataKeys, toggleSelectedDataKey } from "./chartSeriesSelection.js";
+import {
+    createKeyListSignature,
+    normalizeKeys,
+    reconcileSelectedDataKeys,
+    reconcileVisibleColumns,
+    toggleSelectedDataKey,
+} from "./chartSeriesSelection.js";
 import {
     collectChartLegendSelectionRows,
     normalizeChartDatumSelection,
@@ -427,6 +433,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const availableDataKeys = visibleState.availableDataKeys;
     const yAxisLabel = visibleState.yAxisLabel;
     const staleWhileLoading = visibleState.staleWhileLoading;
+    const availableDataKeysSignature = useMemo(
+        () => createKeyListSignature(availableDataKeys),
+        [availableDataKeys],
+    );
+    const stableAvailableDataKeys = useMemo(
+        () => normalizeKeys(availableDataKeys),
+        [availableDataKeysSignature],
+    );
 
     useEffect(() => {
         if (!effectiveLoading && !error && Array.isArray(prepared.chartData) && prepared.chartData.length > 0) {
@@ -441,7 +455,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
     useEffect(() => {
         setSelectedDataKeys((previousKeys) => {
-            const nextSelection = reconcileSelectedDataKeys(previousKeys, availableDataKeys, selectionStateRef.current);
+            const nextSelection = reconcileSelectedDataKeys(previousKeys, stableAvailableDataKeys, selectionStateRef.current);
             selectionStateRef.current = {
                 ...selectionStateRef.current,
                 initialized: nextSelection.initialized,
@@ -450,7 +464,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 ? previousKeys
                 : nextSelection.selectedDataKeys;
         });
-    }, [availableDataKeys]);
+    }, [availableDataKeysSignature, stableAvailableDataKeys]);
 
     useEffect(() => {
         if (embedded && viewMode !== "chart") {
@@ -458,18 +472,15 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
     }, [embedded, viewMode]);
 
-    const allTableColumns = [xAxis?.dataKey, ...availableDataKeys].filter(Boolean);
+    const allTableColumns = useMemo(
+        () => [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        [xAxis?.dataKey, stableAvailableDataKeys],
+    );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
 
     useEffect(() => {
-        setVisibleColumns((prev) => {
-            const keep = prev.filter((k) => allTableColumns.includes(k));
-            const add = allTableColumns.filter((k) => !keep.includes(k));
-            const next = [...keep, ...add];
-            return next.length ? next : [...allTableColumns];
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [xAxis?.dataKey, availableDataKeys.join("|")]);
+        setVisibleColumns((prev) => reconcileVisibleColumns(prev, allTableColumns));
+    }, [allTableColumns]);
 
 
 

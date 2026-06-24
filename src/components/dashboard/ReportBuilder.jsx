@@ -42,6 +42,7 @@ import {
     buildReportBuilderReopenedExportFailureNotice,
     buildReportBuilderReopenedExportJobPanelState,
     buildReportBuilderDraftExportRequestPanelState,
+    buildReportBuilderLatestSharedArtifactSupplementalText,
     buildReportBuilderReopenedExportRequestPanelState,
     buildReportBuilderReopenedSessionNoticeState,
     buildReportBuilderSavedPayloadExportActionState,
@@ -1375,13 +1376,16 @@ export default function ReportBuilder({ container, context }) {
             && String(semanticSelectionValidationState?.fingerprint || "").trim() === semanticValidationFingerprint,
     }), [config?.semanticModel, displayConfig, semanticModelProvider, semanticModelRef, semanticModelState, semanticSelectionValidationState, semanticValidationFingerprint, state]);
     const readiness = useMemo(() => resolveStateReadiness(state), [resolveStateReadiness, state]);
+    const semanticSelectedIssueCount = Array.isArray(semanticFieldValidation?.selectedIssues)
+        ? semanticFieldValidation.selectedIssues.length
+        : 0;
     const semanticInlineNotices = useMemo(() => buildReportBuilderSemanticInlineNotices({
         semanticStatus,
         readiness,
         semanticFieldValidationMessage: semanticFieldValidation?.message,
-        semanticSelectedIssueCount: semanticSelectedIssues.length,
+        semanticSelectedIssueCount,
         semanticSelectionValidationState,
-    }), [readiness, semanticFieldValidation?.message, semanticSelectedIssues.length, semanticSelectionValidationState, semanticStatus]);
+    }), [readiness, semanticFieldValidation?.message, semanticSelectedIssueCount, semanticSelectionValidationState, semanticStatus]);
     const canRunReport = readiness.canRun;
     const requestFingerprintRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
@@ -2195,9 +2199,10 @@ export default function ReportBuilder({ container, context }) {
         }),
         [authoredDetailFieldOption, authoredDetailPresetTargets],
     );
+    const authoredDetailTargetDraftText = String(authoredDetailTargetRefDraft || "").trim();
     const authoredDetailSelectedRoutePreset = useMemo(
-        () => authoredDetailRouteSuggestions.find((entry) => entry.targetRef === authoredDetailTargetDraftValue)?.targetRef || "",
-        [authoredDetailRouteSuggestions, authoredDetailTargetDraftValue],
+        () => authoredDetailRouteSuggestions.find((entry) => entry.targetRef === authoredDetailTargetDraftText)?.targetRef || "",
+        [authoredDetailRouteSuggestions, authoredDetailTargetDraftText],
     );
     const authoredDetailParameterSourceFieldOptions = useMemo(() => {
         const seen = new Set();
@@ -2246,7 +2251,7 @@ export default function ReportBuilder({ container, context }) {
                 })
         ));
     }, [authoredDrillMetadata.detailTargets, authoredDrillMetadata.fieldActions, dimensions]);
-    const authoredDetailTargetDraftValue = String(authoredDetailTargetRefDraft || "").trim();
+    const authoredDetailTargetDraftValue = authoredDetailTargetDraftText;
     const matchingAuthoredDetailBinding = useMemo(
         () => authoredDetailActionBindings.find(
             (binding) => binding.fieldRef === authoredDetailFieldRef && binding.targetRef === authoredDetailTargetDraftValue,
@@ -4813,12 +4818,6 @@ export default function ReportBuilder({ container, context }) {
         () => buildReportBuilderListReportDocumentsResponseSummary(activeListReportDocumentsResponse),
         [activeListReportDocumentsResponse],
     );
-    const listReportDocumentsEntryOptions = useMemo(
-        () => buildReportBuilderListReportDocumentsEntryOptions(activeListReportDocumentsResponse, {
-            localSavedPayloads: localSavedReportRecords,
-        }),
-        [activeListReportDocumentsResponse, localSavedReportRecords],
-    );
     const selectedListReportDocumentsEntry = useMemo(
         () => resolveReportBuilderListReportDocumentsResponseEntry(activeListReportDocumentsResponse, {
             selectedEntryKey: listReportDocumentsSelectedReportId,
@@ -4872,6 +4871,12 @@ export default function ReportBuilder({ container, context }) {
     const localReportDocumentSavedPayloads = savedReportState.rawLocalSavedPayloads;
     const localSavedReportRecords = savedReportState.localSavedReportRecords;
     const savedReportPayloadExportRequest = savedReportState.savedReportPayloadExportRequest;
+    const listReportDocumentsEntryOptions = useMemo(
+        () => buildReportBuilderListReportDocumentsEntryOptions(activeListReportDocumentsResponse, {
+            localSavedPayloads: localSavedReportRecords,
+        }),
+        [activeListReportDocumentsResponse, localSavedReportRecords],
+    );
     const selectedListReportDocumentsEntrySummary = useMemo(
         () => buildReportBuilderListReportDocumentsEntrySummary(selectedListReportDocumentsEntry, {
             localSavedPayloads: localSavedReportRecords,
@@ -4888,9 +4893,9 @@ export default function ReportBuilder({ container, context }) {
     );
     const selectedListEntryLifecycleBlockedReason = useMemo(
         () => (normalizeString(selectedListReportDocumentsEntrySummary?.localBackingAvailability) === "ambiguous"
-            ? normalizeString(selectedListReportDocumentsEntryNotice?.message)
+            ? "Multiple local artifacts match this report id. Explicit source identity is required before lifecycle actions can continue."
             : ""),
-        [selectedListReportDocumentsEntryNotice?.message, selectedListReportDocumentsEntrySummary?.localBackingAvailability],
+        [selectedListReportDocumentsEntrySummary?.localBackingAvailability],
     );
     const selectedListEntrySavedRecord = savedReportState.selectedListEntrySavedRecord;
     const selectedBackendSharedArtifactHydrationNotice = useMemo(() => {
@@ -5552,7 +5557,7 @@ export default function ReportBuilder({ container, context }) {
     ]);
     const exportExecutionConfigs = useMemo(
         () => buildReportBuilderExportExecutionConfigs({
-            draftRequest,
+            draftRequest: draftExportRequest,
             importedStandaloneRequest: importedStandaloneExportRequest,
             importedPipelineRequest: importedPipelineRuntimeArtifact?.exportRequest || null,
             savedPayloadRequest: savedReportPayloadExportRequest,
@@ -6099,6 +6104,9 @@ export default function ReportBuilder({ container, context }) {
                 actorRef: reportAuditActorRef,
                 metadata: reportAuditMetadata,
             });
+            if (!savedReportPayloadSummary && lifecycleResultProjection?.record) {
+                setSavedReportPayloadRecord(lifecycleResultProjection.record);
+            }
             setChartApplyFeedback({
                 level: auditResult.issue || viewCreationAuditResult.issue ? "warning" : "info",
                 message: `${normalizeString(lifecycleResultProjection?.envelope?.message || result?.message) || `${actionLabel} request sent for ${title}.`}${auditResult.issue ? ` ${auditResult.issue}` : ""}${viewCreationAuditResult.issue ? ` ${viewCreationAuditResult.issue}` : ""}`,
@@ -6120,6 +6128,7 @@ export default function ReportBuilder({ container, context }) {
         reportAuditHandler,
         reportAuditMetadata,
         reportLifecycleHandler,
+        savedReportPayloadSummary,
         savedReportPayload,
         savedReportPayloadExportRequest,
         savedReportPayloadRecord,
@@ -6220,16 +6229,23 @@ export default function ReportBuilder({ container, context }) {
         selectedListReportDocumentsEntrySummary,
         state,
     ]);
+    const reopenedSessionLifecycleSummary = useMemo(
+        () => buildReportBuilderReopenedSessionNoticeState({
+            session: hydratedReportDocumentSession,
+            exportRequestSummary: null,
+        }),
+        [hydratedReportDocumentSession],
+    );
     const triggerReopenedSessionLifecycleAction = React.useCallback(async (actionId = "") => {
         const normalizedActionId = normalizeString(actionId).toLowerCase();
-        if (!normalizedActionId || !hydratedReportDocumentSession || !reopenedSessionNoticeState || !reportLifecycleHandler) {
+        if (!normalizedActionId || !hydratedReportDocumentSession || !reopenedSessionLifecycleSummary || !reportLifecycleHandler) {
             return;
         }
-        const request = buildReportBuilderLifecycleActionRequest(normalizedActionId, reopenedSessionNoticeState, {
+        const request = buildReportBuilderLifecycleActionRequest(normalizedActionId, reopenedSessionLifecycleSummary, {
             metadata: {
                 source: "reportBuilder.reopenedSession",
                 reportId: normalizeString(hydratedReportDocumentSession?.reportId),
-                artifactKind: normalizeString(reopenedSessionNoticeState?.artifactKind || reopenedSessionNoticeState?.kind),
+                artifactKind: normalizeString(reopenedSessionLifecycleSummary?.artifactKind || reopenedSessionLifecycleSummary?.kind),
             },
         });
         if (!request) {
@@ -6301,7 +6317,7 @@ export default function ReportBuilder({ container, context }) {
         reportAuditMetadata,
         reportLifecycleHandler,
         reopenedExportRequest,
-        reopenedSessionNoticeState,
+        reopenedSessionLifecycleSummary,
         state,
     ]);
 
@@ -7576,21 +7592,14 @@ export default function ReportBuilder({ container, context }) {
             }
             : null;
     }, [hydratedReportDocumentSession?.reopenedScopeParams]);
-    const reopenedSessionNoticeState = useMemo(
-        () => buildReportBuilderReopenedSessionNoticeState({
-            session: hydratedReportDocumentSession,
-            exportRequestSummary: reopenedExportRequestSummary,
-        }),
-        [hydratedReportDocumentSession, reopenedExportRequestSummary],
-    );
     const reopenedSessionLifecycleActionState = useMemo(
-        () => buildReportBuilderLifecycleActionState(reopenedSessionNoticeState, {
+        () => buildReportBuilderLifecycleActionState(reopenedSessionLifecycleSummary, {
             handler: reportLifecycleHandler,
             busyActionId: reopenedSessionLifecycleActionId,
         }),
         [
             reopenedSessionLifecycleActionId,
-            reopenedSessionNoticeState,
+            reopenedSessionLifecycleSummary,
             reportLifecycleHandler,
         ],
     );
@@ -8263,6 +8272,13 @@ export default function ReportBuilder({ container, context }) {
         downloadArtifact: downloadReopenedExportArtifact,
         downloadRequest: downloadReopenedExportRequest,
     } = reopenedExportExecution;
+    const reopenedSessionNoticeState = useMemo(
+        () => buildReportBuilderReopenedSessionNoticeState({
+            session: hydratedReportDocumentSession,
+            exportRequestSummary: reopenedExportRequestSummary,
+        }),
+        [hydratedReportDocumentSession, reopenedExportRequestSummary],
+    );
     const {
         requestOpen: selectedListEntryExportRequestOpen,
         setRequestOpen: setSelectedListEntryExportRequestOpen,
@@ -11997,9 +12013,7 @@ export default function ReportBuilder({ container, context }) {
                             description={latestLifecycleSharedArtifactSummary.description}
                             supplemental={(
                                 <span>
-                                    {normalizeString(latestLifecycleSharedArtifactSummary?.kind) === "reportBuilder.publishedSnapshot"
-                                        ? "The latest publish action returned an immutable snapshot artifact for this report."
-                                        : "The latest share action returned an immutable shared artifact for this report."}
+                                    {buildReportBuilderLatestSharedArtifactSupplementalText(latestLifecycleSharedArtifactSummary)}
                                 </span>
                             )}
                             footer={(

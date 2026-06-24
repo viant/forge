@@ -23,6 +23,7 @@ import {
   incrementReportBuilderPreviewMetric,
   recordReportBuilderPreviewObservation,
 } from './previewMetrics.js';
+import { applyPreviewLifecycleBehavior } from "./previewLifecycleBehaviors.js";
 import {
   attachPreviewRuntimeSurfaceApi,
   detachPreviewRuntimeSurfaceApi,
@@ -321,6 +322,7 @@ function createDemoContext() {
   const exportJobs = new Map();
   const exportArtifacts = new Map();
   let exportSequence = 0;
+  let lifecycleSequence = 0;
   const ctx = {
     locale: 'en-US',
     identity: {
@@ -362,8 +364,144 @@ function createDemoContext() {
     }
   };
 
+  const runLifecycleAction = async (request = {}) => {
+    const metrics = ensurePreviewMetrics();
+    const action = String(request?.action || "").trim().toLowerCase();
+    const transitionTo = String(request?.transition?.to || "").trim().toLowerCase();
+    const reportId = String(
+      request?.reportId
+      || request?.metadata?.reportId
+      || request?.reportDocument?.id
+      || request?.reportDocument?.reportId
+      || "report"
+    ).trim() || "report";
+    const title = String(
+      request?.reportDocument?.title
+      || request?.source?.title
+      || request?.title
+      || reportId
+      || "Report"
+    ).trim() || "Report";
+    const exportRequest = request?.reportExportRequest && typeof request.reportExportRequest === "object"
+      ? clonePreviewValue(request.reportExportRequest)
+      : null;
+    const baseDocument = request?.reportDocument && typeof request.reportDocument === "object"
+      ? clonePreviewValue(request.reportDocument)
+      : {
+        version: 1,
+        kind: "reportDocument",
+        id: reportId,
+        title,
+      };
+    const documentVersion = Number(
+      exportRequest?.source?.documentVersion
+      || request?.version
+      || request?.reportDocument?.documentVersion
+      || 1
+    ) || 1;
+    lifecycleSequence += 1;
+    const publishAction = action === "publish" || transitionTo === "published";
+    const archiveAction = action === "archive" || transitionTo === "archived";
+    const kind = publishAction || archiveAction
+      ? "reportBuilder.publishedSnapshot"
+      : "reportBuilder.savedView";
+    const sourceArtifactId = kind === "reportBuilder.publishedSnapshot"
+      ? `published_snapshot_${reportId}_${lifecycleSequence}`
+      : `saved_view_${reportId}_${lifecycleSequence}`;
+    const artifactRef = `${kind}://${sourceArtifactId}`;
+    const artifactTitle = kind === "reportBuilder.publishedSnapshot"
+      ? `${title} Published Snapshot`
+      : `${title} Shared View`;
+    const lifecycle = archiveAction
+      ? "archived"
+      : (publishAction ? "published" : "draft");
+    const overridden = await applyPreviewLifecycleBehavior(metrics, {
+      action,
+      source: String(request?.metadata?.source || "").trim(),
+      reportId,
+      artifactRef: String(request?.artifactRef || request?.transition?.artifactRef || "").trim(),
+      title,
+    });
+    if (overridden) {
+      return overridden;
+    }
+    const sharedArtifact = {
+      version: 1,
+      kind,
+      id: sourceArtifactId,
+      artifactId: sourceArtifactId,
+      artifactKind: kind,
+      artifactRef,
+      lifecycle,
+      ownerRef: "team://preview/reporting",
+      policyRef: "policy://preview/reporting",
+      shareableVersion: documentVersion,
+      badges: [{ id: "certified", label: "Certified" }],
+      capabilities: archiveAction
+        ? { view: true, share: true, export: !!exportRequest }
+        : (publishAction
+          ? { view: true, share: true, archive: true, export: !!exportRequest }
+          : { view: true, share: true, publish: true, export: !!exportRequest }),
+      reportId,
+      documentVersion,
+      savedAt: Date.now(),
+      source: {
+        kind,
+        reportId,
+        sourceArtifactId,
+      },
+      document: {
+        ...baseDocument,
+        id: reportId,
+        title: artifactTitle,
+      },
+      ...(exportRequest?.reportSpec ? { reportSpec: clonePreviewValue(exportRequest.reportSpec) } : {}),
+      ...(exportRequest?.reportFill ? { reportFill: clonePreviewValue(exportRequest.reportFill) } : {}),
+      ...(exportRequest?.reportPrint ? { reportPrint: clonePreviewValue(exportRequest.reportPrint) } : {}),
+    };
+    const nextExportRequest = exportRequest
+      ? {
+        ...exportRequest,
+        source: {
+          ...clonePreviewValue(exportRequest.source || {}),
+          from: kind === "reportBuilder.publishedSnapshot" ? "publishedSnapshot" : "savedView",
+          artifactKind: kind,
+          artifactRef,
+          sourceArtifactId,
+          title: artifactTitle,
+          reportId,
+          documentVersion,
+        },
+      }
+      : null;
+    if (metrics) {
+      const record = {
+        action,
+        artifactRef,
+        reportId,
+        title: artifactTitle,
+        lifecycle,
+      };
+      metrics.lastLifecycleAction = record;
+      metrics.lifecycleActionHistory = [
+        ...(Array.isArray(metrics.lifecycleActionHistory) ? metrics.lifecycleActionHistory : []),
+        record,
+      ];
+    }
+    return {
+      message: archiveAction
+        ? `Archived shared artifact for ${title}.`
+        : (publishAction ? `Published snapshot created for ${title}.` : `Shared view created for ${title}.`),
+      sharedArtifact,
+      ...(nextExportRequest ? { exportRequest: nextExportRequest } : {}),
+    };
+  };
+
   ctx.handlers = {
     semanticModel,
+    reportLifecycle: {
+      runAction: runLifecycleAction,
+    },
     reportExport: {
       async submitRequest({ request, source } = {}) {
         const metrics = ensurePreviewMetrics();

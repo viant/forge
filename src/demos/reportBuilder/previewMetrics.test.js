@@ -38,6 +38,7 @@ assert.deepEqual(
     runtimeActionBehaviors: metrics.runtimeActionBehaviors,
     fetchBehaviors: metrics.fetchBehaviors,
     exportBehaviors: metrics.exportBehaviors,
+    lifecycleBehaviors: metrics.lifecycleBehaviors,
   },
   {
     fetchCollectionCount: 0,
@@ -55,6 +56,7 @@ assert.deepEqual(
     runtimeActionBehaviors: [],
     fetchBehaviors: [],
     exportBehaviors: [],
+    lifecycleBehaviors: [],
   },
 );
 
@@ -164,6 +166,17 @@ assert.equal(metrics.replaceExportBehaviors([
   },
 ]), 1);
 assert.equal(metrics.exportBehaviors.length, 1);
+assert.equal(metrics.replaceLifecycleBehaviors([
+  {
+    match: {
+      action: "archive",
+      source: "reportBuilder",
+      title: "Capacity Trend Q3 Published Snapshot",
+    },
+    error: "Lifecycle archive failed.",
+  },
+]), 1);
+assert.equal(metrics.lifecycleBehaviors.length, 1);
 assert.equal(storage.size > 0, true);
 
 metrics.resetCounters();

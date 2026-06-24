@@ -2584,6 +2584,41 @@ assert.equal(sharedArtifactListResponse.entries[0].artifactId, "shared_view_capa
 assert.equal(sharedArtifactListResponse.entries[0].source.kind, "reportBuilder.savedView");
 assert.equal(sharedArtifactListResponse.entries[1].source.kind, "reportBuilder.publishedSnapshot");
 
+const archivedSharedArtifactListResponse = buildReportBuilderListReportDocumentsResponse(null, {
+    localSavedPayloads: [
+        {
+            artifactId: "shared_snapshot_capacity_shared_archived",
+            lifecycle: "archived",
+            capabilities: {
+                view: true,
+                share: true,
+                export: true,
+            },
+            reportId: "capacityShared",
+            title: "Capacity Shared Archived Snapshot",
+            documentVersion: 10,
+            savedAt: 9300,
+            importedArtifactKind: "reportBuilder.publishedSnapshot",
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityShared",
+                title: "Capacity Shared Archived Snapshot",
+            },
+            source: {
+                kind: "reportBuilder.publishedSnapshot",
+                reportId: "capacityShared",
+                sourceArtifactId: "published_snapshot_capacity_shared_archived",
+            },
+        },
+    ],
+    savedAt: 9300,
+});
+assert.equal(archivedSharedArtifactListResponse.entries.length, 1);
+assert.equal(archivedSharedArtifactListResponse.entries[0].source.kind, "reportBuilder.publishedSnapshot");
+assert.equal(archivedSharedArtifactListResponse.entries[0].lifecycle, "archived");
+assert.equal(archivedSharedArtifactListResponse.entries[0].capabilities?.archive, undefined);
+
 const sharedArtifactListInspector = buildReportBuilderReportDocumentReadResponseInspectorState(sharedArtifactListResponse, {
     selectedReportId: "capacityShared",
 });

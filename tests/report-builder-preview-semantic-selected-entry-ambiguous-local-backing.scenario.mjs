@@ -85,6 +85,16 @@ export default {
               reportRef: { reportId: "capacityShared" },
               documentVersion: 9,
               title: "Capacity Shared",
+              artifactRef: "report://capacityShared",
+              lifecycle: "draft",
+              shareableVersion: 9,
+              capabilities: {
+                view: true,
+                share: true,
+                publish: true,
+                export: true,
+              },
+              ownerRef: "team://preview/reporting",
             },
           ],
           cursor: "",
@@ -117,8 +127,19 @@ export default {
         const openSelected = buttons.find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Open selected response'));
         const unavailable = buttons.find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Export unavailable'));
         const explain = buttons.find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Why export is unavailable'));
+        const share = buttons.find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Share'));
+        const publish = buttons.find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Publish'));
         const disabled = (node) => !!node && (node.disabled || node.getAttribute('aria-disabled') === 'true');
-        return disabled(prepareSelected) && disabled(openSelected) && disabled(unavailable) && !!explain;
+        const lifecycleReason = 'Explicit source identity is required before lifecycle actions can continue.';
+        const lifecycleBlocked = (node) => disabled(node)
+          && (((node?.getAttribute('title') || '').includes(lifecycleReason))
+            || ((node?.getAttribute('aria-label') || '').includes(lifecycleReason)));
+        return disabled(prepareSelected)
+          && disabled(openSelected)
+          && disabled(unavailable)
+          && !!explain
+          && lifecycleBlocked(share)
+          && lifecycleBlocked(publish);
       })()`,
       timeoutMs: 60000,
     },
