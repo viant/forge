@@ -2,9 +2,11 @@ import Foundation
 
 extension ForgeRuntime {
 
-    /// Register all 12 built-in handlers. Call once after init.
+    /// Register built-in handlers without replacing application-provided handlers.
     public func registerBuiltInHandlers() {
-        handlers = Self.makeBuiltInHandlers(for: self)
+        for (name, handler) in Self.makeBuiltInHandlers(for: self) where handlers[name] == nil {
+            handlers[name] = handler
+        }
     }
 
     static func makeBuiltInHandlers(for runtime: ForgeRuntime) -> [String: ForgeHandler] {
@@ -227,21 +229,87 @@ extension ForgeRuntime {
             guard let runtime, let ctx = args.context, !ctx.dataSourceRef.isEmpty else {
                 return nil
             }
-            let dsID = WindowIdentity(windowID: ctx.windowID)
-                .dataSourceID(ref: ctx.dataSourceRef)
             // If a direct "filter" dict was passed, use it verbatim
             if let direct = args.args["filter"]?.objectValue, !direct.isEmpty {
-                await runtime.dataSourceRuntime.setFilter(dataSourceID: dsID, filter: direct)
+                await runtime.setDataSourceFilter(
+                    windowID: ctx.windowID,
+                    dataSourceRef: ctx.dataSourceRef,
+                    filter: direct
+                )
                 return nil
             }
             // Otherwise merge non-reserved args into current filter
-            var next = await runtime.dataSourceRuntime.input(dataSourceID: dsID).filter
+            let current = await runtime.dataSourceInputState(windowID: ctx.windowID, dataSourceRef: ctx.dataSourceRef)
+            var next = current.filter
             let skip = Set(["row", "rowIndex", "windowId"])
             for (k, v) in args.args where !skip.contains(k) {
                 next[k] = v
             }
-            await runtime.dataSourceRuntime.setFilter(dataSourceID: dsID, filter: next)
+            await runtime.setDataSourceFilter(
+                windowID: ctx.windowID,
+                dataSourceRef: ctx.dataSourceRef,
+                filter: next
+            )
             return nil
+        }
+
+        // 11A. reportRuntime.executeAction
+        handlers["reportRuntime.executeAction"] = { [weak runtime] args in
+            guard let runtime else { return nil }
+            let execution = args.args["execution"]?.objectValue ?? args.args
+            guard let kind = execution["kind"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !kind.isEmpty else {
+                return nil
+            }
+
+            let handlerName: String
+            var forwardedArgs: [String: JSONValue]
+            switch kind {
+            case "keep", "exclude":
+                guard let refinement = execution["refinement"]?.objectValue else { return nil }
+                handlerName = "reportRuntime.applyRefinement"
+                forwardedArgs = ["refinement": .object(refinement)]
+            case "drill":
+                guard let refinement = execution["refinement"]?.objectValue else { return nil }
+                handlerName = "reportRuntime.applyDrillTransition"
+                forwardedArgs = ["refinement": .object(refinement)]
+                if let transition = execution["transition"]?.objectValue {
+                    for (key, value) in transition {
+                        forwardedArgs[key] = value
+                    }
+                }
+            case "detail":
+                guard let detailRequest = execution["detailRequest"]?.objectValue else { return nil }
+                handlerName = "reportRuntime.openDetailTarget"
+                forwardedArgs = ["detailRequest": .object(detailRequest)]
+            case "removeRefinement":
+                let refinementID = execution["refinementId"] ?? execution["refinementID"] ?? .null
+                guard refinementID.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+                    return nil
+                }
+                handlerName = "reportRuntime.removeRefinement"
+                forwardedArgs = ["refinementId": refinementID]
+            case "clearRefinements":
+                handlerName = "reportRuntime.clearRefinements"
+                forwardedArgs = [:]
+            case "undoRefinements":
+                handlerName = "reportRuntime.undoRefinements"
+                forwardedArgs = [:]
+            case "redoRefinements":
+                handlerName = "reportRuntime.redoRefinements"
+                forwardedArgs = [:]
+            default:
+                return nil
+            }
+            guard let handler = await runtime.registeredHandler(named: handlerName) else {
+                return .object(["executed": .bool(false), "reason": .string("unsupportedExecution")])
+            }
+            let result = await handler(ExecutionArgs(
+                execution: ExecutionDef(action: handlerName),
+                context: args.context,
+                args: forwardedArgs
+            ))
+            return result ?? .object(["executed": .bool(true), "branch": .string(kind)])
         }
 
         // 12. dataSource.toggleSelection

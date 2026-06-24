@@ -3,6 +3,7 @@ package com.viant.forgeandroid.runtime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -153,8 +154,8 @@ class ForgeRuntime(
         windowContext(windowID).contextOrNull(dataSourceRef)?.fetchCollection()
     }
 
-    fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap()) {
-        execEngine.execute(execution, context, args)
+    fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap()): Job? {
+        return execEngine.execute(execution, context, args)
     }
 
     private fun loadWindowMetadata(window: WindowState, forceReload: Boolean = false) {
@@ -316,17 +317,18 @@ class ExecutionEngine(
     private val parameterResolver: ParameterResolver,
     private val scope: CoroutineScope
 ) {
-    fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap()) {
+    fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap()): Job? {
         val params = if (context != null) parameterResolver.resolve(execution.parameters, context) else ParameterResolution(emptyMap(), emptyList())
         val resolved = ExecutionArgs(execution, context, params.inbound, args)
 
-        val handlerName = execution.handler ?: return
+        val handlerName = execution.handler ?: return null
         val handler = handlers.resolve(handlerName) ?: builtIn(handlerName)
         if (handler != null) {
-            scope.launch {
+            return scope.launch {
                 handler.invoke(resolved)
             }
         }
+        return null
     }
 
     fun evaluateReadOnly(execution: ExecutionDef, context: DataSourceContext?): Boolean {
@@ -488,6 +490,54 @@ class ExecutionEngine(
             }
             context.setFilter(next)
             null
+        }
+        "reportRuntime.executeAction" -> handler@{ args ->
+            val execution = JsonUtil.asStringMap(args.args["execution"]).takeIf { it.isNotEmpty() } ?: args.args
+            val kind = (execution["kind"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: return@handler null
+            val handlerName: String
+            val forwardedArgs: Map<String, Any?>
+            when (kind) {
+                "keep", "exclude" -> {
+                    val refinement = JsonUtil.asStringMap(execution["refinement"]).takeIf { it.isNotEmpty() } ?: return@handler null
+                    handlerName = "reportRuntime.applyRefinement"
+                    forwardedArgs = mapOf("refinement" to refinement)
+                }
+                "drill" -> {
+                    val refinement = JsonUtil.asStringMap(execution["refinement"]).takeIf { it.isNotEmpty() } ?: return@handler null
+                    handlerName = "reportRuntime.applyDrillTransition"
+                    forwardedArgs = buildMap {
+                        put("refinement", refinement)
+                        putAll(JsonUtil.asStringMap(execution["transition"]))
+                    }
+                }
+                "detail" -> {
+                    val detailRequest = JsonUtil.asStringMap(execution["detailRequest"]).takeIf { it.isNotEmpty() } ?: return@handler null
+                    handlerName = "reportRuntime.openDetailTarget"
+                    forwardedArgs = mapOf("detailRequest" to detailRequest)
+                }
+                "removeRefinement" -> {
+                    val refinementId = (execution["refinementId"] ?: execution["refinementID"])?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: return@handler null
+                    handlerName = "reportRuntime.removeRefinement"
+                    forwardedArgs = mapOf("refinementId" to refinementId)
+                }
+                "clearRefinements" -> {
+                    handlerName = "reportRuntime.clearRefinements"
+                    forwardedArgs = emptyMap()
+                }
+                "undoRefinements" -> {
+                    handlerName = "reportRuntime.undoRefinements"
+                    forwardedArgs = emptyMap()
+                }
+                "redoRefinements" -> {
+                    handlerName = "reportRuntime.redoRefinements"
+                    forwardedArgs = emptyMap()
+                }
+                else -> return@handler null
+            }
+            val handler = handlers.resolve(handlerName)
+                ?: return@handler mapOf("executed" to false, "reason" to "unsupportedExecution")
+            handler.invoke(ExecutionArgs(ExecutionDef(handler = handlerName), args.context, emptyMap(), forwardedArgs))
+                ?: mapOf("executed" to true, "branch" to kind)
         }
         "dataSource.toggleSelection" -> handler@{ args ->
             val row = JsonUtil.asStringMap(args.args["row"]).takeIf { it.isNotEmpty() } ?: return@handler null

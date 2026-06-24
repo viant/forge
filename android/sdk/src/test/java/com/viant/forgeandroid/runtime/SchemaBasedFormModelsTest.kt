@@ -33,6 +33,9 @@ class SchemaBasedFormModelsTest {
                             }
                           }
                         },
+                        "on": [
+                          { "event": "submit", "handler": "approval.submit" }
+                        ],
                         "showSubmit": false
                       }
                     }
@@ -50,6 +53,8 @@ class SchemaBasedFormModelsTest {
         assertEquals("approvalForgeForm", container?.schemaBasedForm?.id)
         assertEquals("approvalEditor", container?.schemaBasedForm?.dataSourceRef)
         assertEquals(false, container?.schemaBasedForm?.showSubmit)
+        assertEquals("submit", container?.schemaBasedForm?.on?.firstOrNull()?.event)
+        assertEquals("approval.submit", container?.schemaBasedForm?.on?.firstOrNull()?.handler)
         assertNotNull(container?.schemaBasedForm?.schema)
     }
 }

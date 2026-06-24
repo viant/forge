@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 fun normalizeWindowMetadataJson(element: JsonElement): JsonElement {
     val root = element as? JsonObject ?: return element
+    rejectUnsupportedDataSourceAliases(root)
     val view = root["view"] as? JsonObject ?: run {
         return if (isMeaningfulContainerObject(root)) wrapTopLevelContainer(root) else element
     }
@@ -55,7 +56,12 @@ private fun normalizeMetadataContainers(root: JsonObject): JsonObject {
 }
 
 private fun wrapTopLevelContainer(root: JsonObject): JsonObject {
-    val normalizedContainer = normalizeContainerObject(root)
+    val normalizedContainer = JsonObject(
+        normalizeContainerObject(root).toMutableMap().apply {
+            remove("dataSource")
+            remove("dataSources")
+        }
+    )
     return JsonObject(
         root.toMutableMap().apply {
             put(
@@ -120,10 +126,74 @@ private fun normalizeContainerObject(container: JsonObject): JsonObject {
             hasDashboardPatch = true
         }
     }
+    if (isDashboardFiltersContainer(container) && dashboard["filters"] == null) {
+        val items = container["items"] as? JsonArray
+        if (items != null && items.isNotEmpty()) {
+            dashboard["filters"] = JsonObject(mapOf("items" to items))
+            hasDashboardPatch = true
+        }
+    }
     if (hasDashboardPatch || existingDashboard != null) {
         next["dashboard"] = JsonObject(dashboard)
     }
     return JsonObject(next)
+}
+
+private fun rejectUnsupportedDataSourceAliases(root: JsonObject) {
+    if (root["view"] !is JsonObject && isMeaningfulContainerObject(root)) {
+        val dataSource = root["dataSource"]
+        if (dataSource != null && dataSource !is JsonObject) {
+            throw IllegalArgumentException("$.dataSource is not supported on Forge containers; use dataSourceRef")
+        }
+        val childContainers = root["containers"] as? JsonArray
+        childContainers?.forEachIndexed { index, child ->
+            val childObject = child as? JsonObject ?: return@forEachIndexed
+            rejectUnsupportedContainerDataSourceAlias(childObject, "$.containers[$index]")
+        }
+    }
+    val view = root["view"] as? JsonObject
+    val content = view?.get("content") as? JsonObject
+    if (content != null) {
+        rejectUnsupportedContentDataSourceAliases(content, "$.view.content")
+    }
+    val dialogs = root["dialogs"] as? JsonArray
+    dialogs?.forEachIndexed { index, item ->
+        val dialog = item as? JsonObject ?: return@forEachIndexed
+        rejectUnsupportedDialogDataSourceAlias(dialog, "$.dialogs[$index]")
+        val dialogContent = dialog["content"] as? JsonObject
+        if (dialogContent != null) {
+            rejectUnsupportedContainerDataSourceAlias(dialogContent, "$.dialogs[$index].content")
+        }
+    }
+}
+
+private fun rejectUnsupportedContentDataSourceAliases(content: JsonObject, path: String) {
+    val containers = content["containers"] as? JsonArray
+    if (containers != null) {
+        containers.forEachIndexed { index, child ->
+            val childObject = child as? JsonObject ?: return@forEachIndexed
+            rejectUnsupportedContainerDataSourceAlias(childObject, "$path.containers[$index]")
+        }
+    } else if (isMeaningfulContainerObject(content)) {
+        rejectUnsupportedContainerDataSourceAlias(content, path)
+    }
+}
+
+private fun rejectUnsupportedContainerDataSourceAlias(container: JsonObject, path: String) {
+    if (container["dataSource"] != null) {
+        throw IllegalArgumentException("$path.dataSource is not supported on Forge containers; use dataSourceRef")
+    }
+    val childContainers = container["containers"] as? JsonArray
+    childContainers?.forEachIndexed { index, child ->
+        val childObject = child as? JsonObject ?: return@forEachIndexed
+        rejectUnsupportedContainerDataSourceAlias(childObject, "$path.containers[$index]")
+    }
+}
+
+private fun rejectUnsupportedDialogDataSourceAlias(dialog: JsonObject, path: String) {
+    if (dialog["dataSource"] != null) {
+        throw IllegalArgumentException("$path.dataSource is not supported on Forge dialogs; use dataSourceRef")
+    }
 }
 
 private fun isMeaningfulContainerObject(content: JsonObject): Boolean {
@@ -141,6 +211,7 @@ private fun isMeaningfulContainerObject(content: JsonObject): Boolean {
         "dataSourceRef",
         "layout",
         "treeBrowser",
+        "fileBrowser",
         "editor",
         "terminal",
         "chat"
@@ -163,6 +234,9 @@ private val dashboardCompatKeys = setOf(
     "reportBuilder",
     "detail"
 )
+
+private fun isDashboardFiltersContainer(container: JsonObject): Boolean =
+    stringValue(container["kind"]) == "dashboard.filters"
 
 private fun normalizeColumnsArray(element: JsonElement?): JsonArray? {
     val columns = element as? JsonArray ?: return null

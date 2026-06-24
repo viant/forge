@@ -66,7 +66,7 @@ internal fun describeFence(rawLang: String, body: String): FenceDescriptor {
     return FenceDescriptor(FenceRendererType.Code, lang, body)
 }
 
-private fun normalizeFenceLanguage(value: String): String {
+internal fun normalizeFenceLanguage(value: String): String {
     return when (value.trim().lowercase()) {
         "" -> "plaintext"
         "js" -> "javascript"

@@ -79,7 +79,7 @@ public enum MetadataResolver {
         let formFactor = targetContext.formFactor.trimmingCharacters(in: .whitespacesAndNewlines)
         let surface = targetContext.surface.trimmingCharacters(in: .whitespacesAndNewlines)
         let mobilePlatforms: Set<String> = ["android", "ios"]
-        let mobileFormFactors: Set<String> = ["phone", "tablet"]
+        let mobileFormFactors: Set<String> = ["phone", "tablet", "foldable"]
         let isMobile = mobilePlatforms.contains(platform) || mobileFormFactors.contains(formFactor)
         var keys: [String] = []
 
@@ -106,27 +106,42 @@ public enum MetadataResolver {
             keys.append("\(platform).\(formFactor)")
             keys.append("\(platform)/\(formFactor)")
             keys.append("\(platform):\(formFactor)")
+            keys.append(platformFormFactorAlias(platform: platform, formFactor: formFactor))
         }
         return keys
+    }
+
+    private static func platformFormFactorAlias(platform: String, formFactor: String) -> String {
+        guard let first = formFactor.first else {
+            return platform
+        }
+        return "\(platform)\(String(first).uppercased())\(formFactor.dropFirst())"
     }
 
     private static func matchesTarget(_ raw: JSONValue?, for targetContext: ForgeTargetContext) -> Bool {
         guard let spec = normalizeTarget(raw) else {
             return true
         }
+        let platform = targetContext.platform.trimmingCharacters(in: .whitespacesAndNewlines)
+        let formFactor = targetContext.formFactor.trimmingCharacters(in: .whitespacesAndNewlines)
+        let capabilities = Set(
+            targetContext.capabilities.compactMap { capability -> String? in
+                let trimmed = capability.trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }
+        )
 
-        if !spec.platforms.isEmpty && !spec.platforms.contains(targetContext.platform) {
+        if !spec.platforms.isEmpty && !spec.platforms.contains(platform) {
             return false
         }
-        if !spec.excludePlatforms.isEmpty && spec.excludePlatforms.contains(targetContext.platform) {
+        if !spec.excludePlatforms.isEmpty && spec.excludePlatforms.contains(platform) {
             return false
         }
-        if !spec.formFactors.isEmpty && !spec.formFactors.contains(targetContext.formFactor) {
+        if !spec.formFactors.isEmpty && !spec.formFactors.contains(formFactor) {
             return false
         }
         if !spec.capabilities.isEmpty {
-            let actual = Set(targetContext.capabilities)
-            if !Set(spec.capabilities).isSubset(of: actual) {
+            if !Set(spec.capabilities).isSubset(of: capabilities) {
                 return false
             }
         }

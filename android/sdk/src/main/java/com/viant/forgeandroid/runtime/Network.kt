@@ -6,7 +6,13 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
 class EndpointRegistry(private val endpoints: Map<String, EndpointConfig>) {
-    fun resolve(name: String?): EndpointConfig? = name?.let { endpoints[it] }
+    fun resolve(name: String?): EndpointConfig? {
+        val key = name?.trim().orEmpty()
+        if (key.isNotEmpty()) {
+            return endpoints[key]
+        }
+        return endpoints.values.singleOrNull()
+    }
 }
 
 data class EndpointConfig(

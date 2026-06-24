@@ -22,20 +22,18 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.EditorDef
+import com.viant.forgeandroid.runtime.EditorSelectorDef
 
 @Composable
 fun EditorRenderer(context: DataSourceContext, editor: EditorDef) {
     val form by context.form.flow.collectAsState(initial = emptyMap())
     val selector = editor.selector
-    val sourceKey = selector?.source ?: "source"
-    val extensionKey = selector?.extension ?: "extension"
-    val locationKey = selector?.location ?: "location"
-    val source = form[sourceKey]?.toString().orEmpty()
-    val extension = form[extensionKey]?.toString().orEmpty()
-    val location = form[locationKey]?.toString().orEmpty()
-    val isDiff = extension.equals("diff", true) || source.startsWith("---") || source.startsWith("@@")
-    val readOnly = editor.style["readonly"]?.equals("true", true) == true
-        || editor.style["readOnly"]?.equals("true", true) == true
+    val sourceKey = editorSourceKey(selector)
+    val source = editorSource(form, selector, fallback = editor.value.orEmpty())
+    val extension = editorExtension(form, selector)
+    val location = editorLocation(form, selector).orEmpty()
+    val isDiff = editorIsDiff(source, extension)
+    val readOnly = editorReadOnly(editor.style)
 
     Column(
         modifier = Modifier
@@ -56,12 +54,9 @@ fun EditorRenderer(context: DataSourceContext, editor: EditorDef) {
                     color = Color(0xFF6A7280)
                 )
             }
-            if (extension.isNotBlank()) {
+            editorLanguageLabel(editor.language ?: extension, editor.style)?.let { label ->
                 Text(
-                    text = buildString {
-                        append(extension.uppercase())
-                        if (readOnly) append(" • READ ONLY")
-                    },
+                    text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF6A7280)
                 )
@@ -84,6 +79,45 @@ fun EditorRenderer(context: DataSourceContext, editor: EditorDef) {
         }
     }
 }
+
+internal fun editorSourceKey(selector: EditorSelectorDef?): String =
+    selector?.source?.trim()?.takeIf { it.isNotEmpty() } ?: "source"
+
+internal fun editorLocationKey(selector: EditorSelectorDef?): String =
+    selector?.location?.trim()?.takeIf { it.isNotEmpty() } ?: "location"
+
+internal fun editorExtensionKey(selector: EditorSelectorDef?): String =
+    selector?.extension?.trim()?.takeIf { it.isNotEmpty() } ?: "extension"
+
+internal fun editorSource(form: Map<String, Any?>, selector: EditorSelectorDef?, fallback: String = ""): String =
+    editorStringValue(form[editorSourceKey(selector)]) ?: fallback
+
+internal fun editorLocation(form: Map<String, Any?>, selector: EditorSelectorDef?): String? =
+    editorStringValue(form[editorLocationKey(selector)])?.trim()?.takeIf { it.isNotEmpty() }
+
+internal fun editorExtension(form: Map<String, Any?>, selector: EditorSelectorDef?): String? =
+    editorStringValue(form[editorExtensionKey(selector)])?.trim()?.takeIf { it.isNotEmpty() }
+
+internal fun editorReadOnly(style: Map<String, String>): Boolean =
+    listOf("readonly", "readOnly").any { key ->
+        style[key]?.trim()?.equals("true", ignoreCase = true) == true
+    }
+
+internal fun editorLanguageLabel(extension: String?, style: Map<String, String>): String? {
+    val value = extension?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return if (editorReadOnly(style)) "${value.uppercase()} • READ ONLY" else value.uppercase()
+}
+
+internal fun editorIsDiff(source: String, extension: String?): Boolean =
+    extension?.equals("diff", ignoreCase = true) == true || source.startsWith("---") || source.startsWith("@@")
+
+private fun editorStringValue(value: Any?): String? =
+    when (value) {
+        null -> null
+        is String -> value
+        is Number, is Boolean -> value.toString()
+        else -> value.toString()
+    }
 
 @Composable
 private fun DiffView(text: String) {

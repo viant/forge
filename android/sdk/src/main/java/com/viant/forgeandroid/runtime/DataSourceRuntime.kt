@@ -112,7 +112,7 @@ class DataSourceRuntime(
     }
 
     private suspend fun fetchCollection(ctx: DataSourceContext) {
-        ctx.control.set(ctx.control.peek().copy(loading = true, error = null))
+        ctx.control.set(ctx.control.peek().copy(loading = true, error = null, resolved = false))
 
         try {
             val loaderResult = collectionLoader?.invoke(ctx)
@@ -143,21 +143,22 @@ class DataSourceRuntime(
                 ctx.metrics.set(loaderResult.metrics)
                 trigger(ctx, "onFetch", mapOf("collection" to data))
                 trigger(ctx, "onSuccess", mapOf("collection" to data))
-                ctx.control.set(ctx.control.peek().copy(loading = false, error = null))
-                ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
+                finishFetch(ctx)
                 return
             }
 
-            val service = ctx.dataSource.service ?: return
-            val endpoint = service.endpoint
-            val uri = buildRequestUri(ctx) ?: return
+            val endpoint = ctx.dataSource.service?.endpoint
+            val request = buildRequest(ctx) ?: run {
+                finishFetch(ctx)
+                return
+            }
 
-            val response = restClient.get(endpoint, uri) { JsonUtil.parseObject(it) }
+            val response = executeRequest(endpoint, request)
             val data = applyCollectionHook(
                 ctx,
                 normalizeCollection(response, ctx.dataSource.selectors?.data)
             )
-            val dataInfo = normalizeMap(selectValue(response, ctx.dataSource.selectors?.dataInfo))
+            val dataInfo = normalizeDataInfo(response, ctx.dataSource.selectors?.dataInfo)
             ctx.collection.set(data)
             if (ctx.dataSource.autoSelect != false && data.isNotEmpty() && ctx.peekSelection().selected == null) {
                 ctx.toggleSelection(data.first(), 0)
@@ -169,13 +170,27 @@ class DataSourceRuntime(
             }
             trigger(ctx, "onFetch", mapOf("collection" to data, "response" to response))
             trigger(ctx, "onSuccess", mapOf("collection" to data, "response" to response))
-            ctx.control.set(ctx.control.peek().copy(loading = false, error = null))
-            ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
+            finishFetch(ctx)
         } catch (e: Exception) {
             trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")))
-            ctx.control.set(ctx.control.peek().copy(loading = false, error = e.message))
-            ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
+            finishFetch(ctx, error = e.message)
         }
+    }
+
+    private fun executeRequest(endpoint: String?, request: DataSourceRequest): Map<String, Any?> {
+        val parser: (String) -> Map<String, Any?> = { JsonUtil.parseObject(it) }
+        return when (request.method) {
+            "PATCH" -> restClient.patch(endpoint, request.uri, request.body, parser)
+            "POST" -> restClient.post(endpoint, request.uri, request.body, parser)
+            "PUT" -> restClient.put(endpoint, request.uri, request.body, parser)
+            "DELETE" -> restClient.delete(endpoint, request.uri, parser)
+            else -> restClient.get(endpoint, request.uri, parser)
+        }
+    }
+
+    private fun finishFetch(ctx: DataSourceContext, error: String? = null) {
+        ctx.control.set(ctx.control.peek().copy(loading = false, error = error, resolved = true))
+        ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
     }
 
     private suspend fun applyCollectionHook(
@@ -230,9 +245,24 @@ class DataSourceRuntime(
             ?: row
     }
 
-    private fun buildRequestUri(ctx: DataSourceContext): String? {
-        val service = ctx.dataSource.service ?: return null
-        val baseUri = service.uri ?: return null
+    private fun buildRequest(ctx: DataSourceContext): DataSourceRequest? {
+        val baseUri = ctx.dataSource.service?.uri ?: ctx.dataSource.uri ?: return null
+        val method = (ctx.dataSource.service?.method ?: ctx.dataSource.method ?: "GET")
+            .trim()
+            .uppercase()
+            .ifBlank { "GET" }
+        return if (method == "GET") {
+            DataSourceRequest(method = "GET", uri = buildRequestUri(ctx, baseUri))
+        } else {
+            DataSourceRequest(
+                method = method,
+                uri = baseUri,
+                body = buildRequestBody(ctx, baseUri)
+            )
+        }
+    }
+
+    private fun buildRequestUri(ctx: DataSourceContext, baseUri: String): String {
         val query = linkedMapOf<String, String>()
 
         ctx.dataSource.params.forEach { (key, value) ->
@@ -260,7 +290,8 @@ class DataSourceRuntime(
             val pageParameters = paging?.parameters.orEmpty()
             val pageValue = ctx.input.peek().page
             if (pageValue != null) {
-                query[pageParameters["page"] ?: "page"] = pageValue.toString()
+                val pageParamName = pageParameters["page"] ?: "page"
+                query[pageParamName] = resolvedPageValue(pageParamName, pageValue, paging?.size).toString()
             }
             val sizeValue = paging?.size
             if (sizeValue != null && sizeValue > 0) {
@@ -278,22 +309,122 @@ class DataSourceRuntime(
         return baseUri + separator + encoded
     }
 
+    private fun buildRequestBody(ctx: DataSourceContext, baseUri: String): String {
+        val payload = if (isDatasourceFetchRoute(baseUri)) {
+            mapOf("inputs" to buildDatasourceFetchInputs(ctx))
+        } else {
+            buildBodyParameters(ctx)
+        }
+        return JsonUtil.json.encodeToString(
+            kotlinx.serialization.json.JsonElement.serializer(),
+            JsonUtil.anyToElement(payload)
+        )
+    }
+
+    private fun buildDatasourceFetchInputs(ctx: DataSourceContext): Map<String, Any?> {
+        val inputs = linkedMapOf<String, Any?>()
+        ctx.dataSource.params.forEach { (key, value) -> inputs[key] = value }
+        ctx.dataSource.parameters.forEach { parameter ->
+            val target = parameter.to ?: return@forEach
+            if (!(target.endsWith(":query") || target == "query" || target.endsWith(":input.query"))) {
+                return@forEach
+            }
+            val name = parameter.name ?: return@forEach
+            inputs[name] = resolveParameterValue(ctx, parameter) ?: return@forEach
+        }
+        val paging = ctx.dataSource.paging
+        if (paging?.enabled != false) {
+            val pageParameters = paging?.parameters.orEmpty()
+            val pageValue = ctx.input.peek().page
+            if (pageValue != null) {
+                val pageParamName = pageParameters["page"] ?: "page"
+                val sizeValue = paging?.size
+                inputs[pageParamName] = resolvedPageValue(pageParamName, pageValue, sizeValue)
+                if (sizeValue != null && sizeValue > 0) {
+                    inputs[pageParameters["size"] ?: "size"] = sizeValue
+                }
+            }
+        }
+        ctx.input.peek().filter.forEach { (key, value) ->
+            if (value != null) {
+                inputs[key] = value
+            }
+        }
+        return inputs
+    }
+
+    private fun buildBodyParameters(ctx: DataSourceContext): Map<String, Any?> {
+        val body = linkedMapOf<String, Any?>()
+        ctx.dataSource.parameters.forEach { parameter ->
+            val target = parameter.to ?: return@forEach
+            if (!(target.endsWith(":body") || target == "body" || target.endsWith(":input.body"))) {
+                return@forEach
+            }
+            val name = parameter.name ?: return@forEach
+            body[name] = resolveParameterValue(ctx, parameter) ?: return@forEach
+        }
+        return body
+    }
+
+    private fun resolvedPageValue(pageParamName: String, pageValue: Int, pageSize: Int?): Int =
+        if (pageParamName.lowercase() == "offset") {
+            val size = pageSize?.takeIf { it > 0 } ?: 0
+            ((pageValue.takeIf { it > 0 } ?: 1) - 1) * size
+        } else {
+            pageValue
+        }
+
+    private fun isDatasourceFetchRoute(uri: String): Boolean =
+        Regex("""(^|/)v1/api/datasources/[^/]+/fetch(?:\?.*)?$""").containsMatchIn(uri)
+
     private fun resolveParameterValue(ctx: DataSourceContext, parameter: ParameterDef): Any? {
         val source = ((parameter.from ?: "").ifBlank { parameter.input ?: "" }).lowercase()
         val (sourceContext, location) = resolveSourceContext(ctx, parameter.location)
         return when (source) {
-            "const" -> parameter.location
-            "form" -> location?.let { sourceContext.peekForm()[it] }
+            "const" -> parameter.locationAny() ?: parameter.value?.let(JsonUtil::elementToAny)
+            "form" -> location?.let { SelectorUtil.resolve(sourceContext.peekForm(), it) }
+            "datasource" -> resolveFromLegacyDataSource(sourceContext, location)
             "metrics" -> location?.let {
                 SelectorUtil.resolve(sourceContext.metrics.peek(), it)
                     ?: SelectorUtil.resolve(sourceContext.collection.peek().firstOrNull().orEmpty(), it)
             }
-            "filter", "input.query", "query" -> location?.let { sourceContext.peekFilter()[it] }
+            "filter", "input.query", "query" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
             "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
             "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
             "windowform" -> location?.let { SelectorUtil.resolve(ctx.window.peekWindowForm(), it) }
-            else -> location?.let { sourceContext.peekFilter()[it] } ?: parameter.location
+            else -> {
+                parameter.value?.let(JsonUtil::elementToAny)
+                    ?: parameter.selector?.let { SelectorUtil.resolve(ctx.window.peekWindowForm(), it) }
+                    ?: location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
+                    ?: parameter.locationAny()
+            }
         }
+    }
+
+    private fun resolveFromLegacyDataSource(ctx: DataSourceContext, location: String?): Any? {
+        val path = location.orEmpty()
+        val candidates = listOf(
+            ctx.peekSelection().selected,
+            ctx.peekForm(),
+            ctx.peekFilter(),
+            inputObject(ctx.input.peek())
+        )
+        return candidates.firstNotNullOfOrNull { candidate ->
+            candidate?.let { if (path.isBlank()) it else SelectorUtil.resolve(it, path) }
+        }
+    }
+
+    private fun inputObject(input: InputState): Map<String, Any?> {
+        val output = linkedMapOf<String, Any?>(
+            "filter" to input.filter,
+            "parameters" to input.parameters,
+            "fetch" to input.fetch,
+            "refresh" to input.refresh
+        )
+        if (input.page != null) {
+            output["page"] = input.page
+        }
+        return output
     }
 
     private fun resolveSourceContext(ctx: DataSourceContext, rawLocation: String?): Pair<DataSourceContext, String?> {
@@ -346,6 +477,14 @@ class DataSourceRuntime(
             return response
         }
         return SelectorUtil.resolve(response, path)
+    }
+
+    private fun normalizeDataInfo(response: Map<String, Any?>, selector: String?): Map<String, Any?> {
+        val path = selector?.trim().orEmpty()
+        if (path.isEmpty()) {
+            return emptyMap()
+        }
+        return normalizeMap(selectValue(response, path))
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -420,12 +559,18 @@ class DataSourceRuntime(
     }
 }
 
+private data class DataSourceRequest(
+    val method: String,
+    val uri: String,
+    val body: String = "{}"
+)
+
 class DataSourceContext(
     val window: WindowContext,
     val dataSourceRef: String,
     val dataSource: DataSourceDef,
     val collection: Signal<List<Map<String, Any?>>>,
-    val form: Signal<Map<String, Any?>>, 
+    val form: Signal<Map<String, Any?>>,
     val selection: Signal<SelectionState>,
     val input: Signal<InputState>,
     val control: Signal<ControlState>,

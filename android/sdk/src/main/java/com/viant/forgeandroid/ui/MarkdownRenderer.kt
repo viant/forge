@@ -11,11 +11,20 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -101,16 +110,30 @@ fun MarkdownRenderer(markdown: String, modifier: Modifier = Modifier) {
 
 @Composable
 private fun FallbackCodeBlock(lang: String, body: String) {
-    if (lang.isNotBlank()) {
+    val clipboardManager = LocalClipboardManager.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Text(
-            text = lang.uppercase(),
+            text = markdownCodeLanguageLabel(lang),
             style = MaterialTheme.typography.labelSmall,
             color = Color(0xFF667085)
         )
+        IconButton(
+            onClick = { clipboardManager.setText(AnnotatedString(body)) }
+        ) {
+            Icon(
+                Icons.Default.ContentCopy,
+                contentDescription = markdownCodeCopyAccessibilityLabel(lang),
+                tint = Color(0xFF667085)
+            )
+        }
     }
     Box(modifier = Modifier.horizontalScroll(rememberScrollState())) {
         Text(
-            text = body,
+            text = markdownCodeHighlightedAnnotatedString(lang, body),
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace
         )
@@ -247,6 +270,194 @@ private fun inlineMarkdown(text: String): String {
         .replace(Regex("`(.+?)`"), "$1")
         .replace(Regex("\\[(.+?)]\\((.+?)\\)"), "$1")
 }
+
+internal fun markdownCodeLanguageLabel(language: String): String {
+    val normalized = normalizeFenceLanguage(language)
+    return if (normalized == "plaintext") "CODE" else normalized.uppercase()
+}
+
+internal fun markdownCodeCopyAccessibilityLabel(language: String): String {
+    val normalized = normalizeFenceLanguage(language)
+    return if (normalized == "plaintext") "Copy code block" else "Copy $normalized code block"
+}
+
+internal enum class MarkdownCodeHighlightKind {
+    Plain,
+    Keyword,
+    Literal,
+    String,
+    Number,
+    Comment,
+    Punctuation
+}
+
+internal data class MarkdownCodeHighlightRun(
+    val text: String,
+    val kind: MarkdownCodeHighlightKind
+)
+
+internal fun markdownCodeHighlightRuns(language: String, body: String): List<MarkdownCodeHighlightRun> {
+    if (body.isEmpty()) return emptyList()
+    val cleanLanguage = normalizeFenceLanguage(language)
+    val keywords = markdownCodeKeywords(cleanLanguage)
+    val literals = setOf("true", "false", "null", "nil", "none")
+    val runs = mutableListOf<MarkdownCodeHighlightRun>()
+    var index = 0
+
+    fun append(text: String, kind: MarkdownCodeHighlightKind) {
+        if (text.isEmpty()) return
+        val last = runs.lastOrNull()
+        if (last != null && last.kind == kind) {
+            runs[runs.lastIndex] = last.copy(text = last.text + text)
+        } else {
+            runs += MarkdownCodeHighlightRun(text, kind)
+        }
+    }
+
+    fun slice(start: Int, end: Int): String = body.substring(start, end)
+
+    while (index < body.length) {
+        val current = body[index]
+        when {
+            current.isWhitespace() -> {
+                val start = index
+                while (index < body.length && body[index].isWhitespace()) index += 1
+                append(slice(start, index), MarkdownCodeHighlightKind.Plain)
+            }
+            current == '/' && index + 1 < body.length && body[index + 1] == '/' -> {
+                val start = index
+                index += 2
+                while (index < body.length && body[index] != '\n') index += 1
+                append(slice(start, index), MarkdownCodeHighlightKind.Comment)
+            }
+            current == '-' && index + 1 < body.length && body[index + 1] == '-' -> {
+                val start = index
+                index += 2
+                while (index < body.length && body[index] != '\n') index += 1
+                append(slice(start, index), MarkdownCodeHighlightKind.Comment)
+            }
+            current == '#' && cleanLanguage != "json" -> {
+                val start = index
+                index += 1
+                while (index < body.length && body[index] != '\n') index += 1
+                append(slice(start, index), MarkdownCodeHighlightKind.Comment)
+            }
+            current == '"' || current == '\'' -> {
+                val quote = current
+                val start = index
+                index += 1
+                var escaped = false
+                while (index < body.length) {
+                    val value = body[index]
+                    index += 1
+                    if (escaped) {
+                        escaped = false
+                    } else if (value == '\\') {
+                        escaped = true
+                    } else if (value == quote) {
+                        break
+                    }
+                }
+                append(slice(start, index), MarkdownCodeHighlightKind.String)
+            }
+            current.isNumberStart(body.getOrNull(index + 1)) -> {
+                val start = index
+                index += 1
+                while (index < body.length && body[index].isNumberContinuation()) index += 1
+                append(slice(start, index), MarkdownCodeHighlightKind.Number)
+            }
+            current.isIdentifierStart() -> {
+                val start = index
+                index += 1
+                while (index < body.length && body[index].isIdentifierContinuation()) index += 1
+                val value = slice(start, index)
+                val lowercased = value.lowercase()
+                append(
+                    value,
+                    when {
+                        literals.contains(lowercased) -> MarkdownCodeHighlightKind.Literal
+                        keywords.contains(lowercased) -> MarkdownCodeHighlightKind.Keyword
+                        else -> MarkdownCodeHighlightKind.Plain
+                    }
+                )
+            }
+            current.isCodePunctuation() -> {
+                append(current.toString(), MarkdownCodeHighlightKind.Punctuation)
+                index += 1
+            }
+            else -> {
+                append(current.toString(), MarkdownCodeHighlightKind.Plain)
+                index += 1
+            }
+        }
+    }
+    return runs
+}
+
+private fun markdownCodeHighlightedAnnotatedString(language: String, body: String): AnnotatedString =
+    buildAnnotatedString {
+        markdownCodeHighlightRuns(language, body).forEach { run ->
+            pushStyle(SpanStyle(color = markdownCodeHighlightColor(run.kind)))
+            append(run.text)
+            pop()
+        }
+    }
+
+private fun markdownCodeHighlightColor(kind: MarkdownCodeHighlightKind): Color =
+    when (kind) {
+        MarkdownCodeHighlightKind.Plain -> Color(0xFF101828)
+        MarkdownCodeHighlightKind.Keyword -> Color(0xFF1D4ED8)
+        MarkdownCodeHighlightKind.Literal -> Color(0xFF7C3AED)
+        MarkdownCodeHighlightKind.String -> Color(0xFF047857)
+        MarkdownCodeHighlightKind.Number -> Color(0xFFB45309)
+        MarkdownCodeHighlightKind.Comment -> Color(0xFF667085)
+        MarkdownCodeHighlightKind.Punctuation -> Color(0xFF667085)
+    }
+
+private fun markdownCodeKeywords(language: String): Set<String> =
+    when (language) {
+        "swift" -> setOf(
+            "actor", "as", "associatedtype", "await", "case", "catch", "class", "continue", "default", "defer",
+            "do", "else", "enum", "extension", "for", "func", "guard", "if", "import", "in", "init", "let",
+            "private", "public", "return", "self", "static", "struct", "switch", "throw", "throws", "try",
+            "var", "while"
+        )
+        "kotlin", "kt", "java" -> setOf(
+            "as", "break", "catch", "class", "continue", "data", "else", "false", "for", "fun", "if", "import",
+            "in", "interface", "is", "null", "object", "override", "package", "private", "public", "return",
+            "sealed", "suspend", "true", "try", "val", "var", "when", "while"
+        )
+        "javascript", "js", "typescript", "ts", "jsx", "tsx" -> setOf(
+            "async", "await", "break", "case", "catch", "class", "const", "continue", "default", "else",
+            "export", "extends", "finally", "for", "from", "function", "if", "import", "let", "new", "return",
+            "switch", "throw", "try", "typeof", "var", "while", "yield"
+        )
+        "sql" -> setOf(
+            "and", "as", "asc", "by", "case", "desc", "else", "end", "from", "group", "having", "in", "inner",
+            "insert", "join", "left", "limit", "not", "null", "on", "or", "order", "outer", "right", "select",
+            "then", "union", "update", "when", "where", "with"
+        )
+        "json" -> emptySet()
+        else -> setOf(
+            "and", "async", "await", "case", "class", "const", "else", "enum", "false", "for", "func",
+            "function", "if", "import", "let", "null", "return", "select", "struct", "true", "var", "where"
+        )
+    }
+
+private fun Char.isNumberStart(next: Char?): Boolean =
+    isDigit() || (this == '-' && next?.isDigit() == true)
+
+private fun Char.isNumberContinuation(): Boolean =
+    isDigit() || this == '.' || this == '_' || this == 'e' || this == 'E' || this == '+' || this == '-'
+
+private fun Char.isIdentifierStart(): Boolean =
+    this == '_' || isLetter()
+
+private fun Char.isIdentifierContinuation(): Boolean =
+    this == '_' || isLetterOrDigit()
+
+private fun Char.isCodePunctuation(): Boolean =
+    this in setOf('{', '}', '[', ']', '(', ')', ':', ',', '.', ';', '=', '+', '*', '/', '<', '>', '|', '&', '!', '?')
 
 @Composable
 private fun MermaidRenderer(source: String) {

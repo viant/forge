@@ -7,19 +7,22 @@ public actor ForgeRuntime {
         public let dataSource: DataSourceDef
         public let input: InputState
         public let resolvedInputs: [String: JSONValue]
+        public let conversationID: String?
 
         public init(
             windowID: String,
             dataSourceRef: String,
             dataSource: DataSourceDef,
             input: InputState,
-            resolvedInputs: [String: JSONValue] = [:]
+            resolvedInputs: [String: JSONValue] = [:],
+            conversationID: String? = nil
         ) {
             self.windowID = windowID
             self.dataSourceRef = dataSourceRef
             self.dataSource = dataSource
             self.input = input
             self.resolvedInputs = resolvedInputs
+            self.conversationID = conversationID
         }
     }
 
@@ -406,7 +409,22 @@ public actor ForgeRuntime {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setInputParameters(dataSourceID: dataSourceID, parameters: parameters, fetch: fetch)
         let signal = await signals.input(dataSourceID: dataSourceID)
-        await signal.set(await dataSourceRuntime.input(dataSourceID: dataSourceID))
+        let next = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        await signal.set(next)
+        if next.fetch {
+            await refreshDataSourceCollection(windowID: windowID, dataSourceRef: dataSourceRef)
+        }
+    }
+
+    public func setDataSourcePage(windowID: String, dataSourceRef: String, page: Int?) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        await dataSourceRuntime.setPage(dataSourceID: dataSourceID, page: page)
+        let signal = await signals.input(dataSourceID: dataSourceID)
+        let next = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        await signal.set(next)
+        if next.fetch {
+            await refreshDataSourceCollection(windowID: windowID, dataSourceRef: dataSourceRef)
+        }
     }
 
     public func refreshDataSourceCollection(
@@ -440,7 +458,8 @@ public actor ForgeRuntime {
                                 identityDataSourceRef: dataSourceRef,
                                 preferredInput: input
                             )
-                        )
+                        ),
+                        conversationID: windows.first { $0.id == windowID }?.conversationID
                     )
                 ) {
                     let hookedRows = applyCollectionHook(metadata: metadata, rows: result.rows)
@@ -491,6 +510,16 @@ public actor ForgeRuntime {
 
         let resolvedPath = dataSource.service?.uri ?? dataSource.uri
         guard let path = resolvedPath, !path.isEmpty else { return }
+        let resolvedMethod = dataSource.service?.method ?? dataSource.method ?? "GET"
+        let resolvedInputs = ParameterResolver.resolve(
+            parameters: dataSource.parameters,
+            context: await buildParameterResolutionContext(
+                windowID: windowID,
+                metadata: metadata,
+                identityDataSourceRef: dataSourceRef,
+                preferredInput: input
+            )
+        )
         let resolvedBaseURL: String
         if !baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             resolvedBaseURL = baseURL
@@ -503,6 +532,11 @@ public actor ForgeRuntime {
             dataSourceID: dataSourceID,
             baseURL: resolvedBaseURL,
             path: path,
+            method: resolvedMethod,
+            staticParameters: dataSource.params,
+            inputParameters: resolvedInputs,
+            selectors: dataSource.selectors,
+            paging: dataSource.paging,
             additionalHeaders: additionalHeaders,
             session: session
         )
@@ -524,13 +558,24 @@ public actor ForgeRuntime {
         handlers[name] = handler
     }
 
+    public func canExecute(_ execution: ExecutionDef) -> Bool {
+        if handlers[execution.action] == nil {
+            registerBuiltInHandlers()
+        }
+        return handlers[execution.action] != nil
+    }
+
+    func registeredHandler(named name: String) -> ForgeHandler? {
+        handlers[name]
+    }
+
     @discardableResult
     public func execute(
         _ execution: ExecutionDef,
         context: ExecutionContext? = nil,
         args: [String: JSONValue] = [:]
     ) async -> JSONValue? {
-        if handlers.isEmpty {
+        if handlers[execution.action] == nil {
             registerBuiltInHandlers()
         }
         let execArgs = ExecutionArgs(execution: execution, context: context, args: args)
@@ -600,7 +645,15 @@ public actor ForgeRuntime {
         let dsID = WindowIdentity(windowID: callerWindowID).dataSourceID(ref: callerDSRef)
         var form = await dataSourceRuntime.form(dataSourceID: dsID)
         for param in outbound where param.direction == "out" || param.direction == "inout" {
-            if let val = payload[param.name] { form[param.name] = val }
+            let targetName = param.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !targetName.isEmpty else { continue }
+            let sourceName = param.location?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let sourceName, !sourceName.isEmpty,
+               let val = Self.jsonValue(any: SelectorUtil.resolve(Self.jsonObjectAny(payload), selector: sourceName)) {
+                form[targetName] = val
+            } else if let val = payload[targetName] {
+                form[targetName] = val
+            }
         }
         await dataSourceRuntime.setForm(dataSourceID: dsID, values: form)
     }
@@ -757,6 +810,62 @@ public actor ForgeRuntime {
             return row
         }
         return result.objectValue ?? row
+    }
+
+    private static func jsonObjectAny(_ value: [String: JSONValue]) -> [String: Any] {
+        value.mapValues(jsonAnyValue)
+    }
+
+    private static func jsonAnyValue(_ value: JSONValue) -> Any {
+        switch value {
+        case .string(let string):
+            return string
+        case .number(let number):
+            return number
+        case .bool(let bool):
+            return bool
+        case .array(let values):
+            return values.map(jsonAnyValue)
+        case .object(let object):
+            return jsonObjectAny(object)
+        case .null:
+            return NSNull()
+        }
+    }
+
+    private static func jsonValue(any value: Any?) -> JSONValue? {
+        guard let value else { return nil }
+        if let json = value as? JSONValue {
+            return json
+        }
+        if let string = value as? String {
+            return .string(string)
+        }
+        if let bool = value as? Bool {
+            return .bool(bool)
+        }
+        if let int = value as? Int {
+            return .number(Double(int))
+        }
+        if let double = value as? Double {
+            return .number(double)
+        }
+        if let number = value as? NSNumber {
+            return .number(number.doubleValue)
+        }
+        if let object = value as? [String: JSONValue] {
+            return .object(object)
+        }
+        if let object = value as? [String: Any] {
+            return .object(object.compactMapValues { jsonValue(any: $0) })
+        }
+        if let array = value as? [JSONValue] {
+            return .array(array)
+        }
+        if let array = value as? [Any] {
+            return .array(array.compactMap { jsonValue(any: $0) })
+        }
+        return nil
     }
 }
 

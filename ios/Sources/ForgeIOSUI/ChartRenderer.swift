@@ -10,17 +10,41 @@ public struct ChartRenderer: View {
     private let window: WindowContext?
     private let container: ContainerDef
     private let chart: ChartDef
+    private let providedRows: [[String: JSONValue]]?
+    private let reportRuntimeBlockID: String?
+    private let reportRuntimeActionFields: [DashboardReportRuntimeActionField]
+    private let reportRuntimeActionDescriptors: [DashboardReportRuntimeActionDescriptor]
+    private let onReportRuntimeAction: ((DashboardReportRuntimeActionExecution) -> Void)?
     @State private var rows: [[String: JSONValue]] = []
     @State private var hasResolvedRows = false
     @State private var chartWindowForm: [String: JSONValue] = [:]
+    @State private var controlState = ControlState()
     @State private var selectedSeriesKeys: Set<String> = []
     @State private var appliedSeriesKeys: [String] = []
+    @State private var selectedCategory: String?
+    @State private var selectedPieID: String?
+    @State private var showsChartDataTable = false
 
-    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, chart: ChartDef) {
+    public init(
+        runtime: ForgeRuntime? = nil,
+        window: WindowContext? = nil,
+        container: ContainerDef,
+        chart: ChartDef,
+        rows: [[String: JSONValue]]? = nil,
+        reportRuntimeBlockID: String? = nil,
+        reportRuntimeActionFields: [DashboardReportRuntimeActionField] = [],
+        reportRuntimeActionDescriptors: [DashboardReportRuntimeActionDescriptor] = [],
+        onReportRuntimeAction: ((DashboardReportRuntimeActionExecution) -> Void)? = nil
+    ) {
         self.runtime = runtime
         self.window = window
         self.container = container
         self.chart = chart
+        self.providedRows = rows
+        self.reportRuntimeBlockID = reportRuntimeBlockID
+        self.reportRuntimeActionFields = reportRuntimeActionFields
+        self.reportRuntimeActionDescriptors = reportRuntimeActionDescriptors
+        self.onReportRuntimeAction = onReportRuntimeAction
     }
 
     public var body: some View {
@@ -30,15 +54,20 @@ public struct ChartRenderer: View {
                     .font((isCompactPresentation ? Font.footnote : .subheadline).weight(.semibold))
                     .foregroundStyle(.primary.opacity(0.9))
             }
-            let showsEmptyChartState = hasResolvedRows && rows.isEmpty
-            if supportsSeriesSelection && !showsEmptyChartState {
+            let chartStateFeedback = chartDataStateFeedback(
+                loading: controlState.loading,
+                error: controlState.error,
+                hasResolvedRows: hasResolvedRows,
+                hasChartValues: chartHasValues
+            )
+            if supportsSeriesSelection && chartStateFeedback == nil {
                 chartSeriesSelector
             }
-            if supportsSeriesSelection && !showsEmptyChartState && filteredSeriesKeys.isEmpty {
+            if supportsSeriesSelection && chartStateFeedback == nil && filteredSeriesKeys.isEmpty {
                 Text("Select at least one measure")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            } else if rows.isEmpty {
+            } else if let chartStateFeedback {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.forgeSystemBackground)
                     .frame(height: compactChartHeight)
@@ -46,21 +75,34 @@ public struct ChartRenderer: View {
                         VStack(spacing: 10) {
                             Image(systemName: "chart.xyaxis.line")
                                 .font(.title3.weight(.semibold))
-                                .foregroundStyle(.secondary.opacity(0.7))
-                            Text(showsEmptyChartState ? "No data for the selected period." : "Loading chart")
+                                .foregroundStyle(chartStateFeedback.isError ? Color.red.opacity(0.75) : Color.secondary.opacity(0.7))
+                            Text(chartStateFeedback.message)
                                 .font(.footnote.weight(.medium))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(chartStateFeedback.isError ? .red : .secondary)
+                            if let detail = chartStateFeedback.detail {
+                                Text(detail)
+                                    .font(.caption2)
+                                    .foregroundStyle(chartStateFeedback.isError ? .red.opacity(0.85) : .secondary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.center)
+                            }
                         }
+                        .padding(.horizontal, 12)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.black.opacity(0.06), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
                     )
             } else {
+                if let selectedChartSummary {
+                    chartSelectionSummaryCard(selectedChartSummary)
+                }
+                reportRuntimeSelectedChartActions
                 chartBody
                     .frame(height: compactChartHeight)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
+                chartDataFallback
             }
         }
         .padding(isCompactPresentation ? 10 : 12)
@@ -80,6 +122,9 @@ public struct ChartRenderer: View {
         }
         .task(id: rowSubscriptionKey) {
             await observeRows()
+        }
+        .task(id: controlSubscriptionKey) {
+            await observeControl()
         }
         .task(id: window?.windowID ?? "") {
             await observeWindowForm()
@@ -107,25 +152,35 @@ public struct ChartRenderer: View {
         let type = normalizedChartType
         let singleCategory = Set(chartSeriesData.map(\.category)).count <= 1
         if type == "pie" || type == "donut" {
-            if pieDataUsesSeriesStyle {
-                Chart(pieData) { item in
-                    SectorMark(
-                        angle: .value("Value", item.value),
-                        innerRadius: type == "donut" ? .ratio(0.45) : .ratio(0)
-                    )
-                    .foregroundStyle(by: .value("Series", item.seriesKey))
+            VStack(alignment: .leading, spacing: 10) {
+                if pieDataUsesSeriesStyle {
+                    Chart(pieData) { item in
+                        SectorMark(
+                            angle: .value("Value", item.value),
+                            innerRadius: type == "donut" ? .ratio(0.45) : .ratio(0),
+                            angularInset: selectedPieID == item.id ? 2 : 0
+                        )
+                        .foregroundStyle(by: .value("Series", item.seriesKey))
+                        .opacity(selectedPieID == nil || selectedPieID == item.id ? 1 : 0.42)
+                    }
+                    .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
+                    .chartLegend(position: .bottom)
+                } else {
+                    Chart(pieData) { item in
+                        SectorMark(
+                            angle: .value("Value", item.value),
+                            innerRadius: type == "donut" ? .ratio(0.45) : .ratio(0),
+                            angularInset: selectedPieID == item.id ? 2 : 0
+                        )
+                        .foregroundStyle(by: .value("Category", item.label))
+                        .opacity(selectedPieID == nil || selectedPieID == item.id ? 1 : 0.42)
+                    }
+                    .chartLegend(position: .bottom)
                 }
-                .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
-                .chartLegend(position: .bottom)
-            } else {
-                Chart(pieData) { item in
-                    SectorMark(
-                        angle: .value("Value", item.value),
-                        innerRadius: type == "donut" ? .ratio(0.45) : .ratio(0)
-                    )
-                    .foregroundStyle(by: .value("Category", item.label))
+                if let selectedPieSummary {
+                    pieSelectionSummaryCard(selectedPieSummary)
                 }
-                .chartLegend(position: .bottom)
+                pieSliceSelector
             }
         } else {
             Chart(chartSeriesData) { item in
@@ -167,6 +222,14 @@ public struct ChartRenderer: View {
                     )
                     .foregroundStyle(by: .value("Series", item.seriesKey))
                 }
+                if item.category == selectedCategory, type != "bar", type != "stacked_bar" {
+                    PointMark(
+                        x: .value("Category", item.category),
+                        y: .value("Value", item.value)
+                    )
+                    .foregroundStyle(by: .value("Series", item.seriesKey))
+                    .symbolSize(72)
+                }
             }
             .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
             .chartXAxis {
@@ -176,6 +239,7 @@ public struct ChartRenderer: View {
                     AxisValueLabel()
                 }
             }
+            .chartXSelection(value: $selectedCategory)
         }
     }
 
@@ -186,12 +250,17 @@ public struct ChartRenderer: View {
             resolvedDataSourceRef,
             chart.type ?? chart.kind ?? "",
             chart.xKey ?? "",
-            chart.valueKey ?? ""
+            chart.valueKey ?? "",
+            providedRows.map { "provided:\(String(describing: $0).hashValue)" } ?? "runtime"
         ].joined(separator: ":")
     }
 
     private var rowSubscriptionKey: String {
         [window?.windowID ?? "", resolvedDataSourceRef, "rows"].joined(separator: ":")
+    }
+
+    private var controlSubscriptionKey: String {
+        [window?.windowID ?? "", resolvedDataSourceRef, "control"].joined(separator: ":")
     }
 
     private var compactChartHeight: CGFloat {
@@ -224,6 +293,117 @@ public struct ChartRenderer: View {
 
     private var pieDataUsesSeriesStyle: Bool {
         seriesKeys.count > 1
+    }
+
+    private var selectedChartSummary: ChartSelectionSummary? {
+        chartSelectionSummary(category: selectedCategory, data: chartSeriesData)
+    }
+
+    private var selectedPieSummary: PieSelectionSummary? {
+        pieSelectionSummary(selectedID: selectedPieID, data: pieData)
+    }
+
+    private var chartHasValues: Bool {
+        if normalizedChartType == "pie" || normalizedChartType == "donut" {
+            return !pieData.isEmpty
+        }
+        return !chartSeriesData.isEmpty
+    }
+
+    private var accessibleDataRows: [ChartAccessibleDataRow] {
+        chartAccessibleDataRows(
+            chartType: normalizedChartType,
+            seriesData: chartSeriesData,
+            pieData: pieData,
+            limit: 8
+        )
+    }
+
+    private var accessibleDataTotalCount: Int {
+        chartAccessibleDataValueCount(
+            chartType: normalizedChartType,
+            seriesData: chartSeriesData,
+            pieData: pieData
+        )
+    }
+
+    private var selectedReportRuntimeChartSelection: DashboardReportRuntimeChartSelection? {
+        if let selectedPieID,
+           let datum = pieData.first(where: { $0.id == selectedPieID }),
+           rows.indices.contains(datum.rowIndex) {
+            let row = rows[datum.rowIndex]
+            return DashboardReportRuntimeChartSelection(
+                xValue: .string(datum.label),
+                seriesKey: .string(datum.seriesKey),
+                row: row,
+                selectionRows: [row]
+            )
+        }
+        guard let selectedCategory, !selectedCategory.isEmpty else {
+            return nil
+        }
+        let selectedRows = uniqueChartSelectionRows(category: selectedCategory, data: chartSeriesData, rows: rows)
+        guard let row = selectedRows.first else {
+            return nil
+        }
+        return DashboardReportRuntimeChartSelection(
+            xValue: .string(selectedCategory),
+            row: row,
+            selectionRows: selectedRows
+        )
+    }
+
+    private var reportRuntimeChartActionExecutions: [DashboardReportRuntimeActionExecution] {
+        guard let selection = selectedReportRuntimeChartSelection,
+              !reportRuntimeActionFields.isEmpty,
+              !reportRuntimeActionDescriptors.isEmpty else {
+            return []
+        }
+        return DashboardRuntime.dashboardReportRuntimeChartActionExecutions(
+            blockID: reportRuntimeBlockID ?? container.id,
+            descriptors: reportRuntimeActionDescriptors,
+            fields: reportRuntimeActionFields,
+            selection: selection
+        )
+    }
+
+    @ViewBuilder
+    private var chartDataFallback: some View {
+        let dataRows = accessibleDataRows
+        if !dataRows.isEmpty {
+            DisclosureGroup(isExpanded: $showsChartDataTable) {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(dataRows) { row in
+                        HStack(spacing: 8) {
+                            Text(row.category)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(row.seriesLabel)
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                            Text(row.valueLabel)
+                                .fontWeight(.semibold)
+                                .frame(minWidth: 48, alignment: .trailing)
+                        }
+                        .font(isCompactPresentation ? .caption2 : .caption)
+                    }
+                    let remaining = accessibleDataTotalCount - dataRows.count
+                    if remaining > 0 {
+                        Text("+\(remaining) more")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.top, 6)
+            } label: {
+                Label("Chart data", systemImage: "tablecells")
+                    .font((isCompactPresentation ? Font.caption : .footnote).weight(.semibold))
+            }
+            .accessibilityLabel(chartAccessibleDataSummary(rows: dataRows, totalCount: accessibleDataTotalCount))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 10))
+        }
     }
 
     private var seriesDisplays: [ChartSeriesDisplay] {
@@ -282,11 +462,143 @@ public struct ChartRenderer: View {
         }
     }
 
+    @ViewBuilder
+    private var reportRuntimeSelectedChartActions: some View {
+        let executions = reportRuntimeChartActionExecutions
+        if let onReportRuntimeAction, !executions.isEmpty {
+            HStack(spacing: 8) {
+                Text("Selection actions")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+                Spacer(minLength: 8)
+                Menu {
+                    ForEach(executions) { execution in
+                        Button(execution.label) {
+                            onReportRuntimeAction(execution)
+                        }
+                    }
+                } label: {
+                    Label("Actions", systemImage: "ellipsis.circle")
+                        .font(.caption.weight(.semibold))
+                }
+                .menuStyle(.button)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Color.forgeSecondarySystemBackground, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var pieSliceSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(pieData) { slice in
+                    let checked = selectedPieID == slice.id
+                    Button {
+                        selectedPieID = checked ? nil : slice.id
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: checked ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(checked ? Color.accentColor : Color.secondary)
+                            Text(slice.displayLabel)
+                                .lineLimit(1)
+                                .foregroundStyle(checked ? .primary : .secondary)
+                            Text(slice.valueLabel)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+                        }
+                        .font(isCompactPresentation ? .caption2 : .caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule().fill(checked ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.08))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func chartSelectionSummaryCard(_ summary: ChartSelectionSummary) -> some View {
+        let colorByKey = Dictionary(uniqueKeysWithValues: seriesDisplays.map { ($0.key, $0.color) })
+        VStack(alignment: .leading, spacing: 6) {
+            Text(summary.category)
+                .font((isCompactPresentation ? Font.caption : .footnote).weight(.semibold))
+                .foregroundStyle(.primary)
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: isCompactPresentation ? 112 : 132), spacing: 8)],
+                alignment: .leading,
+                spacing: 6
+            ) {
+                ForEach(summary.values) { value in
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(colorByKey[value.seriesKey] ?? .accentColor)
+                            .frame(width: 7, height: 7)
+                        Text(value.seriesLabel)
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 4)
+                        Text(value.valueLabel)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.primary)
+                    }
+                    .font(isCompactPresentation ? .caption2 : .caption)
+                }
+            }
+        }
+        .padding(8)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func pieSelectionSummaryCard(_ summary: PieSelectionSummary) -> some View {
+        HStack(spacing: 8) {
+            Text(summary.displayLabel)
+                .font((isCompactPresentation ? Font.caption2 : .caption).weight(.semibold))
+                .lineLimit(1)
+                .foregroundStyle(.primary)
+            Text(summary.seriesLabel)
+                .font(isCompactPresentation ? .caption2 : .caption)
+                .lineLimit(1)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            Text(summary.valueLabel)
+                .font((isCompactPresentation ? Font.caption2 : .caption).weight(.bold))
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+
     private var isCompactPresentation: Bool {
         presentationDensity == .compact
     }
 
     private func loadRows() async {
+        if let providedRows {
+            rows = providedRows
+            hasResolvedRows = true
+            return
+        }
         guard let runtime, let window else {
             rows = []
             hasResolvedRows = true
@@ -312,6 +624,9 @@ public struct ChartRenderer: View {
     }
 
     private func observeRows() async {
+        guard providedRows == nil else {
+            return
+        }
         guard let runtime, let window, !resolvedDataSourceRef.isEmpty else {
             return
         }
@@ -323,6 +638,34 @@ public struct ChartRenderer: View {
             await MainActor.run {
                 rows = next
                 hasResolvedRows = true
+            }
+        }
+    }
+
+    private func observeControl() async {
+        guard providedRows == nil else {
+            await MainActor.run {
+                controlState = ControlState()
+            }
+            return
+        }
+        guard let runtime, let window, !resolvedDataSourceRef.isEmpty else {
+            await MainActor.run {
+                controlState = ControlState()
+            }
+            return
+        }
+        let initialControl = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        await MainActor.run {
+            controlState = initialControl
+        }
+        let stream = await runtime.dataSourceControlUpdates(
+            windowID: window.windowID,
+            dataSourceRef: resolvedDataSourceRef
+        )
+        for await next in stream {
+            await MainActor.run {
+                controlState = next
             }
         }
     }
@@ -402,12 +745,16 @@ public struct ChartRenderer: View {
                 let display = displayByKey[key]
                 let seriesLabel = display?.label ?? titleizedSeriesKey(key)
                 let label = rowLabel ?? seriesLabel
+                let displayLabel = pieDataUsesSeriesStyle && rowLabel != nil ? "\(label) - \(seriesLabel)" : label
                 return PieDatum(
                     id: "\(rowIndex)|\(key)|\(label)",
+                    rowIndex: rowIndex,
                     label: label,
+                    displayLabel: displayLabel,
                     seriesKey: key,
                     seriesLabel: seriesLabel,
-                    value: value
+                    value: value,
+                    valueLabel: formatChartValue(value)
                 )
             }
         }
@@ -417,12 +764,13 @@ public struct ChartRenderer: View {
         let categoryKey = chart.xKey ?? chart.nameKey ?? seriesKeys.first ?? "label"
         let valueKeys = filteredSeriesKeys
         let displayByKey = Dictionary(uniqueKeysWithValues: seriesDisplays.map { ($0.key, $0) })
-        return rows.flatMap { row in
+        return rows.enumerated().flatMap { rowIndex, row in
             let category = row[categoryKey]?.displayStringValue ?? "—"
             return valueKeys.compactMap { key -> SeriesDatum? in
                 guard let value = row[key]?.doubleValueValue else { return nil }
                 let display = displayByKey[key]
                 return SeriesDatum(
+                    rowIndex: rowIndex,
                     category: category,
                     seriesKey: key,
                     seriesLabel: display?.label ?? titleizedSeriesKey(key),
@@ -458,6 +806,63 @@ internal func toggledChartSeriesSelection(current: Set<String>, key: String) -> 
     return next
 }
 
+internal func chartSelectionSummary(category: String?, data: [SeriesDatum]) -> ChartSelectionSummary? {
+    guard let category, !category.isEmpty else {
+        return nil
+    }
+    let values = data
+        .filter { $0.category == category }
+        .map {
+            ChartSelectionValue(
+                seriesKey: $0.seriesKey,
+                seriesLabel: $0.seriesLabel,
+                value: $0.value,
+                valueLabel: formatChartValue($0.value)
+            )
+        }
+    guard !values.isEmpty else {
+        return nil
+    }
+    return ChartSelectionSummary(category: category, values: values)
+}
+
+internal func uniqueChartSelectionRows(
+    category: String?,
+    data: [SeriesDatum],
+    rows: [[String: JSONValue]]
+) -> [[String: JSONValue]] {
+    guard let category, !category.isEmpty else {
+        return []
+    }
+    var seen: Set<Int> = []
+    return data.compactMap { datum in
+        guard datum.category == category,
+              rows.indices.contains(datum.rowIndex),
+              seen.insert(datum.rowIndex).inserted else {
+            return nil
+        }
+        return rows[datum.rowIndex]
+    }
+}
+
+internal func pieSelectionSummary(selectedID: String?, data: [PieDatum]) -> PieSelectionSummary? {
+    guard let selectedID, !selectedID.isEmpty else {
+        return nil
+    }
+    guard let slice = data.first(where: { $0.id == selectedID }) else {
+        return nil
+    }
+    return PieSelectionSummary(
+        id: slice.id,
+        label: slice.label,
+        displayLabel: slice.displayLabel,
+        seriesKey: slice.seriesKey,
+        seriesLabel: slice.seriesLabel,
+        value: slice.value,
+        valueLabel: slice.valueLabel
+    )
+}
+
 private func chartDataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) -> Bool {
     guard let dataSource else {
         return false
@@ -481,20 +886,145 @@ private func chartSelectorStringValue(from value: Any?) -> String? {
     }
 }
 
-private struct PieDatum: Identifiable {
+internal struct PieDatum: Identifiable {
     let id: String
+    let rowIndex: Int
     let label: String
+    let displayLabel: String
     let seriesKey: String
     let seriesLabel: String
     let value: Double
+    let valueLabel: String
 }
 
-private struct SeriesDatum: Identifiable {
-    let id = UUID()
+internal struct SeriesDatum: Identifiable {
+    let rowIndex: Int
     let category: String
     let seriesKey: String
     let seriesLabel: String
     let value: Double
+
+    var id: String {
+        "\(rowIndex)|\(category)|\(seriesKey)"
+    }
+}
+
+internal struct ChartSelectionSummary {
+    let category: String
+    let values: [ChartSelectionValue]
+}
+
+internal struct ChartSelectionValue: Identifiable {
+    var id: String { seriesKey }
+    let seriesKey: String
+    let seriesLabel: String
+    let value: Double
+    let valueLabel: String
+}
+
+internal struct PieSelectionSummary: Identifiable {
+    let id: String
+    let label: String
+    let displayLabel: String
+    let seriesKey: String
+    let seriesLabel: String
+    let value: Double
+    let valueLabel: String
+}
+
+internal struct ChartAccessibleDataRow: Identifiable, Equatable {
+    let id: String
+    let category: String
+    let seriesLabel: String
+    let valueLabel: String
+}
+
+internal struct ChartDataStateFeedback: Equatable {
+    let message: String
+    let detail: String?
+    let isError: Bool
+
+    init(message: String, detail: String? = nil, isError: Bool = false) {
+        self.message = message
+        self.detail = detail
+        self.isError = isError
+    }
+}
+
+internal func chartAccessibleDataRows(
+    chartType: String,
+    seriesData: [SeriesDatum],
+    pieData: [PieDatum],
+    limit: Int = 12
+) -> [ChartAccessibleDataRow] {
+    let normalizedType = chartType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    let rows: [ChartAccessibleDataRow]
+    if normalizedType == "pie" || normalizedType == "donut" {
+        rows = pieData.enumerated().map { index, slice in
+            ChartAccessibleDataRow(
+                id: "pie-\(index)-\(slice.id)",
+                category: slice.displayLabel,
+                seriesLabel: slice.seriesLabel,
+                valueLabel: slice.valueLabel
+            )
+        }
+    } else {
+        rows = seriesData.enumerated().map { index, datum in
+            ChartAccessibleDataRow(
+                id: "series-\(index)-\(datum.id)",
+                category: datum.category,
+                seriesLabel: datum.seriesLabel,
+                valueLabel: formatChartValue(datum.value)
+            )
+        }
+    }
+    return Array(rows.prefix(max(limit, 0)))
+}
+
+internal func chartAccessibleDataValueCount(
+    chartType: String,
+    seriesData: [SeriesDatum],
+    pieData: [PieDatum]
+) -> Int {
+    let normalizedType = chartType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return (normalizedType == "pie" || normalizedType == "donut") ? pieData.count : seriesData.count
+}
+
+internal func chartDataStateFeedback(
+    loading: Bool,
+    error: String?,
+    hasResolvedRows: Bool,
+    hasChartValues: Bool
+) -> ChartDataStateFeedback? {
+    if hasChartValues {
+        return nil
+    }
+    if loading || !hasResolvedRows {
+        return ChartDataStateFeedback(message: "Loading chart")
+    }
+    let detail = error?.trimmingCharacters(in: .whitespacesAndNewlines)
+    if let detail, !detail.isEmpty {
+        return ChartDataStateFeedback(
+            message: "Unable to load chart data",
+            detail: detail,
+            isError: true
+        )
+    }
+    return ChartDataStateFeedback(message: "No chart data")
+}
+
+internal func chartAccessibleDataSummary(rows: [ChartAccessibleDataRow], totalCount: Int) -> String {
+    guard !rows.isEmpty else {
+        return "Chart data table, no values"
+    }
+    let preview = rows.prefix(3).map { row in
+        "\(row.category), \(row.seriesLabel), \(row.valueLabel)"
+    }.joined(separator: "; ")
+    let remaining = max(totalCount - rows.count, 0)
+    if remaining > 0 {
+        return "Chart data table, \(totalCount) values. \(preview). \(remaining) more values."
+    }
+    return "Chart data table, \(totalCount) values. \(preview)."
 }
 
 private struct ChartSeriesDisplay: Identifiable {
@@ -551,6 +1081,13 @@ private func titleizedSeriesKey(_ key: String) -> String {
         .replacingOccurrences(of: "_", with: " ")
         .replacingOccurrences(of: "-", with: " ")
     return spaced.prefix(1).uppercased() + spaced.dropFirst()
+}
+
+internal func formatChartValue(_ value: Double) -> String {
+    if value.rounded(.towardZero) == value {
+        return String(Int(value))
+    }
+    return String(format: "%.2f", value)
 }
 
 private extension JSONValue {

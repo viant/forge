@@ -13,6 +13,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.content
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -273,7 +276,11 @@ class ActionHookRuntimeTest {
                       "pathField": "path",
                       "valueField": "value",
                       "subtitleField": "value",
-                      "lazyExpand": false
+                      "lazyExpand": false,
+                      "target": { "kind": "dialog" },
+                      "targetOverrides": {
+                        "android:phone": { "title": "Choose" }
+                      }
                     }
                   },
                   "properties": {
@@ -297,6 +304,11 @@ class ActionHookRuntimeTest {
         assertEquals("path", dialog.content?.treeBrowser?.pathField)
         assertEquals("value", dialog.content?.treeBrowser?.valueField)
         assertEquals(false, dialog.content?.treeBrowser?.lazyExpand)
+        assertEquals("dialog", dialog.content?.treeBrowser?.target?.jsonObject?.get("kind")?.jsonPrimitive?.content)
+        assertEquals(
+            "Choose",
+            dialog.content?.treeBrowser?.targetOverrides?.get("android:phone")?.jsonObject?.get("title")?.jsonPrimitive?.content
+        )
         assertTrue(dialog.properties.containsKey("quickFilters"))
     }
 }

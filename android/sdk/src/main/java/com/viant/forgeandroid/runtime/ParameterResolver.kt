@@ -8,11 +8,11 @@ class ParameterResolver {
         fun ensure(ds: String): MutableMap<String, Any?> =
             inbound.getOrPut(ds) { mutableMapOf() }
 
-        val compact = params.filter { it.from?.contains(":") == true && it.to?.contains(":") == true }
+        val compact = params.filter { isCompact(it) }
         compact.forEach { p ->
             val from = p.from ?: return@forEach
             val to = p.to ?: return@forEach
-            if (p.direction == "out" || p.output == true || from.endsWith(":output")) {
+            if (isOutbound(p)) {
                 outbound.add(p)
                 return@forEach
             }
@@ -22,13 +22,13 @@ class ParameterResolver {
             val dstDs = if (dstDsRaw.isBlank()) context.dataSourceRef else dstDsRaw
             val srcStore = expandStore(srcStoreRaw)
             val dstStore = expandStore(dstStoreRaw)
-            val srcValue = readStore(context, srcDs, srcStore, p.location ?: p.name)
+            val srcValue = readStore(context, srcDs, srcStore, p.location ?: p.name) ?: return@forEach
             val dstMap = ensure(dstDs)
             writeStore(dstMap, dstStore, p.name, srcValue)
         }
 
         params.filter { it !in compact }.forEach { p ->
-            if (p.output == true) {
+            if (isOutbound(p)) {
                 outbound.add(p)
                 return@forEach
             }
@@ -43,25 +43,34 @@ class ParameterResolver {
         return ParameterResolution(inbound, outbound)
     }
 
-    private fun expandStore(store: String): String = when (store) {
+    private fun isCompact(parameter: ParameterDef): Boolean =
+        parameter.from?.contains(":") == true && parameter.to?.contains(":") == true
+
+    private fun isOutbound(parameter: ParameterDef): Boolean {
+        if (parameter.output == true) return true
+        if (parameter.direction?.trim()?.lowercase() == "out") return true
+        return parameter.from?.trim()?.lowercase()?.endsWith(":output") == true
+    }
+
+    private fun expandStore(store: String): String = when (store.trim().lowercase()) {
         "query" -> "input.query"
         "path" -> "input.path"
         "headers" -> "input.headers"
         "body" -> "input.body"
-        else -> store
+        else -> store.trim().lowercase()
     }
 
     private fun readStore(context: DataSourceContext, dsRef: String, store: String, path: String?): Any? {
-        val ctx = context.window.context(dsRef)
+        val ctx = context.window.contextOrNull(dsRef) ?: return null
         val key = path ?: ""
         return when (store) {
-            "form" -> ctx.peekForm()[key]
-            "selection" -> ctx.peekSelection().selected?.get(key)
-            "filter" -> ctx.peekFilter()[key]
+            "form" -> readObjectValue(ctx.peekForm(), key)
+            "selection" -> readSelectionValue(ctx, key)
+            "filter" -> readObjectValue(ctx.peekFilter(), key)
             "metrics" -> SelectorUtil.resolve(ctx.metrics.peek(), key)
                 ?: SelectorUtil.resolve(ctx.collection.peek().firstOrNull().orEmpty(), key)
             "input" -> SelectorUtil.resolve(ctx.input.peek(), key)
-            "windowForm" -> SelectorUtil.resolve(context.window.peekWindowForm(), key)
+            "windowform" -> SelectorUtil.resolve(context.window.peekWindowForm(), key)
             else -> null
         }
     }
@@ -71,15 +80,18 @@ class ParameterResolver {
         when (store) {
             "input", "input.query", "input.path", "input.headers", "input.body" -> {
                 val sub = mutableMapStore(dst, "input")
-                val subKey = store.removePrefix("input.")
+                val subKey = if (store == "input") "" else store.removePrefix("input.")
                 if (subKey.isNotEmpty()) {
                     val child = mutableMapStore(sub, subKey)
-                    child[key] = value
+                    applyResolvedValue(child, key, value)
                 } else {
-                    sub[key] = value
+                    applyResolvedValue(sub, key, value)
                 }
             }
-            else -> dst[key] = value
+            else -> {
+                val target = mutableMapStore(dst, store)
+                applyResolvedValue(target, key, value)
+            }
         }
     }
 
@@ -98,6 +110,7 @@ class ParameterResolver {
         return when (p.input) {
             "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
             "form" -> location?.let { SelectorUtil.resolve(sourceContext.peekForm(), it) }
+            "dataSource" -> resolveFromLegacyDataSource(sourceContext, location)
             "windowForm" -> location?.let { SelectorUtil.resolve(context.window.peekWindowForm(), it) }
             "metrics" -> location?.let {
                 SelectorUtil.resolve(sourceContext.metrics.peek(), it)
@@ -106,8 +119,75 @@ class ParameterResolver {
             "filter" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
             "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
             "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed
-            "const" -> p.location
-            else -> null
+            "const" -> p.locationAny()
+            else -> {
+                p.value?.let(JsonUtil::elementToAny)
+                    ?: p.selector?.let { SelectorUtil.resolve(context.window.peekWindowForm(), it) }
+                    ?: p.locationAny()
+            }
+        }
+    }
+
+    private fun readSelectionValue(context: DataSourceContext, path: String): Any? {
+        val selection = context.peekSelection()
+        return if (context.dataSource.selectionMode == "multi") {
+            if (path.isBlank()) {
+                selection.selection
+            } else {
+                selection.selection.mapNotNull { row -> SelectorUtil.resolve(row, path) }
+            }
+        } else {
+            val selected = selection.selected ?: return null
+            readObjectValue(selected, path)
+        }
+    }
+
+    private fun readObjectValue(source: Map<String, Any?>, path: String): Any? =
+        if (path.isBlank()) source else SelectorUtil.resolve(source, path)
+
+    private fun inputObject(input: InputState): Map<String, Any?> {
+        val output = linkedMapOf<String, Any?>(
+            "filter" to input.filter,
+            "parameters" to input.parameters,
+            "fetch" to input.fetch,
+            "refresh" to input.refresh
+        )
+        if (input.page != null) {
+            output["page"] = input.page
+        }
+        return output
+    }
+
+    private fun resolveFromLegacyDataSource(context: DataSourceContext, location: String?): Any? {
+        val path = location.orEmpty()
+        val candidates = listOf(
+            context.peekSelection().selected,
+            context.peekForm(),
+            context.peekFilter(),
+            inputObject(context.input.peek())
+        )
+        return candidates.firstNotNullOfOrNull { candidate ->
+            candidate?.let { readObjectValue(it, path) }
+        }
+    }
+
+    private fun applyResolvedValue(target: MutableMap<String, Any?>, name: String, value: Any?) {
+        when {
+            name == "..." -> {
+                JsonUtil.asStringMap(value).forEach { (key, child) -> target[key] = child }
+            }
+            name.startsWith("[]") -> {
+                val key = name.removePrefix("[]")
+                if (key.isNotBlank()) {
+                    target[key] = if (value is List<*>) value else listOf(value)
+                }
+            }
+            name.contains(".") -> {
+                val next = SelectorUtil.set(target, name, value)
+                target.clear()
+                target.putAll(next)
+            }
+            else -> target[name] = value
         }
     }
 

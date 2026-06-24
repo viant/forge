@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +16,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,7 +42,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ChartDef
 import com.viant.forgeandroid.runtime.ChartValueOption
+import com.viant.forgeandroid.runtime.ControlState
 import com.viant.forgeandroid.runtime.DataSourceContext
+import com.viant.forgeandroid.runtime.DashboardReportRuntimeActionDescriptor
+import com.viant.forgeandroid.runtime.DashboardReportRuntimeActionExecution
+import com.viant.forgeandroid.runtime.DashboardReportRuntimeActionField
+import com.viant.forgeandroid.runtime.DashboardReportRuntimeChartSelection
+import com.viant.forgeandroid.runtime.dashboardReportRuntimeChartActionExecutions
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.max
@@ -52,15 +62,32 @@ private val ChartMutedText = Color(0xFF6A7280)
 private val DefaultChartPalette = listOf("#2563EB", "#16A34A", "#EA580C", "#9333EA")
 
 @Composable
-fun ChartRenderer(context: DataSourceContext, chart: ChartDef) {
+fun ChartRenderer(context: DataSourceContext, chart: ChartDef, containerTitle: String? = null) {
     val rows by context.collection.flow.collectAsState(initial = emptyList())
-    ChartRenderer(rows, chart)
+    val control by context.control.flow.collectAsState(initial = context.control.peek())
+    ChartRenderer(
+        rows = rows,
+        chart = chart,
+        containerTitle = containerTitle,
+        control = control,
+        hasResolvedRows = control.loading || control.resolved || rows.isNotEmpty()
+    )
 }
 
 @Composable
-fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
+fun ChartRenderer(
+    rows: List<Map<String, Any?>>,
+    chart: ChartDef,
+    containerTitle: String? = null,
+    control: ControlState = ControlState(),
+    hasResolvedRows: Boolean = true,
+    reportRuntimeBlockId: String? = null,
+    reportRuntimeActionFields: List<DashboardReportRuntimeActionField> = emptyList(),
+    reportRuntimeActionDescriptors: List<DashboardReportRuntimeActionDescriptor> = emptyList(),
+    onReportRuntimeAction: ((DashboardReportRuntimeActionExecution) -> Unit)? = null
+) {
     val prepared = prepareChartData(rows, chart)
-    val type = (chart.type ?: "line").trim().lowercase()
+    val type = chartType(chart)
     var selection by remember(prepared, type) { mutableStateOf<ChartSelection?>(null) }
     val supportsSeriesSelection = prepared.series.size > 1 && type != "pie" && type != "donut"
     val selectionKey = remember(prepared.series) { prepared.series.joinToString("|") { it.key } }
@@ -89,6 +116,9 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
                 .padding(panelPadding),
             verticalArrangement = Arrangement.spacedBy(if (regularWidth) 10.dp else 12.dp)
         ) {
+            chartDisplayTitle(chart.title, containerTitle)?.let {
+                Text(text = it, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            }
             chart.yAxis?.label?.takeIf { it.isNotBlank() }?.let {
                 Text(text = it, style = MaterialTheme.typography.titleSmall)
             }
@@ -112,12 +142,28 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
                 return@Column
             }
             if (activePrepared.points.isEmpty()) {
-                Text("No chart data", style = MaterialTheme.typography.bodyMedium, color = ChartMutedText)
+                val feedback = chartDataStateFeedback(
+                    loading = control.loading,
+                    error = control.error,
+                    hasResolvedRows = hasResolvedRows,
+                    hasChartValues = false
+                ) ?: return@Column
+                ChartDataStateMessage(feedback)
                 return@Column
             }
 
             selection?.let { selected ->
                 ChartTooltip(selected)
+            }
+            val selectedExecutions = reportRuntimeChartActionExecutions(
+                selection = selection,
+                rows = rows,
+                blockId = reportRuntimeBlockId,
+                fields = reportRuntimeActionFields,
+                descriptors = reportRuntimeActionDescriptors
+            )
+            if (onReportRuntimeAction != null && selectedExecutions.isNotEmpty()) {
+                ChartSelectionActions(selectedExecutions, onReportRuntimeAction)
             }
 
             when {
@@ -147,6 +193,29 @@ fun ChartRenderer(rows: List<Map<String, Any?>>, chart: ChartDef) {
                     )
                 }
             }
+            ChartDataFallback(
+                rows = chartAccessibleDataRows(activePrepared, type, limit = 8),
+                totalCount = chartAccessibleDataValueCount(activePrepared, type)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChartDataStateMessage(feedback: ChartDataStateFeedback) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            feedback.message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (feedback.isError) MaterialTheme.colorScheme.error else ChartMutedText,
+            fontWeight = if (feedback.isError) FontWeight.SemiBold else FontWeight.Normal
+        )
+        feedback.detail?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (feedback.isError) MaterialTheme.colorScheme.error else ChartMutedText
+            )
         }
     }
 }
@@ -229,6 +298,52 @@ private fun ChartTooltip(selection: ChartSelection) {
 }
 
 @Composable
+private fun ChartSelectionActions(
+    executions: List<DashboardReportRuntimeActionExecution>,
+    onAction: (DashboardReportRuntimeActionExecution) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        executions.forEach { execution ->
+            AssistChip(
+                onClick = { onAction(execution) },
+                label = { Text(execution.label) },
+                colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFE9EEF9))
+            )
+        }
+    }
+}
+
+private fun reportRuntimeChartActionExecutions(
+    selection: ChartSelection?,
+    rows: List<Map<String, Any?>>,
+    blockId: String?,
+    fields: List<DashboardReportRuntimeActionField>,
+    descriptors: List<DashboardReportRuntimeActionDescriptor>
+): List<DashboardReportRuntimeActionExecution> {
+    if (selection == null || fields.isEmpty() || descriptors.isEmpty()) {
+        return emptyList()
+    }
+    val row = rows.getOrNull(selection.rowIndex).orEmpty()
+    val selectionRows = rows.filterIndexed { index, _ -> index == selection.rowIndex }
+    return dashboardReportRuntimeChartActionExecutions(
+        blockId = blockId,
+        descriptors = descriptors,
+        fields = fields,
+        selection = DashboardReportRuntimeChartSelection(
+            xValue = selection.label,
+            seriesKey = selection.seriesKey,
+            row = row,
+            selectionRows = selectionRows
+        )
+    )
+}
+
+@Composable
 private fun StackedBarChart(
     prepared: PreparedChartData,
     selection: ChartSelection?,
@@ -258,7 +373,7 @@ private fun StackedBarChart(
                                     hit
                                 } ?: point.values.maxByOrNull { it.value }
                                 onSelect(chosen?.let {
-                                    ChartSelection(point.label, it.label, it.key, formatChartValue(it.value), it.color)
+                                    ChartSelection(point.rowIndex, point.label, it.label, it.key, formatChartValue(it.value), it.color)
                                 })
                             }
                         },
@@ -466,6 +581,73 @@ private fun ChartLegend(series: List<ChartSeriesDisplay>) {
     }
 }
 
+@Composable
+private fun ChartDataFallback(
+    rows: List<ChartAccessibleDataRow>,
+    totalCount: Int
+) {
+    if (rows.isEmpty()) {
+        return
+    }
+    Surface(
+        color = Color(0xFFF8FAFC),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Color(0xFFE4E7EC))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "Chart data",
+                style = MaterialTheme.typography.labelMedium,
+                color = ChartMutedText,
+                fontWeight = FontWeight.SemiBold
+            )
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = row.category,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = row.seriesLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ChartMutedText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = row.valueLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+            }
+            val remaining = totalCount - rows.size
+            if (remaining > 0) {
+                Text(
+                    text = "+$remaining more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ChartMutedText,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
 internal data class ChartSeriesDisplay(
     val key: String,
     val label: String,
@@ -480,6 +662,7 @@ internal data class ChartSeriesValue(
 )
 
 internal data class ChartPoint(
+    val rowIndex: Int,
     val label: String,
     val values: List<ChartSeriesValue>
 ) {
@@ -487,12 +670,25 @@ internal data class ChartPoint(
 }
 
 internal data class PieSlice(
+    val rowIndex: Int,
     val label: String,
     val seriesKey: String,
     val seriesLabel: String,
     val value: Double,
     val valueLabel: String,
     val color: Color
+)
+
+internal data class ChartAccessibleDataRow(
+    val category: String,
+    val seriesLabel: String,
+    val valueLabel: String
+)
+
+internal data class ChartDataStateFeedback(
+    val message: String,
+    val detail: String? = null,
+    val isError: Boolean = false
 )
 
 internal data class PreparedChartData(
@@ -502,6 +698,7 @@ internal data class PreparedChartData(
 )
 
 internal data class ChartSelection(
+    val rowIndex: Int,
     val label: String,
     val seriesLabel: String,
     val seriesKey: String,
@@ -516,6 +713,8 @@ internal data class ChartSelection(
 internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): PreparedChartData {
     val seriesDefs = resolveSeriesDefinitions(chart)
     val labelKey = chart.series?.nameKey?.takeIf { it.isNotBlank() }
+        ?: chart.xKey?.takeIf { it.isNotBlank() }
+        ?: chart.nameKey?.takeIf { it.isNotBlank() }
         ?: chart.xAxis?.dataKey.orEmpty()
     val points = rows.mapIndexedNotNull { index, row ->
         val label = row[labelKey]?.toString()?.takeIf { it.isNotBlank() } ?: "Item ${index + 1}"
@@ -530,9 +729,9 @@ internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): P
                 color = series.color
             )
         }
-        if (values.isEmpty()) null else ChartPoint(label = label, values = values)
+        if (values.isEmpty()) null else ChartPoint(rowIndex = index, label = label, values = values)
     }
-    val maxValue = when ((chart.type ?: "line").trim().lowercase()) {
+    val maxValue = when (chartType(chart)) {
         "bar", "stacked_bar" -> points.maxOfOrNull { it.total }
         "pie", "donut" -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
         else -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
@@ -544,6 +743,7 @@ internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
     return prepared.points.flatMap { point ->
         point.values.map { value ->
             PieSlice(
+                rowIndex = point.rowIndex,
                 label = if (prepared.series.size > 1) "${point.label} · ${value.label}" else point.label,
                 seriesKey = value.key,
                 seriesLabel = value.label,
@@ -553,6 +753,75 @@ internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
             )
         }
     }.filter { it.value > 0 }
+}
+
+internal fun chartAccessibleDataRows(
+    prepared: PreparedChartData,
+    chartType: String,
+    limit: Int = 12
+): List<ChartAccessibleDataRow> {
+    val normalizedType = chartType.trim().lowercase()
+    val rows = if (normalizedType == "pie" || normalizedType == "donut") {
+        buildPieSlices(prepared).map { slice ->
+            ChartAccessibleDataRow(
+                category = slice.label,
+                seriesLabel = slice.seriesLabel,
+                valueLabel = slice.valueLabel
+            )
+        }
+    } else {
+        prepared.points.flatMap { point ->
+            point.values.map { value ->
+                ChartAccessibleDataRow(
+                    category = point.label,
+                    seriesLabel = value.label,
+                    valueLabel = formatChartValue(value.value)
+                )
+            }
+        }
+    }
+    return rows.take(max(limit, 0))
+}
+
+internal fun chartAccessibleDataValueCount(
+    prepared: PreparedChartData,
+    chartType: String
+): Int {
+    val normalizedType = chartType.trim().lowercase()
+    return if (normalizedType == "pie" || normalizedType == "donut") {
+        buildPieSlices(prepared).size
+    } else {
+        prepared.points.sumOf { it.values.size }
+    }
+}
+
+internal fun chartDataStateFeedback(
+    loading: Boolean,
+    error: String?,
+    hasResolvedRows: Boolean = true,
+    hasChartValues: Boolean
+): ChartDataStateFeedback? {
+    if (hasChartValues) {
+        return null
+    }
+    if (loading || !hasResolvedRows) {
+        return ChartDataStateFeedback("Loading chart")
+    }
+    val detail = error?.trim()?.takeIf { it.isNotEmpty() }
+    if (detail != null) {
+        return ChartDataStateFeedback(
+            message = "Unable to load chart data",
+            detail = detail,
+            isError = true
+        )
+    }
+    return ChartDataStateFeedback("No chart data")
+}
+
+internal fun chartDisplayTitle(chartTitle: String?, containerTitle: String? = null): String? {
+    val chart = chartTitle?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    val container = containerTitle?.trim()?.takeIf { it.isNotEmpty() }
+    return chart.takeUnless { container != null && it.equals(container, ignoreCase = true) }
 }
 
 internal fun filterPreparedChartData(
@@ -589,6 +858,7 @@ private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> 
     val candidates = when {
         explicitValues.isNotEmpty() -> explicitValues
         !rawSeries?.valueKey.isNullOrBlank() -> listOf(ChartValueOption(name = rawSeries?.valueKey, value = rawSeries?.valueKey))
+        !chart.valueKey.isNullOrBlank() -> listOf(ChartValueOption(name = chart.valueKey, value = chart.valueKey))
         else -> emptyList()
     }
     return candidates.mapIndexedNotNull { index, item ->
@@ -600,6 +870,9 @@ private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> 
         )
     }
 }
+
+private fun chartType(chart: ChartDef): String =
+    (chart.type ?: chart.kind ?: "line").trim().lowercase()
 
 internal fun findCartesianSelection(
     tap: Offset,
@@ -621,6 +894,7 @@ internal fun findCartesianSelection(
     }
     val chosen = nearest?.takeIf { it.third <= 40f } ?: return null
     return ChartSelection(
+        rowIndex = chosen.first.rowIndex,
         label = chosen.first.label,
         seriesLabel = chosen.second.label,
         seriesKey = chosen.second.key,
@@ -652,7 +926,7 @@ internal fun findPieSelection(
     slices.forEach { slice ->
         val sweep = ((slice.value / total) * 360.0).toFloat()
         if (angle in startAngle..(startAngle + sweep)) {
-            return ChartSelection(slice.label, slice.seriesLabel, slice.seriesKey, slice.valueLabel, slice.color)
+            return ChartSelection(slice.rowIndex, slice.label, slice.seriesLabel, slice.seriesKey, slice.valueLabel, slice.color)
         }
         startAngle += sweep
     }

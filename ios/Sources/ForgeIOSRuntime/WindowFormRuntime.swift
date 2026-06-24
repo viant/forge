@@ -1,5 +1,8 @@
 import Foundation
 
+private let windowFormReplaceKey = "$replace"
+private let windowFormReplaceValueKey = "value"
+
 extension ForgeRuntime {
     public func windowFormJSONValue(windowID: String) async -> [String: JSONValue] {
         let dataSourceID = WindowIdentity(windowID: windowID).windowFormID()
@@ -78,7 +81,7 @@ private func prefillRevision(from values: [String: JSONValue]) -> Int {
 
 private func resolveInitialWindowFormValues(metadata: WindowMetadata) -> [String: JSONValue] {
     var initial: [String: JSONValue] = [:]
-    let entries = metadata.on
+    let entries = metadata.on + (metadata.window?.on ?? [])
     for entry in entries where entry.event == "onInit" && entry.handler == "dataSource.setWindowFormData" {
         for parameter in entry.parameters where parameter.input == "const" {
             let name = parameter.name.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
@@ -101,8 +104,7 @@ private func collectInitialWindowFormItemValues(
     initial: inout [String: JSONValue]
 ) {
     for item in container.items where (item.scope ?? "").trimmingCharacters(in: .whitespacesAndNewlines) == "windowForm" {
-        let fieldKey = (item.bindingPath ?? item.dataField ?? item.id ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let fieldKey = item.valueKey ?? ""
         guard !fieldKey.isEmpty, let value = item.value else { continue }
         initial[fieldKey] = value
     }
@@ -117,6 +119,10 @@ private func mergeWindowFormValues(
 ) -> [String: JSONValue] {
     var result = base
     for (key, value) in override {
+        if let replacementValue = windowFormReplacementValue(value) {
+            result[key] = replacementValue
+            continue
+        }
         if
             case .object(let currentObject)? = result[key],
             case .object(let overrideObject) = value
@@ -127,6 +133,16 @@ private func mergeWindowFormValues(
         }
     }
     return result
+}
+
+private func windowFormReplacementValue(_ value: JSONValue) -> JSONValue? {
+    guard
+        case .object(let object) = value,
+        object[windowFormReplaceKey]?.boolValue == true
+    else {
+        return nil
+    }
+    return object[windowFormReplaceValueKey] ?? .null
 }
 
 extension JSONValue {

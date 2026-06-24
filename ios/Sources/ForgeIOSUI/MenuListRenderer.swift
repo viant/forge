@@ -579,8 +579,7 @@ public struct MenuListRenderer: View {
     }
 
     private func resolvedItemValue(_ item: ItemDef) -> JSONValue? {
-        let key = (item.field ?? item.dataField ?? item.bindingPath ?? item.id ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = item.valueKey ?? ""
         guard !key.isEmpty else {
             return item.value
         }
@@ -818,8 +817,7 @@ public struct MenuListRenderer: View {
         guard let runtime, let window else {
             return
         }
-        let key = (item.bindingPath ?? item.dataField ?? item.field ?? item.id ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = item.valueKey ?? ""
         guard !key.isEmpty else {
             return
         }

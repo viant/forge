@@ -161,7 +161,8 @@ public struct WindowContentView: View {
         guard let runtime, let window else { return }
         let dataSourceRef = defaultDataSourceRef()
         let executionContext = ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef)
-        for execution in metadata.on where execution.event == event {
+        let executions = metadata.on + (metadata.window?.on ?? [])
+        for execution in executions where execution.event == event {
             guard let resolved = execution.executionDef else { continue }
             _ = await runtime.execute(resolved, context: executionContext, args: ["windowId": .string(window.windowID)])
         }

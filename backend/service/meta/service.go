@@ -274,18 +274,24 @@ func importCandidates(baseDir, importPath string, target *TargetContext) []strin
 		return []string{joinMetaPath(baseDir, importPath)}
 	}
 	rootDir, inBranch := branchRoot(baseDir, target)
-	logicalBase := baseDir
-	if inBranch {
-		logicalBase = rootDir
+	if !inBranch {
+		return []string{joinMetaPath(baseDir, importPath)}
 	}
-	logicalPath := joinMetaPath(logicalBase, importPath)
-	candidates := []string{logicalPath}
-	if inBranch {
-		for _, branch := range branchPathCandidates(target) {
-			candidates = append(candidates, joinMetaPath(rootDir, path.Join(branch, importPath)))
-		}
-		candidates = append(candidates, joinMetaPath(rootDir, path.Join("shared", importPath)))
+	currentBranchPath := joinMetaPath(baseDir, importPath)
+	sharedPath := joinMetaPath(rootDir, path.Join("shared", importPath))
+	currentIsShared := isSharedBranch(baseDir)
+	candidates := make([]string, 0, len(branchPathCandidates(target))+3)
+	if !currentIsShared {
+		candidates = append(candidates, currentBranchPath)
 	}
+	for _, branch := range branchPathCandidates(target) {
+		candidates = append(candidates, joinMetaPath(rootDir, path.Join(branch, importPath)))
+	}
+	candidates = append(candidates, sharedPath)
+	if currentIsShared {
+		candidates = append(candidates, currentBranchPath)
+	}
+	candidates = append(candidates, joinMetaPath(rootDir, importPath))
 	return uniqueStrings(candidates)
 }
 
@@ -300,6 +306,10 @@ func branchRoot(baseDir string, target *TargetContext) (string, bool) {
 		}
 	}
 	return baseDir, false
+}
+
+func isSharedBranch(baseDir string) bool {
+	return strings.HasSuffix(strings.TrimSuffix(baseDir, "/"), "/shared")
 }
 
 func branchPathCandidates(target *TargetContext) []string {
@@ -335,7 +345,7 @@ func isMobileTarget(platform, formFactor, surface string) bool {
 		return true
 	}
 	switch formFactor {
-	case "phone", "tablet":
+	case "phone", "tablet", "foldable":
 		return true
 	}
 	return surface == "app" && platform != "web"

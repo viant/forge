@@ -71,7 +71,7 @@ object MetadataResolver {
         val formFactor = targetContext.formFactor?.trim().orEmpty()
         val surface = targetContext.surface?.trim().orEmpty()
         val mobilePlatforms = setOf("android", "ios")
-        val mobileFormFactors = setOf("phone", "tablet")
+        val mobileFormFactors = setOf("phone", "tablet", "foldable")
         val isMobile = platform in mobilePlatforms || formFactor in mobileFormFactors
         val keys = mutableListOf<String>()
         if (surface.isNotBlank()) {
@@ -97,28 +97,35 @@ object MetadataResolver {
             keys += "$platform.$formFactor"
             keys += "$platform/$formFactor"
             keys += "$platform:$formFactor"
+            keys += platformFormFactorAlias(platform, formFactor)
         }
         return keys
     }
 
+    private fun platformFormFactorAlias(platform: String, formFactor: String): String {
+        return platform + formFactor.substring(0, 1).uppercase() + formFactor.substring(1)
+    }
+
     private fun matchesTarget(raw: JsonElement?, targetContext: ForgeTargetContext): Boolean {
         val spec = normalizeTarget(raw) ?: return true
+        val platform = targetContext.platform.trim()
+        val formFactor = targetContext.formFactor?.trim().orEmpty()
+        val capabilities = targetContext.capabilities.map { it.trim() }.filter { it.isNotBlank() }.toSet()
 
-        if (spec.platforms.isNotEmpty() && targetContext.platform !in spec.platforms) {
+        if (spec.platforms.isNotEmpty() && platform !in spec.platforms) {
             return false
         }
-        if (spec.excludePlatforms.isNotEmpty() && targetContext.platform in spec.excludePlatforms) {
+        if (spec.excludePlatforms.isNotEmpty() && platform in spec.excludePlatforms) {
             return false
         }
         if (spec.formFactors.isNotEmpty()) {
-            val formFactor = targetContext.formFactor ?: return false
             if (formFactor !in spec.formFactors) {
                 return false
             }
         }
         if (spec.capabilities.isNotEmpty()) {
             for (capability in spec.capabilities) {
-                if (capability !in targetContext.capabilities) {
+                if (capability !in capabilities) {
                     return false
                 }
             }

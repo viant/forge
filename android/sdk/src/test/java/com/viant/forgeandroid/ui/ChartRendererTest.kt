@@ -8,9 +8,18 @@ import com.viant.forgeandroid.runtime.ChartValueOption
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ChartRendererTest {
+
+    @Test
+    fun `chartDisplayTitle trims blanks and suppresses duplicate container titles`() {
+        assertEquals("Capacity Trend", chartDisplayTitle("  Capacity Trend  "))
+        assertNull(chartDisplayTitle("   "))
+        assertNull(chartDisplayTitle("Capacity Trend", containerTitle = " capacity trend "))
+        assertEquals("Inventory Trend", chartDisplayTitle("Inventory Trend", containerTitle = "Capacity Trend"))
+    }
 
     @Test
     fun `prepareChartData keeps multiple named series`() {
@@ -64,6 +73,27 @@ class ChartRendererTest {
     }
 
     @Test
+    fun `prepareChartData uses legacy chart keys`() {
+        val chart = ChartDef(
+            kind = "bar",
+            xKey = "channel",
+            valueKey = "avails"
+        )
+
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("channel" to "Audio", "avails" to 20),
+                mapOf("channel" to "Video", "avails" to 30)
+            ),
+            chart = chart
+        )
+
+        assertEquals(listOf("Audio", "Video"), prepared.points.map { it.label })
+        assertEquals(listOf("avails"), prepared.series.map { it.key })
+        assertEquals(30.0, prepared.maxValue)
+    }
+
+    @Test
     fun `prepareChartData keeps duplicate labels distinct by series key`() {
         val chart = ChartDef(
             type = "bar",
@@ -83,6 +113,7 @@ class ChartRendererTest {
             chart = chart
         )
         val selection = ChartSelection(
+            rowIndex = 0,
             label = "Jan",
             seriesLabel = "Activity",
             seriesKey = "secondaryActivity",
@@ -181,6 +212,87 @@ class ChartRendererTest {
     }
 
     @Test
+    fun `chartAccessibleDataRows flattens cartesian chart values`() {
+        val chart = ChartDef(
+            type = "line",
+            xAxis = ChartAxisDef(dataKey = "month"),
+            series = ChartSeriesDef(
+                values = listOf(
+                    ChartValueOption(name = "Revenue", value = "revenue"),
+                    ChartValueOption(name = "Cost", value = "cost")
+                )
+            )
+        )
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("month" to "Jan", "revenue" to 10, "cost" to 6.5),
+                mapOf("month" to "Feb", "revenue" to 14, "cost" to 7)
+            ),
+            chart = chart
+        )
+
+        val rows = chartAccessibleDataRows(prepared, "line", limit = 3)
+
+        assertEquals(3, rows.size)
+        assertEquals(listOf("Jan", "Jan", "Feb"), rows.map { it.category })
+        assertEquals(listOf("Revenue", "Cost", "Revenue"), rows.map { it.seriesLabel })
+        assertEquals(listOf("10", "6.50", "14"), rows.map { it.valueLabel })
+        assertEquals(4, chartAccessibleDataValueCount(prepared, "line"))
+    }
+
+    @Test
+    fun `chartAccessibleDataRows uses pie slices for donut charts`() {
+        val chart = ChartDef(
+            type = "donut",
+            xAxis = ChartAxisDef(dataKey = "channel"),
+            series = ChartSeriesDef(
+                values = listOf(
+                    ChartValueOption(name = "Avails", value = "avails"),
+                    ChartValueOption(name = "HH Uniques", value = "uniques")
+                )
+            )
+        )
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("channel" to "Audio", "avails" to 385800000, "uniques" to 7600000)
+            ),
+            chart = chart
+        )
+
+        val rows = chartAccessibleDataRows(prepared, "donut")
+
+        assertEquals(2, rows.size)
+        assertEquals(listOf("Audio · Avails", "Audio · HH Uniques"), rows.map { it.category })
+        assertEquals(listOf("Avails", "HH Uniques"), rows.map { it.seriesLabel })
+        assertEquals(listOf("385800000", "7600000"), rows.map { it.valueLabel })
+        assertEquals(2, chartAccessibleDataValueCount(prepared, "donut"))
+    }
+
+    @Test
+    fun `chartDataStateFeedback distinguishes loading empty and errors`() {
+        assertEquals(
+            ChartDataStateFeedback("Loading chart"),
+            chartDataStateFeedback(loading = true, error = null, hasChartValues = false)
+        )
+        assertEquals(
+            ChartDataStateFeedback("Loading chart"),
+            chartDataStateFeedback(loading = false, error = null, hasResolvedRows = false, hasChartValues = false)
+        )
+        assertEquals(
+            ChartDataStateFeedback("Unable to load chart data", detail = "Timeout", isError = true),
+            chartDataStateFeedback(loading = false, error = "  Timeout  ", hasChartValues = false)
+        )
+        assertEquals(
+            ChartDataStateFeedback("No chart data"),
+            chartDataStateFeedback(loading = false, error = "  ", hasChartValues = false)
+        )
+        assertEquals(
+            null,
+            chartDataStateFeedback(loading = true, error = "Timeout", hasChartValues = true)
+        )
+    }
+
+    @Test
     fun `findCartesianSelection picks nearest point`() {
         val chart = ChartDef(
             type = "line",
@@ -218,6 +330,7 @@ class ChartRendererTest {
         val prepared = PreparedChartData(
             points = listOf(
                 ChartPoint(
+                    rowIndex = 0,
                     label = "Q1",
                     values = listOf(
                         ChartSeriesValue("north", "North", 8.0, parseColorForTest("#2563EB")),

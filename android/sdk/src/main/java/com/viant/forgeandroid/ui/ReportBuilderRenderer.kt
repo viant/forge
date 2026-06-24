@@ -643,7 +643,12 @@ fun ReportBuilderRenderer(
             }
 
             if (viewMode == "chart" && chartSpec != null && chartDef != null) {
-                ChartRenderer(chartRows, chartDef)
+                ChartRenderer(
+                    rows = chartRows,
+                    chart = chartDef,
+                    control = control,
+                    hasResolvedRows = control.loading || control.resolved || rows.isNotEmpty()
+                )
             } else {
                 SimpleReportTable(aggregatedRows, selectedDimensions + selectedMeasures)
             }
@@ -2424,7 +2429,8 @@ internal fun shouldAutoCollapseReportBuilderFilters(
     lastCollapsedRequestSignature: String
 ): Boolean {
     val signature = completedRequestSignature.trim()
-    return hasRows && signature.isNotEmpty() && signature != lastCollapsedRequestSignature
+    val lastCollapsedSignature = lastCollapsedRequestSignature.trim()
+    return hasRows && signature.isNotEmpty() && signature != lastCollapsedSignature
 }
 
 internal fun activeReportBuilderFilterCount(
