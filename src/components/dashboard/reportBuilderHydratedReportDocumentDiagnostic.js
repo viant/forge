@@ -1,7 +1,10 @@
 import { resolveReportBuilderSavedReportRecordByReportId } from "./reportBuilderSavedReportRecords.js";
 import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
-import { resolveReportBuilderListReportDocumentsResponseEntry } from "./reportBuilderReportDocumentReadResponse.js";
+import {
+    buildReportBuilderListReportDocumentsEntrySummary,
+    resolveReportBuilderListReportDocumentsResponseEntry,
+} from "./reportBuilderReportDocumentReadResponse.js";
 import {
     resolvePreferredScopeParams,
     resolveNormalizedReportSpecDocumentContext,
@@ -278,6 +281,9 @@ export function buildReportBuilderListReportDocumentsEntryDiagnostic(listRespons
         };
     }
     const resolvedReportId = normalizeString(entry?.reportRef?.reportId || targetReportId);
+    const selectedEntrySummary = buildReportBuilderListReportDocumentsEntrySummary(entry, {
+        localSavedPayloads,
+    });
     const companionContext = resolveSavedReportRecordContextBySource(
         entry?.source || null,
         localSavedPayloads,
@@ -334,6 +340,12 @@ export function buildReportBuilderListReportDocumentsEntryDiagnostic(listRespons
         suggestedAction: buildSuggestedAction(compatibility.code),
         ...(templateConflictState ? templateConflictState : {}),
         ...(templateIdentity ? templateIdentity : {}),
+        ...(normalizeString(selectedEntrySummary?.localBackingAvailability) ? {
+            localBackingAvailability: normalizeString(selectedEntrySummary.localBackingAvailability),
+        } : {}),
+        ...(normalizeString(selectedEntrySummary?.localBackingLabel) ? {
+            localBackingLabel: normalizeString(selectedEntrySummary.localBackingLabel),
+        } : {}),
         ...(semanticBindingViewState ? {
             semanticBindingTitle: semanticBindingViewState.title,
             semanticBindingChips: semanticBindingViewState.chips,

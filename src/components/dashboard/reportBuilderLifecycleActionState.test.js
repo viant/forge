@@ -76,6 +76,36 @@ assert.deepEqual(buildReportBuilderLifecycleActionState({
     ],
 });
 
+assert.deepEqual(buildReportBuilderLifecycleActionState({
+    artifactRef: "report://doc_789",
+    lifecycle: "draft",
+    shareableVersion: 3,
+    shareableCapabilities: {
+        share: true,
+        publish: true,
+    },
+}, {
+    handler: resolvedHandler,
+    blockedReason: "Multiple local artifacts match this report id. Explicit source identity is required before lifecycle actions can continue.",
+}), {
+    actions: [
+        {
+            id: "share",
+            label: "Share",
+            disabled: true,
+            disabledReason: "Multiple local artifacts match this report id. Explicit source identity is required before lifecycle actions can continue.",
+            busy: false,
+        },
+        {
+            id: "publish",
+            label: "Publish",
+            disabled: true,
+            disabledReason: "Multiple local artifacts match this report id. Explicit source identity is required before lifecycle actions can continue.",
+            busy: false,
+        },
+    ],
+});
+
 assert.deepEqual(buildReportBuilderLifecycleActionRequest("publish", {
     artifactRef: "report://doc_123",
     lifecycle: "draft",

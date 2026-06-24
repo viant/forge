@@ -1032,6 +1032,22 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportActionState({
     inspectLabel: "Hide published snapshot export",
 });
 
+assert.deepEqual(buildReportBuilderSelectedListEntryExportActionState({
+    requestSummary: null,
+    requestOpen: false,
+    submitting: false,
+    reportExportHandlerAvailable: true,
+    entrySummary: {
+        title: "Capacity Shared",
+        localBackingAvailability: "ambiguous",
+        localBackingLabel: "ambiguous local backing",
+    },
+}), {
+    submitLabel: "Export unavailable",
+    submitDisabled: true,
+    inspectLabel: "Why export is unavailable",
+});
+
 assert.deepEqual(buildReportBuilderSavedPayloadExportRequestPanelState({
     requestInspector: {
         from: "savedPayload",
@@ -1338,6 +1354,35 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportRequestPanelState({
     content: "{\"entry\":true}",
 });
 
+assert.deepEqual(buildReportBuilderSelectedListEntryExportRequestPanelState({
+    requestInspector: null,
+    requestOpen: true,
+    requestSummary: null,
+    entrySummary: {
+        title: "Capacity Shared",
+        localBackingAvailability: "ambiguous",
+        localBackingLabel: "ambiguous local backing",
+        semanticBindingTitle: "Semantic Binding",
+        semanticBindingChips: ["Model Ad Delivery"],
+        scopeSummaryTitle: "Report Scope",
+        scopeSummaryText: "Reporting Window",
+        scopeSummaryItems: [{ id: "dateRange", label: "Reporting Window" }],
+    },
+}), {
+    metaChips: [
+        "ambiguous local backing",
+    ],
+    hideLabel: "Hide export blocker",
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: ["Model Ad Delivery"],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Reporting Window",
+    scopeSummaryItems: [{ id: "dateRange", label: "Reporting Window" }],
+    headerSubtitle: "Capacity Shared",
+    headerDescription: "Multiple local artifacts match this report id. Explicit source identity is required before a selected-entry export request can be prepared.",
+    content: "Multiple local artifacts match this report id. Explicit source identity is required before a selected-entry export request can be prepared.",
+});
+
 assert.deepEqual(buildReportBuilderSelectedListEntryExportJobPanelState({
     jobSummary: {
         jobId: "job-3",
@@ -1381,6 +1426,32 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportJobPanelState({
     refreshDisabled: true,
     downloadLabel: "Download artifact",
     downloadDisabled: false,
+});
+
+assert.deepEqual(buildReportBuilderSelectedListEntryExportJobPanelState({
+    jobSummary: null,
+    requestSummary: null,
+    entrySummary: {
+        title: "Capacity Shared",
+        localBackingAvailability: "ambiguous",
+        localBackingLabel: "ambiguous local backing",
+        semanticBindingTitle: "Semantic Binding",
+        semanticBindingChips: ["Model Ad Delivery"],
+    },
+}), {
+    tone: "warning",
+    label: "Selected export",
+    title: "Capacity Shared",
+    error: "Multiple local artifacts match this report id. Explicit source identity is required before a selected-entry export request can be prepared.",
+    metaChips: [
+        "ambiguous local backing",
+    ],
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: ["Model Ad Delivery"],
+    refreshLabel: "Refresh status",
+    refreshDisabled: true,
+    downloadLabel: "Download artifact",
+    downloadDisabled: true,
 });
 
 assert.deepEqual(buildReportBuilderSelectedListEntryExportFailureNotice({

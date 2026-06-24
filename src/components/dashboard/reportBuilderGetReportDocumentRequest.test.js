@@ -96,6 +96,63 @@ assert.equal(buildReportBuilderGetReportDocumentRequest(duplicateListResponse, {
     entryReportId: "capacityShared",
 }), null);
 
+const ambiguousSelectedEntrySummary = buildReportBuilderListReportDocumentsEntrySummary({
+    reportRef: { reportId: "capacityShared" },
+    documentVersion: 9,
+    title: "Capacity Shared",
+}, {
+    localSavedPayloads: [
+        {
+            reportId: "capacityShared",
+            title: "Capacity Shared Saved View",
+            documentVersion: 8,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityShared",
+                title: "Capacity Shared Saved View",
+            },
+            source: {
+                kind: "reportBuilder.savedView",
+                reportId: "capacityShared",
+                sourceArtifactId: "saved_view_capacity_shared",
+            },
+        },
+        {
+            reportId: "capacityShared",
+            title: "Capacity Shared Published Snapshot",
+            documentVersion: 9,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityShared",
+                title: "Capacity Shared Published Snapshot",
+            },
+            source: {
+                kind: "reportBuilder.publishedSnapshot",
+                reportId: "capacityShared",
+                sourceArtifactId: "published_snapshot_capacity_shared",
+            },
+        },
+    ],
+});
+
+assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary({
+    version: 1,
+    kind: "getReportDocumentRequest",
+    reportRef: {
+        reportId: "capacityShared",
+    },
+}, {
+    metadata: ambiguousSelectedEntrySummary,
+}), {
+    kind: "getReportDocumentRequest",
+    reportId: "capacityShared",
+    title: "Capacity Shared",
+    localBackingAvailability: "ambiguous",
+    localBackingLabel: "ambiguous local backing",
+});
+
 assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary(request), {
     kind: "getReportDocumentRequest",
     reportId: "capacityQ3",
@@ -283,6 +340,29 @@ assert.deepEqual(buildReportBuilderGetReportDocumentRequestInspectorState(reques
     headerSubtitle: "Inventory Ladder",
     headerDescription: "Selected request metadata.",
     content: serializeReportBuilderGetReportDocumentRequest(request),
+});
+
+assert.deepEqual(buildReportBuilderGetReportDocumentRequestInspectorState({
+    version: 1,
+    kind: "getReportDocumentRequest",
+    reportRef: {
+        reportId: "capacityShared",
+    },
+}, {
+    metadata: ambiguousSelectedEntrySummary,
+}), {
+    kind: "getReportDocumentRequest",
+    reportId: "capacityShared",
+    title: "Capacity Shared",
+    localBackingAvailability: "ambiguous",
+    localBackingLabel: "ambiguous local backing",
+    content: serializeReportBuilderGetReportDocumentRequest({
+        version: 1,
+        kind: "getReportDocumentRequest",
+        reportRef: {
+            reportId: "capacityShared",
+        },
+    }),
 });
 
 assert.deepEqual(buildReportBuilderGetReportDocumentRequestDownload(request, {

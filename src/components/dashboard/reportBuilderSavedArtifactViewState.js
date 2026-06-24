@@ -147,6 +147,17 @@ function buildSelectedListEntryExportLabelsState({
     });
 }
 
+function buildSelectedListEntryExportUnavailableReason(entrySummary = null) {
+    const availability = normalizeString(entrySummary?.localBackingAvailability);
+    if (availability === "ambiguous") {
+        return "Multiple local artifacts match this report id. Explicit source identity is required before a selected-entry export request can be prepared.";
+    }
+    if (availability === "missing") {
+        return "No unique local export-ready artifact is available for this catalog entry yet. Prepare a matching local reopen or saved artifact first.";
+    }
+    return "";
+}
+
 export function buildReportBuilderSavedArtifactViewState({
     savedExplorationArtifactOpen = false,
     savedReportPayloadOpen = false,
@@ -902,6 +913,7 @@ export function buildReportBuilderSelectedListEntryExportMetaChips({
         backingState: entrySummary?.backingState,
         backingSource: entrySummary?.backingSource,
         artifactKindLabel,
+        localBackingLabel: entrySummary?.localBackingLabel,
     }).concat(buildTemplateMetaChips({
         templateLabel: entrySummary?.templateLabel,
         templateConflictLabel: entrySummary?.templateConflictLabel,
@@ -931,6 +943,14 @@ export function buildReportBuilderSelectedListEntryExportActionState({
         requestSummary,
         entrySummary,
     });
+    const unavailableReason = buildSelectedListEntryExportUnavailableReason(entrySummary);
+    if (!requestSummary && unavailableReason) {
+        return {
+            submitLabel: "Export unavailable",
+            submitDisabled: true,
+            inspectLabel: requestOpen ? "Hide export blocker" : "Why export is unavailable",
+        };
+    }
     return buildReportBuilderExportActionState({
         requestSummary,
         requestOpen,
@@ -1003,6 +1023,37 @@ export function buildReportBuilderSelectedListEntryExportRequestPanelState({
         requestSummary,
         entrySummary,
     });
+    const unavailableReason = buildSelectedListEntryExportUnavailableReason(entrySummary);
+    if (requestOpen && !requestInspector && unavailableReason) {
+        return {
+            metaChips: buildReportBuilderSelectedListEntryExportMetaChips({
+                entrySummary,
+                artifactKindLabel: requestSummary?.artifactKindLabel,
+            }),
+            hideLabel: normalizeString(hideLabel) || "Hide export blocker",
+            ...(normalizeString(entrySummary?.semanticBindingTitle)
+                ? { semanticBindingTitle: normalizeString(entrySummary.semanticBindingTitle) }
+                : {}),
+            ...(Array.isArray(entrySummary?.semanticBindingChips)
+                ? { semanticBindingChips: entrySummary.semanticBindingChips.filter(Boolean) }
+                : {}),
+            ...(Array.isArray(entrySummary?.semanticBindingFieldGroups) && entrySummary.semanticBindingFieldGroups.length > 0
+                ? { semanticBindingFieldGroups: entrySummary.semanticBindingFieldGroups }
+                : {}),
+            ...(normalizeString(entrySummary?.scopeSummaryTitle)
+                ? { scopeSummaryTitle: normalizeString(entrySummary.scopeSummaryTitle) }
+                : {}),
+            ...(normalizeString(entrySummary?.scopeSummaryText)
+                ? { scopeSummaryText: normalizeString(entrySummary.scopeSummaryText) }
+                : {}),
+            ...(Array.isArray(entrySummary?.scopeSummaryItems) && entrySummary.scopeSummaryItems.length > 0
+                ? { scopeSummaryItems: entrySummary.scopeSummaryItems }
+                : {}),
+            ...(normalizeString(entrySummary?.title) ? { headerSubtitle: normalizeString(entrySummary.title) } : {}),
+            headerDescription: unavailableReason,
+            content: unavailableReason,
+        };
+    }
     return buildReportBuilderExportRequestPanelState({
         requestInspector,
         requestOpen,
@@ -1027,6 +1078,41 @@ export function buildReportBuilderSelectedListEntryExportJobPanelState({
         requestSummary,
         entrySummary,
     });
+    const unavailableReason = buildSelectedListEntryExportUnavailableReason(entrySummary);
+    if (!jobSummary && unavailableReason) {
+        return {
+            tone: "warning",
+            label: normalizeString(label) || labels.jobLabel,
+            title: normalizeString(entrySummary?.title) || "Report",
+            error: unavailableReason,
+            metaChips: buildReportBuilderSelectedListEntryExportMetaChips({
+                entrySummary,
+                artifactKindLabel: requestSummary?.artifactKindLabel,
+            }),
+            ...(normalizeString(entrySummary?.semanticBindingTitle)
+                ? { semanticBindingTitle: normalizeString(entrySummary.semanticBindingTitle) }
+                : {}),
+            ...(Array.isArray(entrySummary?.semanticBindingChips)
+                ? { semanticBindingChips: entrySummary.semanticBindingChips.filter(Boolean) }
+                : {}),
+            ...(Array.isArray(entrySummary?.semanticBindingFieldGroups) && entrySummary.semanticBindingFieldGroups.length > 0
+                ? { semanticBindingFieldGroups: entrySummary.semanticBindingFieldGroups }
+                : {}),
+            ...(normalizeString(entrySummary?.scopeSummaryTitle)
+                ? { scopeSummaryTitle: normalizeString(entrySummary.scopeSummaryTitle) }
+                : {}),
+            ...(normalizeString(entrySummary?.scopeSummaryText)
+                ? { scopeSummaryText: normalizeString(entrySummary.scopeSummaryText) }
+                : {}),
+            ...(Array.isArray(entrySummary?.scopeSummaryItems) && entrySummary.scopeSummaryItems.length > 0
+                ? { scopeSummaryItems: entrySummary.scopeSummaryItems }
+                : {}),
+            refreshLabel: "Refresh status",
+            refreshDisabled: true,
+            downloadLabel: "Download artifact",
+            downloadDisabled: true,
+        };
+    }
     return buildReportBuilderExportJobPanelState({
         jobSummary,
         label: normalizeString(label) || labels.jobLabel,

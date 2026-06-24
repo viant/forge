@@ -866,6 +866,65 @@ assert.equal(duplicatePublishedDiagnostic?.reportRef?.reportId, "capacityShared"
 assert.equal(duplicatePublishedDiagnostic?.source?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(duplicatePublishedDiagnostic?.source?.sourceArtifactId, "published_snapshot_capacity_shared");
 
+const ambiguousSourceLessDuplicateDiagnostic = buildReportBuilderListReportDocumentsEntryDiagnostic(
+    {
+        version: 1,
+        kind: "listReportDocumentsResponse",
+        entries: [
+            {
+                reportRef: { reportId: "capacityShared" },
+                documentVersion: 9,
+                title: "Capacity Shared",
+            },
+        ],
+    },
+    {
+        entryReportId: "capacityShared",
+        builderIdentity: {
+            containerId: "demoReportBuilder",
+            stateKey: "demoReportBuilder",
+            dataSourceRef: "demoReportSource",
+        },
+        localSavedPayloads: [
+            {
+                reportId: "capacityShared",
+                title: "Capacity Shared Saved View",
+                documentVersion: 8,
+                document: {
+                    version: 1,
+                    kind: "reportDocument",
+                    id: "capacityShared",
+                    title: "Capacity Shared Saved View",
+                },
+                source: {
+                    kind: "reportBuilder.savedView",
+                    reportId: "capacityShared",
+                    sourceArtifactId: "saved_view_capacity_shared",
+                },
+            },
+            {
+                reportId: "capacityShared",
+                title: "Capacity Shared Published Snapshot",
+                documentVersion: 9,
+                document: {
+                    version: 1,
+                    kind: "reportDocument",
+                    id: "capacityShared",
+                    title: "Capacity Shared Published Snapshot",
+                },
+                source: {
+                    kind: "reportBuilder.publishedSnapshot",
+                    reportId: "capacityShared",
+                    sourceArtifactId: "published_snapshot_capacity_shared",
+                },
+            },
+        ],
+        detectedAt: 9305,
+    },
+);
+assert.equal(ambiguousSourceLessDuplicateDiagnostic?.localBackingAvailability, "ambiguous");
+assert.equal(ambiguousSourceLessDuplicateDiagnostic?.localBackingLabel, "ambiguous local backing");
+
 const conflictingTemplateListDiagnostic = buildReportBuilderListReportDocumentsEntryDiagnostic({
     version: 1,
     kind: "listReportDocumentsResponse",

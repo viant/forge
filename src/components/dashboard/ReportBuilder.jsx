@@ -408,6 +408,7 @@ import {
     buildReportBuilderSelectedGetReportDocumentResponse,
     buildReportBuilderGetReportDocumentResponseSummary,
     buildReportBuilderListReportDocumentsEntryMetaChips,
+    buildReportBuilderListReportDocumentsEntryNotice,
     buildReportBuilderListReportDocumentsEntryOptions,
     buildReportBuilderListReportDocumentsEntryOptionLabel,
     buildReportBuilderListReportDocumentsEntrySelectionKey,
@@ -4877,6 +4878,16 @@ export default function ReportBuilder({ container, context }) {
         () => buildReportBuilderListReportDocumentsEntryMetaChips(selectedListReportDocumentsEntrySummary),
         [selectedListReportDocumentsEntrySummary],
     );
+    const selectedListReportDocumentsEntryNotice = useMemo(
+        () => buildReportBuilderListReportDocumentsEntryNotice(selectedListReportDocumentsEntrySummary),
+        [selectedListReportDocumentsEntrySummary],
+    );
+    const selectedListEntryLifecycleBlockedReason = useMemo(
+        () => (normalizeString(selectedListReportDocumentsEntrySummary?.localBackingAvailability) === "ambiguous"
+            ? normalizeString(selectedListReportDocumentsEntryNotice?.message)
+            : ""),
+        [selectedListReportDocumentsEntryNotice?.message, selectedListReportDocumentsEntrySummary?.localBackingAvailability],
+    );
     const selectedListEntrySavedRecord = savedReportState.selectedListEntrySavedRecord;
     const selectedBackendSharedArtifactHydrationNotice = useMemo(() => {
         if (listReportDocumentsResponse || !selectedListReportDocumentsEntry) {
@@ -4902,6 +4913,9 @@ export default function ReportBuilder({ container, context }) {
         selectedListReportDocumentsEntry,
     ]);
     const selectedListEntrySavedRecordExportRequest = savedReportState.selectedListEntryExportRequest;
+    const selectedListEntryCanExpandLocally = !!listReportDocumentsSelectedReportId && !!selectedListReportDocumentsEntrySummary?.reopenable;
+    const selectedListEntryExpandDisabledReason = selectedListReportDocumentsEntryNotice?.message
+        || "Select a valid catalog entry first.";
     const selectedListReportDocumentsEntryCompileValidation = useMemo(
         () => buildReportBuilderDocumentCompileValidation(selectedListReportDocumentsEntry?.compileState?.diagnostics),
         [selectedListReportDocumentsEntry?.compileState?.diagnostics],
@@ -6112,6 +6126,13 @@ export default function ReportBuilder({ container, context }) {
         if (!normalizedActionId || !selectedListReportDocumentsEntrySummary || !reportLifecycleHandler) {
             return;
         }
+        if (selectedListEntryLifecycleBlockedReason) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: selectedListEntryLifecycleBlockedReason,
+            });
+            return;
+        }
         const request = buildReportBuilderLifecycleActionRequest(normalizedActionId, selectedListReportDocumentsEntrySummary, {
             metadata: {
                 source: "reportBuilder.catalogEntry",
@@ -6187,6 +6208,7 @@ export default function ReportBuilder({ container, context }) {
         reportAuditHandler,
         reportAuditMetadata,
         reportLifecycleHandler,
+        selectedListEntryLifecycleBlockedReason,
         selectedListEntrySavedRecord,
         selectedListReportDocumentsEntry,
         reopenReportDocumentDiagnostic,
@@ -8661,9 +8683,11 @@ export default function ReportBuilder({ container, context }) {
         () => buildReportBuilderLifecycleActionState(selectedListReportDocumentsEntrySummary, {
             handler: reportLifecycleHandler,
             busyActionId: selectedListEntryLifecycleActionId,
+            blockedReason: selectedListEntryLifecycleBlockedReason,
         }),
         [
             reportLifecycleHandler,
+            selectedListEntryLifecycleBlockedReason,
             selectedListEntryLifecycleActionId,
             selectedListReportDocumentsEntrySummary,
         ],
@@ -9037,6 +9061,9 @@ export default function ReportBuilder({ container, context }) {
         }
         const resolvedDetailColor = String(detailColor || "").trim()
             || (String(level || "info").trim() === "warning" ? "#5f3411" : "#486579");
+        const resolvedHideLabel = String(hideLabel || "").trim();
+        const resolvedDownloadLabel = String(downloadLabel || panelState?.downloadLabel || "").trim();
+        const showDownloadAction = !!resolvedDownloadLabel;
         return (
             <ReportBuilderInspectorNotice
                 level={level}
@@ -9045,11 +9072,13 @@ export default function ReportBuilder({ container, context }) {
                 actions={(
                     <>
                         <Button small minimal onClick={hide || undefined}>
-                            {hideLabel}
+                            {resolvedHideLabel}
                         </Button>
-                        <Button small minimal onClick={download || undefined}>
-                            {downloadLabel}
-                        </Button>
+                        {showDownloadAction ? (
+                            <Button small minimal onClick={download || undefined}>
+                                {resolvedDownloadLabel}
+                            </Button>
+                        ) : null}
                     </>
                 )}
                 content={String(content || panelState.content || "")}
@@ -11580,7 +11609,9 @@ export default function ReportBuilder({ container, context }) {
                                                 small
                                                 minimal
                                                 onClick={prepareSelectedGetReportDocumentResponse}
-                                                disabled={!listReportDocumentsSelectedReportId}
+                                                disabled={!selectedListEntryCanExpandLocally}
+                                                title={!selectedListEntryCanExpandLocally ? selectedListEntryExpandDisabledReason : ""}
+                                                aria-label={!selectedListEntryCanExpandLocally ? `Prepare selected get response. ${selectedListEntryExpandDisabledReason}` : "Prepare selected get response"}
                                             >
                                                 Prepare selected get response
                                             </Button>
@@ -11588,7 +11619,9 @@ export default function ReportBuilder({ container, context }) {
                                                 small
                                                 minimal
                                                 onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
-                                                disabled={!listReportDocumentsSelectedReportId}
+                                                disabled={!selectedListEntryCanExpandLocally}
+                                                title={!selectedListEntryCanExpandLocally ? selectedListEntryExpandDisabledReason : ""}
+                                                aria-label={!selectedListEntryCanExpandLocally ? `Open selected response. ${selectedListEntryExpandDisabledReason}` : "Open selected response"}
                                             >
                                                 Open selected response
                                             </Button>
@@ -11635,14 +11668,16 @@ export default function ReportBuilder({ container, context }) {
                                                 <span key={`handoff_${chip}`} className="forge-report-builder__result-meta-chip">{chip}</span>
                                             ))}
                                             {!selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
-                                                <span className="forge-report-builder__result-meta-chip">No local payload backing</span>
+                                                <span className="forge-report-builder__result-meta-chip">
+                                                    {selectedListReportDocumentsEntrySummary?.localBackingLabel || "no local backing"}
+                                                </span>
                                             ) : null}
                                         </div>
                                     ) : null}
-                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && !selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && !selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && selectedListReportDocumentsEntryNotice ? (
                                         <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
                                             <span>
-                                                This imported catalog entry can prepare a get request and reopen diagnostic, but it cannot expand into a local reopen bundle until a matching local reopen artifact is available.
+                                                {selectedListReportDocumentsEntryNotice.message}
                                             </span>
                                         </div>
                                     ) : null}
@@ -11690,7 +11725,9 @@ export default function ReportBuilder({ container, context }) {
                                                         small
                                                         minimal
                                                         onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
-                                                        disabled={!listReportDocumentsSelectedReportId}
+                                                        disabled={!selectedListEntryCanExpandLocally}
+                                                        title={!selectedListEntryCanExpandLocally ? selectedListEntryExpandDisabledReason : ""}
+                                                        aria-label={!selectedListEntryCanExpandLocally ? `Open selected response. ${selectedListEntryExpandDisabledReason}` : "Open selected response"}
                                                     >
                                                         Open selected response
                                                     </Button>
@@ -12404,7 +12441,9 @@ export default function ReportBuilder({ container, context }) {
                                             <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
                                         ))}
                                         {!selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
-                                            <span className="forge-report-builder__result-meta-chip">No local payload backing</span>
+                                            <span className="forge-report-builder__result-meta-chip">
+                                                {selectedListReportDocumentsEntrySummary?.localBackingLabel || "no local backing"}
+                                            </span>
                                         ) : null}
                                         <Button
                                             small
@@ -12426,7 +12465,9 @@ export default function ReportBuilder({ container, context }) {
                                             small
                                             minimal
                                             onClick={prepareSelectedGetReportDocumentResponse}
-                                            disabled={!listReportDocumentsSelectedReportId}
+                                            disabled={!selectedListEntryCanExpandLocally}
+                                            title={!selectedListEntryCanExpandLocally ? selectedListEntryExpandDisabledReason : ""}
+                                            aria-label={!selectedListEntryCanExpandLocally ? `Prepare selected get response. ${selectedListEntryExpandDisabledReason}` : "Prepare selected get response"}
                                         >
                                             Prepare selected get response
                                         </Button>
@@ -12434,7 +12475,9 @@ export default function ReportBuilder({ container, context }) {
                                             small
                                             minimal
                                             onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
-                                            disabled={!listReportDocumentsSelectedReportId}
+                                            disabled={!selectedListEntryCanExpandLocally}
+                                            title={!selectedListEntryCanExpandLocally ? selectedListEntryExpandDisabledReason : ""}
+                                            aria-label={!selectedListEntryCanExpandLocally ? `Open selected response. ${selectedListEntryExpandDisabledReason}` : "Open selected response"}
                                         >
                                             Open selected response
                                         </Button>
@@ -12481,10 +12524,10 @@ export default function ReportBuilder({ container, context }) {
                                             {savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.downloadLabel || "Download catalog response file"}
                                         </Button>
                                     </div>
-                                    {!selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
+                                    {!selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && selectedListReportDocumentsEntryNotice ? (
                                         <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
                                             <span>
-                                                This imported catalog entry can prepare a get request and reopen diagnostic, but it cannot expand into a local reopen bundle until a matching local reopen artifact is available.
+                                                {selectedListReportDocumentsEntryNotice.message}
                                             </span>
                                         </div>
                                     ) : null}

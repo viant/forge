@@ -11,11 +11,13 @@ export function buildReportBuilderExportProvenanceMetaChips({
     backingState = "",
     backingSource = "",
     artifactKindLabel = "",
+    localBackingLabel = "",
 } = {}) {
     return [
         normalizeString(backingState),
         normalizeString(backingSource),
         normalizeString(artifactKindLabel),
+        normalizeString(localBackingLabel),
     ].filter(Boolean);
 }
 
