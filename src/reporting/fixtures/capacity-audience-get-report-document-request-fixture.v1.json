@@ -3,5 +3,11 @@
   "kind": "getReportDocumentRequest",
   "reportRef": {
     "reportId": "capacityAudienceSegmentIndexQ3"
-  }
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_capacity_audience_segment_index_q3",
+    "sourceArtifactId": "capacity_audience_segment_index_q3"
+  },
+  "listEntrySelectionKey": "capacityAudienceSegmentIndexQ3::reportBuilder.savedReportPayload::rbreport_capacity_audience_segment_index_q3::capacity_audience_segment_index_q3"
 }

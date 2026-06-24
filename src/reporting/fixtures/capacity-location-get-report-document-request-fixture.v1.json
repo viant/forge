@@ -1,1 +1,13 @@
-{"version":1,"kind":"getReportDocumentRequest","reportRef":{"reportId":"capacityLocationsTopMarketsQ3"}}
+{
+  "version": 1,
+  "kind": "getReportDocumentRequest",
+  "reportRef": {
+    "reportId": "capacityLocationsTopMarketsQ3"
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_capacity_q3_locations_top_markets",
+    "sourceArtifactId": "capacity_q3_locations_top_markets"
+  },
+  "listEntrySelectionKey": "capacityLocationsTopMarketsQ3::reportBuilder.savedReportPayload::rbreport_capacity_q3_locations_top_markets::capacity_q3_locations_top_markets"
+}

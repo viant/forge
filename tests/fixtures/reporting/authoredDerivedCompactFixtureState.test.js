@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { buildAuthoredDerivedCompactFixtureState } from "./authoredDerivedCompactFixtureState.js";
+import { buildAuthoredDerivedCompactFixtureState } from "../../../src/reporting/fixtures/authoredDerivedCompactFixtureState.js";
 
 const fixtureState = buildAuthoredDerivedCompactFixtureState();
 
