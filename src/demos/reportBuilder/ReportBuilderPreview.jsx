@@ -1431,6 +1431,7 @@ const DEMO_LEGACY_CHART_PRESET_STORAGE_KEYS = DEMO_LEGACY_STORAGE_SCOPES.map((sc
 export default function ReportBuilderPreview() {
   useSignals();
   const context = useMemo(() => createDemoContext(), []);
+  const preparedArtifactBridgeRef = useRef(null);
   const lastHandledFetchInputRef = useRef(null);
   const lastObservedWindowFormJSONRef = useRef(undefined);
   const lastObservedInputJSONRef = useRef(undefined);
@@ -1441,6 +1442,18 @@ export default function ReportBuilderPreview() {
 
   if (typeof window !== 'undefined') {
     ensurePreviewMetrics();
+  }
+  if (context?.handlers) {
+    context.handlers.reportBuilderPreview = {
+      registerPreparedArtifactBridge(bridge = null) {
+        preparedArtifactBridgeRef.current = bridge && typeof bridge === 'object' ? bridge : null;
+        return () => {
+          if (preparedArtifactBridgeRef.current === bridge) {
+            preparedArtifactBridgeRef.current = null;
+          }
+        };
+      },
+    };
   }
 
   useSignalEffect(() => {
@@ -1692,6 +1705,15 @@ export default function ReportBuilderPreview() {
           semanticModel: previewSemanticModelState.model || DEMO_SEMANTIC_MODEL,
           seed,
         });
+      },
+      getPreparedListReportDocumentsResponse() {
+        return preparedArtifactBridgeRef.current?.getListReportDocumentsResponse?.() || null;
+      },
+      getPreparedListReportDocumentsSelectedEntryKey() {
+        return preparedArtifactBridgeRef.current?.getListReportDocumentsSelectedEntryKey?.() || "";
+      },
+      replacePreparedListReportDocumentsResponse(nextResponse, options = {}) {
+        return preparedArtifactBridgeRef.current?.replaceListReportDocumentsResponse?.(nextResponse, options) || null;
       },
       runtimeSurface,
       runtimeInteractionSnapshot: previewRuntimeInteractionSnapshot,

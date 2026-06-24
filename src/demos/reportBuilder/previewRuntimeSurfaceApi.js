@@ -142,6 +142,9 @@ export function attachPreviewRuntimeSurfaceApi(metrics = {}, {
   getSavedReportPayloads = null,
   setSavedReportPayloads = null,
   buildSavedReportPayloadRecord = null,
+  getPreparedListReportDocumentsResponse = null,
+  getPreparedListReportDocumentsSelectedEntryKey = null,
+  replacePreparedListReportDocumentsResponse = null,
   runtimeSurface = null,
   runtimeInteractionSnapshot = null,
   stateKey = "",
@@ -715,6 +718,28 @@ export function attachPreviewRuntimeSurfaceApi(metrics = {}, {
     return cloneValue(matchedPayload);
   };
 
+  metrics.getPreparedListReportDocumentsResponse = function getPreparedListReportDocumentsResponseSnapshot() {
+    if (typeof getPreparedListReportDocumentsResponse !== "function") {
+      return null;
+    }
+    const current = getPreparedListReportDocumentsResponse();
+    return current ? cloneValue(current) : null;
+  };
+
+  metrics.getPreparedListReportDocumentsSelectedEntryKey = function getPreparedListReportDocumentsSelectedEntryKeySnapshot() {
+    if (typeof getPreparedListReportDocumentsSelectedEntryKey !== "function") {
+      return "";
+    }
+    return String(getPreparedListReportDocumentsSelectedEntryKey() || "").trim();
+  };
+
+  metrics.replacePreparedListReportDocumentsResponse = function replacePreparedListReportDocumentsResponseSnapshot(nextResponse = null, options = {}) {
+    if (typeof replacePreparedListReportDocumentsResponse !== "function") {
+      return null;
+    }
+    return replacePreparedListReportDocumentsResponse(cloneValue(nextResponse), cloneValue(options || {}));
+  };
+
   attachPreviewRuntimeInteractionApi(metrics, {
     getWindowFormState,
     setWindowFormState,
@@ -754,6 +779,9 @@ export function detachPreviewRuntimeSurfaceApi(metrics = {}) {
   delete metrics.replaceSeededSavedReportPayloads;
   delete metrics.appendSeededSavedReportPayloadRecord;
   delete metrics.patchSeededSavedReportPayload;
+  delete metrics.getPreparedListReportDocumentsResponse;
+  delete metrics.getPreparedListReportDocumentsSelectedEntryKey;
+  delete metrics.replacePreparedListReportDocumentsResponse;
   detachPreviewRuntimeInteractionApi(metrics);
   return metrics;
 }

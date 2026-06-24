@@ -162,6 +162,20 @@ let currentSavedReportPayloads = [
     },
   },
 ];
+let currentPreparedListReportDocumentsResponse = {
+  version: 1,
+  kind: "listReportDocumentsResponse",
+  entries: [
+    {
+      reportRef: { reportId: "capacityLocationQ3" },
+      documentVersion: 8,
+      title: "Capacity Location Q3",
+    },
+  ],
+  cursor: "",
+  hasMore: false,
+};
+let currentPreparedListReportDocumentsSelectedEntryKey = "capacityLocationQ3";
 let lastPersistedBuilderState = null;
 let appliedRefinement = null;
 let clearInteractionCount = 0;
@@ -222,6 +236,20 @@ attachPreviewRuntimeSurfaceApi(metrics, {
         },
       },
       documentVersion: Number(seed.documentVersion || 0) || 0,
+    };
+  },
+  getPreparedListReportDocumentsResponse() {
+    return currentPreparedListReportDocumentsResponse;
+  },
+  getPreparedListReportDocumentsSelectedEntryKey() {
+    return currentPreparedListReportDocumentsSelectedEntryKey;
+  },
+  replacePreparedListReportDocumentsResponse(nextResponse, options = {}) {
+    currentPreparedListReportDocumentsResponse = nextResponse;
+    currentPreparedListReportDocumentsSelectedEntryKey = String(options?.selectedEntryKey || options?.selectedReportId || "").trim();
+    return {
+      response: currentPreparedListReportDocumentsResponse,
+      selectedEntryKey: currentPreparedListReportDocumentsSelectedEntryKey,
     };
   },
   runtimeSurface: {
@@ -496,6 +524,44 @@ assert.deepEqual(
 );
 assert.equal(currentSavedReportPayloads.length, 2);
 assert.equal(currentSavedReportPayloads[1].savedReportPayload.reportDocument.id, "capacityAppended");
+
+assert.deepEqual(metrics.getPreparedListReportDocumentsResponse(), currentPreparedListReportDocumentsResponse);
+assert.equal(metrics.getPreparedListReportDocumentsSelectedEntryKey(), "capacityLocationQ3");
+assert.deepEqual(
+  metrics.replacePreparedListReportDocumentsResponse({
+    version: 1,
+    kind: "listReportDocumentsResponse",
+    entries: [
+      {
+        reportRef: { reportId: "capacityShared" },
+        documentVersion: 9,
+        title: "Capacity Shared",
+      },
+    ],
+    cursor: "",
+    hasMore: false,
+  }, {
+    selectedEntryKey: "capacityShared",
+  }),
+  {
+    response: {
+      version: 1,
+      kind: "listReportDocumentsResponse",
+      entries: [
+        {
+          reportRef: { reportId: "capacityShared" },
+          documentVersion: 9,
+          title: "Capacity Shared",
+        },
+      ],
+      cursor: "",
+      hasMore: false,
+    },
+    selectedEntryKey: "capacityShared",
+  },
+);
+assert.equal(metrics.getPreparedListReportDocumentsSelectedEntryKey(), "capacityShared");
+assert.equal(metrics.getPreparedListReportDocumentsResponse()?.entries?.[0]?.reportRef?.reportId, "capacityShared");
 
 const failingAppendMetrics = {};
 attachPreviewRuntimeSurfaceApi(failingAppendMetrics, {
@@ -1176,6 +1242,9 @@ assert.equal(metrics.getSeededSavedReportPayloads, undefined);
 assert.equal(metrics.replaceSeededSavedReportPayloads, undefined);
 assert.equal(metrics.appendSeededSavedReportPayloadRecord, undefined);
 assert.equal(metrics.patchSeededSavedReportPayload, undefined);
+assert.equal(metrics.getPreparedListReportDocumentsResponse, undefined);
+assert.equal(metrics.getPreparedListReportDocumentsSelectedEntryKey, undefined);
+assert.equal(metrics.replacePreparedListReportDocumentsResponse, undefined);
 assert.equal(metrics.getStandaloneRuntimeInteraction, undefined);
 assert.equal(metrics.replaceStandaloneRuntimeInteraction, undefined);
 assert.equal(metrics.advanceStandaloneRuntimeInteraction, undefined);

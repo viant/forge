@@ -1465,6 +1465,10 @@ export default function ReportBuilder({ container, context }) {
     const [listReportDocumentsResponse, setListReportDocumentsResponse] = useState(null);
     const [listReportDocumentsResponseOpen, setListReportDocumentsResponseOpen] = useState(false);
     const [listReportDocumentsSelectedReportId, setListReportDocumentsSelectedReportId] = useState("");
+    const listReportDocumentsResponseRef = useRef(listReportDocumentsResponse);
+    listReportDocumentsResponseRef.current = listReportDocumentsResponse;
+    const listReportDocumentsSelectedReportIdRef = useRef(listReportDocumentsSelectedReportId);
+    listReportDocumentsSelectedReportIdRef.current = listReportDocumentsSelectedReportId;
     const [selectedListEntryLifecycleActionId, setSelectedListEntryLifecycleActionId] = useState("");
     const [reopenedSessionLifecycleActionId, setReopenedSessionLifecycleActionId] = useState("");
     const [getReportDocumentRequestPayload, setGetReportDocumentRequestPayload] = useState(null);
@@ -9447,6 +9451,37 @@ export default function ReportBuilder({ container, context }) {
             [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: "",
         });
     }, [applyPreparedApiArtifactOrigins]);
+    const replacePreparedListReportDocumentsResponse = React.useCallback((nextResponse = null, {
+        selectedEntryKey = "",
+        selectedReportId = "",
+        origin = "",
+    } = {}) => {
+        const normalizedResponse = nextResponse && typeof nextResponse === "object" && !Array.isArray(nextResponse)
+            ? cloneReportBuilderValue(nextResponse)
+            : null;
+        const fallbackSelectionKey = buildReportBuilderListReportDocumentsEntrySelectionKey(normalizedResponse?.entries?.[0] || null);
+        const resolvedSelectionKey = normalizeString(selectedEntryKey || selectedReportId || fallbackSelectionKey || normalizedResponse?.entries?.[0]?.reportRef?.reportId || "");
+        setListReportDocumentsResponse(normalizedResponse);
+        setListReportDocumentsResponseOpen(false);
+        setListReportDocumentsSelectedReportId(resolvedSelectionKey);
+        setGetReportDocumentRequestPayload(null);
+        setGetReportDocumentRequestPayloadOpen(false);
+        setGetReportDocumentResponse(null);
+        setGetReportDocumentResponseOpen(false);
+        setReopenReportDocumentDiagnostic(null);
+        setReopenReportDocumentDiagnosticOpen(false);
+        setSelectedListEntryExportRequestOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse]: normalizeString(origin),
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: "",
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: "",
+        });
+        return {
+            response: normalizedResponse,
+            selectedEntryKey: resolvedSelectionKey,
+        };
+    }, [applyPreparedApiArtifactOrigins]);
     const prepareGetReportDocumentRequestPayload = React.useCallback(() => {
         const request = buildReportBuilderGetReportDocumentRequest(activeListReportDocumentsResponse, {
             entryReportId: listReportDocumentsSelectedReportId,
@@ -9654,6 +9689,21 @@ export default function ReportBuilder({ container, context }) {
             },
         );
     }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, container, getReportDocumentRequestPayload, getReportDocumentResponse, hydratedReportDocumentSession, listReportDocumentsResponse, localSavedReportRecords, preparedApiArtifactOrigins, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, selectedBackendSharedArtifactRecord, semanticDisplayConfig, semanticModelState.model, state]);
+    useEffect(() => {
+        const registerBridge = builderContext?.handlers?.reportBuilderPreview?.registerPreparedArtifactBridge;
+        if (typeof registerBridge !== "function") {
+            return undefined;
+        }
+        return registerBridge({
+            getListReportDocumentsResponse() {
+                return cloneReportBuilderValue(listReportDocumentsResponseRef.current);
+            },
+            getListReportDocumentsSelectedEntryKey() {
+                return normalizeString(listReportDocumentsSelectedReportIdRef.current);
+            },
+            replaceListReportDocumentsResponse: replacePreparedListReportDocumentsResponse,
+        });
+    }, [builderContext?.handlers?.reportBuilderPreview, replacePreparedListReportDocumentsResponse]);
     const downloadGetReportDocumentRequestPayload = React.useCallback(() => {
         const descriptor = buildReportBuilderGetReportDocumentRequestDownload(getReportDocumentRequestPayload, {
             metadata: selectedListReportDocumentsEntrySummary,
