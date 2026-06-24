@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch } from './WindowContent.jsx';
+import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
 describe('resolveInitialWindowFormValues', () => {
   it('collects explicit windowForm item values alongside onInit constants', () => {
@@ -204,5 +204,19 @@ describe('shouldPreserveMissingResolvedParameters', () => {
         {},
       ),
     ).toBe(false);
+  });
+});
+
+describe('shouldResetWindowDashboardState', () => {
+  it('runs only once for the same window/dashboard identity', () => {
+    expect(shouldResetWindowDashboardState('', 'window-1', 'dashboard-1')).toBe(true);
+    expect(shouldResetWindowDashboardState('window-1:dashboard-1', 'window-1', 'dashboard-1')).toBe(false);
+  });
+
+  it('allows resets when the window or dashboard identity changes', () => {
+    expect(shouldResetWindowDashboardState('window-1:dashboard-1', 'window-2', 'dashboard-1')).toBe(true);
+    expect(shouldResetWindowDashboardState('window-1:dashboard-1', 'window-1', 'dashboard-2')).toBe(true);
+    expect(shouldResetWindowDashboardState('', '', 'dashboard-1')).toBe(false);
+    expect(shouldResetWindowDashboardState('', 'window-1', '')).toBe(false);
   });
 });

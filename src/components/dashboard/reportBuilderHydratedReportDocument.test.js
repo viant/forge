@@ -2535,4 +2535,35 @@ assert.equal(promotedSharedArtifactSession?.documentVersion, 7);
 assert.equal(promotedSharedArtifactSession?.savedSource?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(promotedSharedArtifactSession?.savedSource?.sourceArtifactId, "published_snapshot_capacity_trend");
 
+const archivedSharedArtifactSession = setReportBuilderHydratedDocumentSessionSharedArtifact(promotedSharedArtifactSession, {
+    artifactId: "published_snapshot_capacity_trend_archived",
+    artifactKind: "reportBuilder.publishedSnapshot",
+    artifactRef: "reportBuilder.publishedSnapshot://published_snapshot_capacity_trend_archived",
+    lifecycle: "archived",
+    ownerRef: "team://analytics",
+    policyRef: "policy://reports/shared",
+    shareableVersion: 5,
+    documentVersion: 8,
+    capabilities: {
+        view: true,
+        share: true,
+        export: true,
+    },
+    source: {
+        kind: "reportBuilder.publishedSnapshot",
+        sourceArtifactId: "published_snapshot_capacity_trend_archived",
+        reportId: "capacityTrendQ3",
+    },
+});
+assert.equal(archivedSharedArtifactSession?.artifactId, "published_snapshot_capacity_trend_archived");
+assert.equal(archivedSharedArtifactSession?.artifactKind, "reportBuilder.publishedSnapshot");
+assert.equal(archivedSharedArtifactSession?.artifactRef, "reportBuilder.publishedSnapshot://published_snapshot_capacity_trend_archived");
+assert.equal(archivedSharedArtifactSession?.lifecycle, "archived");
+assert.equal(archivedSharedArtifactSession?.shareableVersion, 5);
+assert.equal(archivedSharedArtifactSession?.documentVersion, 8);
+assert.equal(archivedSharedArtifactSession?.savedSource?.kind, "reportBuilder.publishedSnapshot");
+assert.equal(archivedSharedArtifactSession?.savedSource?.sourceArtifactId, "published_snapshot_capacity_trend_archived");
+assert.equal(archivedSharedArtifactSession?.capabilities?.share, true);
+assert.equal(archivedSharedArtifactSession?.capabilities?.archive, undefined);
+
 console.log("reportBuilderHydratedReportDocument ✓ hydrates compatible ReportDocument responses back into live builder config and state");

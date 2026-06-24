@@ -155,6 +155,9 @@ function buildSelectedListEntryExportUnavailableReason(entrySummary = null) {
     if (availability === "missing") {
         return "No unique local export-ready artifact is available for this catalog entry yet. Prepare a matching local reopen or saved artifact first.";
     }
+    if (entrySummary?.reopenable && entrySummary?.exportable !== true) {
+        return "A local reopen artifact is available for this catalog entry, but no local export-ready artifact is available yet. Save or prepare a matching export-ready artifact first.";
+    }
     return "";
 }
 
@@ -695,6 +698,23 @@ export function buildReportBuilderReopenedSessionNoticeState({
     };
 }
 
+export function buildReportBuilderLatestSharedArtifactSupplementalText(summary = null) {
+    if (!summary || typeof summary !== "object" || Array.isArray(summary)) {
+        return "";
+    }
+    const kind = normalizeString(summary?.kind);
+    const lifecycle = normalizeString(summary?.lifecycle).toLowerCase();
+    if (lifecycle === "archived") {
+        return kind === "reportBuilder.publishedSnapshot"
+            ? "The latest archive action preserved an immutable snapshot artifact for this report."
+            : "The latest archive action preserved an immutable shared artifact for this report.";
+    }
+    if (kind === "reportBuilder.publishedSnapshot") {
+        return "The latest publish action returned an immutable snapshot artifact for this report.";
+    }
+    return "The latest share action returned an immutable shared artifact for this report.";
+}
+
 export function buildReportBuilderDraftExportMetaChips({
     requestSummary = null,
     templateIdentity = null,
@@ -912,7 +932,7 @@ export function buildReportBuilderSelectedListEntryExportMetaChips({
     return buildReportBuilderExportProvenanceMetaChips({
         backingState: entrySummary?.backingState,
         backingSource: entrySummary?.backingSource,
-        artifactKindLabel,
+        artifactKindLabel: normalizeString(artifactKindLabel || entrySummary?.backingArtifactKindLabel),
         localBackingLabel: entrySummary?.localBackingLabel,
     }).concat(buildTemplateMetaChips({
         templateLabel: entrySummary?.templateLabel,

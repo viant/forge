@@ -175,10 +175,10 @@ assert.equal(reconciled.record?.source?.kind, "reportBuilder.publishedSnapshot")
 assert.equal(reconciled.localLifecycleSharedArtifactRecords?.[0]?.source?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(reconciled.getReportDocumentResponse?.source?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(reconciled.reopenReportDocumentDiagnostic?.source?.kind, "reportBuilder.publishedSnapshot");
-assert.equal(reconciled.createReportDocumentPayload?.source?.kind, "reportBuilder.publishedSnapshot");
-assert.equal(reconciled.updateReportDocumentPayload?.source?.kind, "reportBuilder.publishedSnapshot");
-assert.equal(reconciled.updateReportDocumentPayload?.expectedVersion, 9);
-assert.equal(reconciled.clearUpdateReportDocumentConflictDiagnostic, true);
+assert.equal(reconciled.createReportDocumentPayload?.source?.kind, "reportBuilder.savedView");
+assert.equal(reconciled.updateReportDocumentPayload?.source?.kind, "reportBuilder.savedView");
+assert.equal(reconciled.updateReportDocumentPayload?.expectedVersion, 8);
+assert.equal(reconciled.clearUpdateReportDocumentConflictDiagnostic, false);
 assert.equal(reconciled.backendSharedArtifactRecords?.[0]?.source?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(reconciled.hydratedSession?.savedSource?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(reconciled.listReportDocumentsResponse?.entries?.[0]?.source?.kind, "reportBuilder.publishedSnapshot");
@@ -257,9 +257,9 @@ const projected = projectReportBuilderLifecycleEnvelopeState({
 assert.equal(projected?.record?.source?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(projected?.getReportDocumentResponse?.source?.kind, "reportBuilder.publishedSnapshot");
 assert.equal(projected?.listReportDocumentsResponse?.entries?.[0]?.source?.kind, "reportBuilder.publishedSnapshot");
-assert.equal(projected?.updateReportDocumentPayload?.source?.kind, "reportBuilder.publishedSnapshot");
-assert.equal(projected?.clearUpdateReportDocumentConflictDiagnostic, true);
-assert.equal(projected?.updateReportDocumentConflictDiagnostic, null);
+assert.equal(projected?.updateReportDocumentPayload?.source?.kind, "reportBuilder.savedView");
+assert.equal(projected?.clearUpdateReportDocumentConflictDiagnostic, false);
+assert.equal(projected?.updateReportDocumentConflictDiagnostic?.kind, "updateReportDocumentConflictDiagnostic");
 assert.equal(
     projected?.selectedEntryKey,
     buildReportBuilderListReportDocumentsEntrySelectionKey(projected?.listReportDocumentsResponse?.entries?.[0] || null),
@@ -331,5 +331,104 @@ assert.equal(
     sharedArtifactOnlyProjected?.selectedReportId,
     "capacityShared::reportBuilder.publishedSnapshot::::published_snapshot_capacity_shared",
 );
+
+const archivedSharedRecord = {
+    ...sharedRecord,
+    artifactId: "published_snapshot_capacity_shared_archived",
+    artifactRef: "reportBuilder.publishedSnapshot://published_snapshot_capacity_shared_archived",
+    lifecycle: "archived",
+    capabilities: {
+        view: true,
+        share: true,
+        export: true,
+    },
+    source: {
+        kind: "reportBuilder.publishedSnapshot",
+        reportId: "capacityShared",
+        sourceArtifactId: "published_snapshot_capacity_shared_archived",
+    },
+    document: {
+        ...sharedRecord.document,
+        title: "Capacity Shared Archived Snapshot",
+    },
+};
+
+const archivedProjected = projectReportBuilderLifecycleEnvelopeState({
+    result: {
+        message: "Archived shared artifact for Capacity Shared Published Snapshot.",
+        sharedArtifact: archivedSharedRecord,
+        listReportDocumentsResponse: {
+            version: 1,
+            kind: "listReportDocumentsResponse",
+            entries: [
+                {
+                    reportRef: { reportId: "capacityShared" },
+                    title: "Capacity Shared Published Snapshot",
+                    documentVersion: 9,
+                    lifecycle: "published",
+                    capabilities: {
+                        view: true,
+                        share: true,
+                        archive: true,
+                        export: true,
+                    },
+                    source: {
+                        kind: "reportBuilder.publishedSnapshot",
+                        reportId: "capacityShared",
+                        sourceArtifactId: "published_snapshot_capacity_shared",
+                    },
+                },
+            ],
+            cursor: "",
+            hasMore: false,
+        },
+    },
+    localLifecycleSharedArtifactRecords: [],
+    hydratedSession: {
+        reportId: "capacityShared",
+        title: "Capacity Shared Published Snapshot",
+        documentVersion: 9,
+        savedSource: {
+            kind: "reportBuilder.publishedSnapshot",
+            reportId: "capacityShared",
+            sourceArtifactId: "published_snapshot_capacity_shared",
+        },
+        artifactKind: "reportBuilder.publishedSnapshot",
+        artifactId: "published_snapshot_capacity_shared",
+        artifactRef: "reportBuilder.publishedSnapshot://published_snapshot_capacity_shared",
+        lifecycle: "published",
+        capabilities: {
+            view: true,
+            share: true,
+            archive: true,
+            export: true,
+        },
+        reopenedConfig: {},
+        liveSnapshot: {
+            config: {},
+            state: {},
+        },
+    },
+    hydratedSessionTargetSource: {
+        kind: "reportBuilder.publishedSnapshot",
+        reportId: "capacityShared",
+        sourceArtifactId: "published_snapshot_capacity_shared",
+    },
+    replaceSelectedListEntrySource: {
+        kind: "reportBuilder.publishedSnapshot",
+        reportId: "capacityShared",
+        sourceArtifactId: "published_snapshot_capacity_shared",
+    },
+});
+
+assert.equal(archivedProjected?.record?.lifecycle, "archived");
+assert.equal(archivedProjected?.record?.source?.sourceArtifactId, "published_snapshot_capacity_shared_archived");
+assert.equal(archivedProjected?.hydratedSession?.lifecycle, "archived");
+assert.equal(archivedProjected?.hydratedSession?.artifactId, "published_snapshot_capacity_shared_archived");
+assert.equal(archivedProjected?.hydratedSession?.savedSource?.sourceArtifactId, "published_snapshot_capacity_shared_archived");
+assert.equal(archivedProjected?.hydratedSession?.capabilities?.archive, undefined);
+assert.equal(archivedProjected?.listReportDocumentsResponse?.entries?.[0]?.lifecycle, "archived");
+assert.equal(archivedProjected?.listReportDocumentsResponse?.entries?.[0]?.source?.sourceArtifactId, "published_snapshot_capacity_shared_archived");
+assert.equal(archivedProjected?.listReportDocumentsResponse?.entries?.[0]?.capabilities?.archive, undefined);
 
 console.log("reportBuilderLifecycleSharedArtifactReconciliation ✓ reconciles shared-artifact lifecycle results across prepared, reopened, and catalog surfaces");

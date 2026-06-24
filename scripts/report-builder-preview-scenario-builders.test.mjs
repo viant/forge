@@ -26,6 +26,7 @@ import {
   buildSemanticValidationBehaviorInjectionSteps,
   buildQueuedSemanticValidationBehaviorsStep,
   buildPreviewFetchBehaviorReplacementStep,
+  buildPreviewLifecycleBehaviorReplacementStep,
   buildPreviewPatchBuilderStateStep,
   buildPreviewPatchBuilderConfigStep,
   buildSeededSavedPayloadCompileStatePatchSteps,
@@ -316,6 +317,26 @@ assert.equal(previewFetchBehaviorReplacementWithoutResetStep.type, "eval");
 assert.match(previewFetchBehaviorReplacementWithoutResetStep.expression, /replaceFetchBehaviors/);
 assert.doesNotMatch(previewFetchBehaviorReplacementWithoutResetStep.expression, /preview\.resetCounters\(\)/);
 assert.match(previewFetchBehaviorReplacementWithoutResetStep.expression, /Replacement chart query failed\./);
+
+assert.throws(
+  () => buildPreviewLifecycleBehaviorReplacementStep(),
+  /requires behaviors/i,
+);
+
+const previewLifecycleBehaviorReplacementStep = buildPreviewLifecycleBehaviorReplacementStep({
+  behaviors: [{
+    match: {
+      action: "archive",
+      source: "reportBuilder.catalogEntry",
+      title: "Capacity Trend Q3 Published Snapshot",
+    },
+    error: "Preview lifecycle archive failed.",
+  }],
+});
+assert.equal(previewLifecycleBehaviorReplacementStep.type, "eval");
+assert.match(previewLifecycleBehaviorReplacementStep.expression, /replaceLifecycleBehaviors/);
+assert.match(previewLifecycleBehaviorReplacementStep.expression, /reportBuilder\.catalogEntry/);
+assert.match(previewLifecycleBehaviorReplacementStep.expression, /Preview lifecycle archive failed\./);
 
 assert.throws(
   () => buildPreviewPatchBuilderStateStep(),

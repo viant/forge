@@ -35,6 +35,10 @@ assert.equal(
   true,
 );
 assert.equal(
+  expressions.some((expression) => expression.includes("Explicit source identity is required before lifecycle actions can continue.") && expression.includes("Share") && expression.includes("Publish")),
+  true,
+);
+assert.equal(
   expressions.some((expression) => expression.includes("Selected catalog entry export request summary") && expression.includes("ambiguous local backing")),
   true,
 );

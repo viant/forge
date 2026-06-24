@@ -9,6 +9,7 @@ import {
     buildReportBuilderDraftExportNoticeState,
     buildReportBuilderDraftExportMetaChips,
     buildReportBuilderDraftExportRequestPanelState,
+    buildReportBuilderLatestSharedArtifactSupplementalText,
     buildReportBuilderReopenedExportActionState,
     buildReportBuilderReopenedExportExecutionConfig,
     buildReportBuilderReopenedExportFailureNotice,
@@ -63,6 +64,31 @@ const exportHandler = {
 };
 const feedbackSink = () => {};
 const localSavedPayloads = [{ id: "saved-1" }];
+
+assert.equal(
+    buildReportBuilderLatestSharedArtifactSupplementalText({
+        kind: "reportBuilder.savedView",
+        lifecycle: "draft",
+    }),
+    "The latest share action returned an immutable shared artifact for this report.",
+);
+
+assert.equal(
+    buildReportBuilderLatestSharedArtifactSupplementalText({
+        kind: "reportBuilder.publishedSnapshot",
+        lifecycle: "published",
+    }),
+    "The latest publish action returned an immutable snapshot artifact for this report.",
+);
+
+assert.equal(
+    buildReportBuilderLatestSharedArtifactSupplementalText({
+        kind: "reportBuilder.publishedSnapshot",
+        lifecycle: "archived",
+    }),
+    "The latest archive action preserved an immutable snapshot artifact for this report.",
+);
+
 assert.equal(openState.savedExploration.inspectLabel, "Hide draft snapshot");
 assert.equal(openState.savedExploration.inspectLabel, "Hide draft snapshot");
 assert.equal(openState.savedReportPayload.inspectLabel, "Hide report file");
@@ -1046,6 +1072,63 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportActionState({
     submitLabel: "Export unavailable",
     submitDisabled: true,
     inspectLabel: "Why export is unavailable",
+});
+
+assert.deepEqual(buildReportBuilderSelectedListEntryExportActionState({
+    requestSummary: null,
+    requestOpen: false,
+    submitting: false,
+    reportExportHandlerAvailable: true,
+    entrySummary: {
+        title: "Capacity External",
+        localBackingAvailability: "missing",
+        localBackingLabel: "no local backing",
+    },
+}), {
+    submitLabel: "Export unavailable",
+    submitDisabled: true,
+    inspectLabel: "Why export is unavailable",
+});
+
+assert.deepEqual(buildReportBuilderSelectedListEntryExportActionState({
+    requestSummary: null,
+    requestOpen: false,
+    submitting: false,
+    reportExportHandlerAvailable: true,
+    entrySummary: {
+        title: "Capacity Imported",
+        reopenable: true,
+        backingState: "reopen-ready",
+        backingSource: "imported saved-view",
+        backingArtifactKindLabel: "saved-view artifact",
+    },
+}), {
+    submitLabel: "Export unavailable",
+    submitDisabled: true,
+    inspectLabel: "Why export is unavailable",
+});
+
+assert.deepEqual(buildReportBuilderSelectedListEntryExportRequestPanelState({
+    requestInspector: null,
+    requestOpen: true,
+    requestSummary: null,
+    entrySummary: {
+        title: "Capacity Imported",
+        reopenable: true,
+        backingState: "reopen-ready",
+        backingSource: "imported saved-view",
+        backingArtifactKindLabel: "saved-view artifact",
+    },
+}), {
+    metaChips: [
+        "reopen-ready",
+        "imported saved-view",
+        "saved-view artifact",
+    ],
+    hideLabel: "Hide export blocker",
+    headerSubtitle: "Capacity Imported",
+    headerDescription: "A local reopen artifact is available for this catalog entry, but no local export-ready artifact is available yet. Save or prepare a matching export-ready artifact first.",
+    content: "A local reopen artifact is available for this catalog entry, but no local export-ready artifact is available yet. Save or prepare a matching export-ready artifact first.",
 });
 
 assert.deepEqual(buildReportBuilderSavedPayloadExportRequestPanelState({

@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 
 import {Spinner} from '@blueprintjs/core';
@@ -236,6 +236,15 @@ export function shouldPreserveMissingResolvedParameters(dataSource = {}, previou
     return resolvedKeys.length === 0 && explicitKeys.length === 0;
 }
 
+export function shouldResetWindowDashboardState(previousDashboardKey = '', windowId = '', dashboardId = '') {
+    const normalizedWindowId = String(windowId || '').trim();
+    const normalizedDashboardId = String(dashboardId || '').trim();
+    if (!normalizedWindowId || !normalizedDashboardId) {
+        return false;
+    }
+    return String(previousDashboardKey || '').trim() !== `${normalizedWindowId}:${normalizedDashboardId}`;
+}
+
 function resolveBoundWindowTitle(metadata, window = {}) {
     const binding = metadata?.window?.titleBinding || metadata?.view?.titleBinding;
     const windowId = String(window?.windowId || '').trim();
@@ -366,6 +375,7 @@ function WindowContentInner({window, metadata, services}) {
     const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
     const existingContext = getWindowContext(windowId);
     const context = existingContext?.metadata === metadata ? existingContext : hookContext;
+    const initializedDashboardKeyRef = useRef('');
 
     const liveWindowForm = windowFormSignal?.value || {};
     const windowFormSnapshot = useMemo(() => ({
@@ -553,6 +563,10 @@ function WindowContentInner({window, metadata, services}) {
         const rootContainer = metadata?.view?.content || null;
         if (!rootContainer || rootContainer.kind !== 'dashboard') return;
         if (!windowId || !rootContainer.id) return;
+        if (!shouldResetWindowDashboardState(initializedDashboardKeyRef.current, windowId, rootContainer.id)) {
+            return;
+        }
+        initializedDashboardKeyRef.current = `${windowId}:${rootContainer.id}`;
         try {
             context.handlers?.window?.resetDashboardState?.({
                 context,

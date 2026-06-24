@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 
 import {
+  createKeyListSignature,
+  reconcileVisibleColumns,
   reconcileSelectedDataKeys,
   toggleSelectedDataKey,
 } from './chartSeriesSelection.js';
@@ -47,3 +49,15 @@ assert.deepEqual(
 
 assert.deepEqual(toggleSelectedDataKey(['spend', 'clicks'], 'clicks'), ['spend']);
 assert.deepEqual(toggleSelectedDataKey(['spend'], 'clicks'), ['spend', 'clicks']);
+
+assert.equal(createKeyListSignature([' spend ', 'clicks', 'spend']), 'spend\u0001clicks');
+
+const existingVisibleColumns = ['eventDate', 'spend'];
+assert.equal(
+  reconcileVisibleColumns(existingVisibleColumns, ['eventDate', 'spend']),
+  existingVisibleColumns,
+);
+assert.deepEqual(
+  reconcileVisibleColumns(['eventDate'], ['eventDate', 'spend']),
+  ['eventDate', 'spend'],
+);

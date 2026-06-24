@@ -248,6 +248,23 @@ export function buildPreviewFetchBehaviorReplacementStep({
   };
 }
 
+export function buildPreviewLifecycleBehaviorReplacementStep({
+  behaviors = [],
+  missingApiMessage = "replaceLifecycleBehaviors API not available.",
+} = {}) {
+  const normalizedBehaviors = (Array.isArray(behaviors) ? behaviors : [behaviors])
+    .filter((behavior) => behavior && typeof behavior === "object" && !Array.isArray(behavior))
+    .map((behavior) => JSON.parse(JSON.stringify(behavior)));
+  if (normalizedBehaviors.length === 0) {
+    throw new Error("buildPreviewLifecycleBehaviorReplacementStep requires behaviors.");
+  }
+  const normalizedMissingApiMessage = normalizeString(missingApiMessage) || "replaceLifecycleBehaviors API not available.";
+  return {
+    type: "eval",
+    expression: `(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.replaceLifecycleBehaviors !== 'function') { throw new Error(${JSON.stringify(normalizedMissingApiMessage)}); } return preview.replaceLifecycleBehaviors(${JSON.stringify(normalizedBehaviors)}) > 0; })()`,
+  };
+}
+
 export function buildPreviewPatchBuilderStateStep({
   patch = null,
   missingApiMessage = "patchBuilderState API not available.",
