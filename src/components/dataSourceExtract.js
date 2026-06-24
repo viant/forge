@@ -87,7 +87,6 @@ export function extractData(selectors = {}, paging, data) {
                 ?? resolveKey(data, "recordCount")
                 ?? 0
         };
-        info.value = info || {};
     }
 
     if (data && typeof data === "object" && data.metrics && typeof data.metrics === "object" && !Array.isArray(data.metrics)) {
