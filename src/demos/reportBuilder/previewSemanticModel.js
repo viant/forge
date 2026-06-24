@@ -35,6 +35,22 @@ function ensureMetricsBehaviors(metrics = {}) {
   return currentBehaviors;
 }
 
+export function hasQueuedPreviewSemanticModelBehavior(metrics = {}, modelRef = "") {
+  const behaviors = ensureMetricsBehaviors(metrics);
+  const normalizedRef = String(modelRef || "").trim();
+  return behaviors.some((behavior) => {
+    if (!behavior || typeof behavior !== "object") {
+      return false;
+    }
+    const match = behavior.match && typeof behavior.match === "object" ? behavior.match : {};
+    const matchedModelRef = String(match.modelRef || "").trim();
+    if (matchedModelRef && matchedModelRef !== normalizedRef) {
+      return false;
+    }
+    return true;
+  });
+}
+
 export function replacePreviewSemanticModelBehaviors(metrics = {}, nextBehaviors = []) {
   metrics.semanticModelBehaviors = (Array.isArray(nextBehaviors) ? nextBehaviors : [nextBehaviors])
     .map((behavior) => normalizePreviewSemanticModelBehavior(behavior))

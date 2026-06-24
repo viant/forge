@@ -6,6 +6,7 @@ import { applyPreviewDetailTargetBehavior } from "./previewDetailTargetBehaviors
 import { incrementReportBuilderPreviewMetric } from "./previewMetrics.js";
 import {
   applyPreviewSemanticModelBehavior,
+  hasQueuedPreviewSemanticModelBehavior,
   persistPreviewSemanticModelBehaviors,
 } from "./previewSemanticModel.js";
 import {
@@ -23,6 +24,26 @@ function clonePreviewValue(value) {
 
 function normalizeString(value = "") {
   return String(value || "").trim();
+}
+
+function buildSemanticModelResolutionDiagnostics(modelRef = "", error = null) {
+  const normalizedRef = normalizeString(modelRef);
+  const message = normalizeString(error?.message || error);
+  if (!message || message === `Unknown semantic model '${normalizedRef}'.`) {
+    return [{
+      code: "unknownModel",
+      severity: "error",
+      path: "selection.modelRef",
+      message: `Unknown semantic model '${modelRef}'.`,
+    }];
+  }
+  return [{
+    code: "semanticModelError",
+    severity: "error",
+    path: "selection.modelRef",
+    message,
+    suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
+  }];
 }
 
 function resolveMaybeFunction(value = null) {
@@ -96,6 +117,13 @@ export function createDemoSemanticModelHandler({
 
   async function loadDemoSemanticModel(modelRef = "") {
     const normalizedRef = normalizeString(modelRef);
+    if (
+      normalizedRef
+      && resolvedModelCache.has(normalizedRef)
+      && !hasQueuedPreviewSemanticModelBehavior(resolveMaybeFunction(getMetrics), normalizedRef)
+    ) {
+      return clonePreviewValue(resolvedModelCache.get(normalizedRef));
+    }
     if (!pendingModelRequests.has(normalizedRef)) {
       const request = resolveDemoSemanticModel(normalizedRef)
         .finally(() => {
@@ -105,6 +133,19 @@ export function createDemoSemanticModelHandler({
     }
     return pendingModelRequests.get(normalizedRef)
       .then((payload) => clonePreviewValue(payload));
+  }
+
+  function invalidateModelCache(modelRef = "") {
+    const normalizedRef = normalizeString(modelRef);
+    if (normalizedRef) {
+      resolvedModelCache.delete(normalizedRef);
+      pendingModelRequests.delete(normalizedRef);
+      return 1;
+    }
+    const clearedCount = resolvedModelCache.size;
+    resolvedModelCache.clear();
+    pendingModelRequests.clear();
+    return clearedCount;
   }
 
   return {
@@ -131,6 +172,7 @@ export function createDemoSemanticModelHandler({
     async getModel(modelRef = "") {
       return loadDemoSemanticModel(modelRef);
     },
+    invalidateModelCache,
     async validateSelection(modelRef = "", selection = {}) {
       const metrics = resolveMaybeFunction(getMetrics);
       if (metrics) {
@@ -149,16 +191,11 @@ export function createDemoSemanticModelHandler({
       let resolvedSemanticModel = null;
       try {
         resolvedSemanticModel = await loadDemoSemanticModel(normalizedRef);
-      } catch (_) {
+      } catch (error) {
         return {
           valid: false,
           normalizedSelection: null,
-          diagnostics: [{
-            code: "unknownModel",
-            severity: "error",
-            path: "selection.modelRef",
-            message: `Unknown semantic model '${modelRef}'.`,
-          }],
+          diagnostics: buildSemanticModelResolutionDiagnostics(modelRef, error),
         };
       }
       const validation = validateSemanticBinding({

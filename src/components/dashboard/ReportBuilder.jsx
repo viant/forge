@@ -3238,9 +3238,9 @@ export default function ReportBuilder({ container, context }) {
                             || authoredDrillSummary.detailTargetCount > 0
                             || authoredDrillSummary.fieldActionCount > 0) ? (
                             <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ marginTop: 10 }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                <div className="forge-report-builder__chart-inline-notice-header">
                                     <strong>Drill navigation</strong>
-                                    <div className="forge-report-builder__result-meta">
+                                    <div className="forge-report-builder__result-meta forge-report-builder__chart-inline-notice-meta">
                                         <span className="forge-report-builder__result-meta-chip">
                                             {authoredDrillSummary.hierarchyCount} {authoredDrillSummary.hierarchyCount === 1 ? "hierarchy" : "hierarchies"}
                                         </span>
@@ -3251,19 +3251,19 @@ export default function ReportBuilder({ container, context }) {
                                         ) : null}
                                     </div>
                                 </div>
-                                <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: "#486579" }}>
+                                <div className="forge-report-builder__chart-inline-notice-description">
                                     Capture the current breakdown order for drill paths, then bind breakdown fields to detail targets for runtime navigation in preview and saved report artifacts.
                                 </div>
                                 {currentBreakdownDrillHierarchy ? (
-                                    <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5, color: "#183247" }}>
+                                    <div className="forge-report-builder__chart-inline-notice-current-path">
                                         <strong>Current path:</strong> {currentBreakdownDrillHierarchy.levels.map((level) => level.label).join(" -> ")}
                                     </div>
                                 ) : (
-                                    <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5, color: "#486579" }}>
+                                    <div className="forge-report-builder__chart-inline-notice-description">
                                         Select at least two breakdowns to capture a drill path.
                                     </div>
                                 )}
-                                <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                                <div className="forge-report-builder__chart-inline-notice-actions">
                                     <Button
                                         small
                                         minimal

@@ -291,7 +291,29 @@ function normalizeChartExtent(value, fallback) {
     return fallback;
 }
 
+export function hasNonEmptySummary(metrics = {}) {
+    if (!metrics || typeof metrics !== 'object') {
+        return false;
+    }
+    return Object.entries(metrics).some(([key, value]) => {
+        if (!/summary/i.test(String(key || ''))) {
+            return false;
+        }
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+            return false;
+        }
+        return Object.values(value).some((item) => {
+            if (item == null) return false;
+            if (typeof item === 'string') return item.trim().length > 0;
+            return true;
+        });
+    });
+}
+
 export function resolveEmptyChartMessage(metrics = {}) {
+    if (hasNonEmptySummary(metrics)) {
+        return 'No detailed chart rows were returned for the selected period. Summary totals may still be available below.';
+    }
     return 'No data for the selected period.';
 }
 
