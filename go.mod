@@ -13,6 +13,8 @@ require (
 	github.com/viant/jsonrpc v0.21.0
 	github.com/viant/mcp v0.10.0
 	github.com/viant/mcp-protocol v0.10.0
+	github.com/xuri/excelize/v2 v2.10.0
+	golang.org/x/image v0.33.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

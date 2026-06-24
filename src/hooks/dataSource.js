@@ -15,6 +15,19 @@ function isPlainObject(value) {
 }
 
 const WINDOW_FORM_META_KEY = "__forge";
+const WINDOW_FORM_REPLACE_KEY = "$replace";
+const WINDOW_FORM_REPLACE_VALUE_KEY = "value";
+
+function windowFormReplacementValue(value) {
+    if (!isPlainObject(value) || value[WINDOW_FORM_REPLACE_KEY] !== true) {
+        return null;
+    }
+    return {
+        value: Object.prototype.hasOwnProperty.call(value, WINDOW_FORM_REPLACE_VALUE_KEY)
+            ? value[WINDOW_FORM_REPLACE_VALUE_KEY]
+            : null,
+    };
+}
 
 export const withWindowFormPrefillRevision = (previous = {}, next = {}) => {
     if (!isPlainObject(next) || !Object.prototype.hasOwnProperty.call(next, "prefill")) {
@@ -38,6 +51,11 @@ export const mergeWindowFormValues = (previous = {}, next = {}) => {
     const right = isPlainObject(next) ? next : {};
     const merged = { ...left };
     Object.entries(right).forEach(([key, value]) => {
+        const replacementValue = windowFormReplacementValue(value);
+        if (replacementValue) {
+            merged[key] = replacementValue.value;
+            return;
+        }
         const prevValue = merged[key];
         if (isPlainObject(prevValue) && isPlainObject(value)) {
             merged[key] = mergeWindowFormValues(prevValue, value);
@@ -53,7 +71,7 @@ function findDataSourceDependencies(dataSourceRef, dataSources) {
     Object.entries(dataSources).forEach(([ref, dataSource]) => {
         if (dataSourceRef === ref) return; // Skip self
         const { parameters = [] } = dataSource;
-        if ((!parameters || parameters.length === 0) && dataSourceRef === dataSource.dataSourceRef) {//parent 
+        if ((!parameters || parameters.length === 0) && dataSourceRef === dataSource.dataSourceRef) {//parent
             const parameter = {
                 from: dataSourceRef + ':',
                 to: ':selection',

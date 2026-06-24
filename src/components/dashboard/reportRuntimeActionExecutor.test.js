@@ -110,7 +110,7 @@ assert.deepEqual(executeReportRuntimeAction({
       id: "detail_channel",
       kind: "detail",
       label: "Show channel details",
-      targetRef: "target://steward/performance/channel-detail",
+      targetRef: "target://example/performance/channel-detail",
     },
     item: {
       channelV2: "Display",
@@ -133,7 +133,7 @@ assert.deepEqual(detailCalls, [{
     id: "detail_channel",
     kind: "detail",
     label: "Show channel details",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
   item: {
     channelV2: "Display",

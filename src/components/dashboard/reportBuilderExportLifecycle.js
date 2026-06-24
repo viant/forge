@@ -47,6 +47,31 @@ function decodeBase64Bytes(value = "") {
     return Uint8Array.from(Buffer.from(source, "base64"));
 }
 
+function normalizeTimestamp(value = "") {
+    const normalized = normalizeString(value);
+    if (!normalized) {
+        return "";
+    }
+    const parsed = Date.parse(normalized);
+    return Number.isFinite(parsed) ? normalized : "";
+}
+
+function normalizeDurationMs(value = 0) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+        return 0;
+    }
+    return Math.round(numeric / 1_000_000);
+}
+
+function normalizeMaybeDurationMs(value = 0, fallbackValue = 0) {
+    const direct = Number(value);
+    if (Number.isFinite(direct) && direct > 0) {
+        return Math.round(direct);
+    }
+    return normalizeDurationMs(fallbackValue);
+}
+
 export function buildReportBuilderExportRequestIdentity(request = null) {
     if (!request || typeof request !== "object" || Array.isArray(request)) {
         return "";
@@ -76,7 +101,20 @@ export function normalizeReportBuilderExportJob(job = null) {
         scope: normalizeString(job?.scope),
         error: normalizeString(job?.error),
         diagnostics: normalizeDiagnostics(job?.diagnostics),
+        submittedAt: normalizeTimestamp(job?.submittedAt),
+        startedAt: normalizeTimestamp(job?.startedAt),
+        completedAt: normalizeTimestamp(job?.completedAt),
+        retentionTtlMs: normalizeMaybeDurationMs(job?.retentionTtlMs, job?.retentionTtl),
     };
+}
+
+export function normalizeReportBuilderExportJobList(value = null) {
+    const jobs = Array.isArray(value)
+        ? value
+        : (Array.isArray(value?.jobs) ? value.jobs : []);
+    return jobs
+        .map((entry) => normalizeReportBuilderExportJob(entry))
+        .filter(Boolean);
 }
 
 export function isReportBuilderExportJobTerminal(job = null) {
@@ -108,7 +146,18 @@ export function normalizeReportBuilderExportArtifact(artifact = null) {
         ...(normalizeString(artifact?.artifactRef) ? { artifactRef: normalizeString(artifact.artifactRef) } : {}),
         ...(normalizeString(artifact?.jobId) ? { jobId: normalizeString(artifact.jobId) } : {}),
         ...(normalizeString(artifact?.format) ? { format: normalizeString(artifact.format).toLowerCase() } : {}),
+        createdAt: normalizeTimestamp(artifact?.createdAt),
+        retentionTtlMs: normalizeMaybeDurationMs(artifact?.retentionTtlMs, artifact?.retentionTtl),
     };
+}
+
+export function normalizeReportBuilderExportArtifactList(value = null) {
+    const artifacts = Array.isArray(value)
+        ? value
+        : (Array.isArray(value?.artifacts) ? value.artifacts : []);
+    return artifacts
+        .map((entry) => normalizeReportBuilderExportArtifact(entry))
+        .filter(Boolean);
 }
 
 export function buildReportBuilderExportArtifactDownload(artifact = null, {
@@ -165,6 +214,13 @@ export function buildReportBuilderExportJobSummary(job = null) {
 
 export function buildReportBuilderExportFailureNotice(job = null, {
     label = "Export",
+    semanticBindingTitle = "",
+    semanticBindingChips = [],
+    semanticBindingFieldGroups = [],
+    scopeSummaryTitle = "",
+    scopeSummaryText = "",
+    scopeSummaryItems = [],
+    additionalMetaChips = [],
 } = {}) {
     const summary = buildReportBuilderExportJobSummary(job);
     if (!summary?.hasFailure) {
@@ -174,6 +230,26 @@ export function buildReportBuilderExportFailureNotice(job = null, {
     return {
         title: `${normalizedLabel} failed`,
         description: normalizeString(summary.error || summary.primaryDiagnosticMessage || `${normalizedLabel} failed.`) || `${normalizedLabel} failed.`,
+        ...(Array.isArray(additionalMetaChips) && additionalMetaChips.filter(Boolean).length > 0
+            ? { metaChips: additionalMetaChips.filter(Boolean) }
+            : {}),
+        ...(normalizeString(semanticBindingTitle) ? { semanticBindingTitle: normalizeString(semanticBindingTitle) } : {}),
+        ...(Array.isArray(semanticBindingChips) && semanticBindingChips.filter(Boolean).length > 0
+            ? { semanticBindingChips: semanticBindingChips.filter(Boolean) }
+            : {}),
+        ...(Array.isArray(semanticBindingFieldGroups) && semanticBindingFieldGroups.length > 0
+            ? {
+                semanticBindingFieldGroups: semanticBindingFieldGroups.map((group) => ({
+                    ...group,
+                    fields: Array.isArray(group?.fields) ? group.fields.filter(Boolean) : [],
+                })).filter((group) => Array.isArray(group.fields) && group.fields.length > 0),
+            }
+            : {}),
+        ...(normalizeString(scopeSummaryTitle) ? { scopeSummaryTitle: normalizeString(scopeSummaryTitle) } : {}),
+        ...(normalizeString(scopeSummaryText) ? { scopeSummaryText: normalizeString(scopeSummaryText) } : {}),
+        ...(Array.isArray(scopeSummaryItems) && scopeSummaryItems.length > 0
+            ? { scopeSummaryItems }
+            : {}),
         diagnostics: summary.diagnostics,
     };
 }

@@ -96,6 +96,12 @@ const broadOverrideMetadata = {
                     layout: { kind: 'androidPhone' },
                     containers: [{ id: 'androidPhoneTabs' }]
                 },
+                androidPhone: {
+                    layout: { alias: 'androidPhone' }
+                },
+                iosTablet: {
+                    layout: { alias: 'iosTablet' }
+                },
                 web: {
                     layout: { kind: 'web' },
                     containers: [{ id: 'webGrid' }]
@@ -113,6 +119,7 @@ const resolvedAndroidPhone = resolveMetadataForTarget(broadOverrideMetadata, {
 assert.equal(resolvedAndroidPhone.view.content.layout.kind, 'androidPhone');
 assert.equal(resolvedAndroidPhone.view.content.layout.density, 'phone');
 assert.equal(resolvedAndroidPhone.view.content.layout.platform, 'android');
+assert.equal(resolvedAndroidPhone.view.content.layout.alias, 'androidPhone');
 assert.equal(resolvedAndroidPhone.view.content.containers.length, 1);
 assert.equal(resolvedAndroidPhone.view.content.containers[0].id, 'androidPhoneTabs');
 assert.equal(typeof resolvedAndroidPhone.view.content.targetOverrides, 'undefined');
@@ -123,6 +130,7 @@ const resolvedIosTablet = resolveMetadataForTarget(broadOverrideMetadata, {
 });
 
 assert.equal(resolvedIosTablet.view.content.layout.kind, 'mobile');
+assert.equal(resolvedIosTablet.view.content.layout.alias, 'iosTablet');
 assert.equal(resolvedIosTablet.view.content.containers[0].id, 'mobileTabs');
 
 const resolvedWebWindow = resolveMetadataForTarget(broadOverrideMetadata, {
@@ -132,3 +140,185 @@ const resolvedWebWindow = resolveMetadataForTarget(broadOverrideMetadata, {
 
 assert.equal(resolvedWebWindow.view.content.layout.kind, 'web');
 assert.equal(resolvedWebWindow.view.content.containers[0].id, 'webGrid');
+
+const mobileOnlyOverrideMetadata = {
+    view: {
+        content: {
+            id: 'builder',
+            title: 'Base',
+            layout: { mode: 'desktop' },
+            targetOverrides: {
+                mobile: {
+                    title: 'Mobile',
+                    layout: { mode: 'mobile' }
+                },
+                phone: {
+                    layout: { density: 'phone' }
+                },
+                tablet: {
+                    layout: { density: 'tablet' }
+                },
+                'ios:phone': {
+                    title: 'iPhone'
+                }
+            }
+        }
+    }
+};
+
+const resolvedWebDesktopWithoutOverride = resolveMetadataForTarget(mobileOnlyOverrideMetadata, {
+    platform: 'web',
+    formFactor: 'desktop',
+    surface: 'browser'
+});
+
+assert.equal(resolvedWebDesktopWithoutOverride.view.content.title, 'Base');
+assert.equal(resolvedWebDesktopWithoutOverride.view.content.layout.mode, 'desktop');
+assert.equal(typeof resolvedWebDesktopWithoutOverride.view.content.layout.density, 'undefined');
+assert.equal(typeof resolvedWebDesktopWithoutOverride.view.content.targetOverrides, 'undefined');
+
+const foldableOverrideMetadata = {
+    view: {
+        content: {
+            layout: { kind: 'base' },
+            targetOverrides: {
+                mobile: {
+                    layout: { kind: 'mobile' }
+                },
+                foldable: {
+                    layout: { density: 'foldable' }
+                },
+                'mobile:foldable': {
+                    layout: { mode: 'hingeAware' }
+                }
+            }
+        }
+    }
+};
+
+const resolvedFoldable = resolveMetadataForTarget(foldableOverrideMetadata, {
+    formFactor: 'foldable'
+});
+
+assert.equal(resolvedFoldable.view.content.layout.kind, 'mobile');
+assert.equal(resolvedFoldable.view.content.layout.density, 'foldable');
+assert.equal(resolvedFoldable.view.content.layout.mode, 'hingeAware');
+
+const normalizedTargetMetadata = {
+    view: {
+        content: {
+            containers: [
+                {
+                    id: 'normalized',
+                    target: {
+                        platforms: [' android '],
+                        formFactors: [' phone '],
+                        capabilities: [' lookup ']
+                    }
+                },
+                {
+                    id: 'excluded',
+                    target: {
+                        excludePlatforms: [' android ']
+                    }
+                }
+            ]
+        }
+    }
+};
+
+const resolvedNormalizedTarget = resolveMetadataForTarget(normalizedTargetMetadata, {
+    platform: ' android ',
+    formFactor: ' phone ',
+    capabilities: [' lookup ']
+});
+
+assert.deepEqual(
+    resolvedNormalizedTarget.view.content.containers.map((container) => container.id),
+    ['normalized']
+);
+
+const layeredMobileOverrideMetadata = {
+    view: {
+        content: {
+            id: 'reportBuilder',
+            reportBuilder: {
+                filterPresentation: 'inline',
+                density: 'desktop',
+                controls: {
+                    placement: 'toolbar',
+                    summary: 'full'
+                }
+            },
+            targetOverrides: {
+                mobile: {
+                    reportBuilder: {
+                        filterPresentation: 'drawer-left',
+                        density: 'mobile',
+                        controls: {
+                            summary: 'compact'
+                        }
+                    }
+                },
+                phone: {
+                    reportBuilder: {
+                        density: 'phone'
+                    }
+                },
+                'mobile.phone': {
+                    reportBuilder: {
+                        controls: {
+                            placement: 'bottom-sheet'
+                        }
+                    }
+                },
+                ios: {
+                    reportBuilder: {
+                        platformChrome: 'cupertino'
+                    }
+                },
+                'ios.phone': {
+                    reportBuilder: {
+                        filterPresentation: 'sheet'
+                    }
+                },
+                'ios:phone': {
+                    reportBuilder: {
+                        controls: {
+                            summary: 'ios-phone'
+                        }
+                    }
+                },
+                web: {
+                    reportBuilder: {
+                        controls: {
+                            placement: 'web-toolbar'
+                        }
+                    }
+                }
+            }
+        }
+    }
+};
+
+const resolvedIosPhoneLayeredOverride = resolveMetadataForTarget(layeredMobileOverrideMetadata, {
+    platform: 'ios',
+    formFactor: 'phone'
+});
+
+assert.equal(resolvedIosPhoneLayeredOverride.view.content.reportBuilder.filterPresentation, 'sheet');
+assert.equal(resolvedIosPhoneLayeredOverride.view.content.reportBuilder.density, 'phone');
+assert.equal(resolvedIosPhoneLayeredOverride.view.content.reportBuilder.platformChrome, 'cupertino');
+assert.equal(resolvedIosPhoneLayeredOverride.view.content.reportBuilder.controls.placement, 'bottom-sheet');
+assert.equal(resolvedIosPhoneLayeredOverride.view.content.reportBuilder.controls.summary, 'ios-phone');
+assert.equal(typeof resolvedIosPhoneLayeredOverride.view.content.targetOverrides, 'undefined');
+
+const resolvedWebLayeredOverride = resolveMetadataForTarget(layeredMobileOverrideMetadata, {
+    platform: 'web',
+    formFactor: 'desktop'
+});
+
+assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.filterPresentation, 'inline');
+assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.density, 'desktop');
+assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.controls.placement, 'web-toolbar');
+assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.controls.summary, 'full');

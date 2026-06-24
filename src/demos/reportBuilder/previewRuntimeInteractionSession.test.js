@@ -36,7 +36,7 @@ const runtimeInteraction = {
   ],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/market-detail",
+    targetRef: "target://example/performance/market-detail",
     navigationMode: "hostRoute",
     parameters: {
       country: "US",
@@ -71,7 +71,7 @@ assert.deepEqual(buildPreviewRuntimeInteractionSnapshot(runtimeInteraction), {
   ],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/market-detail",
+    targetRef: "target://example/performance/market-detail",
     navigationMode: "hostRoute",
     parameters: {
       country: "US",
@@ -85,8 +85,8 @@ assert.deepEqual(buildPreviewRuntimeInteractionSnapshot(runtimeInteraction), {
 });
 
 const session = {
-  reportId: "forecastingLocationsTopMarketsQ3",
-  title: "Forecasting Locations Top Markets Q3",
+  reportId: "capacityLocationsTopMarketsQ3",
+  title: "Capacity Locations Top Markets Q3",
   documentVersion: 8,
   source: {
     kind: "dashboard.reportBuilder",
@@ -101,7 +101,7 @@ const session = {
   },
   reopenedSemanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -305,7 +305,7 @@ assert.deepEqual(buildPreviewRuntimeInteractionAdvancedState({
       ],
       hostIntent: {
         intentKind: "detailTarget",
-        targetRef: "target://steward/performance/market-detail",
+        targetRef: "target://example/performance/market-detail",
         navigationMode: "hostRoute",
         parameters: {
           country: "US",

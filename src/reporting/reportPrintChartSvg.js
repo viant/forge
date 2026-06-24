@@ -108,6 +108,9 @@ function resolveCartesianRows(resolvedChart = {}) {
 
 function resolveChartSupportedSeriesType(type = "") {
   const normalized = normalizeString(type).toLowerCase();
+  if (normalized === "funnel_bar") {
+    return "horizontal_bar";
+  }
   return ["line", "area", "bar", "horizontal_bar"].includes(normalized) ? normalized : "";
 }
 
@@ -532,7 +535,8 @@ export function buildReportPrintChartSvg({
     return renderCategoryChartSvg({ chartModel, resolvedChart, width });
   }
   if (kind === "directSeries" || kind === "groupedSeries") {
-    if (normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase() === "horizontal_bar") {
+    const normalizedChartType = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
+    if (normalizedChartType === "horizontal_bar" || normalizedChartType === "funnel_bar") {
       return renderHorizontalBarChartSvg({ chartModel, resolvedChart, width });
     }
     return renderCartesianChartSvg({ chartModel, resolvedChart, width });

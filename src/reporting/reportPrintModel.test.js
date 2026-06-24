@@ -39,6 +39,7 @@ const config = {
   staticFilters: [
     {
       id: "dateRange",
+      description: "Approved reporting window for shared runtime scope.",
       type: "dateRange",
       required: true,
       startParamPath: "filters.From",
@@ -520,6 +521,10 @@ assert.ok(printElements.some((element) => (
 assert.ok(printElements.some((element) => (
   element.kind === "text"
   && /dateRange: 2026-05-01 to 2026-05-04/.test(element.text)
+)));
+assert.ok(printElements.some((element) => (
+  element.kind === "text"
+  && /Approved reporting window for shared runtime scope\./.test(element.text)
 )));
 assert.ok(printElements.some((element) => (
   element.kind === "text"

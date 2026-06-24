@@ -6,7 +6,9 @@ import { buildReportPrintFromReportFill } from "./reportPrintModel.js";
 import {
   buildDraftReportExportRequest,
   buildReportExportArtifactRef,
+  buildPublishedSnapshotReportExportRequest,
   buildSavedReportExportRequest,
+  buildSavedViewReportExportRequest,
 } from "./reportExportRequestModel.js";
 import { validateReportExportRequest } from "./schema/reportSchemas.js";
 import { buildAuthoredDerivedCompactArtifacts } from "./fixtures/authoredDerivedCompactArtifactBuilder.js";
@@ -106,6 +108,10 @@ assert.equal(draftExportRequest.source.reportId, "performanceReport");
 assert.equal(draftExportRequest.source.title, "Performance Report");
 assert.equal(validateReportExportRequest(draftExportRequest).valid, true);
 
+const staleDraftExportRequest = JSON.parse(JSON.stringify(draftExportRequest));
+staleDraftExportRequest.reportPrint.fillHash = "fnv1a:deadbeef";
+assert.equal(validateReportExportRequest(staleDraftExportRequest).valid, false);
+
 const savedReportPayload = {
   version: 1,
   kind: "reportBuilder.savedReportPayload",
@@ -139,6 +145,54 @@ assert.equal(savedExportRequest.source.title, "Performance Snapshot");
 assert.equal(savedExportRequest.reportPrint.title, "Performance Report");
 assert.equal(validateReportExportRequest(savedExportRequest).valid, true);
 
+const savedViewExportRequest = buildSavedViewReportExportRequest({
+  savedView: {
+    id: "saved_view_capacity_q3",
+    kind: "reportBuilder.savedView",
+    title: "Capacity Q3 Saved View",
+    reportId: "capacityQ3",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
+  documentVersion: 8,
+  format: "pdf",
+});
+
+assert.ok(savedViewExportRequest);
+assert.equal(savedViewExportRequest.source.from, "savedView");
+assert.equal(savedViewExportRequest.source.artifactKind, "reportBuilder.savedView");
+assert.equal(savedViewExportRequest.source.artifactRef, "reportBuilder.savedView://saved_view_capacity_q3");
+assert.equal(savedViewExportRequest.source.sourceArtifactId, "saved_view_capacity_q3");
+assert.equal(savedViewExportRequest.source.reportId, "capacityQ3");
+assert.equal(savedViewExportRequest.source.documentVersion, 8);
+assert.equal(savedViewExportRequest.source.title, "Capacity Q3 Saved View");
+assert.equal(validateReportExportRequest(savedViewExportRequest).valid, true);
+
+const publishedSnapshotExportRequest = buildPublishedSnapshotReportExportRequest({
+  publishedSnapshot: {
+    id: "published_snapshot_capacity_q3",
+    kind: "reportBuilder.publishedSnapshot",
+    title: "Capacity Q3 Published Snapshot",
+    reportId: "capacityQ3",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
+  documentVersion: 9,
+  format: "pdf",
+});
+
+assert.ok(publishedSnapshotExportRequest);
+assert.equal(publishedSnapshotExportRequest.source.from, "publishedSnapshot");
+assert.equal(publishedSnapshotExportRequest.source.artifactKind, "reportBuilder.publishedSnapshot");
+assert.equal(publishedSnapshotExportRequest.source.artifactRef, "reportBuilder.publishedSnapshot://published_snapshot_capacity_q3");
+assert.equal(publishedSnapshotExportRequest.source.sourceArtifactId, "published_snapshot_capacity_q3");
+assert.equal(publishedSnapshotExportRequest.source.reportId, "capacityQ3");
+assert.equal(publishedSnapshotExportRequest.source.documentVersion, 9);
+assert.equal(publishedSnapshotExportRequest.source.title, "Capacity Q3 Published Snapshot");
+assert.equal(validateReportExportRequest(publishedSnapshotExportRequest).valid, true);
+
 assert.equal(buildSavedReportExportRequest({
   savedReportPayload: {
     ...savedReportPayload,
@@ -148,6 +202,26 @@ assert.equal(buildSavedReportExportRequest({
   reportPrint,
   documentVersion: 7,
   format: "pdf",
+}), null);
+
+assert.equal(buildSavedViewReportExportRequest({
+  savedView: {
+    id: "",
+    kind: "reportBuilder.savedView",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
+}), null);
+
+assert.equal(buildPublishedSnapshotReportExportRequest({
+  publishedSnapshot: {
+    id: "",
+    kind: "reportBuilder.publishedSnapshot",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
 }), null);
 
 assert.equal(buildDraftReportExportRequest({

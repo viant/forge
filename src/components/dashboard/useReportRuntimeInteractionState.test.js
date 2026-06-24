@@ -114,7 +114,7 @@ const keepOnlyState = {
   drillTransitions: [],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/market-detail",
+    targetRef: "target://example/performance/market-detail",
     navigationMode: "hostRoute",
     parameters: {
       country: "US",

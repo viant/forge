@@ -167,11 +167,11 @@ function buildMarketEfficiencyBriefTemplate() {
   };
 }
 
-function buildForecastInventoryBriefTemplate() {
+function buildCapacityInventoryBriefTemplate() {
   return {
-    id: "forecast_inventory_brief",
-    label: "Forecast Inventory Brief",
-    description: "Forecast-first authored starter aligned with Channel -> Publisher -> Site Type drill ladders.",
+    id: "capacity_inventory_brief",
+    label: "Capacity Inventory Brief",
+    description: "Capacity-first authored starter aligned with Channel -> Publisher -> Site Type drill ladders.",
     statePatch: {
       selectedDimensions: ["channelV2"],
       selectedMeasures: ["avails", "hhUniqs", "reachRate"],
@@ -191,9 +191,9 @@ function buildForecastInventoryBriefTemplate() {
       },
     },
     documentPatch: {
-      title: "Forecast Inventory Brief",
+      title: "Capacity Inventory Brief",
       subtitle: "Q2 Channel Ladder",
-      description: "Forecast-first authored report starter seeded for Channel -> Publisher -> Site Type drill flows.",
+      description: "Capacity-first authored report starter seeded for Channel -> Publisher -> Site Type drill flows.",
       blocks: [
         {
           id: "scopeFilters",
@@ -241,11 +241,11 @@ function buildForecastInventoryBriefTemplate() {
   };
 }
 
-function buildForecastLocationBriefTemplate() {
+function buildCapacityLocationBriefTemplate() {
   return {
-    id: "forecast_location_brief",
-    label: "Forecast Location Brief",
-    description: "Forecast-first authored starter aligned with Market -> Region -> Metro Area drill ladders.",
+    id: "capacity_location_brief",
+    label: "Capacity Location Brief",
+    description: "Capacity-first authored starter aligned with Market -> Region -> Metro Area drill ladders.",
     statePatch: {
       selectedDimensions: ["country"],
       selectedMeasures: ["avails", "hhUniqs", "reachRate"],
@@ -265,9 +265,9 @@ function buildForecastLocationBriefTemplate() {
       },
     },
     documentPatch: {
-      title: "Forecast Location Brief",
+      title: "Capacity Location Brief",
       subtitle: "Q2 Market Ladder",
-      description: "Forecast-first authored report starter seeded for Market -> Region -> Metro Area drill flows.",
+      description: "Capacity-first authored report starter seeded for Market -> Region -> Metro Area drill flows.",
       blocks: [
         {
           id: "scopeFilters",
@@ -319,7 +319,7 @@ export function buildPreviewReportDocumentTemplates() {
   return cloneValue([
     buildMarketBriefTemplate(),
     buildMarketEfficiencyBriefTemplate(),
-    buildForecastInventoryBriefTemplate(),
-    buildForecastLocationBriefTemplate(),
+    buildCapacityInventoryBriefTemplate(),
+    buildCapacityLocationBriefTemplate(),
   ]);
 }

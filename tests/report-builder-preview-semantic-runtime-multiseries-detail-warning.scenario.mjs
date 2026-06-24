@@ -1,0 +1,73 @@
+import { buildPreviewBootstrapSteps } from "./report-builder-preview-scenario-builders.mjs";
+
+export default {
+  baseUrl: "http://127.0.0.1:5175",
+  viewport: {
+    width: 390,
+    height: 844,
+  },
+  steps: [
+    ...buildPreviewBootstrapSteps(),
+    {
+      type: "clickSelectorContains",
+      selector: ".forge-report-builder__compact-action",
+      text: "Chart",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Create or apply a chart",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickSelector",
+      selector: ".forge-report-builder__chart-action-button--quick",
+    },
+    {
+      type: "clickSelectorContains",
+      selector: "[role=\"menuitem\"]",
+      text: "Avails by Date and Channel",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Showing Avails by Date and Channel.",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "document.querySelectorAll('.forge-chart-legend-action').length >= 2",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickSelector",
+      selector: ".forge-chart-legend-action",
+    },
+    {
+      type: "waitForDomContains",
+      text: "Selected value: Display",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickSelectorContains",
+      selector: ".forge-report-runtime-chart-action",
+      text: "Show channel details",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Resolved detail target",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const panel = document.querySelector('.forge-report-runtime-host-intent'); const text = panel?.innerText || panel?.textContent || ''; const parameterCount = panel?.querySelectorAll('.forge-report-runtime-host-intent__parameter')?.length || 0; return parameterCount === 1 && text.includes('Resolved detail target') && text.includes('target://example/performance/channel-detail') && text.includes('channel') && text.includes('Display') && text.includes('Detail target resolved with omitted parameters: campaign.'); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "screenshot",
+      file: "report-builder-preview-runtime-multiseries-detail-warning-proof.png",
+      fullPage: true,
+    },
+  ],
+};

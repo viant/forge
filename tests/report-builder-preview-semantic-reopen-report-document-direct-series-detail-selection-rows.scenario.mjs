@@ -14,7 +14,7 @@ export default {
     ...buildPreviewBootstrapSteps({ captureDownloads: true }),
     {
       type: "eval",
-      expression: "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.getSeededSavedReportPayloads !== 'function' || typeof api.replaceSeededSavedReportPayloads !== 'function') { throw new Error('Preview seeded saved payload API not available.'); } return import('/src/reporting/fixtures/forecastDirectSeriesFixtureState.js').then(({ buildForecastDirectSeriesFixtureState }) => { const record = buildForecastDirectSeriesFixtureState().record; const existing = api.getSeededSavedReportPayloads(); const next = [...existing.filter((entry) => { const target = entry?.savedReportPayload || entry; const reportId = target?.reportDocument?.id || target?.reportRef?.reportId || target?.reportId || ''; return reportId !== 'forecastingKpiBlendByDateQ3'; }), record]; const replaced = api.replaceSeededSavedReportPayloads(next); return Array.isArray(replaced) && replaced.some((entry) => { const target = entry?.savedReportPayload || entry; return (target?.reportDocument?.id || '') === 'forecastingKpiBlendByDateQ3'; }); }); })()",
+      expression: "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.getSeededSavedReportPayloads !== 'function' || typeof api.replaceSeededSavedReportPayloads !== 'function') { throw new Error('Preview seeded saved payload API not available.'); } return import('/src/reporting/fixtures/capacityDirectSeriesFixtureState.js').then(({ buildCapacityDirectSeriesFixtureState }) => { const record = buildCapacityDirectSeriesFixtureState().record; const existing = api.getSeededSavedReportPayloads(); const next = [...existing.filter((entry) => { const target = entry?.savedReportPayload || entry; const reportId = target?.reportDocument?.id || target?.reportRef?.reportId || target?.reportId || ''; return reportId !== 'capacityKpiBlendByDateQ3'; }), record]; const replaced = api.replaceSeededSavedReportPayloads(next); return Array.isArray(replaced) && replaced.some((entry) => { const target = entry?.savedReportPayload || entry; return (target?.reportDocument?.id || '') === 'capacityKpiBlendByDateQ3'; }); }); })()",
     },
     ...buildSavedPayloadPreparationSteps({ documentVersion: "11", draftTriggerText: "Reach Rate" }),
     {
@@ -23,8 +23,8 @@ export default {
       timeoutMs: 60000,
     },
     ...buildSelectedReportDocumentPreparationSteps({
-      reportId: "forecastingKpiBlendByDateQ3",
-      responseTitle: "Get ReportDocument response: Forecasting KPI Blend Q3",
+      reportId: "capacityKpiBlendByDateQ3",
+      responseTitle: "Get ReportDocument response: Capacity KPI Blend Q3",
     }),
     {
       type: "waitForDomContains",
@@ -47,12 +47,12 @@ export default {
     },
     {
       type: "waitForDomContains",
-      text: "Reopened ReportDocument Forecasting KPI Blend Q3 for editing.",
+      text: "Reopened ReportDocument Capacity KPI Blend Q3 for editing.",
       timeoutMs: 60000,
     },
     {
       type: "waitForDomContains",
-      text: "Reopened ReportDocument: Forecasting KPI Blend Q3",
+      text: "Reopened ReportDocument: Capacity KPI Blend Q3",
       timeoutMs: 60000,
     },
     {
@@ -62,7 +62,7 @@ export default {
     },
     {
       type: "eval",
-      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.replaceDetailTargetBehaviors !== 'function') { throw new Error('replaceDetailTargetBehaviors API not available.'); } return preview.replaceDetailTargetBehaviors([{ match: { targetRef: 'target://steward/performance/date-detail' }, result: { targetRef: 'target://steward/performance/date-detail', navigationMode: 'hostRoute', parameters: { eventDate: '$value', country: '$row.country' } } }]); })()",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.replaceDetailTargetBehaviors !== 'function') { throw new Error('replaceDetailTargetBehaviors API not available.'); } return preview.replaceDetailTargetBehaviors([{ match: { targetRef: 'target://example/performance/date-detail' }, result: { targetRef: 'target://example/performance/date-detail', navigationMode: 'hostRoute', parameters: { eventDate: '$value', country: '$row.country' } } }]); })()",
     },
     {
       type: "eval",
@@ -88,7 +88,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => Array.from(document.querySelectorAll('.forge-report-runtime-host-intent')).some((entry) => !entry.closest('.forge-report-builder__runtime-preview') && (entry.innerText || entry.textContent || '').includes('target://steward/performance/date-detail') && (entry.innerText || entry.textContent || '').includes('eventDate') && (entry.innerText || entry.textContent || '').includes('2026-05-01') && (entry.innerText || entry.textContent || '').includes('country') && (entry.innerText || entry.textContent || '').includes('US') && !document.body.innerText.includes('Detail target resolved with omitted parameters: country.')) )()",
+      expression: "(() => Array.from(document.querySelectorAll('.forge-report-runtime-host-intent')).some((entry) => !entry.closest('.forge-report-builder__runtime-preview') && (entry.innerText || entry.textContent || '').includes('target://example/performance/date-detail') && (entry.innerText || entry.textContent || '').includes('eventDate') && (entry.innerText || entry.textContent || '').includes('2026-05-01') && (entry.innerText || entry.textContent || '').includes('country') && (entry.innerText || entry.textContent || '').includes('US') && !document.body.innerText.includes('Detail target resolved with omitted parameters: country.')) )()",
       timeoutMs: 60000,
     },
     {
@@ -98,7 +98,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Draft export request summary\"]')).find(Boolean); if (!summary) { return false; } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const pre = container?.querySelector('pre'); if (!pre) { return false; } const raw = pre.textContent || ''; try { const parsed = JSON.parse(raw); const reportPrint = parsed?.reportPrint || {}; return parsed?.kind === 'reportExportRequest' && parsed?.source?.from === 'draft' && reportPrint?.kind === 'reportPrint' && reportPrint?.title === 'Forecasting KPI Blend Q3' && raw.includes('\"id\": \"bookmark.primaryChart\"') && raw.includes('Avails + HH Uniques by Date'); } catch (_) { return false; } })()",
+      expression: "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Draft export request summary\"]')).find(Boolean); if (!summary) { return false; } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const text = container?.innerText || container?.textContent || ''; const pre = container?.querySelector('pre'); if (!pre) { return false; } const raw = pre.textContent || ''; try { const parsed = JSON.parse(raw); const reportPrint = parsed?.reportPrint || {}; return text.includes('Semantic Binding') && text.includes('Model Ad Delivery') && text.includes('Entity Line Delivery') && parsed?.kind === 'reportExportRequest' && parsed?.source?.from === 'draft' && reportPrint?.kind === 'reportPrint' && reportPrint?.title === 'Capacity KPI Blend Q3' && raw.includes('\"id\": \"bookmark.primaryChart\"') && raw.includes('Avails + HH Uniques by Date'); } catch (_) { return false; } })()",
       timeoutMs: 60000,
     },
     {
@@ -119,7 +119,7 @@ export default {
     },
     {
       type: "waitForDomContains",
-      text: "Reopened ReportDocument: Forecasting KPI Blend Q3",
+      text: "Reopened ReportDocument: Capacity KPI Blend Q3",
       timeoutMs: 60000,
     },
     {
@@ -129,7 +129,7 @@ export default {
     },
     {
       type: "eval",
-      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.replaceDetailTargetBehaviors !== 'function') { throw new Error('replaceDetailTargetBehaviors API not available.'); } return preview.replaceDetailTargetBehaviors([{ match: { targetRef: 'target://steward/performance/date-detail' }, result: { targetRef: 'target://steward/performance/date-detail', navigationMode: 'hostRoute', parameters: { eventDate: '$value', country: '$row.country' } } }]); })()",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.replaceDetailTargetBehaviors !== 'function') { throw new Error('replaceDetailTargetBehaviors API not available.'); } return preview.replaceDetailTargetBehaviors([{ match: { targetRef: 'target://example/performance/date-detail' }, result: { targetRef: 'target://example/performance/date-detail', navigationMode: 'hostRoute', parameters: { eventDate: '$value', country: '$row.country' } } }]); })()",
     },
     {
       type: "eval",
@@ -155,7 +155,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => Array.from(document.querySelectorAll('.forge-report-runtime-host-intent')).some((entry) => !entry.closest('.forge-report-builder__runtime-preview') && (entry.innerText || entry.textContent || '').includes('target://steward/performance/date-detail') && (entry.innerText || entry.textContent || '').includes('eventDate') && (entry.innerText || entry.textContent || '').includes('2026-05-01') && (entry.innerText || entry.textContent || '').includes('country') && (entry.innerText || entry.textContent || '').includes('US') && !document.body.innerText.includes('Detail target resolved with omitted parameters: country.')) )()",
+      expression: "(() => Array.from(document.querySelectorAll('.forge-report-runtime-host-intent')).some((entry) => !entry.closest('.forge-report-builder__runtime-preview') && (entry.innerText || entry.textContent || '').includes('target://example/performance/date-detail') && (entry.innerText || entry.textContent || '').includes('eventDate') && (entry.innerText || entry.textContent || '').includes('2026-05-01') && (entry.innerText || entry.textContent || '').includes('country') && (entry.innerText || entry.textContent || '').includes('US') && !document.body.innerText.includes('Detail target resolved with omitted parameters: country.')) )()",
       timeoutMs: 60000,
     },
     {
@@ -165,7 +165,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Draft export request summary\"]')).find(Boolean); if (!summary) { return false; } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const pre = container?.querySelector('pre'); if (!pre) { return false; } const raw = pre.textContent || ''; try { const parsed = JSON.parse(raw); const reportPrint = parsed?.reportPrint || {}; return parsed?.kind === 'reportExportRequest' && parsed?.source?.from === 'draft' && reportPrint?.kind === 'reportPrint' && reportPrint?.title === 'Forecasting KPI Blend Q3' && raw.includes('\"id\": \"bookmark.primaryChart\"') && raw.includes('Avails + HH Uniques by Date'); } catch (_) { return false; } })()",
+      expression: "(() => { const summary = Array.from(document.querySelectorAll('[aria-label=\"Draft export request summary\"]')).find(Boolean); if (!summary) { return false; } const container = summary.closest('.forge-report-builder__chart-inline-notice'); const text = container?.innerText || container?.textContent || ''; const pre = container?.querySelector('pre'); if (!pre) { return false; } const raw = pre.textContent || ''; try { const parsed = JSON.parse(raw); const reportPrint = parsed?.reportPrint || {}; return text.includes('Semantic Binding') && text.includes('Model Ad Delivery') && text.includes('Entity Line Delivery') && parsed?.kind === 'reportExportRequest' && parsed?.source?.from === 'draft' && reportPrint?.kind === 'reportPrint' && reportPrint?.title === 'Capacity KPI Blend Q3' && raw.includes('\"id\": \"bookmark.primaryChart\"') && raw.includes('Avails + HH Uniques by Date'); } catch (_) { return false; } })()",
       timeoutMs: 60000,
     },
     {

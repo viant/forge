@@ -85,6 +85,12 @@ export function createDataConnector(dataSource, runtime = {}) {
         };
     }
 
+    function appendServiceTargetContext(queryParams) {
+        if (dataSource?.service?.includeTargetContext) {
+            appendTargetContextQuery(queryParams, targetContext);
+        }
+    }
+
     function summarizeErrorPayload(raw) {
         const text = String(raw || '').trim();
         if (!text) {
@@ -232,9 +238,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             // Prepare the request body
             let body = {};
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
-            if (dataSource?.service?.includeTargetContext) {
-                appendTargetContextQuery(queryParams, targetContext);
-            }
+            appendServiceTargetContext(queryParams);
             ({url, method, headers, queryParams, body} = applyRequestPreparation({url, method, headers, queryParams, body}));
             const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
 
@@ -292,9 +296,7 @@ export function createDataConnector(dataSource, runtime = {}) {
 
             const body = {};
             url = applyParameters({url, headers, queryParams, body}, effectiveInputParameters);
-            if (dataSource?.service?.includeTargetContext) {
-                appendTargetContextQuery(queryParams, targetContext);
-            }
+            appendServiceTargetContext(queryParams);
             let payload = requestMethod !== 'GET' && isDatasourceFetchRoute
                 ? {
                     inputs: buildDatasourceFetchInputs({
@@ -371,6 +373,7 @@ export function createDataConnector(dataSource, runtime = {}) {
 
             // apply path/query/header/body parameters
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            appendServiceTargetContext(queryParams);
             ({url, method, headers, queryParams, body} = applyRequestPreparation({
                 url,
                 method: String(method || 'POST').toUpperCase(),
@@ -410,6 +413,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             let {method, url, headers} = getUrlAndHeaders('PATCH');
             let queryParams = new URLSearchParams();
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            appendServiceTargetContext(queryParams);
             ({url, method, headers, queryParams, body} = applyRequestPreparation({
                 url,
                 method: String(method || 'PATCH').toUpperCase(),
@@ -444,6 +448,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             let {method, url, headers} = getUrlAndHeaders('PUT');
             let queryParams = new URLSearchParams();
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
+            appendServiceTargetContext(queryParams);
             ({url, method, headers, queryParams, body} = applyRequestPreparation({
                 url,
                 method: String(method || 'PUT').toUpperCase(),
@@ -478,6 +483,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             let {method, url, headers} = getUrlAndHeaders('DELETE');
             let queryParams = new URLSearchParams();
             url = `${url}/${id}`;
+            appendServiceTargetContext(queryParams);
             ({url, method, headers, queryParams} = applyRequestPreparation({
                 url,
                 method: String(method || 'DELETE').toUpperCase(),

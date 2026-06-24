@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "kind": "createReportDocumentPayload",
+  "createdAt": 9701,
+  "reportRef": {
+    "reportId": "authoredLandscapeBuilder"
+  },
+  "title": "Authored Landscape Report",
+  "document": {
+    "version": 1,
+    "kind": "reportDocument",
+    "id": "authoredLandscapeBuilder",
+    "title": "Authored Landscape Report",
+    "subtitle": "",
+    "description": "",
+    "refinements": [],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    },
+    "layout": {
+      "type": "stack",
+      "items": [
+        {
+          "blockId": "primaryBuilder"
+        },
+        {
+          "blockId": "channelTrend"
+        }
+      ]
+    },
+    "blocks": [
+      {
+        "id": "primaryBuilder",
+        "kind": "reportBuilderBlock",
+        "title": "Authored Landscape Report",
+        "source": {
+          "kind": "dashboard.reportBuilder",
+          "containerId": "authoredLandscapeBuilder",
+          "stateKey": "authoredLandscapeBuilder",
+          "dataSourceRef": "demoReportSource"
+        },
+        "config": {
+          "title": "Authored Landscape Report",
+          "measures": [
+            {
+              "id": "totalSpend",
+              "key": "totalSpend",
+              "label": "Spend",
+              "default": true,
+              "format": "currency"
+            },
+            {
+              "id": "impressions",
+              "key": "impressions",
+              "label": "Impressions",
+              "format": "compactNumber"
+            }
+          ],
+          "dimensions": [
+            {
+              "id": "eventDate",
+              "key": "eventDate",
+              "label": "Date",
+              "default": true,
+              "chartAxis": true,
+              "format": "date"
+            },
+            {
+              "id": "channelId",
+              "key": "channelId",
+              "label": "Channel",
+              "default": true
+            }
+          ],
+          "staticFilters": [
+            {
+              "id": "dateRange",
+              "type": "dateRange",
+              "required": true,
+              "startParamPath": "filters.From",
+              "endParamPath": "filters.To",
+              "default": {
+                "start": "2026-05-01",
+                "end": "2026-05-04"
+              }
+            }
+          ],
+          "result": {
+            "defaultMode": "table",
+            "pageSize": 50
+          }
+        },
+        "state": {
+          "selectedMeasures": [
+            "totalSpend",
+            "impressions"
+          ],
+          "primaryMeasure": "totalSpend",
+          "selectedDimensions": [
+            "eventDate",
+            "channelId"
+          ],
+          "viewMode": "table",
+          "orderField": "eventDate",
+          "orderDir": "asc",
+          "staticFilters": {
+            "dateRange": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          }
+        },
+        "scopeBindings": [
+          {
+            "paramId": "dateRange",
+            "target": "staticFilters.dateRange"
+          }
+        ]
+      },
+      {
+        "id": "channelTrend",
+        "kind": "chartBlock",
+        "title": "Channel Trend",
+        "datasetRef": "primary",
+        "chartSpec": {
+          "title": "Channel Trend",
+          "type": "line",
+          "xField": "eventDate",
+          "yFields": [
+            "totalSpend"
+          ],
+          "seriesField": "channelId"
+        }
+      }
+    ]
+  },
+  "compileState": {
+    "status": "clean",
+    "reportSpecVersion": 1,
+    "blockCount": 2,
+    "datasetCount": 1
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_authored_landscape_report",
+    "sourceArtifactId": "authored_landscape_report",
+    "sourceSession": {
+      "sessionId": "rbexplore_authoredLandscapeBuilder",
+      "sourceRef": {
+        "kind": "reportBuilder.chartResult",
+        "contextLabel": "Authored Landscape Report • Channel Trend"
+      }
+    }
+  }
+}

@@ -87,6 +87,36 @@ assert.match(horizontalBar.svg, /CTV/);
 assert.match(horizontalBar.svg, /158.4K/);
 assert.match(horizontalBar.svg, /Available Impressions/);
 
+const funnelBar = buildReportPrintChartSvg({
+  chartModel: {
+    type: "funnel_bar",
+    series: {
+      values: [
+        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "funnel_bar" },
+      ],
+    },
+  },
+  resolvedChart: {
+    kind: "directSeries",
+    type: "funnel_bar",
+    xAxisKey: "channelV2",
+    seriesKeys: ["avails"],
+    rows: [
+      { channelV2: "Display", avails: 158400 },
+      { channelV2: "CTV", avails: 138200 },
+    ],
+  },
+  width: 640,
+});
+
+assert.equal(funnelBar.diagnostics.length, 0);
+assert.ok(funnelBar.height > 120);
+assert.match(funnelBar.svg, /<rect/);
+assert.match(funnelBar.svg, /Display/);
+assert.match(funnelBar.svg, /CTV/);
+assert.match(funnelBar.svg, /158.4K/);
+assert.match(funnelBar.svg, /Available Impressions/);
+
 const donut = buildReportPrintChartSvg({
   chartModel: {
     type: "donut",

@@ -1,0 +1,228 @@
+{
+  "functions": [
+    {
+      "name": "deltaFromPrevious",
+      "label": "Delta From Previous",
+      "supportsPartition": true,
+      "requiresOrder": true,
+      "nullBehavior": "nonFiniteValuesYieldZeroAndDoNotAdvancePreviousFiniteValue",
+      "defaultFormat": "number"
+    },
+    {
+      "name": "movingAverage",
+      "label": "Moving Average",
+      "supportsPartition": true,
+      "requiresOrder": true,
+      "requiresWindowSize": true,
+      "supportsDecimals": true,
+      "nullBehavior": "windowAveragesIgnoreNonFiniteValues",
+      "defaultFormat": "number"
+    },
+    {
+      "name": "percentOfTotal",
+      "label": "Percent of Total",
+      "supportsPartition": true,
+      "supportsDecimals": true,
+      "usesFilteredScopeTotal": true,
+      "nullBehavior": "nonFiniteValuesYieldZeroAndAreExcludedFromTotals",
+      "defaultFormat": "percent"
+    },
+    {
+      "name": "rank",
+      "label": "Rank",
+      "supportsPartition": true,
+      "requiresOrder": true,
+      "supportsRankDirection": true,
+      "supportsTieBreaker": true,
+      "tieMode": "dense",
+      "nullBehavior": "nonFiniteValuesYieldNullAndDoNotAdvanceRank",
+      "defaultFormat": "number"
+    },
+    {
+      "name": "runningTotal",
+      "label": "Running Total",
+      "supportsPartition": true,
+      "requiresOrder": true,
+      "nullBehavior": "nonFiniteValuesDoNotAdvanceRunningTotal",
+      "defaultFormat": "number"
+    }
+  ],
+  "runtimeCases": [
+    {
+      "id": "percent_of_total_global",
+      "definitions": [
+        {
+          "id": "spendShare",
+          "key": "spendShare",
+          "label": "Spend Share",
+          "dataType": "number",
+          "compute": {
+            "type": "percentOfTotal",
+            "sourceField": "spend",
+            "scale": 100,
+            "decimals": 1
+          }
+        }
+      ],
+      "rows": [
+        { "channel": "Display", "spend": 40 },
+        { "channel": "CTV", "spend": 60 }
+      ],
+      "expectedRows": [
+        { "channel": "Display", "spend": 40, "spendShare": 40 },
+        { "channel": "CTV", "spend": 60, "spendShare": 60 }
+      ]
+    },
+    {
+      "id": "percent_of_total_partitioned",
+      "definitions": [
+        {
+          "id": "spendShareByChannel",
+          "key": "spendShareByChannel",
+          "label": "Spend Share By Channel",
+          "dataType": "number",
+          "compute": {
+            "type": "percentOfTotal",
+            "sourceField": "spend",
+            "partitionBy": ["channel"],
+            "scale": 100,
+            "decimals": 0
+          }
+        }
+      ],
+      "rows": [
+        { "channel": "Display", "market": "US", "spend": 40 },
+        { "channel": "Display", "market": "CA", "spend": 60 },
+        { "channel": "CTV", "market": "US", "spend": 10 },
+        { "channel": "CTV", "market": "CA", "spend": 30 }
+      ],
+      "expectedRows": [
+        { "channel": "Display", "market": "US", "spend": 40, "spendShareByChannel": 40 },
+        { "channel": "Display", "market": "CA", "spend": 60, "spendShareByChannel": 60 },
+        { "channel": "CTV", "market": "US", "spend": 10, "spendShareByChannel": 25 },
+        { "channel": "CTV", "market": "CA", "spend": 30, "spendShareByChannel": 75 }
+      ]
+    },
+    {
+      "id": "running_total_partitioned",
+      "definitions": [
+        {
+          "id": "runningSpend",
+          "key": "runningSpend",
+          "label": "Running Spend",
+          "dataType": "number",
+          "compute": {
+            "type": "runningTotal",
+            "sourceField": "spend",
+            "partitionBy": ["channel"],
+            "orderBy": [
+              { "field": "eventDate", "direction": "asc" }
+            ]
+          }
+        }
+      ],
+      "rows": [
+        { "eventDate": "2026-05-02", "channel": "Display", "spend": 20 },
+        { "eventDate": "2026-05-01", "channel": "Display", "spend": 10 },
+        { "eventDate": "2026-05-01", "channel": "CTV", "spend": 5 },
+        { "eventDate": "2026-05-02", "channel": "CTV", "spend": 15 }
+      ],
+      "expectedRows": [
+        { "eventDate": "2026-05-02", "channel": "Display", "spend": 20, "runningSpend": 30 },
+        { "eventDate": "2026-05-01", "channel": "Display", "spend": 10, "runningSpend": 10 },
+        { "eventDate": "2026-05-01", "channel": "CTV", "spend": 5, "runningSpend": 5 },
+        { "eventDate": "2026-05-02", "channel": "CTV", "spend": 15, "runningSpend": 20 }
+      ]
+    },
+    {
+      "id": "delta_from_previous_null_handling",
+      "definitions": [
+        {
+          "id": "deltaSpend",
+          "key": "deltaSpend",
+          "label": "Delta Spend",
+          "dataType": "number",
+          "compute": {
+            "type": "deltaFromPrevious",
+            "sourceField": "spend",
+            "orderBy": [
+              { "field": "eventDate", "direction": "asc" }
+            ]
+          }
+        }
+      ],
+      "rows": [
+        { "eventDate": "2026-05-01", "spend": 10 },
+        { "eventDate": "2026-05-02", "spend": null },
+        { "eventDate": "2026-05-03", "spend": 15 }
+      ],
+      "expectedRows": [
+        { "eventDate": "2026-05-01", "spend": 10, "deltaSpend": 0 },
+        { "eventDate": "2026-05-02", "spend": null, "deltaSpend": 0 },
+        { "eventDate": "2026-05-03", "spend": 15, "deltaSpend": 5 }
+      ]
+    },
+    {
+      "id": "moving_average_window_ignores_non_finite_values",
+      "definitions": [
+        {
+          "id": "movingSpend",
+          "key": "movingSpend",
+          "label": "Moving Spend",
+          "dataType": "number",
+          "compute": {
+            "type": "movingAverage",
+            "sourceField": "spend",
+            "orderBy": [
+              { "field": "eventDate", "direction": "asc" }
+            ],
+            "windowSize": 2,
+            "decimals": 1
+          }
+        }
+      ],
+      "rows": [
+        { "eventDate": "2026-05-01", "spend": 10 },
+        { "eventDate": "2026-05-02", "spend": null },
+        { "eventDate": "2026-05-03", "spend": 30 }
+      ],
+      "expectedRows": [
+        { "eventDate": "2026-05-01", "spend": 10, "movingSpend": 10 },
+        { "eventDate": "2026-05-02", "spend": null, "movingSpend": 10 },
+        { "eventDate": "2026-05-03", "spend": 30, "movingSpend": 30 }
+      ]
+    },
+    {
+      "id": "dense_rank_with_ties_and_null",
+      "definitions": [
+        {
+          "id": "rankSpend",
+          "key": "rankSpend",
+          "label": "Rank Spend",
+          "dataType": "number",
+          "compute": {
+            "type": "rank",
+            "sourceField": "spend",
+            "orderBy": [
+              { "field": "spend", "direction": "desc" },
+              { "field": "eventDate", "direction": "asc" }
+            ],
+            "tieMode": "dense"
+          }
+        }
+      ],
+      "rows": [
+        { "eventDate": "2026-05-01", "spend": 100 },
+        { "eventDate": "2026-05-02", "spend": 100 },
+        { "eventDate": "2026-05-03", "spend": 50 },
+        { "eventDate": "2026-05-04", "spend": null }
+      ],
+      "expectedRows": [
+        { "eventDate": "2026-05-01", "spend": 100, "rankSpend": 1 },
+        { "eventDate": "2026-05-02", "spend": 100, "rankSpend": 1 },
+        { "eventDate": "2026-05-03", "spend": 50, "rankSpend": 2 },
+        { "eventDate": "2026-05-04", "spend": null, "rankSpend": null }
+      ]
+    }
+  ]
+}

@@ -78,6 +78,8 @@ export function normalizeDetailTarget(payload = {}) {
     parameters: detailTarget.parameters && typeof detailTarget.parameters === "object" && !Array.isArray(detailTarget.parameters)
       ? cloneValue(detailTarget.parameters)
       : {},
+    ...(normalizeString(detailTarget.title) ? { title: normalizeString(detailTarget.title) } : {}),
+    ...(normalizeString(detailTarget.description) ? { description: normalizeString(detailTarget.description) } : {}),
   };
 }
 

@@ -30,7 +30,7 @@ const semanticConfig = {
     ],
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["spend", "household_uniques"],
@@ -38,7 +38,7 @@ const semanticConfig = {
 };
 
 const semanticModel = {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     version: 1,
     label: "Ad Delivery",
     entities: [
@@ -72,7 +72,7 @@ const semanticState = {
 };
 
 const semanticValidationFingerprint = JSON.stringify({
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     selection: {
         entity: "line_delivery",
         dimensions: ["event_date", "channel", "age_group"],
@@ -128,6 +128,25 @@ assert.deepEqual(resolveReportBuilderStateReadiness({
     canRun: false,
     reason: "semantic",
     message: "Loading semantic model metadata…",
+});
+
+assert.deepEqual(resolveReportBuilderStateReadiness({
+    config: semanticConfig,
+    state: semanticState,
+    semanticModelProvider: { validateSelection() {}, getModel() {} },
+    semanticModelState: {
+        loading: false,
+        error: "Semantic model provider unavailable.",
+        model: null,
+    },
+    semanticSelectionValidationState: {},
+    semanticModelRetryAvailable: true,
+    semanticRetryAvailable: false,
+}), {
+    canRun: false,
+    reason: "semantic",
+    message: "Semantic model provider unavailable.",
+    action: "retrySemanticModelLoad",
 });
 
 assert.deepEqual(resolveReportBuilderStateReadiness({
@@ -240,6 +259,81 @@ assert.deepEqual(resolveReportBuilderStateReadiness({
     canRun: true,
     reason: "",
     message: "",
+});
+
+const semanticParameterConfig = {
+    ...semanticConfig,
+    staticFilters: [
+        {
+            ...semanticConfig.staticFilters[0],
+            semanticRef: "reporting_window",
+            label: "Date Range",
+        },
+    ],
+};
+
+const semanticParameterModel = {
+    ...semanticModel,
+    entities: [
+        {
+            ...semanticModel.entities[0],
+            parameters: [
+                { id: "reporting_window", label: "Date Range", dataType: "date" },
+            ],
+        },
+    ],
+};
+
+const semanticParameterState = {
+    ...semanticState,
+    binding: semanticParameterConfig.binding,
+};
+
+const semanticParameterValidationFingerprint = JSON.stringify({
+    modelRef: "model://example/performance/delivery@v1",
+    selection: {
+        entity: "line_delivery",
+        dimensions: ["event_date", "channel", "age_group"],
+        measures: ["spend", "household_uniques"],
+        parameters: {
+            reporting_window: {
+                start: "2026-05-01",
+                end: "2026-05-04",
+            },
+        },
+    },
+});
+
+assert.deepEqual(resolveReportBuilderStateReadiness({
+    config: semanticParameterConfig,
+    state: semanticParameterState,
+    semanticModelProvider: { validateSelection() {} },
+    semanticModelState: {
+        loading: false,
+        error: "",
+        model: semanticParameterModel,
+    },
+    semanticSelectionValidationState: {
+        fingerprint: semanticParameterValidationFingerprint,
+        requestKey: `${semanticParameterValidationFingerprint}::0`,
+        loading: false,
+        error: "",
+        valid: false,
+        diagnostics: [
+            {
+                code: "invalidParameterRange",
+                severity: "error",
+                path: "selection.parameters.reporting_window",
+                message: "Date Range start date must be on or before the end date.",
+                suggestedFix: "Adjust the date range so the start date is not after the end date.",
+            },
+        ],
+    },
+    semanticRetryAvailable: false,
+}), {
+    canRun: false,
+    reason: "semantic",
+    message: "Date Range start date must be on or before the end date. Adjust the date range so the start date is not after the end date.",
 });
 
 console.log("reportBuilderReadiness ✓ semantic provider gating and recovery");

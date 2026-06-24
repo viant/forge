@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
     buildReportBuilderGetReportDocumentRequest,
@@ -7,6 +8,17 @@ import {
     buildReportBuilderGetReportDocumentRequestSummary,
     serializeReportBuilderGetReportDocumentRequest,
 } from "./reportBuilderGetReportDocumentRequest.js";
+import {
+    buildReportBuilderListReportDocumentsEntrySelectionKey,
+    buildReportBuilderListReportDocumentsEntrySummary,
+    buildReportBuilderListReportDocumentsResponse,
+} from "./reportBuilderReportDocumentReadResponse.js";
+const audienceArtifactFixture = JSON.parse(
+    readFileSync(
+        new URL("../../reporting/fixtures/capacity-audience-artifact-fixture.v1.json", import.meta.url),
+        "utf8",
+    ),
+);
 
 const listResponse = {
     version: 1,
@@ -18,40 +30,181 @@ const listResponse = {
             title: "Exploration Demo",
         },
         {
-            reportRef: { reportId: "forecastingQ3" },
+            reportRef: { reportId: "capacityQ3" },
             documentVersion: 4,
-            title: "Forecasting Q3",
+            title: "Capacity Q3",
         },
     ],
 };
 
 const request = buildReportBuilderGetReportDocumentRequest(listResponse, {
-    entryReportId: "forecastingQ3",
+    entryReportId: "capacityQ3",
 });
 assert.deepEqual(request, {
     version: 1,
     kind: "getReportDocumentRequest",
     reportRef: {
-        reportId: "forecastingQ3",
+        reportId: "capacityQ3",
     },
+    listEntrySelectionKey: "capacityQ3",
 });
+
+const duplicateListResponse = {
+    version: 1,
+    kind: "listReportDocumentsResponse",
+    entries: [
+        {
+            reportRef: { reportId: "capacityShared" },
+            documentVersion: 8,
+            title: "Capacity Shared Saved View",
+            source: {
+                kind: "reportBuilder.savedView",
+                reportId: "capacityShared",
+                sourceArtifactId: "saved_view_capacity_shared",
+            },
+        },
+        {
+            reportRef: { reportId: "capacityShared" },
+            documentVersion: 9,
+            title: "Capacity Shared Published Snapshot",
+            source: {
+                kind: "reportBuilder.publishedSnapshot",
+                reportId: "capacityShared",
+                sourceArtifactId: "published_snapshot_capacity_shared",
+            },
+        },
+    ],
+};
+const duplicateRequest = buildReportBuilderGetReportDocumentRequest(duplicateListResponse, {
+    entryReportId: "capacityShared",
+    entrySelectionKey: buildReportBuilderListReportDocumentsEntrySelectionKey(duplicateListResponse.entries[1]),
+});
+assert.deepEqual(duplicateRequest, {
+    version: 1,
+    kind: "getReportDocumentRequest",
+    reportRef: {
+        reportId: "capacityShared",
+    },
+    source: {
+        kind: "reportBuilder.publishedSnapshot",
+        reportId: "capacityShared",
+        sourceArtifactId: "published_snapshot_capacity_shared",
+    },
+    listEntrySelectionKey: "capacityShared::reportBuilder.publishedSnapshot::::published_snapshot_capacity_shared",
+});
+assert.equal(buildReportBuilderGetReportDocumentRequest(duplicateListResponse, {
+    entryReportId: "capacityShared",
+}), null);
 
 assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary(request), {
     kind: "getReportDocumentRequest",
-    reportId: "forecastingQ3",
+    reportId: "capacityQ3",
 });
 assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary(request, {
     metadata: {
-        title: "Forecasting Q3",
+        title: "Capacity Q3",
         subtitle: "Inventory Ladder",
         description: "Selected request metadata.",
+        scopeSummaryTitle: "Report Scope",
+        scopeSummaryText: "Reporting Window",
+        scopeSummaryItems: [
+            {
+                id: "dateRange",
+                label: "Reporting Window",
+                description: "Approved reporting window for selected request metadata.",
+            },
+        ],
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                { id: "channel", rawId: "channelV2", label: "Channel" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+            ],
+        },
     },
 }), {
     kind: "getReportDocumentRequest",
-    reportId: "forecastingQ3",
-    title: "Forecasting Q3",
+    reportId: "capacityQ3",
+    title: "Capacity Q3",
     subtitle: "Inventory Ladder",
     description: "Selected request metadata.",
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: [
+        "Model Ad Delivery",
+        "Entity Line Delivery",
+        "Dimensions Delivery Date, Channel",
+        "Measures Available Impressions",
+    ],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for selected request metadata.",
+        },
+    ],
+    semanticBindingFieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (2)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                { id: "channel", rawId: "channelV2", label: "Channel" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+            ],
+        },
+    ],
+});
+assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary(request, {
+    metadata: {
+        title: "Capacity Q3",
+        semanticBindingTitle: "Semantic Binding",
+        semanticBindingFieldGroups: [
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "avails",
+                        label: "Available Impressions",
+                    },
+                ],
+            },
+        ],
+    },
+}), {
+    kind: "getReportDocumentRequest",
+    reportId: "capacityQ3",
+    title: "Capacity Q3",
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingFieldGroups: [
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                {
+                    id: "available_impressions",
+                    rawId: "avails",
+                    label: "Available Impressions",
+                },
+            ],
+        },
+    ],
 });
 
 assert.match(
@@ -61,16 +214,72 @@ assert.match(
 
 assert.deepEqual(buildReportBuilderGetReportDocumentRequestInspectorState(request, {
     metadata: {
-        title: "Forecasting Q3",
+        title: "Capacity Q3",
         subtitle: "Inventory Ladder",
         description: "Selected request metadata.",
+        scopeSummaryTitle: "Report Scope",
+        scopeSummaryText: "Reporting Window",
+        scopeSummaryItems: [
+            {
+                id: "dateRange",
+                label: "Reporting Window",
+                description: "Approved reporting window for selected request metadata.",
+            },
+        ],
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                { id: "channel", rawId: "channelV2", label: "Channel" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+            ],
+        },
     },
 }), {
     kind: "getReportDocumentRequest",
-    reportId: "forecastingQ3",
-    title: "Forecasting Q3",
+    reportId: "capacityQ3",
+    title: "Capacity Q3",
     subtitle: "Inventory Ladder",
     description: "Selected request metadata.",
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: [
+        "Model Ad Delivery",
+        "Entity Line Delivery",
+        "Dimensions Delivery Date, Channel",
+        "Measures Available Impressions",
+    ],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for selected request metadata.",
+        },
+    ],
+    semanticBindingFieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (2)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                { id: "channel", rawId: "channelV2", label: "Channel" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+            ],
+        },
+    ],
     headerSubtitle: "Inventory Ladder",
     headerDescription: "Selected request metadata.",
     content: serializeReportBuilderGetReportDocumentRequest(request),
@@ -78,13 +287,123 @@ assert.deepEqual(buildReportBuilderGetReportDocumentRequestInspectorState(reques
 
 assert.deepEqual(buildReportBuilderGetReportDocumentRequestDownload(request, {
     metadata: {
-        title: "Forecasting Q3",
+        title: "Capacity Q3",
     },
 }), {
-    filename: "Forecasting Q3-get-report-document-request.json",
+    filename: "Capacity Q3-get-report-document-request.json",
     mimeType: "application/json;charset=utf-8",
     payload: serializeReportBuilderGetReportDocumentRequest(request),
 });
+
+const audienceRequest = buildReportBuilderGetReportDocumentRequest(audienceArtifactFixture.listReportDocumentsResponse, {
+    entryReportId: "capacityAudienceSegmentIndexQ3",
+});
+const audienceMetadata = buildReportBuilderListReportDocumentsEntrySummary(audienceArtifactFixture.listReportDocumentsResponse.entries[0], {
+    localSavedPayloads: [
+        {
+            documentVersion: 13,
+            savedAt: 9379,
+            savedReportPayload: audienceArtifactFixture.savedReportPayload,
+        },
+    ],
+});
+assert.equal(buildReportBuilderGetReportDocumentRequestSummary(audienceRequest, {
+    metadata: audienceMetadata,
+}).semanticBindingChips.includes("Measures Audience Index"), true);
+assert.equal(buildReportBuilderGetReportDocumentRequestSummary(audienceRequest, {
+    metadata: audienceMetadata,
+}).semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
+assert.equal(buildReportBuilderGetReportDocumentRequestSummary(audienceRequest, {
+    metadata: audienceMetadata,
+}).scopeSummaryText, "Date Range • Channels • Audience Segment");
+
+const embeddedMetadataRequest = buildReportBuilderGetReportDocumentRequest(listResponse, {
+    entryReportId: "capacityQ3",
+});
+const embeddedMetadataContext = {
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+    },
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "embeddedMetadataTrendQ3",
+        title: "Embedded Metadata Trend Q3",
+        subtitle: "Embedded metadata",
+        description: "Derived directly from the document payload.",
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    kind: "dashboard.reportBuilder",
+                    dataSourceRef: "demoReportSource",
+                },
+                config: {
+                    dimensions: [
+                        { id: "eventDate", key: "eventDate", semanticRef: "event_date", label: "Delivery Date", category: "Time" },
+                        { id: "channelV2", key: "channelV2", semanticRef: "channel", label: "Channel", category: "Delivery" },
+                    ],
+                    measures: [
+                        { id: "avails", key: "avails", semanticRef: "available_impressions", label: "Available Impressions", category: "Metrics" },
+                    ],
+                    staticFilters: [
+                        {
+                            id: "dateRange",
+                            type: "dateRange",
+                            label: "Reporting Window",
+                            description: "Embedded request scope metadata.",
+                            required: true,
+                        },
+                    ],
+                    binding: {
+                        mode: "semantic",
+                        modelRef: "model://example/performance/delivery@v1",
+                        entity: "line_delivery",
+                        selectedDimensions: ["event_date"],
+                        selectedMeasures: ["available_impressions"],
+                    },
+                },
+                state: {
+                    binding: {
+                        mode: "semantic",
+                        modelRef: "model://example/performance/delivery@v1",
+                        entity: "line_delivery",
+                        selectedDimensions: ["event_date", "channel"],
+                        selectedMeasures: ["available_impressions"],
+                    },
+                    selectedDimensions: ["eventDate", "channelV2"],
+                    selectedMeasures: ["avails"],
+                    staticFilters: {
+                        dateRange: {
+                            start: "2026-05-01",
+                            end: "2026-05-04",
+                        },
+                    },
+                },
+            },
+        ],
+    },
+};
+assert.equal(
+    buildReportBuilderGetReportDocumentRequestSummary(embeddedMetadataRequest, {
+        metadata: embeddedMetadataContext,
+    }).semanticBindingChips.includes("Dimensions Delivery Date, Channel"),
+    true,
+);
+assert.equal(
+    buildReportBuilderGetReportDocumentRequestSummary(embeddedMetadataRequest, {
+        metadata: embeddedMetadataContext,
+    }).scopeSummaryText,
+    "Reporting Window",
+);
+assert.equal(
+    buildReportBuilderGetReportDocumentRequestInspectorState(embeddedMetadataRequest, {
+        metadata: embeddedMetadataContext,
+    }).headerSubtitle,
+    "Embedded metadata",
+);
 
 assert.equal(buildReportBuilderGetReportDocumentRequest(listResponse, { entryReportId: "" }), null);
 assert.equal(buildReportBuilderGetReportDocumentRequest(listResponse, { entryReportId: "missing" }), null);

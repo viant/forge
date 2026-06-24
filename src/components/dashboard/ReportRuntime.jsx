@@ -10,6 +10,7 @@ import {
   resolveReportRuntimeBindingSummary,
   resolveReportRuntimeRefinementFields,
   resolveReportRuntimePrimaryBlocks,
+  resolveReportRuntimeScopeSummary,
 } from "./reportRuntimeModel.js";
 import {
   buildIdleReportRuntimeProviderActionsState,
@@ -23,6 +24,7 @@ import {
   buildReportRuntimeHostIntentViewModel,
 } from "./reportRuntimeOverlayViewModel.js";
 import { buildReportRuntimeChartInteractionState } from "./reportRuntimeChartInteractionState.js";
+import { buildReportRuntimeChartSelectionViewModel } from "./reportRuntimeChartSelectionViewModel.js";
 import { executeReportRuntimeAction } from "./reportRuntimeActionExecutor.js";
 import {
   buildReportRuntimeTableInteractionState,
@@ -39,9 +41,36 @@ import {
 } from "./reportRuntimeChartSelectionState.js";
 import { resolveReportRuntimeDrillMetadataProvider } from "./reportRuntimeDrillProvider.js";
 import { DEFAULT_GEO_PALETTE, US_STATE_TILES, normalizeGeoKey } from "./geoMapUtils.js";
+import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGovernanceView.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
+}
+
+function supportsReportRuntimeExecution(execution = null, runtimeHandlers = null) {
+  const kind = normalizeString(execution?.kind).toLowerCase();
+  if (kind === "keep" || kind === "exclude") {
+    return typeof runtimeHandlers?.applyRefinement === "function";
+  }
+  if (kind === "drill") {
+    return typeof runtimeHandlers?.applyDrillTransition === "function";
+  }
+  if (kind === "detail") {
+    return typeof runtimeHandlers?.openDetailTarget === "function";
+  }
+  if (kind === "removeRefinement") {
+    return typeof runtimeHandlers?.removeRefinement === "function";
+  }
+  if (kind === "clearrefinements") {
+    return typeof runtimeHandlers?.clearRefinements === "function";
+  }
+  if (kind === "undorefinements") {
+    return typeof runtimeHandlers?.undoRefinements === "function";
+  }
+  if (kind === "redorefinements") {
+    return typeof runtimeHandlers?.redoRefinements === "function";
+  }
+  return false;
 }
 
 function createRuntimeContext(dataset = {}, locale = "en-US") {
@@ -243,16 +272,18 @@ function BindingFieldGovernanceChips({ field = {} }) {
   const governance = field?.governance && typeof field.governance === "object" && !Array.isArray(field.governance)
     ? field.governance
     : {};
-  const status = normalizeString(governance.status).toLowerCase();
-  const certification = normalizeString(governance.certification).toLowerCase();
-  const chips = [
-    status === "deprecated" ? { label: "Deprecated", tone: { background: "#fff1f0", border: "#f5c2c0", text: "#a82a2a" } } : null,
-    status === "draft" ? { label: "Draft", tone: { background: "#eef6ff", border: "#c9dcf8", text: "#21538f" } } : null,
-    certification ? {
-      label: certification.replace(/(^\w)|(_\w)/g, (match) => match.replace("_", " ").toUpperCase()),
-      tone: { background: "#edf7ee", border: "#cde5d1", text: "#2d6b3f" },
-    } : null,
-  ].filter(Boolean);
+  const toneByKind = {
+    deprecated: { background: "#fff1f0", border: "#f5c2c0", text: "#a82a2a" },
+    draft: { background: "#eef6ff", border: "#c9dcf8", text: "#21538f" },
+    approved: { background: "#eef8f2", border: "#cfe7d6", text: "#2d6b3f" },
+    certification: { background: "#edf7ee", border: "#cde5d1", text: "#2d6b3f" },
+    owner: { background: "#f4f7fa", border: "#d7e2ee", text: "#486579" },
+  };
+  const chips = buildSemanticFieldGovernanceChipViewModels(governance)
+    .map((chip) => ({
+      ...chip,
+      tone: toneByKind[chip.tone] || toneByKind.owner,
+    }));
   if (chips.length === 0) {
     return null;
   }
@@ -260,7 +291,7 @@ function BindingFieldGovernanceChips({ field = {} }) {
     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
       {chips.map((chip) => (
         <span
-          key={chip.label}
+          key={chip.key}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -286,6 +317,8 @@ function BindingFieldCard({ field = {} }) {
   const label = normalizeString(field?.label || field?.id);
   const rawId = normalizeString(field?.rawId);
   const description = normalizeString(field?.description);
+  const category = normalizeString(field?.category);
+  const definitionRef = normalizeString(field?.definitionRef);
   if (!label) {
     return null;
   }
@@ -305,9 +338,35 @@ function BindingFieldCard({ field = {} }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "#182026" }}>
           {label}
         </div>
+        {category ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                borderRadius: 999,
+                padding: "3px 8px",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.03em",
+                textTransform: "uppercase",
+                background: "#f1f5f9",
+                border: "1px solid #d9e2ec",
+                color: "#486581",
+              }}
+            >
+              {category}
+            </span>
+          </div>
+        ) : null}
         {rawId ? (
           <div style={{ fontSize: 11, color: "#5f6b7c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
             {rawId}
+          </div>
+        ) : null}
+        {definitionRef ? (
+          <div style={{ fontSize: 11, color: "#5f6b7c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.45 }}>
+            {definitionRef}
           </div>
         ) : null}
         {description ? (
@@ -428,6 +487,53 @@ function BindingDetailsPanel({ bindingSummary = null }) {
           title={`Selected measures (${Number(bindingSummary.measureCount || 0)})`}
           fields={bindingSummary.selectedMeasures}
         />
+        {Number(bindingSummary.parameterCount || 0) > 0 || (Array.isArray(bindingSummary.selectedParameters) && bindingSummary.selectedParameters.length > 0) ? (
+          <BindingFieldGroup
+            title={`Selected parameters (${Number(bindingSummary.parameterCount || 0)})`}
+            fields={bindingSummary.selectedParameters}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ScopeDetailsPanel({ scopeSummary = null }) {
+  if (!scopeSummary || typeof scopeSummary !== "object" || Array.isArray(scopeSummary)) {
+    return null;
+  }
+  const params = Array.isArray(scopeSummary?.params) ? scopeSummary.params : [];
+  if (params.length === 0) {
+    return null;
+  }
+  return (
+    <div
+      data-report-runtime-scope-panel="shared"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        borderTop: "1px solid #e6edf3",
+        paddingTop: 14,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
+          {normalizeString(scopeSummary.title || "Report Scope")}
+        </div>
+        <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>
+          Shared scope parameters compiled into this runtime artifact.
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+        {params.map((param) => (
+          <BindingMetadataCard
+            key={normalizeString(param?.id)}
+            label={normalizeString(param?.label || param?.id)}
+            value={formatReportRuntimeScopeValue(param)}
+            description={normalizeString(param?.description)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -818,7 +924,9 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
     fields: refinementFields,
     providerActionsByField,
   });
-  const rowActions = tableInteractionState.actions.map((action) => ({
+  const rowActions = tableInteractionState.actions
+    .filter((action) => supportsReportRuntimeExecution(action, runtimeHandlers))
+    .map((action) => ({
     ...action,
     onExecute: ({ item }) => {
       const execution = action.resolveExecution(item);
@@ -864,23 +972,31 @@ function FilterBarBlock({ block = {}, scopeParams = new Map() }) {
         {params.map((param) => {
           const metadata = scopeParams.get(normalizeString(param?.id)) || {};
           const label = normalizeString(metadata?.label || param?.id);
+          const description = normalizeString(metadata?.description || param?.description);
           return (
             <span
               key={param?.id}
               style={{
                 display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
+                alignItems: "flex-start",
+                flexDirection: "column",
+                gap: 4,
                 border: "1px solid #d4dee8",
                 background: "#f7fafc",
-                borderRadius: 999,
+                borderRadius: 14,
                 padding: "6px 10px",
                 fontSize: 12,
                 color: "#30404d",
+                minWidth: 160,
               }}
             >
-              <strong style={{ color: "#182026" }}>{label}</strong>
-              <span>{formatReportRuntimeScopeValue({ ...metadata, value: param?.value })}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <strong style={{ color: "#182026" }}>{label}</strong>
+                <span>{formatReportRuntimeScopeValue({ ...metadata, value: param?.value })}</span>
+              </span>
+              {description ? (
+                <span style={{ fontSize: 11, lineHeight: 1.4, color: "#5f6b7c" }}>{description}</span>
+              ) : null}
             </span>
           );
         })}
@@ -1269,6 +1385,7 @@ function UnsupportedBlock({ block = {} }) {
 
 export default function ReportRuntime({
   reportSpec = {},
+  reportDocument = null,
   reportFill = {},
   title = "",
   subtitle = "",
@@ -1281,12 +1398,27 @@ export default function ReportRuntime({
       .map((dataset) => [normalizeString(dataset?.id), dataset])
       .filter(([id]) => !!id),
   ), [reportFill]);
+  const scopeSummary = useMemo(
+    () => resolveReportRuntimeScopeSummary({
+      reportSpec,
+      reportDocument,
+      title,
+    }),
+    [reportSpec, reportDocument, title],
+  );
   const scopeParamIndex = useMemo(() => new Map(
-    (Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [])
+    (Array.isArray(scopeSummary?.params) ? scopeSummary.params : [])
       .map((param) => [normalizeString(param?.id), param])
       .filter(([id]) => !!id),
-  ), [reportSpec]);
-  const bindingSummary = useMemo(() => resolveReportRuntimeBindingSummary(reportSpec), [reportSpec]);
+  ), [scopeSummary]);
+  const bindingSummary = useMemo(
+    () => resolveReportRuntimeBindingSummary({
+      reportSpec,
+      reportDocument,
+      title,
+    }),
+    [reportSpec, reportDocument, title],
+  );
   const { primary, beforePrimary, afterPrimary } = useMemo(
     () => resolveReportRuntimePrimaryBlocks(reportSpec, reportFill),
     [reportSpec, reportFill],
@@ -1294,6 +1426,10 @@ export default function ReportRuntime({
   const allRuntimeBlocks = useMemo(
     () => [...beforePrimary, ...primary, ...afterPrimary],
     [beforePrimary, primary, afterPrimary],
+  );
+  const hasTopLevelFilterBarBlock = useMemo(
+    () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "filterBarBlock"),
+    [allRuntimeBlocks],
   );
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
   const [providerActionState, setProviderActionState] = useState(() => buildIdleReportRuntimeProviderActionsState());
@@ -1422,7 +1558,6 @@ export default function ReportRuntime({
       const chartSpec = block?.content?.chartSpec || block?.chartSpec || {};
       const chartModel = block?.content?.chartModel || block?.chartModel || null;
       const chartInteractionSupport = resolveReportRuntimeChartInteractionSupport(chartSpec);
-      const chartInteractionEnabled = chartInteractionSupport.enabled;
       const chartInteractionState = buildReportRuntimeChartInteractionState({
         blockId: block?.id,
         blockTitle: block?.title,
@@ -1430,10 +1565,33 @@ export default function ReportRuntime({
         selection: selectedDatum,
         providerActionsByField,
         interactionSupport: chartInteractionSupport,
+        canClearSelection: chartInteractionSupport.enabled,
+      });
+      const supportedChartExecutions = chartInteractionState.executions
+        .filter((execution) => supportsReportRuntimeExecution(execution, runtimeHandlers));
+      const effectiveChartInteractionSupport = chartInteractionSupport.enabled && supportedChartExecutions.length === 0
+        ? {
+          enabled: false,
+          reason: "readOnlyRuntime",
+          message: "Chart actions are unavailable because this runtime preview is read-only.",
+          legendEnabled: false,
+        }
+        : chartInteractionSupport;
+      const chartInteractionEnabled = effectiveChartInteractionSupport.enabled;
+      const supportedChartActions = supportedChartExecutions.map((execution) => ({
+        id: execution.id,
+        label: execution.label,
+        kind: execution.kind,
+      }));
+      const chartSelectionViewModel = buildReportRuntimeChartSelectionViewModel({
+        blockTitle: block?.title,
+        selection: selectedDatum,
+        actions: supportedChartActions,
+        interactionSupport: effectiveChartInteractionSupport,
         canClearSelection: chartInteractionEnabled,
       });
       const chartExecutionsById = new Map(
-        chartInteractionState.executions.map((execution) => [normalizeString(execution?.id), execution]),
+        supportedChartExecutions.map((execution) => [normalizeString(execution?.id), execution]),
       );
       return (
         <RuntimePanel
@@ -1463,7 +1621,7 @@ export default function ReportRuntime({
             </div>
           )}
           <ChartSelectionPanel
-            viewModel={chartInteractionState.viewModel}
+            viewModel={chartSelectionViewModel}
             onAction={(actionId) => executeReportRuntimeAction(chartExecutionsById.get(normalizeString(actionId)), runtimeHandlers)}
             onClearSelection={chartInteractionEnabled ? (() => clearSelectedChartSelection(block.id)) : null}
           />
@@ -1508,11 +1666,12 @@ export default function ReportRuntime({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <RuntimePanel
-        title={normalizeString(title || reportSpec?.title || "Report Runtime Preview")}
+        title={normalizeString(title || reportDocument?.title || reportSpec?.title || "Report Runtime Preview")}
         subtitle={normalizeString(subtitle)}
       >
         <BindingChips bindingSummary={bindingSummary} />
         <BindingDetailsPanel bindingSummary={bindingSummary} />
+        {!hasTopLevelFilterBarBlock ? <ScopeDetailsPanel scopeSummary={scopeSummary} /> : null}
       </RuntimePanel>
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
       <DiagnosticsPanel diagnostics={[

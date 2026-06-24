@@ -252,6 +252,36 @@ export const DASHBOARD_METADATA_SCHEMA = {
           type: 'object',
           additionalProperties: true,
         },
+        reportPrint: {
+          type: 'object',
+          additionalProperties: true,
+        },
+        semanticBindingViewState: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            title: { type: 'string' },
+            chips: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            fieldGroups: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: true,
+                properties: {
+                  id: { type: 'string' },
+                  title: { type: 'string' },
+                  fields: {
+                    type: 'array',
+                    items: { type: 'object', additionalProperties: true },
+                  },
+                },
+              },
+            },
+          },
+        },
         locale: { type: 'string' },
         hostIntent: {
           type: 'object',

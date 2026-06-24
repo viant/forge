@@ -22,6 +22,7 @@ export function resolveReportBuilderStateReadiness({
     semanticModelProvider = null,
     semanticModelState = {},
     semanticSelectionValidationState = {},
+    semanticModelRetryAvailable = false,
     semanticRetryAvailable = false,
 } = {}) {
     const baseReadiness = resolveBaseReportBuilderReadiness(config, state);
@@ -59,6 +60,14 @@ export function resolveReportBuilderStateReadiness({
             canRun: false,
             reason: "semantic",
             message: nextSemanticStatus?.message || "Semantic model metadata is still loading.",
+        };
+    }
+    if (normalizedSemanticModelState.error) {
+        return {
+            canRun: false,
+            reason: "semantic",
+            message: nextSemanticStatus?.message || normalizedSemanticModelState.error || "Semantic model metadata could not be loaded.",
+            action: semanticModelRetryAvailable ? "retrySemanticModelLoad" : "",
         };
     }
     if (nextSemanticStatus && nextSemanticStatus.level !== "info") {

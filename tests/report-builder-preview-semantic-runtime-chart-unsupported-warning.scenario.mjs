@@ -1,0 +1,76 @@
+import { buildPreviewBootstrapSteps } from "./report-builder-preview-scenario-builders.mjs";
+
+export default {
+  baseUrl: "http://127.0.0.1:5175",
+  viewport: {
+    width: 1280,
+    height: 960,
+  },
+  steps: [
+    ...buildPreviewBootstrapSteps(),
+    {
+      type: "eval",
+      expression: "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.replaceRuntimeActionBehaviors && window.__REPORT_BUILDER_PREVIEW__.replaceRuntimeActionBehaviors([{ match: { blockKind: 'chartBlock', fieldRef: 'eventDate' }, actions: [ { id: 'keep_date', label: 'Keep Date only', kind: 'keep' }, { id: 'exclude_date', label: 'Exclude Date', kind: 'exclude' }, { id: 'drill_time', label: 'Drill to Time Detail', kind: 'drill', nextFieldRef: 'country' }, { id: 'detail_date', label: 'Show date details', kind: 'detail', targetRef: 'target://example/performance/date-detail' } ] }]);",
+    },
+    {
+      type: "clickSelector",
+      selector: ".forge-report-builder__chart-action-button--quick",
+    },
+    {
+      type: "clickSelectorContains",
+      selector: "[role=\"menuitem\"]",
+      text: "Avails + HH Uniques by Date",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Avails + HH Uniques by Date",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitSelector",
+      selector: ".forge-report-runtime-chart-panel .recharts-bar-rectangle",
+      index: 0,
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickSelector",
+      selector: ".forge-report-runtime-chart-panel .recharts-bar-rectangle",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Selected value: 2026-05-01 • avails",
+      timeoutMs: 60000,
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Runtime Diagnostics",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Runtime refinement actions are unavailable for Date because no backend runtime filter mapping is declared.",
+    },
+    {
+      type: "assertDomContains",
+      text: "Show date details",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Keep Date only",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Exclude Date",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Drill to Time Detail",
+    },
+    {
+      type: "screenshot",
+      file: "report-builder-preview-runtime-chart-unsupported-warning-proof.png",
+      fullPage: true,
+    },
+  ],
+};

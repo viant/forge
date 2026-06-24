@@ -1,0 +1,887 @@
+{
+  "version": 1,
+  "kind": "getReportDocumentResponse",
+  "reportRef": {
+    "reportId": "capacityInventoryTopChannelsQ3"
+  },
+  "documentVersion": 7,
+  "savedAt": 9400,
+  "document": {
+    "version": 1,
+    "kind": "reportDocument",
+    "id": "capacityInventoryTopChannelsQ3",
+    "title": "Capacity Inventory Top Channels Q3",
+    "subtitle": "Q2 Channel Ladder",
+    "description": "Capacity-first authored report starter seeded for Channel -> Publisher -> Site Type drill flows.",
+    "semanticSummary": {
+      "kind": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "modelLabel": "Ad Delivery",
+      "entity": "line_delivery",
+      "entityLabel": "Line Delivery",
+      "selectedDimensions": [
+        {
+          "id": "channel",
+          "rawId": "channelV2",
+          "label": "Channel"
+        }
+      ],
+      "selectedMeasures": [
+        {
+          "id": "available_impressions",
+          "rawId": "avails",
+          "label": "Available Impressions",
+          "format": "compactNumber"
+        }
+      ]
+    },
+    "refinements": [],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        },
+        {
+          "id": "channelsFilter",
+          "kind": "multiSelect",
+          "label": "Channels",
+          "required": false,
+          "value": []
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    },
+    "layout": {
+      "type": "stack",
+      "items": [
+        {
+          "blockId": "scopeFilters"
+        },
+        {
+          "blockId": "activeDrillPath"
+        },
+        {
+          "blockId": "primaryBuilder"
+        },
+        {
+          "blockId": "narrativeIntro",
+          "size": "half"
+        },
+        {
+          "blockId": "headlineKpi",
+          "size": "half"
+        }
+      ]
+    },
+    "blocks": [
+      {
+        "id": "primaryBuilder",
+        "kind": "reportBuilderBlock",
+        "title": "Capacity Inventory Top Channels Q3",
+        "source": {
+          "kind": "dashboard.reportBuilder",
+          "containerId": "demoReportBuilder",
+          "stateKey": "demoReportBuilder",
+          "dataSourceRef": "demoReportSource"
+        },
+        "config": {
+          "title": "Report Builder Demo",
+          "binding": {
+            "mode": "semantic",
+            "modelRef": "model://example/performance/delivery@v1",
+            "entity": "line_delivery",
+            "selectedDimensions": [
+              "event_date",
+              "channel",
+              "country_code"
+            ],
+            "selectedMeasures": [
+              "available_impressions"
+            ]
+          },
+          "measures": [
+            {
+              "id": "avails",
+              "key": "avails",
+              "semanticRef": "available_impressions",
+              "label": "Available Impressions",
+              "default": true,
+              "format": "compactNumber",
+              "semanticDataType": "number"
+            },
+            {
+              "id": "hhUniqs",
+              "key": "hhUniqs",
+              "semanticRef": "household_uniques",
+              "label": "Household Uniques",
+              "format": "compactNumber",
+              "semanticDataType": "number"
+            }
+          ],
+          "computedMeasures": [
+            {
+              "id": "reachRate",
+              "key": "reachRate",
+              "label": "Reach Rate",
+              "format": "percent",
+              "compute": {
+                "type": "ratio",
+                "numerator": "hhUniqs",
+                "denominator": "avails",
+                "scale": 100,
+                "decimals": 2
+              }
+            }
+          ],
+          "dimensions": [
+            {
+              "id": "eventDate",
+              "key": "eventDate",
+              "semanticRef": "event_date",
+              "label": "Event Date",
+              "default": true,
+              "chartAxis": true,
+              "format": "date",
+              "semanticDataType": "date"
+            },
+            {
+              "id": "channelV2",
+              "key": "channelV2",
+              "semanticRef": "channel",
+              "label": "Channel",
+              "default": true,
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "country",
+              "key": "country",
+              "semanticRef": "country_code",
+              "label": "Market",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "publisher",
+              "key": "publisher",
+              "semanticRef": "publisher",
+              "label": "Publisher",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includePublisher",
+                "excludeParamPath": "filters.excludePublisher"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "siteType",
+              "key": "siteType",
+              "semanticRef": "site_type",
+              "label": "Site Type",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeSiteType",
+                "excludeParamPath": "filters.excludeSiteType"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "region",
+              "key": "region",
+              "semanticRef": "region",
+              "label": "Region",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeLocationDim",
+                "excludeParamPath": "filters.excludeLocationDim",
+                "format": "locationTuple",
+                "parentField": "country"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "metrocode",
+              "key": "metrocode",
+              "semanticRef": "metro_code",
+              "label": "Metro Area",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeMetrocode",
+                "excludeParamPath": "filters.excludeMetrocode"
+              },
+              "semanticDataType": "string"
+            }
+          ],
+          "staticFilters": [
+            {
+              "id": "dateRange",
+              "type": "dateRange",
+              "required": true,
+              "startParamPath": "filters.From",
+              "endParamPath": "filters.To"
+            },
+            {
+              "id": "channelsFilter",
+              "label": "Channels",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Display",
+                  "value": "Display"
+                },
+                {
+                  "label": "CTV",
+                  "value": "CTV"
+                }
+              ]
+            }
+          ],
+          "drillMetadata": {
+            "hierarchies": [
+              {
+                "id": "capacity_inventory",
+                "label": "Capacity Inventory",
+                "levels": [
+                  {
+                    "field": "channelV2",
+                    "label": "Channel"
+                  },
+                  {
+                    "field": "publisher",
+                    "label": "Publisher"
+                  },
+                  {
+                    "field": "siteType",
+                    "label": "Site Type"
+                  }
+                ]
+              },
+              {
+                "id": "capacity_location",
+                "label": "Capacity Location",
+                "levels": [
+                  {
+                    "field": "country",
+                    "label": "Market"
+                  },
+                  {
+                    "field": "region",
+                    "label": "Region"
+                  },
+                  {
+                    "field": "metrocode",
+                    "label": "Metro Area"
+                  }
+                ]
+              }
+            ],
+            "fieldActions": [
+              {
+                "fieldRef": "channelV2",
+                "actions": [
+                  {
+                    "id": "drill_market",
+                    "label": "Drill to Market",
+                    "kind": "drill",
+                    "nextFieldRef": "country"
+                  },
+                  {
+                    "id": "detail_channel",
+                    "label": "Show channel details",
+                    "kind": "detail",
+                    "targetRef": "target://example/performance/channel-detail"
+                  }
+                ]
+              },
+              {
+                "fieldRef": "country",
+                "actions": [
+                  {
+                    "id": "detail_market",
+                    "label": "Show market details",
+                    "kind": "detail",
+                    "targetRef": "target://example/performance/market-detail"
+                  }
+                ]
+              }
+            ],
+            "detailTargets": [
+              {
+                "targetRef": "target://example/performance/channel-detail",
+                "navigationMode": "hostRoute",
+                "parameters": {
+                  "channel": "$value",
+                  "campaign": "$row.campaign"
+                }
+              },
+              {
+                "targetRef": "target://example/performance/market-detail",
+                "navigationMode": "hostRoute",
+                "parameters": {
+                  "country": "$value"
+                }
+              }
+            ]
+          },
+          "result": {
+            "chartCreationMode": "explicit",
+            "defaultMode": "chart",
+            "pageSize": 50,
+            "defaultTablePresets": [
+              {
+                "title": "Inventory Ladder",
+                "dimensions": [
+                  "channelV2"
+                ],
+                "measures": [
+                  "avails",
+                  "hhUniqs"
+                ],
+                "primaryMeasure": "avails",
+                "orderField": "avails",
+                "orderDir": "desc",
+                "pageSize": 12,
+                "clearChart": true
+              },
+              {
+                "title": "Location Ladder",
+                "dimensions": [
+                  "country"
+                ],
+                "measures": [
+                  "avails",
+                  "hhUniqs"
+                ],
+                "primaryMeasure": "avails",
+                "orderField": "avails",
+                "orderDir": "desc",
+                "pageSize": 12,
+                "clearChart": true
+              }
+            ],
+            "orderFields": [
+              {
+                "value": "eventDate",
+                "field": "eventDate",
+                "default": true,
+                "defaultDirection": "asc"
+              },
+              {
+                "value": "avails",
+                "field": "avails",
+                "defaultDirection": "desc"
+              },
+              {
+                "value": "hhUniqs",
+                "field": "hhUniqs",
+                "defaultDirection": "desc"
+              }
+            ],
+            "defaultChartSpecs": [
+              {
+                "title": "Inventory · Top Channels",
+                "type": "horizontal_bar",
+                "xField": "channelV2",
+                "yFields": [
+                  "avails"
+                ]
+              },
+              {
+                "title": "Locations · Top Markets",
+                "type": "horizontal_bar",
+                "xField": "country",
+                "yFields": [
+                  "avails"
+                ]
+              }
+            ]
+          }
+        },
+        "state": {
+          "selectedMeasures": [
+            "avails"
+          ],
+          "primaryMeasure": "avails",
+          "selectedDimensions": [
+            "channelV2"
+          ],
+          "binding": {
+            "mode": "semantic",
+            "modelRef": "model://example/performance/delivery@v1",
+            "entity": "line_delivery",
+            "selectedDimensions": [
+              "event_date",
+              "channel",
+              "country_code"
+            ],
+            "selectedMeasures": [
+              "available_impressions"
+            ]
+          },
+          "localCalculatedFields": [],
+          "localTableCalculations": [],
+          "viewMode": "chart",
+          "chartSpec": {
+            "title": "Inventory · Top Channels",
+            "type": "horizontal_bar",
+            "xField": "channelV2",
+            "yFields": [
+              "avails"
+            ]
+          },
+          "groupBy": "",
+          "page": 1,
+          "pageSize": 12,
+          "orderField": "avails",
+          "orderDir": "desc",
+          "staticFilters": {
+            "dateRange": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            },
+            "channelsFilter": []
+          },
+          "dynamicGroups": {},
+          "activeTablePreset": null,
+          "lastTablePreset": null,
+          "reportDocumentTitle": "Capacity Inventory Top Channels Q3",
+          "reportDocumentSubtitle": "Q2 Channel Ladder",
+          "reportDocumentDescription": "Capacity-first authored report starter seeded for Channel -> Publisher -> Site Type drill flows.",
+          "reportDocumentTemplateId": "capacity_inventory_brief",
+          "reportDocumentTemplateLabel": "Capacity Inventory Brief"
+        },
+        "scopeBindings": [
+          {
+            "paramId": "dateRange",
+            "target": "staticFilters.dateRange"
+          },
+          {
+            "paramId": "channelsFilter",
+            "target": "staticFilters.channelsFilter"
+          }
+        ]
+      },
+      {
+        "id": "scopeFilters",
+        "kind": "filterBarBlock",
+        "title": "Scope",
+        "paramIds": [
+          "dateRange",
+          "channelsFilter"
+        ]
+      },
+      {
+        "id": "activeDrillPath",
+        "kind": "refinementBarBlock",
+        "title": "Active Drill Path",
+        "actionKinds": [
+          "remove",
+          "clearAll"
+        ],
+        "emptyLabel": "No active inventory drill path"
+      },
+      {
+        "id": "narrativeIntro",
+        "kind": "markdownBlock",
+        "title": "Inventory Outlook",
+        "markdown": "## Inventory Outlook\nStart at Channel, then drill deeper through Publisher and Site Type."
+      },
+      {
+        "id": "headlineKpi",
+        "kind": "kpiBlock",
+        "title": "Top Channel KPI",
+        "datasetRef": "primary",
+        "valueField": "avails",
+        "valueLabel": "Avails",
+        "secondaryField": "channelV2",
+        "secondaryLabel": "Channel",
+        "description": "Highlights the leading channel row before drilling deeper.",
+        "emptyLabel": "No inventory KPI value available."
+      }
+    ],
+    "binding": {
+      "mode": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "entity": "line_delivery",
+      "selectedDimensions": [
+        "event_date",
+        "channel",
+        "country_code"
+      ],
+      "selectedMeasures": [
+        "available_impressions"
+      ]
+    }
+  },
+  "compileState": {
+    "status": "clean",
+    "reportSpecVersion": 1,
+    "blockCount": 6,
+    "datasetCount": 1
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_capacity_q3_inventory_top_channels",
+    "sourceArtifactId": "capacity_q3_inventory_top_channels"
+  },
+  "reportSpec": {
+    "version": 1,
+    "kind": "reportSpec",
+    "source": {
+      "kind": "dashboard.reportBuilder",
+      "containerId": "demoReportBuilder",
+      "stateKey": "demoReportBuilder",
+      "dataSourceRef": "demoReportSource"
+    },
+    "title": "Capacity Inventory Top Channels Q3",
+    "binding": {
+      "mode": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "entity": "line_delivery",
+      "selectedDimensions": [
+        "event_date",
+        "channel",
+        "country_code"
+      ],
+      "selectedMeasures": [
+        "available_impressions"
+      ]
+    },
+    "semanticSummary": {
+      "kind": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "modelLabel": "Ad Delivery",
+      "entity": "line_delivery",
+      "entityLabel": "Line Delivery",
+      "selectedDimensions": [
+        {
+          "id": "channel",
+          "rawId": "channelV2",
+          "label": "Channel"
+        }
+      ],
+      "selectedMeasures": [
+        {
+          "id": "available_impressions",
+          "rawId": "avails",
+          "label": "Available Impressions",
+          "format": "compactNumber"
+        }
+      ]
+    },
+    "parameters": {
+      "viewMode": "chart",
+      "groupBy": "",
+      "pageSize": 12,
+      "orderField": "avails",
+      "orderDir": "desc"
+    },
+    "layoutIntent": {
+      "kind": "single",
+      "resultPanePosition": "right",
+      "blockOrder": [
+        "scopeFilters",
+        "activeDrillPath",
+        "primaryTable",
+        "primaryChart",
+        "narrativeIntro",
+        "headlineKpi"
+      ],
+      "items": [
+        {
+          "blockId": "scopeFilters"
+        },
+        {
+          "blockId": "activeDrillPath"
+        },
+        {
+          "blockId": "primaryTable"
+        },
+        {
+          "blockId": "primaryChart"
+        },
+        {
+          "blockId": "narrativeIntro",
+          "size": "half"
+        },
+        {
+          "blockId": "headlineKpi",
+          "size": "half"
+        }
+      ]
+    },
+    "drillMetadata": {
+      "hierarchies": [
+        {
+          "id": "capacity_inventory",
+          "label": "Capacity Inventory",
+          "levels": [
+            {
+              "id": "channelV2",
+              "field": "channelV2",
+              "label": "Channel"
+            },
+            {
+              "id": "publisher",
+              "field": "publisher",
+              "label": "Publisher"
+            },
+            {
+              "id": "siteType",
+              "field": "siteType",
+              "label": "Site Type"
+            }
+          ]
+        },
+        {
+          "id": "capacity_location",
+          "label": "Capacity Location",
+          "levels": [
+            {
+              "id": "country",
+              "field": "country",
+              "label": "Market"
+            },
+            {
+              "id": "region",
+              "field": "region",
+              "label": "Region"
+            },
+            {
+              "id": "metrocode",
+              "field": "metrocode",
+              "label": "Metro Area"
+            }
+          ]
+        }
+      ],
+      "detailTargets": [
+        {
+          "targetRef": "target://example/performance/channel-detail",
+          "navigationMode": "hostRoute",
+          "parameters": {
+            "channel": "$value",
+            "campaign": "$row.campaign"
+          }
+        },
+        {
+          "targetRef": "target://example/performance/market-detail",
+          "navigationMode": "hostRoute",
+          "parameters": {
+            "country": "$value"
+          }
+        }
+      ],
+      "fieldActions": [
+        {
+          "fieldRef": "channelV2",
+          "actions": [
+            {
+              "id": "drill_market",
+              "label": "Drill to Market",
+              "kind": "drill",
+              "nextFieldRef": "country"
+            },
+            {
+              "id": "detail_channel",
+              "label": "Show channel details",
+              "kind": "detail",
+              "targetRef": "target://example/performance/channel-detail"
+            }
+          ]
+        },
+        {
+          "fieldRef": "country",
+          "actions": [
+            {
+              "id": "detail_market",
+              "label": "Show market details",
+              "kind": "detail",
+              "targetRef": "target://example/performance/market-detail"
+            }
+          ]
+        }
+      ]
+    },
+    "refinements": [],
+    "calculatedFields": [],
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "demoReportSource",
+        "request": {
+          "measures": {
+            "avails": true
+          },
+          "dimensions": {
+            "channelV2": true
+          },
+          "filters": {
+            "From": "2026-05-01",
+            "To": "2026-05-04",
+            "from": "2026-05-01",
+            "to": "2026-05-04"
+          },
+          "semanticSelection": {
+            "modelRef": "model://example/performance/delivery@v1",
+            "entity": "line_delivery",
+            "selection": {
+              "dimensions": [
+                "channel"
+              ],
+              "measures": [
+                "available_impressions"
+              ]
+            },
+            "refinements": [],
+            "parameters": {}
+          },
+          "limit": 12,
+          "offset": 0,
+          "orderBy": [
+            "avails desc"
+          ]
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "scopeFilters",
+        "kind": "filterBarBlock",
+        "title": "Scope",
+        "paramIds": [
+          "dateRange",
+          "channelsFilter"
+        ]
+      },
+      {
+        "id": "activeDrillPath",
+        "kind": "refinementBarBlock",
+        "title": "Active Drill Path",
+        "actionKinds": [
+          "remove",
+          "clearAll"
+        ],
+        "emptyLabel": "No active inventory drill path"
+      },
+      {
+        "id": "primaryTable",
+        "kind": "tableBlock",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "channelV2",
+            "sourceKey": "channelV2",
+            "displayKey": "channelV2",
+            "label": "Channel",
+            "kind": "dimension",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "avails",
+            "sourceKey": "avails",
+            "displayKey": "avails",
+            "label": "Available Impressions",
+            "kind": "measure",
+            "format": "compactNumber",
+            "align": "right"
+          }
+        ]
+      },
+      {
+        "id": "primaryChart",
+        "kind": "chartBlock",
+        "datasetRef": "primary",
+        "chartSpec": {
+          "title": "Inventory · Top Channels",
+          "type": "horizontal_bar",
+          "xField": "channelV2",
+          "yFields": [
+            "avails"
+          ]
+        },
+        "chartModel": {
+          "type": "horizontal_bar",
+          "xAxis": {
+            "dataKey": "channelV2"
+          },
+          "yAxis": {
+            "format": "compactNumber"
+          },
+          "series": {
+            "values": [
+              {
+                "value": "avails",
+                "label": "Available Impressions",
+                "color": "#1f77b4",
+                "format": "compactNumber",
+                "type": "horizontal_bar"
+              }
+            ],
+            "palette": [
+              "#1f77b4",
+              "#ff7f0e",
+              "#2ca02c",
+              "#d62728",
+              "#9467bd",
+              "#8c564b",
+              "#e377c2",
+              "#7f7f7f",
+              "#bcbd22",
+              "#17becf"
+            ]
+          }
+        }
+      },
+      {
+        "id": "narrativeIntro",
+        "kind": "markdownBlock",
+        "title": "Inventory Outlook",
+        "markdown": "## Inventory Outlook\nStart at Channel, then drill deeper through Publisher and Site Type."
+      },
+      {
+        "id": "headlineKpi",
+        "kind": "kpiBlock",
+        "title": "Top Channel KPI",
+        "datasetRef": "primary",
+        "valueField": "avails",
+        "valueLabel": "Avails",
+        "secondaryField": "channelV2",
+        "secondaryLabel": "Channel",
+        "description": "Highlights the leading channel row before drilling deeper.",
+        "emptyLabel": "No inventory KPI value available."
+      }
+    ],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        },
+        {
+          "id": "channelsFilter",
+          "kind": "multiSelect",
+          "label": "Channels",
+          "required": false,
+          "value": []
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    }
+  }
+}

@@ -7,9 +7,25 @@ import {
   normalizeReportCalculatedField,
   parseReportCalculatedFieldExpression,
 } from "./calculatedFieldModel.js";
+import {
+  listReportCalculatedFieldFunctionSpecs,
+  listReportCalculatedFieldTableCalculationSpecs,
+} from "./calculationContracts.js";
 
-const fixtures = JSON.parse(
+const fixtureCorpus = JSON.parse(
   readFileSync(new URL("./fixtures/calculated-field-expression-fixtures.v1.json", import.meta.url), "utf8"),
+);
+const tableCalculationFixtureCorpus = JSON.parse(
+  readFileSync(new URL("./fixtures/table-calculation-conformance-fixtures.v1.json", import.meta.url), "utf8"),
+);
+
+assert.deepEqual(
+  listReportCalculatedFieldFunctionSpecs(),
+  fixtureCorpus.functions,
+);
+assert.deepEqual(
+  listReportCalculatedFieldTableCalculationSpecs(),
+  tableCalculationFixtureCorpus.functions,
 );
 
 assert.deepEqual(parseReportCalculatedFieldExpression("if(impressions = 0, null, round((clicks / impressions) * 100, 2))"), {
@@ -48,7 +64,15 @@ assert.deepEqual(parseReportCalculatedFieldExpression("if(impressions = 0, null,
   dependencies: ["impressions", "clicks"],
 });
 
-fixtures.forEach((fixture) => {
+fixtureCorpus.parseErrorCases.forEach((fixture) => {
+  assert.throws(
+    () => parseReportCalculatedFieldExpression(fixture.expr),
+    new RegExp(fixture.error.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    fixture.id,
+  );
+});
+
+fixtureCorpus.evaluationCases.forEach((fixture) => {
   assert.deepEqual(
     evaluateReportCalculatedFieldExpression(fixture.expr, fixture.row),
     fixture.expected,
@@ -56,18 +80,26 @@ fixtures.forEach((fixture) => {
   );
 });
 
+tableCalculationFixtureCorpus.runtimeCases.forEach((fixture) => {
+  assert.deepEqual(
+    applyReportCalculatedFields(fixture.rows, fixture.definitions),
+    fixture.expectedRows,
+    fixture.id,
+  );
+});
+
 assert.deepEqual(
   normalizeReportCalculatedField({
-    id: "forecastLift",
-    label: "Forecast Lift",
+    id: "projectedLift",
+    label: "Projected Lift",
     dataType: "number",
     expr: "if(channelId = 'CTV', totalSpend, null)",
   }, { datasetRef: "primary" }),
   {
-    id: "forecastLift",
-    key: "forecastLift",
+    id: "projectedLift",
+    key: "projectedLift",
     kind: "rowCalc",
-    label: "Forecast Lift",
+    label: "Projected Lift",
     dataType: "number",
     datasetRef: "primary",
     dependencies: ["channelId", "totalSpend"],

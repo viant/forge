@@ -40,4 +40,15 @@ const singleCtx = context.Context('lookup');
 assert.equal(singleCtx.dataSource.selectionMode, 'single');
 assert.equal(multiCtx.dataSource.selectionMode, 'multi');
 
+const actorContext = Context('W_ctx_actor', metadata, 'lookup', {
+  __connectorRuntime: {
+    targetContext: {
+      actorRef: 'user://awitas',
+    },
+  },
+});
+actorContext.init();
+assert.equal(actorContext.identity.actorRef, 'user://awitas');
+assert.equal(actorContext.Context('lookup').identity.actorRef, 'user://awitas');
+
 console.log('Context ✓ preserves selectionMode overrides for dataSource handlers');

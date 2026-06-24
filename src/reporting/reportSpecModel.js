@@ -13,7 +13,7 @@ import {
 import { buildReportBuilderCalculatedFieldConfig } from "../components/dashboard/reportBuilderCalculatedFieldAuthoring.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
 import { normalizeReportCalculatedFields } from "./calculatedFieldModel.js";
-import { normalizeReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
+import { resolveReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
 import { normalizeReportTableCellVisual } from "./tableVisualSpec.js";
 
 function normalizeString(value = "") {
@@ -22,6 +22,12 @@ function normalizeString(value = "") {
 
 function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function normalizeStringArray(values = []) {
+  return (Array.isArray(values) ? values : [])
+    .map((value) => normalizeString(value))
+    .filter(Boolean);
 }
 
 function buildReportSpecColumns(columns = []) {
@@ -94,24 +100,52 @@ export function buildReportSpecChartBlock({
 }
 
 function buildReportSpecCalculatedFields(config = {}, state = {}) {
-  const selectedMeasureIds = new Set(
-    (Array.isArray(state?.selectedMeasures) ? state.selectedMeasures : [])
-      .map((id) => normalizeString(id))
-      .filter(Boolean),
-  );
-  const selectedComputedMeasures = [
+  const selectedMeasureIds = normalizeStringArray(state?.selectedMeasures);
+  if (selectedMeasureIds.length === 0) {
+    return [];
+  }
+  const availableDefinitions = normalizeReportCalculatedFields([
     ...(Array.isArray(config?.calculatedFields) ? config.calculatedFields : []),
     ...(Array.isArray(config?.computedMeasures) ? config.computedMeasures : []),
     ...(Array.isArray(config?.tableCalculations) ? config.tableCalculations : []),
-  ]
-    .filter((definition) => selectedMeasureIds.has(normalizeString(definition?.id || definition?.key)));
-  return normalizeReportCalculatedFields(selectedComputedMeasures, {
+  ], {
     datasetRef: "primary",
   });
+  const definitionsById = new Map(
+    availableDefinitions
+      .map((definition) => [normalizeString(definition?.id || definition?.key), definition])
+      .filter(([id]) => !!id),
+  );
+  const visiting = new Set();
+  const visited = new Set();
+  const selectedDefinitions = [];
+
+  function visitDefinition(id) {
+    const normalizedId = normalizeString(id);
+    if (!normalizedId || visited.has(normalizedId) || visiting.has(normalizedId)) {
+      return;
+    }
+    const definition = definitionsById.get(normalizedId);
+    if (!definition) {
+      return;
+    }
+    visiting.add(normalizedId);
+    normalizeStringArray(definition?.dependencies).forEach((dependencyId) => {
+      visitDefinition(dependencyId);
+    });
+    visiting.delete(normalizedId);
+    visited.add(normalizedId);
+    selectedDefinitions.push(cloneValue(definition));
+  }
+
+  selectedMeasureIds.forEach((measureId) => {
+    visitDefinition(measureId);
+  });
+  return selectedDefinitions;
 }
 
-function buildReportSpecDrillMetadata(config = {}) {
-  const normalized = normalizeReportBuilderDrillMetadata(config);
+function buildReportSpecDrillMetadata(config = {}, state = {}) {
+  const normalized = resolveReportBuilderDrillMetadata(config, state?.drillMetadata || null);
   if ((normalized?.hierarchies?.length || 0) === 0
     && (normalized?.detailTargets?.length || 0) === 0
     && (normalized?.fieldActions?.length || 0) === 0) {
@@ -160,6 +194,8 @@ function normalizeSemanticSummaryField(field = {}) {
   const rawId = normalizeString(field?.rawId);
   const description = normalizeString(field?.description);
   const format = normalizeString(field?.format);
+  const category = normalizeString(field?.category);
+  const definitionRef = normalizeString(field?.definitionRef);
   const governance = normalizeSemanticSummaryGovernance(field?.governance);
   return {
     id,
@@ -167,6 +203,8 @@ function normalizeSemanticSummaryField(field = {}) {
     label,
     ...(description ? { description } : {}),
     ...(format ? { format } : {}),
+    ...(category ? { category } : {}),
+    ...(definitionRef ? { definitionRef } : {}),
     ...(governance ? { governance } : {}),
   };
 }
@@ -184,6 +222,9 @@ function normalizeSemanticSummary(summary = {}) {
   if (!modelRef || !entity) {
     return null;
   }
+  const selectedParameters = (Array.isArray(summary.selectedParameters) ? summary.selectedParameters : [])
+    .map((field) => normalizeSemanticSummaryField(field))
+    .filter(Boolean);
   return {
     kind: "semantic",
     modelRef,
@@ -198,6 +239,7 @@ function normalizeSemanticSummary(summary = {}) {
     selectedMeasures: (Array.isArray(summary.selectedMeasures) ? summary.selectedMeasures : [])
       .map((field) => normalizeSemanticSummaryField(field))
       .filter(Boolean),
+    ...(selectedParameters.length > 0 ? { selectedParameters } : {}),
   };
 }
 
@@ -221,7 +263,7 @@ export function buildReportBuilderReportSpec({
   const tableColumns = buildReportSpecColumns(buildReportBuilderColumns(effectiveConfig, normalizedState));
   const chartSpec = resolveReportBuilderChartSpecForReportSpec(effectiveConfig, normalizedState);
   const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);
-  const drillMetadata = buildReportSpecDrillMetadata(effectiveConfig);
+  const drillMetadata = buildReportSpecDrillMetadata(effectiveConfig, normalizedState);
   const normalizedSemanticSummary = normalizeSemanticSummary(semanticSummary);
   const chartBlock = chartSpec
     ? buildReportSpecChartBlock({

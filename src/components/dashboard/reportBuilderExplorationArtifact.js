@@ -3,8 +3,14 @@ import {
     lowerReportDocumentToReportSpec,
 } from "../../reporting/reportDocumentModel.js";
 import { buildReportDocumentCompileState } from "../../reporting/reportDocumentStore.js";
-import { buildReportBuilderDocumentCompileDiagnostics } from "./reportBuilderDocumentBlocks.js";
+import {
+    buildReportBuilderDocumentCompileDiagnostics,
+    buildReportBuilderScopeSummaryFromParams,
+} from "./reportBuilderDocumentBlocks.js";
+import { buildReportBuilderSemanticRuntimeDiagnosticsFromState } from "./reportBuilderSemantic.js";
 import { normalizeReportBuilderExplorationSession } from "./reportBuilderExplorationSession.js";
+import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import { resolveReportBuilderSemanticRuntimeState } from "./useReportBuilderSemanticRuntimeState.js";
 
 function normalizeString(value = "") {
@@ -13,6 +19,47 @@ function normalizeString(value = "") {
 
 function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function normalizeSemanticBindingViewState(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+    const title = normalizeString(value?.title);
+    const chips = (Array.isArray(value?.chips) ? value.chips : [])
+        .map((entry) => normalizeString(entry))
+        .filter(Boolean);
+    const fieldGroups = (Array.isArray(value?.fieldGroups) ? value.fieldGroups : [])
+        .map((group) => {
+            const id = normalizeString(group?.id);
+            const groupTitle = normalizeString(group?.title);
+            const fields = (Array.isArray(group?.fields) ? group.fields : [])
+                .filter((field) => field && typeof field === "object" && !Array.isArray(field))
+                .filter((field) => (
+                    normalizeString(field?.id)
+                    || normalizeString(field?.rawId)
+                    || normalizeString(field?.label)
+                    || normalizeString(field?.definitionRef)
+                ))
+                .map((field) => cloneValue(field));
+            if (!id || !groupTitle || fields.length === 0) {
+                return null;
+            }
+            return {
+                id,
+                title: groupTitle,
+                fields,
+            };
+        })
+        .filter(Boolean);
+    if (chips.length === 0 && fieldGroups.length === 0) {
+        return null;
+    }
+    return {
+        ...(title ? { title } : { title: "Semantic Binding" }),
+        ...(chips.length > 0 ? { chips } : {}),
+        ...(fieldGroups.length > 0 ? { fieldGroups } : {}),
+    };
 }
 
 function sanitizeFilenameSegment(value = "") {
@@ -33,6 +80,11 @@ export function buildReportBuilderExplorationArtifact({
     savedAt = Date.now(),
     semanticSummary = null,
     semanticModel = null,
+    semanticModelProviderAvailable = false,
+    semanticModelLoading = false,
+    semanticModelError = "",
+    fallbackSemanticSummary = null,
+    fallbackSemanticFingerprint = "",
     semanticRuntimeDiagnostics = [],
 } = {}) {
     const session = normalizeReportBuilderExplorationSession(state?.explorationSession, {
@@ -47,19 +99,36 @@ export function buildReportBuilderExplorationArtifact({
         state: authoredState,
         binding: authoredState?.binding || config?.binding || null,
         model: semanticModel,
+        providerAvailable: semanticModelProviderAvailable,
+        modelLoading: semanticModelLoading,
+        modelError: semanticModelError,
+        fallbackSummary: fallbackSemanticSummary,
+        fallbackFingerprint: fallbackSemanticFingerprint,
     });
+    const implicitSemanticRuntimeDiagnostics = Array.isArray(semanticRuntimeDiagnostics) && semanticRuntimeDiagnostics.length > 0
+        ? []
+        : buildReportBuilderSemanticRuntimeDiagnosticsFromState({
+            config,
+            state: authoredState,
+            binding: authoredState?.binding || config?.binding || null,
+            model: semanticModel,
+            providerAvailable: semanticModelProviderAvailable,
+            modelLoading: semanticModelLoading,
+            modelError: semanticModelError,
+        });
     const document = buildReportBuilderReportDocument({
         container,
         config: semanticRuntimeState.semanticDisplayConfig,
         state: authoredState,
         refinements,
-        semanticSummary: semanticSummary || semanticRuntimeState.semanticSummary,
+        semanticSummary: semanticSummary || semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
     });
     const reportSpec = lowerReportDocumentToReportSpec(document);
     const diagnostics = [
         ...buildReportBuilderDocumentCompileDiagnostics({
             document,
         }),
+        ...implicitSemanticRuntimeDiagnostics,
         ...(Array.isArray(semanticRuntimeDiagnostics) ? semanticRuntimeDiagnostics : []),
     ];
     const seen = new Set();
@@ -78,6 +147,10 @@ export function buildReportBuilderExplorationArtifact({
             return true;
         }),
     });
+    const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
+        semanticSummary: semanticSummary || semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
+        binding: authoredState?.binding || config?.binding || null,
+    });
     const savedTimestamp = Number(savedAt || Date.now()) || Date.now();
     return {
         version: 1,
@@ -93,6 +166,7 @@ export function buildReportBuilderExplorationArtifact({
         },
         document,
         reportSpec,
+        ...(semanticBindingViewState ? { semanticBindingViewState } : {}),
         ...(compileState ? { compileState } : {}),
     };
 }
@@ -101,12 +175,23 @@ export function buildReportBuilderExplorationArtifactSummary(artifact = null) {
     if (!artifact || typeof artifact !== "object" || Array.isArray(artifact)) {
         return null;
     }
-    const subtitle = normalizeString(artifact?.document?.subtitle);
-    const description = normalizeString(artifact?.document?.description);
+    const artifactContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: artifact?.reportSpec || null,
+        document: artifact?.document || null,
+        title: artifact?.title || "",
+    });
+    const semanticBindingViewState = normalizeSemanticBindingViewState(artifact?.semanticBindingViewState)
+        || buildReportBuilderSemanticBindingViewState({
+            semanticSummary: artifactContext?.semanticSummary || null,
+            binding: artifactContext?.binding || null,
+        });
+    const subtitle = normalizeString(artifactContext?.document?.subtitle || artifact?.document?.subtitle);
+    const description = normalizeString(artifactContext?.document?.description || artifact?.document?.description);
     const blockCount = Array.isArray(artifact?.reportSpec?.blocks) ? artifact.reportSpec.blocks.length : 0;
     const datasetCount = Array.isArray(artifact?.reportSpec?.datasets) ? artifact.reportSpec.datasets.length : 0;
+    const scopeSummary = buildReportBuilderScopeSummaryFromParams(artifactContext?.scopeParams);
     return {
-        title: normalizeString(artifact?.title || artifact?.document?.title || "Report"),
+        title: normalizeString(artifact?.title || artifactContext?.title || "Report"),
         ...(subtitle ? { subtitle } : {}),
         ...(description ? { description } : {}),
         artifactId: normalizeString(artifact?.artifactId),
@@ -115,6 +200,18 @@ export function buildReportBuilderExplorationArtifactSummary(artifact = null) {
         sourceLabel: normalizeString(artifact?.sourceSession?.sourceRef?.contextLabel || artifact?.sourceSession?.sourceRef?.chartTitle || artifact?.sourceSession?.sourceRef?.primaryMeasure),
         blockCount,
         datasetCount,
+        ...(semanticBindingViewState ? {
+            semanticBindingTitle: semanticBindingViewState.title,
+            semanticBindingChips: semanticBindingViewState.chips,
+            ...(Array.isArray(semanticBindingViewState.fieldGroups) && semanticBindingViewState.fieldGroups.length > 0
+                ? { semanticBindingFieldGroups: semanticBindingViewState.fieldGroups }
+                : {}),
+        } : {}),
+        ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
+            scopeSummaryTitle: "Report Scope",
+            scopeSummaryText: scopeSummary.text,
+            scopeSummaryItems: scopeSummary.items,
+        } : {}),
     };
 }
 

@@ -1,4 +1,4 @@
-import { createDrillMetadataProvider } from "../../reporting/drillMetadataProvider.js";
+import { createDrillMetadataProvider, hasDrillMetadataProvider } from "../../reporting/drillMetadataProvider.js";
 import { createReportBuilderDrillMetadataProvider, normalizeReportBuilderDrillMetadata } from "../../reporting/reportBuilderDrillMetadata.js";
 
 function normalizeString(value = "") {
@@ -10,7 +10,7 @@ export function resolveReportRuntimeDrillMetadataProvider({
   runtimeHandlers = null,
 } = {}) {
   const explicitProvider = runtimeHandlers?.drillMetadataProvider;
-  if (explicitProvider && typeof explicitProvider.listAvailableRefinements === "function") {
+  if (hasDrillMetadataProvider(explicitProvider)) {
     return explicitProvider;
   }
   const normalizedDrillMetadata = normalizeReportBuilderDrillMetadata({

@@ -6,6 +6,7 @@ import {
 
 const FILTER_FIELD_ALIASES = {
   channelsFilter: 'channelsFilter',
+  audienceSegmentFilter: 'audienceSegmentFilter',
   scopeFilter: 'scopeFilter',
   inventoryFilter: 'inventoryFilter',
   targetingFilter: 'targetingFilter',
@@ -20,6 +21,51 @@ function normalizeArray(values = []) {
     return values.filter((entry) => entry !== undefined && entry !== null && entry !== "");
   }
   return values !== undefined && values !== null && values !== "" ? [values] : [];
+}
+
+function normalizeString(value = "") {
+  return String(value || "").trim();
+}
+
+function buildMeasureConfigIndex(config = {}) {
+  return new Map(
+    (Array.isArray(config?.measures) ? config.measures : [])
+      .map((measure) => [normalizeString(measure?.id || measure?.key), measure])
+      .filter(([id, measure]) => !!id && !!measure),
+  );
+}
+
+function resolveMeasureAggregation(measureConfig = null) {
+  const aggregation = normalizeString(measureConfig?.aggregation).toLowerCase();
+  return aggregation || "sum";
+}
+
+function updateAggregatedMeasure(rowState = {}, measureKey = "", rowValue = undefined, measureConfig = null) {
+  const numericValue = Number(rowValue);
+  const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+  const aggregation = resolveMeasureAggregation(measureConfig);
+  if (aggregation === "avg") {
+    const current = rowState.__measureAggregateState?.[measureKey] || { sum: 0, count: 0 };
+    const next = {
+      sum: current.sum + safeValue,
+      count: current.count + 1,
+    };
+    rowState.__measureAggregateState = {
+      ...(rowState.__measureAggregateState || {}),
+      [measureKey]: next,
+    };
+    rowState[measureKey] = next.count > 0 ? (next.sum / next.count) : 0;
+    return;
+  }
+  rowState[measureKey] = Number(rowState[measureKey] || 0) + safeValue;
+}
+
+function finalizeAggregatedRow(rowState = {}) {
+  if (!rowState || typeof rowState !== "object" || Array.isArray(rowState)) {
+    return rowState;
+  }
+  const { __measureAggregateState: _ignored, ...next } = rowState;
+  return next;
 }
 
 export function applyPreviewRequestFilters(rows, request = {}, config = {}) {
@@ -63,6 +109,7 @@ export function runPreviewRuntimeRequest(rows, request = {}, config = {}) {
   const measures = Object.entries(request.measures || {})
     .filter(([, enabled]) => enabled)
     .map(([key]) => key);
+  const measureConfigIndex = buildMeasureConfigIndex(config);
   const grouped = new Map();
 
   filteredRows.forEach((row) => {
@@ -72,12 +119,12 @@ export function runPreviewRuntimeRequest(rows, request = {}, config = {}) {
       existing[key] = row[key];
     });
     measures.forEach((key) => {
-      existing[key] = Number(existing[key] || 0) + Number(row[key] || 0);
+      updateAggregatedMeasure(existing, key, row[key], measureConfigIndex.get(key));
     });
     grouped.set(bucket, existing);
   });
 
-  const aggregated = Array.from(grouped.values());
+  const aggregated = Array.from(grouped.values()).map((row) => finalizeAggregatedRow(row));
   const [orderField = 'eventDate', orderDir = 'asc'] = String((request.orderBy || [])[0] || 'eventDate asc').split(/\s+/);
   aggregated.sort((left, right) => {
     const leftValue = left?.[orderField];

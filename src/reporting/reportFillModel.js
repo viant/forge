@@ -147,10 +147,15 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map()) {
           params: (Array.isArray(block?.paramIds) ? block.paramIds : [])
             .map((paramId) => normalizeString(paramId))
             .filter(Boolean)
-            .map((paramId) => ({
-              id: paramId,
-              value: cloneValue(reportSpec?.scope?.params?.find((entry) => normalizeString(entry?.id) === paramId)?.value),
-            })),
+            .map((paramId) => {
+              const scopeParam = (Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [])
+                .find((entry) => normalizeString(entry?.id) === paramId);
+              return {
+                id: paramId,
+                ...(normalizeString(scopeParam?.description) ? { description: normalizeString(scopeParam.description) } : {}),
+                value: cloneValue(scopeParam?.value),
+              };
+            }),
         },
       };
     }

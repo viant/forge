@@ -1574,6 +1574,12 @@
     color: #9a6200;
 }
 
+.forge-report-builder__pill-badge--owner {
+    border-color: #d7e2ee;
+    background: #f4f7fa;
+    color: #486579;
+}
+
 .forge-report-builder__selector-box {
     display: inline-flex;
     align-items: center;
@@ -2147,8 +2153,9 @@
 
 .forge-report-builder__inline-filter-control {
     display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
     min-height: 30px;
     padding: 0 10px;
     border: 1px solid #d8dee8;
@@ -2160,12 +2167,49 @@
     padding: 6px 10px;
 }
 
+.forge-report-builder__inline-filter-control.is-semantic-invalid {
+    border-color: rgba(207, 92, 72, 0.42);
+    background: rgba(253, 236, 234, 0.38);
+}
+
+.forge-report-builder__inline-filter-control.is-semantic-provider-invalid {
+    border-color: rgba(217, 130, 43, 0.38);
+    background: rgba(255, 247, 225, 0.42);
+}
+
+.forge-report-builder__inline-filter-control.is-semantic-invalid.is-semantic-provider-invalid {
+    border-color: rgba(207, 92, 72, 0.42);
+    background: linear-gradient(180deg, rgba(253, 236, 234, 0.42) 0%, rgba(255, 247, 225, 0.46) 100%);
+}
+
+.forge-report-builder__inline-filter-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 30px;
+}
+
 .forge-report-builder__inline-filter-label {
     font-size: 11px;
     font-weight: 700;
     color: #5f6b7c;
     letter-spacing: 0.02em;
     white-space: nowrap;
+}
+
+.forge-report-builder__inline-filter-description {
+    color: #6b778c;
+    font-size: 11px;
+    line-height: 1.35;
+    max-width: 260px;
+}
+
+.forge-report-builder__inline-filter-description--danger {
+    color: #b83a2f;
+}
+
+.forge-report-builder__inline-filter-description--warning {
+    color: #8a5d00;
 }
 
 .forge-report-builder__toolbar-button {
@@ -2782,6 +2826,25 @@
     padding: 12px;
 }
 
+.forge-report-builder__panel--bottom.is-semantic-invalid {
+    border: 1px solid rgba(207, 92, 72, 0.42);
+    border-radius: 14px;
+    background: rgba(253, 236, 234, 0.38);
+    box-shadow: inset 0 0 0 1px rgba(207, 92, 72, 0.08);
+}
+
+.forge-report-builder__panel--bottom.is-semantic-provider-invalid {
+    border: 1px solid rgba(217, 130, 43, 0.38);
+    border-radius: 14px;
+    background: rgba(255, 247, 225, 0.42);
+    box-shadow: inset 0 0 0 1px rgba(217, 130, 43, 0.06);
+}
+
+.forge-report-builder__panel--bottom.is-semantic-invalid.is-semantic-provider-invalid {
+    border-color: rgba(207, 92, 72, 0.42);
+    background: linear-gradient(180deg, rgba(253, 236, 234, 0.42) 0%, rgba(255, 247, 225, 0.46) 100%);
+}
+
 .forge-report-builder__bottom {
     grid-area: drawer;
     display: flex;
@@ -3079,6 +3142,14 @@
     margin-top: 6px;
 }
 
+.forge-report-builder__bottom-description--danger {
+    color: #b83a2f;
+}
+
+.forge-report-builder__bottom-description--warning {
+    color: #8a5d00;
+}
+
 .forge-report-builder__bottom-toggle,
 .forge-report-builder__category-chip {
     display: inline-flex;
@@ -3362,6 +3433,23 @@
     color: #314154;
 }
 
+.forge-report-builder__category-chip.is-semantic-invalid {
+    border-color: rgba(207, 92, 72, 0.42);
+    background: rgba(253, 236, 234, 0.38);
+    color: #7a2f24;
+}
+
+.forge-report-builder__category-chip.is-semantic-provider-invalid {
+    border-color: rgba(217, 130, 43, 0.38);
+    background: rgba(255, 247, 225, 0.42);
+    color: #8a5d00;
+}
+
+.forge-report-builder__category-chip.is-semantic-invalid.is-semantic-provider-invalid {
+    border-color: rgba(207, 92, 72, 0.42);
+    background: linear-gradient(180deg, rgba(253, 236, 234, 0.42) 0%, rgba(255, 247, 225, 0.46) 100%);
+}
+
 .forge-report-builder__category-chip-icon {
     display: inline-flex;
     align-items: center;
@@ -3376,6 +3464,14 @@
 
 .forge-report-builder__category-chip.is-active .forge-report-builder__category-chip-icon {
     background: rgba(47, 109, 225, 0.14);
+}
+
+.forge-report-builder__category-chip.is-semantic-invalid .forge-report-builder__category-chip-icon {
+    background: rgba(207, 92, 72, 0.14);
+}
+
+.forge-report-builder__category-chip.is-semantic-provider-invalid .forge-report-builder__category-chip-icon {
+    background: rgba(217, 130, 43, 0.14);
 }
 
 .forge-report-builder__category-chip-label {
@@ -3753,6 +3849,23 @@
     flex: 0 0 auto;
 }
 
+.forge-report-builder__result-state-icon-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.forge-report-builder__result-state-icon.is-animated {
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 0 0 rgba(29, 78, 216, 0.18);
+    animation: forge-report-builder-result-state-pulse 1.8s ease-in-out infinite;
+}
+
+.forge-report-builder__result-state-icon.is-animated .forge-report-builder__result-state-icon-glyph {
+    animation: forge-report-builder-result-state-orbit 1.5s ease-in-out infinite;
+}
+
 .forge-report-builder__result-state--warning .forge-report-builder__result-state-icon {
     background: #fff0d8;
     color: #a16207;
@@ -3766,6 +3879,52 @@
 .forge-report-builder__result-state-copy {
     min-width: 0;
     flex: 1 1 auto;
+}
+
+@keyframes forge-report-builder-result-state-orbit {
+    0% {
+        transform: translate(0, 0) rotate(0deg) scale(1);
+    }
+    20% {
+        transform: translate(3px, -2px) rotate(72deg) scale(1.04);
+    }
+    40% {
+        transform: translate(-2px, -3px) rotate(144deg) scale(0.98);
+    }
+    60% {
+        transform: translate(-3px, 2px) rotate(216deg) scale(1.03);
+    }
+    80% {
+        transform: translate(2px, 3px) rotate(288deg) scale(0.99);
+    }
+    100% {
+        transform: translate(0, 0) rotate(360deg) scale(1);
+    }
+}
+
+@keyframes forge-report-builder-result-state-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(29, 78, 216, 0.12);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(29, 78, 216, 0.04);
+        transform: scale(1.03);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .forge-report-builder__result-state-icon.is-animated {
+        animation: none;
+        box-shadow: 0 0 0 0 rgba(29, 78, 216, 0.12);
+        transform: none;
+    }
+
+    .forge-report-builder__result-state-icon.is-animated .forge-report-builder__result-state-icon-glyph {
+        animation: none;
+        transform: none;
+    }
 }
 
 .forge-report-builder__result-state-eyebrow {
@@ -3863,6 +4022,13 @@
 
 .forge-report-builder__compact-summary-chips::-webkit-scrollbar {
     display: none;
+}
+
+.forge-report-builder__compact-summary-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
 }
 
 .forge-report-builder__compact-summary-chip {

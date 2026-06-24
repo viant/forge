@@ -55,7 +55,7 @@ const config = {
   },
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["available_impressions"],
@@ -92,7 +92,7 @@ const rows = [
 
 const semanticSummary = {
   kind: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -102,6 +102,25 @@ const semanticSummary = {
   ],
   selectedMeasures: [
     { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
+  ],
+};
+
+const semanticModel = {
+  modelRef: "model://example/performance/delivery@v1",
+  version: 1,
+  label: "Canonical Ad Delivery",
+  entities: [
+    {
+      id: "line_delivery",
+      label: "Canonical Line Delivery",
+      dimensions: [
+        { id: "event_date", label: "Canonical Delivery Date" },
+        { id: "channel", label: "Canonical Channel" },
+      ],
+      measures: [
+        { id: "available_impressions", label: "Canonical Available Impressions", format: "compactNumber" },
+      ],
+    },
   ],
 };
 
@@ -182,8 +201,25 @@ assert.equal(authored.runtimeBlock.kind, "dashboard.reportRuntime");
 assert.equal(authored.runtimeBlock.dashboard.reportRuntime.reportPrint.kind, "reportPrint");
 assert.equal(authored.runtimeBlock.dashboard.reportRuntime.reportSpec.title, "Preview Report");
 assert.equal(authored.runtimeBlock.dashboard.reportRuntime.reportSpec.semanticSummary.entityLabel, "Line Delivery");
+assert.equal(authored.semanticBindingViewState.title, "Semantic Binding");
+assert.equal(authored.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.title, "Semantic Binding");
+assert.equal(authored.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.chips.includes("Measures Available Impressions"), true);
 assert.equal(authored.runtimeBlock.dashboard.reportRuntime.reportFill.blocks[0].kind, "filterBarBlock");
 assert.equal(authored.runtimeBlock.dashboard.reportRuntime.reportFill.blocks[4].kind, "kpiBlock");
+
+const authoredFromSemanticModel = buildPreviewAuthoredReport({
+  container,
+  config,
+  state,
+  rows,
+  binding: config.binding,
+  semanticModel,
+});
+assert.equal(authoredFromSemanticModel.reportSpec.semanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(authoredFromSemanticModel.reportSpec.semanticSummary.entityLabel, "Canonical Line Delivery");
+assert.deepEqual(authoredFromSemanticModel.reportSpec.semanticSummary.selectedDimensions, []);
+assert.deepEqual(authoredFromSemanticModel.reportSpec.semanticSummary.selectedMeasures, []);
+assert.equal(authoredFromSemanticModel.runtimeBlock.dashboard.reportRuntime.reportSpec.semanticSummary.modelLabel, "Canonical Ad Delivery");
 
 const refinedAuthored = buildPreviewAuthoredReport({
   container,
@@ -264,7 +300,7 @@ const drilledAuthored = buildPreviewAuthoredReport({
   ],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
     navigationMode: "hostRoute",
     parameters: {
       channel: "Display",
@@ -314,7 +350,7 @@ assert.deepEqual(drilledAuthored.reportFill.diagnostics, [
 ]);
 assert.deepEqual(drilledAuthored.runtimeBlock.dashboard.reportRuntime.hostIntent, {
   intentKind: "detailTarget",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",

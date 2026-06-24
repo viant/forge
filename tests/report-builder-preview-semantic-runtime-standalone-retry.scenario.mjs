@@ -1,0 +1,87 @@
+import { buildPreviewBootstrapSteps } from "./report-builder-preview-scenario-builders.mjs";
+
+export default {
+  baseUrl: "http://127.0.0.1:5175",
+  viewport: {
+    width: 1280,
+    height: 960,
+  },
+  steps: [
+    ...buildPreviewBootstrapSteps(),
+    {
+      type: "clickSelector",
+      selector: ".forge-report-builder__chart-action-button--quick",
+    },
+    {
+      type: "clickSelectorContains",
+      selector: "[role=\"menuitem\"]",
+      text: "Inventory · Top Channels",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Inventory · Top Channels",
+      timeoutMs: 60000,
+    },
+    {
+      type: "eval",
+      expression: "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.applyStandaloneRuntimeRefinement && window.__REPORT_BUILDER_PREVIEW__.applyStandaloneRuntimeRefinement({ op: 'keep', field: 'channelV2', values: ['Display'], sourceBlockId: 'authoredRuntimePreview', label: 'Keep only = Display' });",
+    },
+    {
+      type: "waitForDomContains",
+      text: "Keep only = Display",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; return !!preview && (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'success').length > 0; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "eval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const requestFingerprint = preview?.getStandaloneRuntimeRequestFingerprint?.(); if (!preview || !preview.replaceFetchBehaviors || !requestFingerprint) { return false; } preview.__standaloneRuntimeRetryBaseline = { requestFingerprint, errorCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'error').length, successCount: (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'success').length }; return preview.replaceFetchBehaviors([{ match: { type: 'runtimePreview', requestFingerprint }, error: 'Runtime preview fetch failed.' }]); })()",
+    },
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Run",
+      exact: true,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__standaloneRuntimeRetryBaseline; if (!preview || !baseline) { return false; } const errorCount = (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'error').length; return errorCount > baseline.errorCount; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-runtime-table-panel')); const panel = panels[panels.length - 1]; const panelText = panel?.innerText || panel?.textContent || ''; const pageText = document.body?.innerText || document.body?.textContent || ''; return panelText.includes('Runtime preview fetch failed.') && pageText.includes('Keep only = Display'); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "window.__REPORT_BUILDER_PREVIEW__ && window.__REPORT_BUILDER_PREVIEW__.fetchBehaviors && window.__REPORT_BUILDER_PREVIEW__.fetchBehaviors.length === 0",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Run",
+      exact: true,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; const baseline = preview?.__standaloneRuntimeRetryBaseline; if (!preview || !baseline) { return false; } const successCount = (preview.fetchEventHistory || []).filter((entry) => entry.type === 'runtimePreview' && entry.phase === 'success').length; return successCount > baseline.successCount; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const panels = Array.from(document.querySelectorAll('.forge-report-runtime-table-panel')); const panel = panels[panels.length - 1]; const panelText = (panel?.innerText || panel?.textContent || '').toLowerCase(); const pageText = document.body?.innerText || document.body?.textContent || ''; return !panelText.includes('runtime preview fetch failed.') && pageText.includes('Keep only = Display') && panelText.includes('display') && !panelText.includes('ctv'); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "screenshot",
+      file: "report-builder-preview-semantic-runtime-standalone-retry.png",
+      fullPage: true,
+    },
+  ],
+};

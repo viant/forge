@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import { buildStandaloneDashboardHtml } from '../src/core/ui/dashboardExport.js';
 
-const outputDir = path.resolve('/Users/awitas/go/src/github.com/viant/forge/output/mdp-diagnostics-replica');
+const outputDir = path.resolve(process.cwd(), 'output/mdp-diagnostics-replica');
 const outputFile = path.join(outputDir, 'index.html');
 
 const styles = `

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { buildDraftReportExportRequest } from "../reportExportRequestModel.js";
+import {
+  buildDraftReportExportRequest,
+  buildPublishedSnapshotReportExportRequest,
+  buildSavedReportExportRequest,
+  buildSavedViewReportExportRequest,
+} from "../reportExportRequestModel.js";
 import { buildReportBuilderReportSpec } from "../reportSpecModel.js";
 import { buildReportFillFromReportSpec } from "../reportFillModel.js";
 import { buildReportPrintFromReportFill } from "../reportPrintModel.js";
@@ -93,6 +98,10 @@ const reportFill = buildReportFillFromReportSpec(reportSpec, {
     ],
   },
 });
+const reportPrint = buildReportPrintFromReportFill({
+  reportSpec,
+  reportFill,
+});
 
 assert.deepEqual(validateReportSpec(reportSpec), {
   valid: true,
@@ -103,12 +112,18 @@ const semanticSummarySpec = {
   ...reportSpec,
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
     selectedDimensions: [
-      { id: "event_date", rawId: "eventDate", label: "Event Date" },
+      {
+        id: "event_date",
+        rawId: "eventDate",
+        label: "Event Date",
+        category: "Time",
+        definitionRef: "semantic://example/event_date",
+      },
     ],
     selectedMeasures: [
       {
@@ -116,10 +131,21 @@ const semanticSummarySpec = {
         rawId: "totalSpend",
         label: "Total Spend",
         format: "currency",
+        category: "Metrics",
+        definitionRef: "semantic://example/total_spend",
         governance: {
           status: "approved",
           certification: "certified",
         },
+      },
+    ],
+    selectedParameters: [
+      {
+        id: "reporting_window",
+        rawId: "dateRange",
+        label: "Reporting Window",
+        category: "Scope",
+        definitionRef: "semantic://example/reporting_window",
       },
     ],
   },
@@ -127,6 +153,271 @@ const semanticSummarySpec = {
 assert.deepEqual(validateReportSpec(semanticSummarySpec), {
   valid: true,
   errors: [],
+});
+
+const invalidCalculatedFieldKindSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "rankSpend",
+      key: "rankSpend",
+      kind: "rowCalc",
+      label: "Rank Spend",
+      dataType: "number",
+      dependencies: ["totalSpend"],
+      compute: {
+        type: "rank",
+        sourceField: "totalSpend",
+        orderBy: [
+          { field: "totalSpend", direction: "desc" },
+        ],
+        tieMode: "dense",
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidCalculatedFieldKindSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].kind",
+      code: "invalid",
+      message: "Calculated field kind 'rowCalc' does not match normalized kind 'tableCalc'.",
+    },
+  ],
+});
+
+const invalidCalculatedFieldDatasetRefSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "projectedLift",
+      key: "projectedLift",
+      kind: "rowCalc",
+      label: "Projected Lift",
+      dataType: "number",
+      datasetRef: "secondary",
+      dependencies: ["totalSpend"],
+      expr: "totalSpend + 1",
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidCalculatedFieldDatasetRefSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].datasetRef",
+      code: "unknownDatasetRef",
+      message: "Unknown datasetRef 'secondary'.",
+    },
+  ],
+});
+
+const invalidCalculatedFieldExpressionSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "badExpression",
+      key: "badExpression",
+      kind: "rowCalc",
+      label: "Bad Expression",
+      dataType: "number",
+      dependencies: [],
+      expr: "foo(totalSpend)",
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidCalculatedFieldExpressionSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].expr",
+      code: "invalidSyntax",
+      message: "Invalid calculated field expression at 0: unsupported function \"foo\"",
+    },
+  ],
+});
+
+const invalidTableCalculationComputeSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "badRank",
+      key: "badRank",
+      kind: "tableCalc",
+      label: "Bad Rank",
+      dataType: "number",
+      dependencies: [],
+      compute: {
+        type: "rank",
+        sourceField: "totalSpend",
+        orderBy: [
+          { field: "otherField", direction: "desc" },
+        ],
+        tieMode: "dense",
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidTableCalculationComputeSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].compute.orderBy[0].field",
+      code: "invalid",
+      message: "Rank table calculations must order first by their sourceField.",
+    },
+  ],
+});
+
+const invalidTableCalculationTieModeSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "badTieMode",
+      key: "badTieMode",
+      kind: "tableCalc",
+      label: "Bad Tie Mode",
+      dataType: "number",
+      dependencies: [],
+      compute: {
+        type: "rank",
+        sourceField: "totalSpend",
+        orderBy: [
+          { field: "totalSpend", direction: "desc" },
+        ],
+        tieMode: "sparse",
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidTableCalculationTieModeSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].compute.tieMode",
+      code: "invalid",
+      message: "Unsupported rank tieMode 'sparse'.",
+    },
+  ],
+});
+
+const invalidMovingAverageWindowSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "badMovingAverage",
+      key: "badMovingAverage",
+      kind: "tableCalc",
+      label: "Bad Moving Average",
+      dataType: "number",
+      dependencies: [],
+      compute: {
+        type: "movingAverage",
+        sourceField: "totalSpend",
+        orderBy: [
+          { field: "eventDate", direction: "asc" },
+        ],
+        windowSize: 0,
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidMovingAverageWindowSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].compute.windowSize",
+      code: "invalid",
+      message: "Moving average windowSize must be a positive integer.",
+    },
+  ],
+});
+
+const invalidRunningTotalOrderSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "badRunningTotal",
+      key: "badRunningTotal",
+      kind: "tableCalc",
+      label: "Bad Running Total",
+      dataType: "number",
+      dependencies: [],
+      compute: {
+        type: "runningTotal",
+        sourceField: "totalSpend",
+        orderBy: [],
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidRunningTotalOrderSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].compute.orderBy",
+      code: "required",
+      message: "runningTotal table calculations require at least one orderBy entry.",
+    },
+  ],
+});
+
+const invalidMovingAverageOrderSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "badMovingAverageOrder",
+      key: "badMovingAverageOrder",
+      kind: "tableCalc",
+      label: "Bad Moving Average Order",
+      dataType: "number",
+      dependencies: [],
+      compute: {
+        type: "movingAverage",
+        sourceField: "totalSpend",
+        orderBy: [],
+        windowSize: 3,
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidMovingAverageOrderSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].compute.orderBy",
+      code: "required",
+      message: "movingAverage table calculations require at least one orderBy entry.",
+    },
+  ],
+});
+
+const invalidPercentOfTotalSourceSpec = {
+  ...reportSpec,
+  calculatedFields: [
+    {
+      id: "badPercentOfTotal",
+      key: "badPercentOfTotal",
+      kind: "tableCalc",
+      label: "Bad Percent Of Total",
+      dataType: "number",
+      dependencies: [],
+      compute: {
+        type: "percentOfTotal",
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(invalidPercentOfTotalSourceSpec), {
+  valid: false,
+  errors: [
+    {
+      path: "$.calculatedFields[0].compute.sourceField",
+      code: "required",
+      message: "Percent-of-total table calculations require a sourceField.",
+    },
+  ],
 });
 
 assert.deepEqual(validateReportFill(reportFill), {
@@ -149,12 +440,184 @@ const exportRequest = buildDraftReportExportRequest({
   },
   reportSpec,
   reportFill,
-  reportPrint: printFixtures.raw.reportPrint,
+  reportPrint,
   format: "pdf",
 });
 assert.deepEqual(validateReportExportRequest(exportRequest), {
   valid: true,
   errors: [],
+});
+
+const savedPayloadExportRequest = buildSavedReportExportRequest({
+  savedReportPayload: {
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_performance_snapshot",
+    sourceArtifactId: "performance_snapshot",
+    title: "Performance Snapshot",
+    reportDocument: {
+      version: 1,
+      kind: "reportDocument",
+      id: "performanceSnapshot",
+      title: "Performance Snapshot",
+    },
+    reportSpec,
+  },
+  reportFill,
+  reportPrint,
+  documentVersion: 7,
+  format: "pdf",
+});
+assert.deepEqual(validateReportExportRequest(savedPayloadExportRequest), {
+  valid: true,
+  errors: [],
+});
+
+const savedViewExportRequest = buildSavedViewReportExportRequest({
+  savedView: {
+    id: "saved_view_capacity_q3",
+    kind: "reportBuilder.savedView",
+    title: "Capacity Q3 Saved View",
+    reportId: "capacityQ3",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
+  documentVersion: 8,
+  format: "pdf",
+});
+assert.deepEqual(validateReportExportRequest(savedViewExportRequest), {
+  valid: true,
+  errors: [],
+});
+
+const publishedSnapshotExportRequest = buildPublishedSnapshotReportExportRequest({
+  publishedSnapshot: {
+    id: "published_snapshot_capacity_q3",
+    kind: "reportBuilder.publishedSnapshot",
+    title: "Capacity Q3 Published Snapshot",
+    reportId: "capacityQ3",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
+  documentVersion: 9,
+  format: "pdf",
+});
+assert.deepEqual(validateReportExportRequest(publishedSnapshotExportRequest), {
+  valid: true,
+  errors: [],
+});
+
+const invalidSavedViewSourceContract = JSON.parse(JSON.stringify(savedViewExportRequest));
+delete invalidSavedViewSourceContract.source.sourceArtifactId;
+delete invalidSavedViewSourceContract.source.documentVersion;
+invalidSavedViewSourceContract.source.artifactKind = "reportBuilder.savedReportPayload";
+assert.deepEqual(validateReportExportRequest(invalidSavedViewSourceContract), {
+  valid: false,
+  errors: [
+    {
+      path: "$.source.artifactKind",
+      code: "invalidContract",
+      message: "Export source 'savedView' must use artifactKind 'reportBuilder.savedView'.",
+    },
+    {
+      path: "$.source.sourceArtifactId",
+      code: "required",
+      message: "Saved view export sources require a sourceArtifactId.",
+    },
+    {
+      path: "$.source.documentVersion",
+      code: "required",
+      message: "Saved view export sources require a documentVersion.",
+    },
+  ],
+});
+
+const invalidPublishedSnapshotSourceContract = JSON.parse(JSON.stringify(publishedSnapshotExportRequest));
+delete invalidPublishedSnapshotSourceContract.source.reportId;
+invalidPublishedSnapshotSourceContract.source.artifactKind = "reportBuilder.savedView";
+assert.deepEqual(validateReportExportRequest(invalidPublishedSnapshotSourceContract), {
+  valid: false,
+  errors: [
+    {
+      path: "$.source.artifactKind",
+      code: "invalidContract",
+      message: "Export source 'publishedSnapshot' must use artifactKind 'reportBuilder.publishedSnapshot'.",
+    },
+    {
+      path: "$.source.reportId",
+      code: "required",
+      message: "Published snapshot export sources require a reportId.",
+    },
+  ],
+});
+
+const invalidExportRequestFillConformance = JSON.parse(JSON.stringify(exportRequest));
+invalidExportRequestFillConformance.reportFill.specVersion = 99;
+invalidExportRequestFillConformance.reportFill.specHash = "fnv1a:deadbeef";
+invalidExportRequestFillConformance.reportFill.source.stateKey = "otherBuilder";
+assert.deepEqual(validateReportExportRequest(invalidExportRequestFillConformance), {
+  valid: false,
+  errors: [
+    {
+      path: "$.reportFill.specVersion",
+      code: "invalidContract",
+      message: "ReportFill specVersion must match reportSpec.version.",
+    },
+    {
+      path: "$.reportFill.specHash",
+      code: "invalidContract",
+      message: "ReportFill specHash must match reportSpec.",
+    },
+    {
+      path: "$.reportFill.source",
+      code: "invalidContract",
+      message: "ReportFill source must match reportSpec.source.",
+    },
+    {
+      path: "$.reportPrint.fillHash",
+      code: "invalidContract",
+      message: "ReportPrint fillHash must match reportFill.",
+    },
+  ],
+});
+
+const invalidExportRequestPrintConformance = JSON.parse(JSON.stringify(exportRequest));
+invalidExportRequestPrintConformance.reportPrint.specVersion = 2;
+invalidExportRequestPrintConformance.reportPrint.specHash = "fnv1a:deadbeef";
+invalidExportRequestPrintConformance.reportPrint.fillVersion = 2;
+invalidExportRequestPrintConformance.reportPrint.fillHash = "fnv1a:feedface";
+invalidExportRequestPrintConformance.reportPrint.source.stateKey = "otherBuilder";
+assert.deepEqual(validateReportExportRequest(invalidExportRequestPrintConformance), {
+  valid: false,
+  errors: [
+    {
+      path: "$.reportPrint.specVersion",
+      code: "invalidContract",
+      message: "ReportPrint specVersion must match reportSpec.version.",
+    },
+    {
+      path: "$.reportPrint.specHash",
+      code: "invalidContract",
+      message: "ReportPrint specHash must match reportSpec.",
+    },
+    {
+      path: "$.reportPrint.fillVersion",
+      code: "invalidContract",
+      message: "ReportPrint fillVersion must match reportFill.version.",
+    },
+    {
+      path: "$.reportPrint.fillHash",
+      code: "invalidContract",
+      message: "ReportPrint fillHash must match reportFill.",
+    },
+    {
+      path: "$.reportPrint.source",
+      code: "invalidContract",
+      message: "ReportPrint source must match reportSpec.source.",
+    },
+  ],
 });
 
 const kpiSpec = {
@@ -196,6 +659,41 @@ const authoredLayoutSpec = {
   },
 };
 assert.deepEqual(validateReportSpec(authoredLayoutSpec), {
+  valid: true,
+  errors: [],
+});
+
+const authoredDetailTargetSpec = {
+  ...authoredLayoutSpec,
+  drillMetadata: {
+    hierarchies: [],
+    detailTargets: [
+      {
+        targetRef: "target://demo/date-detail-modal",
+        navigationMode: "modal",
+        title: "Date detail",
+        description: "Open the selected date detail in a modal.",
+        parameters: {
+          eventDate: "$value",
+        },
+      },
+    ],
+    fieldActions: [
+      {
+        fieldRef: "eventDate",
+        actions: [
+          {
+            id: "detail:eventDate:target:_demo_date-detail-modal",
+            label: "Show date details",
+            kind: "detail",
+            targetRef: "target://demo/date-detail-modal",
+          },
+        ],
+      },
+    ],
+  },
+};
+assert.deepEqual(validateReportSpec(authoredDetailTargetSpec), {
   valid: true,
   errors: [],
 });

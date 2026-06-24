@@ -1,11 +1,19 @@
 package pdf
 
 import (
+	"bytes"
+	"encoding/base64"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	"image/png"
+	_ "image/png"
 	"strings"
 
 	"codeberg.org/go-pdf/fpdf"
 	reportprint "github.com/viant/forge/backend/reporting/print"
+	_ "golang.org/x/image/webp"
 )
 
 type renderPlan struct {
@@ -25,6 +33,7 @@ type renderOperation struct {
 	text      *textPaintOperation
 	line      *linePaintOperation
 	rect      *reportRectPaintOperation
+	image     *imagePaintOperation
 	dataBar   *dataBarPaintOperation
 	labelPill *labelPillPaintOperation
 	svg       *svgRenderProgram
@@ -59,6 +68,13 @@ type reportRectPaintOperation struct {
 	strokeWidth float64
 	radius      float64
 	style       string
+}
+
+type imagePaintOperation struct {
+	box       reportprint.Box
+	imageType string
+	payload   []byte
+	cacheKey  string
 }
 
 type dataBarPaintOperation struct {
@@ -97,6 +113,7 @@ type svgLinePaintOperation struct {
 	y2          float64
 	stroke      string
 	strokeWidth float64
+	dashPattern []float64
 	opacity     float64
 }
 
@@ -106,6 +123,7 @@ type svgRectPaintOperation struct {
 	fillColor   string
 	strokeColor string
 	strokeWidth float64
+	dashPattern []float64
 	opacity     float64
 	style       string
 }
@@ -118,6 +136,7 @@ type svgCirclePaintOperation struct {
 	fillColor   string
 	strokeColor string
 	strokeWidth float64
+	dashPattern []float64
 	opacity     float64
 	style       string
 }
@@ -142,6 +161,7 @@ type svgPathPaintOperation struct {
 	fillColor   string
 	strokeColor string
 	strokeWidth float64
+	dashPattern []float64
 	opacity     float64
 	style       string
 }
@@ -242,17 +262,14 @@ func buildRenderOperation(element elementProgram) (*renderOperation, []RenderDia
 			svg:  svgProgram,
 		}, diagnostics
 	case "image":
-		return nil, []RenderDiagnostic{
-			{
-				Code:         "unsupportedReportPrintElement",
-				Severity:     "warning",
-				Path:         element.path,
-				Message:      "ReportPrint PDF renderer does not yet support image elements.",
-				SuggestedFix: "Add canonical image handling to the PDF renderer before exporting this print artifact.",
-				PageNumber:   element.pageNumber,
-				ElementID:    element.element.ID,
-			},
+		imageOperation, diagnostics := buildImagePaintOperation(element.element, element.pageNumber)
+		if imageOperation == nil {
+			return nil, diagnostics
 		}
+		return &renderOperation{
+			kind:  kind,
+			image: imageOperation,
+		}, diagnostics
 	default:
 		return nil, []RenderDiagnostic{
 			{
@@ -266,6 +283,141 @@ func buildRenderOperation(element elementProgram) (*renderOperation, []RenderDia
 			},
 		}
 	}
+}
+
+func buildImagePaintOperation(element reportprint.Element, pageNumber int) (*imagePaintOperation, []RenderDiagnostic) {
+	imageType := resolveReportPrintImageType(element.Image)
+	if imageType == "" {
+		return nil, []RenderDiagnostic{
+			{
+				Code:         "unsupportedReportPrintImageMimeType",
+				Severity:     "warning",
+				Message:      fmt.Sprintf("ReportPrint PDF renderer does not support image mime type %s.", strings.TrimSpace(element.Image.MimeType)),
+				SuggestedFix: "Use a canonical PNG, JPEG, GIF, or WebP image payload before exporting this print artifact.",
+				PageNumber:   pageNumber,
+				ElementID:    element.ID,
+			},
+		}
+	}
+	payload, err := decodeReportPrintImagePayload(element.Image)
+	if err != nil {
+		return nil, []RenderDiagnostic{
+			{
+				Code:         "invalidReportPrintImagePayload",
+				Severity:     "warning",
+				Message:      fmt.Sprintf("ReportPrint PDF renderer could not decode image payload: %v", err),
+				SuggestedFix: "Ensure the canonical image payload is valid base64 data before exporting this print artifact.",
+				PageNumber:   pageNumber,
+				ElementID:    element.ID,
+			},
+		}
+	}
+	if err := validateReportPrintImagePayload(imageType, payload); err != nil {
+		return nil, []RenderDiagnostic{
+			{
+				Code:         "invalidReportPrintImagePayload",
+				Severity:     "warning",
+				Message:      fmt.Sprintf("ReportPrint PDF renderer could not validate image payload: %v", err),
+				SuggestedFix: "Ensure the canonical image payload matches the declared PNG, JPEG, GIF, or WebP type before exporting this print artifact.",
+				PageNumber:   pageNumber,
+				ElementID:    element.ID,
+			},
+		}
+	}
+	imageType, payload, err = canonicalizeReportPrintImagePayload(imageType, payload)
+	if err != nil {
+		return nil, []RenderDiagnostic{
+			{
+				Code:         "invalidReportPrintImagePayload",
+				Severity:     "warning",
+				Message:      fmt.Sprintf("ReportPrint PDF renderer could not canonicalize image payload: %v", err),
+				SuggestedFix: "Ensure the canonical image payload can be decoded before exporting this print artifact.",
+				PageNumber:   pageNumber,
+				ElementID:    element.ID,
+			},
+		}
+	}
+	return &imagePaintOperation{
+		box:       element.Box,
+		imageType: imageType,
+		payload:   payload,
+		cacheKey:  fmt.Sprintf("%s_page_%d", strings.TrimSpace(element.ID), pageNumber),
+	}, nil
+}
+
+func resolveReportPrintImageType(image *reportprint.Image) string {
+	normalized := strings.ToLower(strings.TrimSpace(image.MimeType))
+	if strings.Contains(normalized, ";") {
+		normalized = strings.TrimSpace(strings.SplitN(normalized, ";", 2)[0])
+	}
+	switch normalized {
+	case "image/png", "png":
+		return "png"
+	case "image/jpeg", "image/jpg", "jpeg", "jpg":
+		return "jpg"
+	case "image/gif", "gif":
+		return "gif"
+	case "image/webp", "webp":
+		return "webp"
+	default:
+		return ""
+	}
+}
+
+func decodeReportPrintImagePayload(image *reportprint.Image) ([]byte, error) {
+	payload := strings.TrimSpace(image.Payload)
+	if payload == "" {
+		return nil, fmt.Errorf("image payload is empty")
+	}
+	if strings.HasPrefix(strings.ToLower(payload), "data:") {
+		parts := strings.SplitN(payload, ",", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("data URI payload is malformed")
+		}
+		payload = strings.TrimSpace(parts[1])
+	}
+	decoded, err := base64.StdEncoding.DecodeString(payload)
+	if err == nil {
+		return decoded, nil
+	}
+	decoded, rawErr := base64.RawStdEncoding.DecodeString(payload)
+	if rawErr == nil {
+		return decoded, nil
+	}
+	return nil, err
+}
+
+func validateReportPrintImagePayload(imageType string, payload []byte) error {
+	if len(payload) == 0 {
+		return fmt.Errorf("image payload is empty")
+	}
+	_, format, err := image.DecodeConfig(bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	normalizedFormat := strings.ToLower(strings.TrimSpace(format))
+	if normalizedFormat == "jpeg" {
+		normalizedFormat = "jpg"
+	}
+	if normalizedFormat != imageType {
+		return fmt.Errorf("decoded image format %s does not match declared type %s", normalizedFormat, imageType)
+	}
+	return nil
+}
+
+func canonicalizeReportPrintImagePayload(imageType string, payload []byte) (string, []byte, error) {
+	if imageType != "webp" {
+		return imageType, payload, nil
+	}
+	decoded, _, err := image.Decode(bytes.NewReader(payload))
+	if err != nil {
+		return "", nil, err
+	}
+	buffer := new(bytes.Buffer)
+	if err := png.Encode(buffer, decoded); err != nil {
+		return "", nil, err
+	}
+	return "png", buffer.Bytes(), nil
 }
 
 func buildTextPaintOperation(element reportprint.Element, defaultVerticalAlign string) *textPaintOperation {

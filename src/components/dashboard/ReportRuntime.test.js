@@ -14,6 +14,19 @@ const reportSpec = {
     orderField: "eventDate",
     orderDir: "asc",
   },
+  scope: {
+    params: [
+      {
+        id: "dateRange",
+        label: "Reporting Window",
+        description: "Approved reporting window for semantic preview.",
+        value: {
+          start: "2026-05-01",
+          end: "2026-05-07",
+        },
+      },
+    ],
+  },
   layoutIntent: {
     blockOrder: [],
     items: [],
@@ -22,7 +35,7 @@ const reportSpec = {
   datasets: [],
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     modelDescription: "Governed reporting model for the report builder preview.",
     entity: "line_delivery",
@@ -33,15 +46,19 @@ const reportSpec = {
         id: "event_date",
         rawId: "eventDate",
         label: "Delivery Date",
+        category: "Time",
         description: "Daily delivery grain",
       },
       {
         id: "channel",
         rawId: "channelV2",
         label: "Channel",
+        category: "Delivery",
+        definitionRef: "semantic://example/channel",
         description: "Approved buying channel",
         governance: {
           status: "deprecated",
+          ownerRef: "team://example/performance",
         },
       },
     ],
@@ -50,12 +67,24 @@ const reportSpec = {
         id: "available_impressions",
         rawId: "avails",
         label: "Available Impressions",
+        category: "Metrics",
         description: "Certified available inventory",
         format: "compactNumber",
         governance: {
           status: "draft",
           certification: "certified",
+          ownerRef: "team://example/performance",
         },
+      },
+    ],
+    selectedParameters: [
+      {
+        id: "reporting_window",
+        rawId: "dateRange",
+        label: "Reporting Window",
+        category: "Scope",
+        definitionRef: "semantic://example/reporting_window",
+        description: "Approved reporting window for semantic preview.",
       },
     ],
   },
@@ -95,12 +124,24 @@ assert.ok(html.includes("Governed reporting model for the report builder preview
 assert.ok(html.includes("Daily delivery grain approved for reporting."));
 assert.ok(html.includes("Selected dimensions (2)"));
 assert.ok(html.includes("Delivery Date"));
+assert.ok(html.includes("Time"));
 assert.ok(html.includes("Daily delivery grain"));
+assert.ok(html.includes("semantic://example/channel"));
 assert.ok(html.includes("Dimensions Delivery Date, Channel"));
 assert.ok(html.includes("Measures Available Impressions"));
+assert.ok(html.includes("Parameters Reporting Window"));
+assert.ok(html.includes("Categories Time, Delivery +2"));
+assert.ok(html.includes("Owner team://example/performance"));
+assert.ok(html.includes("Lineage semantic://example/channel +1"));
 assert.ok(html.includes("Selected measures (1)"));
+assert.ok(html.includes("Selected parameters (1)"));
+assert.ok(html.includes("Reporting Window"));
+assert.ok(html.includes("Approved reporting window for semantic preview."));
+assert.ok(html.includes("Shared scope parameters compiled into this runtime artifact."));
+assert.ok(html.includes("2026-05-01 to 2026-05-07"));
 assert.ok(html.includes("Certified available inventory"));
 assert.ok(html.includes("Certified"));
+assert.ok(html.includes("Owner team://example/performance"));
 assert.ok(html.includes("1 deprecated"));
 assert.ok(html.includes("1 draft"));
 assert.ok(html.includes("Runtime Diagnostics"));
@@ -120,9 +161,22 @@ const bindingOnlyHtml = renderToStaticMarkup(
       },
       blocks: [],
       datasets: [],
+      scope: {
+        params: [
+          {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for semantic preview.",
+            value: {
+              start: "2026-05-01",
+              end: "2026-05-07",
+            },
+          },
+        ],
+      },
       binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["available_impressions", "household_uniques"],
@@ -136,13 +190,16 @@ const bindingOnlyHtml = renderToStaticMarkup(
     title: "Runtime Preview",
   }),
 );
-assert.ok(bindingOnlyHtml.includes("Model model://steward/performance/ad_delivery@v1"));
+assert.ok(bindingOnlyHtml.includes("Model model://example/performance/delivery@v1"));
 assert.ok(bindingOnlyHtml.includes("Entity line_delivery"));
 assert.ok(bindingOnlyHtml.includes("Semantic Binding"));
 assert.ok(bindingOnlyHtml.includes("Selected dimensions (2)"));
 assert.ok(bindingOnlyHtml.includes("Selected measures (2)"));
 assert.ok(bindingOnlyHtml.includes("Dimensions event_date, channel"));
 assert.ok(bindingOnlyHtml.includes("Measures available_impressions, household_uniques"));
+assert.ok(bindingOnlyHtml.includes("Report Scope"));
+assert.ok(bindingOnlyHtml.includes("Reporting Window"));
+assert.ok(bindingOnlyHtml.includes("2026-05-01 to 2026-05-07"));
 
 const emptySummaryBindingFallbackHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -156,14 +213,14 @@ const emptySummaryBindingFallbackHtml = renderToStaticMarkup(
       datasets: [],
       binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["available_impressions", "household_uniques"],
       },
       semanticSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -196,14 +253,14 @@ const mixedSummaryBindingFallbackHtml = renderToStaticMarkup(
       datasets: [],
       binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["available_impressions", "household_uniques"],
       },
       semanticSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -246,14 +303,14 @@ const mixedMeasureSummaryBindingFallbackHtml = renderToStaticMarkup(
       datasets: [],
       binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["available_impressions", "household_uniques"],
       },
       semanticSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -296,7 +353,7 @@ const overflowBindingHtml = renderToStaticMarkup(
       datasets: [],
       binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel", "country_code"],
         selectedMeasures: ["available_impressions", "household_uniques", "reach_rate"],
@@ -325,7 +382,7 @@ const overflowSemanticSummaryHtml = renderToStaticMarkup(
       datasets: [],
       semanticSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -401,7 +458,7 @@ const overflowSemanticSummaryPlusTwoHtml = renderToStaticMarkup(
       datasets: [],
       semanticSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -474,6 +531,72 @@ assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("Dimensions Delivery Date,
 assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("Measures Available Impressions, Household Uniques +2"));
 assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("2 deprecated"));
 assert.ok(overflowSemanticSummaryPlusTwoHtml.includes("1 draft"));
+
+const scopeFilterHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Scope Runtime Report",
+      layoutIntent: {
+        blockOrder: ["sharedFilters"],
+        items: [{ blockId: "sharedFilters" }],
+      },
+      scope: {
+        dataSourceRef: "demoReportSource",
+        params: [
+          {
+            id: "dateRange",
+            kind: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for semantic preview.",
+            required: true,
+            value: {
+              start: "2026-05-01",
+              end: "2026-05-07",
+            },
+          },
+        ],
+      },
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          title: "Report Scope",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          content: {
+            title: "Report Scope",
+            params: [
+              {
+                id: "dateRange",
+                label: "Reporting Window",
+                description: "Approved reporting window for semantic preview.",
+                value: {
+                  start: "2026-05-01",
+                  end: "2026-05-07",
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(scopeFilterHtml.includes("Report Scope"));
+assert.ok(scopeFilterHtml.includes("Reporting Window"));
+assert.ok(scopeFilterHtml.includes("2026-05-01 to 2026-05-07"));
+assert.ok(scopeFilterHtml.includes("Approved reporting window for semantic preview."));
+assert.equal((scopeFilterHtml.match(/Report Scope/g) || []).length, 1);
 
 const emptyRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -1099,5 +1222,207 @@ assert.ok(redoButton);
 assert.equal(redoButton.props.disabled, true);
 redoButton.props.onClick();
 assert.equal(redoCalls, 0);
+
+const readOnlyImportedRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Imported Runtime Report",
+      layoutIntent: {
+        blockOrder: ["primaryTable", "primaryChart"],
+        items: [{ blockId: "primaryTable" }, { blockId: "primaryChart" }],
+      },
+      blocks: [
+        {
+          id: "primaryTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          columns: [
+            { key: "channelV2", sourceKey: "channelV2", displayKey: "channelV2", label: "Channel", kind: "dimension" },
+            { key: "avails", sourceKey: "avails", displayKey: "avails", label: "Avails", kind: "measure" },
+          ],
+        },
+        {
+          id: "primaryChart",
+          kind: "chartBlock",
+          datasetRef: "primary",
+          chartSpec: {
+            title: "Channel Trend",
+            type: "line",
+            xField: "eventDate",
+            yFields: ["avails"],
+          },
+          chartModel: {
+            type: "line",
+            xAxis: {
+              dataKey: "eventDate",
+            },
+            yAxis: {},
+            series: {
+              valueKey: "avails",
+              values: [{ value: "avails", label: "Avails", type: "line" }],
+            },
+          },
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {
+            dimensions: {
+              channelV2: true,
+              eventDate: true,
+            },
+          },
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          rows: [
+            { channelV2: "Display", eventDate: "2026-05-01", avails: 120000 },
+          ],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "primaryTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          content: {
+            columns: [
+              { key: "channelV2", sourceKey: "channelV2", displayKey: "channelV2", label: "Channel", kind: "dimension" },
+              { key: "avails", sourceKey: "avails", displayKey: "avails", label: "Avails", kind: "measure" },
+            ],
+            resolvedRows: [
+              {
+                rowIndex: 0,
+                cells: [
+                  { key: "channelV2", displayKey: "channelV2", value: "Display", displayValue: "Display" },
+                  { key: "avails", displayKey: "avails", value: 120000, displayValue: 120000 },
+                ],
+              },
+            ],
+          },
+        },
+        {
+          id: "primaryChart",
+          kind: "chartBlock",
+          datasetRef: "primary",
+          content: {
+            chartSpec: {
+              title: "Channel Trend",
+              type: "line",
+              xField: "eventDate",
+              yFields: ["avails"],
+            },
+            chartModel: {
+              type: "line",
+              xAxis: {
+                dataKey: "eventDate",
+              },
+              yAxis: {},
+              series: {
+                valueKey: "avails",
+                values: [{ value: "avails", label: "Avails", type: "line" }],
+              },
+            },
+          },
+        },
+      ],
+    },
+    title: "Imported Runtime Preview",
+    runtimeHandlers: null,
+  }),
+);
+assert.ok(readOnlyImportedRuntimeHtml.includes("Chart actions are unavailable because this runtime preview is read-only."));
+assert.ok(!readOnlyImportedRuntimeHtml.includes("Click a chart mark to apply authored runtime actions."));
+assert.ok(!readOnlyImportedRuntimeHtml.includes(">Actions<"));
+assert.ok(!readOnlyImportedRuntimeHtml.includes("Keep Channel"));
+assert.ok(!readOnlyImportedRuntimeHtml.includes("Exclude Channel"));
+
+const documentBackedRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Thin Runtime Spec",
+      layoutIntent: {
+        blockOrder: [],
+        items: [],
+      },
+      blocks: [],
+      datasets: [],
+      scope: {
+        params: [],
+      },
+      semanticSummary: {
+        kind: "semantic",
+        selectedDimensions: [],
+        selectedMeasures: [],
+      },
+    },
+    reportDocument: {
+      title: "Document Backed Runtime",
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://example/audience/performance@v1",
+        modelLabel: "Audience Performance",
+        entity: "audience_segment",
+        entityLabel: "Audience Segment",
+        selectedDimensions: [
+          {
+            id: "audience_segment",
+            rawId: "audienceSegment",
+            label: "Audience Segment",
+          },
+        ],
+        selectedMeasures: [
+          {
+            id: "audience_index",
+            rawId: "audienceIndex",
+            label: "Audience Index",
+          },
+        ],
+        selectedParameters: [
+          {
+            id: "reporting_window",
+            rawId: "dateRange",
+            label: "Reporting Window",
+          },
+        ],
+      },
+      scope: {
+        params: [
+          {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Recovered from the embedded runtime document.",
+            value: {
+              start: "2026-06-01",
+              end: "2026-06-07",
+            },
+          },
+        ],
+      },
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [],
+    },
+  }),
+);
+assert.ok(documentBackedRuntimeHtml.includes("Document Backed Runtime"));
+assert.ok(documentBackedRuntimeHtml.includes("Model Audience Performance"));
+assert.ok(documentBackedRuntimeHtml.includes("Entity Audience Segment"));
+assert.ok(documentBackedRuntimeHtml.includes("Dimensions Audience Segment"));
+assert.ok(documentBackedRuntimeHtml.includes("Measures Audience Index"));
+assert.ok(documentBackedRuntimeHtml.includes("Parameters Reporting Window"));
+assert.ok(documentBackedRuntimeHtml.includes("Recovered from the embedded runtime document."));
+assert.ok(documentBackedRuntimeHtml.includes("2026-06-01 to 2026-06-07"));
 
 console.log("ReportRuntime ✓ renders semantic binding chips and actionable runtime diagnostics");

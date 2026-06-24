@@ -16,6 +16,7 @@ import (
 	"codeberg.org/go-pdf/fpdf"
 	pdfreader "github.com/ledongthuc/pdf"
 	"github.com/stretchr/testify/require"
+	reportexport "github.com/viant/forge/backend/reporting/export"
 	reportprint "github.com/viant/forge/backend/reporting/print"
 )
 
@@ -60,9 +61,9 @@ func TestRender_SupportedSubsetIsDeterministic(t *testing.T) {
 		FillHash:    "fnv1a:test-fill",
 		Source: reportprint.Source{
 			Kind:          "dashboard.reportBuilder",
-			ContainerID:   "forecastBuilder",
-			StateKey:      "forecastBuilder",
-			DataSourceRef: "forecasting_cube_report",
+			ContainerID:   "capacityBuilder",
+			StateKey:      "capacityBuilder",
+			DataSourceRef: "capacity_cube_report",
 		},
 		Title: "Supported Subset",
 		PageGeometry: reportprint.PageGeometry{
@@ -285,6 +286,7 @@ func TestRender_TableCellLabelPillsPreserveConfiguredTextStyle(t *testing.T) {
 						Box:             reportprint.Box{X: 42, Y: 136, Width: 90, Height: 18},
 						RowKey:          "row_1",
 						ColumnKey:       "status",
+						Tone:            "neutral",
 						Label:           "Tone Neutral",
 						BackgroundColor: "#eff6ff",
 						BorderColor:     "#bfdbfe",
@@ -608,7 +610,7 @@ func TestRender_UnsupportedImageProducesDiagnostic(t *testing.T) {
 						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
 						Image: &reportprint.Image{
 							MimeType: "image/png",
-							Payload:  "not-used-yet",
+							Payload:  tinyPNGBase64,
 						},
 					},
 				},
@@ -618,10 +620,160 @@ func TestRender_UnsupportedImageProducesDiagnostic(t *testing.T) {
 
 	result, err := Render(report, Options{})
 	require.NoError(t, err)
-	require.Len(t, result.Diagnostics, 1)
-	require.Equal(t, "unsupportedReportPrintElement", result.Diagnostics[0].Code)
-	require.Equal(t, "image_1", result.Diagnostics[0].ElementID)
-	require.Contains(t, result.Diagnostics[0].Message, "image elements")
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintImageMimeType"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "invalidReportPrintImagePayload"))
+}
+
+func TestRender_InvalidImagePayloadProducesDiagnostic(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "invalidImageBuilder",
+			StateKey:      "invalidImageBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Invalid Image",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "invalid_image",
+						Kind: "image",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
+						Image: &reportprint.Image{
+							MimeType: "image/png",
+							Payload:  "aGVsbG8=",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Len(t, findDiagnosticsByCode(result.Diagnostics, "invalidReportPrintImagePayload"), 1)
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
+}
+
+func TestRender_ImageWithMimeParametersProducesPDF(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "parameterizedImageBuilder",
+			StateKey:      "parameterizedImageBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Parameterized Image",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "image_with_params",
+						Kind: "image",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
+						Image: &reportprint.Image{
+							MimeType: "image/png;base64",
+							Payload:  tinyPNGBase64,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintImageMimeType"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "invalidReportPrintImagePayload"))
+}
+
+func TestRender_WebPImagesAreAccepted(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "webpImageBuilder",
+			StateKey:      "webpImageBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "WebP Image",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "webp_image",
+						Kind: "image",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
+						Image: &reportprint.Image{
+							MimeType: "image/webp",
+							Payload:  tinyWEBPBase64,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintImageMimeType"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "invalidReportPrintImagePayload"))
 }
 
 func TestRender_GeoFixtureMatchesPreviewVisibleLabels(t *testing.T) {
@@ -802,8 +954,7 @@ func TestRender_AuthoredLandscapeFixturePreservesPageSizeAndRightEdgeContent(t *
 
 	result, err := Render(report, Options{})
 	require.NoError(t, err)
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
+	require.Empty(t, result.Diagnostics)
 	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
 
 	inspected := inspectRenderedPDF(t, result.Bytes)
@@ -857,6 +1008,95 @@ func TestRender_AuthoredLandscapeFixtureChartSVGTextGeometry(t *testing.T) {
 	require.Equal(t, len(targets), matched)
 }
 
+func TestRender_AuthoredLandscapeExportRequestFixturePreservesPDFParity(t *testing.T) {
+	report := loadStandaloneExportRequestReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "authored-landscape-export-request-fixture.v1.json",
+		),
+	)
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
+
+	inspected := inspectRenderedPDF(t, result.Bytes)
+	require.Equal(t, 1, inspected.pageCount)
+	require.Contains(t, inspected.plainText, "Impressions")
+	require.Contains(t, inspected.plainText, "Channel Trend")
+	require.Contains(t, inspected.plainText, "2026-05-04")
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Impressions", 640))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "2026-05-04", 650))
+
+	expectedRuns := collectExpectedSVGTextRuns(report)
+	targets := map[string]bool{
+		"55.2K":      true,
+		"2026-05-04": true,
+		"Display":    true,
+		"CTV":        true,
+	}
+	matched := 0
+	for _, expected := range expectedRuns {
+		if !targets[strings.TrimSpace(expected.Text)] {
+			continue
+		}
+		require.Truef(
+			t,
+			hasMatchingPDFTextRun(inspected.pageRuns[expected.PageNumber], expected),
+			"missing export-request chart text geometry for page=%d text=%q x=%.2f y=%.2f size=%.2f",
+			expected.PageNumber,
+			expected.Text,
+			expected.X,
+			expected.Y,
+			expected.FontSize,
+		)
+		matched++
+	}
+	require.Equal(t, len(targets), matched)
+}
+
+func TestRender_AuthoredLandscapeExportRequestFixtureTranslatedPathGroupMovesChartPath(t *testing.T) {
+	report := loadStandaloneExportRequestReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "authored-landscape-export-request-fixture.v1.json",
+		),
+	)
+
+	mutateFirstSVGPathIntoTranslatedGroup(t, report, "channelTrend__svg_page_1", "translate(10,0)")
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+
+	contentStream := extractPDFContentStreams(t, result.Bytes)
+	require.True(t, hasMatchingMoveLine(contentStream, 98, 279.7391304347826, 532.6666666666667, 328))
+	require.False(t, hasMatchingMoveLine(contentStream, 88, 279.7391304347826, 522.6666666666667, 328))
+}
+
+func TestRender_AuthoredLandscapeFixtureTranslatedPathGroupMovesChartPath(t *testing.T) {
+	report := loadStandaloneFixtureReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "authored-landscape-report-print-fixture.v1.json",
+		),
+	)
+
+	mutateFirstSVGPathIntoTranslatedGroup(t, report, "channelTrend__svg_page_1", "translate(10,0)")
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+
+	contentStream := extractPDFContentStreams(t, result.Bytes)
+	require.True(t, hasMatchingMoveLine(contentStream, 98, 279.7391304347826, 532.6666666666667, 328))
+	require.False(t, hasMatchingMoveLine(contentStream, 88, 279.7391304347826, 522.6666666666667, 328))
+}
+
 func TestRender_AuthoredLandscapeGeoFixturePreservesPageSizeAndGeoSVGTextGeometry(t *testing.T) {
 	report := loadStandaloneFixtureReportPrint(
 		t,
@@ -868,8 +1108,7 @@ func TestRender_AuthoredLandscapeGeoFixturePreservesPageSizeAndGeoSVGTextGeometr
 
 	result, err := Render(report, Options{})
 	require.NoError(t, err)
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
+	require.Empty(t, result.Diagnostics)
 	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
 
 	inspected := inspectRenderedPDF(t, result.Bytes)
@@ -905,6 +1144,80 @@ func TestRender_AuthoredLandscapeGeoFixturePreservesPageSizeAndGeoSVGTextGeometr
 		matched++
 	}
 	require.Equal(t, len(targets), matched)
+}
+
+func TestRender_CapacityDirectSeriesExportRequestFixturePreservesPDFParity(t *testing.T) {
+	report := loadStandaloneExportRequestReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "capacity-direct-series-export-request-fixture.v1.json",
+		),
+	)
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
+
+	inspected := inspectRenderedPDF(t, result.Bytes)
+	require.Equal(t, 3, inspected.pageCount)
+	require.Contains(t, inspected.plainText, "Capacity KPI Blend Q3")
+	require.Contains(t, inspected.plainText, "Avails + HH Uniques by Date")
+	require.Contains(t, inspected.plainText, "Headline KPI")
+	require.Contains(t, inspected.plainText, "Delivery Comparison")
+	require.Contains(t, inspected.plainText, "2026-05-04")
+	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[2], "Avails + HH Uniques by Date", 30))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[2], "Headline KPI", 30))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[2], "Delivery Comparison", 30))
+
+	expectedRuns := collectExpectedSVGTextRuns(report)
+	targets := map[string]bool{
+		"78.4K":      true,
+		"52.3K":      true,
+		"2026-05-01": true,
+		"2026-05-04": true,
+	}
+	matchedTargets := map[string]bool{}
+	for _, expected := range expectedRuns {
+		targetText := strings.TrimSpace(expected.Text)
+		if !targets[targetText] || matchedTargets[targetText] {
+			continue
+		}
+		require.Truef(
+			t,
+			hasMatchingPDFTextRun(inspected.pageRuns[expected.PageNumber], expected),
+			"missing direct-series export-request chart text geometry for page=%d text=%q x=%.2f y=%.2f size=%.2f",
+			expected.PageNumber,
+			expected.Text,
+			expected.X,
+			expected.Y,
+			expected.FontSize,
+		)
+		matchedTargets[targetText] = true
+	}
+	require.Equal(t, len(targets), len(matchedTargets))
+}
+
+func TestRender_CapacityDirectSeriesExportRequestFixtureTranslatedPathGroupMovesChartPath(t *testing.T) {
+	report := loadStandaloneExportRequestReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "capacity-direct-series-export-request-fixture.v1.json",
+		),
+	)
+
+	mutateFirstSVGPathIntoTranslatedGroup(t, report, "primaryChart__svg_page_2", "translate(10,0)")
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+
+	contentStream := extractPDFContentStreams(t, result.Bytes)
+	require.True(t, hasMatchingMoveLine(contentStream, 98, 379.63265306122446, 315.33333333333337, 382.84693877551024))
+	require.False(t, hasMatchingMoveLine(contentStream, 88, 379.63265306122446, 305.33333333333337, 382.84693877551024))
 }
 
 func TestRender_AuthoredLandscapeMixedFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
@@ -1012,112 +1325,68 @@ func TestRender_AuthoredLandscapeMixedBuilderFixturePreservesLandscapeParityAcro
 	require.Equal(t, len(targets), len(matchedTargets))
 }
 
-func TestRender_ForecastInventoryLandscapeFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
+func TestRender_CapacityInventoryLandscapeFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
 	report := loadStandaloneFixtureReportPrint(
 		t,
 		filepath.Join(
 			"..", "..", "..", "..",
-			"src", "reporting", "fixtures", "forecast-inventory-landscape-report-print-fixture.v1.json",
+			"src", "reporting", "fixtures", "capacity-inventory-landscape-report-print-fixture.v1.json",
 		),
 	)
 
-	result, err := Render(report, Options{})
-	require.NoError(t, err)
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
-	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
-
-	inspected := inspectRenderedPDF(t, result.Bytes)
-	require.Equal(t, 2, inspected.pageCount)
-	require.Contains(t, inspected.plainText, "Forecasting Inventory Top Channels Q3")
-	require.Contains(t, inspected.plainText, "Available Impressions")
-	require.Contains(t, inspected.plainText, "Top Channel KPI")
-	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
-	page2 := inspected.pageStream[2]
-	require.True(t, hasMatchingPathBounds(page2, 152, 328, 736, 300, "f"))
-	require.True(t, hasMatchingPathBounds(page2, 152, 290, 661.52525, 262, "f"))
-
-	expectedRuns := collectExpectedSVGTextRuns(report)
-	targets := map[string]bool{
-		"158.4K":                true,
-		"138.2K":                true,
-		"Display":               true,
-		"CTV":                   true,
-		"Available Impressions": true,
-	}
-	matchedTargets := map[string]bool{}
-	for _, expected := range expectedRuns {
-		targetText := strings.TrimSpace(expected.Text)
-		if !targets[targetText] || matchedTargets[targetText] {
-			continue
-		}
-		require.Truef(
-			t,
-			hasMatchingPDFTextRun(inspected.pageRuns[expected.PageNumber], expected),
-			"missing forecast landscape text geometry for page=%d text=%q x=%.2f y=%.2f size=%.2f",
-			expected.PageNumber,
-			expected.Text,
-			expected.X,
-			expected.Y,
-			expected.FontSize,
-		)
-		matchedTargets[targetText] = true
-	}
-	require.Equal(t, len(targets), len(matchedTargets))
+	assertCapacityInventoryLandscapeParityAcrossPages(t, report)
 }
 
-func TestRender_ForecastLocationLandscapeFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
+func TestRender_CapacityInventoryExportRequestFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
+	report := loadStandaloneExportRequestReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "capacity-inventory-export-request-fixture.v1.json",
+		),
+	)
+
+	assertCapacityInventoryLandscapeParityAcrossPages(t, report)
+}
+
+func TestRender_CapacityLocationLandscapeFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
 	report := loadStandaloneFixtureReportPrint(
 		t,
 		filepath.Join(
 			"..", "..", "..", "..",
-			"src", "reporting", "fixtures", "forecast-location-landscape-report-print-fixture.v1.json",
+			"src", "reporting", "fixtures", "capacity-location-landscape-report-print-fixture.v1.json",
 		),
 	)
 
-	result, err := Render(report, Options{})
-	require.NoError(t, err)
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
-	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
-	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
+	assertCapacityLocationLandscapeParityAcrossPages(t, report)
+}
 
-	inspected := inspectRenderedPDF(t, result.Bytes)
-	require.Equal(t, 2, inspected.pageCount)
-	require.Contains(t, inspected.plainText, "Forecasting Locations Top Markets Q3")
-	require.Contains(t, inspected.plainText, "Available Impressions")
-	require.Contains(t, inspected.plainText, "Top Market KPI")
-	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
-	page2 := inspected.pageStream[2]
-	require.True(t, hasMatchingPathBounds(page2, 152, 352, 736, 324, "f"))
-	require.True(t, hasMatchingPathBounds(page2, 152, 314, 699.3808, 286, "f"))
+func TestRender_CapacityLocationExportRequestFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
+	report := loadStandaloneExportRequestReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "capacity-location-export-request-fixture.v1.json",
+		),
+	)
 
-	expectedRuns := collectExpectedSVGTextRuns(report)
-	targets := map[string]bool{
-		"153.1K":                true,
-		"143.5K":                true,
-		"US":                    true,
-		"CA":                    true,
-		"Available Impressions": true,
-	}
-	matchedTargets := map[string]bool{}
-	for _, expected := range expectedRuns {
-		targetText := strings.TrimSpace(expected.Text)
-		if !targets[targetText] || matchedTargets[targetText] {
-			continue
-		}
-		require.Truef(
-			t,
-			hasMatchingPDFTextRun(inspected.pageRuns[expected.PageNumber], expected),
-			"missing forecast location landscape text geometry for page=%d text=%q x=%.2f y=%.2f size=%.2f",
-			expected.PageNumber,
-			expected.Text,
-			expected.X,
-			expected.Y,
-			expected.FontSize,
-		)
-		matchedTargets[targetText] = true
-	}
-	require.Equal(t, len(targets), len(matchedTargets))
+	assertCapacityLocationLandscapeParityAcrossPages(t, report)
+}
+
+func TestRender_CapacityAudiencePDFExportFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
+	assertCapacityAudienceLandscapeParityAcrossPages(t, loadAudienceFixtureReportPrint(t))
+}
+
+func TestRender_CapacityAudienceExportRequestFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
+	report := loadStandaloneExportRequestReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "capacity-audience-export-request-fixture.v1.json",
+		),
+	)
+
+	assertCapacityAudienceLandscapeParityAcrossPages(t, report)
 }
 
 func TestRender_InvalidSVGReportsStructuredDiagnostic(t *testing.T) {
@@ -1702,7 +1971,7 @@ func TestRender_SVGGroupProducesExplicitDiagnostic(t *testing.T) {
 						ID:   "svg_group_style_1",
 						Kind: "svg",
 						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
-						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><g fill="#ff0000"><rect x="10" y="10" width="20" height="20" /></g></svg>`,
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><g transform="scale(2)"><rect x="10" y="10" width="20" height="20" /></g></svg>`,
 					},
 				},
 			},
@@ -1715,7 +1984,106 @@ func TestRender_SVGGroupProducesExplicitDiagnostic(t *testing.T) {
 	require.Equal(t, "unsupportedReportPrintSVGGroup", result.Diagnostics[0].Code)
 }
 
-func TestRender_SVGStyleAttributeProducesExplicitDiagnostic(t *testing.T) {
+func TestRender_SVGTranslateGroupProducesPDF(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "svgTranslateGroupBuilder",
+			StateKey:      "svgTranslateGroupBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "SVG Translate Group",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "translated_svg",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><g transform="translate(10,10)"><rect x="10" y="10" width="20" height="20" /></g></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGGroup"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
+}
+
+func TestRender_SVGTranslatePathGroupProducesPDF(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "svgTranslatePathGroupBuilder",
+			StateKey:      "svgTranslatePathGroupBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "SVG Translate Path Group",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "translated_svg_path",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><g transform="translate(10,10)"><path d="M10,10 L30,10" fill="none" stroke="#ff0000" stroke-width="2" /></g></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "invalidReportPrintSVGPath"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGGroup"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
+
+	contentStream := extractPDFContentStreams(t, result.Bytes)
+	require.Contains(t, contentStream, "1.000 0.000 0.000 RG")
+	require.True(t, hasMatchingMoveLine(contentStream, 56, 688, 76, 688))
+}
+
+func TestRender_SupportedSVGStyleAttributeProducesPDF(t *testing.T) {
 	report := &reportprint.ReportPrint{
 		Version:     1,
 		Kind:        "reportPrint",
@@ -1757,8 +2125,148 @@ func TestRender_SVGStyleAttributeProducesExplicitDiagnostic(t *testing.T) {
 
 	result, err := Render(report, Options{})
 	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGStyleAttribute"))
+}
+
+func TestRender_ReportsUnsupportedSVGStyleAttributeDiagnostic(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "svgStyleAttributeBuilder",
+			StateKey:      "svgStyleAttributeBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Unsupported SVG Style",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "svg_style_attr_unsupported",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><rect x="40" y="10" width="20" height="20" style="transform:scale(2)" /></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
 	require.Len(t, result.Diagnostics, 1)
 	require.Equal(t, "unsupportedReportPrintSVGStyleAttribute", result.Diagnostics[0].Code)
+}
+
+func TestRender_SVGStyleTranslateProducesPDF(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "svgStyleTranslateBuilder",
+			StateKey:      "svgStyleTranslateBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "SVG Style Translate",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "svg_style_translate",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><rect x="40" y="10" width="20" height="20" style="transform:translate(10px, 0);fill:#00ff00" /></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGStyleAttribute"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
+}
+
+func TestRender_SVGDashPatternProducesPDF(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "svgDashBuilder",
+			StateKey:      "svgDashBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "SVG Dash",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "svg_dash_1",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><line x1="10" y1="10" x2="200" y2="10" stroke="#ff0000" stroke-width="2" stroke-dasharray="4 2" /></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(result.Bytes, []byte("%PDF")))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGStyleAttribute"))
+	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
 }
 
 func TestRender_SVGDefaultFillStillRendersTextAndRect(t *testing.T) {
@@ -1927,6 +2435,57 @@ func loadStandaloneFixtureReportPrint(t *testing.T, relativePath string) *report
 	return report
 }
 
+func loadStandaloneExportRequestReportPrint(t *testing.T, relativePath string) *reportprint.ReportPrint {
+	t.Helper()
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	fixturePath := filepath.Join(filepath.Dir(filename), relativePath)
+	data, err := os.ReadFile(fixturePath)
+	require.NoError(t, err)
+	request, err := reportexport.DecodeJSON(data)
+	require.NoError(t, err)
+	require.NotNil(t, request.ReportPrintModel())
+	return request.ReportPrintModel()
+}
+
+func mutateFirstSVGPathIntoTranslatedGroup(t *testing.T, report *reportprint.ReportPrint, elementID string, transform string) {
+	t.Helper()
+	require.NotNil(t, report)
+	mutated := false
+	for pageIndex := range report.Pages {
+		for elementIndex := range report.Pages[pageIndex].Elements {
+			element := &report.Pages[pageIndex].Elements[elementIndex]
+			if element.ID != elementID || element.Kind != "svg" {
+				continue
+			}
+			pathStart := strings.Index(element.SVG, "<path ")
+			require.NotEqual(t, -1, pathStart)
+			pathEnd := strings.Index(element.SVG[pathStart:], "/>")
+			require.NotEqual(t, -1, pathEnd)
+			pathMarkup := element.SVG[pathStart : pathStart+pathEnd+2]
+			replacement := `<g transform="` + transform + `">` + pathMarkup + `</g>`
+			element.SVG = strings.Replace(element.SVG, pathMarkup, replacement, 1)
+			mutated = true
+			break
+		}
+		if mutated {
+			break
+		}
+	}
+	require.True(t, mutated)
+}
+
+func loadAudienceFixtureReportPrint(t *testing.T) *reportprint.ReportPrint {
+	t.Helper()
+	return loadStandaloneFixtureReportPrint(
+		t,
+		filepath.Join(
+			"..", "..", "..", "..",
+			"src", "reporting", "fixtures", "capacity-audience-landscape-report-print-fixture.v1.json",
+		),
+	)
+}
+
 func loadFixtureReportPrint(t *testing.T, variant string) *reportprint.ReportPrint {
 	t.Helper()
 
@@ -1984,6 +2543,139 @@ func findDiagnosticsByCode(diagnostics []RenderDiagnostic, code string) []Render
 		}
 	}
 	return result
+}
+
+func assertCapacityAudienceLandscapeParityAcrossPages(t *testing.T, report *reportprint.ReportPrint) {
+	t.Helper()
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
+
+	inspected := inspectRenderedPDF(t, result.Bytes)
+	require.Equal(t, 2, inspected.pageCount)
+	require.Contains(t, inspected.plainText, "Capacity Audience Segment Index Q3")
+	require.Contains(t, inspected.plainText, "Audience Index")
+	require.Contains(t, inspected.plainText, "Young Adults")
+	require.Contains(t, inspected.plainText, "Delivery Comparison")
+	require.Contains(t, inspected.plainText, "Headline KPI")
+	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Report Scope", 30))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Headline KPI", 30))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Delivery Comparison", 30))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Page 1", 700))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[2], "Page 2", 700))
+
+	page2 := inspected.pageStream[2]
+	page2Runs := inspected.pageRuns[2]
+	page2Rects := inspected.pageRects[2]
+
+	// Page 2 preserves the canonical comparison-table badges and data bars
+	// from the audience export artifact.
+	require.True(t, hasMatchingPDFRect(page2Rects, 402, 500, 535.77778, 484))
+	require.True(t, hasMatchingPDFRect(page2Rects, 582, 500, 718, 484))
+	require.True(t, hasMatchingPathBounds(page2, 222, 500, 291, 484, "B"))
+	require.True(t, hasMatchingPathBounds(page2, 222, 476, 263, 460, "B"))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "audienceSegmentFilter: Young Adults", 36))
+	require.True(t, hasPDFTextRunWithMinX(page2Runs, "Display", 230))
+	require.True(t, hasPDFTextRunWithMinX(page2Runs, "CTV", 230))
+	require.True(t, hasPDFTextRunWithMinX(page2Runs, "18000", 400))
+	require.True(t, hasPDFTextRunWithMinX(page2Runs, "7400", 580))
+}
+
+func assertCapacityInventoryLandscapeParityAcrossPages(t *testing.T, report *reportprint.ReportPrint) {
+	t.Helper()
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
+
+	inspected := inspectRenderedPDF(t, result.Bytes)
+	require.Equal(t, 2, inspected.pageCount)
+	require.Contains(t, inspected.plainText, "Capacity Inventory Top Channels Q3")
+	require.Contains(t, inspected.plainText, "Available Impressions")
+	require.Contains(t, inspected.plainText, "Top Channel KPI")
+	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
+	page1 := inspected.pageStream[1]
+	require.True(t, hasMatchingPathBounds(page1, 152, 304, 736, 276, "f"))
+	require.True(t, hasMatchingPathBounds(page1, 152, 266, 661.52525, 238, "f"))
+
+	expectedRuns := collectExpectedSVGTextRuns(report)
+	targets := map[string]bool{
+		"158.4K":                true,
+		"138.2K":                true,
+		"Display":               true,
+		"CTV":                   true,
+		"Available Impressions": true,
+	}
+	matchedTargets := map[string]bool{}
+	for _, expected := range expectedRuns {
+		targetText := strings.TrimSpace(expected.Text)
+		if !targets[targetText] || matchedTargets[targetText] {
+			continue
+		}
+		require.Truef(
+			t,
+			hasMatchingPDFTextRun(inspected.pageRuns[expected.PageNumber], expected),
+			"missing capacity inventory landscape text geometry for page=%d text=%q x=%.2f y=%.2f size=%.2f",
+			expected.PageNumber,
+			expected.Text,
+			expected.X,
+			expected.Y,
+			expected.FontSize,
+		)
+		matchedTargets[targetText] = true
+	}
+	require.Equal(t, len(targets), len(matchedTargets))
+}
+
+func assertCapacityLocationLandscapeParityAcrossPages(t *testing.T, report *reportprint.ReportPrint) {
+	t.Helper()
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+	require.Contains(t, string(result.Bytes), "/MediaBox [0 0 792.00 612.00]")
+
+	inspected := inspectRenderedPDF(t, result.Bytes)
+	require.Equal(t, 2, inspected.pageCount)
+	require.Contains(t, inspected.plainText, "Capacity Locations Top Markets Q3")
+	require.Contains(t, inspected.plainText, "Available Impressions")
+	require.Contains(t, inspected.plainText, "Top Market KPI")
+	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
+	page1 := inspected.pageStream[1]
+	require.True(t, hasMatchingPathBounds(page1, 152, 320, 736, 292, "f"))
+	require.True(t, hasMatchingPathBounds(page1, 152, 282, 699.3808, 254, "f"))
+
+	expectedRuns := collectExpectedSVGTextRuns(report)
+	targets := map[string]bool{
+		"153.1K":                true,
+		"143.5K":                true,
+		"US":                    true,
+		"CA":                    true,
+		"Available Impressions": true,
+	}
+	matchedTargets := map[string]bool{}
+	for _, expected := range expectedRuns {
+		targetText := strings.TrimSpace(expected.Text)
+		if !targets[targetText] || matchedTargets[targetText] {
+			continue
+		}
+		require.Truef(
+			t,
+			hasMatchingPDFTextRun(inspected.pageRuns[expected.PageNumber], expected),
+			"missing capacity location landscape text geometry for page=%d text=%q x=%.2f y=%.2f size=%.2f",
+			expected.PageNumber,
+			expected.Text,
+			expected.X,
+			expected.Y,
+			expected.FontSize,
+		)
+		matchedTargets[targetText] = true
+	}
+	require.Equal(t, len(targets), len(matchedTargets))
 }
 
 func extractPDFPlainText(t *testing.T, data []byte) (int, string) {

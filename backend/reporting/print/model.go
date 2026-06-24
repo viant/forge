@@ -109,6 +109,18 @@ type Diagnostic struct {
 	ElementID  string `json:"elementId,omitempty"`
 }
 
+var supportedElementKinds = map[string]struct{}{
+	"image":            {},
+	"line":             {},
+	"rect":             {},
+	"svg":              {},
+	"tableCellBadge":   {},
+	"tableCellDataBar": {},
+	"tableCellText":    {},
+	"tableCellTone":    {},
+	"text":             {},
+}
+
 func DecodeJSON(data []byte) (*ReportPrint, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
@@ -153,6 +165,9 @@ func (r *ReportPrint) Validate() error {
 	if r.PageGeometry.Width <= 0 || r.PageGeometry.Height <= 0 {
 		return fmt.Errorf("reportPrint.pageGeometry.width and height must be > 0")
 	}
+	if r.PageGeometry.MarginTop < 0 || r.PageGeometry.MarginRight < 0 || r.PageGeometry.MarginBottom < 0 || r.PageGeometry.MarginLeft < 0 || r.PageGeometry.HeaderHeight < 0 || r.PageGeometry.FooterHeight < 0 {
+		return fmt.Errorf("reportPrint.pageGeometry margins, headerHeight, and footerHeight must be >= 0")
+	}
 	if len(r.Pages) == 0 {
 		return fmt.Errorf("reportPrint.pages must not be empty")
 	}
@@ -170,6 +185,12 @@ func (r *ReportPrint) Validate() error {
 			return err
 		}
 	}
+	if err := validateBookmarks(r.Bookmarks); err != nil {
+		return err
+	}
+	if err := validateDiagnostics(r.Diagnostics); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -178,19 +199,26 @@ func validateElements(elements []Element, location string) error {
 		if strings.TrimSpace(element.ID) == "" {
 			return fmt.Errorf("%s[%d].id is required", location, index)
 		}
-		if strings.TrimSpace(element.Kind) == "" {
+		kind := strings.TrimSpace(element.Kind)
+		if kind == "" {
 			return fmt.Errorf("%s[%d].kind is required", location, index)
+		}
+		if _, ok := supportedElementKinds[kind]; !ok {
+			return fmt.Errorf("%s[%d].kind %q is not supported", location, index, kind)
+		}
+		if element.ZIndex != nil && *element.ZIndex < 0 {
+			return fmt.Errorf("%s[%d].zIndex must be >= 0", location, index)
 		}
 		if element.Box.Width < 0 || element.Box.Height < 0 || element.Box.X < 0 || element.Box.Y < 0 {
 			return fmt.Errorf("%s[%d].box values must be >= 0", location, index)
 		}
-		switch strings.TrimSpace(element.Kind) {
+		switch kind {
 		case "line":
 			if strings.TrimSpace(element.StrokeColor) == "" {
 				return fmt.Errorf("%s[%d].strokeColor is required for line elements", location, index)
 			}
-			if element.StrokeWidth <= 0 {
-				return fmt.Errorf("%s[%d].strokeWidth must be > 0 for line elements", location, index)
+			if element.StrokeWidth < 0 {
+				return fmt.Errorf("%s[%d].strokeWidth must be >= 0 for line elements", location, index)
 			}
 		case "text":
 			if strings.TrimSpace(element.Text) == "" {
@@ -201,12 +229,16 @@ func validateElements(elements []Element, location string) error {
 				return fmt.Errorf("%s[%d].rowKey, columnKey, and text are required for tableCellText elements", location, index)
 			}
 		case "tableCellDataBar":
-			if strings.TrimSpace(element.RowKey) == "" || strings.TrimSpace(element.ColumnKey) == "" {
-				return fmt.Errorf("%s[%d].rowKey and columnKey are required for tableCellDataBar elements", location, index)
+			if strings.TrimSpace(element.RowKey) == "" || strings.TrimSpace(element.ColumnKey) == "" || strings.TrimSpace(element.FillColor) == "" {
+				return fmt.Errorf("%s[%d].rowKey, columnKey, and fillColor are required for tableCellDataBar elements", location, index)
 			}
-		case "tableCellTone", "tableCellBadge":
+		case "tableCellTone":
+			if strings.TrimSpace(element.RowKey) == "" || strings.TrimSpace(element.ColumnKey) == "" || strings.TrimSpace(element.Tone) == "" || strings.TrimSpace(element.Label) == "" || strings.TrimSpace(element.BackgroundColor) == "" {
+				return fmt.Errorf("%s[%d].rowKey, columnKey, tone, label, and backgroundColor are required for tableCellTone elements", location, index)
+			}
+		case "tableCellBadge":
 			if strings.TrimSpace(element.RowKey) == "" || strings.TrimSpace(element.ColumnKey) == "" || strings.TrimSpace(element.Label) == "" {
-				return fmt.Errorf("%s[%d].rowKey, columnKey, and label are required for %s elements", location, index, strings.TrimSpace(element.Kind))
+				return fmt.Errorf("%s[%d].rowKey, columnKey, and label are required for tableCellBadge elements", location, index)
 			}
 		case "svg":
 			if strings.TrimSpace(element.SVG) == "" {
@@ -216,6 +248,39 @@ func validateElements(elements []Element, location string) error {
 			if element.Image == nil || strings.TrimSpace(element.Image.MimeType) == "" || strings.TrimSpace(element.Image.Payload) == "" {
 				return fmt.Errorf("%s[%d].image.mimeType and image.payload are required for image elements", location, index)
 			}
+		}
+	}
+	return nil
+}
+
+func validateBookmarks(bookmarks []Bookmark) error {
+	for index, bookmark := range bookmarks {
+		if strings.TrimSpace(bookmark.ID) == "" {
+			return fmt.Errorf("reportPrint.bookmarks[%d].id is required", index)
+		}
+		if strings.TrimSpace(bookmark.Title) == "" {
+			return fmt.Errorf("reportPrint.bookmarks[%d].title is required", index)
+		}
+		if bookmark.PageNumber < 1 {
+			return fmt.Errorf("reportPrint.bookmarks[%d].pageNumber must be >= 1", index)
+		}
+		if bookmark.Y < 0 {
+			return fmt.Errorf("reportPrint.bookmarks[%d].y must be >= 0", index)
+		}
+	}
+	return nil
+}
+
+func validateDiagnostics(diagnostics []Diagnostic) error {
+	for index, diagnostic := range diagnostics {
+		if strings.TrimSpace(diagnostic.Code) == "" {
+			return fmt.Errorf("reportPrint.diagnostics[%d].code is required", index)
+		}
+		if strings.TrimSpace(diagnostic.Severity) == "" {
+			return fmt.Errorf("reportPrint.diagnostics[%d].severity is required", index)
+		}
+		if strings.TrimSpace(diagnostic.Message) == "" {
+			return fmt.Errorf("reportPrint.diagnostics[%d].message is required", index)
 		}
 	}
 	return nil

@@ -36,6 +36,9 @@ export const BASE_ROWS = [
 export function buildPreviewRawRows(baseRows = BASE_ROWS) {
   return (Array.isArray(baseRows) ? baseRows : []).map((row, index) => ({
     ...row,
+    audienceIndex: row.agegroupId === "18-24"
+      ? (row.country === "US" ? 118 : 112)
+      : (row.channelV2 === "CTV" ? 101 : 96),
     siteType: resolvePreviewInventorySiteType(row),
     publisher: row.country === "US" ? "Acme Media" : "North Star Media",
     metrocode: row.country === "US"
@@ -48,6 +51,7 @@ export function buildPreviewRawRows(baseRows = BASE_ROWS) {
     campaign: row.agegroupId === "18-24" ? "Prospect Sprint" : "Family Reach",
     adOrder: row.channelV2 === "CTV" ? "Connected TV Burst" : "Display Always-On",
     audience: row.agegroupId === "18-24" ? "Young Adults" : "Established Adults",
+    audienceSegmentFilter: row.agegroupId === "18-24" ? "Young Adults" : "Established Adults",
     deal: row.channelV2 === "CTV" ? "Premium OTT Deal" : "Open Exchange",
     deviceType: index % 2 === 0 ? "Mobile" : "CTV",
     region: row.country === "US"

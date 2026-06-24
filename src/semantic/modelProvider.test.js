@@ -26,8 +26,8 @@ assert.deepEqual(validateSemanticModelProvider({ listModels() {} }), {
 
 const wrapped = createSemanticModelProvider(provider);
 assert.deepEqual(await wrapped.listModels("performance"), [{ namespace: "performance" }]);
-assert.deepEqual(await wrapped.getModel("model://steward/performance/ad_delivery@v1"), {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+assert.deepEqual(await wrapped.getModel("model://example/performance/delivery@v1"), {
+    modelRef: "model://example/performance/delivery@v1",
 });
 
 await assert.rejects(

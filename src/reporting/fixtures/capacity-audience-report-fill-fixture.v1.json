@@ -1,0 +1,1046 @@
+{
+  "version": 1,
+  "kind": "reportFill",
+  "specVersion": 1,
+  "specHash": "fnv1a:6c7cc6f9",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "demoReportBuilder",
+    "stateKey": "demoReportBuilder",
+    "dataSourceRef": "demoReportSource"
+  },
+  "parameters": {
+    "viewMode": "table",
+    "groupBy": "",
+    "pageSize": 50,
+    "orderField": "audienceIndex",
+    "orderDir": "desc"
+  },
+  "refinements": [],
+  "calculatedFields": [],
+  "datasets": [
+    {
+      "id": "primary",
+      "dataSourceRef": "demoReportSource",
+      "request": {
+        "measures": {
+          "audienceIndex": true,
+          "avails": true,
+          "hhUniqs": true
+        },
+        "dimensions": {
+          "country": true,
+          "channelV2": true,
+          "eventDate": true
+        },
+        "filters": {
+          "From": "2026-05-01",
+          "To": "2026-05-04",
+          "audienceSegmentFilter": [
+            "Young Adults"
+          ],
+          "from": "2026-05-01",
+          "to": "2026-05-04",
+          "audience_segment_filter": [
+            "Young Adults"
+          ]
+        },
+        "semanticSelection": {
+          "modelRef": "model://example/performance/delivery@v1",
+          "entity": "line_delivery",
+          "selection": {
+            "dimensions": [
+              "country_code"
+            ],
+            "measures": [
+              "audience_index"
+            ]
+          },
+          "refinements": [],
+          "parameters": {
+            "reporting_window": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            },
+            "audience_segment": [
+              "Young Adults"
+            ]
+          }
+        },
+        "limit": 50,
+        "offset": 0,
+        "orderBy": [
+          "audienceIndex desc"
+        ]
+      },
+      "provenance": {
+        "requestHash": "fnv1a:6480cc09",
+        "rowCount": 8,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "country": "US",
+          "channelV2": "Display",
+          "eventDate": "2026-05-01",
+          "audienceIndex": 118,
+          "avails": 18000,
+          "hhUniqs": 7400
+        },
+        {
+          "country": "US",
+          "channelV2": "CTV",
+          "eventDate": "2026-05-01",
+          "audienceIndex": 118,
+          "avails": 14200,
+          "hhUniqs": 6100
+        },
+        {
+          "country": "US",
+          "channelV2": "Display",
+          "eventDate": "2026-05-02",
+          "audienceIndex": 118,
+          "avails": 19100,
+          "hhUniqs": 7800
+        },
+        {
+          "country": "US",
+          "channelV2": "CTV",
+          "eventDate": "2026-05-02",
+          "audienceIndex": 118,
+          "avails": 15100,
+          "hhUniqs": 6400
+        },
+        {
+          "country": "CA",
+          "channelV2": "Display",
+          "eventDate": "2026-05-03",
+          "audienceIndex": 112,
+          "avails": 16200,
+          "hhUniqs": 6800
+        },
+        {
+          "country": "CA",
+          "channelV2": "CTV",
+          "eventDate": "2026-05-03",
+          "audienceIndex": 112,
+          "avails": 13700,
+          "hhUniqs": 5700
+        },
+        {
+          "country": "CA",
+          "channelV2": "Display",
+          "eventDate": "2026-05-04",
+          "audienceIndex": 112,
+          "avails": 17500,
+          "hhUniqs": 7100
+        },
+        {
+          "country": "CA",
+          "channelV2": "CTV",
+          "eventDate": "2026-05-04",
+          "audienceIndex": 112,
+          "avails": 14500,
+          "hhUniqs": 6000
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "sharedFilters",
+      "kind": "filterBarBlock",
+      "title": "Report Scope",
+      "paramIds": [
+        "dateRange",
+        "channelsFilter",
+        "audienceSegmentFilter"
+      ],
+      "content": {
+        "title": "Report Scope",
+        "params": [
+          {
+            "id": "dateRange",
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          {
+            "id": "channelsFilter",
+            "value": null
+          },
+          {
+            "id": "audienceSegmentFilter",
+            "value": [
+              "Young Adults"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "activeRefinements",
+      "kind": "refinementBarBlock",
+      "title": "Active Refinements",
+      "actionKinds": [
+        "remove",
+        "clearAll"
+      ],
+      "emptyLabel": "No active refinements",
+      "content": {
+        "refinements": [],
+        "title": "Active Refinements",
+        "actionKinds": [
+          "remove",
+          "clearAll"
+        ],
+        "emptyLabel": "No active refinements"
+      }
+    },
+    {
+      "id": "primaryTable",
+      "kind": "tableBlock",
+      "datasetRef": "primary",
+      "columns": [
+        {
+          "key": "country",
+          "sourceKey": "country",
+          "displayKey": "country",
+          "label": "Market",
+          "kind": "dimension",
+          "runtimeFilterable": true
+        },
+        {
+          "key": "audienceIndex",
+          "sourceKey": "audienceIndex",
+          "displayKey": "audienceIndex",
+          "label": "Audience Index",
+          "kind": "measure",
+          "format": "number",
+          "align": "right"
+        }
+      ],
+      "content": {
+        "columns": [
+          {
+            "key": "country",
+            "sourceKey": "country",
+            "displayKey": "country",
+            "label": "Market",
+            "kind": "dimension",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "audienceIndex",
+            "sourceKey": "audienceIndex",
+            "displayKey": "audienceIndex",
+            "label": "Audience Index",
+            "kind": "measure",
+            "format": "number",
+            "align": "right"
+          }
+        ],
+        "rowCount": 8,
+        "resolvedRows": [
+          {
+            "rowIndex": 0,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 118,
+                "displayValue": 118,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 1,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 118,
+                "displayValue": 118,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 2,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 118,
+                "displayValue": 118,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 3,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 118,
+                "displayValue": 118,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 4,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 112,
+                "displayValue": 112,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 5,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 112,
+                "displayValue": 112,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 6,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 112,
+                "displayValue": 112,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 7,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "audienceIndex",
+                "sourceKey": "audienceIndex",
+                "displayKey": "audienceIndex",
+                "value": 112,
+                "displayValue": 112,
+                "visualState": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "headlineKpi",
+      "kind": "kpiBlock",
+      "title": "Headline KPI",
+      "datasetRef": "primary",
+      "valueField": "avails",
+      "valueLabel": "Available Impressions",
+      "secondaryField": "channelV2",
+      "secondaryLabel": "Channel",
+      "description": "Generic KPI block resolved from the first authored runtime row.",
+      "emptyLabel": "No headline KPI value available.",
+      "content": {
+        "title": "Headline KPI",
+        "description": "Generic KPI block resolved from the first authored runtime row.",
+        "valueField": "avails",
+        "valueLabel": "Available Impressions",
+        "value": 18000,
+        "rowCount": 8,
+        "secondaryField": "channelV2",
+        "secondaryLabel": "Channel",
+        "secondaryValue": "Display",
+        "emptyLabel": "No headline KPI value available."
+      }
+    },
+    {
+      "id": "comparisonTable",
+      "kind": "tableBlock",
+      "title": "Delivery Comparison",
+      "datasetRef": "primary",
+      "columns": [
+        {
+          "key": "eventDate",
+          "label": "Date",
+          "format": "date",
+          "sourceKey": "eventDate",
+          "displayKey": "eventDate"
+        },
+        {
+          "key": "channelV2",
+          "label": "Channel",
+          "cellVisual": {
+            "kind": "badge",
+            "rules": [
+              {
+                "value": "Display",
+                "tone": "info",
+                "label": "Display"
+              },
+              {
+                "value": "CTV",
+                "tone": "success",
+                "label": "CTV"
+              }
+            ]
+          },
+          "sourceKey": "channelV2",
+          "displayKey": "channelV2",
+          "runtimeFilterable": true
+        },
+        {
+          "key": "avails",
+          "label": "Avails",
+          "format": "compactNumber",
+          "cellVisual": {
+            "kind": "dataBar",
+            "valueField": "avails",
+            "range": {
+              "mode": "columnMax"
+            },
+            "palette": [
+              "#dbeafe",
+              "#2563eb"
+            ]
+          },
+          "sourceKey": "avails",
+          "displayKey": "avails"
+        },
+        {
+          "key": "hhUniqs",
+          "label": "HH Uniques",
+          "format": "compactNumber",
+          "cellVisual": {
+            "kind": "dataBar",
+            "valueField": "hhUniqs",
+            "range": {
+              "mode": "columnMax"
+            },
+            "palette": [
+              "#dcfce7",
+              "#16a34a"
+            ]
+          },
+          "sourceKey": "hhUniqs",
+          "displayKey": "hhUniqs"
+        }
+      ],
+      "content": {
+        "columns": [
+          {
+            "key": "eventDate",
+            "label": "Date",
+            "format": "date",
+            "sourceKey": "eventDate",
+            "displayKey": "eventDate"
+          },
+          {
+            "key": "channelV2",
+            "label": "Channel",
+            "cellVisual": {
+              "kind": "badge",
+              "rules": [
+                {
+                  "value": "Display",
+                  "tone": "info",
+                  "label": "Display"
+                },
+                {
+                  "value": "CTV",
+                  "tone": "success",
+                  "label": "CTV"
+                }
+              ]
+            },
+            "sourceKey": "channelV2",
+            "displayKey": "channelV2",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "avails",
+            "label": "Avails",
+            "format": "compactNumber",
+            "cellVisual": {
+              "kind": "dataBar",
+              "valueField": "avails",
+              "range": {
+                "mode": "columnMax"
+              },
+              "palette": [
+                "#dbeafe",
+                "#2563eb"
+              ]
+            },
+            "sourceKey": "avails",
+            "displayKey": "avails"
+          },
+          {
+            "key": "hhUniqs",
+            "label": "HH Uniques",
+            "format": "compactNumber",
+            "cellVisual": {
+              "kind": "dataBar",
+              "valueField": "hhUniqs",
+              "range": {
+                "mode": "columnMax"
+              },
+              "palette": [
+                "#dcfce7",
+                "#16a34a"
+              ]
+            },
+            "sourceKey": "hhUniqs",
+            "displayKey": "hhUniqs"
+          }
+        ],
+        "rowCount": 8,
+        "resolvedRows": [
+          {
+            "rowIndex": 0,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-01",
+                "displayValue": "2026-05-01",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "Display",
+                "displayValue": "Display",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "info",
+                  "label": "Display"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 18000,
+                "displayValue": 18000,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 18000,
+                  "percent": 0.7962962962962963,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 7400,
+                "displayValue": 7400,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 7400,
+                  "percent": 0.8095238095238095,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "rowIndex": 1,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-01",
+                "displayValue": "2026-05-01",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "CTV",
+                "displayValue": "CTV",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "success",
+                  "label": "CTV"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 14200,
+                "displayValue": 14200,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 14200,
+                  "percent": 0.09259259259259259,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 6100,
+                "displayValue": 6100,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 6100,
+                  "percent": 0.19047619047619047,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "rowIndex": 2,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-02",
+                "displayValue": "2026-05-02",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "Display",
+                "displayValue": "Display",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "info",
+                  "label": "Display"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 19100,
+                "displayValue": 19100,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 19100,
+                  "percent": 1,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 7800,
+                "displayValue": 7800,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 7800,
+                  "percent": 1,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "rowIndex": 3,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-02",
+                "displayValue": "2026-05-02",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "CTV",
+                "displayValue": "CTV",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "success",
+                  "label": "CTV"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 15100,
+                "displayValue": 15100,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 15100,
+                  "percent": 0.25925925925925924,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 6400,
+                "displayValue": 6400,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 6400,
+                  "percent": 0.3333333333333333,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "rowIndex": 4,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-03",
+                "displayValue": "2026-05-03",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "Display",
+                "displayValue": "Display",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "info",
+                  "label": "Display"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 16200,
+                "displayValue": 16200,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 16200,
+                  "percent": 0.46296296296296297,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 6800,
+                "displayValue": 6800,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 6800,
+                  "percent": 0.5238095238095238,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "rowIndex": 5,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-03",
+                "displayValue": "2026-05-03",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "CTV",
+                "displayValue": "CTV",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "success",
+                  "label": "CTV"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 13700,
+                "displayValue": 13700,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 13700,
+                  "percent": 0,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 5700,
+                "displayValue": 5700,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 5700,
+                  "percent": 0,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "rowIndex": 6,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-04",
+                "displayValue": "2026-05-04",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "Display",
+                "displayValue": "Display",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "info",
+                  "label": "Display"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 17500,
+                "displayValue": 17500,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 17500,
+                  "percent": 0.7037037037037037,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 7100,
+                "displayValue": 7100,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 7100,
+                  "percent": 0.6666666666666666,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "rowIndex": 7,
+            "cells": [
+              {
+                "key": "eventDate",
+                "sourceKey": "eventDate",
+                "displayKey": "eventDate",
+                "value": "2026-05-04",
+                "displayValue": "2026-05-04",
+                "visualState": null
+              },
+              {
+                "key": "channelV2",
+                "sourceKey": "channelV2",
+                "displayKey": "channelV2",
+                "value": "CTV",
+                "displayValue": "CTV",
+                "visualState": {
+                  "kind": "badge",
+                  "tone": "success",
+                  "label": "CTV"
+                }
+              },
+              {
+                "key": "avails",
+                "sourceKey": "avails",
+                "displayKey": "avails",
+                "value": 14500,
+                "displayValue": 14500,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 14500,
+                  "percent": 0.14814814814814814,
+                  "palette": [
+                    "#dbeafe",
+                    "#2563eb"
+                  ]
+                }
+              },
+              {
+                "key": "hhUniqs",
+                "sourceKey": "hhUniqs",
+                "displayKey": "hhUniqs",
+                "value": 6000,
+                "displayValue": 6000,
+                "visualState": {
+                  "kind": "dataBar",
+                  "value": 6000,
+                  "percent": 0.14285714285714285,
+                  "palette": [
+                    "#dcfce7",
+                    "#16a34a"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "diagnostics": []
+}

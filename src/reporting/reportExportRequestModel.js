@@ -179,3 +179,79 @@ export function buildSavedReportExportRequest({
     reportPrint,
   });
 }
+
+export function buildSavedViewReportExportRequest({
+  savedView = null,
+  reportSpec = null,
+  reportFill = null,
+  reportPrint = null,
+  documentVersion = 0,
+  format = "pdf",
+} = {}) {
+  const payload = savedView && typeof savedView === "object" && !Array.isArray(savedView)
+    ? savedView
+    : null;
+  if (!payload) {
+    return null;
+  }
+  const artifactId = normalizeString(payload?.viewId || payload?.savedViewId || payload?.id);
+  if (!artifactId) {
+    return null;
+  }
+  return buildReportExportRequest({
+    format,
+    source: {
+      from: "savedView",
+      artifactKind: normalizeString(payload?.kind || "reportBuilder.savedView") || "reportBuilder.savedView",
+      artifactRef: buildReportExportArtifactRef({
+        artifactKind: normalizeString(payload?.kind || "reportBuilder.savedView") || "reportBuilder.savedView",
+        sourceArtifactId: artifactId,
+      }),
+      sourceArtifactId: artifactId,
+      reportId: normalizeString(payload?.reportId || payload?.reportRef?.reportId),
+      documentVersion,
+      title: normalizeString(payload?.title || reportSpec?.title || "Report") || "Report",
+    },
+    reportSpec,
+    reportFill,
+    reportPrint,
+  });
+}
+
+export function buildPublishedSnapshotReportExportRequest({
+  publishedSnapshot = null,
+  reportSpec = null,
+  reportFill = null,
+  reportPrint = null,
+  documentVersion = 0,
+  format = "pdf",
+} = {}) {
+  const payload = publishedSnapshot && typeof publishedSnapshot === "object" && !Array.isArray(publishedSnapshot)
+    ? publishedSnapshot
+    : null;
+  if (!payload) {
+    return null;
+  }
+  const artifactId = normalizeString(payload?.snapshotId || payload?.publishedSnapshotId || payload?.id);
+  if (!artifactId) {
+    return null;
+  }
+  return buildReportExportRequest({
+    format,
+    source: {
+      from: "publishedSnapshot",
+      artifactKind: normalizeString(payload?.kind || "reportBuilder.publishedSnapshot") || "reportBuilder.publishedSnapshot",
+      artifactRef: buildReportExportArtifactRef({
+        artifactKind: normalizeString(payload?.kind || "reportBuilder.publishedSnapshot") || "reportBuilder.publishedSnapshot",
+        sourceArtifactId: artifactId,
+      }),
+      sourceArtifactId: artifactId,
+      reportId: normalizeString(payload?.reportId || payload?.reportRef?.reportId),
+      documentVersion,
+      title: normalizeString(payload?.title || reportSpec?.title || "Report") || "Report",
+    },
+    reportSpec,
+    reportFill,
+    reportPrint,
+  });
+}

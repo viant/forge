@@ -1,70 +1,107 @@
-[
-  {
-    "id": "ctr_percent",
-    "expr": "if(impressions = 0, null, round((clicks / impressions) * 100, 2))",
-    "row": {
-      "clicks": 25,
-      "impressions": 1000
+{
+  "functions": [
+    { "name": "abs", "minArgs": 1, "maxArgs": 1 },
+    { "name": "case", "minArgs": 3 },
+    { "name": "ceil", "minArgs": 1, "maxArgs": 1 },
+    { "name": "coalesce", "minArgs": 1 },
+    { "name": "concat", "minArgs": 1 },
+    { "name": "floor", "minArgs": 1, "maxArgs": 1 },
+    { "name": "greatest", "minArgs": 1 },
+    { "name": "if", "minArgs": 3, "maxArgs": 3 },
+    { "name": "isnull", "minArgs": 1, "maxArgs": 1 },
+    { "name": "least", "minArgs": 1 },
+    { "name": "lower", "minArgs": 1, "maxArgs": 1 },
+    { "name": "max", "minArgs": 1 },
+    { "name": "min", "minArgs": 1 },
+    { "name": "nullif", "minArgs": 2, "maxArgs": 2 },
+    { "name": "round", "minArgs": 1, "maxArgs": 2 },
+    { "name": "upper", "minArgs": 1, "maxArgs": 1 }
+  ],
+  "evaluationCases": [
+    {
+      "id": "ctr_percent",
+      "expr": "if(impressions = 0, null, round((clicks / impressions) * 100, 2))",
+      "row": {
+        "clicks": 25,
+        "impressions": 1000
+      },
+      "expected": 2.5
     },
-    "expected": 2.5
-  },
-  {
-    "id": "divide_by_zero_null",
-    "expr": "if(impressions = 0, null, round((clicks / impressions) * 100, 2))",
-    "row": {
-      "clicks": 25,
-      "impressions": 0
+    {
+      "id": "divide_by_zero_null",
+      "expr": "if(impressions = 0, null, round((clicks / impressions) * 100, 2))",
+      "row": {
+        "clicks": 25,
+        "impressions": 0
+      },
+      "expected": null
     },
-    "expected": null
-  },
-  {
-    "id": "null_arithmetic",
-    "expr": "clicks + missingMetric",
-    "row": {
-      "clicks": 25
+    {
+      "id": "null_arithmetic",
+      "expr": "clicks + missingMetric",
+      "row": {
+        "clicks": 25
+      },
+      "expected": null
     },
-    "expected": null
-  },
-  {
-    "id": "case_sensitive_comparison",
-    "expr": "channelId = 'CTV'",
-    "row": {
-      "channelId": "ctv"
+    {
+      "id": "case_sensitive_comparison",
+      "expr": "channelId = 'CTV'",
+      "row": {
+        "channelId": "ctv"
+      },
+      "expected": false
     },
-    "expected": false
-  },
-  {
-    "id": "case_function_branching",
-    "expr": "case(channelId = 'CTV', 'video', channelId = 'Display', 'banner', 'other')",
-    "row": {
-      "channelId": "Display"
+    {
+      "id": "case_function_branching",
+      "expr": "case(channelId = 'CTV', 'video', channelId = 'Display', 'banner', 'other')",
+      "row": {
+        "channelId": "Display"
+      },
+      "expected": "banner"
     },
-    "expected": "banner"
-  },
-  {
-    "id": "null_helpers",
-    "expr": "coalesce(nullIf(channelId, 'Display'), 'fallback')",
-    "row": {
-      "channelId": "Display"
+    {
+      "id": "null_helpers",
+      "expr": "coalesce(nullIf(channelId, 'Display'), 'fallback')",
+      "row": {
+        "channelId": "Display"
+      },
+      "expected": "fallback"
     },
-    "expected": "fallback"
-  },
-  {
-    "id": "boolean_logic",
-    "expr": "not(isNull(channelId)) and totalSpend > 0",
-    "row": {
-      "channelId": "CTV",
-      "totalSpend": 10
+    {
+      "id": "boolean_logic",
+      "expr": "not(isNull(channelId)) and totalSpend > 0",
+      "row": {
+        "channelId": "CTV",
+        "totalSpend": 10
+      },
+      "expected": true
     },
-    "expected": true
-  },
-  {
-    "id": "string_functions",
-    "expr": "concat(upper(channelId), '-', lower(siteType))",
-    "row": {
-      "channelId": "CTV",
-      "siteType": "STREAMING"
+    {
+      "id": "string_functions",
+      "expr": "concat(upper(channelId), '-', lower(siteType))",
+      "row": {
+        "channelId": "CTV",
+        "siteType": "STREAMING"
+      },
+      "expected": "CTV-streaming"
+    }
+  ],
+  "parseErrorCases": [
+    {
+      "id": "unsupported_function",
+      "expr": "foo(clicks)",
+      "error": "Invalid calculated field expression at 0: unsupported function \"foo\""
     },
-    "expected": "CTV-streaming"
-  }
-]
+    {
+      "id": "round_too_many_args",
+      "expr": "round(clicks, 2, 1)",
+      "error": "Invalid calculated field expression at 0: function \"round\" accepts at most 2 arguments"
+    },
+    {
+      "id": "if_missing_else",
+      "expr": "if(clicks > 0, 1)",
+      "error": "Invalid calculated field expression at 0: function \"if\" requires at least 3 arguments"
+    }
+  ]
+}

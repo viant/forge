@@ -1,3 +1,7 @@
+import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
+
 export function resolveReportBuilderActiveResultState({
     loading = false,
     error = null,
@@ -52,6 +56,16 @@ export function buildReportBuilderEmptyResultState({
         };
     }
     if (String(readinessReason || "").trim() === "semantic") {
+        if (String(readinessAction || "").trim() === "retrySemanticModelLoad") {
+            return {
+                icon: "database",
+                eyebrow: "Semantic model",
+                title: "Reload semantic model metadata",
+                description: readinessMessage || "The semantic model could not be loaded for this report.",
+                actionLabel: "Retry model load",
+                action: "retrySemanticModelLoad",
+            };
+        }
         return {
             icon: "filter-list",
             eyebrow: "Semantic issue",
@@ -66,7 +80,7 @@ export function buildReportBuilderEmptyResultState({
             icon: "filter-list",
             eyebrow: "Scope required",
             title: "Choose the required scope",
-            description: "Select an advertiser, campaign, ad order, or audience before running the report.",
+            description: "Select the required scope before running the report.",
             actionLabel: "",
             action: "",
         };
@@ -141,11 +155,103 @@ export function buildReportBuilderRuntimePreviewBlockedState({
     return {
         ...emptyState,
         tone: String(readinessReason || "").trim() === "semantic"
-            ? toneFromSemanticDiagnosticsLevel(semanticDiagnosticsNotice?.level)
+            ? (
+                String(readinessAction || "").trim() === "retrySemanticModelLoad"
+                    ? "error"
+                    : toneFromSemanticDiagnosticsLevel(semanticDiagnosticsNotice?.level)
+            )
             : "neutral",
         diagnostics,
         diagnosticsTitle: String(semanticDiagnosticsNotice?.title || "").trim(),
         diagnosticsDescription: String(semanticDiagnosticsNotice?.description || "").trim(),
+    };
+}
+
+function resolvePrimaryRuntimeDataset(runtimeConfig = null) {
+    const datasets = Array.isArray(runtimeConfig?.reportFill?.datasets)
+        ? runtimeConfig.reportFill.datasets
+        : [];
+    return datasets.find((dataset) => String(dataset?.id || "").trim() === "primary")
+        || datasets[0]
+        || null;
+}
+
+export function buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled = false,
+    runtimePreviewArtifact = null,
+    runtimePreviewRowsSource = {},
+    canRunReport = false,
+    readinessReason = "",
+    runtimePreviewArtifactDiagnostics = [],
+    runtimePreviewBlockedState = null,
+    runtimePreviewErrorDescription = "",
+} = {}) {
+    if (!runtimePreviewEnabled) {
+        return null;
+    }
+    const runtimeConfig = runtimePreviewArtifact?.runtimeBlock?.dashboard?.reportRuntime || null;
+    const runtimePrimaryDataset = resolvePrimaryRuntimeDataset(runtimeConfig);
+    const hasRuntimeRows = Array.isArray(runtimePrimaryDataset?.rows)
+        && runtimePrimaryDataset.rows.length > 0;
+    const loading = !!runtimePreviewRowsSource?.loading;
+    const error = runtimePreviewRowsSource?.error || null;
+    const diagnostics = Array.isArray(runtimePreviewArtifactDiagnostics)
+        ? runtimePreviewArtifactDiagnostics
+        : [];
+    const runtimePreviewContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: runtimeConfig?.reportSpec || runtimePreviewArtifact?.reportSpec || null,
+        document: runtimePreviewArtifact?.document || null,
+        title: runtimePreviewArtifact?.document?.title || "",
+    });
+    const scopeSummary = buildReportBuilderScopeSummaryFromParams(runtimePreviewContext?.scopeParams);
+    const semanticBindingViewState = runtimeConfig?.semanticBindingViewState && typeof runtimeConfig.semanticBindingViewState === "object" && !Array.isArray(runtimeConfig.semanticBindingViewState)
+        ? runtimeConfig.semanticBindingViewState
+        : buildReportBuilderSemanticBindingViewState({
+            semanticSummary: runtimePreviewContext?.semanticSummary || null,
+            binding: runtimePreviewContext?.binding || null,
+        });
+    return {
+        eyebrow: "Authored Runtime",
+        title: runtimePreviewArtifact?.document?.title || runtimePreviewContext?.title || "Compiled Runtime Preview",
+        subtitle: String(runtimePreviewContext?.document?.subtitle || runtimePreviewArtifact?.document?.subtitle || "").trim(),
+        description: runtimePreviewContext?.document?.description
+            || runtimePreviewArtifact?.document?.description
+            || "Refine the current builder result through the compiled ReportDocument, ReportSpec, and ReportFill flow.",
+        ...(semanticBindingViewState ? {
+            semanticBindingTitle: semanticBindingViewState.title,
+            semanticBindingChips: semanticBindingViewState.chips,
+            ...(Array.isArray(semanticBindingViewState.fieldGroups) && semanticBindingViewState.fieldGroups.length > 0
+                ? { semanticBindingFieldGroups: semanticBindingViewState.fieldGroups }
+                : {}),
+        } : {}),
+        ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
+            scopeSummaryTitle: "Report Scope",
+            scopeSummaryText: scopeSummary.text,
+            scopeSummaryItems: scopeSummary.items,
+        } : {}),
+        runtimeConfig,
+        hasRuntimeRows,
+        loadingState: loading && !hasRuntimeRows
+            ? {
+                icon: "refresh",
+                eyebrow: "Runtime preview",
+                title: "Refreshing authored runtime",
+                description: "Executing the compiled runtime request for the current builder state.",
+                animated: true,
+            }
+            : null,
+        blockedState: !canRunReport && !loading ? runtimePreviewBlockedState : null,
+        errorState: !loading && error && !hasRuntimeRows
+            ? {
+                tone: "error",
+                icon: "warning-sign",
+                eyebrow: "Runtime preview",
+                title: "We couldn't compile these runtime results",
+                description: String(runtimePreviewErrorDescription || "").trim(),
+            }
+            : null,
+        canRenderRuntime: !!runtimeConfig
+            && (canRunReport || (String(readinessReason || "").trim() === "semantic" && diagnostics.length > 0)),
     };
 }
 

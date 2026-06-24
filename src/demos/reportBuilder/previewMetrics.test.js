@@ -37,6 +37,7 @@ assert.deepEqual(
     detailTargetBehaviors: metrics.detailTargetBehaviors,
     runtimeActionBehaviors: metrics.runtimeActionBehaviors,
     fetchBehaviors: metrics.fetchBehaviors,
+    exportBehaviors: metrics.exportBehaviors,
   },
   {
     fetchCollectionCount: 0,
@@ -53,6 +54,7 @@ assert.deepEqual(
     detailTargetBehaviors: [],
     runtimeActionBehaviors: [],
     fetchBehaviors: [],
+    exportBehaviors: [],
   },
 );
 
@@ -119,7 +121,7 @@ assert.equal(metrics.semanticValidationBehaviors.length, 1);
 assert.equal(metrics.replaceDetailTargetBehaviors([
   {
     match: {
-      targetRef: "target://steward/performance/channel-detail",
+      targetRef: "target://example/performance/channel-detail",
     },
     result: {
       detailTarget: null,
@@ -133,7 +135,7 @@ assert.equal(metrics.replaceRuntimeActionBehaviors([
       fieldRef: "eventDate",
     },
     actions: [
-      { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+      { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
     ],
   },
 ]), 1);
@@ -149,6 +151,19 @@ assert.equal(metrics.replaceFetchBehaviors([
   },
 ]), 1);
 assert.equal(metrics.fetchBehaviors.length, 1);
+assert.equal(metrics.replaceExportBehaviors([
+  {
+    match: {
+      phase: "status",
+      jobId: "demo-export-job-1",
+    },
+    result: {
+      jobId: "demo-export-job-1",
+      status: "failed",
+    },
+  },
+]), 1);
+assert.equal(metrics.exportBehaviors.length, 1);
 assert.equal(storage.size > 0, true);
 
 metrics.resetCounters();

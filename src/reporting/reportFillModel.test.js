@@ -41,6 +41,7 @@ const rawConfig = {
   staticFilters: [
     {
       id: "dateRange",
+      description: "Approved reporting window for shared runtime scope.",
       type: "dateRange",
       required: true,
       startParamPath: "filters.From",
@@ -158,7 +159,7 @@ assert.deepEqual(rawFill.blocks[1].content.resolvedChart, {
 assert.deepEqual(rawFill.diagnostics, []);
 
 const semanticModel = {
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   version: 1,
   label: "Ad Delivery",
   entities: [
@@ -191,14 +192,14 @@ const semanticConfig = applyReportBuilderSemanticConfig({
   )),
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["spend", "impressions"],
   },
 }, {
   mode: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   entity: "line_delivery",
   selectedDimensions: ["event_date", "channel"],
   selectedMeasures: ["spend", "impressions"],
@@ -375,6 +376,7 @@ assert.deepEqual(documentFill.blocks[2].content, {
   params: [
     {
       id: "dateRange",
+      description: "Approved reporting window for shared runtime scope.",
       value: {
         start: "2026-05-01",
         end: "2026-05-04",
@@ -557,9 +559,9 @@ const expressionSpec = buildReportBuilderReportSpec({
     ...rawConfig,
     calculatedFields: [
       {
-        id: "forecastLift",
-        key: "forecastLift",
-        label: "Forecast Lift",
+        id: "projectedLift",
+        key: "projectedLift",
+        label: "Projected Lift",
         dataType: "number",
         format: "currency",
         expr: "if(channelId = 'CTV', totalSpend, null)",
@@ -568,13 +570,13 @@ const expressionSpec = buildReportBuilderReportSpec({
   },
   state: {
     ...rawState,
-    selectedMeasures: ["forecastLift"],
-    primaryMeasure: "forecastLift",
+    selectedMeasures: ["projectedLift"],
+    primaryMeasure: "projectedLift",
     chartSpec: {
-      title: "Forecast Lift by Date",
+      title: "Projected Lift by Date",
       type: "line",
       xField: "eventDate",
-      yFields: ["forecastLift"],
+      yFields: ["projectedLift"],
     },
   },
 });
@@ -587,10 +589,10 @@ const expressionFill = buildReportFillFromReportSpec(expressionSpec, {
 
 assert.deepEqual(expressionFill.calculatedFields, [
   {
-    id: "forecastLift",
-    key: "forecastLift",
+    id: "projectedLift",
+    key: "projectedLift",
     kind: "rowCalc",
-    label: "Forecast Lift",
+    label: "Projected Lift",
     dataType: "number",
     format: "currency",
     datasetRef: "primary",
@@ -598,9 +600,9 @@ assert.deepEqual(expressionFill.calculatedFields, [
     expr: "if(channelId = 'CTV', totalSpend, null)",
   },
 ]);
-assert.equal(expressionFill.datasets[0].rows[0].forecastLift, null);
-assert.equal(expressionFill.datasets[0].rows[1].forecastLift, 34300);
-assert.equal(expressionFill.blocks[0].content.columns[2].key, "forecastLift");
+assert.equal(expressionFill.datasets[0].rows[0].projectedLift, null);
+assert.equal(expressionFill.datasets[0].rows[1].projectedLift, 34300);
+assert.equal(expressionFill.blocks[0].content.columns[2].key, "projectedLift");
 
 const stateOwnedExpressionFill = buildReportBuilderReportFill({
   container: rawContainer,
@@ -609,21 +611,21 @@ const stateOwnedExpressionFill = buildReportBuilderReportFill({
     ...rawState,
     localCalculatedFields: [
       {
-        id: "forecastLift",
-        key: "forecastLift",
-        label: "Forecast Lift",
+        id: "projectedLift",
+        key: "projectedLift",
+        label: "Projected Lift",
         dataType: "number",
         format: "currency",
         expr: "if(channelId = 'CTV', totalSpend, null)",
       },
     ],
-    selectedMeasures: ["forecastLift"],
-    primaryMeasure: "forecastLift",
+    selectedMeasures: ["projectedLift"],
+    primaryMeasure: "projectedLift",
     chartSpec: {
-      title: "Forecast Lift by Date",
+      title: "Projected Lift by Date",
       type: "line",
       xField: "eventDate",
-      yFields: ["forecastLift"],
+      yFields: ["projectedLift"],
     },
   },
   primaryRows: rawRows,
@@ -631,10 +633,10 @@ const stateOwnedExpressionFill = buildReportBuilderReportFill({
 
 assert.deepEqual(stateOwnedExpressionFill.calculatedFields, [
   {
-    id: "forecastLift",
-    key: "forecastLift",
+    id: "projectedLift",
+    key: "projectedLift",
     kind: "rowCalc",
-    label: "Forecast Lift",
+    label: "Projected Lift",
     dataType: "number",
     format: "currency",
     datasetRef: "primary",
@@ -642,9 +644,90 @@ assert.deepEqual(stateOwnedExpressionFill.calculatedFields, [
     expr: "if(channelId = 'CTV', totalSpend, null)",
   },
 ]);
-assert.equal(stateOwnedExpressionFill.datasets[0].rows[0].forecastLift, null);
-assert.equal(stateOwnedExpressionFill.datasets[0].rows[1].forecastLift, 34300);
-assert.equal(stateOwnedExpressionFill.blocks[0].content.columns[2].key, "forecastLift");
+assert.equal(stateOwnedExpressionFill.datasets[0].rows[0].projectedLift, null);
+assert.equal(stateOwnedExpressionFill.datasets[0].rows[1].projectedLift, 34300);
+assert.equal(stateOwnedExpressionFill.blocks[0].content.columns[2].key, "projectedLift");
+
+const dependentTableCalcFill = buildReportBuilderReportFill({
+  container: rawContainer,
+  config: rawConfig,
+  state: {
+    ...rawState,
+    localCalculatedFields: [
+      {
+        id: "projectedLift",
+        key: "projectedLift",
+        label: "Projected Lift",
+        dataType: "number",
+        format: "currency",
+        expr: "if(channelId = 'CTV', totalSpend, null)",
+      },
+    ],
+    localTableCalculations: [
+      {
+        id: "runningProjectedLift",
+        key: "runningProjectedLift",
+        label: "Running Projected Lift",
+        format: "currency",
+        compute: {
+          type: "runningTotal",
+          sourceField: "projectedLift",
+          partitionBy: ["channelId"],
+          orderBy: [
+            { field: "eventDate", direction: "asc" },
+          ],
+        },
+      },
+    ],
+    selectedMeasures: ["runningProjectedLift"],
+    primaryMeasure: "runningProjectedLift",
+    selectedDimensions: ["eventDate", "channelId"],
+    chartSpec: {
+      title: "Running Projected Lift by Date",
+      type: "line",
+      xField: "eventDate",
+      yFields: ["runningProjectedLift"],
+    },
+  },
+  primaryRows: rawRows,
+});
+
+assert.deepEqual(dependentTableCalcFill.calculatedFields, [
+  {
+    id: "projectedLift",
+    key: "projectedLift",
+    kind: "rowCalc",
+    label: "Projected Lift",
+    dataType: "number",
+    format: "currency",
+    datasetRef: "primary",
+    dependencies: ["channelId", "totalSpend"],
+    expr: "if(channelId = 'CTV', totalSpend, null)",
+  },
+  {
+    id: "runningProjectedLift",
+    key: "runningProjectedLift",
+    kind: "tableCalc",
+    label: "Running Projected Lift",
+    dataType: "number",
+    format: "currency",
+    datasetRef: "primary",
+    dependencies: ["projectedLift", "eventDate", "channelId"],
+    compute: {
+      type: "runningTotal",
+      sourceField: "projectedLift",
+      partitionBy: ["channelId"],
+      orderBy: [
+        { field: "eventDate", direction: "asc" },
+      ],
+    },
+  },
+]);
+assert.equal(dependentTableCalcFill.datasets[0].rows[0].projectedLift, null);
+assert.equal(dependentTableCalcFill.datasets[0].rows[1].projectedLift, 34300);
+assert.equal(dependentTableCalcFill.datasets[0].rows[0].runningProjectedLift, 0);
+assert.equal(dependentTableCalcFill.datasets[0].rows[1].runningProjectedLift, 34300);
+assert.equal(dependentTableCalcFill.blocks[0].content.columns[2].key, "runningProjectedLift");
 
 const stateOwnedTableCalcFill = buildReportBuilderReportFill({
   container: rawContainer,

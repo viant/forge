@@ -25,6 +25,36 @@ const document = {
   ],
 };
 
+const templatedDocument = {
+  ...document,
+  blocks: [
+    {
+      id: "primaryBuilder",
+      kind: "reportBuilderBlock",
+      state: {
+        reportDocumentTemplateId: "market_brief",
+        reportDocumentTemplateLabel: "Market Brief",
+      },
+    },
+  ],
+};
+
+const explicitTemplatedDocument = {
+  ...templatedDocument,
+  templateId: "market_brief",
+  templateLabel: "Market Brief",
+  blocks: [
+    {
+      id: "primaryBuilder",
+      kind: "reportBuilderBlock",
+      state: {
+        reportDocumentTemplateId: "capacity_inventory_brief",
+        reportDocumentTemplateLabel: "Capacity Inventory Brief",
+      },
+    },
+  ],
+};
+
 const reportSpec = {
   version: 1,
   kind: "reportSpec",
@@ -270,9 +300,45 @@ assert.deepEqual(buildGetReportDocumentResponse({
   },
 });
 
+assert.deepEqual(buildGetReportDocumentResponse({
+  reportRef: { reportId: "demoReportBuilder" },
+  version: 11,
+  savedAt: 2601,
+  document: templatedDocument,
+}), {
+  version: 1,
+  kind: "getReportDocumentResponse",
+  reportRef: {
+    reportId: "demoReportBuilder",
+  },
+  documentVersion: 11,
+  savedAt: 2601,
+  document: templatedDocument,
+  templateId: "market_brief",
+  templateLabel: "Market Brief",
+});
+
+assert.deepEqual(buildGetReportDocumentResponse({
+  reportRef: { reportId: "demoReportBuilder" },
+  version: 12,
+  savedAt: 2602,
+  document: explicitTemplatedDocument,
+}), {
+  version: 1,
+  kind: "getReportDocumentResponse",
+  reportRef: {
+    reportId: "demoReportBuilder",
+  },
+  documentVersion: 12,
+  savedAt: 2602,
+  document: explicitTemplatedDocument,
+  templateId: "market_brief",
+  templateLabel: "Market Brief",
+});
+
 assert.deepEqual(buildListReportDocumentsRequest({
   scope: {
-    workspaceRef: "forecasting",
+    workspaceRef: "capacity",
   },
   cursor: "next-page",
   limit: 500,
@@ -281,7 +347,7 @@ assert.deepEqual(buildListReportDocumentsRequest({
   kind: "listReportDocumentsRequest",
   limit: 200,
   scope: {
-    workspaceRef: "forecasting",
+    workspaceRef: "capacity",
   },
   cursor: "next-page",
 });
@@ -293,6 +359,23 @@ assert.deepEqual(buildListReportDocumentsResponse({
       documentVersion: 11,
       title: "Report Builder Demo",
       savedAt: 2600,
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+      },
+      binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+      },
+      scope: {
+        params: [
+          {
+            id: "dateRange",
+            label: "Reporting Window",
+          },
+        ],
+      },
       source: {
         kind: "dashboard.reportBuilder",
         containerId: "demoReportBuilder",
@@ -308,11 +391,16 @@ assert.deepEqual(buildListReportDocumentsResponse({
     },
     {
       document: {
-        id: "forecastingQ3",
-        title: "Forecasting Q3",
+        id: "capacityQ3",
+        title: "Capacity Q3",
       },
       version: 4,
       savedAt: 2800,
+    },
+    {
+      document: templatedDocument,
+      version: 5,
+      savedAt: 2900,
     },
   ],
   cursor: "next-page",
@@ -326,6 +414,23 @@ assert.deepEqual(buildListReportDocumentsResponse({
       documentVersion: 11,
       title: "Report Builder Demo",
       savedAt: 2600,
+      semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+      },
+      binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+      },
+      scope: {
+        params: [
+          {
+            id: "dateRange",
+            label: "Reporting Window",
+          },
+        ],
+      },
       source: {
         kind: "dashboard.reportBuilder",
         containerId: "demoReportBuilder",
@@ -340,14 +445,61 @@ assert.deepEqual(buildListReportDocumentsResponse({
       },
     },
     {
-      reportRef: { reportId: "forecastingQ3" },
+      reportRef: { reportId: "capacityQ3" },
       documentVersion: 4,
-      title: "Forecasting Q3",
+      title: "Capacity Q3",
       savedAt: 2800,
+    },
+    {
+      reportRef: { reportId: "demoReportBuilder" },
+      documentVersion: 5,
+      title: "Report Builder Demo",
+      subtitle: "Weekly Rollup",
+      description: "Conflict diagnostic metadata summary.",
+      templateId: "market_brief",
+      templateLabel: "Market Brief",
+      savedAt: 2900,
     },
   ],
   cursor: "next-page",
   hasMore: true,
+});
+
+assert.deepEqual(buildListReportDocumentsResponse({
+  entries: [
+    {
+      document: templatedDocument,
+      version: 6,
+      title: "Overridden Title",
+      templateId: "custom_template",
+      templateLabel: "Custom Template",
+    },
+  ],
+}).entries[0], {
+  reportRef: { reportId: "demoReportBuilder" },
+  documentVersion: 6,
+  title: "Overridden Title",
+  subtitle: "Weekly Rollup",
+  description: "Conflict diagnostic metadata summary.",
+  templateId: "custom_template",
+  templateLabel: "Custom Template",
+});
+
+assert.deepEqual(buildListReportDocumentsResponse({
+  entries: [
+    {
+      document: explicitTemplatedDocument,
+      version: 7,
+    },
+  ],
+}).entries[0], {
+  reportRef: { reportId: "demoReportBuilder" },
+  documentVersion: 7,
+  title: "Report Builder Demo",
+  subtitle: "Weekly Rollup",
+  description: "Conflict diagnostic metadata summary.",
+  templateId: "market_brief",
+  templateLabel: "Market Brief",
 });
 
 assert.deepEqual(buildDeleteReportDocumentRequest({

@@ -8,6 +8,7 @@ import {
     validateSemanticBinding,
     validateSemanticModel,
 } from "../../semantic/modelValidation.js";
+import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGovernanceView.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -46,6 +47,17 @@ function semanticSelectableMeasureFields(config = {}) {
         ...(Array.isArray(config?.computedMeasures) ? config.computedMeasures : []).filter((field) => !isLocalComputedMeasure(field)),
         ...(Array.isArray(config?.tableCalculations) ? config.tableCalculations : []).filter((field) => !isLocalComputedMeasure(field)),
     ];
+}
+
+function semanticSelectableParameterFields(config = {}) {
+    return (Array.isArray(config?.staticFilters) ? config.staticFilters : [])
+        .filter((field) => !!semanticFieldId(field));
+}
+
+function semanticDiagnosableParameterFields(config = {}) {
+    return (Array.isArray(config?.staticFilters) ? config.staticFilters : [])
+        .filter((field) => !!field && typeof field === "object" && !Array.isArray(field))
+        .filter((field) => Object.prototype.hasOwnProperty.call(field, "semanticRef"));
 }
 
 function buildSemanticFieldIndex(fields = []) {
@@ -105,6 +117,53 @@ function normalizeFieldSelectionIds(selectedIds = []) {
             .map((id) => normalizeString(id))
             .filter(Boolean),
     ));
+}
+
+function hasConfiguredSemanticParameterValue(field = {}, value = null) {
+    if (field?.type === "dateRange") {
+        return !!normalizeString(value?.start) || !!normalizeString(value?.end);
+    }
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+    if (value && typeof value === "object") {
+        return Object.keys(value).length > 0;
+    }
+    return value !== undefined && value !== null && normalizeString(value) !== "";
+}
+
+function cloneValue(value = null) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function buildSemanticSelectionParameters(config = {}, state = {}) {
+    const next = {};
+    semanticSelectableParameterFields(config).forEach((field) => {
+        const rawId = normalizeString(field?.id || field?.field);
+        const semanticRef = semanticFieldId(field);
+        if (!rawId || !semanticRef) {
+            return;
+        }
+        const value = state?.staticFilters?.[rawId];
+        if (!hasConfiguredSemanticParameterValue(field, value)) {
+            return;
+        }
+        next[semanticRef] = cloneValue(value);
+    });
+    return next;
+}
+
+function resolveSelectedSemanticParameterIds(config = {}, state = {}) {
+    return semanticDiagnosableParameterFields(config)
+        .filter((field) => {
+            const rawId = normalizeString(field?.id || field?.field);
+            if (!rawId) {
+                return false;
+            }
+            return hasConfiguredSemanticParameterValue(field, state?.staticFilters?.[rawId]);
+        })
+        .map((field) => normalizeString(field?.id || field?.field))
+        .filter(Boolean);
 }
 
 function resolveGroupByDimensionId(config = {}, state = {}) {
@@ -360,6 +419,7 @@ function overlayField(baseField = {}, semanticField = null) {
         label: semanticField.label || baseField.label || baseField.id,
         ...(semanticField.description ? { description: semanticField.description } : {}),
         ...(semanticField.category ? { category: semanticField.category } : {}),
+        ...(semanticField.definitionRef ? { definitionRef: semanticField.definitionRef } : {}),
         ...(semanticField.format ? { format: semanticField.format } : {}),
         ...(semanticField.governance ? { governance: semanticField.governance } : {}),
         ...(semanticField.dataType ? { semanticDataType: semanticField.dataType } : {}),
@@ -398,6 +458,7 @@ export function applyReportBuilderSemanticConfig(config = {}, binding = null, mo
     }
     const measureIndex = buildSemanticFieldIndex(entity.measures || []);
     const dimensionIndex = buildSemanticFieldIndex(entity.dimensions || []);
+    const parameterIndex = buildSemanticFieldIndex(entity.parameters || []);
     const nextMeasures = Array.isArray(config.measures)
         ? config.measures.map((entry) => overlayField(entry, resolveSemanticField(measureIndex, entry)))
         : config.measures;
@@ -418,6 +479,9 @@ export function applyReportBuilderSemanticConfig(config = {}, binding = null, mo
     const nextDimensions = Array.isArray(config.dimensions)
         ? config.dimensions.map((entry) => overlayField(entry, resolveSemanticField(dimensionIndex, entry)))
         : config.dimensions;
+    const nextStaticFilters = Array.isArray(config.staticFilters)
+        ? config.staticFilters.map((entry) => overlayField(entry, resolveSemanticField(parameterIndex, entry)))
+        : config.staticFilters;
     const nextGroupBy = config?.groupBy && Array.isArray(config.groupBy.options)
         ? {
             ...config.groupBy,
@@ -435,6 +499,7 @@ export function applyReportBuilderSemanticConfig(config = {}, binding = null, mo
         computedMeasures: nextComputed,
         tableCalculations: nextTableCalculations,
         dimensions: nextDimensions,
+        staticFilters: nextStaticFilters,
         groupBy: nextGroupBy,
     };
 }
@@ -471,10 +536,15 @@ export function buildReportBuilderSemanticSelection(config = {}, state = {}) {
         ...(Array.isArray(state?.selectedMeasures) ? state.selectedMeasures : []),
         ...localCalculatedDependencies.measureIds,
     ]);
+    const selectedParameters = buildSemanticSelectionParameters(config, state);
     const unmappedDimensions = buildUnmappedSelectionIds(config.dimensions, selectedDimensionIds);
     const unmappedMeasures = buildUnmappedSelectionIds(semanticSelectableMeasureFields(config), state?.selectedMeasures, {
         ignoreIds: localComputedMeasureIds,
     });
+    const unmappedParameters = buildUnmappedSelectionIds(
+        semanticDiagnosableParameterFields(config),
+        resolveSelectedSemanticParameterIds(config, state),
+    );
     return {
         modelRef: normalizedBinding.modelRef,
         entity: normalizedBinding.entity,
@@ -482,16 +552,17 @@ export function buildReportBuilderSemanticSelection(config = {}, state = {}) {
             dimensions: selectedDimensions,
             measures: selectedMeasures,
         },
-        ...((unmappedDimensions.length > 0 || unmappedMeasures.length > 0)
+        ...((unmappedDimensions.length > 0 || unmappedMeasures.length > 0 || unmappedParameters.length > 0)
             ? {
                 unmapped: {
                     ...(unmappedDimensions.length > 0 ? { dimensions: unmappedDimensions } : {}),
                     ...(unmappedMeasures.length > 0 ? { measures: unmappedMeasures } : {}),
+                    ...(unmappedParameters.length > 0 ? { parameters: unmappedParameters } : {}),
                 },
             }
             : {}),
         refinements: [],
-        parameters: {},
+        parameters: selectedParameters,
     };
 }
 
@@ -529,16 +600,27 @@ export function buildReportBuilderSemanticDiagnosticTargets({
         return {
             measureDiagnosticsById: {},
             dimensionDiagnosticsById: {},
+            parameterDiagnosticsById: {},
             groupByDiagnostics: [],
             unmatchedDiagnostics: [],
         };
     }
     const selectedDimensionRawIds = buildSemanticSelectionRawIds(config.dimensions, resolveSemanticSelectedDimensions(config, state));
     const selectedMeasureRawIds = buildSemanticSelectionRawIds(semanticSelectableMeasureFields(config), state?.selectedMeasures);
+    const selectedParametersBySemanticRef = new Map(
+        semanticSelectableParameterFields(config)
+            .filter((field) => {
+                const rawId = normalizeString(field?.id || field?.field);
+                return !!rawId && hasConfiguredSemanticParameterValue(field, state?.staticFilters?.[rawId]);
+            })
+            .map((field) => [semanticFieldId(field), normalizeString(field?.id || field?.field)])
+            .filter(([semanticRef, rawId]) => !!semanticRef && !!rawId),
+    );
     const groupByDimensionId = resolveGroupByDimensionId(config, state);
     const normalizedDiagnostics = normalizeReportBuilderSemanticDiagnostics(diagnostics);
     const measureDiagnosticsById = {};
     const dimensionDiagnosticsById = {};
+    const parameterDiagnosticsById = {};
     const groupByDiagnostics = [];
     const unmatchedDiagnostics = [];
 
@@ -573,12 +655,22 @@ export function buildReportBuilderSemanticDiagnosticTargets({
                 return;
             }
         }
+        const parameterMatch = /^selection\.parameters(?:\.([^.[]+)|\[(?:"([^"]+)"|'([^']+)'|([^[\]]+))\])/.exec(path);
+        if (parameterMatch) {
+            const semanticRef = normalizeString(parameterMatch[1] || parameterMatch[2] || parameterMatch[3] || parameterMatch[4]);
+            const rawId = selectedParametersBySemanticRef.get(semanticRef);
+            if (rawId) {
+                pushTargeted(parameterDiagnosticsById, rawId, diagnostic);
+                return;
+            }
+        }
         unmatchedDiagnostics.push(diagnostic);
     });
 
     return {
         measureDiagnosticsById,
         dimensionDiagnosticsById,
+        parameterDiagnosticsById,
         groupByDiagnostics,
         unmatchedDiagnostics,
     };
@@ -770,6 +862,45 @@ export function buildReportBuilderSemanticRuntimeDiagnostics({
     return deduped;
 }
 
+export function buildReportBuilderSemanticRuntimeDiagnosticsFromState({
+    config = {},
+    state = {},
+    binding = null,
+    model = null,
+    providerAvailable = false,
+    modelLoading = false,
+    modelError = "",
+} = {}) {
+    const normalizedBinding = normalizeSemanticBinding(binding || state?.binding || config?.binding);
+    if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
+        return [];
+    }
+    const semanticStatus = buildReportBuilderSemanticStatus({
+        binding: normalizedBinding,
+        providerAvailable,
+        loading: modelLoading,
+        error: modelError,
+        model,
+    });
+    const semanticFieldValidation = buildReportBuilderSemanticFieldValidation({
+        config,
+        state,
+        binding: normalizedBinding,
+        model,
+    });
+    const semanticGovernanceNotice = buildReportBuilderSemanticGovernanceNotice({
+        config,
+        state,
+        binding: normalizedBinding,
+    });
+    return buildReportBuilderSemanticRuntimeDiagnostics({
+        binding: normalizedBinding,
+        semanticStatus,
+        semanticGovernanceNotice,
+        semanticFieldValidation,
+    });
+}
+
 export function buildReportBuilderSemanticGovernanceNotice({
     config = {},
     state = {},
@@ -787,13 +918,15 @@ export function buildReportBuilderSemanticGovernanceNotice({
         const governance = field?.governance && typeof field.governance === "object" ? field.governance : {};
         const status = normalizeString(governance.status).toLowerCase();
         const label = normalizeString(field?.label || field?.id);
+        const ownerRef = normalizeString(governance.ownerRef);
         if (!label) {
             return;
         }
+        const itemLabel = ownerRef ? `${label} • Owner ${ownerRef}` : label;
         if (status === "draft") {
-            draftFields.push(label);
+            draftFields.push(itemLabel);
         } else if (status === "deprecated") {
-            deprecatedFields.push(label);
+            deprecatedFields.push(itemLabel);
         }
     });
 
@@ -854,6 +987,7 @@ export function buildReportBuilderSemanticFieldValidation({
             selectedIssues: [],
             measureIssuesById: {},
             dimensionIssuesById: {},
+            parameterIssuesById: {},
             message: "",
         };
     }
@@ -865,11 +999,13 @@ export function buildReportBuilderSemanticFieldValidation({
             selectedIssues: [],
             measureIssuesById: {},
             dimensionIssuesById: {},
+            parameterIssuesById: {},
             message: "",
         };
     }
     const selectedDimensionIds = resolveSemanticSelectedDimensions(config, state);
     const selectedMeasureIds = normalizeFieldSelectionIds(state?.selectedMeasures);
+    const selectedParameterIds = resolveSelectedSemanticParameterIds(config, state);
     const dimensionResult = buildSemanticFieldIssues(
         config.dimensions,
         new Set((entity.dimensions || []).map((field) => normalizeString(field?.id || field?.key))),
@@ -880,14 +1016,19 @@ export function buildReportBuilderSemanticFieldValidation({
         new Set((entity.measures || []).map((field) => normalizeString(field?.id || field?.key))),
         selectedMeasureIds,
     );
-    const selectedIssues = [...dimensionResult.selectedIssues, ...measureResult.selectedIssues];
-    const issues = [...dimensionResult.issues, ...measureResult.issues];
+    const parameterResult = buildSemanticFieldIssues(
+        semanticDiagnosableParameterFields(config),
+        new Set((entity.parameters || []).map((field) => normalizeString(field?.id || field?.key))),
+        selectedParameterIds,
+    );
+    const selectedIssues = [...dimensionResult.selectedIssues, ...measureResult.selectedIssues, ...parameterResult.selectedIssues];
+    const issues = [...dimensionResult.issues, ...measureResult.issues, ...parameterResult.issues];
     let message = "";
     if (selectedIssues.length === 1) {
         const issue = selectedIssues[0];
         message = `${issue.message} Remove it or add a valid semantic mapping before running the report.`;
     } else if (selectedIssues.length > 1) {
-        message = `${selectedIssues.length} selected fields are not valid for the current semantic entity. Remove them or add valid semantic mappings before running the report.`;
+        message = `${selectedIssues.length} selected fields or scope parameters are not valid for the current semantic entity. Remove them or add valid semantic mappings before running the report.`;
     }
     return {
         canRun: selectedIssues.length === 0,
@@ -895,6 +1036,7 @@ export function buildReportBuilderSemanticFieldValidation({
         selectedIssues,
         measureIssuesById: measureResult.issueIndex,
         dimensionIssuesById: dimensionResult.issueIndex,
+        parameterIssuesById: parameterResult.issueIndex,
         message,
     };
 }
@@ -955,6 +1097,8 @@ function buildReportBuilderSemanticSummaryField(semanticId = "", configIndex = n
     const rawId = normalizeString(configField?.id || configField?.key);
     const description = normalizeString(resolvedField?.description || entityField?.description);
     const format = normalizeString(resolvedField?.format || entityField?.format);
+    const category = normalizeString(resolvedField?.category || entityField?.category);
+    const definitionRef = normalizeString(resolvedField?.definitionRef || entityField?.definitionRef);
     const governance = normalizeSemanticSummaryGovernance(resolvedField?.governance || entityField?.governance);
     return {
         id: normalizedSemanticId,
@@ -962,6 +1106,8 @@ function buildReportBuilderSemanticSummaryField(semanticId = "", configIndex = n
         label,
         ...(description ? { description } : {}),
         ...(format ? { format } : {}),
+        ...(category ? { category } : {}),
+        ...(definitionRef ? { definitionRef } : {}),
         ...(governance ? { governance } : {}),
     };
 }
@@ -988,13 +1134,18 @@ export function buildReportBuilderSemanticSummary({
     const entity = resolveReportBuilderSemanticEntity(normalizedModel, normalizedBinding);
     const configMeasureIndex = buildSemanticFieldIndex(semanticSelectableMeasureFields(config));
     const configDimensionIndex = buildSemanticFieldIndex(config.dimensions || []);
+    const configParameterIndex = buildSemanticFieldIndex(semanticSelectableParameterFields(config));
     const entityMeasureIndex = buildSemanticFieldIndex(entity?.measures || []);
     const entityDimensionIndex = buildSemanticFieldIndex(entity?.dimensions || []);
+    const entityParameterIndex = buildSemanticFieldIndex(entity?.parameters || []);
     const selectedDimensions = (semanticSelection?.selection?.dimensions || [])
         .map((semanticId) => buildReportBuilderSemanticSummaryField(semanticId, configDimensionIndex, entityDimensionIndex))
         .filter(Boolean);
     const selectedMeasures = (semanticSelection?.selection?.measures || [])
         .map((semanticId) => buildReportBuilderSemanticSummaryField(semanticId, configMeasureIndex, entityMeasureIndex))
+        .filter(Boolean);
+    const selectedParameters = Object.keys(semanticSelection?.parameters || {})
+        .map((semanticId) => buildReportBuilderSemanticSummaryField(semanticId, configParameterIndex, entityParameterIndex))
         .filter(Boolean);
     return {
         kind: "semantic",
@@ -1006,6 +1157,7 @@ export function buildReportBuilderSemanticSummary({
         ...(normalizeString(entity?.description) ? { entityDescription: normalizeString(entity.description) } : {}),
         selectedDimensions,
         selectedMeasures,
+        ...(selectedParameters.length > 0 ? { selectedParameters } : {}),
     };
 }
 
@@ -1021,6 +1173,8 @@ function normalizeReportBuilderSemanticSummaryField(field = {}) {
     const rawId = normalizeString(field?.rawId);
     const description = normalizeString(field?.description);
     const format = normalizeString(field?.format);
+    const category = normalizeString(field?.category);
+    const definitionRef = normalizeString(field?.definitionRef);
     const governance = normalizeSemanticSummaryGovernance(field?.governance);
     return {
         id,
@@ -1028,6 +1182,8 @@ function normalizeReportBuilderSemanticSummaryField(field = {}) {
         label,
         ...(description ? { description } : {}),
         ...(format ? { format } : {}),
+        ...(category ? { category } : {}),
+        ...(definitionRef ? { definitionRef } : {}),
         ...(governance ? { governance } : {}),
     };
 }
@@ -1045,6 +1201,9 @@ export function normalizeReportBuilderSemanticSummary(summary = null) {
     if (!modelRef || !entity) {
         return null;
     }
+    const selectedParameters = (Array.isArray(summary?.selectedParameters) ? summary.selectedParameters : [])
+        .map((field) => normalizeReportBuilderSemanticSummaryField(field))
+        .filter(Boolean);
     return {
         kind: "semantic",
         modelRef,
@@ -1059,6 +1218,7 @@ export function normalizeReportBuilderSemanticSummary(summary = null) {
         selectedMeasures: (Array.isArray(summary?.selectedMeasures) ? summary.selectedMeasures : [])
             .map((field) => normalizeReportBuilderSemanticSummaryField(field))
             .filter(Boolean),
+        ...(selectedParameters.length > 0 ? { selectedParameters } : {}),
     };
 }
 
@@ -1087,7 +1247,7 @@ function mergeReportBuilderSemanticSummaryFields(currentFields = [], fallbackFie
         .map((field) => normalizeReportBuilderSemanticSummaryField(field))
         .filter(Boolean);
     if (normalizedCurrent.length === 0) {
-        return [];
+        return normalizedFallback;
     }
     if (normalizedFallback.length === 0) {
         return normalizedCurrent;
@@ -1124,11 +1284,15 @@ export function resolveReportBuilderSemanticSummary({
     fallbackSummary = null,
     currentFingerprint = "",
     fallbackFingerprint = "",
+    allowFallbackMetadata = true,
     preferFallbackMetadata = false,
 } = {}) {
     const normalizedCurrent = normalizeReportBuilderSemanticSummary(currentSummary);
     const normalizedFallback = normalizeReportBuilderSemanticSummary(fallbackSummary);
     if (!normalizedFallback) {
+        return normalizedCurrent;
+    }
+    if (allowFallbackMetadata === false) {
         return normalizedCurrent;
     }
     const normalizedCurrentFingerprint = normalizeString(currentFingerprint);
@@ -1146,6 +1310,11 @@ export function resolveReportBuilderSemanticSummary({
     const modelDescription = normalizeString(normalizedCurrent?.modelDescription || normalizedFallback?.modelDescription);
     const entityLabel = normalizeString(normalizedCurrent?.entityLabel || normalizedFallback?.entityLabel);
     const entityDescription = normalizeString(normalizedCurrent?.entityDescription || normalizedFallback?.entityDescription);
+    const selectedParameters = mergeReportBuilderSemanticSummaryFields(
+        normalizedCurrent.selectedParameters,
+        normalizedFallback.selectedParameters,
+        { preferFallbackMetadata },
+    );
     return {
         ...normalizedFallback,
         ...normalizedCurrent,
@@ -1163,6 +1332,7 @@ export function resolveReportBuilderSemanticSummary({
             normalizedFallback.selectedMeasures,
             { preferFallbackMetadata },
         ),
+        ...(selectedParameters.length > 0 ? { selectedParameters } : {}),
     };
 }
 
@@ -1176,11 +1346,9 @@ export function semanticFieldTitle(field = {}) {
         parts.push(description);
     }
     const governance = field.governance && typeof field.governance === "object" ? field.governance : {};
-    const governanceParts = [
-        normalizeString(governance.status),
-        normalizeString(governance.certification),
-        normalizeString(governance.ownerRef),
-    ].filter(Boolean);
+    const governanceParts = buildSemanticFieldGovernanceChipViewModels(governance)
+        .map((chip) => normalizeString(chip?.label))
+        .filter(Boolean);
     if (governanceParts.length > 0) {
         parts.push(governanceParts.join(" • "));
     }
@@ -1191,7 +1359,11 @@ export function resolveSemanticGovernanceBadges(field = {}) {
     const governance = field?.governance && typeof field.governance === "object" ? field.governance : {};
     const certification = normalizeString(governance.certification).toLowerCase();
     const status = normalizeString(governance.status).toLowerCase();
+    const ownerRef = normalizeString(governance.ownerRef);
     const badges = [];
+    if (status === "approved") {
+        badges.push({ id: "approved", label: "Approved", tone: "approved" });
+    }
     if (certification === "certified") {
         badges.push({ id: "certified", label: "Certified", tone: "certified" });
     } else if (certification === "reviewed") {
@@ -1201,8 +1373,9 @@ export function resolveSemanticGovernanceBadges(field = {}) {
         badges.push({ id: "deprecated", label: "Deprecated", tone: "deprecated" });
     } else if (status === "draft") {
         badges.push({ id: "draft", label: "Draft", tone: "draft" });
-    } else if (status === "approved" && badges.length === 0) {
-        badges.push({ id: "approved", label: "Approved", tone: "approved" });
+    }
+    if (ownerRef) {
+        badges.push({ id: `owner:${ownerRef}`, label: `Owner ${ownerRef}`, tone: "owner" });
     }
     return badges;
 }

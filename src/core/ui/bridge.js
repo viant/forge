@@ -6,6 +6,14 @@ let activeSnapshotPublisher = null;
 const UI_BRIDGE_CLIENT_STORAGE_KEY = 'forge.uiBridge.clientId';
 let seededUIBridgeClientId = '';
 let activeBridgeReadyState = null;
+const DEFAULT_SNAPSHOT_EVENTS = [
+  'forge:conversation-select',
+  'forge:conversation-new',
+  'forge:conversation-active',
+  'forge:authorized',
+  'popstate',
+];
+const DEFAULT_AUTH_READY_EVENTS = ['forge:authorized'];
 
 function createBridgeReadyState() {
   let resolve = null;
@@ -117,6 +125,15 @@ function snapshotLooksStartupReady(snapshot = null) {
   return !!conversationId;
 }
 
+function normalizeEventList(value, fallback = []) {
+  const raw = Array.isArray(value) ? value : [value];
+  const events = raw
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean);
+  if (!events.length) return [...fallback];
+  return Array.from(new Set(events));
+}
+
 /**
  * Optional UI bridge for "reverse API" control.
  *
@@ -136,6 +153,7 @@ export function startUIBridge(options = {}) {
     ? options.snapshotBuilder
     : () => buildUISnapshot(snapshotOptions);
   const snapshotIntervalMs = Math.max(100, options.snapshotIntervalMs || 750);
+  const snapshotEvents = normalizeEventList(options.snapshotEvents, DEFAULT_SNAPSHOT_EVENTS);
 
   let closed = false;
   let ws = null;
@@ -168,10 +186,9 @@ export function startUIBridge(options = {}) {
     const handler = () => {
       try { publishSnapshot(); } catch (_) {}
     };
-    const events = ['agently:conversation-select', 'agently:conversation-new', 'forge:conversation-active', 'agently:authorized', 'popstate'];
-    events.forEach((eventName) => window.addEventListener(eventName, handler));
+    snapshotEvents.forEach((eventName) => window.addEventListener(eventName, handler));
     return () => {
-      events.forEach((eventName) => window.removeEventListener(eventName, handler));
+      snapshotEvents.forEach((eventName) => window.removeEventListener(eventName, handler));
     };
   };
 
@@ -268,6 +285,8 @@ export function startUIBridgeHTTP(options = {}) {
   const snapshotIntervalMs = Math.max(200, options.snapshotIntervalMs || 1000);
   const reconnectDelayMs = Math.max(500, options.reconnectDelayMs || 1000);
   const sessionHeader = options.sessionHeader || 'Mcp-Session-Id';
+  const snapshotEvents = normalizeEventList(options.snapshotEvents, DEFAULT_SNAPSHOT_EVENTS);
+  const authReadyEvents = normalizeEventList(options.authReadyEvents, DEFAULT_AUTH_READY_EVENTS);
 
   let stopped = false;
   let snapshotTimer = null;
@@ -368,10 +387,9 @@ export function startUIBridgeHTTP(options = {}) {
     const handler = () => {
       void publishSnapshot();
     };
-    const events = ['agently:conversation-select', 'agently:conversation-new', 'forge:conversation-active', 'agently:authorized', 'popstate'];
-    events.forEach((eventName) => window.addEventListener(eventName, handler));
+    snapshotEvents.forEach((eventName) => window.addEventListener(eventName, handler));
     return () => {
-      events.forEach((eventName) => window.removeEventListener(eventName, handler));
+      snapshotEvents.forEach((eventName) => window.removeEventListener(eventName, handler));
     };
   };
 
@@ -453,9 +471,9 @@ export function startUIBridgeHTTP(options = {}) {
       if (stopped) return;
       void start();
     };
-    window.addEventListener('agently:authorized', onAuthorized, { once: true });
+    authReadyEvents.forEach((eventName) => window.addEventListener(eventName, onAuthorized, { once: true }));
     detachAuthRetry = () => {
-      window.removeEventListener('agently:authorized', onAuthorized);
+      authReadyEvents.forEach((eventName) => window.removeEventListener(eventName, onAuthorized));
     };
   };
 

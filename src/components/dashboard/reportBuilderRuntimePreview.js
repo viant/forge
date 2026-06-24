@@ -19,6 +19,7 @@ import {
   buildReportBuilderSemanticSummary,
   normalizeReportBuilderSemanticSummary,
 } from "./reportBuilderSemantic.js";
+import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
 import { buildReportBuilderCalculatedFieldConfig } from "./reportBuilderCalculatedFieldAuthoring.js";
 import { applyReportRuntimeDrillTransitions } from "./reportRuntimeDrillState.js";
 import {
@@ -30,6 +31,7 @@ import {
   resolveReportRuntimeChartActionFields,
   resolveReportRuntimeRefinementFields,
 } from "./reportRuntimeModel.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -178,19 +180,18 @@ function augmentRuntimePreviewPrimaryRequest(reportSpec = {}, config = {}, state
   const drillTargetFields = (Array.isArray(drillTransitions) ? drillTransitions : [])
     .map((transition) => normalizeString(transition?.nextFieldRef))
     .filter(Boolean);
-  if (hiddenRefinementFields.length === 0 && drillTargetFields.length === 0) {
-    return nextSpec;
+  if (hiddenRefinementFields.length > 0 || drillTargetFields.length > 0) {
+    const nextDimensions = {
+      ...(request.dimensions && typeof request.dimensions === "object" ? request.dimensions : {}),
+    };
+    hiddenRefinementFields.forEach((field) => {
+      nextDimensions[field] = true;
+    });
+    drillTargetFields.forEach((field) => {
+      nextDimensions[field] = true;
+    });
+    request.dimensions = nextDimensions;
   }
-  const nextDimensions = {
-    ...(request.dimensions && typeof request.dimensions === "object" ? request.dimensions : {}),
-  };
-  hiddenRefinementFields.forEach((field) => {
-    nextDimensions[field] = true;
-  });
-  drillTargetFields.forEach((field) => {
-    nextDimensions[field] = true;
-  });
-  request.dimensions = nextDimensions;
   const refinedRequest = applyRuntimeRequestRefinementFilters(request, config);
   primaryDataset.request = typeof requestTransform === "function"
     ? (requestTransform({
@@ -238,8 +239,15 @@ export function resolveReportBuilderRuntimeRefinementCapability({
 
 export function resolveReportBuilderRuntimeScopeCapability({
   reportSpec = null,
+  reportDocument = null,
+  title = "",
 } = {}) {
-  const paramIds = (Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [])
+  const context = resolveNormalizedReportSpecDocumentContext({
+    reportSpec,
+    document: reportDocument,
+    title,
+  });
+  const paramIds = (Array.isArray(context?.scopeParams) ? context.scopeParams : [])
     .map((param) => normalizeString(param?.id))
     .filter(Boolean);
   return {
@@ -367,6 +375,8 @@ function attachRuntimePreviewCapabilities(previewModel = null, {
     ...previewModel,
     scopeCapability: resolveReportBuilderRuntimeScopeCapability({
       reportSpec: previewModel.reportSpec,
+      reportDocument: previewModel.document,
+      title: previewModel.document?.title || previewModel.reportSpec?.title || "",
     }),
     chartCapability: resolveReportBuilderRuntimeChartCapability({
       config: authoringConfig || config,
@@ -406,8 +416,17 @@ export function buildReportBuilderRuntimePreviewModel({
     return null;
   }
   const drilledState = applyReportRuntimeDrillTransitions(state, drillTransitions);
-  const authoringConfig = buildReportBuilderCalculatedFieldConfig(config, state);
-  const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, drilledState);
+  const normalizedBinding = binding || drilledState?.binding || state?.binding || config?.binding || null;
+  const authoringConfig = applyReportBuilderSemanticConfig(
+    buildReportBuilderCalculatedFieldConfig(config, state),
+    normalizedBinding,
+    semanticModel,
+  );
+  const effectiveConfig = applyReportBuilderSemanticConfig(
+    buildReportBuilderCalculatedFieldConfig(config, drilledState),
+    normalizedBinding,
+    semanticModel,
+  );
   const authoredBlockKinds = new Set(
     normalizeReportBuilderDocumentBlocks(drilledState?.reportDocumentBlocks)
       .map((block) => normalizeString(block?.kind))
@@ -425,7 +444,7 @@ export function buildReportBuilderRuntimePreviewModel({
       }),
     ] : []),
   ];
-  const basePreviewModel = attachRuntimePreviewCapabilities(buildRuntimePreviewDocumentAndSpec({
+  const initialPreviewModel = attachRuntimePreviewCapabilities(buildRuntimePreviewDocumentAndSpec({
     container,
     config: effectiveConfig,
     state: drilledState,
@@ -433,7 +452,7 @@ export function buildReportBuilderRuntimePreviewModel({
     leadingBlocks,
     trailingBlocks,
     drillTransitions,
-    requestTransform,
+    requestTransform: null,
     semanticSummary,
     binding,
     semanticModel,
@@ -442,28 +461,29 @@ export function buildReportBuilderRuntimePreviewModel({
     state: drilledState,
     authoringConfig,
     authoringState: state,
-    refinements,
-    drillTransitions,
+      refinements,
+      drillTransitions,
   });
-  const { scopeCapability, refinementCapability } = basePreviewModel;
+  const { refinementCapability } = initialPreviewModel;
   const shouldIncludeGenericRefinementBlock = includeRefinementBlock
     && !authoredBlockKinds.has("refinementBarBlock")
     && refinementCapability.supported;
-  if (!shouldIncludeGenericRefinementBlock) {
-    return basePreviewModel;
-  }
-  return attachRuntimePreviewCapabilities(buildRuntimePreviewDocumentAndSpec({
-      container,
-      config: effectiveConfig,
-      state: drilledState,
-      refinements,
-      leadingBlocks: [
+  const finalLeadingBlocks = shouldIncludeGenericRefinementBlock
+    ? [
         ...leadingBlocks,
         buildReportDocumentRefinementBarBlock({
           id: "activeRefinements",
           title: "Active Refinements",
         }),
-      ],
+      ]
+    : leadingBlocks;
+  const previewModelSource = shouldIncludeGenericRefinementBlock || typeof requestTransform === "function"
+    ? attachRuntimePreviewCapabilities(buildRuntimePreviewDocumentAndSpec({
+      container,
+      config: effectiveConfig,
+      state: drilledState,
+      refinements,
+      leadingBlocks: finalLeadingBlocks,
       trailingBlocks,
       drillTransitions,
       requestTransform,
@@ -477,7 +497,16 @@ export function buildReportBuilderRuntimePreviewModel({
       authoringState: state,
       refinements,
       drillTransitions,
-    });
+    })
+    : initialPreviewModel;
+  const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
+    semanticSummary: previewModelSource?.reportSpec?.semanticSummary || null,
+    binding: previewModelSource?.reportSpec?.binding || normalizedBinding,
+  });
+  return {
+    ...previewModelSource,
+    ...(semanticBindingViewState ? { semanticBindingViewState: cloneValue(semanticBindingViewState) } : {}),
+  };
 }
 
 export function buildReportBuilderRuntimePreview({
@@ -517,6 +546,7 @@ export function buildReportBuilderRuntimePreview({
       reportSpec: artifacts.reportSpec,
       reportFill: artifacts.reportFill,
       reportPrint: artifacts.reportPrint,
+      semanticBindingViewState: artifacts.semanticBindingViewState || model?.semanticBindingViewState || null,
       hostIntent,
     }),
   };
@@ -565,6 +595,7 @@ export function buildReportBuilderRuntimePreviewArtifacts({
     reportSpec: cloneValue(model.reportSpec),
     reportFill: previewReportFill,
     reportPrint: previewReportPrint,
+    ...(model?.semanticBindingViewState ? { semanticBindingViewState: cloneValue(model.semanticBindingViewState) } : {}),
     exportRequest,
   };
 }

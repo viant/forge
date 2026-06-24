@@ -35,6 +35,28 @@ function normalizeLayoutItemSize(value = "") {
   return normalizeString(value).toLowerCase() === "half" ? "half" : "";
 }
 
+export function extractReportDocumentTemplateIdentity(document = null) {
+  const explicitTemplateId = normalizeString(document?.templateId);
+  const explicitTemplateLabel = normalizeString(document?.templateLabel);
+  if (explicitTemplateId || explicitTemplateLabel) {
+    return {
+      ...(explicitTemplateId ? { templateId: explicitTemplateId } : {}),
+      ...(explicitTemplateLabel ? { templateLabel: explicitTemplateLabel } : {}),
+    };
+  }
+  const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
+  const reportBuilderBlock = blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null;
+  const embeddedTemplateId = normalizeString(reportBuilderBlock?.state?.reportDocumentTemplateId);
+  const embeddedTemplateLabel = normalizeString(reportBuilderBlock?.state?.reportDocumentTemplateLabel);
+  if (!embeddedTemplateId && !embeddedTemplateLabel) {
+    return null;
+  }
+  return {
+    ...(embeddedTemplateId ? { templateId: embeddedTemplateId } : {}),
+    ...(embeddedTemplateLabel ? { templateLabel: embeddedTemplateLabel } : {}),
+  };
+}
+
 function buildLayoutItem(blockId = "", { size = "" } = {}) {
   const normalizedBlockId = normalizeString(blockId);
   if (!normalizedBlockId) {
@@ -316,6 +338,18 @@ function resolveDocumentDataSourceRef(container = {}, config = {}) {
   return normalizeString(container?.dataSourceRef || config?.dataSourceRef);
 }
 
+function resolveDocumentTemplateIdentity(state = {}) {
+  const templateId = normalizeString(state?.reportDocumentTemplateId);
+  const templateLabel = normalizeString(state?.reportDocumentTemplateLabel);
+  if (!templateId && !templateLabel) {
+    return null;
+  }
+  return {
+    ...(templateId ? { templateId } : {}),
+    ...(templateLabel ? { templateLabel } : {}),
+  };
+}
+
 function stripReportBuilderDocumentAuthoringState(state = {}) {
   const next = cloneValue(isPlainObject(state) ? state : {});
   delete next.reportDocumentBlocks;
@@ -348,10 +382,12 @@ export function buildReportDocumentScopeParams(config = {}, state = {}) {
         return null;
       }
       const value = resolveScopeParamValue(filter, state);
+      const description = normalizeString(filter?.description);
       return {
         id,
         kind: normalizeString(filter?.type || (filter?.multiple ? "multiSelect" : "value")) || "value",
         label: normalizeString(filter?.label || id),
+        ...(description ? { description } : {}),
         required: filter?.required === true,
         value,
       };
@@ -626,6 +662,7 @@ export function buildReportBuilderReportDocument({
     title: resolveDocumentMetadataValue(state?.reportDocumentTitle, resolveDocumentTitle(container, config)),
     subtitle: normalizeString(state?.reportDocumentSubtitle),
     description: normalizeString(state?.reportDocumentDescription),
+    ...(resolveDocumentTemplateIdentity(state) || {}),
     ...(semanticSummary && typeof semanticSummary === "object" && !Array.isArray(semanticSummary)
       ? { semanticSummary: cloneValue(semanticSummary) }
       : {}),

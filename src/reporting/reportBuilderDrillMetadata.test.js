@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { createReportBuilderDrillMetadataProvider, normalizeReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
+import { createReportBuilderDrillMetadataProvider, normalizeReportBuilderDrillMetadata, resolveReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
 
 const config = {
   drillMetadata: {
@@ -72,6 +72,96 @@ assert.deepEqual(normalizeReportBuilderDrillMetadata(config), {
         { id: "region", field: "region", label: "Region" },
         { id: "country", field: "country", label: "Market" },
         { id: "metrocode", field: "metrocode", label: "Metro Area" },
+      ],
+    },
+  ],
+  detailTargets: [
+    {
+      targetRef: "target://demo/date-detail",
+      navigationMode: "hostRoute",
+      parameters: {
+        eventDate: "$value",
+      },
+    },
+    {
+      targetRef: "target://demo/channel-detail",
+      navigationMode: "hostRoute",
+      parameters: {
+        channel: "$value",
+      },
+    },
+  ],
+  fieldActions: [
+    {
+      fieldRef: "eventDate",
+      actions: [
+        { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://demo/date-detail" },
+      ],
+    },
+    {
+      fieldRef: "channelV2",
+      actions: [
+        { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
+        { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://demo/channel-detail" },
+      ],
+    },
+  ],
+});
+
+assert.deepEqual(resolveReportBuilderDrillMetadata(config, {
+  hierarchies: [],
+}), {
+  hierarchies: [],
+  detailTargets: [
+    {
+      targetRef: "target://demo/date-detail",
+      navigationMode: "hostRoute",
+      parameters: {
+        eventDate: "$value",
+      },
+    },
+    {
+      targetRef: "target://demo/channel-detail",
+      navigationMode: "hostRoute",
+      parameters: {
+        channel: "$value",
+      },
+    },
+  ],
+  fieldActions: [
+    {
+      fieldRef: "eventDate",
+      actions: [
+        { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://demo/date-detail" },
+      ],
+    },
+    {
+      fieldRef: "channelV2",
+      actions: [
+        { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
+        { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://demo/channel-detail" },
+      ],
+    },
+  ],
+});
+
+assert.deepEqual(resolveReportBuilderDrillMetadata(config, {
+  hierarchies: [
+    {
+      id: "replacement",
+      levels: [
+        { field: "eventDate", label: "Date" },
+        { field: "country", label: "Market" },
+      ],
+    },
+  ],
+}), {
+  hierarchies: [
+    {
+      id: "replacement",
+      levels: [
+        { id: "eventDate", field: "eventDate", label: "Date" },
+        { id: "country", field: "country", label: "Market" },
       ],
     },
   ],

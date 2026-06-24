@@ -65,7 +65,7 @@ assert.deepEqual(buildReportRuntimeHostIntentViewModel({
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -80,7 +80,7 @@ assert.deepEqual(buildReportRuntimeHostIntentViewModel({
     description: "Ready for host routing.",
     intentKind: "detailTarget",
     navigationMode: "hostRoute",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
     parameters: [
       { key: "channel", value: "Display" },
       { key: "scope", value: "national" },

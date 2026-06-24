@@ -56,9 +56,10 @@ import { RAW_ROWS } from "./previewDemoRows.js";
 import { buildPreviewAuthoredReport, buildPreviewAuthoredReportModel } from "./previewAuthoredReport.js";
 import {
   PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
+  buildPreviewSavedReportPayloadRecordFromSeed,
   buildPreviewSavedReportPayloadRecord,
 } from "./previewSavedReportPayload.js";
-import { buildForecastDirectSeriesFixtureState } from "../../reporting/fixtures/forecastDirectSeriesFixtureState.js";
+import { buildCapacityDirectSeriesFixtureState } from "../../reporting/fixtures/capacityDirectSeriesFixtureState.js";
 
 const container = {
   id: "demoReportBuilder",
@@ -68,7 +69,7 @@ const container = {
 };
 
 const semanticModel = {
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   version: 1,
   label: "Ad Delivery",
   entities: [
@@ -93,11 +94,117 @@ const semanticModel = {
           aggregation: "sum",
         },
         {
+          id: "audience_index",
+          label: "Audience Index",
+          format: "number",
+          dataType: "number",
+          aggregation: "avg",
+          category: "Audience",
+          definitionRef: "harmonizer://feature/user.segment.index",
+          governance: {
+            status: "approved",
+            certification: "reviewed",
+            classification: "harmonizer.audience",
+          },
+        },
+        {
           id: "household_uniques",
           label: "Household Uniques",
           format: "compactNumber",
           dataType: "number",
           aggregation: "sum",
+        },
+      ],
+      parameters: [
+        {
+          id: "reporting_window",
+          label: "Date Range",
+          dataType: "date",
+        },
+        {
+          id: "delivery_channels_filter",
+          label: "Channels",
+          dataType: "string",
+        },
+        {
+          id: "audience_segment",
+          label: "Audience Segment",
+          dataType: "string",
+          category: "Audience",
+          definitionRef: "harmonizer://feature/user.segment",
+          governance: {
+            status: "approved",
+            classification: "harmonizer.audience",
+          },
+        },
+      ],
+    },
+  ],
+};
+
+const flatFieldSemanticModel = {
+  modelRef: "model://example/performance/delivery@v1",
+  version: 1,
+  label: "Ad Delivery",
+  entities: [
+    {
+      id: "line_delivery",
+      label: "Line Delivery",
+      fields: [
+        { id: "event_date", label: "Event Date", featureType: "dimension", dataType: "date" },
+        { id: "channel", label: "Channel", featureType: "dimension", dataType: "string" },
+        {
+          id: "country_code",
+          label: "Market",
+          featureType: "dimension",
+          dataType: "string",
+          category: "Location",
+          definitionRef: "harmonizer://feature/location",
+          governance: {
+            status: "approved",
+            classification: "harmonizer.audience",
+          },
+        },
+        {
+          id: "available_impressions",
+          label: "Available Impressions",
+          featureType: "measure",
+          format: "compactNumber",
+          dataType: "number",
+          aggregation: "sum",
+        },
+        {
+          id: "audience_index",
+          label: "Audience Index",
+          featureType: "measure",
+          format: "number",
+          dataType: "number",
+          aggregation: "avg",
+          category: "Audience",
+          definitionRef: "harmonizer://feature/user.segment.index",
+          governance: {
+            status: "approved",
+            certification: "reviewed",
+            classification: "harmonizer.audience",
+          },
+        },
+        {
+          id: "audience_segment",
+          label: "Audience Segment",
+          featureType: "parameter",
+          dataType: "string",
+          category: "Audience",
+          definitionRef: "harmonizer://feature/user.segment",
+          governance: {
+            status: "approved",
+            classification: "harmonizer.audience",
+          },
+        },
+        {
+          id: "reporting_window",
+          label: "Date Range",
+          featureType: "parameter",
+          dataType: "date",
         },
       ],
     },
@@ -108,13 +215,14 @@ const reportBuilderConfig = {
   title: "Report Builder Demo",
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel", "country_code"],
     selectedMeasures: ["available_impressions"],
   },
   measures: [
     { id: "avails", key: "avails", semanticRef: "available_impressions", label: "Avails", default: true, format: "compactNumber" },
+    { id: "audienceIndex", key: "audienceIndex", semanticRef: "audience_index", label: "Audience Index", format: "number", aggregation: "avg" },
     { id: "hhUniqs", key: "hhUniqs", semanticRef: "household_uniques", label: "HH Uniques", format: "compactNumber" },
   ],
   computedMeasures: [
@@ -201,13 +309,16 @@ const reportBuilderConfig = {
   staticFilters: [
     {
       id: "dateRange",
+      semanticRef: "reporting_window",
       type: "dateRange",
+      label: "Date Range",
       required: true,
       startParamPath: "filters.From",
       endParamPath: "filters.To",
     },
     {
       id: "channelsFilter",
+      semanticRef: "delivery_channels_filter",
       label: "Channels",
       multiple: true,
       options: [
@@ -215,12 +326,22 @@ const reportBuilderConfig = {
         { label: "CTV", value: "CTV" },
       ],
     },
+    {
+      id: "audienceSegmentFilter",
+      semanticRef: "audience_segment",
+      label: "Audience Segment",
+      multiple: true,
+      options: [
+        { label: "Young Adults", value: "Young Adults" },
+        { label: "Established Adults", value: "Established Adults" },
+      ],
+    },
   ],
   drillMetadata: {
     hierarchies: [
       {
-        id: "forecast_inventory",
-        label: "Forecast Inventory",
+        id: "capacity_inventory",
+        label: "Capacity Inventory",
         levels: [
           { field: "channelV2", label: "Channel" },
           { field: "publisher", label: "Publisher" },
@@ -228,8 +349,8 @@ const reportBuilderConfig = {
         ],
       },
       {
-        id: "forecast_location",
-        label: "Forecast Location",
+        id: "capacity_location",
+        label: "Capacity Location",
         levels: [
           { field: "country", label: "Market" },
           { field: "region", label: "Region" },
@@ -242,19 +363,19 @@ const reportBuilderConfig = {
         fieldRef: "channelV2",
         actions: [
           { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
-          { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+          { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
         ],
       },
       {
         fieldRef: "country",
         actions: [
-          { id: "detail_market", label: "Show market details", kind: "detail", targetRef: "target://steward/performance/market-detail" },
+          { id: "detail_market", label: "Show market details", kind: "detail", targetRef: "target://example/performance/market-detail" },
         ],
       },
     ],
     detailTargets: [
       {
-        targetRef: "target://steward/performance/channel-detail",
+        targetRef: "target://example/performance/channel-detail",
         navigationMode: "hostRoute",
         parameters: {
           channel: "$value",
@@ -262,7 +383,7 @@ const reportBuilderConfig = {
         },
       },
       {
-        targetRef: "target://steward/performance/market-detail",
+        targetRef: "target://example/performance/market-detail",
         navigationMode: "hostRoute",
         parameters: {
           country: "$value",
@@ -298,6 +419,7 @@ const reportBuilderConfig = {
     ],
     orderFields: [
       { value: "eventDate", field: "eventDate", default: true, defaultDirection: "asc" },
+      { value: "audienceIndex", field: "audienceIndex", defaultDirection: "desc" },
       { value: "avails", field: "avails", defaultDirection: "desc" },
       { value: "hhUniqs", field: "hhUniqs", defaultDirection: "desc" },
     ],
@@ -365,6 +487,24 @@ function summarizeRuntimeRows(rows = [], key = "", measureKey = "") {
   return (Array.isArray(rows) ? rows : []).reduce((acc, row) => {
     const groupValue = String(row?.[key] ?? "");
     acc[groupValue] = Number(acc[groupValue] || 0) + Number(row?.[measureKey] || 0);
+    return acc;
+  }, {});
+}
+
+function summarizeAverageRuntimeRows(rows = [], key = "", measureKey = "") {
+  const groups = (Array.isArray(rows) ? rows : []).reduce((acc, row) => {
+    const groupValue = String(row?.[key] ?? "");
+    const numericValue = Number(row?.[measureKey] || 0);
+    if (!acc[groupValue]) {
+      acc[groupValue] = { sum: 0, count: 0 };
+    }
+    acc[groupValue].sum += numericValue;
+    acc[groupValue].count += 1;
+    return acc;
+  }, {});
+  return Object.keys(groups).reduce((acc, groupValue) => {
+    const group = groups[groupValue];
+    acc[groupValue] = group.count > 0 ? (group.sum / group.count) : 0;
     return acc;
   }, {});
 }
@@ -673,34 +813,34 @@ const inventoryLadderRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingQ3",
-  title: "Forecasting Q3",
-  templateId: "forecast_inventory_brief",
+  reportId: "capacityQ3",
+  title: "Capacity Q3",
+  templateId: "capacity_inventory_brief",
   presetKind: "table",
   presetTitle: "Inventory Ladder",
   documentVersion: 4,
-  artifactId: "forecasting_q3_inventory_ladder",
+  artifactId: "capacity_q3_inventory_ladder",
   savedAt: 9100,
 });
 
-assert.equal(inventoryLadderRecord.savedReportPayload.sourceArtifactId, "forecasting_q3_inventory_ladder");
+assert.equal(inventoryLadderRecord.savedReportPayload.sourceArtifactId, "capacity_q3_inventory_ladder");
 assert.equal(inventoryLadderRecord.savedReportPayload.sourceSession.sourceRef.kind, "reportBuilder.reportTemplate");
-assert.equal(inventoryLadderRecord.savedReportPayload.sourceSession.sourceRef.templateId, "forecast_inventory_brief");
-assert.equal(inventoryLadderRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Forecast Inventory Brief");
+assert.equal(inventoryLadderRecord.savedReportPayload.sourceSession.sourceRef.templateId, "capacity_inventory_brief");
+assert.equal(inventoryLadderRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Capacity Inventory Brief");
 assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.viewMode, "table");
 assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.chartSpec?.xField, "channelV2");
-assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "forecast_inventory_brief");
-assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Forecast Inventory Brief");
+assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "capacity_inventory_brief");
+assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Capacity Inventory Brief");
 assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.activeTablePreset?.title, "Inventory Ladder");
 assert.equal(inventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.lastTablePreset?.title, "Inventory Ladder");
 assert.equal(inventoryLadderRecord.reportFill.kind, "reportFill");
 assert.equal(inventoryLadderRecord.reportPrint.kind, "reportPrint");
 assert.equal(validateReportPrint(inventoryLadderRecord.reportPrint).valid, true);
 assert.equal(validateReportExportRequest(inventoryLadderRecord.exportRequest).valid, true);
-assert.equal(inventoryLadderRecord.reportPrint.title, "Forecasting Q3");
-assert.equal(inventoryLadderRecord.runtimeBlock.title, "Forecasting Q3");
-assert.equal(inventoryLadderRecord.runtimeBlock.dashboard.reportRuntime.reportSpec.title, "Forecasting Q3");
-assert.equal(inventoryLadderRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.title, "Forecasting Q3");
+assert.equal(inventoryLadderRecord.reportPrint.title, "Capacity Q3");
+assert.equal(inventoryLadderRecord.runtimeBlock.title, "Capacity Q3");
+assert.equal(inventoryLadderRecord.runtimeBlock.dashboard.reportRuntime.reportSpec.title, "Capacity Q3");
+assert.equal(inventoryLadderRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.title, "Capacity Q3");
 assert.equal(inventoryLadderRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.kind, "reportPrint");
 assert.equal(inventoryLadderRecord.exportRequest.source.from, "savedPayload");
 assert.equal(inventoryLadderRecord.exportRequest.source.payloadId, inventoryLadderRecord.savedReportPayload.payloadId);
@@ -709,7 +849,7 @@ assert.equal(inventoryLadderRecord.savedReportPayload.compileState.status, "clea
 assert.deepEqual(inventoryLadderRecord.savedReportPayload.compileState.diagnostics || [], []);
 assert.equal(inventoryLadderRecord.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.primaryTable"), true);
 assert.deepEqual(
-  findHierarchy(inventoryLadderRecord.savedReportPayload.reportSpec, "forecast_inventory")?.levels?.map((level) => level.field),
+  findHierarchy(inventoryLadderRecord.savedReportPayload.reportSpec, "capacity_inventory")?.levels?.map((level) => level.field),
   ["channelV2", "publisher", "siteType"],
 );
 
@@ -720,12 +860,12 @@ assert.equal(hydratedInventoryLadder.state.viewMode, "table");
 assert.equal(hydratedInventoryLadder.state.chartSpec?.xField, "channelV2");
 assert.deepEqual(hydratedInventoryLadder.state.selectedDimensions, ["channelV2"]);
 assert.deepEqual(hydratedInventoryLadder.state.selectedMeasures, ["avails", "hhUniqs", "reachRate"]);
-assert.equal(hydratedInventoryLadder.state.reportDocumentTemplateId, "forecast_inventory_brief");
-assert.equal(hydratedInventoryLadder.state.reportDocumentTemplateLabel, "Forecast Inventory Brief");
+assert.equal(hydratedInventoryLadder.state.reportDocumentTemplateId, "capacity_inventory_brief");
+assert.equal(hydratedInventoryLadder.state.reportDocumentTemplateLabel, "Capacity Inventory Brief");
 assert.equal(findTablePresetState(hydratedInventoryLadder.state).active?.title, "Inventory Ladder");
 assert.equal(findTablePresetState(hydratedInventoryLadder.state).last?.title, "Inventory Ladder");
 assert.deepEqual(
-  findHierarchy({ drillMetadata: hydratedInventoryLadder.config.drillMetadata }, "forecast_inventory")?.levels?.map((level) => level.field),
+  findHierarchy({ drillMetadata: hydratedInventoryLadder.config.drillMetadata }, "capacity_inventory")?.levels?.map((level) => level.field),
   ["channelV2", "publisher", "siteType"],
 );
 
@@ -793,28 +933,28 @@ const locationLadderRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingLocationQ3",
-  title: "Forecasting Location Q3",
-  templateId: "forecast_location_brief",
+  reportId: "capacityLocationQ3",
+  title: "Capacity Location Q3",
+  templateId: "capacity_location_brief",
   presetKind: "table",
   presetTitle: "Location Ladder",
   documentVersion: 5,
-  artifactId: "forecasting_q3_location_ladder",
+  artifactId: "capacity_q3_location_ladder",
   savedAt: 9200,
 });
 
-assert.equal(locationLadderRecord.savedReportPayload.sourceArtifactId, "forecasting_q3_location_ladder");
+assert.equal(locationLadderRecord.savedReportPayload.sourceArtifactId, "capacity_q3_location_ladder");
 assert.equal(locationLadderRecord.savedReportPayload.sourceSession.sourceRef.kind, "reportBuilder.reportTemplate");
-assert.equal(locationLadderRecord.savedReportPayload.sourceSession.sourceRef.templateId, "forecast_location_brief");
-assert.equal(locationLadderRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Forecast Location Brief");
+assert.equal(locationLadderRecord.savedReportPayload.sourceSession.sourceRef.templateId, "capacity_location_brief");
+assert.equal(locationLadderRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Capacity Location Brief");
 assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.viewMode, "table");
 assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.chartSpec?.xField, "country");
-assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "forecast_location_brief");
-assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Forecast Location Brief");
+assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "capacity_location_brief");
+assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Capacity Location Brief");
 assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.activeTablePreset?.title, "Location Ladder");
 assert.equal(locationLadderRecord.savedReportPayload.reportDocument.blocks[0].state.lastTablePreset?.title, "Location Ladder");
 assert.deepEqual(
-  findHierarchy(locationLadderRecord.savedReportPayload.reportSpec, "forecast_location")?.levels?.map((level) => level.field),
+  findHierarchy(locationLadderRecord.savedReportPayload.reportSpec, "capacity_location")?.levels?.map((level) => level.field),
   ["country", "region", "metrocode"],
 );
 
@@ -824,12 +964,12 @@ assert.equal(hydratedLocationLadder.state.viewMode, "table");
 assert.equal(hydratedLocationLadder.state.chartSpec?.xField, "country");
 assert.deepEqual(hydratedLocationLadder.state.selectedDimensions, ["country"]);
 assert.deepEqual(hydratedLocationLadder.state.selectedMeasures, ["avails", "hhUniqs", "reachRate"]);
-assert.equal(hydratedLocationLadder.state.reportDocumentTemplateId, "forecast_location_brief");
-assert.equal(hydratedLocationLadder.state.reportDocumentTemplateLabel, "Forecast Location Brief");
+assert.equal(hydratedLocationLadder.state.reportDocumentTemplateId, "capacity_location_brief");
+assert.equal(hydratedLocationLadder.state.reportDocumentTemplateLabel, "Capacity Location Brief");
 assert.equal(findTablePresetState(hydratedLocationLadder.state).active?.title, "Location Ladder");
 assert.equal(findTablePresetState(hydratedLocationLadder.state).last?.title, "Location Ladder");
 assert.deepEqual(
-  findHierarchy({ drillMetadata: hydratedLocationLadder.config.drillMetadata }, "forecast_location")?.levels?.map((level) => level.field),
+  findHierarchy({ drillMetadata: hydratedLocationLadder.config.drillMetadata }, "capacity_location")?.levels?.map((level) => level.field),
   ["country", "region", "metrocode"],
 );
 
@@ -838,13 +978,13 @@ const landscapeInventoryLadderRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingQ3Landscape",
-  title: "Forecasting Q3 Landscape",
-  templateId: "forecast_inventory_brief",
+  reportId: "capacityQ3Landscape",
+  title: "Capacity Q3 Landscape",
+  templateId: "capacity_inventory_brief",
   presetKind: "table",
   presetTitle: "Inventory Ladder",
   documentVersion: 9,
-  artifactId: "forecasting_q3_inventory_ladder_landscape",
+  artifactId: "capacity_q3_inventory_ladder_landscape",
   savedAt: 9600,
   pageGeometry: PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
 });
@@ -855,9 +995,9 @@ assert.equal(landscapeInventoryLadderRecord.exportRequest.reportPrint.pageGeomet
 assert.equal(landscapeInventoryLadderRecord.exportRequest.reportPrint.pageGeometry.height, 612);
 assert.equal(landscapeInventoryLadderRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.pageGeometry.width, 792);
 assert.equal(landscapeInventoryLadderRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.pageGeometry.height, 612);
-assert.equal(landscapeInventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "forecast_inventory_brief");
+assert.equal(landscapeInventoryLadderRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "capacity_inventory_brief");
 assert.deepEqual(
-  findHierarchy(landscapeInventoryLadderRecord.savedReportPayload.reportSpec, "forecast_inventory")?.levels?.map((level) => level.field),
+  findHierarchy(landscapeInventoryLadderRecord.savedReportPayload.reportSpec, "capacity_inventory")?.levels?.map((level) => level.field),
   ["channelV2", "publisher", "siteType"],
 );
 
@@ -866,13 +1006,13 @@ const landscapeLocationRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingLocationsTopMarketsQ3Landscape",
-  title: "Forecasting Locations Top Markets Q3 Landscape",
-  templateId: "forecast_location_brief",
+  reportId: "capacityLocationsTopMarketsQ3Landscape",
+  title: "Capacity Locations Top Markets Q3 Landscape",
+  templateId: "capacity_location_brief",
   presetKind: "chart",
   presetTitle: "Locations · Top Markets",
   documentVersion: 10,
-  artifactId: "forecasting_q3_locations_top_markets_landscape",
+  artifactId: "capacity_q3_locations_top_markets_landscape",
   savedAt: 9700,
   pageGeometry: PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
 });
@@ -883,10 +1023,10 @@ assert.equal(landscapeLocationRecord.exportRequest.reportPrint.pageGeometry.widt
 assert.equal(landscapeLocationRecord.exportRequest.reportPrint.pageGeometry.height, 612);
 assert.equal(landscapeLocationRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.pageGeometry.width, 792);
 assert.equal(landscapeLocationRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.pageGeometry.height, 612);
-assert.equal(landscapeLocationRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "forecast_location_brief");
+assert.equal(landscapeLocationRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "capacity_location_brief");
 assert.equal(landscapeLocationRecord.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.primaryChart"), true);
 assert.deepEqual(
-  findHierarchy(landscapeLocationRecord.savedReportPayload.reportSpec, "forecast_location")?.levels?.map((level) => level.field),
+  findHierarchy(landscapeLocationRecord.savedReportPayload.reportSpec, "capacity_location")?.levels?.map((level) => level.field),
   ["country", "region", "metrocode"],
 );
 
@@ -951,8 +1091,284 @@ assert.ok(authoredChannelChartBlock, "An authored chart block should be preserve
 assert.equal(authoredChannelChartBlock?.chartSpec?.xField, "channelV2");
 assert.equal(authoredChannelChartBlock?.chartModel?.type, "horizontal_bar");
 assert.equal(
-  authoredChannelChartRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentBlocks.some((block) => block.id === "channelDetailChart" && block.kind === "chartBlock"),
+  authoredChannelChartRecord.savedReportPayload.reportDocument.blocks.some((block) => block.id === "channelDetailChart" && block.kind === "chartBlock"),
   true,
+);
+
+const authoredUnselectedMeasureKpiRecord = buildPreviewSavedReportPayloadRecord({
+  container,
+  reportBuilderConfig,
+  rows: RAW_ROWS,
+  semanticModel,
+  reportId: "authoredUnselectedMeasureKpiQ3",
+  title: "Authored Unselected Measure KPI Q3",
+  artifactId: "authored_unselected_measure_kpi_q3",
+  documentVersion: 9,
+  savedAt: 9365,
+  baseState: {
+    selectedMeasures: ["hhUniqs"],
+    primaryMeasure: "hhUniqs",
+    selectedDimensions: ["eventDate"],
+    viewMode: "table",
+    chartSpec: null,
+    orderField: "eventDate",
+    orderDir: "asc",
+    pageSize: 50,
+    staticFilters: {
+      dateRange: {
+        start: "2026-05-01",
+        end: "2026-05-04",
+      },
+    },
+    binding: cloneValue(reportBuilderConfig.binding || null),
+    reportDocumentBlocks: [
+      {
+        id: "headlineReachKpi",
+        kind: "kpiBlock",
+        title: "Reach KPI",
+        datasetRef: "primary",
+        valueField: "avails",
+        valueLabel: "Avails",
+      },
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "primaryBuilder" },
+        { blockId: "headlineReachKpi" },
+      ],
+    },
+  },
+});
+assert.equal(authoredUnselectedMeasureKpiRecord.savedReportPayload.compileState.status, "clean");
+assert.deepEqual(authoredUnselectedMeasureKpiRecord.savedReportPayload.compileState.diagnostics || [], []);
+assert.deepEqual(authoredUnselectedMeasureKpiRecord.savedReportPayload.reportDocument.blocks[0].state.selectedMeasures, ["hhUniqs"]);
+assert.equal(
+  authoredUnselectedMeasureKpiRecord.savedReportPayload.reportSpec.datasets[0]?.request?.measures?.avails,
+  true,
+);
+const hydratedAuthoredUnselectedMeasureKpi = buildHydratedFromRecord(authoredUnselectedMeasureKpiRecord, 9, 9365);
+assert.equal(hydratedAuthoredUnselectedMeasureKpi.valid, true);
+assert.equal(hydratedAuthoredUnselectedMeasureKpi.compileState.status, "clean");
+assert.deepEqual(hydratedAuthoredUnselectedMeasureKpi.state.selectedMeasures, ["hhUniqs"]);
+assert.equal(
+  hydratedAuthoredUnselectedMeasureKpi.state.reportDocumentBlocks.some((block) => block.id === "headlineReachKpi" && block.valueField === "avails"),
+  true,
+);
+
+const authoredAudienceSegmentRecord = buildPreviewSavedReportPayloadRecord({
+  container,
+  reportBuilderConfig,
+  rows: RAW_ROWS,
+  semanticModel,
+  reportId: "authoredAudienceSegmentIndexQ3",
+  title: "Authored Audience Segment Index Q3",
+  artifactId: "authored_audience_segment_index_q3",
+  documentVersion: 13,
+  savedAt: 9375,
+  baseState: {
+    selectedMeasures: ["audienceIndex"],
+    primaryMeasure: "audienceIndex",
+    selectedDimensions: ["country"],
+    viewMode: "table",
+    chartSpec: null,
+    orderField: "audienceIndex",
+    orderDir: "desc",
+    pageSize: 50,
+    staticFilters: {
+      dateRange: {
+        start: "2026-05-01",
+        end: "2026-05-04",
+      },
+      audienceSegmentFilter: ["Young Adults"],
+    },
+    binding: cloneValue(reportBuilderConfig.binding || null),
+  },
+});
+assert.equal(authoredAudienceSegmentRecord.savedReportPayload.compileState.status, "clean");
+assert.deepEqual(authoredAudienceSegmentRecord.savedReportPayload.compileState.diagnostics || [], []);
+assert.equal(validateReportPrint(authoredAudienceSegmentRecord.reportPrint).valid, true);
+assert.equal(validateReportExportRequest(authoredAudienceSegmentRecord.exportRequest).valid, true);
+assert.deepEqual(authoredAudienceSegmentRecord.savedReportPayload.reportDocument.blocks[0].state.selectedMeasures, ["audienceIndex"]);
+assert.deepEqual(authoredAudienceSegmentRecord.savedReportPayload.reportDocument.blocks[0].state.staticFilters?.audienceSegmentFilter, ["Young Adults"]);
+assert.equal(authoredAudienceSegmentRecord.savedReportPayload.reportSpec.datasets[0]?.request?.measures?.audienceIndex, true);
+assert.deepEqual(authoredAudienceSegmentRecord.savedReportPayload.reportSpec.datasets[0]?.request?.filters?.audienceSegmentFilter, ["Young Adults"]);
+const authoredAudienceSemanticSummary = resolveSavedSemanticSummary(authoredAudienceSegmentRecord);
+assert.deepEqual(
+  authoredAudienceSemanticSummary?.selectedMeasures?.find((field) => field?.id === "audience_index"),
+  {
+    id: "audience_index",
+    rawId: "audienceIndex",
+    label: "Audience Index",
+    format: "number",
+    category: "Audience",
+    definitionRef: "harmonizer://feature/user.segment.index",
+    governance: {
+      status: "approved",
+      certification: "reviewed",
+      classification: "harmonizer.audience",
+    },
+  },
+);
+assert.deepEqual(
+  authoredAudienceSemanticSummary?.selectedParameters?.find((field) => field?.id === "audience_segment"),
+  {
+    id: "audience_segment",
+    rawId: "audienceSegmentFilter",
+    label: "Audience Segment",
+    category: "Audience",
+    definitionRef: "harmonizer://feature/user.segment",
+    governance: {
+      status: "approved",
+      classification: "harmonizer.audience",
+    },
+  },
+);
+assert.deepEqual(
+  summarizeAverageRuntimeRows(authoredAudienceSegmentRecord.reportFill.datasets[0]?.rows, "country", "audienceIndex"),
+  {
+    US: 118,
+    CA: 112,
+  },
+);
+const hydratedAuthoredAudienceSegment = buildHydratedFromRecord(authoredAudienceSegmentRecord, 13, 9375);
+assert.equal(hydratedAuthoredAudienceSegment.valid, true);
+assert.equal(hydratedAuthoredAudienceSegment.compileState.status, "clean");
+assert.deepEqual(hydratedAuthoredAudienceSegment.state.selectedMeasures, ["audienceIndex"]);
+assert.deepEqual(hydratedAuthoredAudienceSegment.state.selectedDimensions, ["country"]);
+assert.deepEqual(hydratedAuthoredAudienceSegment.state.staticFilters?.audienceSegmentFilter, ["Young Adults"]);
+const reopenedAudienceSegmentPreview = buildPreviewAuthoredReport({
+  container,
+  config: hydratedAuthoredAudienceSegment.config,
+  state: hydratedAuthoredAudienceSegment.state,
+  rows: RAW_ROWS,
+  semanticSummary: authoredAudienceSemanticSummary,
+  additionalDiagnostics: hydratedAuthoredAudienceSegment.compileState?.diagnostics || [],
+});
+assert.deepEqual(
+  summarizeAverageRuntimeRows(reopenedAudienceSegmentPreview.reportFill.datasets[0]?.rows, "country", "audienceIndex"),
+  {
+    US: 118,
+    CA: 112,
+  },
+);
+
+const authoredAudienceSegmentFlatFieldRecord = buildPreviewSavedReportPayloadRecord({
+  container,
+  reportBuilderConfig,
+  rows: RAW_ROWS,
+  semanticModel: flatFieldSemanticModel,
+  reportId: "authoredAudienceSegmentIndexFlatFieldQ3",
+  title: "Authored Audience Segment Index Flat Field Q3",
+  artifactId: "authored_audience_segment_index_flat_field_q3",
+  documentVersion: 14,
+  savedAt: 9376,
+  baseState: {
+    selectedMeasures: ["audienceIndex"],
+    primaryMeasure: "audienceIndex",
+    selectedDimensions: ["country"],
+    viewMode: "table",
+    chartSpec: null,
+    orderField: "audienceIndex",
+    orderDir: "desc",
+    pageSize: 50,
+    staticFilters: {
+      dateRange: {
+        start: "2026-05-01",
+        end: "2026-05-04",
+      },
+      audienceSegmentFilter: ["Young Adults"],
+    },
+    binding: cloneValue(reportBuilderConfig.binding || null),
+  },
+});
+assert.equal(authoredAudienceSegmentFlatFieldRecord.savedReportPayload.compileState.status, "clean");
+assert.deepEqual(authoredAudienceSegmentFlatFieldRecord.savedReportPayload.compileState.diagnostics || [], []);
+assert.deepEqual(
+  resolveSavedSemanticSummary(authoredAudienceSegmentFlatFieldRecord)?.selectedMeasures?.find((field) => field?.id === "audience_index"),
+  {
+    id: "audience_index",
+    rawId: "audienceIndex",
+    label: "Audience Index",
+    format: "number",
+    category: "Audience",
+    definitionRef: "harmonizer://feature/user.segment.index",
+    governance: {
+      status: "approved",
+      certification: "reviewed",
+      classification: "harmonizer.audience",
+    },
+  },
+);
+assert.deepEqual(
+  resolveSavedSemanticSummary(authoredAudienceSegmentFlatFieldRecord)?.selectedParameters?.find((field) => field?.id === "audience_segment"),
+  {
+    id: "audience_segment",
+    rawId: "audienceSegmentFilter",
+    label: "Audience Segment",
+    category: "Audience",
+    definitionRef: "harmonizer://feature/user.segment",
+    governance: {
+      status: "approved",
+      classification: "harmonizer.audience",
+    },
+  },
+);
+const hydratedAuthoredAudienceSegmentFlatField = buildHydratedFromRecord(authoredAudienceSegmentFlatFieldRecord, 14, 9376);
+assert.equal(hydratedAuthoredAudienceSegmentFlatField.valid, true);
+assert.equal(hydratedAuthoredAudienceSegmentFlatField.compileState.status, "clean");
+assert.deepEqual(hydratedAuthoredAudienceSegmentFlatField.state.selectedMeasures, ["audienceIndex"]);
+assert.deepEqual(hydratedAuthoredAudienceSegmentFlatField.state.selectedDimensions, ["country"]);
+assert.deepEqual(hydratedAuthoredAudienceSegmentFlatField.state.staticFilters?.audienceSegmentFilter, ["Young Adults"]);
+
+const authoredAudienceSegmentFlatFieldSeededRecord = buildPreviewSavedReportPayloadRecordFromSeed({
+  container,
+  reportBuilderConfig,
+  rows: RAW_ROWS,
+  semanticModel,
+  seed: {
+    semanticModel: flatFieldSemanticModel,
+    reportId: "authoredAudienceSegmentIndexFlatFieldSeededQ3",
+    title: "Authored Audience Segment Index Flat Field Seeded Q3",
+    artifactId: "authored_audience_segment_index_flat_field_seeded_q3",
+    documentVersion: 15,
+    savedAt: 9377,
+    baseState: {
+      selectedMeasures: ["audienceIndex"],
+      primaryMeasure: "audienceIndex",
+      selectedDimensions: ["country"],
+      viewMode: "table",
+      chartSpec: null,
+      orderField: "audienceIndex",
+      orderDir: "desc",
+      pageSize: 50,
+      staticFilters: {
+        dateRange: {
+          start: "2026-05-01",
+          end: "2026-05-04",
+        },
+        audienceSegmentFilter: ["Young Adults"],
+      },
+      binding: cloneValue(reportBuilderConfig.binding || null),
+    },
+  },
+});
+assert.equal(authoredAudienceSegmentFlatFieldSeededRecord.savedReportPayload.compileState.status, "clean");
+assert.deepEqual(
+  resolveSavedSemanticSummary(authoredAudienceSegmentFlatFieldSeededRecord)?.selectedMeasures?.find((field) => field?.id === "audience_index"),
+  {
+    id: "audience_index",
+    rawId: "audienceIndex",
+    label: "Audience Index",
+    format: "number",
+    category: "Audience",
+    definitionRef: "harmonizer://feature/user.segment.index",
+    governance: {
+      status: "approved",
+      certification: "reviewed",
+      classification: "harmonizer.audience",
+    },
+  },
 );
 
 const inventoryRecord = buildPreviewSavedReportPayloadRecord({
@@ -960,13 +1376,13 @@ const inventoryRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingInventoryTopChannelsQ3",
-  title: "Forecasting Inventory Top Channels Q3",
-  templateId: "forecast_inventory_brief",
+  reportId: "capacityInventoryTopChannelsQ3",
+  title: "Capacity Inventory Top Channels Q3",
+  templateId: "capacity_inventory_brief",
   presetKind: "chart",
   presetTitle: "Inventory · Top Channels",
   documentVersion: 7,
-  artifactId: "forecasting_q3_inventory_top_channels",
+  artifactId: "capacity_q3_inventory_top_channels",
   savedAt: 9400,
 });
 
@@ -975,20 +1391,20 @@ const standaloneInventoryRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingStandaloneTrendQ3",
-  title: "Forecasting Standalone Trend Q3",
+  reportId: "capacityStandaloneTrendQ3",
+  title: "Capacity Standalone Trend Q3",
   presetKind: "chart",
   presetTitle: "Inventory · Top Channels",
   documentVersion: 6,
-  artifactId: "forecasting_q3_standalone_trend",
+  artifactId: "capacity_q3_standalone_trend",
   savedAt: 9350,
 });
 
 assert.equal(standaloneInventoryRecord.savedReportPayload.sourceSession.sourceRef.kind, "reportBuilder.chartResult");
-assert.equal(standaloneInventoryRecord.runtimeBlock.title, "Forecasting Standalone Trend Q3");
-assert.equal(standaloneInventoryRecord.runtimeBlock.dashboard.reportRuntime.reportSpec.title, "Forecasting Standalone Trend Q3");
-assert.equal(standaloneInventoryRecord.reportPrint.title, "Forecasting Standalone Trend Q3");
-assert.equal(standaloneInventoryRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.title, "Forecasting Standalone Trend Q3");
+assert.equal(standaloneInventoryRecord.runtimeBlock.title, "Capacity Standalone Trend Q3");
+assert.equal(standaloneInventoryRecord.runtimeBlock.dashboard.reportRuntime.reportSpec.title, "Capacity Standalone Trend Q3");
+assert.equal(standaloneInventoryRecord.reportPrint.title, "Capacity Standalone Trend Q3");
+assert.equal(standaloneInventoryRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.title, "Capacity Standalone Trend Q3");
 assert.equal(validateReportPrint(standaloneInventoryRecord.reportPrint).valid, true);
 assert.equal(validateReportExportRequest(standaloneInventoryRecord.exportRequest).valid, true);
 assert.equal(standaloneInventoryRecord.exportRequest.source.from, "savedPayload");
@@ -1000,12 +1416,12 @@ const landscapeStandaloneInventoryRecord = buildPreviewSavedReportPayloadRecord(
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingStandaloneTrendQ3Landscape",
-  title: "Forecasting Standalone Trend Q3 Landscape",
+  reportId: "capacityStandaloneTrendQ3Landscape",
+  title: "Capacity Standalone Trend Q3 Landscape",
   presetKind: "chart",
   presetTitle: "Inventory · Top Channels",
   documentVersion: 11,
-  artifactId: "forecasting_q3_standalone_trend_landscape",
+  artifactId: "capacity_q3_standalone_trend_landscape",
   savedAt: 9360,
   pageGeometry: PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
 });
@@ -1831,23 +2247,23 @@ assert.deepEqual(marketEfficiencyAfterClear.model.reportSpec, reopenedMarketEffi
 assert.deepEqual(marketEfficiencyAfterClear.preview.reportFill, reopenedMarketEfficiencyPreview.reportFill);
 assert.deepEqual(marketEfficiencyAfterClear.preview.reportPrint, reopenedMarketEfficiencyPreview.reportPrint);
 
-assert.equal(inventoryRecord.savedReportPayload.sourceArtifactId, "forecasting_q3_inventory_top_channels");
+assert.equal(inventoryRecord.savedReportPayload.sourceArtifactId, "capacity_q3_inventory_top_channels");
 assert.equal(inventoryRecord.savedReportPayload.sourceSession.sourceRef.kind, "reportBuilder.reportTemplate");
-assert.equal(inventoryRecord.savedReportPayload.sourceSession.sourceRef.templateId, "forecast_inventory_brief");
-assert.equal(inventoryRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Forecast Inventory Brief");
+assert.equal(inventoryRecord.savedReportPayload.sourceSession.sourceRef.templateId, "capacity_inventory_brief");
+assert.equal(inventoryRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Capacity Inventory Brief");
 assert.equal(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.viewMode, "chart");
 assert.deepEqual(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.selectedMeasures, ["avails"]);
 assert.deepEqual(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.selectedDimensions, ["channelV2"]);
 assert.equal(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.chartSpec.xField, "channelV2");
 assert.equal(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.chartSpec.title, "Inventory · Top Channels");
-assert.equal(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "forecast_inventory_brief");
-assert.equal(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Forecast Inventory Brief");
+assert.equal(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "capacity_inventory_brief");
+assert.equal(inventoryRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Capacity Inventory Brief");
 assert.equal(inventoryRecord.reportPrint.kind, "reportPrint");
 assert.equal(validateReportPrint(inventoryRecord.reportPrint).valid, true);
 assert.equal(validateReportExportRequest(inventoryRecord.exportRequest).valid, true);
-assert.equal(inventoryRecord.reportPrint.title, "Forecasting Inventory Top Channels Q3");
-assert.equal(inventoryRecord.runtimeBlock.title, "Forecasting Inventory Top Channels Q3");
-assert.equal(inventoryRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.title, "Forecasting Inventory Top Channels Q3");
+assert.equal(inventoryRecord.reportPrint.title, "Capacity Inventory Top Channels Q3");
+assert.equal(inventoryRecord.runtimeBlock.title, "Capacity Inventory Top Channels Q3");
+assert.equal(inventoryRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.title, "Capacity Inventory Top Channels Q3");
 assert.equal(inventoryRecord.exportRequest.source.from, "savedPayload");
 assert.equal(inventoryRecord.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.primaryChart"), true);
 assert.equal(inventoryRecord.runtimeBlock.dashboard.reportRuntime.reportPrint.kind, "reportPrint");
@@ -1855,7 +2271,7 @@ assert.equal(findChartBlock(inventoryRecord.savedReportPayload.reportSpec)?.char
 const inventoryExportRequestSnapshot = cloneValue(inventoryLadderRecord.exportRequest);
 const inventoryReportPrintSnapshot = cloneValue(inventoryLadderRecord.reportPrint);
 assert.deepEqual(
-  findHierarchy(inventoryRecord.savedReportPayload.reportSpec, "forecast_inventory")?.levels?.map((level) => level.field),
+  findHierarchy(inventoryRecord.savedReportPayload.reportSpec, "capacity_inventory")?.levels?.map((level) => level.field),
   ["channelV2", "publisher", "siteType"],
 );
 
@@ -1866,11 +2282,11 @@ assert.equal(hydratedInventory.state.chartSpec.xField, "channelV2");
 assert.equal(hydratedInventory.state.chartSpec.title, "Inventory · Top Channels");
 assert.deepEqual(hydratedInventory.state.selectedMeasures, ["avails"]);
 assert.deepEqual(hydratedInventory.state.selectedDimensions, ["channelV2"]);
-assert.equal(hydratedInventory.state.reportDocumentTemplateId, "forecast_inventory_brief");
-assert.equal(hydratedInventory.state.reportDocumentTemplateLabel, "Forecast Inventory Brief");
-assert.equal(hydratedInventory.state.binding.modelRef, "model://steward/performance/ad_delivery@v1");
+assert.equal(hydratedInventory.state.reportDocumentTemplateId, "capacity_inventory_brief");
+assert.equal(hydratedInventory.state.reportDocumentTemplateLabel, "Capacity Inventory Brief");
+assert.equal(hydratedInventory.state.binding.modelRef, "model://example/performance/delivery@v1");
 assert.deepEqual(
-  findHierarchy({ drillMetadata: hydratedInventory.config.drillMetadata }, "forecast_inventory")?.levels?.map((level) => level.field),
+  findHierarchy({ drillMetadata: hydratedInventory.config.drillMetadata }, "capacity_inventory")?.levels?.map((level) => level.field),
   ["channelV2", "publisher", "siteType"],
 );
 
@@ -1879,31 +2295,31 @@ const locationRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingLocationsTopMarketsQ3",
-  title: "Forecasting Locations Top Markets Q3",
-  templateId: "forecast_location_brief",
+  reportId: "capacityLocationsTopMarketsQ3",
+  title: "Capacity Locations Top Markets Q3",
+  templateId: "capacity_location_brief",
   presetKind: "chart",
   presetTitle: "Locations · Top Markets",
   documentVersion: 8,
-  artifactId: "forecasting_q3_locations_top_markets",
+  artifactId: "capacity_q3_locations_top_markets",
   savedAt: 9500,
 });
 
-assert.equal(locationRecord.savedReportPayload.sourceArtifactId, "forecasting_q3_locations_top_markets");
+assert.equal(locationRecord.savedReportPayload.sourceArtifactId, "capacity_q3_locations_top_markets");
 assert.equal(locationRecord.savedReportPayload.sourceSession.sourceRef.kind, "reportBuilder.reportTemplate");
-assert.equal(locationRecord.savedReportPayload.sourceSession.sourceRef.templateId, "forecast_location_brief");
-assert.equal(locationRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Forecast Location Brief");
+assert.equal(locationRecord.savedReportPayload.sourceSession.sourceRef.templateId, "capacity_location_brief");
+assert.equal(locationRecord.savedReportPayload.sourceSession.sourceRef.templateLabel, "Capacity Location Brief");
 assert.deepEqual(locationRecord.savedReportPayload.reportDocument.blocks[0].state.selectedMeasures, ["avails"]);
 assert.deepEqual(locationRecord.savedReportPayload.reportDocument.blocks[0].state.selectedDimensions, ["country"]);
 assert.equal(locationRecord.savedReportPayload.reportDocument.blocks[0].state.chartSpec.xField, "country");
 assert.equal(locationRecord.savedReportPayload.reportDocument.blocks[0].state.chartSpec.title, "Locations · Top Markets");
-assert.equal(locationRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "forecast_location_brief");
-assert.equal(locationRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Forecast Location Brief");
+assert.equal(locationRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "capacity_location_brief");
+assert.equal(locationRecord.savedReportPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Capacity Location Brief");
 assert.equal(findChartBlock(locationRecord.savedReportPayload.reportSpec)?.chartSpec?.xField, "country");
 const locationExportRequestSnapshot = cloneValue(locationRecord.exportRequest);
 const locationReportPrintSnapshot = cloneValue(locationRecord.reportPrint);
 assert.deepEqual(
-  findHierarchy(locationRecord.savedReportPayload.reportSpec, "forecast_location")?.levels?.map((level) => level.field),
+  findHierarchy(locationRecord.savedReportPayload.reportSpec, "capacity_location")?.levels?.map((level) => level.field),
   ["country", "region", "metrocode"],
 );
 
@@ -1914,10 +2330,10 @@ assert.equal(hydratedLocation.state.chartSpec.xField, "country");
 assert.equal(hydratedLocation.state.chartSpec.title, "Locations · Top Markets");
 assert.deepEqual(hydratedLocation.state.selectedMeasures, ["avails"]);
 assert.deepEqual(hydratedLocation.state.selectedDimensions, ["country"]);
-assert.equal(hydratedLocation.state.reportDocumentTemplateId, "forecast_location_brief");
-assert.equal(hydratedLocation.state.reportDocumentTemplateLabel, "Forecast Location Brief");
+assert.equal(hydratedLocation.state.reportDocumentTemplateId, "capacity_location_brief");
+assert.equal(hydratedLocation.state.reportDocumentTemplateLabel, "Capacity Location Brief");
 assert.deepEqual(
-  findHierarchy({ drillMetadata: hydratedLocation.config.drillMetadata }, "forecast_location")?.levels?.map((level) => level.field),
+  findHierarchy({ drillMetadata: hydratedLocation.config.drillMetadata }, "capacity_location")?.levels?.map((level) => level.field),
   ["country", "region", "metrocode"],
 );
 
@@ -1984,12 +2400,12 @@ const reopenedInventoryDetail = await buildReopenedRuntimeDetailScenario({
     avails: 82800,
     hhUniqs: 34800,
   },
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
 });
 
-assert.equal(reopenedInventoryDetail.execution.detailRequest.action.targetRef, "target://steward/performance/channel-detail");
+assert.equal(reopenedInventoryDetail.execution.detailRequest.action.targetRef, "target://example/performance/channel-detail");
 assert.deepEqual(reopenedInventoryDetail.resolvedDetailTarget, {
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2005,7 +2421,7 @@ assert.deepEqual(reopenedInventoryDetail.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2035,12 +2451,12 @@ const reopenedLocationDetail = await buildReopenedRuntimeDetailScenario({
     },
     selectionRows: RAW_ROWS.filter((row) => row.country === "US"),
   },
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
 });
 
-assert.equal(reopenedLocationDetail.execution.detailRequest.action.targetRef, "target://steward/performance/market-detail");
+assert.equal(reopenedLocationDetail.execution.detailRequest.action.targetRef, "target://example/performance/market-detail");
 assert.deepEqual(reopenedLocationDetail.resolvedDetailTarget, {
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
   navigationMode: "hostRoute",
   parameters: {
     country: "US",
@@ -2051,7 +2467,7 @@ assert.deepEqual(reopenedLocationDetail.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
   navigationMode: "hostRoute",
   parameters: {
     country: "US",
@@ -2121,11 +2537,11 @@ const reopenedAuthoredChannelChartDetail = await buildReopenedRuntimeDetailScena
     },
     selectionRows: RAW_ROWS.filter((row) => row.channelV2 === "Display"),
   },
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
 });
-assert.equal(reopenedAuthoredChannelChartDetail.execution.detailRequest.action.targetRef, "target://steward/performance/channel-detail");
+assert.equal(reopenedAuthoredChannelChartDetail.execution.detailRequest.action.targetRef, "target://example/performance/channel-detail");
 assert.deepEqual(reopenedAuthoredChannelChartDetail.resolvedDetailTarget, {
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2142,7 +2558,7 @@ assert.deepEqual(reopenedAuthoredChannelChartDetail.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2158,7 +2574,7 @@ assert.deepEqual(authoredChannelChartRecord.reportPrint, authoredChannelChartRep
 assert.equal(Object.prototype.hasOwnProperty.call(authoredChannelChartRecord.exportRequest, "hostIntent"), false);
 assert.equal(Object.prototype.hasOwnProperty.call(authoredChannelChartRecord.reportPrint, "hostIntent"), false);
 
-const directSeriesRecord = buildForecastDirectSeriesFixtureState().record;
+const directSeriesRecord = buildCapacityDirectSeriesFixtureState().record;
 const directSeriesExportRequestSnapshot = cloneValue(directSeriesRecord.exportRequest);
 const directSeriesReportPrintSnapshot = cloneValue(directSeriesRecord.reportPrint);
 const hydratedDirectSeries = buildHydratedFromRecord(directSeriesRecord, 9, 9600);
@@ -2188,12 +2604,12 @@ const reopenedDirectSeriesDetail = await buildReopenedRuntimeDetailScenario({
       { eventDate: "2026-05-01", channelV2: "CTV", avails: 34700, hhUniqs: 15200, country: "US" },
     ],
   },
-  targetRef: "target://steward/performance/date-detail",
+  targetRef: "target://example/performance/date-detail",
 });
 
-assert.equal(reopenedDirectSeriesDetail.execution.detailRequest.action.targetRef, "target://steward/performance/date-detail");
+assert.equal(reopenedDirectSeriesDetail.execution.detailRequest.action.targetRef, "target://example/performance/date-detail");
 assert.deepEqual(reopenedDirectSeriesDetail.resolvedDetailTarget, {
-  targetRef: "target://steward/performance/date-detail",
+  targetRef: "target://example/performance/date-detail",
   navigationMode: "hostRoute",
   parameters: {
     eventDate: "2026-05-01",
@@ -2205,7 +2621,7 @@ assert.deepEqual(reopenedDirectSeriesDetail.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/date-detail",
+  targetRef: "target://example/performance/date-detail",
   navigationMode: "hostRoute",
   parameters: {
     eventDate: "2026-05-01",
@@ -2272,7 +2688,7 @@ assert.deepEqual(mixedInventoryState.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -2384,7 +2800,7 @@ const mixedLocationDetailInteraction = buildReportRuntimeChartInteractionState({
   canClearSelection: true,
 });
 
-const mixedLocationDetailExecution = mixedLocationDetailInteraction.executions.find((entry) => entry?.kind === "detail" && entry?.detailRequest?.action?.targetRef === "target://steward/performance/market-detail") || null;
+const mixedLocationDetailExecution = mixedLocationDetailInteraction.executions.find((entry) => entry?.kind === "detail" && entry?.detailRequest?.action?.targetRef === "target://example/performance/market-detail") || null;
 assert.ok(mixedLocationDetailExecution, "A reopened mixed-flow chart detail action is required.");
 const mixedLocationDetailResult = executeReportRuntimeAction(mixedLocationDetailExecution, mixedLocationHandlers);
 assert.equal(mixedLocationDetailResult.executed, true);
@@ -2393,7 +2809,7 @@ assert.deepEqual(mixedLocationState.hostIntent, {
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing from the authored runtime preview.",
-  targetRef: "target://steward/performance/market-detail",
+  targetRef: "target://example/performance/market-detail",
   navigationMode: "hostRoute",
   parameters: {
     country: "US",
@@ -2641,4 +3057,4 @@ assert.ok(rebuiltFromSessionRequest, "A rebuilt-from-session chart-to-table runt
 assert.deepEqual(rebuiltFromSessionRequest.filters.includeCountry, ["US"]);
 assert.deepEqual(rebuiltFromSessionRequest.filters.includeLocationDim, ["US/West"]);
 
-console.log("previewSavedReportPayload ✓ forecasting table and chart presets preserve drill ladders through saved payload and reopen flows");
+console.log("previewSavedReportPayload ✓ capacity table and chart presets preserve drill ladders through saved payload and reopen flows");

@@ -29,7 +29,7 @@ const executions = buildReportRuntimeChartActionExecutions({
       label: "Show channel details",
       value: "Display",
       displayValue: "Display",
-      targetRef: "target://steward/performance/channel-detail",
+      targetRef: "target://example/performance/channel-detail",
     },
   ],
   fields: [
@@ -92,7 +92,7 @@ assert.deepEqual(executions, [
         id: "detail_channel",
         kind: "detail",
         label: "Show channel details",
-        targetRef: "target://steward/performance/channel-detail",
+        targetRef: "target://example/performance/channel-detail",
       },
       item: {
         eventDate: "2026-05-01",
@@ -142,7 +142,7 @@ const authoredDerivedExecutions = buildReportRuntimeChartActionExecutions({
       label: "Show channel details",
       value: "Display",
       displayValue: "Display",
-      targetRef: "target://steward/performance/channel-detail",
+      targetRef: "target://example/performance/channel-detail",
     },
   ],
   fields: [
@@ -205,7 +205,7 @@ assert.deepEqual(authoredDerivedExecutions, [
         id: "detail_channel",
         kind: "detail",
         label: "Show channel details",
-        targetRef: "target://steward/performance/channel-detail",
+        targetRef: "target://example/performance/channel-detail",
       },
       item: {
         country: "US",

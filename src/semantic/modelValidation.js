@@ -3,6 +3,7 @@ import {
     SEMANTIC_BINDING_MODES,
     SEMANTIC_CERTIFICATIONS,
     SEMANTIC_DATA_TYPES,
+    SEMANTIC_FIELD_TYPES,
     SEMANTIC_GOVERNANCE_STATUSES,
     SEMANTIC_TIME_GRAINS,
     normalizeSemanticArray,
@@ -36,6 +37,18 @@ function normalizeGovernance(governance = {}) {
     return Object.keys(next).length > 0 ? next : null;
 }
 
+function normalizeSemanticFeatureType(type = "", fallbackType = "") {
+    const normalizedType = normalizeSemanticString(type).toLowerCase();
+    if (SEMANTIC_FIELD_TYPES.includes(normalizedType)) {
+        return normalizedType;
+    }
+    const normalizedFallbackType = normalizeSemanticString(fallbackType).toLowerCase();
+    if (SEMANTIC_FIELD_TYPES.includes(normalizedFallbackType)) {
+        return normalizedFallbackType;
+    }
+    return "";
+}
+
 function normalizeSemanticField(field = {}, defaults = {}) {
     if (!isPlainObject(field)) {
         return null;
@@ -56,10 +69,12 @@ function normalizeSemanticField(field = {}, defaults = {}) {
     const sourceRef = normalizeSemanticString(field.sourceRef);
     const relationshipRef = normalizeSemanticString(field.relationshipRef);
     const governance = normalizeGovernance(field.governance);
+    const featureType = normalizeSemanticFeatureType(field.featureType, defaults.featureType);
     return {
         id,
         key,
         label,
+        ...(featureType ? { featureType } : {}),
         ...(description ? { description } : {}),
         ...(category ? { category } : {}),
         ...(dataType ? { dataType } : {}),
@@ -83,15 +98,27 @@ function normalizeSemanticEntity(entity = {}) {
     }
     const label = normalizeSemanticString(entity.label || id);
     const description = normalizeSemanticString(entity.description);
-    const dimensions = (Array.isArray(entity.dimensions) ? entity.dimensions : [])
-        .map((entry) => normalizeSemanticField(entry, { dataType: "string" }))
-        .filter(Boolean);
-    const measures = (Array.isArray(entity.measures) ? entity.measures : [])
-        .map((entry) => normalizeSemanticField(entry, { dataType: "number" }))
-        .filter(Boolean);
-    const parameters = (Array.isArray(entity.parameters) ? entity.parameters : [])
+    const flatFields = (Array.isArray(entity.fields) ? entity.fields : [])
         .map((entry) => normalizeSemanticField(entry))
         .filter(Boolean);
+    const dimensions = [
+        ...(Array.isArray(entity.dimensions) ? entity.dimensions : [])
+            .map((entry) => normalizeSemanticField(entry, { dataType: "string", featureType: "dimension" }))
+            .filter(Boolean),
+        ...flatFields.filter((entry) => entry.featureType === "dimension"),
+    ];
+    const measures = [
+        ...(Array.isArray(entity.measures) ? entity.measures : [])
+            .map((entry) => normalizeSemanticField(entry, { dataType: "number", featureType: "measure" }))
+            .filter(Boolean),
+        ...flatFields.filter((entry) => entry.featureType === "measure"),
+    ];
+    const parameters = [
+        ...(Array.isArray(entity.parameters) ? entity.parameters : [])
+            .map((entry) => normalizeSemanticField(entry, { featureType: "parameter" }))
+            .filter(Boolean),
+        ...flatFields.filter((entry) => entry.featureType === "parameter"),
+    ];
     const relationships = (Array.isArray(entity.relationships) ? entity.relationships : [])
         .map((entry) => {
             if (!isPlainObject(entry)) {
@@ -158,6 +185,27 @@ export function validateSemanticModel(model = {}) {
     }
     const entityIds = new Set();
     (normalized.entities || []).forEach((entity, entityIndex) => {
+        const rawEntity = Array.isArray(model?.entities) ? model.entities[entityIndex] : null;
+        (Array.isArray(rawEntity?.fields) ? rawEntity.fields : []).forEach((field, fieldIndex) => {
+            const featureType = normalizeSemanticFeatureType(field?.featureType);
+            if (!normalizeSemanticString(field?.featureType)) {
+                pushError(
+                    errors,
+                    `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
+                    "required",
+                    "Semantic flat field entries require a featureType.",
+                );
+                return;
+            }
+            if (!featureType) {
+                pushError(
+                    errors,
+                    `entities[${entityIndex}].fields[${fieldIndex}].featureType`,
+                    "invalid",
+                    `Unsupported semantic featureType '${field?.featureType}'.`,
+                );
+            }
+        });
         if (entityIds.has(entity.id)) {
             pushError(errors, `entities[${entityIndex}].id`, "duplicate", `Duplicate entity id '${entity.id}'.`);
         } else {

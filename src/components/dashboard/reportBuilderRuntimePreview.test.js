@@ -7,6 +7,7 @@ import {
   resolveReportBuilderRuntimeChartCapability,
   resolveReportBuilderRuntimeGeoCapability,
   resolveReportBuilderRuntimeRefinementCapability,
+  resolveReportBuilderRuntimeScopeCapability,
   resolveReportBuilderRuntimeTableCapability,
 } from "./reportBuilderRuntimePreview.js";
 import { resolveReportRuntimeDrillMetadataProvider } from "./reportRuntimeDrillProvider.js";
@@ -21,16 +22,16 @@ import { buildReportRuntimeTableInteractionState } from "./reportRuntimeTableInt
 import { validateReportExportRequest, validateReportPrint } from "../../reporting/schema/reportSchemas.js";
 
 const container = {
-  id: "forecastBuilder",
-  stateKey: "forecastBuilder",
-  title: "Forecast Builder",
-  dataSourceRef: "forecasting_cube_report",
+  id: "capacityBuilder",
+  stateKey: "capacityBuilder",
+  title: "Capacity Builder",
+  dataSourceRef: "capacity_cube_report",
 };
 
 const config = {
-  dataSourceRef: "forecasting_cube_report",
+  dataSourceRef: "capacity_cube_report",
   staticFilters: [
-    { id: "dateRange", field: "dateRange", label: "Date Range", type: "dateRange" },
+    { id: "dateRange", field: "dateRange", label: "Date Range", type: "dateRange", semanticRef: "reporting_window" },
   ],
   measures: [
     { id: "avails", key: "avails", label: "Avails", default: true, format: "compactNumber" },
@@ -51,8 +52,8 @@ const config = {
   drillMetadata: {
     hierarchies: [
       {
-        id: "forecast_inventory",
-        label: "Forecast Inventory",
+        id: "capacity_inventory",
+        label: "Capacity Inventory",
         levels: [
           { field: "channelV2", label: "Channel" },
           { field: "publisherId", label: "Publisher" },
@@ -101,7 +102,7 @@ const drillTransitions = [{
 
 const semanticSummary = {
   kind: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -110,6 +111,9 @@ const semanticSummary = {
   ],
   selectedMeasures: [
     { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
+  ],
+  selectedParameters: [
+    { id: "reporting_window", rawId: "dateRange", label: "Reporting Window" },
   ],
 };
 
@@ -134,6 +138,9 @@ assert.deepEqual(
 );
 assert.equal(model.reportSpec.scope.params[0].id, "dateRange");
 assert.equal(model.reportSpec.semanticSummary.modelLabel, "Ad Delivery");
+assert.equal(model.semanticBindingViewState.title, "Semantic Binding");
+assert.equal(model.semanticBindingViewState.chips.includes("Measures Available Impressions"), true);
+assert.equal(model.semanticBindingViewState.fieldGroups[0].fields[0].label, "Channel");
 assert.equal(model.reportSpec.datasets[0].request.dimensions.publisherId, true);
 assert.equal(model.reportSpec.datasets[0].request.dimensions.channelV2, true);
 assert.deepEqual(model.reportSpec.datasets[0].request.filters.includeChannelV2, ["Display"]);
@@ -205,6 +212,117 @@ assert.deepEqual(resolveReportBuilderRuntimeRefinementCapability({
   hasFieldSupport: false,
   hasActiveRuntimeRefinements: true,
   hasActiveDrillTransitions: true,
+});
+
+const stateBackedDrillModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config: {
+    ...config,
+    drillMetadata: undefined,
+  },
+  state: {
+    ...state,
+    drillMetadata: {
+      hierarchies: [
+        {
+          id: "hierarchy:channelV2::publisherId::siteType",
+          label: "Channel Drill",
+          levels: [
+            { field: "channelV2", label: "Channel" },
+            { field: "publisherId", label: "Publisher" },
+            { field: "siteType", label: "Site Type" },
+          ],
+        },
+      ],
+      detailTargets: [
+        {
+          targetRef: "target://example/publisher-detail",
+          navigationMode: "hostRoute",
+          title: "Publisher detail",
+          parameters: {
+            publisher: "$value",
+          },
+        },
+      ],
+      fieldActions: [
+        {
+          fieldRef: "publisherId",
+          actions: [
+            {
+              id: "detail:publisherId:target:_example_publisher-detail",
+              label: "Show Publisher details",
+              kind: "detail",
+              targetRef: "target://example/publisher-detail",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  refinements: [],
+  drillTransitions: [],
+});
+
+assert.deepEqual(stateBackedDrillModel.reportSpec.drillMetadata, {
+  hierarchies: [
+    {
+      id: "hierarchy:channelV2::publisherId::siteType",
+      label: "Channel Drill",
+      levels: [
+        { id: "channelV2", field: "channelV2", label: "Channel" },
+        { id: "publisherId", field: "publisherId", label: "Publisher" },
+        { id: "siteType", field: "siteType", label: "Site Type" },
+      ],
+    },
+  ],
+  detailTargets: [
+    {
+      targetRef: "target://example/publisher-detail",
+      navigationMode: "hostRoute",
+      title: "Publisher detail",
+      parameters: {
+        publisher: "$value",
+      },
+    },
+  ],
+  fieldActions: [
+    {
+      fieldRef: "publisherId",
+      actions: [
+        {
+          id: "detail:publisherId:target:_example_publisher-detail",
+          label: "Show Publisher details",
+          kind: "detail",
+          targetRef: "target://example/publisher-detail",
+        },
+      ],
+    },
+  ],
+});
+
+const stateBackedDrillProvider = resolveReportRuntimeDrillMetadataProvider({
+  reportSpec: stateBackedDrillModel.reportSpec,
+  runtimeHandlers: {},
+});
+
+assert.deepEqual(await stateBackedDrillProvider.listAvailableRefinements("tableBlock", "channelV2"), [
+  { id: "keep:channelV2", label: "Keep only", kind: "keep" },
+  { id: "exclude:channelV2", label: "Exclude", kind: "exclude" },
+  { id: "drill:channelV2:publisherId", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisherId" },
+]);
+assert.deepEqual(await stateBackedDrillProvider.listAvailableRefinements("tableBlock", "publisherId"), [
+  { id: "keep:publisherId", label: "Keep only", kind: "keep" },
+  { id: "exclude:publisherId", label: "Exclude", kind: "exclude" },
+  { id: "drill:publisherId:siteType", label: "Drill to Site Type", kind: "drill", nextFieldRef: "siteType" },
+  { id: "detail:publisherId:target:_example_publisher-detail", label: "Show Publisher details", kind: "detail", targetRef: "target://example/publisher-detail" },
+]);
+assert.deepEqual(await stateBackedDrillProvider.getDetailTarget("target://example/publisher-detail"), {
+  targetRef: "target://example/publisher-detail",
+  navigationMode: "hostRoute",
+  title: "Publisher detail",
+  parameters: {
+    publisher: "$value",
+  },
 });
 
 const runtimeRefinementReadyModel = buildReportBuilderRuntimePreviewModel({
@@ -358,6 +476,29 @@ assert.deepEqual(noScopeModel.scopeCapability, {
   paramIds: [],
 });
 
+assert.deepEqual(resolveReportBuilderRuntimeScopeCapability({
+  reportSpec: {
+    title: "Thin Runtime Scope",
+    scope: {
+      params: [],
+    },
+  },
+  reportDocument: {
+    title: "Document Backed Runtime Scope",
+    scope: {
+      params: [
+        {
+          id: "dateRange",
+          label: "Reporting Window",
+        },
+      ],
+    },
+  },
+}), {
+  supported: true,
+  paramIds: ["dateRange"],
+});
+
 const noGeoMetricModel = buildReportBuilderRuntimePreviewModel({
   container,
   config: {
@@ -504,7 +645,7 @@ const previewWithHostIntent = buildReportBuilderRuntimePreview({
   additionalDiagnostics: [],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/publisher-detail",
+    targetRef: "target://example/performance/publisher-detail",
     navigationMode: "hostRoute",
     parameters: {
       publisher: "Acme Media",
@@ -550,23 +691,28 @@ assert.equal(preview.reportPrint.pageGeometry.width, 792);
 assert.equal(preview.reportPrint.pageGeometry.height, 612);
 assert.equal(preview.exportRequest.kind, "reportExportRequest");
 assert.equal(preview.exportRequest.source.from, "draft");
-assert.equal(preview.exportRequest.source.artifactRef, "dashboard.reportBuilder://forecastBuilder");
+assert.equal(preview.exportRequest.source.artifactRef, "dashboard.reportBuilder://capacityBuilder");
 assert.equal(validateReportExportRequest(preview.exportRequest).valid, true);
 assert.equal(preview.exportRequest.reportPrint.pageGeometry.width, 792);
 assert.equal(preview.exportRequest.reportPrint.pageGeometry.height, 612);
 assert.equal(preview.reportFill.datasets[0].rows[0].publisherId, "Acme Media");
 assert.equal(preview.reportFill.datasets[0].provenance.hasMore, true);
 assert.equal(preview.runtimeBlock.kind, "dashboard.reportRuntime");
+assert.equal(preview.semanticBindingViewState.title, "Semantic Binding");
+assert.equal(previewArtifacts.semanticBindingViewState.title, "Semantic Binding");
+assert.equal(preview.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.title, "Semantic Binding");
+assert.equal(preview.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.chips.includes("Measures Available Impressions"), true);
 assert.equal(preview.runtimeBlock.dashboard.reportRuntime.reportPrint.kind, "reportPrint");
 assert.equal(preview.runtimeBlock.title, "Executive Snapshot");
 assert.equal(preview.runtimeBlock.subtitle, "Weekly Rollup");
 assert.equal(preview.runtimeBlock.dashboard.reportRuntime.reportSpec.semanticSummary.entityLabel, "Line Delivery");
+assert.equal(preview.runtimeBlock.dashboard.reportRuntime.reportSpec.semanticSummary.selectedParameters[0].label, "Reporting Window");
 assert.equal(preview.runtimeBlock.dashboard.reportRuntime.reportSpec.datasets[0].request.dimensions.publisherId, true);
 assert.deepEqual(previewWithHostIntent.exportRequest, preview.exportRequest);
 assert.deepEqual(previewWithHostIntent.reportPrint, preview.reportPrint);
 assert.deepEqual(previewWithHostIntent.runtimeBlock.dashboard.reportRuntime.hostIntent, {
   intentKind: "detailTarget",
-  targetRef: "target://steward/performance/publisher-detail",
+  targetRef: "target://example/performance/publisher-detail",
   navigationMode: "hostRoute",
   parameters: {
     publisher: "Acme Media",
@@ -588,14 +734,14 @@ assert.equal(
 
 const semanticBinding = {
   mode: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   entity: "line_delivery",
   selectedDimensions: ["channelV2"],
   selectedMeasures: ["avails"],
 };
 
 const semanticModel = {
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   version: 1,
   label: "Ad Delivery",
   description: "Governed semantic projection for runtime preview.",
@@ -617,6 +763,13 @@ const semanticModel = {
           format: "compactNumber",
         },
       ],
+      parameters: [
+        {
+          id: "reporting_window",
+          label: "Reporting Window",
+          description: "Approved reporting window",
+        },
+      ],
     },
   ],
 };
@@ -632,10 +785,96 @@ const providerResolvedModel = buildReportBuilderRuntimePreviewModel({
   semanticModel,
 });
 
-assert.equal(providerResolvedModel.reportSpec.binding.modelRef, "model://steward/performance/ad_delivery@v1");
+assert.equal(providerResolvedModel.reportSpec.binding.modelRef, "model://example/performance/delivery@v1");
 assert.equal(providerResolvedModel.reportSpec.semanticSummary.modelLabel, "Ad Delivery");
 assert.equal(providerResolvedModel.reportSpec.semanticSummary.entityLabel, "Line Delivery");
 assert.equal(providerResolvedModel.reportSpec.semanticSummary.selectedMeasures[0].label, "Available Impressions");
+assert.equal(providerResolvedModel.reportSpec.semanticSummary.selectedParameters[0].label, "Reporting Window");
+assert.equal(providerResolvedModel.reportSpec.scope.params[0].label, "Reporting Window");
+assert.equal(providerResolvedModel.reportSpec.scope.params[0].description, "Approved reporting window");
+assert.deepEqual(providerResolvedModel.reportSpec.datasets[0].request.semanticSelection.parameters, {
+  reporting_window: {
+    start: "2025-05-01",
+    end: "2025-05-22",
+  },
+});
+
+const lineageResolvedModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config: {
+    ...config,
+    measures: [
+      { id: "avails", key: "avails", semanticRef: "available_impressions", label: "Avails", default: true, format: "compactNumber" },
+    ],
+    dimensions: [
+      {
+        id: "publisherId",
+        key: "publisherId",
+        semanticRef: "publisher",
+        label: "Publisher",
+      },
+    ],
+  },
+  state: {
+    ...state,
+    selectedDimensions: ["publisherId"],
+    binding: {
+      mode: "semantic",
+      modelRef: "model://example/performance/delivery@v1",
+      entity: "line_delivery",
+      selectedDimensions: ["publisher"],
+      selectedMeasures: ["available_impressions"],
+    },
+  },
+  binding: {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["publisher"],
+    selectedMeasures: ["available_impressions"],
+  },
+  semanticModel: {
+    modelRef: "model://example/performance/delivery@v1",
+    version: 1,
+    label: "Ad Delivery",
+    description: "Governed semantic projection for runtime preview.",
+    entities: [
+      {
+        id: "line_delivery",
+        label: "Line Delivery",
+        dimensions: [
+          {
+            id: "publisher",
+            label: "Publisher",
+            category: "Inventory",
+            definitionRef: "harmonizer://feature/publisher",
+            governance: {
+              status: "approved",
+              certification: "reviewed",
+              classification: "harmonizer.audience",
+            },
+          },
+        ],
+        measures: [
+          {
+            id: "available_impressions",
+            label: "Available Impressions",
+            category: "Metrics",
+            format: "compactNumber",
+          },
+        ],
+      },
+    ],
+  },
+});
+
+assert.equal(lineageResolvedModel.reportSpec.semanticSummary.selectedDimensions[0].category, "Inventory");
+assert.equal(lineageResolvedModel.reportSpec.semanticSummary.selectedDimensions[0].definitionRef, "harmonizer://feature/publisher");
+assert.deepEqual(lineageResolvedModel.reportSpec.semanticSummary.selectedDimensions[0].governance, {
+  status: "approved",
+  certification: "reviewed",
+  classification: "harmonizer.audience",
+});
 
 const keepModel = buildReportBuilderRuntimePreviewModel({
   container,

@@ -79,4 +79,42 @@ describe('createDataConnector', () => {
             })
         );
     });
+
+    it('appends target context for mutation methods when requested by the service', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true }),
+        });
+
+        const connector = createDataConnector({
+            service: {
+                URL: '/v1/api/resource',
+                includeTargetContext: true,
+            },
+        }, {
+            endpoints: {},
+            targetContext: {
+                platform: 'android',
+                formFactor: 'phone',
+                surface: 'compose',
+                capabilities: ['markdown', 'chart'],
+            },
+            auth: {},
+        });
+
+        await expect(connector.post({ body: { name: 'created' } })).resolves.toEqual({ ok: true });
+        await expect(connector.patch({ body: { name: 'patched' } })).resolves.toEqual({ ok: true });
+        await expect(connector.put({ body: { name: 'updated' } })).resolves.toEqual({ ok: true });
+        await expect(connector.del({ id: 'item-1' })).resolves.toEqual({ ok: true });
+
+        expect(global.fetch).toHaveBeenCalledTimes(4);
+        for (const [url] of global.fetch.mock.calls) {
+            const parsed = new URL(url, 'https://forge.test');
+            expect(parsed.searchParams.get('platform')).toBe('android');
+            expect(parsed.searchParams.get('formFactor')).toBe('phone');
+            expect(parsed.searchParams.get('surface')).toBe('compose');
+            expect(parsed.searchParams.getAll('capabilities')).toEqual(['markdown', 'chart']);
+        }
+    });
 });

@@ -92,7 +92,7 @@ assert.deepEqual(removeReportRuntimeInteractionRefinement(drilledState, "drill:c
 
 const withHostIntent = setReportRuntimeInteractionHostIntent(initial, {
   intentKind: "detailTarget",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -103,7 +103,7 @@ assert.deepEqual(withHostIntent, {
   drillTransitions: [],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
     navigationMode: "hostRoute",
     parameters: {
       channel: "Display",
@@ -273,7 +273,7 @@ assert.deepEqual(normalizeReportRuntimeInteractionState({
   ],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
     navigationMode: "hostRoute",
     parameters: {
       channel: "Display",
@@ -305,7 +305,7 @@ assert.deepEqual(normalizeReportRuntimeInteractionState({
   ],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
     navigationMode: "hostRoute",
     parameters: {
       channel: "Display",

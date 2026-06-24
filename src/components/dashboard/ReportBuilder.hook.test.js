@@ -51,40 +51,40 @@ const namespacedContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
         namespacedCalls.push(name);
-        if (name === "Performance Metrics.stewardReportBuilder.buildRequest") {
+        if (name === "Performance Metrics.metricsReportBuilder.buildRequest") {
             return namespacedHandler;
         }
         throw new Error(`missing ${name}`);
     },
 };
 assert.equal(
-    resolveReportBuilderHookHandler(namespacedContext, "stewardReportBuilder.buildRequest"),
+    resolveReportBuilderHookHandler(namespacedContext, "metricsReportBuilder.buildRequest"),
     namespacedHandler,
 );
 assert.deepEqual(namespacedCalls, [
-    "stewardReportBuilder.buildRequest",
-    "Performance Metrics.stewardReportBuilder.buildRequest",
+    "metricsReportBuilder.buildRequest",
+    "Performance Metrics.metricsReportBuilder.buildRequest",
 ]);
 
 const directHandler = () => "ok";
 const directContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
-        if (name === "stewardReportBuilder.buildRequest") {
+        if (name === "metricsReportBuilder.buildRequest") {
             return directHandler;
         }
         throw new Error(`missing ${name}`);
     },
 };
 assert.equal(
-    resolveReportBuilderHookHandler(directContext, "stewardReportBuilder.buildRequest"),
+    resolveReportBuilderHookHandler(directContext, "metricsReportBuilder.buildRequest"),
     directHandler,
 );
 
 const stateHookContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
-        if (name === "Performance Metrics.stewardReportBuilder.initializeState") {
+        if (name === "Performance Metrics.metricsReportBuilder.initializeState") {
             return ({ state, windowForm }) => ({
                 ...state,
                 seededFromPrefill: windowForm.prefill.advertiserId,
@@ -96,7 +96,7 @@ const stateHookContext = {
 assert.deepEqual(
     applyReportBuilderStateHook(
         stateHookContext,
-        { hooks: { initializeState: "Performance Metrics.stewardReportBuilder.initializeState" } },
+        { hooks: { initializeState: "Performance Metrics.metricsReportBuilder.initializeState" } },
         { page: 1 },
         { prefill: { advertiserId: 123 } },
     ),
@@ -108,7 +108,7 @@ assert.deepEqual(
 const invalidStateHookContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
-        if (name === "Performance Metrics.stewardReportBuilder.initializeState") {
+        if (name === "Performance Metrics.metricsReportBuilder.initializeState") {
             return () => ["invalid"];
         }
         throw new Error(`missing ${name}`);
@@ -117,7 +117,7 @@ const invalidStateHookContext = {
 assert.deepEqual(
     applyReportBuilderStateHook(
         invalidStateHookContext,
-        { hooks: { initializeState: "Performance Metrics.stewardReportBuilder.initializeState" } },
+        { hooks: { initializeState: "Performance Metrics.metricsReportBuilder.initializeState" } },
         { page: 2 },
         {},
     ),
@@ -127,7 +127,7 @@ assert.deepEqual(
 const requestHookContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
-        if (name === "Performance Metrics.stewardReportBuilder.buildRequest") {
+        if (name === "Performance Metrics.metricsReportBuilder.buildRequest") {
             return ({ request }) => ({
                 ...request,
                 filters: {
@@ -142,7 +142,7 @@ const requestHookContext = {
 assert.deepEqual(
     applyReportBuilderRequestHook(
         requestHookContext,
-        { hooks: { buildRequest: "Performance Metrics.stewardReportBuilder.buildRequest" } },
+        { hooks: { buildRequest: "Performance Metrics.metricsReportBuilder.buildRequest" } },
         {},
         { filters: { channelIds: [1, 2] } },
     ),
@@ -157,7 +157,7 @@ assert.deepEqual(
 const invalidRequestHookContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
-        if (name === "Performance Metrics.stewardReportBuilder.buildRequest") {
+        if (name === "Performance Metrics.metricsReportBuilder.buildRequest") {
             return () => ["invalid"];
         }
         throw new Error(`missing ${name}`);
@@ -166,7 +166,7 @@ const invalidRequestHookContext = {
 assert.deepEqual(
     applyReportBuilderRequestHook(
         invalidRequestHookContext,
-        { hooks: { buildRequest: "Performance Metrics.stewardReportBuilder.buildRequest" } },
+        { hooks: { buildRequest: "Performance Metrics.metricsReportBuilder.buildRequest" } },
         { page: 1 },
         { limit: 25 },
     ),
@@ -178,24 +178,24 @@ assert.deepEqual(
         {
             notices: [
                 {
-                    id: "unsupportedForecastFeatures",
+                    id: "unsupportedCapacityFeatures",
                     level: "warning",
-                    title: "Unsupported forecast features were skipped",
-                    sourcePath: "forecastHandoffMeta.unsupportedFeatureKeys",
+                    title: "Unsupported capacity features were skipped",
+                    sourcePath: "capacityHandoffMeta.unsupportedFeatureKeys",
                 },
             ],
         },
         {
-            forecastHandoffMeta: {
+            capacityHandoffMeta: {
                 unsupportedFeatureKeys: ["peer39.social.context"],
             },
         },
     ),
     [
         {
-            id: "unsupportedForecastFeatures",
+            id: "unsupportedCapacityFeatures",
             level: "warning",
-            title: "Unsupported forecast features were skipped",
+            title: "Unsupported capacity features were skipped",
             description: "",
             items: ["peer39.social.context"],
         },
@@ -203,9 +203,9 @@ assert.deepEqual(
 );
 
 const lookupContext = {
-    metadata: { namespace: "Forecasting" },
+    metadata: { namespace: "Capacity" },
     lookupHandler(name) {
-        if (name === "Forecasting.stewardForecastingBuilder.resolveLookup") {
+        if (name === "Capacity.capacityBuilder.resolveLookup") {
             return ({ filterDef, rowId }) => ({
                 dialogId: "targetingTreePicker",
                 parameters: {
@@ -221,7 +221,7 @@ const lookupContext = {
 assert.deepEqual(
     resolveReportBuilderLookupDescriptor(
         lookupContext,
-        { hooks: { resolveLookup: "Forecasting.stewardForecastingBuilder.resolveLookup" } },
+        { hooks: { resolveLookup: "Capacity.capacityBuilder.resolveLookup" } },
         { staticFilters: { channelIds: [1] } },
         { id: "include" },
         {
@@ -243,9 +243,9 @@ assert.deepEqual(
 );
 
 const nullLookupContext = {
-    metadata: { namespace: "Forecasting" },
+    metadata: { namespace: "Capacity" },
     lookupHandler(name) {
-        if (name === "Forecasting.stewardForecastingBuilder.resolveLookup") {
+        if (name === "Capacity.capacityBuilder.resolveLookup") {
             return () => null;
         }
         throw new Error(`missing ${name}`);
@@ -254,7 +254,7 @@ const nullLookupContext = {
 assert.deepEqual(
     resolveReportBuilderLookupDescriptor(
         nullLookupContext,
-        { hooks: { resolveLookup: "Forecasting.stewardForecastingBuilder.resolveLookup" } },
+        { hooks: { resolveLookup: "Capacity.capacityBuilder.resolveLookup" } },
         {},
         { id: "include" },
         {
@@ -491,8 +491,8 @@ const hydrated = await hydrateReportBuilderLookupLabels(
                     filterId: "audienceIds",
                     selections: [
                         {
-                            value: 7288336,
-                            label: "7288336",
+                            value: 12345,
+                            label: "12345",
                         },
                     ],
                 },
@@ -511,7 +511,7 @@ const hydrated = await hydrateReportBuilderLookupLabels(
 assert.deepEqual(hydrationCalls, [
     {
         Limit: 1,
-        AudienceId: 7288336,
+        AudienceId: 12345,
     },
 ]);
 assert.equal(
@@ -542,8 +542,8 @@ const targetingHydrationContext = {
                         return {
                             rows: [
                                 {
-                                    value: "90473",
-                                    label: "Resolved Deal 90473",
+                                    value: "fixture-pmp-1",
+                                    label: "Resolved Deal fixture-pmp-1",
                                 },
                             ],
                         };
@@ -578,8 +578,8 @@ const targetingHydrated = await hydrateReportBuilderLookupLabels(
                     filterId: "includeDealsPmp",
                     selections: [
                         {
-                            value: "90473",
-                            label: "90473",
+                            value: "fixture-pmp-1",
+                            label: "fixture-pmp-1",
                         },
                     ],
                 },
@@ -592,7 +592,7 @@ const targetingHydrated = await hydrateReportBuilderLookupLabels(
             Field: "PMP_DEAL",
             Body: {
                 treeModelParam: {
-                    forecasting: true,
+                    capacity: true,
                 },
             },
         },
@@ -603,15 +603,15 @@ assert.deepEqual(targetingHydrationCalls, [
         Field: "PMP_DEAL",
         Body: {
             treeModelParam: {
-                forecasting: true,
+                capacity: true,
             },
         },
-        "Body.treeLookupParam.filter.filter": "90473",
+        "Body.treeLookupParam.filter.filter": "fixture-pmp-1",
     },
 ]);
 assert.equal(
     targetingHydrated.dynamicGroups.include[0].selections[0].label,
-    "Resolved Deal 90473",
+    "Resolved Deal fixture-pmp-1",
 );
 
 console.log("ReportBuilder hooks ✓");

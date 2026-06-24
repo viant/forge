@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "kind": "listReportDocumentsResponse",
+  "entries": [
+    {
+      "reportRef": {
+        "reportId": "authoredLandscapeBuilder"
+      },
+      "documentVersion": 12,
+      "title": "Authored Landscape Report",
+      "savedAt": 9700,
+      "compileState": {
+        "status": "clean",
+        "reportSpecVersion": 1,
+        "blockCount": 2,
+        "datasetCount": 1
+      },
+      "source": {
+        "kind": "reportBuilder.savedReportPayload",
+        "payloadId": "rbreport_authored_landscape_report",
+        "sourceArtifactId": "authored_landscape_report"
+      },
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "dateRange",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      }
+    }
+  ],
+  "cursor": "",
+  "hasMore": false
+}

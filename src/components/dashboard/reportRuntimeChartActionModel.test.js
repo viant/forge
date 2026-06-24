@@ -8,12 +8,12 @@ import {
 const providerActionsByField = new Map([
   ["primaryChart:eventDate", [
     { id: "keep_date", label: "Keep only", kind: "keep" },
-    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
   ]],
   ["primaryChart:channelV2", [
     { id: "drill_publisher", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisher" },
     { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
-    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
   ]],
 ]);
 
@@ -66,7 +66,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     label: "Show date details",
     value: "2026-05-01",
     displayValue: "2026-05-01",
-    targetRef: "target://steward/performance/date-detail",
+    targetRef: "target://example/performance/date-detail",
   },
   {
     id: "drill_publisher",
@@ -93,7 +93,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     label: "Show channel details",
     value: 1,
     displayValue: "Display",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
 ]);
 
@@ -119,7 +119,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     label: "Show date details",
     value: "2026-05-01",
     displayValue: "2026-05-01",
-    targetRef: "target://steward/performance/date-detail",
+    targetRef: "target://example/performance/date-detail",
   },
   {
     id: "detail_channel",
@@ -128,7 +128,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     label: "Show channel details",
     value: 1,
     displayValue: "Display",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
 ]);
 
@@ -153,7 +153,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     ]],
     ["reachRateTrend:channelV2", [
       { id: "drill_publisher", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisherId" },
-      { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+      { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
     ]],
   ]),
 }), [
@@ -181,7 +181,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     label: "Show channel details",
     value: "Display",
     displayValue: "Display",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
 ]);
 

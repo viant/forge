@@ -4,6 +4,7 @@ import {
   buildReportBuilderReportDocument,
   buildReportBuilderBlockScopeBindings,
   buildReportDocumentChartBlock,
+  extractReportDocumentTemplateIdentity,
   buildReportDocumentScopeParams,
   buildReportDocumentFilterBarBlock,
   buildReportDocumentGeoMapBlock,
@@ -28,6 +29,7 @@ const config = {
   staticFilters: [
     {
       id: "dateRange",
+      description: "Approved reporting window for shared runtime scope.",
       type: "dateRange",
       required: true,
       startParamPath: "filters.From",
@@ -216,7 +218,7 @@ const document = buildReportBuilderReportDocument({
   additionalBlocks: [filterBarBlock, refinementBarBlock, headlineKpiBlock, authoredChartBlock, comparisonTableBlock, geoMapBlock, markdownBlock],
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -259,6 +261,7 @@ assert.deepEqual(document.scope, {
       id: "dateRange",
       kind: "dateRange",
       label: "dateRange",
+      description: "Approved reporting window for shared runtime scope.",
       required: true,
       value: {
         start: "2026-05-01",
@@ -496,6 +499,8 @@ const stateBackedDocument = buildReportBuilderReportDocument({
     reportDocumentTitle: "Executive Snapshot",
     reportDocumentSubtitle: "Weekly Rollup",
     reportDocumentDescription: "Authored document metadata from builder state.",
+    reportDocumentTemplateId: "market_brief",
+    reportDocumentTemplateLabel: "Market Brief",
     reportDocumentBlocks: [headlineKpiBlock, markdownBlock],
     reportDocumentLayout: {
       type: "stack",
@@ -510,6 +515,8 @@ const stateBackedDocument = buildReportBuilderReportDocument({
 assert.equal(stateBackedDocument.title, "Executive Snapshot");
 assert.equal(stateBackedDocument.subtitle, "Weekly Rollup");
 assert.equal(stateBackedDocument.description, "Authored document metadata from builder state.");
+assert.equal(stateBackedDocument.templateId, "market_brief");
+assert.equal(stateBackedDocument.templateLabel, "Market Brief");
 assert.deepEqual(stateBackedDocument.layout, {
   type: "stack",
   items: [
@@ -525,6 +532,50 @@ assert.deepEqual(stateBackedDocument.blocks.slice(1), [
 assert.equal(Object.prototype.hasOwnProperty.call(stateBackedDocument.blocks[0].state, "reportDocumentBlocks"), false);
 assert.equal(Object.prototype.hasOwnProperty.call(stateBackedDocument.blocks[0].state, "reportDocumentLayout"), false);
 
+assert.deepEqual(extractReportDocumentTemplateIdentity({
+  templateId: "market_brief",
+  templateLabel: "Market Brief",
+  blocks: [
+    {
+      id: "primaryBuilder",
+      kind: "reportBuilderBlock",
+      state: {
+        reportDocumentTemplateId: "capacity_inventory_brief",
+        reportDocumentTemplateLabel: "Capacity Inventory Brief",
+      },
+    },
+  ],
+}), {
+  templateId: "market_brief",
+  templateLabel: "Market Brief",
+});
+
+assert.deepEqual(extractReportDocumentTemplateIdentity({
+  blocks: [
+    {
+      id: "primaryBuilder",
+      kind: "reportBuilderBlock",
+      state: {
+        reportDocumentTemplateId: "capacity_inventory_brief",
+        reportDocumentTemplateLabel: "Capacity Inventory Brief",
+      },
+    },
+  ],
+}), {
+  templateId: "capacity_inventory_brief",
+  templateLabel: "Capacity Inventory Brief",
+});
+
+assert.equal(extractReportDocumentTemplateIdentity({
+  blocks: [
+    {
+      id: "primaryBuilder",
+      kind: "reportBuilderBlock",
+      state: {},
+    },
+  ],
+}), null);
+
 const overriddenScopeDocument = {
   ...document,
   scope: {
@@ -534,6 +585,7 @@ const overriddenScopeDocument = {
         id: "dateRange",
         kind: "dateRange",
         label: "dateRange",
+        description: "Approved reporting window for shared runtime scope.",
         required: true,
         value: {
           start: "2026-06-01",
