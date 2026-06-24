@@ -213,6 +213,29 @@ function hasOwnDataSourceParameters(dataSource = {}, windowParameters = {}) {
     return false;
 }
 
+export function shouldPreserveMissingResolvedParameters(dataSource = {}, previousParameters = {}, resolvedParameters = {}, explicitParameters = {}) {
+    if (dataSource?.preserveParametersOnMissingDependencies !== true) {
+        return false;
+    }
+    const metadataParameters = Array.isArray(dataSource?.parameters) ? dataSource.parameters : [];
+    if (metadataParameters.length === 0) {
+        return false;
+    }
+    const previousKeys = previousParameters && typeof previousParameters === 'object'
+        ? Object.keys(previousParameters)
+        : [];
+    if (previousKeys.length === 0) {
+        return false;
+    }
+    const resolvedKeys = resolvedParameters && typeof resolvedParameters === 'object'
+        ? Object.keys(resolvedParameters)
+        : [];
+    const explicitKeys = explicitParameters && typeof explicitParameters === 'object'
+        ? Object.keys(explicitParameters)
+        : [];
+    return resolvedKeys.length === 0 && explicitKeys.length === 0;
+}
+
 function resolveBoundWindowTitle(metadata, window = {}) {
     const binding = metadata?.window?.titleBinding || metadata?.view?.titleBinding;
     const windowId = String(window?.windowId || '').trim();
@@ -587,10 +610,13 @@ function WindowContentInner({window, metadata, services}) {
             const resolvedMetaParams = resolvedMetaParamsRaw && typeof resolvedMetaParamsRaw === 'object' && resolvedMetaParamsRaw.inbound
                 ? resolvedMetaParamsRaw.inbound
                 : (resolvedMetaParamsRaw || {});
-            const nextParams = {
+            let nextParams = {
                 ...(resolvedMetaParams || {}),
                 ...(explicitWindowParams || {}),
             };
+            if (shouldPreserveMissingResolvedParameters(dataSourceDef, prevParams, resolvedMetaParams, explicitWindowParams)) {
+                nextParams = { ...prevParams };
+            }
             const ownsParameters = hasOwnDataSourceParameters(dataSourceDef, explicitWindowParams);
             const paramsChanged = JSON.stringify(prevParams) !== JSON.stringify(nextParams);
             const collection = collectionSignal?.peek?.() || [];

@@ -38,3 +38,20 @@ export function isQuickFiltersActive(context, filters) {
         return v !== undefined && v !== '' && v !== null;
     });
 }
+
+export function normalizeQuickFilterValues(filters = [], values = {}) {
+    const normalized = {};
+    for (const filter of Array.isArray(filters) ? filters : []) {
+        if (!filter?.field) continue;
+        normalized[filter.field] = values?.[filter.field] ?? '';
+    }
+    return normalized;
+}
+
+export function quickFilterValuesEqual(filters = [], left = {}, right = {}) {
+    const normalizedLeft = normalizeQuickFilterValues(filters, left);
+    const normalizedRight = normalizeQuickFilterValues(filters, right);
+    const keys = Object.keys(normalizedLeft);
+    if (keys.length !== Object.keys(normalizedRight).length) return false;
+    return keys.every((key) => normalizedLeft[key] === normalizedRight[key]);
+}
