@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, shouldPrimeDataSourceFetch } from './WindowContent.jsx';
+import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch } from './WindowContent.jsx';
 
 describe('resolveInitialWindowFormValues', () => {
   it('collects explicit windowForm item values alongside onInit constants', () => {
@@ -176,6 +176,33 @@ describe('shouldPrimeDataSourceFetch', () => {
   it('does not require window bootstrap to own request parameters for user-driven datasources', () => {
     expect(
       shouldPrimeDataSourceFetch({ autoFetch: false, parameters: [] }, { parameters: { measures: { totalSpend: true } } }, [], false),
+    ).toBe(false);
+  });
+});
+
+describe('shouldPreserveMissingResolvedParameters', () => {
+  it('preserves existing parameters when metadata opts into transient missing dependency protection', () => {
+    expect(
+      shouldPreserveMissingResolvedParameters(
+        {
+          preserveParametersOnMissingDependencies: true,
+          parameters: [{ name: 'scheduleId', in: 'dataSource', location: 'schedules.id' }],
+        },
+        { scheduleId: 'schedule-1' },
+        {},
+        {},
+      ),
+    ).toBe(true);
+  });
+
+  it('does not preserve parameters without opt-in', () => {
+    expect(
+      shouldPreserveMissingResolvedParameters(
+        { parameters: [{ name: 'scheduleId', in: 'dataSource', location: 'schedules.id' }] },
+        { scheduleId: 'schedule-1' },
+        {},
+        {},
+      ),
     ).toBe(false);
   });
 });
