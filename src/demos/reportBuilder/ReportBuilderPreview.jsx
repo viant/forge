@@ -819,6 +819,9 @@ function createDemoContext() {
   ctx.getSemanticModelProviderAvailable = () => semanticModelProviderAvailable;
   ctx.setSemanticModelProviderAvailable = (enabled = true) => {
     semanticModelProviderAvailable = enabled !== false;
+    if (semanticModelProviderAvailable && typeof semanticModel?.invalidateModelCache === 'function') {
+      semanticModel.invalidateModelCache();
+    }
     ctx.handlers.semanticModel = semanticModelProviderAvailable ? semanticModel : null;
     return semanticModelProviderAvailable;
   };

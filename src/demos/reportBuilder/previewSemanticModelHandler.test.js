@@ -80,6 +80,50 @@ const handler = createDemoSemanticModelHandler({
 assert.deepEqual(await handler.getModel(modelRef), flatOverrideSemanticModel);
 assert.equal(metrics.getModelCount, 1);
 
+const cachedMetrics = createReportBuilderPreviewMetrics();
+cachedMetrics.queueSemanticModelBehavior({
+  match: { modelRef },
+  result: flatOverrideSemanticModel,
+});
+
+const cachedHandler = createDemoSemanticModelHandler({
+  semanticModel: defaultSemanticModel,
+  staticFilters,
+  getMetrics: () => cachedMetrics,
+});
+
+assert.deepEqual(await cachedHandler.getModel(modelRef), flatOverrideSemanticModel);
+assert.equal(cachedMetrics.getModelCount, 1);
+assert.deepEqual(await cachedHandler.validateSelection(modelRef, {
+  entity: "line_delivery",
+  dimensions: ["publisher"],
+  measures: ["audience_index"],
+  parameters: {
+    audience_segment: ["Young Adults"],
+  },
+}), {
+  valid: true,
+  normalizedSelection: {
+    entity: "line_delivery",
+    dimensions: ["publisher"],
+    measures: ["audience_index"],
+    parameters: {
+      audience_segment: ["Young Adults"],
+    },
+  },
+  diagnostics: [],
+});
+assert.equal(cachedMetrics.getModelCount, 1);
+cachedMetrics.queueSemanticModelBehavior({
+  match: { modelRef },
+  result: defaultSemanticModel,
+});
+assert.deepEqual(await cachedHandler.getModel(modelRef), defaultSemanticModel);
+assert.equal(cachedMetrics.getModelCount, 2);
+assert.equal(cachedHandler.invalidateModelCache(modelRef), 1);
+assert.deepEqual(await cachedHandler.getModel(modelRef), defaultSemanticModel);
+assert.equal(cachedMetrics.getModelCount, 3);
+
 const transientFailureMetrics = createReportBuilderPreviewMetrics();
 transientFailureMetrics.queueSemanticModelBehavior({
   match: { modelRef },
@@ -99,6 +143,42 @@ await assert.rejects(
 assert.equal(transientFailureMetrics.getModelCount, 1);
 assert.deepEqual(await transientFailureHandler.getModel(modelRef), defaultSemanticModel);
 assert.equal(transientFailureMetrics.getModelCount, 2);
+
+const validationFailureMetrics = createReportBuilderPreviewMetrics();
+validationFailureMetrics.queueSemanticModelBehavior({
+  match: { modelRef },
+  error: "Semantic model metadata failed.",
+});
+
+const validationFailureHandler = createDemoSemanticModelHandler({
+  semanticModel: defaultSemanticModel,
+  staticFilters,
+  getMetrics: () => validationFailureMetrics,
+});
+
+const invalidSelectionFromModelError = await validationFailureHandler.validateSelection(modelRef, {
+  entity: "line_delivery",
+  dimensions: ["publisher"],
+  measures: ["audience_index"],
+  parameters: {
+    audience_segment: ["Young Adults"],
+  },
+});
+assert.deepEqual(invalidSelectionFromModelError, {
+  valid: false,
+  normalizedSelection: null,
+  diagnostics: [
+    {
+      code: "semanticModelError",
+      severity: "error",
+      path: "selection.modelRef",
+      message: "Semantic model metadata failed.",
+      suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
+    },
+  ],
+});
+assert.equal(validationFailureMetrics.getModelCount, 1);
+assert.equal(validationFailureMetrics.validateSelectionCount, 1);
 
 const validAudienceSelection = await handler.validateSelection(modelRef, {
   entity: "line_delivery",

@@ -67,11 +67,17 @@ export function useReportBuilderSemanticModelState({
   semanticModelRef = "",
   reloadKey = "",
 } = {}) {
-  const [semanticModelState, setSemanticModelState] = React.useState({
-    loading: false,
-    error: "",
-    model: null,
-  });
+  const [semanticModelState, setSemanticModelState] = React.useState(() => resolveReportBuilderSemanticModelSeedState({
+    binding,
+    configSemanticModel,
+    semanticModelProvider,
+    semanticModelRef,
+    currentState: {
+      loading: false,
+      error: "",
+      model: null,
+    },
+  }));
 
   React.useEffect(() => {
     const seedState = resolveReportBuilderSemanticModelSeedState({

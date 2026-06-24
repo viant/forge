@@ -5,6 +5,7 @@ import {
   attachPreviewSemanticModelBehaviorApi,
   clearPreviewSemanticModelBehaviors,
   consumePreviewSemanticModelBehavior,
+  hasQueuedPreviewSemanticModelBehavior,
   loadStoredPreviewSemanticModelBehaviors,
   normalizePreviewSemanticModelBehavior,
   persistPreviewSemanticModelBehaviors,
@@ -46,6 +47,14 @@ assert.equal(metrics.replaceSemanticModelBehaviors([
 ]), 1);
 assert.equal(Array.isArray(metrics.semanticModelBehaviors), true);
 assert.equal(metrics.semanticModelBehaviors.length, 1);
+assert.equal(
+  hasQueuedPreviewSemanticModelBehavior(metrics, "model://example/commerce/revenue@v1"),
+  true,
+);
+assert.equal(
+  hasQueuedPreviewSemanticModelBehavior(metrics, "model://example/commerce/cost@v1"),
+  false,
+);
 
 assert.equal(metrics.queueSemanticModelBehavior({
   match: {
