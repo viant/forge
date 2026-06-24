@@ -3,5 +3,11 @@
   "kind": "getReportDocumentRequest",
   "reportRef": {
     "reportId": "capacityInventoryTopChannelsQ3"
-  }
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_capacity_q3_inventory_top_channels",
+    "sourceArtifactId": "capacity_q3_inventory_top_channels"
+  },
+  "listEntrySelectionKey": "capacityInventoryTopChannelsQ3::reportBuilder.savedReportPayload::rbreport_capacity_q3_inventory_top_channels::capacity_q3_inventory_top_channels"
 }

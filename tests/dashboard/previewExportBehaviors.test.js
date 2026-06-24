@@ -5,7 +5,7 @@ import {
   attachPreviewExportBehaviorApi,
   normalizePreviewExportBehavior,
   replacePreviewExportBehaviors,
-} from "./previewExportBehaviors.js";
+} from "../../src/demos/reportBuilder/previewExportBehaviors.js";
 
 assert.deepEqual(normalizePreviewExportBehavior({
   match: {

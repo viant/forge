@@ -1,1 +1,13 @@
-{"version":1,"kind":"getReportDocumentRequest","reportRef":{"reportId":"capacityKpiBlendByDateQ3"}}
+{
+  "version": 1,
+  "kind": "getReportDocumentRequest",
+  "reportRef": {
+    "reportId": "capacityKpiBlendByDateQ3"
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_capacity_q3_kpi_blend_by_date",
+    "sourceArtifactId": "capacity_q3_kpi_blend_by_date"
+  },
+  "listEntrySelectionKey": "capacityKpiBlendByDateQ3::reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date"
+}

@@ -1,1 +1,13 @@
-{"version":1,"kind":"getReportDocumentRequest","reportRef":{"reportId":"authoredDerivedCompactBuilder"}}
+{
+  "version": 1,
+  "kind": "getReportDocumentRequest",
+  "reportRef": {
+    "reportId": "authoredDerivedCompactBuilder"
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_authored_derived_compact_report",
+    "sourceArtifactId": "authored_derived_compact_report"
+  },
+  "listEntrySelectionKey": "authoredDerivedCompactBuilder::reportBuilder.savedReportPayload::rbreport_authored_derived_compact_report::authored_derived_compact_report"
+}

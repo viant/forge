@@ -11,7 +11,7 @@ import {
   PREVIEW_SEMANTIC_MODEL_STORAGE_KEY,
   queuePreviewSemanticModelBehavior,
   replacePreviewSemanticModelBehaviors,
-} from "./previewSemanticModel.js";
+} from "../../src/demos/reportBuilder/previewSemanticModel.js";
 
 assert.deepEqual(normalizePreviewSemanticModelBehavior({
   match: {
