@@ -2395,6 +2395,130 @@ assert.deepEqual(
     sourceLessDirectCarriedSelectedGetResponse.semanticBindingViewState,
     directCarriedSavedRecord.semanticBindingViewState,
 );
+
+const ambiguousSourceLessCatalogBackings = [
+    {
+        reportId: "capacityShared",
+        title: "Capacity Shared Saved View",
+        documentVersion: 8,
+        savedAt: 9300,
+        document: {
+            version: 1,
+            kind: "reportDocument",
+            id: "capacityShared",
+            title: "Capacity Shared Saved View",
+        },
+        reportSpec: {
+            version: 1,
+            kind: "reportSpec",
+            blocks: [{ id: "primaryTable" }],
+            datasets: [{ id: "primary" }],
+        },
+        source: {
+            kind: "reportBuilder.savedView",
+            reportId: "capacityShared",
+            sourceArtifactId: "saved_view_capacity_shared",
+        },
+        exportRequest: {
+            version: 1,
+            kind: "reportExportRequest",
+            target: { format: "pdf" },
+            source: {
+                from: "savedView",
+                artifactKind: "reportBuilder.savedView",
+                artifactRef: "reportBuilder.savedView://saved_view_capacity_shared",
+                sourceArtifactId: "saved_view_capacity_shared",
+                reportId: "capacityShared",
+                documentVersion: 8,
+            },
+            reportSpec: {
+                version: 1,
+                kind: "reportSpec",
+                blocks: [{ id: "primaryTable" }],
+                datasets: [{ id: "primary" }],
+            },
+            reportFill: { version: 1, kind: "reportFill" },
+            reportPrint: { version: 1, kind: "reportPrint", title: "Capacity Shared Saved View" },
+        },
+    },
+    {
+        reportId: "capacityShared",
+        title: "Capacity Shared Published Snapshot",
+        documentVersion: 9,
+        savedAt: 9400,
+        document: {
+            version: 1,
+            kind: "reportDocument",
+            id: "capacityShared",
+            title: "Capacity Shared Published Snapshot",
+        },
+        reportSpec: {
+            version: 1,
+            kind: "reportSpec",
+            blocks: [{ id: "primaryTable" }],
+            datasets: [{ id: "primary" }],
+        },
+        source: {
+            kind: "reportBuilder.publishedSnapshot",
+            reportId: "capacityShared",
+            sourceArtifactId: "published_snapshot_capacity_shared",
+        },
+        exportRequest: {
+            version: 1,
+            kind: "reportExportRequest",
+            target: { format: "pdf" },
+            source: {
+                from: "publishedSnapshot",
+                artifactKind: "reportBuilder.publishedSnapshot",
+                artifactRef: "reportBuilder.publishedSnapshot://published_snapshot_capacity_shared",
+                sourceArtifactId: "published_snapshot_capacity_shared",
+                reportId: "capacityShared",
+                documentVersion: 9,
+            },
+            reportSpec: {
+                version: 1,
+                kind: "reportSpec",
+                blocks: [{ id: "primaryTable" }],
+                datasets: [{ id: "primary" }],
+            },
+            reportFill: { version: 1, kind: "reportFill" },
+            reportPrint: { version: 1, kind: "reportPrint", title: "Capacity Shared Published Snapshot" },
+        },
+    },
+];
+const ambiguousSourceLessListEntrySummary = buildReportBuilderListReportDocumentsEntrySummary({
+    reportRef: { reportId: "capacityShared" },
+    documentVersion: 9,
+    title: "Capacity Shared",
+}, {
+    localSavedPayloads: ambiguousSourceLessCatalogBackings,
+});
+assert.equal(ambiguousSourceLessListEntrySummary?.localBackingAvailability, "ambiguous");
+assert.equal(ambiguousSourceLessListEntrySummary?.localBackingLabel, "ambiguous local backing");
+assert.equal(ambiguousSourceLessListEntrySummary?.reopenable, undefined);
+assert.equal(ambiguousSourceLessListEntrySummary?.exportable, undefined);
+assert.equal(buildReportBuilderSelectedGetReportDocumentResponse({
+    version: 1,
+    kind: "listReportDocumentsResponse",
+    entries: [
+        {
+            reportRef: { reportId: "capacityShared" },
+            documentVersion: 9,
+            title: "Capacity Shared",
+        },
+    ],
+    cursor: "",
+    hasMore: false,
+}, ambiguousSourceLessCatalogBackings, {
+    request: {
+        reportRef: { reportId: "capacityShared" },
+    },
+}), null);
+assert.deepEqual(buildReportBuilderListReportDocumentsEntryNotice(ambiguousSourceLessListEntrySummary), {
+    tone: "warning",
+    message: "This imported catalog entry matches multiple local reopen artifacts for the same report id. It can still prepare a get request and reopen diagnostic, but local reopen and export stay disabled until explicit source identity is available.",
+});
+
 const mismatchedLocalSemanticListEntrySummary = buildReportBuilderListReportDocumentsEntrySummary({
     reportRef: { reportId: "carriedSemantic" },
     documentVersion: 3,
@@ -5502,57 +5626,8 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary({
     title: "Capacity Trend Imported Saved View Resolved Overlay",
     documentVersion: 12,
     compileStatus: "",
-    reopenable: true,
-    backingState: "reopen-ready",
-    backingSource: "imported saved-view",
-    backingArtifactKindLabel: "saved-view artifact",
-    savedViewOverlayTitle: "Saved View Overlay",
-    savedViewOverlayText: "1 filter • table view • Base v9 • Snapshot v11",
-    savedViewOverlayChips: [
-        "1 filter",
-        "table view",
-        "Base v9",
-        "Snapshot v11",
-    ],
-    reopenSourceResolutionTitle: "Resolved Reopen Sources",
-    reopenSourceResolutionText: "Resolved reopen against the published snapshot and base report file.",
-    reopenSourceResolutionChips: [
-        "Published snapshot published_snapshot_capacityTrendImported_resolved_overlay • capacityTrendImported",
-        "Base report file capacity_trend_imported_base • capacityTrendImported",
-    ],
-    reopenSourceResolutionSources: [
-        {
-            id: "publishedSnapshot",
-            label: "Published snapshot",
-            value: "published_snapshot_capacityTrendImported_resolved_overlay • capacityTrendImported",
-            source: {
-                kind: "reportBuilder.publishedSnapshot",
-                sourceArtifactId: "published_snapshot_capacityTrendImported_resolved_overlay",
-                reportId: "capacityTrendImported",
-            },
-        },
-        {
-            id: "baseReport",
-            label: "Base report file",
-            value: "capacity_trend_imported_base • capacityTrendImported",
-            source: {
-                kind: "reportBuilder.savedReportPayload",
-                sourceArtifactId: "capacity_trend_imported_base",
-                reportId: "capacityTrendImported",
-            },
-        },
-    ],
-    artifactRef: "reportBuilder.savedView://saved_view_capacityTrendImported_resolved_overlay",
-    lifecycle: "draft",
-    shareableVersion: 10,
-    shareableMetaChips: [
-        "draft",
-        "v10",
-    ],
-    shareableNotice: {
-        level: "info",
-        message: "Draft artifact metadata is ready for local review; publishing creates the immutable shared version.",
-    },
+    localBackingAvailability: "ambiguous",
+    localBackingLabel: "ambiguous local backing",
 });
 assert.deepEqual(buildReportBuilderListReportDocumentsEntryNotice({
     reportId: "capacityTrendImported",

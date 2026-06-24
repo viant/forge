@@ -87,6 +87,7 @@ export function buildReportBuilderLifecycleActionRequest(actionId = "", summary 
 export function buildReportBuilderLifecycleActionState(summary = null, {
     handler = null,
     busyActionId = "",
+    blockedReason = "",
 } = {}) {
     if (!isPlainObject(summary)) {
         return null;
@@ -97,6 +98,7 @@ export function buildReportBuilderLifecycleActionState(summary = null, {
     }
     const resolvedHandler = resolveReportBuilderLifecycleHandler(handler);
     const busyId = normalizeString(busyActionId).toLowerCase();
+    const normalizedBlockedReason = normalizeString(blockedReason);
     const availableActions = Array.isArray(actionState?.availableActions) ? actionState.availableActions : [];
     const blockedActions = new Set(
         (Array.isArray(actionState?.blockedActions) ? actionState.blockedActions : [])
@@ -116,11 +118,12 @@ export function buildReportBuilderLifecycleActionState(summary = null, {
             return;
         }
         const busy = normalizedId === busyId;
+        const blockedByReason = !!normalizedBlockedReason;
         actions.push({
             id: normalizedId,
             label: busy ? `${normalizedLabel}...` : normalizedLabel,
-            disabled: !available || busy,
-            disabledReason: normalizeString(disabledReason),
+            disabled: !available || busy || blockedByReason,
+            disabledReason: blockedByReason ? normalizedBlockedReason : normalizeString(disabledReason),
             busy,
         });
     };

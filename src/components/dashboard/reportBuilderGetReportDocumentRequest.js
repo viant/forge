@@ -53,6 +53,8 @@ function normalizeMetadataContext(context = null) {
     if (!context || typeof context !== "object" || Array.isArray(context)) {
         return null;
     }
+    const localBackingAvailability = normalizeString(context?.localBackingAvailability);
+    const localBackingLabel = normalizeString(context?.localBackingLabel);
     const normalizedContext = resolveNormalizedReportSpecDocumentContext({
         reportSpec: context?.reportSpec || null,
         document: context?.document || null,
@@ -100,13 +102,23 @@ function normalizeMetadataContext(context = null) {
             context?.scopeParams
             || normalizedContext?.scopeParams,
         );
-    if (!title && !subtitle && !description && !semanticBindingViewState && (!Array.isArray(scopeSummary?.items) || scopeSummary.items.length === 0)) {
+    if (
+        !title
+        && !subtitle
+        && !description
+        && !localBackingAvailability
+        && !localBackingLabel
+        && !semanticBindingViewState
+        && (!Array.isArray(scopeSummary?.items) || scopeSummary.items.length === 0)
+    ) {
         return null;
     }
     return {
         ...(title ? { title } : {}),
         ...(subtitle ? { subtitle } : {}),
         ...(description ? { description } : {}),
+        ...(localBackingAvailability ? { localBackingAvailability } : {}),
+        ...(localBackingLabel ? { localBackingLabel } : {}),
         ...(semanticBindingViewState ? {
             semanticBindingTitle: semanticBindingViewState.title,
             semanticBindingChips: semanticBindingViewState.chips,
@@ -135,6 +147,8 @@ export function buildReportBuilderGetReportDocumentRequestSummary(request = null
         ...(normalizedMetadata?.title ? { title: normalizedMetadata.title } : {}),
         ...(normalizedMetadata?.subtitle ? { subtitle: normalizedMetadata.subtitle } : {}),
         ...(normalizedMetadata?.description ? { description: normalizedMetadata.description } : {}),
+        ...(normalizedMetadata?.localBackingAvailability ? { localBackingAvailability: normalizedMetadata.localBackingAvailability } : {}),
+        ...(normalizedMetadata?.localBackingLabel ? { localBackingLabel: normalizedMetadata.localBackingLabel } : {}),
         ...(normalizedMetadata?.semanticBindingTitle ? { semanticBindingTitle: normalizedMetadata.semanticBindingTitle } : {}),
         ...(Array.isArray(normalizedMetadata?.semanticBindingChips) ? { semanticBindingChips: normalizedMetadata.semanticBindingChips } : {}),
         ...(Array.isArray(normalizedMetadata?.semanticBindingFieldGroups) && normalizedMetadata.semanticBindingFieldGroups.length > 0

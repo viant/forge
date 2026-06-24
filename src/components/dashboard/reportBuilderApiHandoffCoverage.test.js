@@ -161,7 +161,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("This imported catalog entry can prepare a get request and reopen diagnostic"),
+  source.includes("selectedListReportDocumentsEntryNotice.message"),
   true,
   "API handoff coverage expects the no-local-backing guidance to remain visible in the handoff area.",
 );

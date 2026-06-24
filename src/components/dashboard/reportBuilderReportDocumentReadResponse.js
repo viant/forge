@@ -146,6 +146,16 @@ function buildListEntryIdentityKey(entry = null) {
     ].join("::");
 }
 
+function resolveUniqueSavedReportRecordByReportId(records = [], reportId = "") {
+    const normalizedReportId = normalizeString(reportId);
+    if (!normalizedReportId) {
+        return null;
+    }
+    const matches = normalizeReportBuilderSavedReportRecords(records)
+        .filter((record) => normalizeString(record?.reportId) === normalizedReportId);
+    return matches.length === 1 ? matches[0] : null;
+}
+
 export function buildReportBuilderListReportDocumentsEntrySelectionKey(entry = null) {
     const hasExplicitSourceIdentity = !!(
         normalizeString(entry?.source?.kind)
@@ -424,12 +434,28 @@ function buildListEntryDrillSummary(localSavedRecord = null) {
 function resolveListReportDocumentsEntrySemanticContext(entry = null, {
     localSavedPayloads = [],
 } = {}) {
+    const normalizedLocalSavedPayloads = normalizeReportBuilderSavedReportRecords(localSavedPayloads);
+    const hasLocalSavedPayloadCandidates = normalizedLocalSavedPayloads.length > 0;
     const reportId = normalizeString(entry?.reportRef?.reportId);
     const entryHasExplicitSource = !!entry?.source && typeof entry.source === "object" && !Array.isArray(entry.source);
+    const reportMatchedLocalSavedRecords = reportId
+        ? normalizedLocalSavedPayloads.filter((record) => normalizeString(record?.reportId) === reportId)
+        : [];
     const sourceMatchedLocalSavedRecord = resolveReportBuilderSavedReportRecordBySource(localSavedPayloads, entry?.source || entry);
     const sourceMatchedLocalRecordContext = resolveSavedReportRecordContextBySource(entry?.source || entry, localSavedPayloads);
     const localSavedRecord = sourceMatchedLocalSavedRecord
-        || (!entryHasExplicitSource && reportId ? resolveReportBuilderSavedReportRecordByReportId(localSavedPayloads, reportId) : null);
+        || (!entryHasExplicitSource && reportId ? resolveUniqueSavedReportRecordByReportId(localSavedPayloads, reportId) : null);
+    const localBackingAvailability = !hasLocalSavedPayloadCandidates
+        ? ""
+        : (
+            localSavedRecord
+                ? "resolved"
+                : (
+                    !entryHasExplicitSource && reportMatchedLocalSavedRecords.length > 1
+                        ? "ambiguous"
+                        : "missing"
+                )
+        );
     const localSavedRecordContext = localSavedRecord
         ? resolveNormalizedSavedReportRecordContext(localSavedRecord)
         : null;
@@ -498,6 +524,7 @@ function resolveListReportDocumentsEntrySemanticContext(entry = null, {
         scopeSummary,
         savedViewOverlaySummary,
         reopenSourceResolutionState,
+        localBackingAvailability,
     };
 }
 
@@ -618,12 +645,12 @@ export function buildReportBuilderSelectedGetReportDocumentResponse(listResponse
     if (!entry) {
         return null;
     }
+    const entryHasExplicitSource = isPlainObject(entry?.source);
     const base = resolveReportBuilderSavedReportRecordBySource(savedReportPayload, entry?.source || entry)
-        || resolveReportBuilderSavedReportRecordByReportId(savedReportPayload, targetReportId);
+        || (!entryHasExplicitSource ? resolveUniqueSavedReportRecordByReportId(savedReportPayload, targetReportId) : null);
     if (!base) {
         return null;
     }
-    const entryHasExplicitSource = isPlainObject(entry?.source);
     if (entryHasExplicitSource && (
         normalizeString(entry?.source?.kind) !== normalizeString(base?.source?.kind)
         || normalizeString(entry?.source?.payloadId) !== normalizeString(base?.source?.payloadId)
@@ -700,8 +727,9 @@ export function buildReportBuilderSelectedGetReportDocumentResponseFromSharedArt
     if (!entry) {
         return null;
     }
+    const entryHasExplicitSource = isPlainObject(entry?.source);
     const base = resolveReportBuilderSavedReportRecordBySource(sharedArtifactRecords, entry?.source || entry)
-        || resolveReportBuilderSavedReportRecordByReportId(sharedArtifactRecords, targetReportId);
+        || (!entryHasExplicitSource ? resolveUniqueSavedReportRecordByReportId(sharedArtifactRecords, targetReportId) : null);
     const sourceKind = normalizeString(base?.source?.kind);
     if (
         !base
@@ -1176,6 +1204,7 @@ export function buildReportBuilderListReportDocumentsEntrySummary(entry = null, 
         scopeSummary,
         savedViewOverlaySummary,
         reopenSourceResolutionState,
+        localBackingAvailability,
     } = resolveListReportDocumentsEntrySemanticContext(entry, {
         localSavedPayloads,
     });
@@ -1207,6 +1236,9 @@ export function buildReportBuilderListReportDocumentsEntrySummary(entry = null, 
         ...(description ? { description } : {}),
         documentVersion: Number(entry?.documentVersion || 0) || 0,
         compileStatus: normalizeString(entry?.compileState?.status),
+        ...(localBackingAvailability && localBackingAvailability !== "resolved" ? { localBackingAvailability } : {}),
+        ...(!localSavedRecord && localBackingAvailability === "ambiguous" ? { localBackingLabel: "ambiguous local backing" } : {}),
+        ...(!localSavedRecord && localBackingAvailability === "missing" ? { localBackingLabel: "no local backing" } : {}),
         ...(localSavedRecord ? { reopenable: true } : {}),
         ...(localSavedRecord ? { backingState: localSavedRecord.exportable ? "export-ready" : "reopen-ready" } : {}),
         ...(backingSource ? { backingSource } : {}),
@@ -1287,6 +1319,7 @@ export function buildReportBuilderListReportDocumentsEntryOptionLabel(entry = nu
         normalizeString(entry?.backingState),
         normalizeString(entry?.backingSource),
         normalizeString(entry?.backingArtifactKindLabel),
+        normalizeString(entry?.localBackingLabel),
     ].filter(Boolean);
     const status = normalizeString(entry?.compileStatus);
     return `${title}${suffixes.length > 0 ? ` • ${suffixes.join(" • ")}` : ""}${status && status !== "clean" ? ` (${status})` : ""}`;
@@ -1302,6 +1335,7 @@ export function buildReportBuilderListReportDocumentsEntryMetaChips(entry = null
         normalizeString(entry?.backingState),
         normalizeString(entry?.backingSource),
         normalizeString(entry?.backingArtifactKindLabel),
+        normalizeString(entry?.localBackingLabel),
     ].filter(Boolean);
 }
 
@@ -1313,6 +1347,12 @@ export function buildReportBuilderListReportDocumentsEntryNotice(entry = null) {
         return {
             tone: "warning",
             message: normalizeString(entry?.templateConflictMessage) || "This imported catalog entry does not match the template identity of its local backing report file.",
+        };
+    }
+    if (normalizeString(entry?.localBackingAvailability) === "ambiguous") {
+        return {
+            tone: "warning",
+            message: "This imported catalog entry matches multiple local reopen artifacts for the same report id. It can still prepare a get request and reopen diagnostic, but local reopen and export stay disabled until explicit source identity is available.",
         };
     }
     if (!entry.reopenable) {
