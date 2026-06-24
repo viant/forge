@@ -69,6 +69,27 @@ export function normalizeReportBuilderDrillMetadata(config = {}) {
   };
 }
 
+export function resolveReportBuilderDrillMetadata(config = {}, overrides = null) {
+  const base = normalizeReportBuilderDrillMetadata(config);
+  if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
+    return base;
+  }
+  const normalizedOverrides = normalizeReportBuilderDrillMetadata({
+    drillMetadata: overrides,
+  });
+  return {
+    hierarchies: Object.prototype.hasOwnProperty.call(overrides, "hierarchies")
+      ? normalizedOverrides.hierarchies
+      : base.hierarchies,
+    detailTargets: Object.prototype.hasOwnProperty.call(overrides, "detailTargets")
+      ? normalizedOverrides.detailTargets
+      : base.detailTargets,
+    fieldActions: Object.prototype.hasOwnProperty.call(overrides, "fieldActions")
+      ? normalizedOverrides.fieldActions
+      : base.fieldActions,
+  };
+}
+
 export function createReportBuilderDrillMetadataProvider(config = {}) {
   const normalized = normalizeReportBuilderDrillMetadata(config);
   const detailTargetsByRef = new Map(

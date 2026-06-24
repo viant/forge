@@ -1,4 +1,7 @@
 import { buildUpdateReportDocumentConflictDiagnostic } from "../../reporting/reportDocumentStore.js";
+import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -48,11 +51,48 @@ export function buildReportBuilderUpdateReportDocumentConflictDiagnostic(updateP
     currentVersion = 0,
     detectedAt = Date.now(),
 } = {}) {
-    return buildUpdateReportDocumentConflictDiagnostic({
+    const diagnostic = buildUpdateReportDocumentConflictDiagnostic({
         updatePayload,
         currentVersion,
         detectedAt,
     });
+    if (!diagnostic) {
+        return null;
+    }
+    const payloadContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: updatePayload?.reportSpec || null,
+        document: updatePayload?.document || null,
+        title: updatePayload?.title || updatePayload?.reportRef?.reportId || "",
+    });
+    const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
+        semanticSummary: payloadContext?.semanticSummary || null,
+        binding: payloadContext?.binding || null,
+    });
+    const scopeSummary = buildReportBuilderScopeSummaryFromParams(payloadContext?.scopeParams);
+    return semanticBindingViewState
+        ? {
+            ...diagnostic,
+            semanticBindingTitle: semanticBindingViewState.title,
+            semanticBindingChips: semanticBindingViewState.chips,
+            ...(Array.isArray(semanticBindingViewState.fieldGroups) && semanticBindingViewState.fieldGroups.length > 0
+                ? { semanticBindingFieldGroups: semanticBindingViewState.fieldGroups }
+                : {}),
+            ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
+                scopeSummaryTitle: "Report Scope",
+                scopeSummaryText: scopeSummary.text,
+                scopeSummaryItems: scopeSummary.items,
+            } : {}),
+        }
+        : (
+            Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0
+                ? {
+                    ...diagnostic,
+                    scopeSummaryTitle: "Report Scope",
+                    scopeSummaryText: scopeSummary.text,
+                    scopeSummaryItems: scopeSummary.items,
+                }
+                : diagnostic
+        );
 }
 
 export function buildReportBuilderUpdateReportDocumentConflictDiagnosticSummary(diagnostic = null) {
@@ -72,6 +112,19 @@ export function buildReportBuilderUpdateReportDocumentConflictDiagnosticSummary(
         expectedVersion: Number(diagnostic?.expectedVersion || 0) || 0,
         currentVersion: Number(diagnostic?.currentVersion || 0) || 0,
         message: normalizeString(diagnostic?.message),
+        ...(normalizeString(diagnostic?.semanticBindingTitle) ? { semanticBindingTitle: normalizeString(diagnostic.semanticBindingTitle) } : {}),
+        ...(Array.isArray(diagnostic?.semanticBindingChips) ? { semanticBindingChips: diagnostic.semanticBindingChips.filter(Boolean) } : {}),
+        ...(Array.isArray(diagnostic?.semanticBindingFieldGroups) && diagnostic.semanticBindingFieldGroups.length > 0
+            ? { semanticBindingFieldGroups: diagnostic.semanticBindingFieldGroups.map((group) => ({
+                ...group,
+                fields: Array.isArray(group?.fields) ? group.fields.filter(Boolean) : [],
+            })) }
+            : {}),
+        ...(normalizeString(diagnostic?.scopeSummaryTitle) ? { scopeSummaryTitle: normalizeString(diagnostic.scopeSummaryTitle) } : {}),
+        ...(normalizeString(diagnostic?.scopeSummaryText) ? { scopeSummaryText: normalizeString(diagnostic.scopeSummaryText) } : {}),
+        ...(Array.isArray(diagnostic?.scopeSummaryItems) && diagnostic.scopeSummaryItems.length > 0
+            ? { scopeSummaryItems: diagnostic.scopeSummaryItems }
+            : {}),
     };
 }
 
@@ -95,6 +148,9 @@ export function buildReportBuilderUpdateReportDocumentConflictDiagnosticInspecto
         ...summary,
         ...(summary.subtitle ? { headerSubtitle: summary.subtitle } : {}),
         ...(summary.description ? { headerDescription: summary.description } : {}),
+        ...(Array.isArray(summary.semanticBindingFieldGroups) && summary.semanticBindingFieldGroups.length > 0
+            ? { semanticBindingFieldGroups: summary.semanticBindingFieldGroups }
+            : {}),
         content: serializeReportBuilderUpdateReportDocumentConflictDiagnostic(diagnostic),
     };
 }

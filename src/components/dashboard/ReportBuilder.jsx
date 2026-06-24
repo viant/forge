@@ -34,6 +34,32 @@ import {
     buildReportBuilderDesktopResultHeaderState,
 } from "./reportBuilderResultHeader.js";
 import {
+    buildReportBuilderActiveSavedArtifactNoticeState,
+    buildReportBuilderDraftExportActionState,
+    buildReportBuilderDraftExportFailureNotice,
+    buildReportBuilderDraftExportJobPanelState,
+    buildReportBuilderReopenedExportActionState,
+    buildReportBuilderReopenedExportFailureNotice,
+    buildReportBuilderReopenedExportJobPanelState,
+    buildReportBuilderDraftExportRequestPanelState,
+    buildReportBuilderReopenedExportRequestPanelState,
+    buildReportBuilderReopenedSessionNoticeState,
+    buildReportBuilderSavedPayloadExportActionState,
+    buildReportBuilderSavedPayloadExportFailureNotice,
+    buildReportBuilderSavedPayloadRecentExportEntries,
+    buildReportBuilderSavedPayloadExportJobPanelState,
+    buildReportBuilderSavedPayloadApiArtifactEntries,
+    buildReportBuilderSavedPayloadExportRequestPanelState,
+    buildReportBuilderSavedArtifactViewState,
+    buildReportBuilderSelectedListEntryExportActionState,
+    buildReportBuilderSelectedListEntryExportFailureNotice,
+    buildReportBuilderSelectedListEntryExportJobPanelState,
+    buildReportBuilderSelectedListEntryExportRequestPanelState,
+} from "./reportBuilderSavedArtifactViewState.js";
+import {
+    buildReportBuilderSemanticBindingViewState,
+} from "./reportBuilderSemanticBindingViewState.js";
+import {
     buildReportBuilderActionModel,
 } from "./reportBuilderActionModel.js";
 import {
@@ -43,7 +69,12 @@ import {
     buildReportBuilderCompactBottomBarActions,
 } from "./reportBuilderCompactBottomBar.js";
 import {
+    buildReportBuilderBulkImportFeedback,
+    buildReportBuilderImportFeedback,
+    buildReportBuilderListEntryCompatibilityFeedback,
     buildReportBuilderPresetApplyFeedback,
+    buildReportBuilderSelectedGetResponseFeedback,
+    buildReportBuilderSemanticInlineNotices,
     resolveCompactChartSheetNotice,
 } from "./reportBuilderFeedback.js";
 import {
@@ -63,9 +94,13 @@ import {
     buildReportBuilderAuthoredCapabilityViewModel,
 } from "./reportBuilderAuthoredCapabilities.js";
 import {
+    summarizeReportBuilderAuthoredDrillMetadata,
+} from "./reportBuilderAuthoredBlockSummary.js";
+import {
     resolveReportBuilderRuntimePreviewRowsSource,
 } from "./reportBuilderRuntimePreviewSource.js";
 import {
+    buildReportBuilderAuthoredRuntimePreviewState,
     buildReportBuilderCompileDiagnosticsNotice,
     buildReportBuilderEmptyResultState,
     buildReportBuilderRuntimePreviewBlockedState,
@@ -75,6 +110,7 @@ import {
     buildReportBuilderChartPlaceholderState,
     resolveReportBuilderResultVisibility,
 } from "./reportBuilderResultVisibility.js";
+import { ReportBuilderAuthoredRuntimePreviewHeader } from "./reportBuilderRuntimePreviewSection.js";
 import {
     buildReportBuilderChartQueryRequest,
     getReportBuilderChartDataPolicy,
@@ -118,7 +154,16 @@ import {
     resolveReportBuilderNotices,
 } from "./reportBuilderHooks.js";
 import {
+    ReportBuilderArtifactEntryCard,
+    buildFilterCategoryChipViewModel,
+    ReportBuilderInspectorNotice,
     InlineStaticFilterControl,
+    ReportBuilderInlineNotice,
+    ReportBuilderPreparedArtifactCard,
+    ReportBuilderScopeSummary,
+    ReportBuilderSemanticBindingChips,
+    ReportBuilderSemanticFieldGroups,
+    ReportBuilderSummaryNotice,
     ReportBuilderCalculatedFieldDialog,
     ReportBuilderDocumentBlockDialog,
     ReportBuilderTableCalculationDialog,
@@ -152,6 +197,7 @@ import {
     getReportBuilderQuickPresetPolicy,
     buildReportBuilderRequest,
     buildReportBuilderSettingsHash,
+    collapseReportBuilderFilterBodyState,
     prepareReportBuilderAutoChartApplication,
     getReportBuilderResultPanePosition,
     getSelectableReportBuilderMeasures,
@@ -192,11 +238,35 @@ import {
     validateReportBuilderTableCalculationDraft,
 } from "./reportBuilderCalculatedFieldAuthoring.js";
 import {
+    buildReportBuilderDetailParameterDraftRow,
+    buildReportBuilderDetailParameterDraftRowsFromParameters,
+    buildReportBuilderDetailTargetParameters,
+    buildReportBuilderDetailTargetDraftFromBinding,
+    buildReportBuilderDetailTargetDraftFromTarget,
+    removeReportBuilderDetailTargetState,
+    hasReportBuilderDetailParameterDraftContent,
+    normalizeReportBuilderDetailParameterDraftRows,
+    resolveReportBuilderDetailTargetDraftParameters,
+    upsertReportBuilderDetailTargetState,
+    validateReportBuilderDetailTargetDraft,
+    buildReportBuilderDrillHierarchyFromDimensions,
+    upsertReportBuilderDrillHierarchyState,
+    removeReportBuilderDrillHierarchyState,
+} from "./reportBuilderDrillAuthoring.js";
+import {
+    buildReportBuilderDetailTargetRouteSuggestions,
+    mergeReportBuilderDetailTargets,
+    resolveReportBuilderDetailTargetRoutePreset,
+    resolveReportBuilderProviderDetailTargetPresets,
+} from "./reportBuilderDrillRoutePresets.js";
+import {
     buildReportBuilderDocumentCompileDiagnostics,
     buildReportBuilderDocumentCompileValidation,
     buildReportBuilderDocumentBlockDiagnostics,
     buildReportBuilderDocumentBlockDraft,
     buildReportBuilderDocumentBlockFieldOptions,
+    buildReportBuilderScopeParamSummary,
+    buildReportBuilderScopeSummaryFromParams,
     duplicateReportBuilderDocumentBlockState,
     moveReportBuilderDocumentBlockState,
     normalizeReportBuilderDocumentLayoutState,
@@ -214,6 +284,7 @@ import {
 } from "./reportBuilderDocumentTemplates.js";
 import {
     beginReportBuilderExplorationSession,
+    buildReportBuilderExplorationSourceContextFromChartSelection,
     buildReportBuilderExplorationBannerState,
     discardReportBuilderExplorationState,
     keepReportBuilderExplorationState,
@@ -232,22 +303,74 @@ import {
 import {
     buildReportBuilderSavedReportPayload,
     buildReportBuilderSavedReportPayloadDownload,
+    buildReportBuilderSavedReportExportRequestFromBuilderState,
     buildReportBuilderSavedReportPayloadInspectorState,
     buildReportBuilderSavedReportPayloadRecord,
     buildReportBuilderSavedReportPayloadSummary,
 } from "./reportBuilderSavedReportPayload.js";
 import {
+    buildReportBuilderExportArtifactKindLabel,
+    buildReportBuilderExportRequestSummary,
     resolveReportBuilderExportHandler,
 } from "./reportBuilderExportRequest.js";
+import {
+    buildReportBuilderExportExecutionConfigs,
+} from "./reportBuilderExportExecutionConfigs.js";
 import {
     buildReportBuilderSavedReportState,
 } from "./reportBuilderSavedReportState.js";
 import {
-    buildReportBuilderExportFailureNotice,
-} from "./reportBuilderExportLifecycle.js";
+    projectReportBuilderLifecycleEnvelopeState,
+} from "./reportBuilderLifecycleSharedArtifactReconciliation.js";
 import {
     useReportBuilderExportExecution,
 } from "./useReportBuilderExportExecution.js";
+import {
+    parseReportBuilderLocalImport,
+} from "./reportBuilderLocalImport.js";
+import {
+    buildImportedPipelineSummary,
+    buildImportedStandaloneReportFillSummary,
+    buildImportedStandaloneReportPrintSummary,
+    resolveImportedPipelineCompanionPrintCompatibility,
+    resolveImportedPipelineRuntimeState,
+} from "./reportBuilderImportedRuntimeState.js";
+import {
+    buildImportedLocalGetReportDocumentResponseIdentity,
+    buildImportedLocalSavedReportRecordIdentity,
+    normalizeReportBuilderImportedArtifactState,
+    resolveReportBuilderImportedArtifactImportPreservation,
+    resolveImportedLocalSavedRecordActivationResponse,
+    resolveImportedLocalSavedRecordRemovalEffect,
+    resolveReportBuilderImportedLocalGetResponseForSavedRecord,
+    resolveReportBuilderImportedLocalSavedRecordForGetResponse,
+    resolveReportBuilderImportedLocalGetResponseByIdentity,
+    resolveReportBuilderImportedLocalGetResponsesAfterRemoval,
+    resolveReportBuilderImportedLocalGetResponsesAfterImport,
+    resolveReportBuilderImportedLocalSavedReportRecordByIdentity,
+    resolveReportBuilderImportedLocalSavedReportRecordsAfterRemoval,
+    resolveReportBuilderImportedLocalSavedReportRecordsAfterImport,
+    resolveReportBuilderImportedArtifactStateAfterImport,
+} from "./reportBuilderImportedArtifactState.js";
+import {
+    buildImportedPipelineExportActionState,
+    buildImportedPipelineExportFailureNotice,
+    buildImportedPipelineExportJobPanelState,
+    buildImportedPipelineExportRequestDetailPanelState,
+    buildImportedLocalReopenablePanelState,
+    buildImportedLocalSavedRecordPanelState,
+    buildImportedPipelineInspectorState,
+    buildImportedPipelinePreviewPanelState,
+    buildImportedStandaloneExportActionState,
+    buildImportedStandaloneExportFailureNotice,
+    buildImportedStandaloneExportJobPanelState,
+    buildImportedStandaloneExportRequestDetailPanelState,
+    buildImportedStandaloneReportFillPanelState,
+    buildImportedStandaloneReportFillInspectorState,
+    buildImportedStandaloneReportPrintPanelState,
+    buildImportedStandaloneReportPrintInspectorState,
+    buildImportedStandaloneExportRequestPanelState,
+} from "./reportBuilderImportedArtifactViewState.js";
 import {
     buildReportBuilderCreateReportDocumentPayload,
     buildReportBuilderCreateReportDocumentPayloadFromBuilderState,
@@ -276,15 +399,22 @@ import {
     buildReportBuilderDocumentVersionState,
     buildReportBuilderGetReportDocumentResponse,
     buildReportBuilderGetReportDocumentResponseFromBuilderState,
+    buildReportBuilderListReportDocumentsResponseFromSavedRecords,
+    buildReportBuilderSelectedGetReportDocumentResponseFromSharedArtifact,
     buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState,
     buildReportBuilderSelectedGetReportDocumentResponse,
     buildReportBuilderGetReportDocumentResponseSummary,
+    buildReportBuilderListReportDocumentsEntryMetaChips,
+    buildReportBuilderListReportDocumentsEntryOptions,
+    buildReportBuilderListReportDocumentsEntryOptionLabel,
+    buildReportBuilderListReportDocumentsEntrySelectionKey,
     buildReportBuilderListReportDocumentsEntrySummary,
     buildReportBuilderListReportDocumentsResponse,
     buildReportBuilderListReportDocumentsResponseFromBuilderState,
     buildReportBuilderListReportDocumentsResponseSummary,
     buildReportBuilderReportDocumentReadResponseInspectorState,
     buildReportBuilderReportDocumentReadResponseDownload,
+    resolveReportBuilderListReportDocumentsResponseEntry,
     resolveReportBuilderReportDocumentResponseSeed,
     serializeReportBuilderReportDocumentReadResponse,
 } from "./reportBuilderReportDocumentReadResponse.js";
@@ -294,6 +424,32 @@ import {
     buildReportBuilderGetReportDocumentRequestInspectorState,
     buildReportBuilderGetReportDocumentRequestSummary,
 } from "./reportBuilderGetReportDocumentRequest.js";
+import {
+    buildReportBuilderLifecycleActionRequest,
+    buildReportBuilderLifecycleActionState,
+    resolveReportBuilderLifecycleHandler,
+} from "./reportBuilderLifecycleActionState.js";
+import {
+    buildReportBuilderLifecycleSharedArtifactDownload,
+    buildReportBuilderLifecycleSharedArtifactInspectorState,
+    buildReportBuilderLifecycleSharedArtifactSummary,
+    applyReportBuilderLifecycleSharedArtifactToListResponse,
+    resolveReportBuilderLifecycleResultEnvelope,
+} from "./reportBuilderLifecycleResult.js";
+import {
+    buildReportBuilderSharedArtifactInventoryNotice,
+    mergeReportBuilderSharedArtifactInventoryRecord,
+    normalizeReportBuilderSharedArtifactInventory,
+    resolveReportBuilderSharedArtifactInventoryRecord,
+    resolveReportBuilderSharedArtifactHandler,
+} from "./reportBuilderSharedArtifactInventory.js";
+import {
+    recordReportBuilderLifecycleAuditEvent,
+    recordReportBuilderViewCreationAuditEvent,
+    resolveReportBuilderAuditActorRef,
+    resolveReportBuilderAuditHandler,
+    resolveReportBuilderAuditMetadata,
+} from "./reportBuilderAuditHandler.js";
 import {
     applyReportBuilderHydratedDocumentSessionState,
     buildHydratedReportBuilderDocument,
@@ -309,6 +465,7 @@ import {
     buildReportBuilderHydratedReportDocumentDiagnosticSummary,
     buildReportBuilderListReportDocumentsEntryDiagnostic,
 } from "./reportBuilderHydratedReportDocumentDiagnostic.js";
+import { buildReportBuilderShareableArtifactViewState } from "./reportBuilderShareableArtifactViewState.js";
 import { resolveReportRuntimeChartSelectionSummary } from "./reportRuntimeChartActionModel.js";
 import {
     buildReportBuilderSemanticDiagnosticTargets,
@@ -322,7 +479,7 @@ import {
     summarizeReportBuilderSemanticDiagnostics,
     semanticFieldTitle,
 } from "./reportBuilderSemantic.js";
-import { normalizeReportBuilderDrillMetadata } from "../../reporting/reportBuilderDrillMetadata.js";
+import { resolveReportBuilderDrillMetadata } from "../../reporting/reportBuilderDrillMetadata.js";
 import { normalizeReportRuntimeInteractionState } from "./reportRuntimeInteractionStateModel.js";
 import { useReportRuntimeInteractionState } from "./useReportRuntimeInteractionState.js";
 import { useAuthoredRuntimePreviewSurface } from "./useAuthoredRuntimePreviewSurface.js";
@@ -351,8 +508,37 @@ function normalizeString(value = "") {
     return String(value || "").trim();
 }
 
+function sanitizeFilenameSegment(value = "") {
+    return normalizeString(value).replace(/[\\/:*?"<>|]+/g, "-");
+}
+
 function cloneReportBuilderValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+const PREPARED_API_ARTIFACT_KEYS = Object.freeze({
+    getReportDocumentResponse: "getReportDocumentResponse",
+    reopenReportDocumentDiagnostic: "reopenReportDocumentDiagnostic",
+    listReportDocumentsResponse: "listReportDocumentsResponse",
+    getReportDocumentRequestPayload: "getReportDocumentRequestPayload",
+    createReportDocumentPayload: "createReportDocumentPayload",
+    updateReportDocumentPayload: "updateReportDocumentPayload",
+    updateReportDocumentConflictDiagnostic: "updateReportDocumentConflictDiagnostic",
+});
+
+const PREPARED_API_ARTIFACT_HANDOFF_ORIGIN = "savedPayloadApiHandoff";
+const PREPARED_API_ARTIFACT_IMPORTED_ORIGIN = "importedArtifact";
+
+function buildEmptyPreparedApiArtifactOrigins() {
+    return {
+        [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+        [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: "",
+        [PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse]: "",
+        [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: "",
+        [PREPARED_API_ARTIFACT_KEYS.createReportDocumentPayload]: "",
+        [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload]: "",
+        [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentConflictDiagnostic]: "",
+    };
 }
 
 function measureById(config = {}, id = "") {
@@ -958,6 +1144,29 @@ export default function ReportBuilder({ container, context }) {
         () => resolveReportBuilderExportHandler(builderContext),
         [builderContext?.handlers?.reportExport],
     );
+    const reportLifecycleHandler = useMemo(
+        () => resolveReportBuilderLifecycleHandler(builderContext?.handlers?.reportLifecycle),
+        [builderContext?.handlers?.reportLifecycle],
+    );
+    const reportSharedArtifactHandler = useMemo(
+        () => resolveReportBuilderSharedArtifactHandler(builderContext?.handlers?.reportSharedArtifacts),
+        [builderContext?.handlers?.reportSharedArtifacts],
+    );
+    const reportAuditHandler = useMemo(
+        () => resolveReportBuilderAuditHandler(builderContext),
+        [builderContext?.handlers?.reportAudit],
+    );
+    const reportAuditActorRef = useMemo(
+        () => resolveReportBuilderAuditActorRef(builderContext),
+        [builderContext?.identity?.actorRef],
+    );
+    const reportAuditMetadata = useMemo(
+        () => resolveReportBuilderAuditMetadata({
+            builderContext,
+            container,
+        }),
+        [builderContext?.identity?.dataSourceRef, builderContext?.identity?.windowId, container?.dataSourceRef, container?.id],
+    );
     const stateKey = useMemo(() => getBuilderStateKey(container), [container]);
     const stateStorageScope = useMemo(() => resolveReportBuilderStateStorageScope({
         stateKey,
@@ -1005,11 +1214,16 @@ export default function ReportBuilder({ container, context }) {
     const effectivePersistedStateRef = useRef(effectivePersistedState);
     effectivePersistedStateRef.current = effectivePersistedState;
     const semanticBinding = state?.binding;
+    const [semanticModelRetrySequence, setSemanticModelRetrySequence] = useState(0);
     const semanticModelReloadKey = useMemo(
-        () => buildReportBuilderSemanticModelReloadKey(hydratedReportDocumentSession),
-        [hydratedReportDocumentSession],
+        () => JSON.stringify({
+            hydratedDocument: buildReportBuilderSemanticModelReloadKey(hydratedReportDocumentSession),
+            retrySequence: semanticModelRetrySequence,
+        }),
+        [hydratedReportDocumentSession, semanticModelRetrySequence],
     );
     const {
+        semanticModelRef,
         semanticModelProvider,
         semanticModelState,
         semanticDisplayConfig,
@@ -1128,16 +1342,42 @@ export default function ReportBuilder({ container, context }) {
         }
         setSemanticValidationRetrySequence((current) => current + 1);
     }, [semanticValidationFingerprint]);
+    const retrySemanticModelLoad = React.useCallback(() => {
+        if (!semanticModelProvider || !semanticModelRef || config?.semanticModel) {
+            return;
+        }
+        setSemanticModelRetrySequence((current) => current + 1);
+    }, [config?.semanticModel, semanticModelProvider, semanticModelRef]);
+    const resolveReadinessActionHandler = React.useCallback((action = "") => {
+        switch (String(action || "").trim()) {
+            case "retrySemanticValidation":
+                return retrySemanticValidation;
+            case "retrySemanticModelLoad":
+                return retrySemanticModelLoad;
+            default:
+                return undefined;
+        }
+    }, [retrySemanticModelLoad, retrySemanticValidation]);
     const resolveStateReadiness = React.useCallback((nextState = state) => resolveReportBuilderStateReadiness({
         config: displayConfig,
         state: nextState,
         semanticModelProvider,
         semanticModelState,
         semanticSelectionValidationState,
+        semanticModelRetryAvailable: !!semanticModelProvider
+            && !!semanticModelRef
+            && !config?.semanticModel,
         semanticRetryAvailable: String(semanticSelectionValidationState?.error || "").trim() !== ""
             && String(semanticSelectionValidationState?.fingerprint || "").trim() === semanticValidationFingerprint,
-    }), [displayConfig, semanticModelProvider, semanticModelState, semanticSelectionValidationState, semanticValidationFingerprint, state]);
+    }), [config?.semanticModel, displayConfig, semanticModelProvider, semanticModelRef, semanticModelState, semanticSelectionValidationState, semanticValidationFingerprint, state]);
     const readiness = useMemo(() => resolveStateReadiness(state), [resolveStateReadiness, state]);
+    const semanticInlineNotices = useMemo(() => buildReportBuilderSemanticInlineNotices({
+        semanticStatus,
+        readiness,
+        semanticFieldValidationMessage: semanticFieldValidation?.message,
+        semanticSelectedIssueCount: semanticSelectedIssues.length,
+        semanticSelectionValidationState,
+    }), [readiness, semanticFieldValidation?.message, semanticSelectedIssues.length, semanticSelectionValidationState, semanticStatus]);
     const canRunReport = readiness.canRun;
     const requestFingerprintRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
@@ -1165,6 +1405,16 @@ export default function ReportBuilder({ container, context }) {
     const [tableCalculationDialogOpen, setTableCalculationDialogOpen] = useState(false);
     const [tableCalculationDraft, setTableCalculationDraft] = useState(() => buildReportBuilderTableCalculationDraft());
     const [editingTableCalculationId, setEditingTableCalculationId] = useState("");
+    const authoredDetailParameterRowSequenceRef = useRef(1);
+    const [authoredDetailFieldRefDraft, setAuthoredDetailFieldRefDraft] = useState("");
+    const [authoredDetailTargetRefDraft, setAuthoredDetailTargetRefDraft] = useState("");
+    const [editingAuthoredDetailTargetRef, setEditingAuthoredDetailTargetRef] = useState("");
+    const [authoredDetailNavigationModeDraft, setAuthoredDetailNavigationModeDraft] = useState("hostRoute");
+    const [authoredDetailParameterRowsDraft, setAuthoredDetailParameterRowsDraft] = useState(() => normalizeReportBuilderDetailParameterDraftRows());
+    const [authoredDetailTitleDraft, setAuthoredDetailTitleDraft] = useState("");
+    const [authoredDetailDescriptionDraft, setAuthoredDetailDescriptionDraft] = useState("");
+    const [authoredProviderDetailTargets, setAuthoredProviderDetailTargets] = useState([]);
+    const [authoredDetailProviderPresetError, setAuthoredDetailProviderPresetError] = useState("");
     const [chartQueryState, setChartQueryState] = useState(() => buildIdleReportBuilderChartQueryState());
     // Keep the latest chart-query state available during render so the full-query
     // fetch effect can avoid depending directly on state that it also mutates.
@@ -1175,12 +1425,32 @@ export default function ReportBuilder({ container, context }) {
     const [storedChartPresets, setStoredChartPresets] = useState([]);
     const [selectedQuickChartOption, setSelectedQuickChartOption] = useState("");
     const [selectedBuilderChartSelection, setSelectedBuilderChartSelection] = useState(null);
+    const [importedStandaloneReportFill, setImportedStandaloneReportFill] = useState(null);
+    const [importedStandaloneReportFillOpen, setImportedStandaloneReportFillOpen] = useState(false);
+    const [importedPipelineCompanionFillAttached, setImportedPipelineCompanionFillAttached] = useState(false);
+    const [importedStandaloneReportPrint, setImportedStandaloneReportPrint] = useState(null);
+    const [importedStandaloneReportPrintOpen, setImportedStandaloneReportPrintOpen] = useState(false);
+    const [importedStandaloneExportRequest, setImportedStandaloneExportRequest] = useState(null);
+    const [importedPipelinePreview, setImportedPipelinePreview] = useState(null);
+    const [importedPipelineInspectorSection, setImportedPipelineInspectorSection] = useState("");
+    const [importedLocalGetReportDocumentResponses, setImportedLocalGetReportDocumentResponses] = useState([]);
     const [savedExplorationArtifact, setSavedExplorationArtifact] = useState(null);
     const [savedExplorationRuntimeArtifact, setSavedExplorationRuntimeArtifact] = useState(null);
     const [savedExplorationArtifactOpen, setSavedExplorationArtifactOpen] = useState(false);
     const [savedReportPayload, setSavedReportPayload] = useState(null);
     const [savedReportPayloadRecord, setSavedReportPayloadRecord] = useState(null);
+    const [localLifecycleSharedArtifactRecords, setLocalLifecycleSharedArtifactRecords] = useState([]);
+    const [latestLifecycleSharedArtifactOpen, setLatestLifecycleSharedArtifactOpen] = useState(false);
+    const [backendSharedArtifactRecords, setBackendSharedArtifactRecords] = useState([]);
+    const [backendSharedArtifactInventoryLoading, setBackendSharedArtifactInventoryLoading] = useState(false);
+    const [backendSharedArtifactInventoryError, setBackendSharedArtifactInventoryError] = useState("");
+    const [selectedBackendSharedArtifactHydrationLoading, setSelectedBackendSharedArtifactHydrationLoading] = useState(false);
+    const [selectedBackendSharedArtifactHydrationError, setSelectedBackendSharedArtifactHydrationError] = useState("");
+    const [importedLocalSavedReportRecords, setImportedLocalSavedReportRecords] = useState([]);
     const [savedReportPayloadOpen, setSavedReportPayloadOpen] = useState(false);
+    const [activeSavedArtifactLifecycleActionId, setActiveSavedArtifactLifecycleActionId] = useState("");
+    const [savedReportPayloadApiArtifactsOpen, setSavedReportPayloadApiArtifactsOpen] = useState(false);
+    const [preparedApiArtifactOrigins, setPreparedApiArtifactOrigins] = useState(() => buildEmptyPreparedApiArtifactOrigins());
     const [createReportDocumentPayload, setCreateReportDocumentPayload] = useState(null);
     const [createReportDocumentPayloadOpen, setCreateReportDocumentPayloadOpen] = useState(false);
     const [reportDocumentVersionDraft, setReportDocumentVersionDraft] = useState("");
@@ -1191,6 +1461,8 @@ export default function ReportBuilder({ container, context }) {
     const [listReportDocumentsResponse, setListReportDocumentsResponse] = useState(null);
     const [listReportDocumentsResponseOpen, setListReportDocumentsResponseOpen] = useState(false);
     const [listReportDocumentsSelectedReportId, setListReportDocumentsSelectedReportId] = useState("");
+    const [selectedListEntryLifecycleActionId, setSelectedListEntryLifecycleActionId] = useState("");
+    const [reopenedSessionLifecycleActionId, setReopenedSessionLifecycleActionId] = useState("");
     const [getReportDocumentRequestPayload, setGetReportDocumentRequestPayload] = useState(null);
     const [getReportDocumentRequestPayloadOpen, setGetReportDocumentRequestPayloadOpen] = useState(false);
     const [updateReportDocumentExpectedVersionDraft, setUpdateReportDocumentExpectedVersionDraft] = useState("");
@@ -1200,11 +1472,35 @@ export default function ReportBuilder({ container, context }) {
     const [updateReportDocumentConflictDiagnostic, setUpdateReportDocumentConflictDiagnostic] = useState(null);
     const [updateReportDocumentConflictDiagnosticOpen, setUpdateReportDocumentConflictDiagnosticOpen] = useState(false);
     const [chartApplyFeedback, setChartApplyFeedback] = useState(null);
+    const [exportHistoryNowMs, setExportHistoryNowMs] = useState(() => Date.now());
     const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
     const [manualRunSequence, setManualRunSequence] = useState(0);
     const [pendingScrollRowId, setPendingScrollRowId] = useState("");
     const builderRootRef = useRef(null);
     const leftRailRef = useRef(null);
+    const importReportFileInputRef = useRef(null);
+    const applyPreparedApiArtifactOrigins = React.useCallback((changes = {}) => {
+        const entries = Object.entries(changes || {})
+            .map(([key, value]) => [normalizeString(key), normalizeString(value)])
+            .filter(([key]) => key);
+        if (entries.length === 0) {
+            return;
+        }
+        setPreparedApiArtifactOrigins((current) => {
+            const next = { ...current };
+            let changed = false;
+            entries.forEach(([key, value]) => {
+                if ((current?.[key] || "") !== value) {
+                    next[key] = value;
+                    changed = true;
+                }
+            });
+            return changed ? next : current;
+        });
+    }, []);
+    const resetPreparedApiArtifactOrigins = React.useCallback(() => {
+        setPreparedApiArtifactOrigins(buildEmptyPreparedApiArtifactOrigins());
+    }, []);
     const [builderWidth, setBuilderWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 0));
     const [leftRailWidthPercent, setLeftRailWidthPercent] = useState(() => (
         loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes)
@@ -1568,8 +1864,8 @@ export default function ReportBuilder({ container, context }) {
     const currentChartQueryRequestKeyRef = useRef(chartQueryRequestKey);
     currentChartQueryRequestKeyRef.current = chartQueryRequestKey;
     const runtimePreviewMetadata = useMemo(
-        () => normalizeReportBuilderDrillMetadata(displayConfig),
-        [displayConfig],
+        () => resolveReportBuilderDrillMetadata(displayConfig, state?.drillMetadata || null),
+        [displayConfig, state?.drillMetadata],
     );
     const runtimePreviewConfig = config?.result?.runtimePreview;
     const runtimePreviewEnabled = useMemo(() => {
@@ -1579,8 +1875,15 @@ export default function ReportBuilder({ container, context }) {
         if (runtimePreviewConfig && typeof runtimePreviewConfig === "object" && Object.prototype.hasOwnProperty.call(runtimePreviewConfig, "enabled")) {
             return runtimePreviewConfig.enabled !== false;
         }
-        return runtimePreviewMetadata.hierarchies.length > 0;
-    }, [runtimePreviewConfig, runtimePreviewMetadata.hierarchies.length]);
+        return runtimePreviewMetadata.hierarchies.length > 0
+            || runtimePreviewMetadata.detailTargets.length > 0
+            || runtimePreviewMetadata.fieldActions.length > 0;
+    }, [
+        runtimePreviewConfig,
+        runtimePreviewMetadata.detailTargets.length,
+        runtimePreviewMetadata.fieldActions.length,
+        runtimePreviewMetadata.hierarchies.length,
+    ]);
     const shouldCompileRuntimePreview = runtimePreviewEnabled
         && (canRunReport || readiness.reason === "semantic");
 
@@ -1795,6 +2098,162 @@ export default function ReportBuilder({ container, context }) {
         () => normalizeReportBuilderDocumentTemplates(displayConfig?.reportDocumentTemplates),
         [displayConfig?.reportDocumentTemplates],
     );
+    const authoredDrillMetadata = runtimePreviewMetadata;
+    const authoredDrillSummary = useMemo(
+        () => summarizeReportBuilderAuthoredDrillMetadata({
+            drillMetadata: authoredDrillMetadata,
+        }),
+        [authoredDrillMetadata],
+    );
+    const currentBreakdownDrillHierarchy = useMemo(
+        () => buildReportBuilderDrillHierarchyFromDimensions(selectedDimensionDefs),
+        [selectedDimensionDefs],
+    );
+    const currentBreakdownDrillHierarchyId = String(currentBreakdownDrillHierarchy?.id || "").trim();
+    const currentBreakdownDrillHierarchyCaptured = useMemo(
+        () => !!currentBreakdownDrillHierarchyId
+            && authoredDrillMetadata.hierarchies.some(
+                (hierarchy) => String(hierarchy?.id || "").trim() === currentBreakdownDrillHierarchyId,
+            ),
+        [authoredDrillMetadata.hierarchies, currentBreakdownDrillHierarchyId],
+    );
+    const authoredDetailFieldOptions = useMemo(
+        () => selectedDimensionDefs.map((dimension) => ({
+            value: String(dimension?.key || dimension?.id || "").trim(),
+            label: String(dimension?.label || dimension?.key || dimension?.id || "").trim(),
+            dimension,
+        })).filter((entry) => entry.value && entry.label),
+        [selectedDimensionDefs],
+    );
+    const authoredDetailFieldRef = useMemo(
+        () => authoredDetailFieldOptions.some((entry) => entry.value === authoredDetailFieldRefDraft)
+            ? authoredDetailFieldRefDraft
+            : (authoredDetailFieldOptions[0]?.value || ""),
+        [authoredDetailFieldOptions, authoredDetailFieldRefDraft],
+    );
+    const authoredDetailFieldOption = useMemo(
+        () => authoredDetailFieldOptions.find((entry) => entry.value === authoredDetailFieldRef) || null,
+        [authoredDetailFieldOptions, authoredDetailFieldRef],
+    );
+    const authoredDetailPresetProvider = builderContext?.handlers?.semanticModel || null;
+    useEffect(() => {
+        let cancelled = false;
+        const nextFieldRef = String(authoredDetailFieldRef || "").trim();
+        if (
+            !nextFieldRef
+            || typeof authoredDetailPresetProvider?.listAvailableRefinements !== "function"
+            || typeof authoredDetailPresetProvider?.getDetailTarget !== "function"
+        ) {
+            setAuthoredProviderDetailTargets([]);
+            setAuthoredDetailProviderPresetError("");
+            return () => {
+                cancelled = true;
+            };
+        }
+        setAuthoredProviderDetailTargets([]);
+        setAuthoredDetailProviderPresetError("");
+        resolveReportBuilderProviderDetailTargetPresets({
+            detailProvider: authoredDetailPresetProvider,
+            fieldRef: nextFieldRef,
+        })
+            .then((nextTargets) => {
+                if (cancelled) {
+                    return;
+                }
+                setAuthoredProviderDetailTargets(Array.isArray(nextTargets) ? nextTargets : []);
+            })
+            .catch((error) => {
+                if (cancelled) {
+                    return;
+                }
+                setAuthoredProviderDetailTargets([]);
+                setAuthoredDetailProviderPresetError(String(error?.message || "Could not load provider route presets."));
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [authoredDetailFieldRef, authoredDetailPresetProvider]);
+    const authoredDetailPresetTargets = useMemo(
+        () => mergeReportBuilderDetailTargets(
+            authoredDrillMetadata.detailTargets,
+            authoredProviderDetailTargets,
+        ),
+        [authoredDrillMetadata.detailTargets, authoredProviderDetailTargets],
+    );
+    const authoredDetailRouteSuggestions = useMemo(
+        () => buildReportBuilderDetailTargetRouteSuggestions({
+            field: authoredDetailFieldOption?.dimension || authoredDetailFieldOption?.value || null,
+            detailTargets: authoredDetailPresetTargets,
+        }),
+        [authoredDetailFieldOption, authoredDetailPresetTargets],
+    );
+    const authoredDetailSelectedRoutePreset = useMemo(
+        () => authoredDetailRouteSuggestions.find((entry) => entry.targetRef === authoredDetailTargetDraftValue)?.targetRef || "",
+        [authoredDetailRouteSuggestions, authoredDetailTargetDraftValue],
+    );
+    const authoredDetailParameterSourceFieldOptions = useMemo(() => {
+        const seen = new Set();
+        return authoredTableColumnOptions
+            .map((option) => ({
+                value: String(option?.key || "").trim(),
+                label: String(option?.label || option?.key || "").trim(),
+            }))
+            .filter((option) => {
+                if (!option.value || !option.label || seen.has(option.value)) {
+                    return false;
+                }
+                seen.add(option.value);
+                return true;
+            });
+    }, [authoredTableColumnOptions]);
+    const authoredDetailActionBindings = useMemo(() => {
+        const fieldLabelByRef = new Map(
+            dimensions.map((dimension) => [
+                String(dimension?.key || dimension?.id || "").trim(),
+                String(dimension?.label || dimension?.key || dimension?.id || "").trim(),
+            ]).filter(([fieldRef, label]) => !!fieldRef && !!label),
+        );
+        return authoredDrillMetadata.fieldActions.flatMap((entry) => (
+            (Array.isArray(entry?.actions) ? entry.actions : [])
+                .filter((action) => String(action?.kind || "").trim() === "detail" && String(action?.targetRef || "").trim())
+                .map((action) => {
+                    const targetRef = String(action?.targetRef || "").trim();
+                    const target = authoredDrillMetadata.detailTargets.find((detailTarget) => String(detailTarget?.targetRef || "").trim() === targetRef) || null;
+                    return {
+                        fieldRef: String(entry?.fieldRef || "").trim(),
+                        fieldLabel: fieldLabelByRef.get(String(entry?.fieldRef || "").trim()) || String(entry?.fieldRef || "").trim(),
+                        actionId: String(action?.id || "").trim(),
+                        actionLabel: String(action?.label || "").trim(),
+                        targetRef,
+                        target,
+                        parameterSummary: Object.entries(
+                            target?.parameters && typeof target.parameters === "object" && !Array.isArray(target.parameters)
+                                ? target.parameters
+                                : {},
+                        )
+                            .map(([key, value]) => `${key}=${value}`)
+                            .filter(Boolean)
+                            .join(", "),
+                    };
+                })
+        ));
+    }, [authoredDrillMetadata.detailTargets, authoredDrillMetadata.fieldActions, dimensions]);
+    const authoredDetailTargetDraftValue = String(authoredDetailTargetRefDraft || "").trim();
+    const matchingAuthoredDetailBinding = useMemo(
+        () => authoredDetailActionBindings.find(
+            (binding) => binding.fieldRef === authoredDetailFieldRef && binding.targetRef === authoredDetailTargetDraftValue,
+        ) || null,
+        [authoredDetailActionBindings, authoredDetailFieldRef, authoredDetailTargetDraftValue],
+    );
+    const isEditingAuthoredDetailTarget = !!String(editingAuthoredDetailTargetRef || "").trim();
+    const detailTargetDraftValidation = useMemo(
+        () => validateReportBuilderDetailTargetDraft({
+            field: authoredDetailFieldOption?.dimension || authoredDetailFieldOption?.value || null,
+            targetRef: authoredDetailTargetDraftValue,
+            parameterRows: authoredDetailParameterRowsDraft,
+        }),
+        [authoredDetailFieldOption, authoredDetailParameterRowsDraft, authoredDetailTargetDraftValue],
+    );
     const chartFields = useMemo(() => buildReportBuilderChartFields(displayConfig, state), [displayConfig, state]);
     const authoredDocumentBlockDiagnostics = useMemo(
         () => buildReportBuilderDocumentBlockDiagnostics(authoredDocumentBlocks, {
@@ -1813,6 +2272,7 @@ export default function ReportBuilder({ container, context }) {
     );
     const semanticMeasureIssuesById = semanticFieldValidation?.measureIssuesById || {};
     const semanticDimensionIssuesById = semanticFieldValidation?.dimensionIssuesById || {};
+    const semanticParameterIssuesById = semanticFieldValidation?.parameterIssuesById || {};
     const semanticSelectedIssues = Array.isArray(semanticFieldValidation?.selectedIssues) ? semanticFieldValidation.selectedIssues : [];
     const semanticDiagnosticsNotice = useMemo(() => buildReportBuilderSemanticDiagnosticsNotice({
         validationState: semanticSelectionValidationState,
@@ -1850,6 +2310,7 @@ export default function ReportBuilder({ container, context }) {
     }), [displayConfig, semanticBinding, semanticSelectionValidationState.diagnostics, state]);
     const semanticProviderMeasureDiagnosticsById = semanticDiagnosticTargets.measureDiagnosticsById || {};
     const semanticProviderDimensionDiagnosticsById = semanticDiagnosticTargets.dimensionDiagnosticsById || {};
+    const semanticProviderParameterDiagnosticsById = semanticDiagnosticTargets.parameterDiagnosticsById || {};
     const documentBlockDraftValidation = useMemo(
         () => validateReportBuilderDocumentBlockDraft(documentBlockDraft, {
             valueFieldOptions: authoredKpiValueFieldOptions,
@@ -1896,7 +2357,7 @@ export default function ReportBuilder({ container, context }) {
     const semanticProviderGroupByDiagnostics = Array.isArray(semanticDiagnosticTargets.groupByDiagnostics)
         ? semanticDiagnosticTargets.groupByDiagnostics
         : [];
-    const staticFilters = Array.isArray(config.staticFilters) ? config.staticFilters : [];
+    const staticFilters = Array.isArray(displayConfig.staticFilters) ? displayConfig.staticFilters : [];
     const dynamicFilterGroups = Array.isArray(config.dynamicFilterGroups) ? config.dynamicFilterGroups : [];
     const dynamicFilterFamilies = useMemo(() => resolveDynamicFilterFamilies(config), [config]);
     const familyMode = dynamicFilterFamilies.length > 0;
@@ -1944,7 +2405,7 @@ export default function ReportBuilder({ container, context }) {
     );
     const hasValidChartSpec = !!state.chartSpec && chartSpecValidation.valid;
     const hasStaleChartSpec = !!state.chartSpec && isReportBuilderChartSpecStale(config, state.chartSpec, chartFields);
-    const settingsHash = useMemo(() => buildReportBuilderSettingsHash(state), [state.binding, state.localCalculatedFields, state.localTableCalculations, state.selectedDimensions, state.selectedMeasures]);
+    const settingsHash = useMemo(() => buildReportBuilderSettingsHash(state), [state.binding, state.drillMetadata, state.localCalculatedFields, state.localTableCalculations, state.selectedDimensions, state.selectedMeasures]);
     const chartRenderCollection = useMemo(
         () => resolveReportBuilderChartCollection({
             computedCollection,
@@ -2071,21 +2532,23 @@ export default function ReportBuilder({ container, context }) {
                             const filterKey = String(filter.id || filter.field || "").trim();
                             const active = activeOptionalFilterKeys.includes(filterKey);
                             const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
-                            const stateLabel = filterCategoryStateLabel({ active, configuredCount });
                             const categoryLabel = filter.label || filter.id;
+                            const chipViewModel = buildFilterCategoryChipViewModel({
+                                label: categoryLabel,
+                                active,
+                                configuredCount,
+                                issue: semanticParameterIssuesById[filterKey] || null,
+                                providerDiagnostics: semanticProviderParameterDiagnosticsById[filterKey] || [],
+                            });
                             return (
                                 <button
                                     key={filterKey}
                                     type="button"
-                                    className={[
-                                        "forge-report-builder__category-chip",
-                                        active ? "is-active" : "is-inactive",
-                                        configuredCount > 0 ? "has-configured-state" : "",
-                                    ].filter(Boolean).join(" ")}
+                                    className={chipViewModel.className}
                                     onClick={() => toggleOptionalFilterCategory(filterKey)}
                                     aria-pressed={active}
-                                    aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                    title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                    aria-label={chipViewModel.title}
+                                    title={chipViewModel.title}
                                 >
                                     <span className="forge-report-builder__category-chip-icon">
                                         <Icon icon={filterCategoryIcon(filter)} size={12} />
@@ -2094,7 +2557,7 @@ export default function ReportBuilder({ container, context }) {
                                     {configuredCount > 0 ? (
                                         <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
                                     ) : (
-                                        <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                        <span className="forge-report-builder__category-chip-state">{chipViewModel.stateLabel}</span>
                                     )}
                                 </button>
                             );
@@ -2140,21 +2603,23 @@ export default function ReportBuilder({ container, context }) {
                             const filterKey = String(filter.id || filter.field || "").trim();
                             const active = activeOptionalFilterKeys.includes(filterKey);
                             const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
-                            const stateLabel = filterCategoryStateLabel({ active, configuredCount });
                             const categoryLabel = filter.label || filter.id;
+                            const chipViewModel = buildFilterCategoryChipViewModel({
+                                label: categoryLabel,
+                                active,
+                                configuredCount,
+                                issue: semanticParameterIssuesById[filterKey] || null,
+                                providerDiagnostics: semanticProviderParameterDiagnosticsById[filterKey] || [],
+                            });
                             return (
                                 <button
                                     key={filterKey}
                                     type="button"
-                                    className={[
-                                        "forge-report-builder__category-chip",
-                                        active ? "is-active" : "is-inactive",
-                                        configuredCount > 0 ? "has-configured-state" : "",
-                                    ].filter(Boolean).join(" ")}
+                                    className={chipViewModel.className}
                                     onClick={() => toggleOptionalFilterCategory(filterKey)}
                                     aria-pressed={active}
-                                    aria-label={filterCategoryTitle(categoryLabel, { active, configuredCount })}
-                                    title={filterCategoryTitle(categoryLabel, { active, configuredCount })}
+                                    aria-label={chipViewModel.title}
+                                    title={chipViewModel.title}
                                 >
                                     <span className="forge-report-builder__category-chip-icon">
                                         <Icon icon={filterCategoryIcon(filter)} size={12} />
@@ -2163,7 +2628,7 @@ export default function ReportBuilder({ container, context }) {
                                     {configuredCount > 0 ? (
                                         <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
                                     ) : (
-                                        <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                                        <span className="forge-report-builder__category-chip-state">{chipViewModel.stateLabel}</span>
                                     )}
                                 </button>
                             );
@@ -2224,36 +2689,16 @@ export default function ReportBuilder({ container, context }) {
             {includeRequiredStaticFilters ? (
                 <div className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--static">
                     {panelRequiredStaticFilters.map((filter) => {
-                        const filterKey = String(filter.id || filter.field || "").trim();
-                        const currentValue = state?.staticFilters?.[filterKey];
-                        return (
-                            <StaticFilterSection
-                                key={filterKey}
-                                filter={filter}
-                                context={builderContext}
-                                value={currentValue}
-                                onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
-                                onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
-                            />
-                        );
+                        return renderStaticFilterSection(filter);
                     })}
                 </div>
             ) : null}
             {optionalStaticFilters
                 .filter((filter) => activeOptionalFilterKeys.includes(String(filter.id || filter.field || "").trim()))
                 .map((filter) => {
-                    const filterKey = String(filter.id || filter.field || "").trim();
-                    const currentValue = state?.staticFilters?.[filterKey];
                     return (
-                        <div key={`row-${filterKey}`} className="forge-report-builder__optional-filter-row">
-                            <StaticFilterSection
-                                key={filterKey}
-                                filter={filter}
-                                context={builderContext}
-                                value={currentValue}
-                                onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
-                                onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
-                            />
+                        <div key={`row-${String(filter.id || filter.field || "").trim()}`} className="forge-report-builder__optional-filter-row">
+                            {renderStaticFilterSection(filter)}
                         </div>
                     );
                 })}
@@ -2418,12 +2863,16 @@ export default function ReportBuilder({ container, context }) {
     const renderStaticFilterSection = (filter) => {
         const filterKey = String(filter.id || filter.field || "").trim();
         const currentValue = state?.staticFilters?.[filterKey];
+        const issue = semanticParameterIssuesById[filterKey] || null;
+        const providerDiagnostics = semanticProviderParameterDiagnosticsById[filterKey] || [];
         return (
             <StaticFilterSection
                 key={filterKey}
                 filter={filter}
                 context={builderContext}
                 value={currentValue}
+                issue={issue}
+                providerDiagnostics={providerDiagnostics}
                 onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
                 onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
             />
@@ -2771,6 +3220,347 @@ export default function ReportBuilder({ container, context }) {
                                 })}
                             </div>
                         ) : null}
+                        {(selectedDimensionDefs.length > 0
+                            || authoredDrillSummary.hierarchyCount > 0
+                            || authoredDrillSummary.detailTargetCount > 0
+                            || authoredDrillSummary.fieldActionCount > 0) ? (
+                            <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ marginTop: 10 }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                    <strong>Drill navigation</strong>
+                                    <div className="forge-report-builder__result-meta">
+                                        <span className="forge-report-builder__result-meta-chip">
+                                            {authoredDrillSummary.hierarchyCount} {authoredDrillSummary.hierarchyCount === 1 ? "hierarchy" : "hierarchies"}
+                                        </span>
+                                        {authoredDrillSummary.detailTargetCount > 0 ? (
+                                            <span className="forge-report-builder__result-meta-chip">
+                                                {authoredDrillSummary.detailTargetCount} {authoredDrillSummary.detailTargetCount === 1 ? "detail target" : "detail targets"}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: "#486579" }}>
+                                    Capture the current breakdown order for drill paths, then bind breakdown fields to detail targets for runtime navigation in preview and saved report artifacts.
+                                </div>
+                                {currentBreakdownDrillHierarchy ? (
+                                    <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5, color: "#183247" }}>
+                                        <strong>Current path:</strong> {currentBreakdownDrillHierarchy.levels.map((level) => level.label).join(" -> ")}
+                                    </div>
+                                ) : (
+                                    <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.5, color: "#486579" }}>
+                                        Select at least two breakdowns to capture a drill path.
+                                    </div>
+                                )}
+                                <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={captureCurrentDrillHierarchy}
+                                        disabled={!currentBreakdownDrillHierarchy}
+                                    >
+                                        {currentBreakdownDrillHierarchyCaptured ? "Update current path" : "Capture current path"}
+                                    </Button>
+                                </div>
+                                {authoredDetailFieldOptions.length > 0 ? (
+                                    <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                            Detail actions
+                                        </div>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                                            <label className="forge-report-builder__chart-field">
+                                                <span>Breakdown field</span>
+                                                <select
+                                                    className="forge-report-builder-select"
+                                                    value={authoredDetailFieldRef}
+                                                    onChange={(event) => setAuthoredDetailFieldRefDraft(event.target.value)}
+                                                >
+                                                    {authoredDetailFieldOptions.map((option) => (
+                                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <label className="forge-report-builder__chart-field">
+                                                <span>Navigation mode</span>
+                                                <select
+                                                    className="forge-report-builder-select"
+                                                    value={authoredDetailNavigationModeDraft}
+                                                    onChange={(event) => setAuthoredDetailNavigationModeDraft(event.target.value)}
+                                                >
+                                                    <option value="hostRoute">Host route</option>
+                                                    <option value="modal">Modal</option>
+                                                </select>
+                                            </label>
+                                                    <label className="forge-report-builder__chart-field">
+                                                        <span>Route preset</span>
+                                                        <select
+                                                            className="forge-report-builder-select"
+                                                            value={authoredDetailSelectedRoutePreset || "__custom__"}
+                                                            onChange={(event) => {
+                                                                const nextValue = event.target.value;
+                                                                if (nextValue === "__custom__") {
+                                                                    return;
+                                                                }
+                                                                setAuthoredDetailTargetRefDraft(nextValue);
+                                                                const presetTarget = resolveReportBuilderDetailTargetRoutePreset(
+                                                                    authoredDetailPresetTargets,
+                                                                    nextValue,
+                                                                );
+                                                                const nextDraft = buildReportBuilderDetailTargetDraftFromTarget(presetTarget, {
+                                                                    fallbackIdPrefix: `detailParam_${String(authoredDetailFieldRef || "detail").trim() || "detail"}`,
+                                                                });
+                                                                if (!nextDraft) {
+                                                                    return;
+                                                                }
+                                                                setAuthoredDetailNavigationModeDraft(nextDraft.navigationMode);
+                                                                setAuthoredDetailTitleDraft(nextDraft.title);
+                                                                setAuthoredDetailDescriptionDraft(nextDraft.description);
+                                                                setAuthoredDetailParameterRowsDraft(nextDraft.parameterRows);
+                                                            }}
+                                                        >
+                                                    <option value="__custom__">Custom target reference</option>
+                                                    {authoredDetailRouteSuggestions.map((option) => (
+                                                        <option key={option.targetRef} value={option.targetRef}>{option.label}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                                <span>Target reference</span>
+                                                <input
+                                                    type="text"
+                                                    className="forge-report-builder-select"
+                                                    value={authoredDetailTargetRefDraft}
+                                                    onChange={(event) => setAuthoredDetailTargetRefDraft(event.target.value)}
+                                                    placeholder="target://example/channel-detail"
+                                                />
+                                                {authoredDetailSelectedRoutePreset ? (
+                                                    <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
+                                                        {authoredDetailRouteSuggestions.find((entry) => entry.targetRef === authoredDetailSelectedRoutePreset)?.description || ""}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
+                                                        Suggested presets reuse authored namespaces and provider-backed detail targets when available.
+                                                    </div>
+                                                )}
+                                                {authoredDetailProviderPresetError ? (
+                                                    <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.45, color: "#ad4e00" }}>
+                                                        {authoredDetailProviderPresetError}
+                                                    </div>
+                                                ) : null}
+                                            </label>
+                                            <label className="forge-report-builder__chart-field">
+                                                <span>Detail title</span>
+                                                <input
+                                                    type="text"
+                                                    className="forge-report-builder-select"
+                                                    value={authoredDetailTitleDraft}
+                                                    onChange={(event) => setAuthoredDetailTitleDraft(event.target.value)}
+                                                    placeholder={authoredDetailFieldOption ? `${authoredDetailFieldOption.label} detail` : "Detail title"}
+                                                />
+                                            </label>
+                                            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                                <span>Description</span>
+                                                <input
+                                                    type="text"
+                                                    className="forge-report-builder-select"
+                                                    value={authoredDetailDescriptionDraft}
+                                                    onChange={(event) => setAuthoredDetailDescriptionDraft(event.target.value)}
+                                                    placeholder="Optional detail target description"
+                                                />
+                                            </label>
+                                        </div>
+                                        <div style={{ display: "grid", gap: 8 }}>
+                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                                    Detail parameters
+                                                </div>
+                                                <Button small minimal onClick={addAuthoredDetailParameterRow}>
+                                                    Add parameter
+                                                </Button>
+                                            </div>
+                                            {normalizeReportBuilderDetailParameterDraftRows(authoredDetailParameterRowsDraft).map((row, index, rows) => (
+                                                <div
+                                                    key={row.id}
+                                                    style={{
+                                                        display: "grid",
+                                                        gridTemplateColumns: "minmax(120px, 1fr) minmax(140px, 1fr) minmax(160px, 1fr) auto",
+                                                        gap: 8,
+                                                        alignItems: "end",
+                                                    }}
+                                                >
+                                                    <label className="forge-report-builder__chart-field">
+                                                        <span>Parameter</span>
+                                                        <input
+                                                            type="text"
+                                                            className="forge-report-builder-select"
+                                                            value={row.parameter}
+                                                            onChange={(event) => updateAuthoredDetailParameterRow(row.id, { parameter: event.target.value })}
+                                                            placeholder={index === 0 ? (authoredDetailFieldOption?.value || "field") : "parameter"}
+                                                        />
+                                                    </label>
+                                                    <label className="forge-report-builder__chart-field">
+                                                        <span>Value source</span>
+                                                        <select
+                                                            className="forge-report-builder-select"
+                                                            value={row.valueKind}
+                                                            onChange={(event) => updateAuthoredDetailParameterRow(row.id, { valueKind: event.target.value })}
+                                                        >
+                                                            <option value="runtimeValue">Selected value</option>
+                                                            <option value="rowField">Row field</option>
+                                                            <option value="literal">Literal</option>
+                                                        </select>
+                                                    </label>
+                                                    {row.valueKind === "rowField" ? (
+                                                        <label className="forge-report-builder__chart-field">
+                                                            <span>Row field</span>
+                                                            <select
+                                                                className="forge-report-builder-select"
+                                                                value={row.valueRef}
+                                                                onChange={(event) => updateAuthoredDetailParameterRow(row.id, { valueRef: event.target.value })}
+                                                            >
+                                                                <option value="">Select…</option>
+                                                                {authoredDetailParameterSourceFieldOptions.map((option) => (
+                                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                                ))}
+                                                            </select>
+                                                        </label>
+                                                    ) : row.valueKind === "literal" ? (
+                                                        <label className="forge-report-builder__chart-field">
+                                                            <span>Literal value</span>
+                                                            <input
+                                                                type="text"
+                                                                className="forge-report-builder-select"
+                                                                value={row.valueRef}
+                                                                onChange={(event) => updateAuthoredDetailParameterRow(row.id, { valueRef: event.target.value })}
+                                                                placeholder="literal value"
+                                                            />
+                                                        </label>
+                                                    ) : (
+                                                        <label className="forge-report-builder__chart-field">
+                                                            <span>Resolved value</span>
+                                                            <input
+                                                                type="text"
+                                                                className="forge-report-builder-select"
+                                                                value="$value"
+                                                                disabled
+                                                                readOnly
+                                                            />
+                                                        </label>
+                                                    )}
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        intent="danger"
+                                                        onClick={() => removeAuthoredDetailParameterRow(row.id)}
+                                                        disabled={rows.length <= 1}
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="forge-report-builder__result-header-actions">
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={applyAuthoredDetailTarget}
+                                                disabled={!authoredDetailFieldOption || !authoredDetailTargetDraftValue || !detailTargetDraftValidation.valid}
+                                            >
+                                                {matchingAuthoredDetailBinding ? "Update detail action" : "Add detail action"}
+                                            </Button>
+                                        </div>
+                                        {detailTargetDraftValidation.errors.length > 0 ? (
+                                            <div style={{ display: "grid", gap: 4 }}>
+                                                {detailTargetDraftValidation.errors.map((error, index) => (
+                                                    <div key={`${error.field}:${error.code}:${index}`} style={{ fontSize: 11, lineHeight: 1.45, color: "#b42318" }}>
+                                                        {error.message}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                                {authoredDrillSummary.hierarchies.length > 0 ? (
+                                    <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                                        {authoredDrillSummary.hierarchies.map((hierarchy) => (
+                                            <div
+                                                key={hierarchy.id}
+                                                style={{
+                                                    border: "1px solid #d7e2ee",
+                                                    borderRadius: 10,
+                                                    background: "#fbfdff",
+                                                    padding: "10px 12px",
+                                                    display: "flex",
+                                                    alignItems: "flex-start",
+                                                    justifyContent: "space-between",
+                                                    gap: 12,
+                                                }}
+                                            >
+                                                <div style={{ display: "grid", gap: 4 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{hierarchy.label}</div>
+                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>{hierarchy.summary}</div>
+                                                </div>
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    intent="danger"
+                                                    onClick={() => removeDrillHierarchy(hierarchy.id)}
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null}
+                                {authoredDetailActionBindings.length > 0 ? (
+                                    <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                                        {authoredDetailActionBindings.map((binding) => (
+                                            <div
+                                                key={binding.actionId}
+                                                style={{
+                                                    border: "1px solid #d7e2ee",
+                                                    borderRadius: 10,
+                                                    background: "#fbfdff",
+                                                    padding: "10px 12px",
+                                                    display: "flex",
+                                                    alignItems: "flex-start",
+                                                    justifyContent: "space-between",
+                                                    gap: 12,
+                                                }}
+                                            >
+                                                <div style={{ display: "grid", gap: 4 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{binding.actionLabel}</div>
+                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>
+                                                        {binding.fieldLabel} {"->"} {binding.target?.title || binding.targetRef}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
+                                                        {binding.target?.navigationMode || "hostRoute"} • {binding.targetRef}
+                                                    </div>
+                                                    {binding.parameterSummary ? (
+                                                        <div style={{ fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
+                                                            {binding.parameterSummary}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    onClick={() => editDetailTarget(binding)}
+                                                >
+                                                    Edit
+                                                </Button>
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    intent="danger"
+                                                    onClick={() => removeDetailTarget(binding.targetRef)}
+                                                >
+                                                    Remove
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </div>
                 ) : null}
             </section>
@@ -3040,10 +3830,20 @@ export default function ReportBuilder({ container, context }) {
                         ].filter(Boolean).join(" • ")
                         : normalizedKind === "filterBarBlock"
                             ? (() => {
-                                const paramLabels = (Array.isArray(block?.paramIds) ? block.paramIds : [])
-                                    .map((paramId) => authoredScopeParamOptions.find((option) => option.value === String(paramId || "").trim())?.label || paramId)
-                                    .filter(Boolean);
-                                return paramLabels.length > 0 ? paramLabels.join(" • ") : "No shared scope parameters";
+                                const scopeSummary = buildReportBuilderScopeParamSummary(block?.paramIds, authoredScopeParamOptions);
+                                if (!Array.isArray(scopeSummary?.items) || scopeSummary.items.length === 0) {
+                                    return "No shared scope parameters";
+                                }
+                                return (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                        {scopeSummary.items.map((item) => (
+                                            <span key={item.id}>
+                                                <strong style={{ color: "#314154" }}>{item.label}</strong>
+                                                {item.description ? <span>{`: ${item.description}`}</span> : null}
+                                            </span>
+                                        ))}
+                                    </div>
+                                );
                             })()
                         : normalizedKind === "refinementBarBlock"
                             ? [
@@ -3258,11 +4058,17 @@ export default function ReportBuilder({ container, context }) {
                     ))}
                 </div>
             ) : null}
-            {chartApplyFeedback?.message ? (
-                <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${chartApplyFeedback.level || "warning"}`}>
-                    {chartApplyFeedback.message}
-                </div>
-            ) : null}
+            <div className="forge-report-builder__compact-summary-actions">
+                <Button
+                    small
+                    outlined
+                    icon="upload"
+                    onClick={openImportReportFilePicker}
+                >
+                    {savedArtifactViewState.loadFileLabel}
+                </Button>
+            </div>
+            {renderChartApplyFeedbackNotice({ compact: true })}
         </div>
     );
 
@@ -3388,9 +4194,12 @@ export default function ReportBuilder({ container, context }) {
                     </div>
                     <div className="forge-report-builder__compact-sheet-body forge-report-builder__compact-sheet-body--chart">
                         {compactChartSheetState.notice?.message ? (
-                            <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${compactChartSheetState.notice.level || "info"}`}>
-                                {compactChartSheetState.notice.message}
-                            </div>
+                            <ReportBuilderInlineNotice
+                                notice={{
+                                    level: compactChartSheetState.notice.level || "info",
+                                    message: compactChartSheetState.notice.message,
+                                }}
+                            />
                         ) : null}
                         {compactChartSheetState.presetIdentity ? (
                             <div
@@ -3548,6 +4357,8 @@ export default function ReportBuilder({ container, context }) {
     const runReport = React.useCallback(() => {
         setManualRunSequence((current) => current + 1);
         setChartApplyFeedback(null);
+        setFilterPanels(collapseReportBuilderFilterBodyState);
+        setFiltersDrawerOpen(false);
         dispatchReportRequest(state, { forceFetch: true, markManual: true });
     }, [dispatchReportRequest, state]);
     const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
@@ -3577,12 +4388,10 @@ export default function ReportBuilder({ container, context }) {
         [savedExplorationArtifact],
     );
     const savedExplorationArtifactInspector = useMemo(
-        () => buildReportBuilderExplorationArtifactInspectorState(savedExplorationArtifact),
-        [savedExplorationArtifact],
-    );
-    const savedReportPayloadSummary = useMemo(
-        () => buildReportBuilderSavedReportPayloadSummary(savedReportPayload),
-        [savedReportPayload],
+        () => savedExplorationArtifactOpen
+            ? buildReportBuilderExplorationArtifactInspectorState(savedExplorationArtifact)
+            : null,
+        [savedExplorationArtifact, savedExplorationArtifactOpen],
     );
     const rawLocalReportDocumentSavedPayloads = useMemo(
         () => [
@@ -3591,9 +4400,141 @@ export default function ReportBuilder({ container, context }) {
         ],
         [config?.reportDocumentSavedPayloads, savedReportPayload],
     );
+    const configuredExportContextSavedPayloads = useMemo(
+        () => [
+            ...rawLocalReportDocumentSavedPayloads,
+            ...localLifecycleSharedArtifactRecords,
+            ...backendSharedArtifactRecords,
+            ...importedLocalSavedReportRecords,
+        ],
+        [backendSharedArtifactRecords, importedLocalSavedReportRecords, localLifecycleSharedArtifactRecords, rawLocalReportDocumentSavedPayloads],
+    );
+    const savedReportPayloadSummary = useMemo(
+        () => buildReportBuilderSavedReportPayloadSummary(savedReportPayload, {
+            localSavedPayloads: configuredExportContextSavedPayloads,
+        }),
+        [configuredExportContextSavedPayloads, savedReportPayload],
+    );
+    const activeSavedArtifactSummary = useMemo(() => {
+        if (savedReportPayloadSummary) {
+            return savedReportPayloadSummary;
+        }
+        if (!savedReportPayloadRecord?.document || !savedReportPayloadRecord?.reportSpec) {
+            return null;
+        }
+        return buildReportBuilderSavedReportPayloadSummary({
+            version: 1,
+            kind: normalizeString(
+                savedReportPayloadRecord?.source?.kind
+                || savedReportPayloadRecord?.importedArtifactKind
+                || "reportBuilder.savedReportRecord",
+            ),
+            title: normalizeString(savedReportPayloadRecord?.title || savedReportPayloadRecord?.document?.title || "Report") || "Report",
+            sourceArtifactId: normalizeString(
+                savedReportPayloadRecord?.source?.sourceArtifactId
+                || savedReportPayloadRecord?.sourceIdentity?.sourceArtifactId,
+            ),
+            savedAt: Number(savedReportPayloadRecord?.savedAt || 0) || 0,
+            reportDocument: savedReportPayloadRecord.document,
+            reportSpec: savedReportPayloadRecord.reportSpec,
+            ...(savedReportPayloadRecord?.source ? { source: savedReportPayloadRecord.source } : {}),
+            ...(savedReportPayloadRecord?.savedViewOverlay ? { savedViewOverlay: savedReportPayloadRecord.savedViewOverlay } : {}),
+            ...(savedReportPayloadRecord?.compileState ? { compileState: savedReportPayloadRecord.compileState } : {}),
+        }, {
+            localSavedPayloads: configuredExportContextSavedPayloads,
+        });
+    }, [configuredExportContextSavedPayloads, savedReportPayloadRecord, savedReportPayloadSummary]);
+    const latestLifecycleSharedArtifactRecord = useMemo(
+        () => localLifecycleSharedArtifactRecords[0] || null,
+        [localLifecycleSharedArtifactRecords],
+    );
+    const latestLifecycleSharedArtifactSummary = useMemo(() => {
+        return buildReportBuilderLifecycleSharedArtifactSummary(latestLifecycleSharedArtifactRecord, {
+            localSavedPayloads: configuredExportContextSavedPayloads,
+        });
+    }, [configuredExportContextSavedPayloads, latestLifecycleSharedArtifactRecord]);
+    const latestLifecycleSharedArtifactInspector = useMemo(
+        () => latestLifecycleSharedArtifactOpen
+            ? buildReportBuilderLifecycleSharedArtifactInspectorState(latestLifecycleSharedArtifactRecord, {
+                localSavedPayloads: configuredExportContextSavedPayloads,
+            })
+            : null,
+        [configuredExportContextSavedPayloads, latestLifecycleSharedArtifactOpen, latestLifecycleSharedArtifactRecord],
+    );
+    const activeSavedArtifactKindLabel = useMemo(
+        () => buildReportBuilderExportArtifactKindLabel(
+            savedReportPayloadRecord?.source?.kind
+            || activeSavedArtifactSummary?.kind
+            || "",
+        ),
+        [activeSavedArtifactSummary?.kind, savedReportPayloadRecord?.source?.kind],
+    );
+    const preparedSavedPayloadApiArtifactCount = useMemo(
+        () => [
+            getReportDocumentResponse,
+            reopenReportDocumentDiagnostic,
+            listReportDocumentsResponse,
+            getReportDocumentRequestPayload,
+            createReportDocumentPayload,
+            updateReportDocumentPayload,
+            updateReportDocumentConflictDiagnostic,
+        ].filter(Boolean).length,
+        [
+            createReportDocumentPayload,
+            getReportDocumentResponse,
+            getReportDocumentRequestPayload,
+            listReportDocumentsResponse,
+            reopenReportDocumentDiagnostic,
+            updateReportDocumentPayload,
+            updateReportDocumentConflictDiagnostic,
+        ],
+    );
+    const savedArtifactViewState = useMemo(
+        () => buildReportBuilderSavedArtifactViewState({
+            savedExplorationArtifactOpen,
+            savedReportPayloadOpen,
+            savedReportPayloadApiArtifactsOpen,
+            preparedApiArtifactCount: preparedSavedPayloadApiArtifactCount,
+        }),
+        [
+            preparedSavedPayloadApiArtifactCount,
+            savedExplorationArtifactOpen,
+            savedReportPayloadApiArtifactsOpen,
+            savedReportPayloadOpen,
+        ],
+    );
+    const activeSavedArtifactNoticeState = useMemo(
+        () => buildReportBuilderActiveSavedArtifactNoticeState({
+            summary: activeSavedArtifactSummary,
+            kindLabel: activeSavedArtifactKindLabel,
+            reuseHint: savedReportPayloadSummary ? savedArtifactViewState.savedReportPayload.reuseHint : "",
+            isSavedReportPayload: !!savedReportPayloadSummary,
+        }),
+        [
+            activeSavedArtifactKindLabel,
+            activeSavedArtifactSummary,
+            savedArtifactViewState.savedReportPayload.reuseHint,
+            savedReportPayloadSummary,
+        ],
+    );
+    const activeSavedArtifactLifecycleActionState = useMemo(
+        () => buildReportBuilderLifecycleActionState(activeSavedArtifactSummary, {
+            handler: reportLifecycleHandler,
+            busyActionId: activeSavedArtifactLifecycleActionId,
+        }),
+        [
+            activeSavedArtifactLifecycleActionId,
+            activeSavedArtifactSummary,
+            reportLifecycleHandler,
+        ],
+    );
     const savedReportPayloadInspector = useMemo(
-        () => buildReportBuilderSavedReportPayloadInspectorState(savedReportPayload),
-        [savedReportPayload],
+        () => savedReportPayloadOpen
+            ? buildReportBuilderSavedReportPayloadInspectorState(savedReportPayload, {
+                localSavedPayloads: configuredExportContextSavedPayloads,
+            })
+            : null,
+        [configuredExportContextSavedPayloads, savedReportPayload, savedReportPayloadOpen],
     );
     const savedReportPayloadCompileDiagnostics = useMemo(
         () => {
@@ -3646,24 +4587,36 @@ export default function ReportBuilder({ container, context }) {
         return null;
     }, [hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, savedReportPayloadCompileValidation]);
     const createReportDocumentPayloadSummary = useMemo(
-        () => buildReportBuilderCreateReportDocumentPayloadSummary(createReportDocumentPayload),
-        [createReportDocumentPayload],
+        () => buildReportBuilderCreateReportDocumentPayloadSummary(createReportDocumentPayload, {
+            localSavedPayloads: configuredExportContextSavedPayloads,
+        }),
+        [configuredExportContextSavedPayloads, createReportDocumentPayload],
     );
     const createReportDocumentPayloadInspector = useMemo(
-        () => buildReportBuilderCreateReportDocumentPayloadInspectorState(createReportDocumentPayload),
-        [createReportDocumentPayload],
+        () => createReportDocumentPayloadOpen
+            ? buildReportBuilderCreateReportDocumentPayloadInspectorState(createReportDocumentPayload, {
+                localSavedPayloads: configuredExportContextSavedPayloads,
+            })
+            : null,
+        [configuredExportContextSavedPayloads, createReportDocumentPayload, createReportDocumentPayloadOpen],
     );
     const reportDocumentVersionState = useMemo(
         () => buildReportBuilderDocumentVersionState(reportDocumentVersionDraft),
         [reportDocumentVersionDraft],
     );
     const getReportDocumentResponseSummary = useMemo(
-        () => buildReportBuilderGetReportDocumentResponseSummary(getReportDocumentResponse),
-        [getReportDocumentResponse],
+        () => buildReportBuilderGetReportDocumentResponseSummary(getReportDocumentResponse, {
+            localSavedPayloads: configuredExportContextSavedPayloads,
+        }),
+        [configuredExportContextSavedPayloads, getReportDocumentResponse],
     );
     const getReportDocumentResponseInspector = useMemo(
-        () => buildReportBuilderReportDocumentReadResponseInspectorState(getReportDocumentResponse),
-        [getReportDocumentResponse],
+        () => getReportDocumentResponseOpen
+            ? buildReportBuilderReportDocumentReadResponseInspectorState(getReportDocumentResponse, {
+                localSavedPayloads: configuredExportContextSavedPayloads,
+            })
+            : null,
+        [configuredExportContextSavedPayloads, getReportDocumentResponse, getReportDocumentResponseOpen],
     );
     const getReportDocumentResponseContent = useMemo(
         () => getReportDocumentResponseInspector?.content || "",
@@ -3689,37 +4642,225 @@ export default function ReportBuilder({ container, context }) {
         compileValidation: reopenedReportDocumentCompileValidation,
         title: "Reopened compile diagnostics",
     }), [reopenedReportDocumentCompileValidation]);
+    const importedStandaloneExportRequestSummary = useMemo(
+        () => buildReportBuilderExportRequestSummary(importedStandaloneExportRequest, {
+            localSavedPayloads: configuredExportContextSavedPayloads,
+        }),
+        [configuredExportContextSavedPayloads, importedStandaloneExportRequest],
+    );
+    const importedStandaloneReportFillSummary = useMemo(
+        () => buildImportedStandaloneReportFillSummary(importedStandaloneReportFill),
+        [importedStandaloneReportFill],
+    );
+    const importedStandaloneReportPrintSummary = useMemo(
+        () => buildImportedStandaloneReportPrintSummary(importedStandaloneReportPrint),
+        [importedStandaloneReportPrint],
+    );
+    const importedPipelineSummary = useMemo(
+        () => buildImportedPipelineSummary(importedPipelinePreview),
+        [importedPipelinePreview],
+    );
+    const importedPipelineRuntimeState = useMemo(
+        () => resolveImportedPipelineRuntimeState({
+            importedPipelinePreview,
+            importedStandaloneReportFill,
+            attachedRequested: importedPipelineCompanionFillAttached,
+        }),
+        [importedPipelineCompanionFillAttached, importedPipelinePreview, importedStandaloneReportFill],
+    );
+    const importedPipelineCompanionFillCompatibility = importedPipelineRuntimeState.compatibility;
+    const importedPipelineCompanionPrintCompatibility = useMemo(
+        () => resolveImportedPipelineCompanionPrintCompatibility({
+            importedPipelinePreview,
+            importedStandaloneReportPrint,
+        }),
+        [importedPipelinePreview, importedStandaloneReportPrint],
+    );
+    const importedPipelineRuntimeArtifact = importedPipelineRuntimeState.runtimeArtifact;
+    const importedPipelineRuntimeConfig = importedPipelineRuntimeState.runtimeConfig;
+    const importedPipelineRuntimeFillSummary = importedPipelineRuntimeState.runtimeFillSummary;
+    const importedStandaloneReportFillPanelState = useMemo(
+        () => buildImportedStandaloneReportFillPanelState({
+            importedStandaloneReportFillSummary,
+            importedPipelineCompanionFillCompatibility,
+            importedStandaloneReportFillOpen,
+            companionReportDocument: importedPipelineRuntimeArtifact?.document || null,
+            companionReportSpec: importedPipelineCompanionFillCompatibility?.compatible
+                ? (
+                    importedPipelineRuntimeConfig?.reportSpec
+                    || importedPipelinePreview?.payload
+                    || null
+                )
+                : null,
+        }),
+        [
+            importedPipelineCompanionFillCompatibility,
+            importedPipelineRuntimeArtifact?.document,
+            importedPipelinePreview?.payload,
+            importedPipelineRuntimeConfig?.reportSpec,
+            importedStandaloneReportFillOpen,
+            importedStandaloneReportFillSummary,
+        ],
+    );
+    const importedStandaloneReportPrintPanelState = useMemo(
+        () => buildImportedStandaloneReportPrintPanelState({
+            importedStandaloneReportPrintSummary,
+            importedStandaloneReportPrintOpen,
+            companionReportDocument: importedPipelineRuntimeArtifact?.document || null,
+            companionReportSpec: importedPipelineCompanionPrintCompatibility?.compatible
+                ? (
+                    importedPipelineRuntimeConfig?.reportSpec
+                    || importedPipelinePreview?.payload
+                    || null
+                )
+                : null,
+        }),
+        [
+            importedPipelineCompanionPrintCompatibility?.compatible,
+            importedPipelineRuntimeArtifact?.document,
+            importedPipelinePreview?.payload,
+            importedPipelineRuntimeConfig?.reportSpec,
+            importedStandaloneReportPrintOpen,
+            importedStandaloneReportPrintSummary,
+        ],
+    );
+    const importedStandaloneReportFillInspectorState = useMemo(
+        () => buildImportedStandaloneReportFillInspectorState({
+            importedStandaloneReportFillSummary,
+            importedStandaloneReportFillOpen,
+            companionReportDocument: importedPipelineRuntimeArtifact?.document || null,
+            companionReportSpec: importedPipelineCompanionFillCompatibility?.compatible
+                ? (
+                    importedPipelineRuntimeConfig?.reportSpec
+                    || importedPipelinePreview?.payload
+                    || null
+                )
+                : null,
+        }),
+        [
+            importedPipelineCompanionFillCompatibility?.compatible,
+            importedPipelineRuntimeArtifact?.document,
+            importedPipelinePreview?.payload,
+            importedPipelineRuntimeConfig?.reportSpec,
+            importedStandaloneReportFillOpen,
+            importedStandaloneReportFillSummary,
+        ],
+    );
+    const importedStandaloneReportPrintInspectorState = useMemo(
+        () => buildImportedStandaloneReportPrintInspectorState({
+            importedStandaloneReportPrintSummary,
+            importedStandaloneReportPrintOpen,
+            companionReportDocument: importedPipelineRuntimeArtifact?.document || null,
+            companionReportSpec: importedPipelineCompanionPrintCompatibility?.compatible
+                ? (
+                    importedPipelineRuntimeConfig?.reportSpec
+                    || importedPipelinePreview?.payload
+                    || null
+                )
+                : null,
+        }),
+        [
+            importedPipelineCompanionPrintCompatibility?.compatible,
+            importedPipelineRuntimeArtifact?.document,
+            importedPipelinePreview?.payload,
+            importedPipelineRuntimeConfig?.reportSpec,
+            importedStandaloneReportPrintOpen,
+            importedStandaloneReportPrintSummary,
+        ],
+    );
+    useEffect(() => {
+        if (!importedPipelineCompanionFillAttached || !importedPipelineRuntimeState.attachFailureMessage) {
+            return;
+        }
+        setImportedPipelineCompanionFillAttached(false);
+        setChartApplyFeedback({
+            level: "warning",
+            message: importedPipelineRuntimeState.attachFailureMessage,
+        });
+    }, [
+        importedPipelineCompanionFillAttached,
+        importedPipelineRuntimeState.attachFailureMessage,
+    ]);
+    const importedPipelineInspector = useMemo(() => {
+        return buildImportedPipelineInspectorState({
+            importedPipelineSummary,
+            importedPipelinePreview,
+            importedPipelineRuntimeArtifact,
+            importedPipelineRuntimeConfig,
+            importedPipelineInspectorSection,
+        });
+    }, [
+        importedPipelineInspectorSection,
+        importedPipelinePreview,
+        importedPipelineRuntimeArtifact,
+        importedPipelineRuntimeConfig,
+        importedPipelineSummary,
+    ]);
+    const backendSharedArtifactsListResponse = useMemo(
+        () => buildReportBuilderListReportDocumentsResponseFromSavedRecords(backendSharedArtifactRecords),
+        [backendSharedArtifactRecords],
+    );
+    const activeListReportDocumentsResponse = listReportDocumentsResponse || backendSharedArtifactsListResponse;
     const listReportDocumentsResponseSummary = useMemo(
-        () => buildReportBuilderListReportDocumentsResponseSummary(listReportDocumentsResponse),
-        [listReportDocumentsResponse],
+        () => buildReportBuilderListReportDocumentsResponseSummary(activeListReportDocumentsResponse),
+        [activeListReportDocumentsResponse],
     );
     const listReportDocumentsEntryOptions = useMemo(
-        () => (Array.isArray(listReportDocumentsResponse?.entries) ? listReportDocumentsResponse.entries : [])
-            .map((entry) => ({
-                reportId: String(entry?.reportRef?.reportId || "").trim(),
-                title: String(entry?.title || entry?.reportRef?.reportId || "").trim(),
-                subtitle: normalizeString(entry?.subtitle),
-                description: normalizeString(entry?.description),
-                compileStatus: normalizeString(entry?.compileState?.status),
-            }))
-            .filter((entry) => entry.reportId),
-        [listReportDocumentsResponse],
+        () => buildReportBuilderListReportDocumentsEntryOptions(activeListReportDocumentsResponse, {
+            localSavedPayloads: localSavedReportRecords,
+        }),
+        [activeListReportDocumentsResponse, localSavedReportRecords],
     );
     const selectedListReportDocumentsEntry = useMemo(
-        () => (Array.isArray(listReportDocumentsResponse?.entries) ? listReportDocumentsResponse.entries : [])
-            .find((entry) => normalizeString(entry?.reportRef?.reportId) === normalizeString(listReportDocumentsSelectedReportId)) || null,
-        [listReportDocumentsResponse, listReportDocumentsSelectedReportId],
+        () => resolveReportBuilderListReportDocumentsResponseEntry(activeListReportDocumentsResponse, {
+            selectedEntryKey: listReportDocumentsSelectedReportId,
+            selectedReportId: listReportDocumentsSelectedReportId,
+        }),
+        [activeListReportDocumentsResponse, listReportDocumentsSelectedReportId],
+    );
+    const selectedBackendSharedArtifactRecord = useMemo(
+        () => (!listReportDocumentsResponse && selectedListReportDocumentsEntry
+            ? resolveReportBuilderSharedArtifactInventoryRecord(
+                backendSharedArtifactRecords,
+                selectedListReportDocumentsEntry,
+            )
+            : null),
+        [backendSharedArtifactRecords, listReportDocumentsResponse, selectedListReportDocumentsEntry],
+    );
+    const selectedBackendSharedArtifactHydrationFingerprint = useMemo(
+        () => [
+            normalizeString(selectedBackendSharedArtifactRecord?.artifactId || selectedBackendSharedArtifactRecord?.id),
+            normalizeString(selectedBackendSharedArtifactRecord?.reportId),
+            Number(selectedBackendSharedArtifactRecord?.documentVersion || 0) || 0,
+            Number(selectedBackendSharedArtifactRecord?.savedAt || 0) || 0,
+            normalizeString(selectedBackendSharedArtifactRecord?.updatedAt || ""),
+        ].join("::"),
+        [selectedBackendSharedArtifactRecord],
+    );
+    const selectedBackendSharedArtifactId = useMemo(
+        () => normalizeString(
+            selectedBackendSharedArtifactRecord?.artifactId
+            || selectedBackendSharedArtifactRecord?.id,
+        ),
+        [selectedBackendSharedArtifactRecord],
     );
     const reopenedSavedReportSource = hydratedReportDocumentSession?.savedSource || hydratedReportDocumentSession?.source || null;
     const savedReportState = useMemo(() => buildReportBuilderSavedReportState({
         savedReportPayload,
         currentSavedRecord: savedReportPayloadRecord,
-        configuredSavedPayloads: rawLocalReportDocumentSavedPayloads.filter((entry) => entry !== savedReportPayload),
+        configuredSavedPayloads: [
+            ...rawLocalReportDocumentSavedPayloads.filter((entry) => entry !== savedReportPayload),
+            ...localLifecycleSharedArtifactRecords,
+            ...backendSharedArtifactRecords,
+            ...importedLocalSavedReportRecords,
+        ],
+        configuredGetResponses: importedLocalGetReportDocumentResponses,
         reopenedSource: reopenedSavedReportSource,
         reopenedReportId: hydratedReportDocumentSession?.reportId || "",
         selectedListEntry: selectedListReportDocumentsEntry,
-    }), [hydratedReportDocumentSession?.reportId, rawLocalReportDocumentSavedPayloads, reopenedSavedReportSource, savedReportPayload, savedReportPayloadRecord, selectedListReportDocumentsEntry]);
-    const reopenedExportRequest = savedReportState.reopenedExportRequest;
+    }), [backendSharedArtifactRecords, hydratedReportDocumentSession?.reportId, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords, localLifecycleSharedArtifactRecords, rawLocalReportDocumentSavedPayloads, reopenedSavedReportSource, savedReportPayload, savedReportPayloadRecord, selectedListReportDocumentsEntry]);
+    const reopenedSavedRecord = savedReportState.reopenedSavedRecord;
+    const reopenedSavedRecordExportRequest = savedReportState.reopenedExportRequest;
     const localReportDocumentSavedPayloads = savedReportState.rawLocalSavedPayloads;
     const localSavedReportRecords = savedReportState.localSavedReportRecords;
     const savedReportPayloadExportRequest = savedReportState.savedReportPayloadExportRequest;
@@ -3729,7 +4870,35 @@ export default function ReportBuilder({ container, context }) {
         }),
         [localSavedReportRecords, selectedListReportDocumentsEntry],
     );
-    const selectedListEntryExportRequest = savedReportState.selectedListEntryExportRequest;
+    const selectedListReportDocumentsEntryMetaChips = useMemo(
+        () => buildReportBuilderListReportDocumentsEntryMetaChips(selectedListReportDocumentsEntrySummary),
+        [selectedListReportDocumentsEntrySummary],
+    );
+    const selectedListEntrySavedRecord = savedReportState.selectedListEntrySavedRecord;
+    const selectedBackendSharedArtifactHydrationNotice = useMemo(() => {
+        if (listReportDocumentsResponse || !selectedListReportDocumentsEntry) {
+            return null;
+        }
+        if (normalizeString(selectedBackendSharedArtifactHydrationError)) {
+            return {
+                level: "warning",
+                message: selectedBackendSharedArtifactHydrationError,
+            };
+        }
+        if (selectedBackendSharedArtifactHydrationLoading) {
+            return {
+                level: "info",
+                message: "Refreshing the selected shared artifact from the backend inventory.",
+            };
+        }
+        return null;
+    }, [
+        listReportDocumentsResponse,
+        selectedBackendSharedArtifactHydrationError,
+        selectedBackendSharedArtifactHydrationLoading,
+        selectedListReportDocumentsEntry,
+    ]);
+    const selectedListEntrySavedRecordExportRequest = savedReportState.selectedListEntryExportRequest;
     const selectedListReportDocumentsEntryCompileValidation = useMemo(
         () => buildReportBuilderDocumentCompileValidation(selectedListReportDocumentsEntry?.compileState?.diagnostics),
         [selectedListReportDocumentsEntry?.compileState?.diagnostics],
@@ -3743,11 +4912,27 @@ export default function ReportBuilder({ container, context }) {
         title: "Saved payload compile diagnostics",
     }), [savedReportPayloadCompileValidation]);
     const listReportDocumentsResponseInspector = useMemo(
-        () => buildReportBuilderReportDocumentReadResponseInspectorState(listReportDocumentsResponse, {
-            selectedReportId: listReportDocumentsSelectedReportId,
-            localSavedPayloads: localSavedReportRecords,
+        () => listReportDocumentsResponseOpen
+            ? buildReportBuilderReportDocumentReadResponseInspectorState(activeListReportDocumentsResponse, {
+                selectedReportId: listReportDocumentsSelectedReportId,
+                selectedEntryKey: listReportDocumentsSelectedReportId,
+                localSavedPayloads: localSavedReportRecords,
+            })
+            : null,
+        [
+            activeListReportDocumentsResponse,
+            listReportDocumentsResponseOpen,
+            listReportDocumentsSelectedReportId,
+            localSavedReportRecords,
+        ],
+    );
+    const backendSharedArtifactInventoryNotice = useMemo(
+        () => buildReportBuilderSharedArtifactInventoryNotice({
+            loading: backendSharedArtifactInventoryLoading,
+            error: backendSharedArtifactInventoryError,
+            recordCount: backendSharedArtifactRecords.length,
         }),
-        [listReportDocumentsResponse, listReportDocumentsSelectedReportId, localSavedReportRecords],
+        [backendSharedArtifactInventoryError, backendSharedArtifactInventoryLoading, backendSharedArtifactRecords.length],
     );
     const listReportDocumentsResponseContent = useMemo(
         () => listReportDocumentsResponseInspector?.content || "",
@@ -3760,22 +4945,34 @@ export default function ReportBuilder({ container, context }) {
         [getReportDocumentRequestPayload, selectedListReportDocumentsEntrySummary],
     );
     const getReportDocumentRequestPayloadInspector = useMemo(
-        () => buildReportBuilderGetReportDocumentRequestInspectorState(getReportDocumentRequestPayload, {
-            metadata: selectedListReportDocumentsEntrySummary,
-        }),
-        [getReportDocumentRequestPayload, selectedListReportDocumentsEntrySummary],
+        () => getReportDocumentRequestPayloadOpen
+            ? buildReportBuilderGetReportDocumentRequestInspectorState(getReportDocumentRequestPayload, {
+                metadata: selectedListReportDocumentsEntrySummary,
+            })
+            : null,
+        [
+            getReportDocumentRequestPayload,
+            getReportDocumentRequestPayloadOpen,
+            selectedListReportDocumentsEntrySummary,
+        ],
     );
     const updateReportDocumentExpectedVersionState = useMemo(
         () => buildReportBuilderUpdateReportDocumentExpectedVersionState(updateReportDocumentExpectedVersionDraft),
         [updateReportDocumentExpectedVersionDraft],
     );
     const updateReportDocumentPayloadSummary = useMemo(
-        () => buildReportBuilderUpdateReportDocumentPayloadSummary(updateReportDocumentPayload),
-        [updateReportDocumentPayload],
+        () => buildReportBuilderUpdateReportDocumentPayloadSummary(updateReportDocumentPayload, {
+            localSavedPayloads: configuredExportContextSavedPayloads,
+        }),
+        [configuredExportContextSavedPayloads, updateReportDocumentPayload],
     );
     const updateReportDocumentPayloadInspector = useMemo(
-        () => buildReportBuilderUpdateReportDocumentPayloadInspectorState(updateReportDocumentPayload),
-        [updateReportDocumentPayload],
+        () => updateReportDocumentPayloadOpen
+            ? buildReportBuilderUpdateReportDocumentPayloadInspectorState(updateReportDocumentPayload, {
+                localSavedPayloads: configuredExportContextSavedPayloads,
+            })
+            : null,
+        [configuredExportContextSavedPayloads, updateReportDocumentPayload, updateReportDocumentPayloadOpen],
     );
     const updateReportDocumentConflictVersionState = useMemo(
         () => buildReportBuilderUpdateReportDocumentConflictVersionState({
@@ -3792,6 +4989,67 @@ export default function ReportBuilder({ container, context }) {
         () => buildReportBuilderUpdateReportDocumentConflictDiagnosticInspectorState(updateReportDocumentConflictDiagnostic),
         [updateReportDocumentConflictDiagnostic],
     );
+    const savedReportPayloadApiArtifactEntries = useMemo(
+        () => buildReportBuilderSavedPayloadApiArtifactEntries({
+            getReportDocumentResponseSummary,
+            getReportDocumentResponseOpen,
+            getReportDocumentResponseCompileValidation,
+            reopenReportDocumentDiagnosticSummary,
+            reopenReportDocumentDiagnosticOpen,
+            listReportDocumentsResponseSummary,
+            listReportDocumentsResponseOpen,
+            selectedListReportDocumentsEntrySummary,
+            getReportDocumentRequestPayloadSummary,
+            getReportDocumentRequestPayloadOpen,
+            createReportDocumentPayloadSummary,
+            createReportDocumentPayloadOpen,
+            updateReportDocumentPayloadSummary,
+            updateReportDocumentPayloadOpen,
+            updateReportDocumentConflictDiagnosticSummary,
+            updateReportDocumentConflictDiagnosticOpen,
+        }),
+        [
+            createReportDocumentPayloadOpen,
+            createReportDocumentPayloadSummary,
+            getReportDocumentRequestPayloadOpen,
+            getReportDocumentRequestPayloadSummary,
+            getReportDocumentResponseCompileValidation,
+            getReportDocumentResponseOpen,
+            getReportDocumentResponseSummary,
+            listReportDocumentsResponseOpen,
+            listReportDocumentsResponseSummary,
+            reopenReportDocumentDiagnosticOpen,
+            reopenReportDocumentDiagnosticSummary,
+            selectedListReportDocumentsEntrySummary,
+            updateReportDocumentConflictDiagnosticOpen,
+            updateReportDocumentConflictDiagnosticSummary,
+            updateReportDocumentPayloadOpen,
+            updateReportDocumentPayloadSummary,
+        ],
+    );
+    const savedReportPayloadApiArtifactEntriesById = useMemo(
+        () => Object.fromEntries(
+            savedReportPayloadApiArtifactEntries
+                .filter((artifact) => artifact && typeof artifact === "object" && !Array.isArray(artifact) && normalizeString(artifact.id))
+                .map((artifact) => [normalizeString(artifact.id), artifact]),
+        ),
+        [savedReportPayloadApiArtifactEntries],
+    );
+    const savedPayloadApiHandoffActive = !!savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen;
+    const hideSavedPayloadHandoffGetResponseSummary = savedPayloadApiHandoffActive
+        && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
+    const hideSavedPayloadHandoffReopenDiagnosticSummary = savedPayloadApiHandoffActive
+        && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
+    const hideSavedPayloadHandoffListResponseSummary = savedPayloadApiHandoffActive
+        && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
+    const hideSavedPayloadHandoffGetRequestSummary = savedPayloadApiHandoffActive
+        && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
+    const hideSavedPayloadHandoffCreatePayloadSummary = savedPayloadApiHandoffActive
+        && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.createReportDocumentPayload]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
+    const hideSavedPayloadHandoffUpdatePayloadSummary = savedPayloadApiHandoffActive
+        && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
+    const hideSavedPayloadHandoffUpdateConflictSummary = savedPayloadApiHandoffActive
+        && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.updateReportDocumentConflictDiagnostic]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
     const chartSelectionSummary = useMemo(
         () => (selectedBuilderChartSelection
             ? resolveReportRuntimeChartSelectionSummary({
@@ -3832,9 +5090,7 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         lastAutoCollapsedRunSequenceRef.current = manualRunSequence;
-        setFilterPanels((current) => (
-            current.common ? { ...current, common: false } : current
-        ));
+        setFilterPanels(collapseReportBuilderFilterBodyState);
         setFiltersDrawerOpen(false);
     }, [canShowResults, hasCompletedCurrentRun, manualRunSequence]);
 
@@ -4086,6 +5342,8 @@ export default function ReportBuilder({ container, context }) {
             refinements: runtimePreviewRefinements,
             drillTransitions: runtimePreviewDrillTransitions,
             semanticSummary: resolvedSemanticSummary,
+            binding: semanticBinding,
+            semanticModel: semanticModelState.model,
             requestTransform: ({ request, state: runtimeState }) => applyReportBuilderRequestHook(
                 builderContext,
                 displayConfig,
@@ -4100,6 +5358,8 @@ export default function ReportBuilder({ container, context }) {
         runtimePreviewDrillTransitions,
         runtimePreviewRefinements,
         resolvedSemanticSummary,
+        semanticBinding,
+        semanticModelState.model,
         state,
     ]);
     const authoredCapabilities = useMemo(() => buildReportBuilderAuthoredCapabilityViewModel({
@@ -4196,42 +5456,142 @@ export default function ReportBuilder({ container, context }) {
         () => runtimePreviewArtifact?.exportRequest || null,
         [runtimePreviewArtifact],
     );
-    const draftExportExecution = useReportBuilderExportExecution({
-        request: draftExportRequest,
-        sourceKind: "draft",
-        reportExportHandler,
-        setFeedback: setChartApplyFeedback,
-        missingRequestMessage: "No draft export request is available.",
-        missingJobMessage: "No draft export job is available to refresh.",
-        missingArtifactMessage: "No completed draft export artifact is available yet.",
-    });
-    const savedReportPayloadExportExecution = useReportBuilderExportExecution({
-        request: savedReportPayloadExportRequest,
-        sourceKind: "savedPayload",
-        reportExportHandler,
-        setFeedback: setChartApplyFeedback,
-        missingRequestMessage: "No canonical saved export snapshot is available for this report payload yet.",
-        missingJobMessage: "No saved export job is available to refresh.",
-        missingArtifactMessage: "No completed saved export artifact is available yet.",
-    });
-    const reopenedExportExecution = useReportBuilderExportExecution({
-        request: reopenedExportRequest,
-        sourceKind: "reopened",
-        reportExportHandler,
-        setFeedback: setChartApplyFeedback,
-        missingRequestMessage: "No canonical export snapshot is available for the reopened ReportDocument.",
-        missingJobMessage: "No reopened export job is available to refresh.",
-        missingArtifactMessage: "No completed reopened export artifact is available yet.",
-    });
-    const selectedListEntryExportExecution = useReportBuilderExportExecution({
-        request: selectedListEntryExportRequest,
-        sourceKind: "listEntry",
-        reportExportHandler,
-        setFeedback: setChartApplyFeedback,
-        missingRequestMessage: "No canonical export snapshot is available for the selected list entry.",
-        missingJobMessage: "No selected export job is available to refresh.",
-        missingArtifactMessage: "No completed selected export artifact is available yet.",
-    });
+    const reopenedExportRequest = useMemo(() => {
+        const reopenedExportSeed = reopenedSavedRecord?.savedReportPayload
+            || (reopenedSavedRecord?.exportable === true ? reopenedSavedRecord : null);
+        if (!hydratedReportDocumentSession || !reopenedExportSeed || !runtimePreviewArtifact) {
+            return reopenedSavedRecordExportRequest;
+        }
+        return buildReportBuilderSavedReportExportRequestFromBuilderState(
+            reopenedExportSeed,
+            {
+                runtimeArtifact: runtimePreviewArtifact,
+                documentVersion: Number(hydratedReportDocumentSession?.documentVersion || 0) || 0,
+                savedAt: Number(reopenedSavedRecord?.savedAt || Date.now()) || Date.now(),
+                format: "pdf",
+                container,
+                config: semanticDisplayConfig,
+                state,
+                semanticSummary: resolvedSemanticSummary,
+                semanticModel: semanticModelState.model,
+                semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
+            },
+        ) || reopenedSavedRecordExportRequest;
+    }, [
+        container,
+        hydratedReportDocumentSession,
+        reopenedSavedRecord?.exportable,
+        reopenedSavedRecord,
+        reopenedSavedRecordExportRequest,
+        resolvedSemanticSummary,
+        runtimePreviewArtifact,
+        runtimePreviewSemanticDiagnostics,
+        semanticDisplayConfig,
+        semanticModelState.model,
+        state,
+    ]);
+    const selectedListEntryExportRequest = useMemo(() => {
+        const selectedListEntryExportSeed = selectedListEntrySavedRecord?.savedReportPayload
+            || (selectedListEntrySavedRecord?.exportable === true ? selectedListEntrySavedRecord : null);
+        const selectedMatchesReopened = !!hydratedReportDocumentSession
+            && !!reopenedSavedRecord
+            && !!selectedListEntrySavedRecord
+            && normalizeString(selectedListEntrySavedRecord?.reportId) === normalizeString(hydratedReportDocumentSession?.reportId)
+            && normalizeString(selectedListEntrySavedRecord?.source?.kind) === normalizeString(reopenedSavedRecord?.source?.kind)
+            && normalizeString(selectedListEntrySavedRecord?.sourceIdentity?.sourceArtifactId || selectedListEntrySavedRecord?.source?.sourceArtifactId)
+                === normalizeString(reopenedSavedRecord?.sourceIdentity?.sourceArtifactId || reopenedSavedRecord?.source?.sourceArtifactId);
+        if (!selectedMatchesReopened || !selectedListEntryExportSeed || !runtimePreviewArtifact) {
+            return selectedListEntrySavedRecordExportRequest;
+        }
+        return buildReportBuilderSavedReportExportRequestFromBuilderState(
+            selectedListEntryExportSeed,
+            {
+                runtimeArtifact: runtimePreviewArtifact,
+                documentVersion: Number(hydratedReportDocumentSession?.documentVersion || 0) || 0,
+                savedAt: Number(selectedListEntrySavedRecord?.savedAt || Date.now()) || Date.now(),
+                format: "pdf",
+                container,
+                config: semanticDisplayConfig,
+                state,
+                semanticSummary: resolvedSemanticSummary,
+                semanticModel: semanticModelState.model,
+                semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
+            },
+        ) || selectedListEntrySavedRecordExportRequest;
+    }, [
+        container,
+        hydratedReportDocumentSession,
+        reopenedSavedRecord,
+        resolvedSemanticSummary,
+        runtimePreviewArtifact,
+        runtimePreviewSemanticDiagnostics,
+        semanticDisplayConfig,
+        semanticModelState.model,
+        selectedListEntrySavedRecord,
+        selectedListEntrySavedRecordExportRequest,
+        state,
+    ]);
+    const exportExecutionConfigs = useMemo(
+        () => buildReportBuilderExportExecutionConfigs({
+            draftRequest,
+            importedStandaloneRequest: importedStandaloneExportRequest,
+            importedPipelineRequest: importedPipelineRuntimeArtifact?.exportRequest || null,
+            savedPayloadRequest: savedReportPayloadExportRequest,
+            reopenedRequest: reopenedExportRequest,
+            selectedListEntryRequest: selectedListEntryExportRequest,
+            localSavedPayloads: configuredExportContextSavedPayloads,
+            reportExportHandler,
+            reportAuditHandler,
+            reportAuditActorRef,
+            reportAuditMetadata,
+            setFeedback: setChartApplyFeedback,
+        }),
+        [
+            configuredExportContextSavedPayloads,
+            draftExportRequest,
+            importedPipelineRuntimeArtifact?.exportRequest,
+            importedStandaloneExportRequest,
+            reopenedExportRequest,
+            reportAuditActorRef,
+            reportAuditHandler,
+            reportAuditMetadata,
+            reportExportHandler,
+            savedReportPayloadExportRequest,
+            selectedListEntryExportRequest,
+            setChartApplyFeedback,
+        ],
+    );
+    const latestLifecycleSharedArtifactExportExecutionConfig = useMemo(
+        () => ({
+            request: latestLifecycleSharedArtifactRecord?.exportRequest || null,
+            sourceKind: "latestSharedArtifact",
+            localSavedPayloads: configuredExportContextSavedPayloads,
+            reportExportHandler,
+            reportAuditHandler,
+            reportAuditActorRef,
+            reportAuditMetadata,
+            setFeedback: setChartApplyFeedback,
+            missingRequestMessage: "No export-ready shared artifact is available yet.",
+            missingJobMessage: "No shared artifact export job is available to refresh.",
+            missingArtifactMessage: "No completed shared artifact export is available yet.",
+        }),
+        [
+            configuredExportContextSavedPayloads,
+            latestLifecycleSharedArtifactRecord?.exportRequest,
+            reportAuditActorRef,
+            reportAuditHandler,
+            reportAuditMetadata,
+            reportExportHandler,
+            setChartApplyFeedback,
+        ],
+    );
+    const draftExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.draft);
+    const importedStandaloneExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.importedStandalone);
+    const importedPipelineExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.importedPipeline);
+    const savedReportPayloadExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.savedPayload);
+    const reopenedExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.reopened);
+    const selectedListEntryExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.selectedListEntry);
+    const latestLifecycleSharedArtifactExportExecution = useReportBuilderExportExecution(latestLifecycleSharedArtifactExportExecutionConfig);
     const runtimePreviewHandlers = runtimePreviewSurface.runtimeHandlers;
 
     useEffect(() => {
@@ -4309,6 +5669,24 @@ export default function ReportBuilder({ container, context }) {
         readinessAction: readiness.action,
         semanticDiagnosticsNotice,
     }), [canRunReport, readiness.action, readiness.message, readiness.reason, semanticDiagnosticsNotice]);
+    const authoredRuntimePreviewState = useMemo(() => buildReportBuilderAuthoredRuntimePreviewState({
+        runtimePreviewEnabled,
+        runtimePreviewArtifact,
+        runtimePreviewRowsSource,
+        canRunReport,
+        readinessReason: readiness.reason,
+        runtimePreviewArtifactDiagnostics,
+        runtimePreviewBlockedState,
+        runtimePreviewErrorDescription: renderReportBuilderError(runtimePreviewRowsSource.error),
+    }), [
+        canRunReport,
+        readiness.reason,
+        runtimePreviewArtifact,
+        runtimePreviewArtifactDiagnostics,
+        runtimePreviewBlockedState,
+        runtimePreviewEnabled,
+        runtimePreviewRowsSource,
+    ]);
     const resultVisibility = useMemo(() => resolveReportBuilderResultVisibility({
         activeResultLoading,
         activeResultError,
@@ -4325,6 +5703,109 @@ export default function ReportBuilder({ container, context }) {
         staleDescription: (chartSpecValidation.errors || []).map((entry) => chartErrorMessage(entry, { dimensions: chartDimensions, measures: chartMeasures })).join(" "),
     }), [canCreateChart, chartDimensions, chartMeasures, chartSpecValidation.errors, compactMode, hasStaleChartSpec]);
     const showPagination = resultVisibility.showPagination;
+
+    useEffect(() => {
+        if (typeof reportSharedArtifactHandler?.listArtifacts !== "function") {
+            setBackendSharedArtifactRecords([]);
+            setBackendSharedArtifactInventoryLoading(false);
+            setBackendSharedArtifactInventoryError("");
+            return undefined;
+        }
+        let cancelled = false;
+        setBackendSharedArtifactInventoryLoading(true);
+        setBackendSharedArtifactInventoryError("");
+        Promise.resolve(reportSharedArtifactHandler.listArtifacts({ limit: 25 }))
+            .then((result) => {
+                if (cancelled) {
+                    return;
+                }
+                setBackendSharedArtifactRecords(normalizeReportBuilderSharedArtifactInventory(result));
+            })
+            .catch((error) => {
+                if (cancelled) {
+                    return;
+                }
+                setBackendSharedArtifactInventoryError(
+                    normalizeString(error?.message || error) || "Could not load shared artifact inventory.",
+                );
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setBackendSharedArtifactInventoryLoading(false);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [reportSharedArtifactHandler]);
+
+    useEffect(() => {
+        if (listReportDocumentsResponse || typeof reportSharedArtifactHandler?.getArtifact !== "function") {
+            setSelectedBackendSharedArtifactHydrationLoading(false);
+            setSelectedBackendSharedArtifactHydrationError("");
+            return undefined;
+        }
+        if (!selectedListReportDocumentsEntry) {
+            setSelectedBackendSharedArtifactHydrationLoading(false);
+            setSelectedBackendSharedArtifactHydrationError("");
+            return undefined;
+        }
+        if (!selectedBackendSharedArtifactId) {
+            setSelectedBackendSharedArtifactHydrationLoading(false);
+            setSelectedBackendSharedArtifactHydrationError(
+                "The selected backend shared artifact is missing its artifact id.",
+            );
+            return undefined;
+        }
+        let cancelled = false;
+        setSelectedBackendSharedArtifactHydrationLoading(true);
+        setSelectedBackendSharedArtifactHydrationError("");
+        Promise.resolve(reportSharedArtifactHandler.getArtifact({ artifactId: selectedBackendSharedArtifactId }))
+            .then((result) => {
+                if (cancelled) {
+                    return;
+                }
+                setBackendSharedArtifactRecords((current) => mergeReportBuilderSharedArtifactInventoryRecord(
+                    current,
+                    result,
+                ));
+            })
+            .catch((error) => {
+                if (cancelled) {
+                    return;
+                }
+                setSelectedBackendSharedArtifactHydrationError(
+                    normalizeString(error?.message || error) || "Could not refresh the selected shared artifact.",
+                );
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setSelectedBackendSharedArtifactHydrationLoading(false);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        listReportDocumentsResponse,
+        listReportDocumentsSelectedReportId,
+        reportSharedArtifactHandler,
+        selectedBackendSharedArtifactId,
+        selectedBackendSharedArtifactHydrationFingerprint,
+    ]);
+
+    useEffect(() => {
+        if (listReportDocumentsResponse || !backendSharedArtifactsListResponse || listReportDocumentsSelectedReportId) {
+            return;
+        }
+        const firstReportId = normalizeString(backendSharedArtifactsListResponse?.entries?.[0]?.reportRef?.reportId);
+        const firstSelectionKey = buildReportBuilderListReportDocumentsEntrySelectionKey(
+            backendSharedArtifactsListResponse?.entries?.[0] || null,
+        );
+        if (firstSelectionKey || firstReportId) {
+            setListReportDocumentsSelectedReportId(firstSelectionKey || firstReportId);
+        }
+    }, [backendSharedArtifactsListResponse, listReportDocumentsResponse, listReportDocumentsSelectedReportId]);
 
     const downloadCsv = React.useCallback(() => {
         if (!Array.isArray(selectedColumns) || selectedColumns.length === 0 || !Array.isArray(exportCollection) || exportCollection.length === 0) {
@@ -4364,6 +5845,438 @@ export default function ReportBuilder({ container, context }) {
     const closeCompactChartSheet = React.useCallback(() => {
         setCompactChartSheetOpen(false);
     }, []);
+
+    const applyLifecycleSharedArtifactResult = React.useCallback((result = null, {
+        replaceSelectedListEntrySource = null,
+        hydratedSessionTargetSource = null,
+        forceHydratedSession = false,
+    } = {}) => {
+        if (!result || typeof result !== "object" || Array.isArray(result)) {
+            return null;
+        }
+        const projection = projectReportBuilderLifecycleEnvelopeState({
+            result,
+            replaceSelectedListEntrySource,
+            hydratedSessionTargetSource,
+            forceHydratedSession,
+            localLifecycleSharedArtifactRecords,
+            getReportDocumentResponse,
+            reopenReportDocumentDiagnostic,
+            createReportDocumentPayload,
+            updateReportDocumentPayload,
+            updateReportDocumentConflictDiagnostic,
+            backendSharedArtifactRecords,
+            hydratedSession: hydratedReportDocumentSession,
+            listReportDocumentsResponse,
+        });
+        if (!projection) {
+            return null;
+        }
+        const {
+            envelope,
+            record: nextRecord,
+            selectedEntryKey,
+            selectedReportId,
+            localLifecycleSharedArtifactRecords: nextLocalLifecycleSharedArtifactRecords,
+            backendSharedArtifactRecords: nextBackendSharedArtifactRecords,
+            hydratedSession: nextHydratedSession,
+            getReportDocumentResponse: nextGetReportDocumentResponse,
+            getReportDocumentRequest: nextGetReportDocumentRequest,
+            reopenReportDocumentDiagnostic: nextReopenReportDocumentDiagnostic,
+            createReportDocumentPayload: nextCreateReportDocumentPayload,
+            updateReportDocumentPayload: nextUpdateReportDocumentPayload,
+            updateReportDocumentConflictDiagnostic: nextUpdateReportDocumentConflictDiagnostic,
+            clearUpdateReportDocumentConflictDiagnostic,
+            listReportDocumentsResponse: nextListReportDocumentsResponse,
+        } = projection;
+        if (
+            !envelope.sharedArtifact
+            && !envelope.getReportDocumentResponse
+            && !envelope.listReportDocumentsResponse
+            && !envelope.getReportDocumentRequest
+            && !envelope.reopenReportDocumentDiagnostic
+            && !envelope.createReportDocumentPayload
+            && !envelope.updateReportDocumentPayload
+            && !envelope.updateReportDocumentConflictDiagnostic
+        ) {
+            return {
+                record: null,
+                envelope,
+            };
+        }
+        setLatestLifecycleSharedArtifactOpen(false);
+        if (nextLocalLifecycleSharedArtifactRecords) {
+            setLocalLifecycleSharedArtifactRecords(nextLocalLifecycleSharedArtifactRecords);
+        }
+        if (envelope.getReportDocumentResponse) {
+            setGetReportDocumentResponse(nextGetReportDocumentResponse);
+            setGetReportDocumentResponseOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            });
+        } else if (projection) {
+            setGetReportDocumentResponse(nextGetReportDocumentResponse);
+        }
+        if (envelope.getReportDocumentRequest) {
+            setGetReportDocumentRequestPayload(nextGetReportDocumentRequest);
+            setGetReportDocumentRequestPayloadOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: "",
+            });
+        }
+        if (envelope.reopenReportDocumentDiagnostic) {
+            setReopenReportDocumentDiagnostic(nextReopenReportDocumentDiagnostic);
+            setReopenReportDocumentDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: "",
+            });
+        } else if (projection) {
+            setReopenReportDocumentDiagnostic(nextReopenReportDocumentDiagnostic);
+        }
+        if (envelope.createReportDocumentPayload) {
+            setCreateReportDocumentPayload(nextCreateReportDocumentPayload);
+            setCreateReportDocumentPayloadOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.createReportDocumentPayload]: "",
+            });
+        } else if (projection) {
+            setCreateReportDocumentPayload(nextCreateReportDocumentPayload);
+        }
+        if (envelope.updateReportDocumentPayload) {
+            setUpdateReportDocumentPayload(nextUpdateReportDocumentPayload);
+            setUpdateReportDocumentPayloadOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload]: "",
+            });
+            if (clearUpdateReportDocumentConflictDiagnostic) {
+                setUpdateReportDocumentConflictDiagnostic(null);
+                setUpdateReportDocumentConflictDiagnosticOpen(false);
+            }
+        } else if (projection) {
+            setUpdateReportDocumentPayload(nextUpdateReportDocumentPayload);
+            if (clearUpdateReportDocumentConflictDiagnostic) {
+                setUpdateReportDocumentConflictDiagnostic(null);
+                setUpdateReportDocumentConflictDiagnosticOpen(false);
+            }
+        }
+        if (envelope.updateReportDocumentConflictDiagnostic) {
+            setUpdateReportDocumentConflictDiagnostic(nextUpdateReportDocumentConflictDiagnostic);
+            setUpdateReportDocumentConflictDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentConflictDiagnostic]: "",
+            });
+        }
+        if (envelope.listReportDocumentsResponse) {
+            setListReportDocumentsResponse(nextListReportDocumentsResponse);
+            setListReportDocumentsResponseOpen(false);
+            if (selectedEntryKey || selectedReportId) {
+                setListReportDocumentsSelectedReportId(selectedEntryKey || selectedReportId);
+            }
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse]: "",
+            });
+        } else if (projection) {
+            if (nextListReportDocumentsResponse !== listReportDocumentsResponse) {
+                setListReportDocumentsResponse(nextListReportDocumentsResponse);
+            }
+            setBackendSharedArtifactRecords(nextBackendSharedArtifactRecords);
+            if (selectedEntryKey || selectedReportId || nextRecord?.reportId) {
+                setListReportDocumentsSelectedReportId(selectedEntryKey || selectedReportId || nextRecord?.reportId || "");
+            }
+        }
+        if (nextHydratedSession && nextHydratedSession !== hydratedReportDocumentSession) {
+            persistStateWithConfig(
+                applyReportBuilderHydratedDocumentSessionState(state, nextHydratedSession),
+                config,
+                { skipExplorationHistory: true },
+            );
+        }
+        return {
+            record: nextRecord,
+            envelope,
+        };
+    }, [
+        applyPreparedApiArtifactOrigins,
+        backendSharedArtifactRecords,
+        config,
+        createReportDocumentPayload,
+        getReportDocumentResponse,
+        hydratedReportDocumentSession,
+        listReportDocumentsResponse,
+        localLifecycleSharedArtifactRecords,
+        persistStateWithConfig,
+        projectReportBuilderLifecycleEnvelopeState,
+        reopenReportDocumentDiagnostic,
+        state,
+        updateReportDocumentConflictDiagnostic,
+        updateReportDocumentPayload,
+    ]);
+
+    const triggerActiveSavedArtifactLifecycleAction = React.useCallback(async (actionId = "") => {
+        const normalizedActionId = normalizeString(actionId).toLowerCase();
+        if (!normalizedActionId || !activeSavedArtifactSummary || !reportLifecycleHandler) {
+            return;
+        }
+        const request = buildReportBuilderLifecycleActionRequest(normalizedActionId, activeSavedArtifactSummary, {
+            metadata: {
+                source: "reportBuilder",
+                artifactKind: normalizeString(activeSavedArtifactSummary?.kind || activeSavedArtifactKindLabel),
+            },
+        });
+        if (!request) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: `Could not prepare a ${normalizedActionId} request for ${normalizeString(activeSavedArtifactSummary?.title || "Report") || "Report"}.`,
+            });
+            return;
+        }
+        const lifecycleRequest = {
+            ...request,
+            ...(savedReportPayloadExportRequest ? { reportExportRequest: cloneReportBuilderValue(savedReportPayloadExportRequest) } : {}),
+            ...(savedReportPayload?.reportDocument ? { reportDocument: cloneReportBuilderValue(savedReportPayload.reportDocument) } : (
+                savedReportPayloadRecord?.document ? { reportDocument: cloneReportBuilderValue(savedReportPayloadRecord.document) } : {}
+            )),
+        };
+        const title = normalizeString(activeSavedArtifactSummary?.title || "Report") || "Report";
+        const actionLabel = normalizedActionId === "share"
+            ? "Share"
+            : (normalizedActionId === "publish" ? "Publish" : "Archive");
+        setActiveSavedArtifactLifecycleActionId(normalizedActionId);
+        try {
+            let result = null;
+            if (normalizedActionId === "share") {
+                result = typeof reportLifecycleHandler.shareArtifact === "function"
+                    ? await reportLifecycleHandler.shareArtifact(lifecycleRequest)
+                    : (typeof reportLifecycleHandler.runAction === "function"
+                        ? await reportLifecycleHandler.runAction(lifecycleRequest)
+                        : null);
+            } else {
+                result = typeof reportLifecycleHandler.transitionArtifact === "function"
+                    ? await reportLifecycleHandler.transitionArtifact(lifecycleRequest.transition)
+                    : (typeof reportLifecycleHandler.runAction === "function"
+                        ? await reportLifecycleHandler.runAction(lifecycleRequest)
+                        : null);
+            }
+            const lifecycleResultProjection = applyLifecycleSharedArtifactResult(result, {
+                replaceSelectedListEntrySource: (
+                    savedReportPayload?.source
+                    || savedReportPayloadRecord?.source
+                    || activeSavedArtifactSummary
+                    || null
+                ),
+                hydratedSessionTargetSource: (
+                    savedReportPayload?.source
+                    || savedReportPayloadRecord?.source
+                    || activeSavedArtifactSummary
+                ),
+            });
+            const auditResult = await recordReportBuilderLifecycleAuditEvent(lifecycleRequest, {
+                handler: reportAuditHandler,
+                actorRef: reportAuditActorRef,
+                metadata: reportAuditMetadata,
+            });
+            const viewCreationAuditResult = await recordReportBuilderViewCreationAuditEvent(result, lifecycleRequest, {
+                handler: reportAuditHandler,
+                actorRef: reportAuditActorRef,
+                metadata: reportAuditMetadata,
+            });
+            setChartApplyFeedback({
+                level: auditResult.issue || viewCreationAuditResult.issue ? "warning" : "info",
+                message: `${normalizeString(lifecycleResultProjection?.envelope?.message || result?.message) || `${actionLabel} request sent for ${title}.`}${auditResult.issue ? ` ${auditResult.issue}` : ""}${viewCreationAuditResult.issue ? ` ${viewCreationAuditResult.issue}` : ""}`,
+            });
+        } catch (error) {
+            const errorMessage = normalizeString(error?.message || String(error || ""));
+            setChartApplyFeedback({
+                level: "warning",
+                message: `${actionLabel} failed for ${title}.${errorMessage ? ` ${errorMessage}` : ""}`,
+            });
+        } finally {
+            setActiveSavedArtifactLifecycleActionId("");
+        }
+    }, [
+        activeSavedArtifactKindLabel,
+        activeSavedArtifactSummary,
+        applyLifecycleSharedArtifactResult,
+        reportAuditActorRef,
+        reportAuditHandler,
+        reportAuditMetadata,
+        reportLifecycleHandler,
+        savedReportPayload,
+        savedReportPayloadExportRequest,
+        savedReportPayloadRecord,
+        state,
+    ]);
+    const triggerSelectedListEntryLifecycleAction = React.useCallback(async (actionId = "") => {
+        const normalizedActionId = normalizeString(actionId).toLowerCase();
+        if (!normalizedActionId || !selectedListReportDocumentsEntrySummary || !reportLifecycleHandler) {
+            return;
+        }
+        const request = buildReportBuilderLifecycleActionRequest(normalizedActionId, selectedListReportDocumentsEntrySummary, {
+            metadata: {
+                source: "reportBuilder.catalogEntry",
+                reportId: normalizeString(selectedListReportDocumentsEntrySummary?.reportId),
+            },
+        });
+        if (!request) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: `Could not prepare a ${normalizedActionId} request for ${normalizeString(selectedListReportDocumentsEntrySummary?.title || "Report") || "Report"}.`,
+            });
+            return;
+        }
+        const lifecycleRequest = {
+            ...request,
+            ...(selectedListEntrySavedRecordExportRequest ? { reportExportRequest: cloneReportBuilderValue(selectedListEntrySavedRecordExportRequest) } : {}),
+            ...(selectedListEntrySavedRecord?.document ? { reportDocument: cloneReportBuilderValue(selectedListEntrySavedRecord.document) } : {}),
+        };
+        const title = normalizeString(selectedListReportDocumentsEntrySummary?.title || "Report") || "Report";
+        const actionLabel = normalizedActionId === "share"
+            ? "Share"
+            : (normalizedActionId === "publish" ? "Publish" : "Archive");
+        setSelectedListEntryLifecycleActionId(normalizedActionId);
+        try {
+            let result = null;
+            if (normalizedActionId === "share") {
+                result = typeof reportLifecycleHandler.shareArtifact === "function"
+                    ? await reportLifecycleHandler.shareArtifact(lifecycleRequest)
+                    : (typeof reportLifecycleHandler.runAction === "function"
+                        ? await reportLifecycleHandler.runAction(lifecycleRequest)
+                        : null);
+            } else {
+                result = typeof reportLifecycleHandler.transitionArtifact === "function"
+                    ? await reportLifecycleHandler.transitionArtifact(lifecycleRequest.transition)
+                    : (typeof reportLifecycleHandler.runAction === "function"
+                        ? await reportLifecycleHandler.runAction(lifecycleRequest)
+                        : null);
+            }
+            const lifecycleResultProjection = applyLifecycleSharedArtifactResult(result, {
+                replaceSelectedListEntrySource: selectedListReportDocumentsEntry?.source || selectedListReportDocumentsEntrySummary || null,
+                hydratedSessionTargetSource: (
+                    selectedListReportDocumentsEntry?.source
+                    || selectedListEntrySavedRecord?.source
+                    || selectedListReportDocumentsEntrySummary
+                ),
+            });
+            const auditResult = await recordReportBuilderLifecycleAuditEvent(lifecycleRequest, {
+                handler: reportAuditHandler,
+                actorRef: reportAuditActorRef,
+                metadata: reportAuditMetadata,
+            });
+            const viewCreationAuditResult = await recordReportBuilderViewCreationAuditEvent(result, lifecycleRequest, {
+                handler: reportAuditHandler,
+                actorRef: reportAuditActorRef,
+                metadata: reportAuditMetadata,
+            });
+            setChartApplyFeedback({
+                level: auditResult.issue || viewCreationAuditResult.issue ? "warning" : "info",
+                message: `${normalizeString(lifecycleResultProjection?.envelope?.message || result?.message) || `${actionLabel} request sent for ${title}.`}${auditResult.issue ? ` ${auditResult.issue}` : ""}${viewCreationAuditResult.issue ? ` ${viewCreationAuditResult.issue}` : ""}`,
+            });
+        } catch (error) {
+            const errorMessage = normalizeString(error?.message || String(error || ""));
+            setChartApplyFeedback({
+                level: "warning",
+                message: `${actionLabel} failed for ${title}.${errorMessage ? ` ${errorMessage}` : ""}`,
+            });
+        } finally {
+            setSelectedListEntryLifecycleActionId("");
+        }
+    }, [
+        applyLifecycleSharedArtifactResult,
+        reportAuditActorRef,
+        reportAuditHandler,
+        reportAuditMetadata,
+        reportLifecycleHandler,
+        selectedListEntrySavedRecord,
+        selectedListReportDocumentsEntry,
+        reopenReportDocumentDiagnostic,
+        selectedListEntrySavedRecordExportRequest,
+        selectedListReportDocumentsEntrySummary,
+        state,
+    ]);
+    const triggerReopenedSessionLifecycleAction = React.useCallback(async (actionId = "") => {
+        const normalizedActionId = normalizeString(actionId).toLowerCase();
+        if (!normalizedActionId || !hydratedReportDocumentSession || !reopenedSessionNoticeState || !reportLifecycleHandler) {
+            return;
+        }
+        const request = buildReportBuilderLifecycleActionRequest(normalizedActionId, reopenedSessionNoticeState, {
+            metadata: {
+                source: "reportBuilder.reopenedSession",
+                reportId: normalizeString(hydratedReportDocumentSession?.reportId),
+                artifactKind: normalizeString(reopenedSessionNoticeState?.artifactKind || reopenedSessionNoticeState?.kind),
+            },
+        });
+        if (!request) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: `Could not prepare a ${normalizedActionId} request for ${normalizeString(hydratedReportDocumentSession?.title || "Report") || "Report"}.`,
+            });
+            return;
+        }
+        const lifecycleRequest = {
+            ...request,
+            ...(reopenedExportRequest ? { reportExportRequest: cloneReportBuilderValue(reopenedExportRequest) } : {}),
+            ...(getReportDocumentResponse?.document ? { reportDocument: cloneReportBuilderValue(getReportDocumentResponse.document) } : {}),
+        };
+        const title = normalizeString(hydratedReportDocumentSession?.title || "Report") || "Report";
+        const actionLabel = normalizedActionId === "share"
+            ? "Share"
+            : (normalizedActionId === "publish" ? "Publish" : "Archive");
+        setReopenedSessionLifecycleActionId(normalizedActionId);
+        try {
+            let result = null;
+            if (normalizedActionId === "share") {
+                result = typeof reportLifecycleHandler.shareArtifact === "function"
+                    ? await reportLifecycleHandler.shareArtifact(lifecycleRequest)
+                    : (typeof reportLifecycleHandler.runAction === "function"
+                        ? await reportLifecycleHandler.runAction(lifecycleRequest)
+                        : null);
+            } else {
+                result = typeof reportLifecycleHandler.transitionArtifact === "function"
+                    ? await reportLifecycleHandler.transitionArtifact(lifecycleRequest.transition)
+                    : (typeof reportLifecycleHandler.runAction === "function"
+                        ? await reportLifecycleHandler.runAction(lifecycleRequest)
+                        : null);
+            }
+            const lifecycleResultProjection = applyLifecycleSharedArtifactResult(result, {
+                forceHydratedSession: true,
+                hydratedSessionTargetSource: hydratedReportDocumentSession?.savedSource || null,
+                replaceSelectedListEntrySource: hydratedReportDocumentSession?.savedSource || null,
+            });
+            const auditResult = await recordReportBuilderLifecycleAuditEvent(lifecycleRequest, {
+                handler: reportAuditHandler,
+                actorRef: reportAuditActorRef,
+                metadata: reportAuditMetadata,
+            });
+            const viewCreationAuditResult = await recordReportBuilderViewCreationAuditEvent(result, lifecycleRequest, {
+                handler: reportAuditHandler,
+                actorRef: reportAuditActorRef,
+                metadata: reportAuditMetadata,
+            });
+            setChartApplyFeedback({
+                level: auditResult.issue || viewCreationAuditResult.issue ? "warning" : "info",
+                message: `${normalizeString(lifecycleResultProjection?.envelope?.message || result?.message) || `${actionLabel} request sent for ${title}.`}${auditResult.issue ? ` ${auditResult.issue}` : ""}${viewCreationAuditResult.issue ? ` ${viewCreationAuditResult.issue}` : ""}`,
+            });
+        } catch (error) {
+            const errorMessage = normalizeString(error?.message || String(error || ""));
+            setChartApplyFeedback({
+                level: "warning",
+                message: `${actionLabel} failed for ${title}.${errorMessage ? ` ${errorMessage}` : ""}`,
+            });
+        } finally {
+            setReopenedSessionLifecycleActionId("");
+        }
+    }, [
+        applyLifecycleSharedArtifactResult,
+        getReportDocumentResponse?.document,
+        hydratedReportDocumentSession,
+        reportAuditActorRef,
+        reportAuditHandler,
+        reportAuditMetadata,
+        reportLifecycleHandler,
+        reopenedExportRequest,
+        reopenedSessionNoticeState,
+        state,
+    ]);
 
     const persistExplorationMutation = React.useCallback((nextState, {
         sourceKind = "reportBuilder.result",
@@ -4410,6 +6323,28 @@ export default function ReportBuilder({ container, context }) {
             : nextState;
         persistState(nextPersistedState, { skipExplorationHistory: true });
     }, [persistState]);
+    const startChartSelectionExploration = React.useCallback(() => {
+        const currentState = currentBuilderStateRef.current || {};
+        if (!selectedBuilderChartSelection || !canShowResultsRef.current || isReportBuilderExplorationActive(currentState)) {
+            return;
+        }
+        const sourceContext = buildReportBuilderExplorationSourceContextFromChartSelection({
+            chartTitle: currentState?.chartSpec?.title || state.chartSpec?.title || "Selected chart value",
+            selection: selectedBuilderChartSelection,
+        });
+        const startedState = beginReportBuilderExplorationSession(currentState, {
+            container,
+            sourceKind: "reportBuilder.chartSelection",
+            sourceContext,
+        });
+        persistState(startedState, { skipExplorationHistory: true });
+        setChartApplyFeedback({
+            level: "info",
+            message: normalizeString(sourceContext?.label)
+                ? `Draft started from ${normalizeString(sourceContext.label)}.`
+                : "Draft started.",
+        });
+    }, [container, persistState, selectedBuilderChartSelection, state.chartSpec?.title]);
 
     const persistDynamicScaffoldingMutation = React.useCallback((nextState, groupIds = [], {
         sourceKind = "reportBuilder.result",
@@ -5130,6 +7065,187 @@ export default function ReportBuilder({ container, context }) {
             },
         });
     }, [config, container, persistExplorationMutation, state]);
+    const captureCurrentDrillHierarchy = React.useCallback(() => {
+        if (!currentBreakdownDrillHierarchy) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: "Select at least two breakdowns before capturing a drill path.",
+            });
+            return;
+        }
+        const nextState = upsertReportBuilderDrillHierarchyState(state, currentBreakdownDrillHierarchy, {
+            currentHierarchies: authoredDrillMetadata.hierarchies,
+        });
+        persistExplorationMutation(nextState, {
+            sourceKind: "reportBuilder.result",
+            sourceContext: {
+                label: currentBreakdownDrillHierarchy.label || "Drill hierarchy",
+            },
+        });
+        setChartApplyFeedback({
+            level: currentBreakdownDrillHierarchyCaptured ? "info" : "success",
+            message: currentBreakdownDrillHierarchyCaptured
+                ? `${currentBreakdownDrillHierarchy.label || "Drill hierarchy"} updated from the current breakdown order.`
+                : `${currentBreakdownDrillHierarchy.label || "Drill hierarchy"} captured for runtime drill navigation.`,
+        });
+    }, [authoredDrillMetadata.hierarchies, currentBreakdownDrillHierarchy, currentBreakdownDrillHierarchyCaptured, persistExplorationMutation, state]);
+    const addAuthoredDetailParameterRow = React.useCallback(() => {
+        const nextId = `detailParam_${authoredDetailParameterRowSequenceRef.current}`;
+        authoredDetailParameterRowSequenceRef.current += 1;
+        setAuthoredDetailParameterRowsDraft((current) => [
+            ...normalizeReportBuilderDetailParameterDraftRows(current),
+            buildReportBuilderDetailParameterDraftRow(nextId),
+        ]);
+    }, []);
+    const updateAuthoredDetailParameterRow = React.useCallback((rowId = "", patch = {}) => {
+        const normalizedRowId = String(rowId || "").trim();
+        if (!normalizedRowId) {
+            return;
+        }
+        setAuthoredDetailParameterRowsDraft((current) => normalizeReportBuilderDetailParameterDraftRows(current).map((row) => (
+            row.id === normalizedRowId
+                ? buildReportBuilderDetailParameterDraftRow(row.id, {
+                    ...row,
+                    ...patch,
+                    ...(patch?.valueKind === "runtimeValue" ? { valueRef: "" } : {}),
+                })
+                : row
+        )));
+    }, []);
+    const removeAuthoredDetailParameterRow = React.useCallback((rowId = "") => {
+        const normalizedRowId = String(rowId || "").trim();
+        if (!normalizedRowId) {
+            return;
+        }
+        setAuthoredDetailParameterRowsDraft((current) => normalizeReportBuilderDetailParameterDraftRows(
+            normalizeReportBuilderDetailParameterDraftRows(current).filter((row) => row.id !== normalizedRowId),
+        ));
+    }, []);
+    const removeDrillHierarchy = React.useCallback((hierarchyId = "") => {
+        const normalizedHierarchyId = String(hierarchyId || "").trim();
+        if (!normalizedHierarchyId) {
+            return;
+        }
+        const currentHierarchy = authoredDrillSummary.hierarchies.find(
+            (hierarchy) => String(hierarchy?.id || "").trim() === normalizedHierarchyId,
+        ) || null;
+        const nextState = removeReportBuilderDrillHierarchyState(state, normalizedHierarchyId, {
+            currentHierarchies: authoredDrillMetadata.hierarchies,
+        });
+        persistExplorationMutation(nextState, {
+            sourceKind: "reportBuilder.result",
+            sourceContext: {
+                label: currentHierarchy?.label || normalizedHierarchyId,
+            },
+        });
+        setChartApplyFeedback({
+            level: "warning",
+            message: `${currentHierarchy?.label || normalizedHierarchyId} removed from runtime drill navigation.`,
+        });
+    }, [authoredDrillMetadata.hierarchies, authoredDrillSummary.hierarchies, persistExplorationMutation, state]);
+    const editDetailTarget = React.useCallback((binding = null) => {
+        const nextDraft = buildReportBuilderDetailTargetDraftFromBinding(binding, {
+            fallbackIdPrefix: `detailParam_${String(binding?.fieldRef || "detail").trim() || "detail"}`,
+        });
+        if (!nextDraft) {
+            return;
+        }
+        setEditingAuthoredDetailTargetRef(String(binding?.targetRef || "").trim());
+        setAuthoredDetailFieldRefDraft(nextDraft.fieldRef);
+        setAuthoredDetailTargetRefDraft(nextDraft.targetRef);
+        setAuthoredDetailNavigationModeDraft(nextDraft.navigationMode);
+        setAuthoredDetailTitleDraft(nextDraft.title);
+        setAuthoredDetailDescriptionDraft(nextDraft.description);
+        setAuthoredDetailParameterRowsDraft(nextDraft.parameterRows);
+    }, []);
+    const applyAuthoredDetailTarget = React.useCallback(() => {
+        if (!authoredDetailFieldOption || !authoredDetailTargetDraftValue) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: "Choose a breakdown field and enter a target reference before adding a detail action.",
+            });
+            return;
+        }
+        if (!detailTargetDraftValidation.valid) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: detailTargetDraftValidation.errors[0]?.message || "Resolve the detail-target draft issues before adding a detail action.",
+            });
+            return;
+        }
+        const nextParameters = resolveReportBuilderDetailTargetDraftParameters(
+            authoredDetailParameterRowsDraft,
+            authoredDetailFieldOption.value,
+            matchingAuthoredDetailBinding?.target?.parameters || null,
+        );
+        const nextState = upsertReportBuilderDetailTargetState(state, {
+            field: authoredDetailFieldOption.dimension,
+            targetRef: authoredDetailTargetDraftValue,
+            replacedTargetRef: editingAuthoredDetailTargetRef,
+            navigationMode: authoredDetailNavigationModeDraft,
+            parameters: nextParameters,
+            title: authoredDetailTitleDraft,
+            description: authoredDetailDescriptionDraft,
+        }, {
+            currentDetailTargets: authoredDrillMetadata.detailTargets,
+            currentFieldActions: authoredDrillMetadata.fieldActions,
+        });
+        persistExplorationMutation(nextState, {
+            sourceKind: "reportBuilder.result",
+            sourceContext: {
+                label: authoredDetailFieldOption.label || "Detail action",
+            },
+        });
+        setEditingAuthoredDetailTargetRef("");
+        setAuthoredDetailTargetRefDraft("");
+        setAuthoredDetailParameterRowsDraft(normalizeReportBuilderDetailParameterDraftRows());
+        setAuthoredDetailTitleDraft("");
+        setAuthoredDetailDescriptionDraft("");
+        setChartApplyFeedback({
+            level: isEditingAuthoredDetailTarget || matchingAuthoredDetailBinding ? "info" : "success",
+            message: isEditingAuthoredDetailTarget || matchingAuthoredDetailBinding
+                ? `Updated detail action for ${authoredDetailFieldOption.label || authoredDetailFieldRef}.`
+                : `Added detail action for ${authoredDetailFieldOption.label || authoredDetailFieldRef}.`,
+        });
+    }, [
+        editingAuthoredDetailTargetRef,
+        authoredDetailDescriptionDraft,
+        authoredDetailFieldOption,
+        authoredDetailFieldRef,
+        authoredDetailNavigationModeDraft,
+        authoredDetailParameterRowsDraft,
+        authoredDetailTargetDraftValue,
+        authoredDetailTitleDraft,
+        detailTargetDraftValidation.errors,
+        detailTargetDraftValidation.valid,
+        authoredDrillMetadata.detailTargets,
+        authoredDrillMetadata.fieldActions,
+        isEditingAuthoredDetailTarget,
+        matchingAuthoredDetailBinding,
+        persistExplorationMutation,
+        state,
+    ]);
+    const removeDetailTarget = React.useCallback((targetRef = "") => {
+        const normalizedTargetRef = String(targetRef || "").trim();
+        if (!normalizedTargetRef) {
+            return;
+        }
+        const currentBinding = authoredDetailActionBindings.find((binding) => binding.targetRef === normalizedTargetRef) || null;
+        const nextState = removeReportBuilderDetailTargetState(state, normalizedTargetRef, {
+            currentDetailTargets: authoredDrillMetadata.detailTargets,
+            currentFieldActions: authoredDrillMetadata.fieldActions,
+        });
+        persistExplorationMutation(nextState, {
+            sourceKind: "reportBuilder.result",
+            sourceContext: {
+                label: currentBinding?.actionLabel || normalizedTargetRef,
+            },
+        });
+        setChartApplyFeedback({
+            level: "warning",
+            message: `${currentBinding?.actionLabel || normalizedTargetRef} removed from runtime detail actions.`,
+        });
+    }, [authoredDetailActionBindings, authoredDrillMetadata.detailTargets, authoredDrillMetadata.fieldActions, persistExplorationMutation, state]);
     const applyAuthoredChartBlockDraft = React.useCallback(() => {
         const result = upsertReportBuilderDocumentBlockState(state, authoredChartBlockDraft, {
             editingId: editingAuthoredChartBlockId,
@@ -5248,30 +7364,606 @@ export default function ReportBuilder({ container, context }) {
             config: semanticDisplayConfig,
             state,
             semanticSummary: resolvedSemanticSummary,
+            semanticModel: semanticModelState.model,
             semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
         });
         if (!artifact) {
             return;
         }
+        const runtimeArtifactValue = cloneReportBuilderValue(runtimePreviewArtifact);
+        const payload = buildReportBuilderSavedReportPayload(artifact);
+        setLocalLifecycleSharedArtifactRecords([]);
+        setLatestLifecycleSharedArtifactOpen(false);
+        if (!payload) {
+            setSavedExplorationArtifact(artifact);
+            setSavedExplorationRuntimeArtifact(runtimeArtifactValue);
+            setSavedExplorationArtifactOpen(false);
+            setSavedReportPayload(null);
+            setSavedReportPayloadRecord(null);
+            setSavedReportPayloadOpen(false);
+            setSavedReportPayloadApiArtifactsOpen(false);
+            setSavedReportPayloadExportRequestOpen(false);
+            resetPreparedApiArtifactOrigins();
+            setChartApplyFeedback({
+                level: "warning",
+                message: `Saved draft snapshot ${artifact.title || "Report"}, but could not build the reusable report file from it.`,
+            });
+            return;
+        }
+        const nextSavedReportPayloadRecord = buildReportBuilderSavedReportPayloadRecord(payload, {
+            runtimeArtifact: runtimeArtifactValue,
+        });
         setSavedExplorationArtifact(artifact);
-        setSavedExplorationRuntimeArtifact(cloneReportBuilderValue(runtimePreviewArtifact));
-        setSavedExplorationArtifactOpen(true);
-        setSavedReportPayload(null);
-        setSavedReportPayloadRecord(null);
+        setSavedExplorationRuntimeArtifact(runtimeArtifactValue);
+        setSavedExplorationArtifactOpen(false);
+        setSavedReportPayload(payload);
+        setSavedReportPayloadRecord(nextSavedReportPayloadRecord);
         setSavedReportPayloadOpen(false);
+        setSavedReportPayloadApiArtifactsOpen(false);
+        setSavedReportPayloadExportRequestOpen(false);
         setCreateReportDocumentPayload(null);
         setCreateReportDocumentPayloadOpen(false);
+        setReportDocumentVersionDraft("");
+        setGetReportDocumentResponse(null);
+        setGetReportDocumentResponseOpen(false);
+        setReopenReportDocumentDiagnostic(null);
+        setReopenReportDocumentDiagnosticOpen(false);
+        setListReportDocumentsResponse(null);
+        setListReportDocumentsResponseOpen(false);
+        setListReportDocumentsSelectedReportId("");
+        setGetReportDocumentRequestPayload(null);
+        setGetReportDocumentRequestPayloadOpen(false);
         setUpdateReportDocumentExpectedVersionDraft("");
         setUpdateReportDocumentPayload(null);
         setUpdateReportDocumentPayloadOpen(false);
         setUpdateReportDocumentCurrentVersionDraft("");
         setUpdateReportDocumentConflictDiagnostic(null);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
+        resetPreparedApiArtifactOrigins();
         setChartApplyFeedback({
             level: "success",
-            message: `Saved exploration artifact ${artifact.title || "Report"}.`,
+            message: `Saved report file ${payload?.title || artifact.title || "Report"}. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`,
         });
-    }, [container, resolvedSemanticSummary, runtimePreviewArtifact, runtimePreviewSemanticDiagnostics, semanticDisplayConfig, state]);
+    }, [container, resetPreparedApiArtifactOrigins, resolvedSemanticSummary, runtimePreviewArtifact, runtimePreviewSemanticDiagnostics, semanticDisplayConfig, semanticModelState.model, state]);
+    const resetImportedArtifactState = React.useCallback(({
+        preserveStandaloneReportFill = false,
+        preservePipelinePreview = false,
+        preserveSavedReportPayload = false,
+        preserveSavedReportRecord = false,
+        preserveGetReportDocumentResponse = false,
+    } = {}) => {
+        if (!preserveStandaloneReportFill) {
+            setImportedStandaloneReportFill(null);
+        }
+        setImportedStandaloneReportFillOpen(false);
+        setImportedPipelineCompanionFillAttached(false);
+        setImportedStandaloneReportPrint(null);
+        setImportedStandaloneReportPrintOpen(false);
+        setImportedStandaloneExportRequest(null);
+        if (!preservePipelinePreview) {
+            setImportedPipelinePreview(null);
+        }
+        setImportedPipelineInspectorSection("");
+        setSavedExplorationArtifact(null);
+        setSavedExplorationRuntimeArtifact(null);
+        setSavedExplorationArtifactOpen(false);
+        setLocalLifecycleSharedArtifactRecords([]);
+        setLatestLifecycleSharedArtifactOpen(false);
+        if (!preserveSavedReportPayload) {
+            setSavedReportPayload(null);
+        }
+        if (!preserveSavedReportRecord) {
+            setSavedReportPayloadRecord(null);
+        }
+        setSavedReportPayloadOpen(false);
+        setSavedReportPayloadApiArtifactsOpen(false);
+        setSavedReportPayloadExportRequestOpen(false);
+        setCreateReportDocumentPayload(null);
+        setCreateReportDocumentPayloadOpen(false);
+        setReportDocumentVersionDraft("");
+        if (!preserveGetReportDocumentResponse) {
+            setGetReportDocumentResponse(null);
+        }
+        setGetReportDocumentResponseOpen(false);
+        setReopenReportDocumentDiagnostic(null);
+        setReopenReportDocumentDiagnosticOpen(false);
+        setListReportDocumentsResponse(null);
+        setListReportDocumentsResponseOpen(false);
+        setListReportDocumentsSelectedReportId("");
+        setGetReportDocumentRequestPayload(null);
+        setGetReportDocumentRequestPayloadOpen(false);
+        setSelectedListEntryExportRequestOpen(false);
+        setUpdateReportDocumentExpectedVersionDraft("");
+        setUpdateReportDocumentPayload(null);
+        setUpdateReportDocumentPayloadOpen(false);
+        setUpdateReportDocumentCurrentVersionDraft("");
+        setUpdateReportDocumentConflictDiagnostic(null);
+        setUpdateReportDocumentConflictDiagnosticOpen(false);
+        resetPreparedApiArtifactOrigins();
+    }, [resetPreparedApiArtifactOrigins]);
+    const importedArtifactState = useMemo(() => normalizeReportBuilderImportedArtifactState({
+        importedStandaloneReportFill,
+        importedStandaloneReportFillOpen,
+        importedPipelineCompanionFillAttached,
+        importedStandaloneReportPrint,
+        importedStandaloneReportPrintOpen,
+        importedStandaloneExportRequest,
+        importedPipelinePreview,
+        importedPipelineInspectorSection,
+        localSavedReportPayloadPresent: !!savedReportPayload,
+        localSavedReportRecordPresent: !!savedReportPayloadRecord,
+        localGetReportDocumentResponsePresent: !!getReportDocumentResponse,
+    }), [
+        importedPipelineCompanionFillAttached,
+        importedPipelineInspectorSection,
+        importedPipelinePreview,
+        getReportDocumentResponse,
+        savedReportPayload,
+        savedReportPayloadRecord,
+        importedStandaloneExportRequest,
+        importedStandaloneReportFill,
+        importedStandaloneReportFillOpen,
+        importedStandaloneReportPrint,
+        importedStandaloneReportPrintOpen,
+    ]);
+    const currentImportedLocalGetResponseIdentity = useMemo(
+        () => buildImportedLocalGetReportDocumentResponseIdentity(getReportDocumentResponse),
+        [getReportDocumentResponse],
+    );
+    const importedLocalReopenablePanelState = useMemo(() => buildImportedLocalReopenablePanelState({
+        importedLocalGetReportDocumentResponses: importedLocalGetReportDocumentResponses.map((response) => ({
+            id: buildImportedLocalGetReportDocumentResponseIdentity(response),
+            title: normalizeString(response?.document?.title || response?.reportRef?.reportId),
+            reportId: normalizeString(response?.reportRef?.reportId || response?.document?.id),
+            documentVersion: Number(response?.documentVersion || 0) || 0,
+            importedArtifactKind: normalizeString(response?.importedArtifactKind),
+            source: response?.source || null,
+            savedViewOverlay: response?.savedViewOverlay || null,
+            reportSpec: response?.reportSpec || null,
+            document: response?.document || null,
+            semanticSummary: response?.reportSpec?.semanticSummary || response?.document?.semanticSummary || null,
+            binding: response?.reportSpec?.binding || response?.document?.binding || null,
+            scopeParams: Array.isArray(response?.reportSpec?.scope?.params) ? response.reportSpec.scope.params : [],
+        })),
+        activeResponseIdentity: currentImportedLocalGetResponseIdentity,
+        localSavedPayloads: importedLocalSavedReportRecords,
+    }), [currentImportedLocalGetResponseIdentity, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
+    const currentImportedLocalSavedRecordIdentity = useMemo(
+        () => buildImportedLocalSavedReportRecordIdentity(savedReportPayloadRecord),
+        [savedReportPayloadRecord],
+    );
+    const reopenedSemanticBindingViewState = useMemo(
+        () => buildReportBuilderSemanticBindingViewState({
+            semanticSummary: hydratedReportDocumentSession?.reopenedSemanticSummary || null,
+            binding: hydratedReportDocumentSession?.reopenedConfig?.binding || null,
+        }),
+        [hydratedReportDocumentSession?.reopenedConfig?.binding, hydratedReportDocumentSession?.reopenedSemanticSummary],
+    );
+    const reopenedScopeSummaryState = useMemo(() => {
+        const summary = buildReportBuilderScopeSummaryFromParams(hydratedReportDocumentSession?.reopenedScopeParams);
+        return Array.isArray(summary?.items) && summary.items.length > 0
+            ? {
+                scopeSummaryTitle: "Report Scope",
+                scopeSummaryText: summary.text,
+                scopeSummaryItems: summary.items,
+            }
+            : null;
+    }, [hydratedReportDocumentSession?.reopenedScopeParams]);
+    const reopenedSessionNoticeState = useMemo(
+        () => buildReportBuilderReopenedSessionNoticeState({
+            session: hydratedReportDocumentSession,
+            exportRequestSummary: reopenedExportRequestSummary,
+        }),
+        [hydratedReportDocumentSession, reopenedExportRequestSummary],
+    );
+    const reopenedSessionLifecycleActionState = useMemo(
+        () => buildReportBuilderLifecycleActionState(reopenedSessionNoticeState, {
+            handler: reportLifecycleHandler,
+            busyActionId: reopenedSessionLifecycleActionId,
+        }),
+        [
+            reopenedSessionLifecycleActionId,
+            reopenedSessionNoticeState,
+            reportLifecycleHandler,
+        ],
+    );
+    const importedLocalSavedRecordPanelState = useMemo(() => buildImportedLocalSavedRecordPanelState({
+        importedLocalSavedReportRecords: importedLocalSavedReportRecords.map((record) => ({
+            id: buildImportedLocalSavedReportRecordIdentity(record),
+            title: normalizeString(record?.title || record?.reportId),
+            reportId: normalizeString(record?.reportId),
+            documentVersion: Number(record?.documentVersion || 0) || 0,
+            exportable: record?.exportable === true,
+            importedArtifactKind: normalizeString(record?.importedArtifactKind),
+            source: record?.source || null,
+            savedViewOverlay: record?.savedViewOverlay || null,
+            savedReportPayload: record?.savedReportPayload || null,
+            reportSpec: record?.reportSpec || null,
+            document: record?.document || null,
+            semanticSummary: record?.reportSpec?.semanticSummary || record?.document?.semanticSummary || record?.savedReportPayload?.reportSpec?.semanticSummary || record?.savedReportPayload?.reportDocument?.semanticSummary || null,
+            binding: record?.reportSpec?.binding || record?.document?.binding || record?.savedReportPayload?.reportSpec?.binding || null,
+            scopeParams: Array.isArray(record?.reportSpec?.scope?.params)
+                ? record.reportSpec.scope.params
+                : (Array.isArray(record?.document?.scope?.params)
+                    ? record.document.scope.params
+                    : (Array.isArray(record?.savedReportPayload?.reportSpec?.scope?.params)
+                        ? record.savedReportPayload.reportSpec.scope.params
+                        : [])),
+        })),
+        activeRecordIdentity: currentImportedLocalSavedRecordIdentity,
+        localSavedPayloads: importedLocalSavedReportRecords,
+    }), [currentImportedLocalSavedRecordIdentity, importedLocalSavedReportRecords]);
+    const removeImportedLocalReopenable = React.useCallback((targetIdentity = "", title = "") => {
+        const normalizedIdentity = normalizeString(targetIdentity);
+        if (!normalizedIdentity) {
+            return;
+        }
+        const removedResponse = resolveReportBuilderImportedLocalGetResponseByIdentity(
+            importedLocalGetReportDocumentResponses,
+            normalizedIdentity,
+        );
+        const documentVersion = Number(removedResponse?.documentVersion || 0) || 0;
+        setImportedLocalGetReportDocumentResponses((current) => resolveReportBuilderImportedLocalGetResponsesAfterRemoval(current, normalizedIdentity));
+        if (currentImportedLocalGetResponseIdentity === normalizedIdentity) {
+            setGetReportDocumentResponse(null);
+            setGetReportDocumentResponseOpen(false);
+            setReopenReportDocumentDiagnostic(null);
+            setReopenReportDocumentDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            });
+        }
+        setChartApplyFeedback(
+            buildReportBuilderImportFeedback({
+                valid: true,
+                kind: "getReportDocumentResponse",
+                payload: removedResponse,
+                documentVersion,
+                feedbackLevel: "info",
+                message: `${normalizeString(title) || "Imported reopen artifact"} removed from imported local artifacts.`,
+            })
+            || {
+                level: "info",
+                message: `${normalizeString(title) || "Imported reopen artifact"} removed from imported local artifacts.`,
+            },
+        );
+    }, [applyPreparedApiArtifactOrigins, currentImportedLocalGetResponseIdentity, importedLocalGetReportDocumentResponses]);
+    const activateImportedLocalReopenable = React.useCallback((targetIdentity = "", title = "") => {
+        const normalizedIdentity = normalizeString(targetIdentity);
+        if (!normalizedIdentity) {
+            return;
+        }
+        const response = resolveReportBuilderImportedLocalGetResponseByIdentity(importedLocalGetReportDocumentResponses, normalizedIdentity);
+        if (!response) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: "Could not activate the selected imported reopen artifact.",
+            });
+            return;
+        }
+        setGetReportDocumentResponse(response);
+        setGetReportDocumentResponseOpen(false);
+        setReopenReportDocumentDiagnostic(null);
+        setReopenReportDocumentDiagnosticOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: PREPARED_API_ARTIFACT_IMPORTED_ORIGIN,
+        });
+        const matchingImportedSavedRecord = resolveReportBuilderImportedLocalSavedRecordForGetResponse(
+            importedLocalSavedReportRecords,
+            response,
+        );
+        setSavedReportPayloadRecord(matchingImportedSavedRecord || null);
+        setSavedReportPayload(matchingImportedSavedRecord?.savedReportPayload || null);
+        setSavedReportPayloadApiArtifactsOpen(false);
+        const documentVersion = Number(response?.documentVersion || 0) || 0;
+        setReportDocumentVersionDraft(documentVersion > 0 ? String(documentVersion) : "");
+        setChartApplyFeedback(
+            buildReportBuilderImportFeedback({
+                valid: true,
+                kind: "getReportDocumentResponse",
+                payload: response,
+                documentVersion,
+                message: `${normalizeString(title) || "Imported reopen artifact"} is now the active reopen artifact.`,
+            })
+            || {
+                level: "success",
+                message: `${normalizeString(title) || "Imported reopen artifact"} is now the active reopen artifact.`,
+            },
+        );
+    }, [applyPreparedApiArtifactOrigins, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
+    const clearImportedLocalReopenables = React.useCallback(() => {
+        if (importedLocalGetReportDocumentResponses.length === 0) {
+            return;
+        }
+        const clearedCount = importedLocalGetReportDocumentResponses.length;
+        const currentIdentities = new Set(
+            importedLocalGetReportDocumentResponses.map((response) => buildImportedLocalGetReportDocumentResponseIdentity(response)).filter(Boolean),
+        );
+        const clearedCurrentGetResponse = !!(currentImportedLocalGetResponseIdentity && currentIdentities.has(currentImportedLocalGetResponseIdentity));
+        setImportedLocalGetReportDocumentResponses([]);
+        if (clearedCurrentGetResponse) {
+            setGetReportDocumentResponse(null);
+            setGetReportDocumentResponseOpen(false);
+            setReopenReportDocumentDiagnostic(null);
+            setReopenReportDocumentDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            });
+        }
+        setChartApplyFeedback(
+            buildReportBuilderBulkImportFeedback({
+                kind: "reopenables",
+                count: clearedCount,
+                clearedCurrentGetResponse,
+            })
+            || {
+                level: "info",
+                message: "Cleared imported reopen artifacts.",
+            },
+        );
+    }, [applyPreparedApiArtifactOrigins, currentImportedLocalGetResponseIdentity, importedLocalGetReportDocumentResponses]);
+    const activateImportedLocalSavedRecord = React.useCallback((targetIdentity = "", title = "") => {
+        const normalizedIdentity = normalizeString(targetIdentity);
+        if (!normalizedIdentity) {
+            return;
+        }
+        const record = resolveReportBuilderImportedLocalSavedReportRecordByIdentity(importedLocalSavedReportRecords, normalizedIdentity);
+        if (!record) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: "Could not activate the selected imported report file.",
+            });
+            return;
+        }
+        setSavedReportPayloadRecord(record);
+        setSavedReportPayload(record?.savedReportPayload || null);
+        setSavedReportPayloadApiArtifactsOpen(false);
+        const nextGetResponse = resolveImportedLocalSavedRecordActivationResponse({
+            importedLocalGetReportDocumentResponses,
+            savedRecord: record,
+        });
+        const documentVersion = Number(record?.documentVersion || 0) || 0;
+        if (nextGetResponse) {
+            setGetReportDocumentResponse(nextGetResponse);
+            setGetReportDocumentResponseOpen(false);
+            setReopenReportDocumentDiagnostic(null);
+            setReopenReportDocumentDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: PREPARED_API_ARTIFACT_IMPORTED_ORIGIN,
+            });
+        } else {
+            setGetReportDocumentResponse(null);
+            setGetReportDocumentResponseOpen(false);
+            setReopenReportDocumentDiagnostic(null);
+            setReopenReportDocumentDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            });
+        }
+        setReportDocumentVersionDraft(documentVersion > 0 ? String(documentVersion) : "");
+        setChartApplyFeedback(
+            buildReportBuilderImportFeedback({
+                valid: true,
+                kind: "reportBuilder.savedReportRecord",
+                savedRecord: record,
+                documentVersion,
+                exportable: record?.exportable === true,
+                message: `${normalizeString(title) || "Imported report file"} is now the active report file.`,
+            })
+            || {
+                level: "success",
+                message: `${normalizeString(title) || "Imported report file"} is now the active report file.`,
+            },
+        );
+    }, [applyPreparedApiArtifactOrigins, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
+    const removeImportedLocalSavedRecord = React.useCallback((targetIdentity = "", title = "") => {
+        const normalizedIdentity = normalizeString(targetIdentity);
+        if (!normalizedIdentity) {
+            return;
+        }
+        const removedRecord = resolveReportBuilderImportedLocalSavedReportRecordByIdentity(importedLocalSavedReportRecords, normalizedIdentity);
+        const removalEffect = resolveImportedLocalSavedRecordRemovalEffect({
+            currentGetReportDocumentResponse: getReportDocumentResponse,
+            importedLocalGetReportDocumentResponses,
+            removedSavedRecord: removedRecord,
+        });
+        setImportedLocalSavedReportRecords((current) => resolveReportBuilderImportedLocalSavedReportRecordsAfterRemoval(current, normalizedIdentity));
+        if (currentImportedLocalSavedRecordIdentity === normalizedIdentity) {
+            setSavedReportPayloadRecord(null);
+            setSavedReportPayload(null);
+            setSavedReportPayloadOpen(false);
+            setSavedReportPayloadApiArtifactsOpen(false);
+            setSavedReportPayloadExportRequestOpen(false);
+        }
+        if (removalEffect.clearCurrentGetResponse) {
+            setGetReportDocumentResponse(null);
+            setGetReportDocumentResponseOpen(false);
+            setReopenReportDocumentDiagnostic(null);
+            setReopenReportDocumentDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            });
+        }
+        setChartApplyFeedback(
+            buildReportBuilderImportFeedback({
+                valid: true,
+                kind: "reportBuilder.savedReportRecord",
+                savedRecord: removedRecord,
+                documentVersion: Number(removedRecord?.documentVersion || 0) || 0,
+                exportable: removedRecord?.exportable === true,
+                feedbackLevel: "info",
+                message: `${normalizeString(title) || "Imported report file"} removed from imported local files.`,
+            })
+            || {
+                level: "info",
+                message: `${normalizeString(title) || "Imported report file"} removed from imported local files.`,
+            },
+        );
+    }, [applyPreparedApiArtifactOrigins, currentImportedLocalSavedRecordIdentity, getReportDocumentResponse, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
+    const clearImportedLocalSavedRecords = React.useCallback(() => {
+        if (importedLocalSavedReportRecords.length === 0) {
+            return;
+        }
+        const clearedCount = importedLocalSavedReportRecords.length;
+        const currentIdentities = new Set(
+            importedLocalSavedReportRecords.map((record) => buildImportedLocalSavedReportRecordIdentity(record)).filter(Boolean),
+        );
+        const removalEffect = resolveImportedLocalSavedRecordRemovalEffect({
+            currentGetReportDocumentResponse: getReportDocumentResponse,
+            importedLocalGetReportDocumentResponses,
+            removedSavedRecord: savedReportPayloadRecord,
+        });
+        const clearedCurrentSavedRecord = !!(currentImportedLocalSavedRecordIdentity && currentIdentities.has(currentImportedLocalSavedRecordIdentity));
+        setImportedLocalSavedReportRecords([]);
+        if (clearedCurrentSavedRecord) {
+            setSavedReportPayloadRecord(null);
+            setSavedReportPayload(null);
+            setSavedReportPayloadOpen(false);
+            setSavedReportPayloadApiArtifactsOpen(false);
+            setSavedReportPayloadExportRequestOpen(false);
+        }
+        if (removalEffect.clearCurrentGetResponse) {
+            setGetReportDocumentResponse(null);
+            setGetReportDocumentResponseOpen(false);
+            setReopenReportDocumentDiagnostic(null);
+            setReopenReportDocumentDiagnosticOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            });
+        }
+        setChartApplyFeedback(
+            buildReportBuilderBulkImportFeedback({
+                kind: "savedRecords",
+                count: clearedCount,
+                clearedCurrentSavedRecord,
+                clearedCurrentGetResponse: removalEffect.clearCurrentGetResponse,
+            })
+            || {
+                level: "info",
+                message: "Cleared imported report files.",
+            },
+        );
+    }, [applyPreparedApiArtifactOrigins, currentImportedLocalSavedRecordIdentity, getReportDocumentResponse, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords, savedReportPayloadRecord]);
+    const openImportReportFilePicker = React.useCallback(() => {
+        importReportFileInputRef.current?.click();
+    }, []);
+    const importLocalReportFile = React.useCallback(async (event) => {
+        const input = event?.target || null;
+        const file = input?.files?.[0] || null;
+        if (input && typeof input.value === "string") {
+            input.value = "";
+        }
+        if (!file || typeof file.text !== "function") {
+            return;
+        }
+        try {
+            const imported = parseReportBuilderLocalImport(await file.text(), {
+                fileName: file.name,
+            });
+            if (!imported.valid) {
+                setChartApplyFeedback({
+                    level: "warning",
+                    message: imported.message || "Could not import the selected report file.",
+                });
+                return;
+            }
+            const nextImportedArtifactState = resolveReportBuilderImportedArtifactStateAfterImport(importedArtifactState, imported);
+            const preserveImportedState = resolveReportBuilderImportedArtifactImportPreservation(imported, importedArtifactState);
+            resetImportedArtifactState(preserveImportedState);
+            const importedPreparedArtifactOrigins = {};
+            setImportedLocalGetReportDocumentResponses((current) => resolveReportBuilderImportedLocalGetResponsesAfterImport(current, imported));
+            setImportedLocalSavedReportRecords((current) => resolveReportBuilderImportedLocalSavedReportRecordsAfterImport(current, imported));
+            setImportedStandaloneReportFill(nextImportedArtifactState.importedStandaloneReportFill);
+            setImportedStandaloneReportFillOpen(nextImportedArtifactState.importedStandaloneReportFillOpen);
+            setImportedPipelineCompanionFillAttached(nextImportedArtifactState.importedPipelineCompanionFillAttached);
+            setImportedStandaloneReportPrint(nextImportedArtifactState.importedStandaloneReportPrint);
+            setImportedStandaloneReportPrintOpen(nextImportedArtifactState.importedStandaloneReportPrintOpen);
+            setImportedStandaloneExportRequest(nextImportedArtifactState.importedStandaloneExportRequest);
+            setImportedPipelinePreview(nextImportedArtifactState.importedPipelinePreview);
+            setImportedPipelineInspectorSection(nextImportedArtifactState.importedPipelineInspectorSection);
+            if (imported.kind === "reportBuilder.explorationArtifact") {
+                setSavedExplorationArtifact(imported.payload);
+                setSavedExplorationRuntimeArtifact(null);
+                setSavedExplorationArtifactOpen(false);
+                setSavedReportPayload(imported.savedReportPayload || null);
+                setSavedReportPayloadRecord(null);
+                setSavedReportPayloadApiArtifactsOpen(false);
+                if (imported.getReportDocumentResponse) {
+                    setGetReportDocumentResponse(imported.getReportDocumentResponse);
+                    importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                }
+            } else if (imported.kind === "reportDocument") {
+                setGetReportDocumentResponse(imported.getReportDocumentResponse || null);
+                if (imported.getReportDocumentResponse) {
+                    importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                }
+                if (imported.documentVersion > 0) {
+                    setReportDocumentVersionDraft(String(imported.documentVersion));
+                }
+            } else if (imported.kind === "reportBuilder.savedReportRecord") {
+                setSavedReportPayload(imported.savedRecord?.savedReportPayload || null);
+                setSavedReportPayloadRecord(imported.savedRecord || null);
+                setSavedReportPayloadApiArtifactsOpen(false);
+                if (imported.getReportDocumentResponse) {
+                    setGetReportDocumentResponse(imported.getReportDocumentResponse);
+                    importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                }
+                if (imported.documentVersion > 0) {
+                    setReportDocumentVersionDraft(String(imported.documentVersion));
+                }
+            } else if (imported.kind === "reportBuilder.savedReportPayload") {
+                setSavedReportPayload(imported.payload);
+                setSavedReportPayloadApiArtifactsOpen(false);
+                if (imported.getReportDocumentResponse) {
+                    setGetReportDocumentResponse(imported.getReportDocumentResponse);
+                    importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                }
+            } else if (imported.kind === "getReportDocumentResponse") {
+                setGetReportDocumentResponse(imported.payload);
+                importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                if (imported.documentVersion > 0) {
+                    setReportDocumentVersionDraft(String(imported.documentVersion));
+                }
+            } else if (imported.kind === "listReportDocumentsResponse") {
+                setListReportDocumentsResponse(imported.payload);
+                setListReportDocumentsSelectedReportId(imported.selectedEntryKey || imported.selectedReportId || "");
+                importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+            } else if (imported.kind === "createReportDocumentPayload") {
+                setCreateReportDocumentPayload(imported.payload);
+                importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.createReportDocumentPayload] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                if (imported.getReportDocumentResponse) {
+                    setGetReportDocumentResponse(imported.getReportDocumentResponse);
+                    importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                }
+            } else if (imported.kind === "updateReportDocumentPayload") {
+                setUpdateReportDocumentPayload(imported.payload);
+                importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                if (imported.getReportDocumentResponse) {
+                    setGetReportDocumentResponse(imported.getReportDocumentResponse);
+                    importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+                }
+                if (imported.expectedVersion > 0) {
+                    setUpdateReportDocumentExpectedVersionDraft(String(imported.expectedVersion));
+                }
+            } else if (imported.kind === "getReportDocumentRequest") {
+                setGetReportDocumentRequestPayload(imported.payload);
+                importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+            }
+            applyPreparedApiArtifactOrigins(importedPreparedArtifactOrigins);
+            setChartApplyFeedback(
+                buildReportBuilderImportFeedback(imported)
+                || {
+                    level: "success",
+                    message: imported.message || `Imported ${imported.kind}.`,
+                },
+            );
+        } catch (error) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: `Could not import ${String(file?.name || "the selected report file")}. ${renderReportBuilderError(error)}`,
+            });
+        }
+    }, [applyPreparedApiArtifactOrigins, importedArtifactState, resetImportedArtifactState]);
     const downloadExplorationArtifact = React.useCallback(() => {
         const descriptor = buildReportBuilderExplorationArtifactDownload(savedExplorationArtifact);
         if (!descriptor) {
@@ -5292,12 +7984,15 @@ export default function ReportBuilder({ container, context }) {
         if (!payload) {
             return;
         }
+        setLocalLifecycleSharedArtifactRecords([]);
+        setLatestLifecycleSharedArtifactOpen(false);
         const nextSavedReportPayloadRecord = buildReportBuilderSavedReportPayloadRecord(payload, {
             runtimeArtifact: savedExplorationRuntimeArtifact,
         });
         setSavedReportPayload(payload);
         setSavedReportPayloadRecord(nextSavedReportPayloadRecord);
-        setSavedReportPayloadOpen(true);
+        setSavedReportPayloadOpen(false);
+        setSavedReportPayloadApiArtifactsOpen(false);
         setSavedReportPayloadExportRequestOpen(false);
         setSavedExplorationArtifactOpen(false);
         setCreateReportDocumentPayload(null);
@@ -5318,11 +8013,12 @@ export default function ReportBuilder({ container, context }) {
         setUpdateReportDocumentCurrentVersionDraft("");
         setUpdateReportDocumentConflictDiagnostic(null);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
+        resetPreparedApiArtifactOrigins();
         setChartApplyFeedback({
             level: "success",
-            message: `Prepared saved report payload ${payload.title || "Report"}.`,
+            message: `Prepared report file ${payload.title || "Report"}. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`,
         });
-    }, [savedExplorationArtifact, savedExplorationRuntimeArtifact]);
+    }, [resetPreparedApiArtifactOrigins, savedExplorationArtifact, savedExplorationRuntimeArtifact]);
     const downloadSavedReportPayload = React.useCallback(() => {
         const descriptor = buildReportBuilderSavedReportPayloadDownload(savedReportPayload);
         if (!descriptor) {
@@ -5338,6 +8034,83 @@ export default function ReportBuilder({ container, context }) {
         document.body.removeChild(anchor);
         URL.revokeObjectURL(url);
     }, [savedReportPayload]);
+    const downloadLatestLifecycleSharedArtifact = React.useCallback(() => {
+        const descriptor = buildReportBuilderLifecycleSharedArtifactDownload(latestLifecycleSharedArtifactRecord);
+        if (!descriptor) {
+            return;
+        }
+        const blob = new Blob([descriptor.payload], { type: descriptor.mimeType });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = descriptor.filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+    }, [latestLifecycleSharedArtifactRecord]);
+    const downloadImportedStandaloneReportFill = React.useCallback(() => {
+        if (!importedStandaloneReportFill) {
+            return;
+        }
+        const baseName = sanitizeFilenameSegment(
+            importedStandaloneReportFillSummary?.title || "imported-report-fill",
+        ) || "imported-report-fill";
+        const blob = new Blob([JSON.stringify(importedStandaloneReportFill, null, 2)], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${baseName}-report-fill.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+    }, [importedStandaloneReportFill, importedStandaloneReportFillSummary?.title]);
+    const downloadImportedStandaloneReportPrint = React.useCallback(() => {
+        if (!importedStandaloneReportPrint) {
+            return;
+        }
+        const baseName = sanitizeFilenameSegment(
+            importedStandaloneReportPrintSummary?.title || "imported-report-print",
+        ) || "imported-report-print";
+        const blob = new Blob([JSON.stringify(importedStandaloneReportPrint, null, 2)], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${baseName}-report-print.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+    }, [importedStandaloneReportPrint, importedStandaloneReportPrintSummary?.title]);
+    const toggleImportedPipelineInspectorSection = React.useCallback((section = "") => {
+        const normalizedSection = normalizeString(section);
+        setImportedPipelineInspectorSection((current) => (
+            current === normalizedSection ? "" : normalizedSection
+        ));
+    }, []);
+    const hideImportedPipelinePreview = React.useCallback(() => {
+        setImportedPipelinePreview(null);
+        setImportedPipelineInspectorSection("");
+    }, []);
+    const downloadImportedPipelineInspector = React.useCallback(() => {
+        if (!importedPipelineInspector?.content) {
+            return;
+        }
+        const baseName = sanitizeFilenameSegment(
+            importedPipelineSummary?.title || importedPipelineSummary?.fileName || "imported-report",
+        ) || "imported-report";
+        const sectionName = sanitizeFilenameSegment(importedPipelineInspector?.label || "artifact") || "artifact";
+        const blob = new Blob([importedPipelineInspector.content], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${baseName}-${sectionName}.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+    }, [importedPipelineInspector, importedPipelineSummary?.fileName, importedPipelineSummary?.title]);
     const {
         requestOpen: draftExportRequestOpen,
         setRequestOpen: setDraftExportRequestOpen,
@@ -5354,6 +8127,79 @@ export default function ReportBuilder({ container, context }) {
         downloadRequest: downloadDraftExportRequest,
     } = draftExportExecution;
     const {
+        requestOpen: importedStandaloneExportRequestOpen,
+        setRequestOpen: setImportedStandaloneExportRequestOpen,
+        requestSummary: importedStandaloneExportRequestExecutionSummary,
+        requestInspector: importedStandaloneExportRequestInspector,
+        submitting: importedStandaloneExportSubmitting,
+        job: importedStandaloneExportJob,
+        jobSummary: importedStandaloneExportJobSummary,
+        statusLoading: importedStandaloneExportStatusLoading,
+        artifactLoading: importedStandaloneExportArtifactLoading,
+        submit: triggerImportedStandaloneExport,
+        refreshStatus: refreshImportedStandaloneExportStatus,
+        downloadArtifact: downloadImportedStandaloneExportArtifact,
+        downloadRequest: downloadImportedStandaloneExportRequest,
+    } = importedStandaloneExportExecution;
+    const {
+        requestOpen: importedPipelineExportRequestOpen,
+        setRequestOpen: setImportedPipelineExportRequestOpen,
+        requestSummary: importedPipelineExportRequestSummary,
+        requestInspector: importedPipelineExportRequestInspector,
+        submitting: importedPipelineExportSubmitting,
+        job: importedPipelineExportJob,
+        jobSummary: importedPipelineExportJobSummary,
+        statusLoading: importedPipelineExportStatusLoading,
+        artifactLoading: importedPipelineExportArtifactLoading,
+        submit: triggerImportedPipelineExport,
+        refreshStatus: refreshImportedPipelineExportStatus,
+        downloadArtifact: downloadImportedPipelineExportArtifact,
+        downloadRequest: downloadImportedPipelineExportRequest,
+    } = importedPipelineExportExecution;
+    const importedStandaloneExportRequestPanelState = useMemo(
+        () => buildImportedStandaloneExportRequestPanelState({
+            importedStandaloneExportRequestSummary,
+        }),
+        [importedStandaloneExportRequestSummary],
+    );
+    const importedStandaloneExportActionState = useMemo(
+        () => buildImportedStandaloneExportActionState({
+            importedStandaloneExportRequestExecutionSummary,
+            importedStandaloneExportRequestOpen,
+            importedStandaloneExportSubmitting,
+            reportExportHandlerAvailable: !!reportExportHandler,
+        }),
+        [
+            importedStandaloneExportRequestExecutionSummary,
+            importedStandaloneExportRequestOpen,
+            importedStandaloneExportSubmitting,
+            reportExportHandler,
+        ],
+    );
+    const importedStandaloneExportRequestDetailPanelState = useMemo(
+        () => buildImportedStandaloneExportRequestDetailPanelState({
+            importedStandaloneExportRequestInspector,
+            importedStandaloneExportRequestOpen,
+        }),
+        [importedStandaloneExportRequestInspector, importedStandaloneExportRequestOpen],
+    );
+    const importedStandaloneExportJobPanelState = useMemo(
+        () => buildImportedStandaloneExportJobPanelState({
+            importedStandaloneExportJobSummary,
+            importedStandaloneExportStatusLoading,
+            importedStandaloneExportArtifactLoading,
+            importedStandaloneExportRequestExecutionSummary,
+            importedStandaloneExportRequestSummary,
+        }),
+        [
+            importedStandaloneExportArtifactLoading,
+            importedStandaloneExportJobSummary,
+            importedStandaloneExportRequestExecutionSummary,
+            importedStandaloneExportRequestSummary,
+            importedStandaloneExportStatusLoading,
+        ],
+    );
+    const {
         requestOpen: savedReportPayloadExportRequestOpen,
         setRequestOpen: setSavedReportPayloadExportRequestOpen,
         requestSummary: savedReportPayloadExportRequestSummary,
@@ -5363,8 +8209,15 @@ export default function ReportBuilder({ container, context }) {
         jobSummary: savedReportPayloadExportJobSummary,
         statusLoading: savedReportPayloadExportStatusLoading,
         artifactLoading: savedReportPayloadExportArtifactLoading,
+        historyAvailable: savedReportPayloadExportHistoryAvailable,
+        historyLoading: savedReportPayloadExportHistoryLoading,
+        historyJobs: savedReportPayloadExportHistoryJobs,
+        historyArtifacts: savedReportPayloadExportHistoryArtifacts,
         submit: triggerSavedReportPayloadExport,
         refreshStatus: refreshSavedReportPayloadExportStatus,
+        refreshHistory: refreshSavedReportPayloadExportHistory,
+        selectHistoryEntry: selectSavedReportPayloadExportHistoryEntry,
+        downloadHistoryArtifact: downloadSavedReportPayloadExportHistoryArtifact,
         downloadArtifact: downloadSavedReportPayloadArtifact,
         downloadRequest: downloadSavedReportPayloadExportRequest,
     } = savedReportPayloadExportExecution;
@@ -5398,21 +8251,421 @@ export default function ReportBuilder({ container, context }) {
         downloadArtifact: downloadSelectedListEntryExportArtifact,
         downloadRequest: downloadSelectedListEntryExportRequest,
     } = selectedListEntryExportExecution;
+    const {
+        requestOpen: latestLifecycleSharedArtifactExportRequestOpen,
+        setRequestOpen: setLatestLifecycleSharedArtifactExportRequestOpen,
+        requestSummary: latestLifecycleSharedArtifactExportRequestSummary,
+        requestInspector: latestLifecycleSharedArtifactExportRequestInspector,
+        submitting: latestLifecycleSharedArtifactExportSubmitting,
+        job: latestLifecycleSharedArtifactExportJob,
+        jobSummary: latestLifecycleSharedArtifactExportJobSummary,
+        statusLoading: latestLifecycleSharedArtifactExportStatusLoading,
+        artifactLoading: latestLifecycleSharedArtifactExportArtifactLoading,
+        submit: triggerLatestLifecycleSharedArtifactExport,
+        refreshStatus: refreshLatestLifecycleSharedArtifactExportStatus,
+        downloadArtifact: downloadLatestLifecycleSharedArtifactExportArtifact,
+        downloadRequest: downloadLatestLifecycleSharedArtifactExportRequest,
+    } = latestLifecycleSharedArtifactExportExecution;
     const draftExportFailureNotice = useMemo(
-        () => buildReportBuilderExportFailureNotice(draftExportJob, { label: "Draft export" }),
-        [draftExportJob],
+        () => buildReportBuilderDraftExportFailureNotice({
+            job: draftExportJob,
+            requestSummary: draftExportRequestSummary,
+            document: runtimePreviewArtifact?.document || null,
+        }),
+        [
+            draftExportJob,
+            draftExportRequestSummary,
+            runtimePreviewArtifact?.document,
+        ],
+    );
+    const draftExportActionState = useMemo(
+        () => buildReportBuilderDraftExportActionState({
+            requestSummary: draftExportRequestSummary,
+            requestOpen: draftExportRequestOpen,
+            submitting: draftExportSubmitting,
+            reportExportHandlerAvailable: !!reportExportHandler,
+        }),
+        [draftExportRequestOpen, draftExportRequestSummary, draftExportSubmitting, reportExportHandler],
+    );
+    const draftExportRequestPanelState = useMemo(
+        () => buildReportBuilderDraftExportRequestPanelState({
+            requestInspector: draftExportRequestInspector,
+            requestOpen: draftExportRequestOpen,
+            requestSummary: draftExportRequestSummary,
+            document: runtimePreviewArtifact?.document || null,
+        }),
+        [
+            draftExportRequestInspector,
+            draftExportRequestOpen,
+            draftExportRequestSummary,
+            runtimePreviewArtifact?.document,
+        ],
+    );
+    const draftExportJobPanelState = useMemo(
+        () => buildReportBuilderDraftExportJobPanelState({
+            jobSummary: draftExportJobSummary,
+            requestSummary: draftExportRequestSummary,
+            document: runtimePreviewArtifact?.document || null,
+            statusLoading: draftExportStatusLoading,
+            artifactLoading: draftExportArtifactLoading,
+        }),
+        [
+            draftExportArtifactLoading,
+            draftExportJobSummary,
+            draftExportRequestSummary,
+            draftExportStatusLoading,
+            runtimePreviewArtifact?.document,
+        ],
+    );
+    const importedStandaloneExportFailureNotice = useMemo(
+        () => buildImportedStandaloneExportFailureNotice({
+            importedStandaloneExportJob,
+            importedStandaloneExportRequestExecutionSummary,
+            importedStandaloneExportRequestSummary,
+        }),
+        [
+            importedStandaloneExportJob,
+            importedStandaloneExportRequestExecutionSummary,
+            importedStandaloneExportRequestSummary,
+        ],
+    );
+    const importedPipelineExportFailureNotice = useMemo(
+        () => buildImportedPipelineExportFailureNotice({
+            importedPipelineExportJob,
+            importedPipelineExportRequestSummary,
+            importedPipelineRuntimeFillSummary,
+        }),
+        [
+            importedPipelineExportJob,
+            importedPipelineExportRequestSummary,
+            importedPipelineRuntimeFillSummary,
+        ],
+    );
+    const importedPipelinePreviewPanelState = useMemo(
+        () => buildImportedPipelinePreviewPanelState({
+            importedPipelineSummary,
+            importedPipelinePreview,
+            importedPipelineRuntimeArtifact,
+            importedPipelineRuntimeConfig,
+            importedPipelineRuntimeFillSummary,
+            importedPipelineCompanionFillCompatibility,
+            importedPipelineInspectorSection,
+        }),
+        [
+            importedPipelineCompanionFillCompatibility,
+            importedPipelineInspectorSection,
+            importedPipelinePreview,
+            importedPipelineRuntimeArtifact,
+            importedPipelineRuntimeConfig,
+            importedPipelineRuntimeFillSummary,
+            importedPipelineSummary,
+        ],
+    );
+    const importedPipelineExportActionState = useMemo(
+        () => buildImportedPipelineExportActionState({
+            importedPipelineExportRequestSummary,
+            importedPipelineExportRequestOpen,
+            importedPipelineExportSubmitting,
+            reportExportHandlerAvailable: !!reportExportHandler,
+        }),
+        [
+            importedPipelineExportRequestOpen,
+            importedPipelineExportRequestSummary,
+            importedPipelineExportSubmitting,
+            reportExportHandler,
+        ],
+    );
+    const importedPipelineExportRequestPanelState = useMemo(
+        () => buildImportedPipelineExportRequestDetailPanelState({
+            importedPipelineExportRequestInspector,
+            importedPipelineExportRequestOpen,
+            importedPipelineRuntimeFillSummary,
+        }),
+        [
+            importedPipelineExportRequestInspector,
+            importedPipelineExportRequestOpen,
+            importedPipelineRuntimeFillSummary,
+        ],
+    );
+    const importedPipelineExportJobPanelState = useMemo(
+        () => buildImportedPipelineExportJobPanelState({
+            importedPipelineExportJobSummary,
+            importedPipelineExportStatusLoading,
+            importedPipelineExportArtifactLoading,
+            importedPipelineExportRequestSummary,
+            importedPipelineRuntimeFillSummary,
+            importedPipelineSummary,
+        }),
+        [
+            importedPipelineExportArtifactLoading,
+            importedPipelineExportJobSummary,
+            importedPipelineExportRequestSummary,
+            importedPipelineExportStatusLoading,
+            importedPipelineRuntimeFillSummary,
+            importedPipelineSummary,
+        ],
     );
     const savedReportPayloadExportFailureNotice = useMemo(
-        () => buildReportBuilderExportFailureNotice(savedReportPayloadExportJob, { label: "Saved export" }),
-        [savedReportPayloadExportJob],
+        () => buildReportBuilderSavedPayloadExportFailureNotice({
+            job: savedReportPayloadExportJob,
+            summary: savedReportPayloadSummary,
+            requestSummary: savedReportPayloadExportRequestSummary,
+        }),
+        [
+            savedReportPayloadExportJob,
+            savedReportPayloadExportRequestSummary,
+            savedReportPayloadSummary,
+        ],
     );
     const reopenedExportFailureNotice = useMemo(
-        () => buildReportBuilderExportFailureNotice(reopenedExportJob, { label: "Reopened export" }),
-        [reopenedExportJob],
+        () => buildReportBuilderReopenedExportFailureNotice({
+            job: reopenedExportJob,
+            requestSummary: reopenedExportRequestSummary,
+            session: hydratedReportDocumentSession,
+        }),
+        [
+            reopenedExportJob,
+            reopenedExportRequestSummary,
+            hydratedReportDocumentSession,
+        ],
+    );
+    const reopenedExportActionState = useMemo(
+        () => buildReportBuilderReopenedExportActionState({
+            requestSummary: reopenedExportRequestSummary,
+            requestOpen: reopenedExportRequestOpen,
+            submitting: reopenedExportSubmitting,
+            reportExportHandlerAvailable: !!reportExportHandler,
+        }),
+        [reopenedExportRequestOpen, reopenedExportRequestSummary, reopenedExportSubmitting, reportExportHandler],
+    );
+    const reopenedExportRequestPanelState = useMemo(
+        () => buildReportBuilderReopenedExportRequestPanelState({
+            requestInspector: reopenedExportRequestInspector,
+            requestOpen: reopenedExportRequestOpen,
+            requestSummary: reopenedExportRequestSummary,
+            session: hydratedReportDocumentSession,
+        }),
+        [
+            reopenedExportRequestInspector,
+            reopenedExportRequestOpen,
+            reopenedExportRequestSummary,
+            hydratedReportDocumentSession,
+        ],
+    );
+    const reopenedExportJobPanelState = useMemo(
+        () => buildReportBuilderReopenedExportJobPanelState({
+            jobSummary: reopenedExportJobSummary,
+            requestSummary: reopenedExportRequestSummary,
+            session: hydratedReportDocumentSession,
+            statusLoading: reopenedExportStatusLoading,
+            artifactLoading: reopenedExportArtifactLoading,
+        }),
+        [
+            reopenedExportArtifactLoading,
+            reopenedExportJobSummary,
+            reopenedExportRequestSummary,
+            reopenedExportStatusLoading,
+            hydratedReportDocumentSession,
+        ],
+    );
+    const savedReportPayloadExportActionState = useMemo(
+        () => buildReportBuilderSavedPayloadExportActionState({
+            requestSummary: savedReportPayloadExportRequestSummary,
+            requestOpen: savedReportPayloadExportRequestOpen,
+            submitting: savedReportPayloadExportSubmitting,
+            reportExportHandlerAvailable: !!reportExportHandler,
+        }),
+        [
+            reportExportHandler,
+            savedReportPayloadExportRequestOpen,
+            savedReportPayloadExportRequestSummary,
+            savedReportPayloadExportSubmitting,
+        ],
+    );
+    const savedReportPayloadExportRequestPanelState = useMemo(
+        () => buildReportBuilderSavedPayloadExportRequestPanelState({
+            requestInspector: savedReportPayloadExportRequestInspector,
+            requestOpen: savedReportPayloadExportRequestOpen,
+            summary: savedReportPayloadSummary,
+        }),
+        [
+            savedReportPayloadExportRequestInspector,
+            savedReportPayloadExportRequestOpen,
+            savedReportPayloadSummary,
+        ],
+    );
+    const savedReportPayloadExportJobPanelState = useMemo(
+        () => buildReportBuilderSavedPayloadExportJobPanelState({
+            jobSummary: savedReportPayloadExportJobSummary,
+            summary: savedReportPayloadSummary,
+            requestSummary: savedReportPayloadExportRequestSummary,
+            statusLoading: savedReportPayloadExportStatusLoading,
+            artifactLoading: savedReportPayloadExportArtifactLoading,
+        }),
+        [
+            savedReportPayloadExportArtifactLoading,
+            savedReportPayloadExportJobSummary,
+            savedReportPayloadExportRequestSummary,
+            savedReportPayloadExportStatusLoading,
+            savedReportPayloadSummary,
+        ],
+    );
+    const savedReportPayloadRecentExportEntries = useMemo(
+        () => buildReportBuilderSavedPayloadRecentExportEntries({
+            jobs: savedReportPayloadExportHistoryJobs,
+            artifacts: savedReportPayloadExportHistoryArtifacts,
+            summary: savedReportPayloadSummary,
+            activeJobId: savedReportPayloadExportJob?.jobId,
+            activeArtifactId: savedReportPayloadExportJob?.artifactId,
+            nowMs: exportHistoryNowMs,
+        }),
+        [
+            exportHistoryNowMs,
+            savedReportPayloadExportHistoryArtifacts,
+            savedReportPayloadExportHistoryJobs,
+            savedReportPayloadExportJob?.artifactId,
+            savedReportPayloadExportJob?.jobId,
+            savedReportPayloadSummary,
+        ],
+    );
+    useEffect(() => {
+        if (!savedReportPayloadExportHistoryAvailable) {
+            return undefined;
+        }
+        setExportHistoryNowMs(Date.now());
+        const timer = setInterval(() => {
+            setExportHistoryNowMs(Date.now());
+        }, 60 * 1000);
+        return () => clearInterval(timer);
+    }, [savedReportPayloadExportHistoryAvailable]);
+    const selectedListEntryExportActionState = useMemo(
+        () => buildReportBuilderSelectedListEntryExportActionState({
+            requestSummary: selectedListEntryExportRequestSummary,
+            requestOpen: selectedListEntryExportRequestOpen,
+            submitting: selectedListEntryExportSubmitting,
+            reportExportHandlerAvailable: !!reportExportHandler,
+            entrySummary: selectedListReportDocumentsEntrySummary,
+        }),
+        [
+            reportExportHandler,
+            selectedListEntryExportRequestOpen,
+            selectedListEntryExportRequestSummary,
+            selectedListReportDocumentsEntrySummary,
+            selectedListEntryExportSubmitting,
+        ],
+    );
+    const selectedListEntryExportRequestPanelState = useMemo(
+        () => buildReportBuilderSelectedListEntryExportRequestPanelState({
+            requestInspector: selectedListEntryExportRequestInspector,
+            requestOpen: selectedListEntryExportRequestOpen,
+            requestSummary: selectedListEntryExportRequestSummary,
+            entrySummary: selectedListReportDocumentsEntrySummary,
+        }),
+        [
+            selectedListEntryExportRequestInspector,
+            selectedListEntryExportRequestOpen,
+            selectedListEntryExportRequestSummary,
+            selectedListReportDocumentsEntrySummary,
+        ],
+    );
+    const selectedListEntryExportJobPanelState = useMemo(
+        () => buildReportBuilderSelectedListEntryExportJobPanelState({
+            jobSummary: selectedListEntryExportJobSummary,
+            requestSummary: selectedListEntryExportRequestSummary,
+            entrySummary: selectedListReportDocumentsEntrySummary,
+            statusLoading: selectedListEntryExportStatusLoading,
+            artifactLoading: selectedListEntryExportArtifactLoading,
+        }),
+        [
+            selectedListEntryExportArtifactLoading,
+            selectedListEntryExportJobSummary,
+            selectedListEntryExportRequestSummary,
+            selectedListEntryExportStatusLoading,
+            selectedListReportDocumentsEntrySummary,
+        ],
     );
     const selectedListEntryExportFailureNotice = useMemo(
-        () => buildReportBuilderExportFailureNotice(selectedListEntryExportJob, { label: "Selected export" }),
-        [selectedListEntryExportJob],
+        () => buildReportBuilderSelectedListEntryExportFailureNotice({
+            job: selectedListEntryExportJob,
+            requestSummary: selectedListEntryExportRequestSummary,
+            entrySummary: selectedListReportDocumentsEntrySummary,
+        }),
+        [
+            selectedListEntryExportJob,
+            selectedListEntryExportRequestSummary,
+            selectedListReportDocumentsEntrySummary,
+        ],
+    );
+    const latestLifecycleSharedArtifactExportActionState = useMemo(
+        () => buildReportBuilderSelectedListEntryExportActionState({
+            requestSummary: latestLifecycleSharedArtifactExportRequestSummary,
+            requestOpen: latestLifecycleSharedArtifactExportRequestOpen,
+            submitting: latestLifecycleSharedArtifactExportSubmitting,
+            reportExportHandlerAvailable: !!reportExportHandler,
+            entrySummary: latestLifecycleSharedArtifactSummary,
+        }),
+        [
+            latestLifecycleSharedArtifactExportRequestOpen,
+            latestLifecycleSharedArtifactExportRequestSummary,
+            latestLifecycleSharedArtifactExportSubmitting,
+            latestLifecycleSharedArtifactSummary,
+            reportExportHandler,
+        ],
+    );
+    const latestLifecycleSharedArtifactExportRequestPanelState = useMemo(
+        () => buildReportBuilderSelectedListEntryExportRequestPanelState({
+            requestInspector: latestLifecycleSharedArtifactExportRequestInspector,
+            requestOpen: latestLifecycleSharedArtifactExportRequestOpen,
+            requestSummary: latestLifecycleSharedArtifactExportRequestSummary,
+            entrySummary: latestLifecycleSharedArtifactSummary,
+        }),
+        [
+            latestLifecycleSharedArtifactExportRequestInspector,
+            latestLifecycleSharedArtifactExportRequestOpen,
+            latestLifecycleSharedArtifactExportRequestSummary,
+            latestLifecycleSharedArtifactSummary,
+        ],
+    );
+    const latestLifecycleSharedArtifactExportJobPanelState = useMemo(
+        () => buildReportBuilderSelectedListEntryExportJobPanelState({
+            jobSummary: latestLifecycleSharedArtifactExportJobSummary,
+            requestSummary: latestLifecycleSharedArtifactExportRequestSummary,
+            entrySummary: latestLifecycleSharedArtifactSummary,
+            label: "Latest shared export",
+            statusLoading: latestLifecycleSharedArtifactExportStatusLoading,
+            artifactLoading: latestLifecycleSharedArtifactExportArtifactLoading,
+        }),
+        [
+            latestLifecycleSharedArtifactExportArtifactLoading,
+            latestLifecycleSharedArtifactExportJobSummary,
+            latestLifecycleSharedArtifactExportRequestSummary,
+            latestLifecycleSharedArtifactExportStatusLoading,
+            latestLifecycleSharedArtifactSummary,
+        ],
+    );
+    const latestLifecycleSharedArtifactExportFailureNotice = useMemo(
+        () => buildReportBuilderSelectedListEntryExportFailureNotice({
+            job: latestLifecycleSharedArtifactExportJob,
+            requestSummary: latestLifecycleSharedArtifactExportRequestSummary,
+            entrySummary: latestLifecycleSharedArtifactSummary,
+            label: "Latest shared export",
+        }),
+        [
+            latestLifecycleSharedArtifactExportJob,
+            latestLifecycleSharedArtifactExportRequestSummary,
+            latestLifecycleSharedArtifactSummary,
+        ],
+    );
+    const selectedListEntryLifecycleActionState = useMemo(
+        () => buildReportBuilderLifecycleActionState(selectedListReportDocumentsEntrySummary, {
+            handler: reportLifecycleHandler,
+            busyActionId: selectedListEntryLifecycleActionId,
+        }),
+        [
+            reportLifecycleHandler,
+            selectedListEntryLifecycleActionId,
+            selectedListReportDocumentsEntrySummary,
+        ],
     );
     const renderExportFailureDiagnostics = React.useCallback((notice = null) => {
         if (!notice || !Array.isArray(notice.diagnostics) || notice.diagnostics.length === 0) {
@@ -5420,6 +8673,16 @@ export default function ReportBuilder({ container, context }) {
         }
         return (
             <div className="forge-report-builder__semantic-diagnostics-list" style={{ marginTop: 10 }}>
+                {Array.isArray(notice?.metaChips) && notice.metaChips.filter(Boolean).length > 0 ? (
+                    <div className="forge-report-builder__result-meta" aria-label="Export failure summary" style={{ marginBottom: 10 }}>
+                        {notice.metaChips.filter(Boolean).map((chip) => (
+                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                        ))}
+                    </div>
+                ) : null}
+                {renderSemanticBindingChips(notice, { marginBottom: 10 })}
+                {renderSemanticBindingFieldGroups(notice, { marginBottom: 10 })}
+                {renderScopeSummaryItems(notice, { marginBottom: 10 })}
                 {notice.diagnostics.map((diagnostic) => (
                     <article
                         key={diagnostic.id}
@@ -5484,11 +8747,337 @@ export default function ReportBuilder({ container, context }) {
             </section>
         );
     }, []);
+    const renderSemanticBindingFieldGroups = React.useCallback((bindingState = null, {
+        marginTop = 0,
+        marginBottom = 0,
+    } = {}) => {
+        return (
+            <ReportBuilderSemanticFieldGroups
+                bindingState={bindingState}
+                marginTop={marginTop}
+                marginBottom={marginBottom}
+            />
+        );
+    }, []);
+    const renderSemanticBindingChips = React.useCallback((bindingState = null, {
+        marginTop = 0,
+        marginBottom = 0,
+    } = {}) => {
+        return (
+            <ReportBuilderSemanticBindingChips
+                bindingState={bindingState}
+                marginTop={marginTop}
+                marginBottom={marginBottom}
+            />
+        );
+    }, []);
+    const renderScopeSummaryItems = React.useCallback((summaryState = null, {
+        marginTop = 0,
+        marginBottom = 0,
+    } = {}) => {
+        return (
+            <ReportBuilderScopeSummary
+                summaryState={summaryState}
+                marginTop={marginTop}
+                marginBottom={marginBottom}
+            />
+        );
+    }, []);
+    const renderReopenSourceResolution = React.useCallback((summaryState = null, {
+        marginTop = 0,
+        marginBottom = 0,
+    } = {}) => {
+        const title = String(summaryState?.reopenSourceResolutionTitle || "").trim();
+        const text = String(summaryState?.reopenSourceResolutionText || "").trim();
+        const sources = Array.isArray(summaryState?.reopenSourceResolutionSources)
+            ? summaryState.reopenSourceResolutionSources.filter(Boolean)
+            : [];
+        if (!title && !text && sources.length === 0) {
+            return null;
+        }
+        return (
+            <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
+                {title ? (
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                        {title}
+                    </div>
+                ) : null}
+                {text ? (
+                    <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                        {text}
+                    </div>
+                ) : null}
+                {sources.length > 0 ? (
+                    <div style={{ display: "grid", gap: 4 }}>
+                        {sources.map((entry) => {
+                            const entryLabel = String(entry?.label || "").trim();
+                            const entryValue = String(entry?.value || "").trim();
+                            if (!entryLabel && !entryValue) {
+                                return null;
+                            }
+                            return (
+                                <div
+                                    key={String(entry?.id || entryLabel || entryValue)}
+                                    style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}
+                                >
+                                    {entryLabel ? <strong>{entryLabel}:</strong> : null}
+                                    {entryValue ? <span>{entryValue}</span> : null}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : null}
+            </div>
+        );
+    }, []);
+    const renderShareableArtifactState = React.useCallback((summaryState = null, {
+        marginTop = 0,
+        marginBottom = 0,
+    } = {}) => {
+        const viewState = buildReportBuilderShareableArtifactViewState(summaryState);
+        if (!viewState) {
+            return null;
+        }
+        const title = String(viewState?.shareableTitle || "").trim();
+        const text = String(viewState?.shareableText || "").trim();
+        const rows = Array.isArray(viewState?.shareableRows) ? viewState.shareableRows.filter(Boolean) : [];
+        const chips = Array.isArray(viewState?.shareableMetaChips) ? viewState.shareableMetaChips.filter(Boolean) : [];
+        const diagnostics = Array.isArray(viewState?.shareableDiagnostics) ? viewState.shareableDiagnostics.filter(Boolean) : [];
+        return (
+            <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
+                {title ? (
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                        {title}
+                    </div>
+                ) : null}
+                {text ? (
+                    <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                        {text}
+                    </div>
+                ) : null}
+                {chips.length > 0 ? (
+                    <div className="forge-report-builder__result-meta" aria-label="Governance summary">
+                        {chips.map((chip) => (
+                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                        ))}
+                    </div>
+                ) : null}
+                {viewState?.shareableNotice ? (
+                    <ReportBuilderInlineNotice
+                        notice={{
+                            level: String(viewState.shareableNotice.level || "info").trim() || "info",
+                            message: String(viewState.shareableNotice.message || "").trim(),
+                        }}
+                    />
+                ) : null}
+                {rows.length > 0 ? (
+                    <div style={{ display: "grid", gap: 4 }}>
+                        {rows.map((row) => (
+                            <div key={String(row?.id || row?.label || row?.value)} style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                                {String(row?.label || "").trim() ? <strong>{String(row.label).trim()}:</strong> : null}
+                                {String(row?.value || "").trim() ? <span>{String(row.value).trim()}</span> : null}
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
+                {diagnostics.length > 0 ? (
+                    <div className="forge-report-builder__semantic-diagnostics-list">
+                        {diagnostics.map((diagnostic) => (
+                            <article
+                                key={String(diagnostic?.code || diagnostic?.message)}
+                                className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${String(diagnostic?.severity || "warning").trim() || "warning"}`}
+                            >
+                                <div className="forge-report-builder__semantic-diagnostic-meta">
+                                    {String(diagnostic?.code || "").trim() ? (
+                                        <span className="forge-report-builder__semantic-diagnostic-chip">{String(diagnostic.code).trim()}</span>
+                                    ) : null}
+                                </div>
+                                <div className="forge-report-builder__semantic-diagnostic-message">{String(diagnostic?.message || "").trim()}</div>
+                            </article>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+        );
+    }, []);
+    const renderAuthoredDocumentProgress = React.useCallback((summaryState = null, {
+        marginTop = 0,
+    } = {}) => {
+        const authoredSummaryText = String(summaryState?.authoredBlockSummaryText || "").trim();
+        const drillSummaryText = String(summaryState?.drillSummaryText || "").trim();
+        if (!authoredSummaryText && !drillSummaryText) {
+            return null;
+        }
+        return (
+            <div style={{ display: "grid", gap: 8, marginTop }}>
+                {authoredSummaryText ? (
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            Authored Blocks
+                        </div>
+                        <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                            {authoredSummaryText}
+                        </div>
+                    </div>
+                ) : null}
+                {drillSummaryText ? (
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            Drill Navigation
+                        </div>
+                        <div style={{ fontSize: 12, color: "#4b5d6b", lineHeight: 1.5 }}>
+                            {drillSummaryText}
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+        );
+    }, []);
+    const renderChartApplyFeedbackNotice = ({
+        compact = false,
+        onAction = undefined,
+    } = {}) => {
+        if (!chartApplyFeedback?.message) {
+            return null;
+        }
+        const metaChips = Array.isArray(chartApplyFeedback?.metaChips)
+            ? chartApplyFeedback.metaChips.filter(Boolean)
+            : [];
+        return (
+            <ReportBuilderInlineNotice
+                notice={{
+                    level: chartApplyFeedback.level || "warning",
+                    message: chartApplyFeedback.message,
+                    actionLabel: !compact && chartApplyFeedback.action === "runReport" && typeof onAction === "function"
+                        ? "Run now"
+                        : "",
+                }}
+                onAction={!compact && chartApplyFeedback.action === "runReport" && typeof onAction === "function" ? onAction : null}
+            >
+                {metaChips.length > 0 ? (
+                    <div className="forge-report-builder__result-meta" aria-label="Feedback summary" style={{ marginTop: 8 }}>
+                        {metaChips.map((chip) => (
+                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                        ))}
+                    </div>
+                ) : null}
+                {renderSemanticBindingChips(chartApplyFeedback, { marginTop: 8 })}
+                {renderSemanticBindingFieldGroups(chartApplyFeedback, { marginTop: 10 })}
+                {renderScopeSummaryItems(chartApplyFeedback, { marginTop: 10 })}
+            </ReportBuilderInlineNotice>
+        );
+    };
+    const renderExportJobPanelNotice = React.useCallback((panelState = null, {
+        refreshStatus = null,
+        downloadArtifact = null,
+        failureNotice = null,
+    } = {}) => {
+        if (!panelState) {
+            return null;
+        }
+        const metaChips = Array.isArray(panelState?.metaChips)
+            ? panelState.metaChips.filter(Boolean)
+            : [];
+        return (
+            <ReportBuilderInlineNotice
+                notice={{
+                    level: panelState.tone || "info",
+                    message: `${panelState.label}: ${panelState.title}`,
+                }}
+            >
+                {panelState.error ? (
+                    <div style={{ marginTop: 4, color: "#486579" }}>
+                        {panelState.error}
+                    </div>
+                ) : null}
+                {renderSemanticBindingChips(panelState, { marginTop: 10 })}
+                {renderSemanticBindingFieldGroups(panelState, { marginTop: 10 })}
+                {renderScopeSummaryItems(panelState, { marginTop: 10 })}
+                <div className="forge-report-builder__result-header-actions">
+                    {metaChips.map((chip) => (
+                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                    ))}
+                    <Button
+                        small
+                        minimal
+                        disabled={panelState.refreshDisabled || typeof refreshStatus !== "function"}
+                        onClick={refreshStatus || undefined}
+                    >
+                        {panelState.refreshLabel}
+                    </Button>
+                    <Button
+                        small
+                        minimal
+                        disabled={panelState.downloadDisabled || typeof downloadArtifact !== "function"}
+                        onClick={downloadArtifact || undefined}
+                    >
+                        {panelState.downloadLabel}
+                    </Button>
+                </div>
+                {renderExportFailureDiagnostics(failureNotice)}
+            </ReportBuilderInlineNotice>
+        );
+    }, [renderExportFailureDiagnostics, renderScopeSummaryItems, renderSemanticBindingChips, renderSemanticBindingFieldGroups]);
+    const renderInspectorNoticePanel = React.useCallback((panelState = null, {
+        ariaLabel = "",
+        hide = null,
+        hideLabel = "",
+        download = null,
+        downloadLabel = "",
+        includeSemanticBindingChips = false,
+        metaChips = null,
+        level = "info",
+        detailColor = "",
+        contentStyle = null,
+        content = "",
+    } = {}) => {
+        if (!panelState) {
+            return null;
+        }
+        const resolvedDetailColor = String(detailColor || "").trim()
+            || (String(level || "info").trim() === "warning" ? "#5f3411" : "#486579");
+        return (
+            <ReportBuilderInspectorNotice
+                level={level}
+                ariaLabel={ariaLabel}
+                metaChips={Array.isArray(metaChips) ? metaChips : (panelState.metaChips || [])}
+                actions={(
+                    <>
+                        <Button small minimal onClick={hide || undefined}>
+                            {hideLabel}
+                        </Button>
+                        <Button small minimal onClick={download || undefined}>
+                            {downloadLabel}
+                        </Button>
+                    </>
+                )}
+                content={String(content || panelState.content || "")}
+                contentStyle={contentStyle}
+            >
+                {includeSemanticBindingChips ? renderSemanticBindingChips(panelState, { marginBottom: 10 }) : null}
+                {renderSemanticBindingFieldGroups(panelState, { marginBottom: 10 })}
+                {renderScopeSummaryItems(panelState, { marginBottom: 10 })}
+                {renderReopenSourceResolution(panelState, { marginBottom: 10 })}
+                {renderShareableArtifactState(panelState, { marginBottom: 10 })}
+                {renderAuthoredDocumentProgress(panelState)}
+                {panelState?.headerSubtitle ? (
+                    <div style={{ marginBottom: 8, fontSize: 12, color: resolvedDetailColor }}>
+                        {panelState.headerSubtitle}
+                    </div>
+                ) : null}
+                {panelState?.headerDescription ? (
+                    <div style={{ marginBottom: 8, fontSize: 12, color: resolvedDetailColor }}>
+                        {panelState.headerDescription}
+                    </div>
+                ) : null}
+            </ReportBuilderInspectorNotice>
+        );
+    }, [renderReopenSourceResolution, renderScopeSummaryItems, renderSemanticBindingChips, renderSemanticBindingFieldGroups, renderShareableArtifactState]);
     const prepareCreateReportDocumentPayload = React.useCallback(() => {
         if (!reportDocumentPayloadCompileValidation.valid) {
             setChartApplyFeedback({
                 level: "warning",
-                message: reportDocumentPayloadCompileValidation.message || "Resolve authored block validation issues before preparing the createReportDocument payload.",
+                message: reportDocumentPayloadCompileValidation.message || "Resolve authored block validation issues before preparing the create request.",
             });
             return;
         }
@@ -5502,18 +9091,19 @@ export default function ReportBuilder({ container, context }) {
                 config: semanticDisplayConfig,
                 state,
                 semanticSummary: resolvedSemanticSummary,
+                semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
             })
             : buildReportBuilderCreateReportDocumentPayload(savedReportPayload);
         if (!payload) {
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the createReportDocument payload. Confirm the saved report payload is available.",
+                message: "Could not prepare the create request. Confirm the saved report file is available.",
             });
             return;
         }
         setCreateReportDocumentPayload(payload);
-        setCreateReportDocumentPayloadOpen(true);
+        setCreateReportDocumentPayloadOpen(false);
         setSavedReportPayloadOpen(false);
         setReopenReportDocumentDiagnostic(null);
         setReopenReportDocumentDiagnosticOpen(false);
@@ -5527,11 +9117,19 @@ export default function ReportBuilder({ container, context }) {
         setUpdateReportDocumentCurrentVersionDraft("");
         setUpdateReportDocumentConflictDiagnostic(null);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.createReportDocumentPayload]: PREPARED_API_ARTIFACT_HANDOFF_ORIGIN,
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            [PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse]: "",
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: "",
+            [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload]: "",
+            [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentConflictDiagnostic]: "",
+        });
         setChartApplyFeedback({
             level: "success",
-            message: `Prepared createReportDocument payload ${payload.title || "Report"}.`,
+            message: `Prepared create request ${payload.title || "Report"}. Review or download it when needed.`,
         });
-    }, [container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, resolvedSemanticSummary, savedReportPayload, semanticDisplayConfig, state]);
+    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state]);
     const downloadCreateReportDocumentPayload = React.useCallback(() => {
         const descriptor = buildReportBuilderCreateReportDocumentPayloadDownload(createReportDocumentPayload);
         if (!descriptor) {
@@ -5558,6 +9156,7 @@ export default function ReportBuilder({ container, context }) {
                 config: semanticDisplayConfig,
                 state,
                 semanticSummary: resolvedSemanticSummary,
+                semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 documentVersion: reportDocumentVersionDraft,
             })
@@ -5567,12 +9166,12 @@ export default function ReportBuilder({ container, context }) {
         if (!response) {
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the getReportDocument response. Confirm the saved report payload and document version are both available.",
+                message: "Could not prepare the reopen bundle. Confirm the saved report file and document version are both available.",
             });
             return;
         }
         setGetReportDocumentResponse(response);
-        setGetReportDocumentResponseOpen(true);
+        setGetReportDocumentResponseOpen(false);
         setReopenReportDocumentDiagnostic(null);
         setReopenReportDocumentDiagnosticOpen(false);
         setListReportDocumentsResponse(null);
@@ -5584,11 +9183,16 @@ export default function ReportBuilder({ container, context }) {
         setCreateReportDocumentPayloadOpen(false);
         setUpdateReportDocumentPayloadOpen(false);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: PREPARED_API_ARTIFACT_HANDOFF_ORIGIN,
+            [PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse]: "",
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: "",
+        });
         setChartApplyFeedback({
             level: "success",
-            message: `Prepared getReportDocument response for ${response.document?.title || response.reportRef?.reportId || "Report"}.`,
+            message: `Prepared reopen bundle for ${response.document?.title || response.reportRef?.reportId || "Report"}. Review or download it when needed.`,
         });
-    }, [container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, resolvedSemanticSummary, savedReportPayload, semanticDisplayConfig, state]);
+    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state]);
     const reopenGetReportDocumentResponse = React.useCallback(() => {
         const hydrated = buildHydratedReportBuilderDocument(getReportDocumentResponse, {
             container,
@@ -5597,6 +9201,7 @@ export default function ReportBuilder({ container, context }) {
                 stateKey,
                 dataSourceRef: builderContext?.identity?.dataSourceRef || container?.dataSourceRef,
             },
+            localSavedPayloads: localSavedReportRecords,
         });
         if (!hydrated.valid) {
             setGetReportDocumentResponseOpen(false);
@@ -5615,9 +9220,17 @@ export default function ReportBuilder({ container, context }) {
             if (diagnostic) {
                 setReopenReportDocumentDiagnostic(diagnostic);
                 setReopenReportDocumentDiagnosticOpen(true);
+                applyPreparedApiArtifactOrigins({
+                    [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: normalizeString(
+                        preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse],
+                    ),
+                });
             } else {
                 setReopenReportDocumentDiagnostic(null);
                 setReopenReportDocumentDiagnosticOpen(false);
+                applyPreparedApiArtifactOrigins({
+                    [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: "",
+                });
             }
             setChartApplyFeedback({
                 level: "warning",
@@ -5656,7 +9269,7 @@ export default function ReportBuilder({ container, context }) {
             level: "success",
             message: `Reopened ReportDocument ${hydrated.title || hydrated.reportId || "Report"} for editing.`,
         });
-    }, [builderContext?.identity?.dataSourceRef, config, container, getReportDocumentResponse, hydratedReportDocumentSession, persistStateWithConfig, state, stateKey]);
+    }, [applyPreparedApiArtifactOrigins, builderContext?.identity?.dataSourceRef, config, container, getReportDocumentResponse, hydratedReportDocumentSession, localSavedReportRecords, persistStateWithConfig, preparedApiArtifactOrigins, state, stateKey]);
     const downloadGetReportDocumentResponse = React.useCallback(() => {
         const descriptor = buildReportBuilderReportDocumentReadResponseDownload(getReportDocumentResponse, {
             fallbackName: "get-report-document-response",
@@ -5714,6 +9327,7 @@ export default function ReportBuilder({ container, context }) {
                 config: semanticDisplayConfig,
                 state,
                 semanticSummary: resolvedSemanticSummary,
+                semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 documentVersion: reportDocumentVersionDraft,
                 cursor: "next-page",
@@ -5740,18 +9354,18 @@ export default function ReportBuilder({ container, context }) {
             setReopenReportDocumentDiagnosticOpen(false);
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the listReportDocuments response. Confirm the saved report payload and document version are both available.",
+                message: "Could not prepare the catalog response. Confirm the saved report file and document version are both available.",
             });
             return;
         }
         setListReportDocumentsResponse(response);
-        setListReportDocumentsResponseOpen(true);
+        setListReportDocumentsResponseOpen(false);
         setReopenReportDocumentDiagnostic(null);
         setReopenReportDocumentDiagnosticOpen(false);
         setGetReportDocumentResponse(null);
         setGetReportDocumentResponseOpen(false);
         setListReportDocumentsSelectedReportId(
-            String(response?.entries?.[0]?.reportRef?.reportId || "").trim(),
+            buildReportBuilderListReportDocumentsEntrySelectionKey(response?.entries?.[0] || null),
         );
         setGetReportDocumentRequestPayload(null);
         setGetReportDocumentRequestPayloadOpen(false);
@@ -5759,15 +9373,21 @@ export default function ReportBuilder({ container, context }) {
         setCreateReportDocumentPayloadOpen(false);
         setUpdateReportDocumentPayloadOpen(false);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse]: PREPARED_API_ARTIFACT_HANDOFF_ORIGIN,
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: "",
+        });
         setChartApplyFeedback({
             level: "success",
-            message: `Prepared listReportDocuments response with ${response.entries.length} entries.`,
+            message: `Prepared catalog response with ${response.entries.length} entries. Review or download it when needed.`,
         });
-    }, [config, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, resolvedSemanticSummary, savedReportPayload, semanticDisplayConfig, state]);
+    }, [applyPreparedApiArtifactOrigins, config, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state]);
     const downloadListReportDocumentsResponse = React.useCallback(() => {
-        const descriptor = buildReportBuilderReportDocumentReadResponseDownload(listReportDocumentsResponse, {
+        const descriptor = buildReportBuilderReportDocumentReadResponseDownload(activeListReportDocumentsResponse, {
             fallbackName: "list-report-documents-response",
             selectedReportId: listReportDocumentsSelectedReportId,
+            selectedEntryKey: listReportDocumentsSelectedReportId,
         });
         if (!descriptor) {
             return;
@@ -5781,37 +9401,64 @@ export default function ReportBuilder({ container, context }) {
         anchor.click();
         document.body.removeChild(anchor);
         URL.revokeObjectURL(url);
-    }, [listReportDocumentsResponse, listReportDocumentsSelectedReportId]);
+    }, [activeListReportDocumentsResponse, listReportDocumentsSelectedReportId]);
+    const handleListReportDocumentsSelectedReportIdChange = React.useCallback((nextReportId = "") => {
+        setListReportDocumentsSelectedReportId(nextReportId);
+        setGetReportDocumentRequestPayload(null);
+        setGetReportDocumentRequestPayloadOpen(false);
+        setGetReportDocumentResponse(null);
+        setGetReportDocumentResponseOpen(false);
+        setReopenReportDocumentDiagnostic(null);
+        setReopenReportDocumentDiagnosticOpen(false);
+        setSelectedListEntryExportRequestOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: "",
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: "",
+            [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: "",
+        });
+    }, [applyPreparedApiArtifactOrigins]);
     const prepareGetReportDocumentRequestPayload = React.useCallback(() => {
-        const request = buildReportBuilderGetReportDocumentRequest(listReportDocumentsResponse, {
+        const request = buildReportBuilderGetReportDocumentRequest(activeListReportDocumentsResponse, {
             entryReportId: listReportDocumentsSelectedReportId,
+            entrySelectionKey: listReportDocumentsSelectedReportId,
         });
         if (!request) {
+            setGetReportDocumentRequestPayload(null);
+            setGetReportDocumentRequestPayloadOpen(false);
+            setListReportDocumentsResponseOpen(false);
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the getReportDocument request. Select a valid list response entry first.",
+                message: "Could not prepare the get request. Select a valid catalog entry first.",
             });
             return;
         }
         setGetReportDocumentRequestPayload(request);
-        setGetReportDocumentRequestPayloadOpen(true);
+        setGetReportDocumentRequestPayloadOpen(false);
+        setListReportDocumentsResponseOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: normalizeString(
+                preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse],
+            ),
+        });
         setChartApplyFeedback({
             level: "success",
-            message: `Prepared getReportDocument request for ${request.reportRef?.reportId || "Report"}.`,
+            message: `Prepared get request for ${request.reportRef?.reportId || "Report"}. Review or download it when needed.`,
         });
-    }, [listReportDocumentsResponse, listReportDocumentsSelectedReportId]);
+    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, listReportDocumentsSelectedReportId, preparedApiArtifactOrigins]);
     const prepareSelectedGetReportDocumentResponseFromListEntry = React.useCallback(() => {
-        const request = buildReportBuilderGetReportDocumentRequest(listReportDocumentsResponse, {
+        const request = buildReportBuilderGetReportDocumentRequest(activeListReportDocumentsResponse, {
             entryReportId: listReportDocumentsSelectedReportId,
+            entrySelectionKey: listReportDocumentsSelectedReportId,
         });
         if (!request) {
             setGetReportDocumentRequestPayload(null);
             setGetReportDocumentRequestPayloadOpen(false);
             setGetReportDocumentResponse(null);
             setGetReportDocumentResponseOpen(false);
+            setListReportDocumentsResponseOpen(false);
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the selected getReportDocument response. Select a valid list response entry first.",
+                message: "Could not prepare the selected reopen bundle. Select a valid catalog entry first.",
             });
             return;
         }
@@ -5819,10 +9466,19 @@ export default function ReportBuilder({ container, context }) {
             hydratedReportDocumentSession,
             getReportDocumentResponse,
         });
-        const response = hydratedReportDocumentSession
+        const directSharedArtifactResponse = !listReportDocumentsResponse && selectedBackendSharedArtifactRecord
+            ? buildReportBuilderSelectedGetReportDocumentResponseFromSharedArtifact(
+                activeListReportDocumentsResponse,
+                [selectedBackendSharedArtifactRecord],
+                {
+                    request,
+                },
+            )
+            : null;
+        const response = directSharedArtifactResponse || (hydratedReportDocumentSession
             ? (
                 buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState(
-                    listReportDocumentsResponse,
+                    activeListReportDocumentsResponse,
                     payloadSeed,
                     {
                         request,
@@ -5830,11 +9486,12 @@ export default function ReportBuilder({ container, context }) {
                         config: semanticDisplayConfig,
                         state,
                         semanticSummary: resolvedSemanticSummary,
+                        semanticModel: semanticModelState.model,
                         semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                     },
                 )
                 || buildReportBuilderSelectedGetReportDocumentResponse(
-                    listReportDocumentsResponse,
+                    activeListReportDocumentsResponse,
                     localSavedReportRecords,
                     {
                         request,
@@ -5842,41 +9499,55 @@ export default function ReportBuilder({ container, context }) {
                 )
             )
             : buildReportBuilderSelectedGetReportDocumentResponse(
-                listReportDocumentsResponse,
+                activeListReportDocumentsResponse,
                 localSavedReportRecords,
                 {
                     request,
                 },
-            );
+            ));
         if (!response) {
             setGetReportDocumentRequestPayload(request);
-            setGetReportDocumentRequestPayloadOpen(true);
+            setGetReportDocumentRequestPayloadOpen(false);
             setGetReportDocumentResponse(null);
             setGetReportDocumentResponseOpen(false);
+            setListReportDocumentsResponseOpen(false);
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the selected getReportDocument response. Only entries backed by a local ReportDocument payload can be expanded locally.",
+                message: "Could not prepare the selected reopen bundle. Only entries backed by a local ReportDocument artifact can be expanded locally.",
             });
             return;
         }
         setGetReportDocumentRequestPayload(request);
-        setGetReportDocumentRequestPayloadOpen(true);
+        setGetReportDocumentRequestPayloadOpen(false);
         setGetReportDocumentResponse(response);
-        setGetReportDocumentResponseOpen(true);
+        setGetReportDocumentResponseOpen(false);
+        setListReportDocumentsResponseOpen(false);
         setReopenReportDocumentDiagnostic(null);
         setReopenReportDocumentDiagnosticOpen(false);
-        setChartApplyFeedback({
-            level: "success",
-            message: `Prepared getReportDocument response for ${response.reportRef?.reportId || response.document?.title || "Report"}.`,
+        const listResponseOrigin = normalizeString(
+            preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse],
+        );
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload]: listResponseOrigin,
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: listResponseOrigin,
         });
-    }, [container, getReportDocumentResponse, hydratedReportDocumentSession, listReportDocumentsResponse, listReportDocumentsSelectedReportId, localSavedReportRecords, resolvedSemanticSummary, savedReportPayload, semanticDisplayConfig, state]);
+        setChartApplyFeedback(
+            buildReportBuilderSelectedGetResponseFeedback({ response })
+            || {
+                level: "success",
+                message: `Prepared reopen bundle for ${response.reportRef?.reportId || response.document?.title || "Report"}. Review or download it when needed.`,
+            },
+        );
+    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, listReportDocumentsResponse, listReportDocumentsSelectedReportId, localSavedReportRecords, preparedApiArtifactOrigins, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, selectedBackendSharedArtifactRecord, semanticDisplayConfig, semanticModelState.model, state]);
     const prepareSelectedGetReportDocumentResponse = React.useCallback(() => {
         if (!getReportDocumentRequestPayload) {
+            setGetReportDocumentRequestPayloadOpen(false);
             setGetReportDocumentResponse(null);
             setGetReportDocumentResponseOpen(false);
+            setListReportDocumentsResponseOpen(false);
             setChartApplyFeedback({
                 level: "warning",
-                message: "Prepare the getReportDocument request for the selected list entry before expanding a response.",
+                message: "Prepare the get request for the selected catalog entry before expanding a reopen bundle.",
             });
             return;
         }
@@ -5884,10 +9555,19 @@ export default function ReportBuilder({ container, context }) {
             hydratedReportDocumentSession,
             getReportDocumentResponse,
         });
-        const response = hydratedReportDocumentSession
+        const directSharedArtifactResponse = !listReportDocumentsResponse && selectedBackendSharedArtifactRecord
+            ? buildReportBuilderSelectedGetReportDocumentResponseFromSharedArtifact(
+                activeListReportDocumentsResponse,
+                [selectedBackendSharedArtifactRecord],
+                {
+                    request: getReportDocumentRequestPayload,
+                },
+            )
+            : null;
+        const response = directSharedArtifactResponse || (hydratedReportDocumentSession
             ? (
                 buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState(
-                    listReportDocumentsResponse,
+                    activeListReportDocumentsResponse,
                     payloadSeed,
                     {
                         request: getReportDocumentRequestPayload,
@@ -5895,10 +9575,12 @@ export default function ReportBuilder({ container, context }) {
                         config: semanticDisplayConfig,
                         state,
                         semanticSummary: resolvedSemanticSummary,
+                        semanticModel: semanticModelState.model,
+                        semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                     },
                 )
                 || buildReportBuilderSelectedGetReportDocumentResponse(
-                    listReportDocumentsResponse,
+                    activeListReportDocumentsResponse,
                     localSavedReportRecords,
                     {
                         request: getReportDocumentRequestPayload,
@@ -5906,30 +9588,42 @@ export default function ReportBuilder({ container, context }) {
                 )
             )
             : buildReportBuilderSelectedGetReportDocumentResponse(
-                listReportDocumentsResponse,
+                activeListReportDocumentsResponse,
                 localSavedReportRecords,
                 {
                     request: getReportDocumentRequestPayload,
                 },
-            );
+            ));
         if (!response) {
+            setGetReportDocumentRequestPayloadOpen(false);
             setGetReportDocumentResponse(null);
             setGetReportDocumentResponseOpen(false);
+            setListReportDocumentsResponseOpen(false);
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the selected getReportDocument response. Only entries backed by a local ReportDocument payload can be expanded locally.",
+                message: "Could not prepare the selected reopen bundle. Only entries backed by a local ReportDocument artifact can be expanded locally.",
             });
             return;
         }
         setGetReportDocumentResponse(response);
-        setGetReportDocumentResponseOpen(true);
+        setGetReportDocumentRequestPayloadOpen(false);
+        setGetReportDocumentResponseOpen(false);
+        setListReportDocumentsResponseOpen(false);
         setReopenReportDocumentDiagnostic(null);
         setReopenReportDocumentDiagnosticOpen(false);
-        setChartApplyFeedback({
-            level: "success",
-            message: `Prepared getReportDocument response for ${response.reportRef?.reportId || response.document?.title || "Report"}.`,
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]: normalizeString(
+                preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload],
+            ),
         });
-    }, [container, getReportDocumentRequestPayload, getReportDocumentResponse, hydratedReportDocumentSession, listReportDocumentsResponse, localSavedReportRecords, resolvedSemanticSummary, savedReportPayload, semanticDisplayConfig, state]);
+        setChartApplyFeedback(
+            buildReportBuilderSelectedGetResponseFeedback({ response })
+            || {
+                level: "success",
+                message: `Prepared reopen bundle for ${response.reportRef?.reportId || response.document?.title || "Report"}. Review or download it when needed.`,
+            },
+        );
+    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, container, getReportDocumentRequestPayload, getReportDocumentResponse, hydratedReportDocumentSession, listReportDocumentsResponse, localSavedReportRecords, preparedApiArtifactOrigins, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, selectedBackendSharedArtifactRecord, semanticDisplayConfig, semanticModelState.model, state]);
     const downloadGetReportDocumentRequestPayload = React.useCallback(() => {
         const descriptor = buildReportBuilderGetReportDocumentRequestDownload(getReportDocumentRequestPayload, {
             metadata: selectedListReportDocumentsEntrySummary,
@@ -5948,36 +9642,58 @@ export default function ReportBuilder({ container, context }) {
         URL.revokeObjectURL(url);
     }, [getReportDocumentRequestPayload, selectedListReportDocumentsEntrySummary]);
     const prepareListEntryReopenDiagnostic = React.useCallback(() => {
-        const diagnostic = buildReportBuilderListReportDocumentsEntryDiagnostic(listReportDocumentsResponse, {
+        const diagnostic = buildReportBuilderListReportDocumentsEntryDiagnostic(activeListReportDocumentsResponse, {
             entryReportId: listReportDocumentsSelectedReportId,
+            entrySelectionKey: listReportDocumentsSelectedReportId,
             builderIdentity: {
                 containerId: container?.id,
                 stateKey,
                 dataSourceRef: builderContext?.identity?.dataSourceRef || container?.dataSourceRef,
             },
+            localSavedPayloads: localSavedReportRecords,
         });
         if (!diagnostic) {
             setReopenReportDocumentDiagnostic(null);
             setReopenReportDocumentDiagnosticOpen(false);
-            setChartApplyFeedback({
-                level: "info",
-                message: "The selected list entry is compatible with the current builder target.",
+            setListReportDocumentsResponseOpen(false);
+            applyPreparedApiArtifactOrigins({
+                [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: "",
             });
+            setChartApplyFeedback(
+                buildReportBuilderListEntryCompatibilityFeedback({
+                    selectedEntry: selectedListReportDocumentsEntrySummary,
+                })
+                || {
+                    level: "info",
+                    message: "The selected catalog entry is compatible with the current builder target.",
+                },
+            );
             return;
         }
         setReopenReportDocumentDiagnostic(diagnostic);
-        setReopenReportDocumentDiagnosticOpen(true);
+        setReopenReportDocumentDiagnosticOpen(false);
         setListReportDocumentsResponseOpen(false);
-        setChartApplyFeedback({
-            level: "warning",
-            message: `Prepared reopen diagnostic for ${diagnostic.title || diagnostic.reportRef?.reportId || "Report"}.`,
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.reopenReportDocumentDiagnostic]: normalizeString(
+                preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.listReportDocumentsResponse],
+            ),
         });
-    }, [builderContext?.identity?.dataSourceRef, container?.dataSourceRef, container?.id, listReportDocumentsResponse, listReportDocumentsSelectedReportId, stateKey]);
+        setChartApplyFeedback(
+            buildReportBuilderListEntryCompatibilityFeedback({
+                selectedEntry: selectedListReportDocumentsEntrySummary,
+                diagnostic,
+            })
+            || {
+                level: "warning",
+                message: `Prepared reopen diagnostic for ${diagnostic.title || diagnostic.reportRef?.reportId || "Report"}. Review or download it when needed.`,
+            },
+        );
+    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, builderContext?.identity?.dataSourceRef, container?.dataSourceRef, container?.id, listReportDocumentsSelectedReportId, localSavedReportRecords, preparedApiArtifactOrigins, selectedListReportDocumentsEntrySummary, stateKey]);
     const prepareUpdateReportDocumentPayload = React.useCallback(() => {
         if (!reportDocumentPayloadCompileValidation.valid) {
             setChartApplyFeedback({
                 level: "warning",
-                message: reportDocumentPayloadCompileValidation.message || "Resolve authored block validation issues before preparing the updateReportDocument payload.",
+                message: reportDocumentPayloadCompileValidation.message || "Resolve authored block validation issues before preparing the update request.",
             });
             return;
         }
@@ -5991,6 +9707,7 @@ export default function ReportBuilder({ container, context }) {
                 config: semanticDisplayConfig,
                 state,
                 semanticSummary: resolvedSemanticSummary,
+                semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 expectedVersion: updateReportDocumentExpectedVersionDraft,
             })
@@ -6000,21 +9717,25 @@ export default function ReportBuilder({ container, context }) {
         if (!payload) {
             setChartApplyFeedback({
                 level: "warning",
-                message: "Could not prepare the updateReportDocument payload. Confirm the saved report payload and expected version are both available.",
+                message: "Could not prepare the update request. Confirm the saved report file and expected version are both available.",
             });
             return;
         }
         setUpdateReportDocumentPayload(payload);
-        setUpdateReportDocumentPayloadOpen(true);
+        setUpdateReportDocumentPayloadOpen(false);
         setCreateReportDocumentPayloadOpen(false);
         setSavedReportPayloadOpen(false);
         setUpdateReportDocumentConflictDiagnostic(null);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload]: PREPARED_API_ARTIFACT_HANDOFF_ORIGIN,
+            [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentConflictDiagnostic]: "",
+        });
         setChartApplyFeedback({
             level: "success",
-            message: `Prepared updateReportDocument payload ${payload.title || "Report"} at version ${payload.expectedVersion}.`,
+            message: `Prepared update request ${payload.title || "Report"} at version ${payload.expectedVersion}. Review or download it when needed.`,
         });
-    }, [container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, resolvedSemanticSummary, savedReportPayload, semanticDisplayConfig, state, updateReportDocumentExpectedVersionDraft]);
+    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state, updateReportDocumentExpectedVersionDraft]);
     const downloadUpdateReportDocumentPayload = React.useCallback(() => {
         const descriptor = buildReportBuilderUpdateReportDocumentPayloadDownload(updateReportDocumentPayload);
         if (!descriptor) {
@@ -6044,11 +9765,16 @@ export default function ReportBuilder({ container, context }) {
         setUpdateReportDocumentConflictDiagnostic(diagnostic);
         setUpdateReportDocumentConflictDiagnosticOpen(true);
         setUpdateReportDocumentPayloadOpen(false);
+        applyPreparedApiArtifactOrigins({
+            [PREPARED_API_ARTIFACT_KEYS.updateReportDocumentConflictDiagnostic]: normalizeString(
+                preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload],
+            ),
+        });
         setChartApplyFeedback({
             level: "warning",
             message: `Prepared update conflict diagnostic for ${diagnostic.title || "Report"}.`,
         });
-    }, [updateReportDocumentCurrentVersionDraft, updateReportDocumentPayload]);
+    }, [applyPreparedApiArtifactOrigins, preparedApiArtifactOrigins, updateReportDocumentCurrentVersionDraft, updateReportDocumentPayload]);
     const downloadUpdateReportDocumentConflictDiagnostic = React.useCallback(() => {
         const descriptor = buildReportBuilderUpdateReportDocumentConflictDiagnosticDownload(updateReportDocumentConflictDiagnostic);
         if (!descriptor) {
@@ -6504,71 +10230,183 @@ export default function ReportBuilder({ container, context }) {
             console.error("reportBuilder lookup failed", e);
         }
     };
-    const renderRuntimePreview = () => {
-        if (!runtimePreviewEnabled) {
+    const renderImportedRuntimePreview = () => {
+        if (!importedPipelinePreviewPanelState || !importedPipelineSummary || !importedPipelineRuntimeArtifact || !importedPipelineRuntimeConfig) {
             return null;
         }
-        const runtimeConfig = runtimePreviewArtifact?.runtimeBlock?.dashboard?.reportRuntime || null;
-        const runtimePrimaryDataset = Array.isArray(runtimeConfig?.reportFill?.datasets)
-            ? (runtimeConfig.reportFill.datasets.find((dataset) => String(dataset?.id || "").trim() === "primary")
-                || runtimeConfig.reportFill.datasets[0]
-                || null)
-            : null;
-        const hasRuntimeRows = Array.isArray(runtimePrimaryDataset?.rows)
-            && runtimePrimaryDataset.rows.length > 0;
+        return (
+            <section
+                className="forge-report-builder__runtime-preview"
+                aria-label="Imported runtime preview"
+            >
+                <div className="forge-report-builder__runtime-preview-header">
+                    <div className="forge-report-builder__runtime-preview-eyebrow">{importedPipelinePreviewPanelState.eyebrow}</div>
+                    <h4 className="forge-report-builder__runtime-preview-title">
+                        {importedPipelinePreviewPanelState.title}
+                    </h4>
+                    <p className="forge-report-builder__runtime-preview-description">
+                        {importedPipelinePreviewPanelState.description}
+                    </p>
+                    {renderSemanticBindingChips(importedPipelinePreviewPanelState, { marginTop: 8 })}
+                    {renderSemanticBindingFieldGroups(importedPipelinePreviewPanelState, { marginTop: 10 })}
+                    {renderScopeSummaryItems(importedPipelinePreviewPanelState, { marginTop: 10 })}
+                    {renderAuthoredDocumentProgress(importedPipelinePreviewPanelState, { marginTop: 10 })}
+                </div>
+                <ReportBuilderSummaryNotice
+                    level={importedPipelinePreviewPanelState.summaryNotice?.tone || "info"}
+                    label={importedPipelinePreviewPanelState.summaryLabel}
+                    value={importedPipelinePreviewPanelState.summaryValue}
+                    subtitle={importedPipelinePreviewPanelState.sourceFileLine}
+                    description={importedPipelinePreviewPanelState.compatibilityMessage}
+                    supplemental={importedPipelinePreviewPanelState.summaryNotice?.templateLabel || importedPipelinePreviewPanelState.summaryNotice?.templateConflictMessage ? (
+                        <>
+                            {importedPipelinePreviewPanelState.summaryNotice?.templateLabel ? (
+                                <span><strong>Template:</strong> {importedPipelinePreviewPanelState.summaryNotice.templateLabel}</span>
+                            ) : null}
+                            {importedPipelinePreviewPanelState.summaryNotice?.templateConflictMessage ? (
+                                <span>{importedPipelinePreviewPanelState.summaryNotice.templateConflictMessage}</span>
+                            ) : null}
+                        </>
+                    ) : null}
+                    footer={(
+                        <div className="forge-report-builder__result-header-actions">
+                            {importedPipelinePreviewPanelState.metaChips.map((chip) => (
+                                <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                            ))}
+                            {importedPipelinePreviewPanelState.attachAction ? (
+                                importedPipelinePreviewPanelState.attachAction.mode === "detach" ? (
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => setImportedPipelineCompanionFillAttached(false)}
+                                    >
+                                        {importedPipelinePreviewPanelState.attachAction.label}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        small
+                                        minimal
+                                        disabled={importedPipelinePreviewPanelState.attachAction.disabled}
+                                        onClick={() => setImportedPipelineCompanionFillAttached(true)}
+                                    >
+                                        {importedPipelinePreviewPanelState.attachAction.label}
+                                    </Button>
+                                )
+                            ) : null}
+                            {importedPipelinePreviewPanelState.inspectActions.map((action) => (
+                                <Button key={action.section} small minimal onClick={() => toggleImportedPipelineInspectorSection(action.section)}>
+                                    {action.label}
+                                </Button>
+                            ))}
+                            {importedPipelineExportActionState ? (
+                                <>
+                                    <Button
+                                        small
+                                        minimal
+                                        disabled={importedPipelineExportActionState.submitDisabled}
+                                        onClick={triggerImportedPipelineExport}
+                                    >
+                                        {importedPipelineExportActionState.submitLabel}
+                                    </Button>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => setImportedPipelineExportRequestOpen((current) => !current)}
+                                    >
+                                        {importedPipelineExportActionState.inspectLabel}
+                                    </Button>
+                                </>
+                            ) : (
+                                <span className="forge-report-builder__result-meta-chip">No export snapshot</span>
+                            )}
+                            <Button small minimal onClick={hideImportedPipelinePreview}>
+                                {importedPipelinePreviewPanelState.hideLabel}
+                            </Button>
+                        </div>
+                    )}
+                />
+                {renderInspectorNoticePanel(importedPipelineInspector, {
+                    ariaLabel: "Imported artifact summary",
+                    hide: () => setImportedPipelineInspectorSection(""),
+                    hideLabel: importedPipelineInspector?.label ? `Hide ${importedPipelineInspector.label}` : "Hide imported artifact",
+                    download: downloadImportedPipelineInspector,
+                    downloadLabel: importedPipelineInspector?.label ? `Download ${importedPipelineInspector.label}` : "Download imported artifact",
+                    includeSemanticBindingChips: true,
+                    metaChips: [
+                        importedPipelineInspector?.label || "",
+                        importedPipelineSummary?.title || "",
+                        importedPipelineSummary?.fileName || "",
+                    ].filter(Boolean),
+                })}
+                {renderInspectorNoticePanel(importedPipelineExportRequestPanelState, {
+                    ariaLabel: "Imported export request summary",
+                    hide: () => setImportedPipelineExportRequestOpen(false),
+                    hideLabel: importedPipelineExportRequestPanelState?.hideLabel || "",
+                    download: downloadImportedPipelineExportRequest,
+                    downloadLabel: importedPipelineExportRequestPanelState?.downloadLabel || "",
+                    includeSemanticBindingChips: true,
+                })}
+                    {renderExportJobPanelNotice(importedPipelineExportJobPanelState, {
+                        refreshStatus: refreshImportedPipelineExportStatus,
+                        downloadArtifact: downloadImportedPipelineExportArtifact,
+                        failureNotice: importedPipelineExportFailureNotice,
+                    })}
+                <ReportRuntime
+                    reportSpec={importedPipelineRuntimeConfig.reportSpec}
+                    reportDocument={importedPipelineRuntimeArtifact?.document || null}
+                    reportFill={importedPipelineRuntimeConfig.reportFill}
+                    title={importedPipelineRuntimeArtifact?.runtimeBlock?.title || ""}
+                    subtitle={importedPipelineRuntimeArtifact?.runtimeBlock?.subtitle || ""}
+                    locale={locale}
+                    hostIntent={importedPipelineRuntimeConfig.hostIntent}
+                />
+            </section>
+        );
+    };
+    const renderRuntimePreview = () => {
+        if (!authoredRuntimePreviewState) {
+            return null;
+        }
         return (
             <section
                 className="forge-report-builder__runtime-preview"
                 aria-label="Authored runtime preview"
             >
-                <div className="forge-report-builder__runtime-preview-header">
-                    <div className="forge-report-builder__runtime-preview-eyebrow">Authored Runtime</div>
-                    <h4 className="forge-report-builder__runtime-preview-title">
-                        {runtimePreviewArtifact?.document?.title || "Compiled Runtime Preview"}
-                    </h4>
-                    {runtimePreviewArtifact?.document?.subtitle ? (
-                        <div className="forge-report-builder__runtime-preview-description">
-                            {runtimePreviewArtifact.document.subtitle}
-                        </div>
-                    ) : null}
-                    <p className="forge-report-builder__runtime-preview-description">
-                        {runtimePreviewArtifact?.document?.description
-                            || "Refine the current builder result through the compiled ReportDocument, ReportSpec, and ReportFill flow."}
-                    </p>
-                </div>
-                {runtimePreviewRowsSource.loading && !hasRuntimeRows ? (
+                <ReportBuilderAuthoredRuntimePreviewHeader state={authoredRuntimePreviewState} />
+                {authoredRuntimePreviewState.loadingState ? (
                     <ReportBuilderResultState
-                        icon="refresh"
-                        eyebrow="Runtime preview"
-                        title="Refreshing authored runtime"
-                        description="Executing the compiled runtime request for the current builder state."
+                        icon={authoredRuntimePreviewState.loadingState.icon}
+                        eyebrow={authoredRuntimePreviewState.loadingState.eyebrow}
+                        title={authoredRuntimePreviewState.loadingState.title}
+                        description={authoredRuntimePreviewState.loadingState.description}
+                        animated={authoredRuntimePreviewState.loadingState.animated}
                     />
                 ) : null}
-                {!canRunReport && !runtimePreviewRowsSource.loading ? (
+                {authoredRuntimePreviewState.blockedState ? (
                     <div>
                         <ReportBuilderResultState
-                            tone={runtimePreviewBlockedState?.tone || "neutral"}
-                            icon={runtimePreviewBlockedState?.icon || "filter-list"}
-                            eyebrow={runtimePreviewBlockedState?.eyebrow || "Runtime preview"}
-                            title={runtimePreviewBlockedState?.title || "Compile the authored runtime preview"}
-                            description={runtimePreviewBlockedState?.description || "Complete the required scope and filters to compile the authored runtime preview."}
-                            actionLabel={runtimePreviewBlockedState?.actionLabel || ""}
-                            onAction={runtimePreviewBlockedState?.action === "retrySemanticValidation" ? retrySemanticValidation : undefined}
+                            tone={authoredRuntimePreviewState.blockedState?.tone || "neutral"}
+                            icon={authoredRuntimePreviewState.blockedState?.icon || "filter-list"}
+                            eyebrow={authoredRuntimePreviewState.blockedState?.eyebrow || "Runtime preview"}
+                            title={authoredRuntimePreviewState.blockedState?.title || "Compile the authored runtime preview"}
+                            description={authoredRuntimePreviewState.blockedState?.description || "Complete the required scope and filters to compile the authored runtime preview."}
+                            actionLabel={authoredRuntimePreviewState.blockedState?.actionLabel || ""}
+                            onAction={resolveReadinessActionHandler(authoredRuntimePreviewState.blockedState?.action)}
                         />
-                        {Array.isArray(runtimePreviewBlockedState?.diagnostics) && runtimePreviewBlockedState.diagnostics.length > 0 ? (
-                            <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${runtimePreviewBlockedState.tone === "error" ? "danger" : (runtimePreviewBlockedState.tone || "warning")}`} style={{ marginTop: 12 }}>
-                                {runtimePreviewBlockedState.diagnosticsTitle || runtimePreviewBlockedState.diagnosticsDescription ? (
+                        {Array.isArray(authoredRuntimePreviewState.blockedState?.diagnostics) && authoredRuntimePreviewState.blockedState.diagnostics.length > 0 ? (
+                            <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${authoredRuntimePreviewState.blockedState.tone === "error" ? "danger" : (authoredRuntimePreviewState.blockedState.tone || "warning")}`} style={{ marginTop: 12 }}>
+                                {authoredRuntimePreviewState.blockedState.diagnosticsTitle || authoredRuntimePreviewState.blockedState.diagnosticsDescription ? (
                                     <div className="forge-report-builder__semantic-diagnostics-header">
-                                        {runtimePreviewBlockedState.diagnosticsTitle ? (
-                                            <div className="forge-report-builder__semantic-diagnostics-title">{runtimePreviewBlockedState.diagnosticsTitle}</div>
+                                        {authoredRuntimePreviewState.blockedState.diagnosticsTitle ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-title">{authoredRuntimePreviewState.blockedState.diagnosticsTitle}</div>
                                         ) : null}
-                                        {runtimePreviewBlockedState.diagnosticsDescription ? (
-                                            <div className="forge-report-builder__semantic-diagnostics-description">{runtimePreviewBlockedState.diagnosticsDescription}</div>
+                                        {authoredRuntimePreviewState.blockedState.diagnosticsDescription ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-description">{authoredRuntimePreviewState.blockedState.diagnosticsDescription}</div>
                                         ) : null}
                                     </div>
                                 ) : null}
                                 <div className="forge-report-builder__semantic-diagnostics-list">
-                                    {runtimePreviewBlockedState.diagnostics.map((diagnostic) => (
+                                    {authoredRuntimePreviewState.blockedState.diagnostics.map((diagnostic) => (
                                         <article
                                             key={diagnostic.id}
                                             className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
@@ -6588,23 +10426,24 @@ export default function ReportBuilder({ container, context }) {
                         ) : null}
                     </div>
                 ) : null}
-                {!runtimePreviewRowsSource.loading && runtimePreviewRowsSource.error && !hasRuntimeRows ? (
+                {authoredRuntimePreviewState.errorState ? (
                     <ReportBuilderResultState
-                        tone="error"
-                        icon="warning-sign"
-                        eyebrow="Runtime preview"
-                        title="We couldn't compile these runtime results"
-                        description={renderReportBuilderError(runtimePreviewRowsSource.error)}
+                        tone={authoredRuntimePreviewState.errorState.tone}
+                        icon={authoredRuntimePreviewState.errorState.icon}
+                        eyebrow={authoredRuntimePreviewState.errorState.eyebrow}
+                        title={authoredRuntimePreviewState.errorState.title}
+                        description={authoredRuntimePreviewState.errorState.description}
                     />
                 ) : null}
-                {runtimeConfig && (canRunReport || (readiness.reason === "semantic" && runtimePreviewArtifactDiagnostics.length > 0)) ? (
+                {authoredRuntimePreviewState.canRenderRuntime ? (
                     <ReportRuntime
-                        reportSpec={runtimeConfig.reportSpec}
-                        reportFill={runtimeConfig.reportFill}
+                        reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
+                        reportDocument={runtimePreviewArtifact?.document || null}
+                        reportFill={authoredRuntimePreviewState.runtimeConfig.reportFill}
                         title={runtimePreviewArtifact?.runtimeBlock?.title || ""}
                         subtitle={runtimePreviewArtifact?.runtimeBlock?.subtitle || ""}
                         locale={locale}
-                        hostIntent={runtimeConfig.hostIntent}
+                        hostIntent={authoredRuntimePreviewState.runtimeConfig.hostIntent}
                         runtimeHandlers={runtimePreviewHandlers}
                     />
                 ) : null}
@@ -6629,6 +10468,14 @@ export default function ReportBuilder({ container, context }) {
         data-report-builder-chart-type={String(state.chartSpec?.type || "").trim()}
         data-report-builder-left-rail-width={compactMode ? "" : `${resolvedLeftRailWidthPercent.toFixed(2)}%`}
         data-report-builder-compact={compactMode ? "true" : "false"}>
+            <input
+                ref={importReportFileInputRef}
+                type="file"
+                accept=".json,application/json"
+                aria-label="Import report file"
+                style={{ display: "none" }}
+                onChange={importLocalReportFile}
+            />
             <div className="forge-report-builder__top">
                 {compactMode ? renderCompactHeader() : (
                     <div className="forge-report-builder__shelf">
@@ -6671,6 +10518,14 @@ export default function ReportBuilder({ container, context }) {
                                     >
                                         Export
                                     </Button>
+                                    <Button
+                                        small
+                                        outlined
+                                        icon="upload"
+                                        onClick={openImportReportFilePicker}
+                                    >
+                                        {savedArtifactViewState.loadFileLabel}
+                                    </Button>
                                 </div>
                                 {inlineToolbarRequiredFilters.length > 0 ? (
                                     <div className="forge-report-builder__toolbar-divider" aria-hidden="true" />
@@ -6680,11 +10535,15 @@ export default function ReportBuilder({ container, context }) {
                                         {inlineToolbarRequiredFilters.map((filter) => {
                                             const filterKey = String(filter.id || filter.field || "").trim();
                                             const currentValue = state?.staticFilters?.[filterKey];
+                                            const issue = semanticParameterIssuesById[filterKey] || null;
+                                            const providerDiagnostics = semanticProviderParameterDiagnosticsById[filterKey] || [];
                                             return (
                                                 <InlineStaticFilterControl
                                                     key={`inline_${filterKey}`}
                                                     filter={filter}
                                                     value={currentValue}
+                                                    issue={issue}
+                                                    providerDiagnostics={providerDiagnostics}
                                                     onToggle={(optionValue) => toggleStaticFilter(filter, optionValue)}
                                                     onDateRange={(edge, value) => setDateRangeValue(filter, edge, value)}
                                                 />
@@ -6708,21 +10567,13 @@ export default function ReportBuilder({ container, context }) {
                 )}
             </div>
 
-            {semanticStatus?.message ? (
-                <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${semanticStatus.level || "info"}`}>
-                    <span>{semanticStatus.title}: {semanticStatus.message}</span>
-                </div>
-            ) : null}
-            {semanticSelectedIssues.length > 0 && readiness.reason === "semantic" ? (
-                <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--danger">
-                    <span>Semantic selection issue: {semanticFieldValidation?.message || "Resolve semantic field issues before running the report."}</span>
-                </div>
-            ) : null}
-            {semanticSelectedIssues.length === 0 && readiness.reason === "semantic" && readiness.message && semanticStatus?.level === "info" ? (
-                <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${semanticSelectionValidationState.error || semanticSelectionValidationState.valid === false ? "danger" : "info"}`}>
-                    <span>Semantic validation: {readiness.message}</span>
-                </div>
-            ) : null}
+            {semanticInlineNotices.map((notice, index) => (
+                <ReportBuilderInlineNotice
+                    key={`${notice.level || "info"}_${notice.message}_${index}`}
+                    notice={notice}
+                    onAction={notice.actionLabel ? resolveReadinessActionHandler(notice.action) : null}
+                />
+            ))}
             {semanticSelectedIssues.length === 0 && semanticDiagnosticsNotice ? (
                 <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${semanticDiagnosticsNotice.level}`}>
                     <div className="forge-report-builder__semantic-diagnostics-header">
@@ -6912,17 +10763,17 @@ export default function ReportBuilder({ container, context }) {
                                         Edit Chart
                                     </Button>
                                 ) : null}
-                                {draftExportRequestSummary ? (
+                                {draftExportActionState ? (
                                     <>
                                         <Button
                                             small
                                             outlined
                                             icon="download"
                                             className="forge-report-builder__chart-action-button"
-                                            disabled={draftExportSubmitting}
+                                            disabled={draftExportActionState.submitDisabled}
                                             onClick={triggerDraftExport}
                                         >
-                                            {reportExportHandler ? "Export PDF" : "Review Export"}
+                                            {draftExportActionState.submitLabel}
                                         </Button>
                                         <Button
                                             small
@@ -6930,7 +10781,7 @@ export default function ReportBuilder({ container, context }) {
                                             className="forge-report-builder__chart-action-button"
                                             onClick={() => setDraftExportRequestOpen((current) => !current)}
                                         >
-                                            {draftExportRequestOpen ? "Hide export" : "Inspect export"}
+                                            {draftExportActionState.inspectLabel}
                                         </Button>
                                     </>
                                 ) : null}
@@ -6953,153 +10804,129 @@ export default function ReportBuilder({ container, context }) {
                         </div>
                     ) : null}
                     {showingChartView && selectedBuilderChartSelection && !explorationActive ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                                <span>
-                                <strong>Chart selection:</strong> {chartSelectionSummary || "Selected chart value"}
-                                </span>
-                                <span style={{ fontSize: 12, lineHeight: 1.45 }}>
-                                    This selection is only temporary context. A local draft starts automatically when you change the result, and the keep/save/discard actions appear above.
-                                </span>
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <Button small minimal onClick={() => setSelectedBuilderChartSelection(null)}>Clear</Button>
-                            </div>
-                        </div>
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label="Chart selection"
+                            value={chartSelectionSummary || "Selected chart value"}
+                            description="Use this selected value as an exploration starting point, or clear it if you only needed the chart context."
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <Button small minimal onClick={startChartSelectionExploration}>Start draft</Button>
+                                    <Button small minimal onClick={() => setSelectedBuilderChartSelection(null)}>Clear</Button>
+                                </div>
+                            )}
+                        />
                     ) : null}
                     {explorationBannerState?.active ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <span>
-                                <strong>{explorationBannerState.title}.</strong>{" "}
-                                {explorationBannerState.description}
-                            </span>
-                            {Array.isArray(explorationBannerState.hintItems) && explorationBannerState.hintItems.length > 0 ? (
-                                <div className="forge-report-builder__result-meta" aria-label="Exploration guidance" style={{ marginTop: 10 }}>
-                                    {explorationBannerState.hintItems.map((item) => (
-                                        <span key={item} className="forge-report-builder__result-meta-chip">{item}</span>
-                                    ))}
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label={explorationBannerState.title}
+                            value={explorationBannerState.description}
+                            supplemental={explorationBannerState.ttlLabel ? (
+                                <div className="forge-report-builder__result-meta" aria-label="Exploration TTL">
+                                    <span className="forge-report-builder__result-meta-chip">{explorationBannerState.ttlLabel}</span>
                                 </div>
                             ) : null}
-                            <div className="forge-report-builder__result-header-actions">
-                                <Button small minimal onClick={undoExploration} disabled={!explorationBannerState.canUndo}>Undo</Button>
-                                <Button small minimal onClick={redoExploration} disabled={!explorationBannerState.canRedo}>Redo</Button>
-                                <Button small minimal onClick={keepExplorationChanges} disabled={!explorationBannerState.canKeep}>Keep changes</Button>
-                                <Button small minimal onClick={saveExploration} disabled={!explorationBannerState.canSaveArtifact}>Save artifact</Button>
-                                <Button small minimal onClick={discardExploration}>Discard draft</Button>
-                            </div>
-                        </div>
+                            footer={(
+                                <>
+                                    {Array.isArray(explorationBannerState.hintItems) && explorationBannerState.hintItems.length > 0 ? (
+                                        <div className="forge-report-builder__result-meta" aria-label="Exploration guidance" style={{ marginTop: 10 }}>
+                                            {explorationBannerState.hintItems.map((item) => (
+                                                <span key={item} className="forge-report-builder__result-meta-chip">{item}</span>
+                                            ))}
+                                        </div>
+                                    ) : null}
+                                    <div className="forge-report-builder__result-header-actions">
+                                        <Button small minimal onClick={undoExploration} disabled={!explorationBannerState.canUndo}>Undo</Button>
+                                        <Button small minimal onClick={redoExploration} disabled={!explorationBannerState.canRedo}>Redo</Button>
+                                        <Button small minimal onClick={keepExplorationChanges} disabled={!explorationBannerState.canKeep}>Keep changes</Button>
+                                        <Button small minimal onClick={saveExploration} disabled={!explorationBannerState.canSaveArtifact}>
+                                            {savedArtifactViewState.saveLabel}
+                                        </Button>
+                                        <Button small minimal onClick={discardExploration}>Discard draft</Button>
+                                    </div>
+                                </>
+                            )}
+                        />
                     ) : null}
                     {hydratedReportDocumentSession ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Reopened ReportDocument:</strong> {hydratedReportDocumentSession.title}
-                                </span>
-                                {hydratedReportDocumentSession.templateLabel ? (
-                                    <span><strong>Template:</strong> {hydratedReportDocumentSession.templateLabel}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{hydratedReportDocumentSession.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">v{hydratedReportDocumentSession.documentVersion || 0}</span>
-                                {hydratedReportDocumentSession.reopenedCompileState?.status ? (
-                                    <span className="forge-report-builder__result-meta-chip">{hydratedReportDocumentSession.reopenedCompileState.status}</span>
-                                ) : null}
-                                {hydratedReportDocumentSession.templateLabel ? (
-                                    <span className="forge-report-builder__result-meta-chip">{hydratedReportDocumentSession.templateLabel}</span>
-                                ) : null}
-                                {reopenedExportRequestSummary ? (
-                                    <>
-                                        <Button small minimal disabled={reopenedExportSubmitting} onClick={triggerReopenedExport}>
-                                            {reportExportHandler ? "Export snapshot" : "Review export"}
+                        <ReportBuilderSummaryNotice
+                            level={reopenedSessionNoticeState?.level || "info"}
+                            label="Reopened ReportDocument"
+                            value={hydratedReportDocumentSession.title}
+                            supplemental={reopenedSessionNoticeState?.templateLabel || reopenedSessionNoticeState?.templateConflictMessage ? (
+                                <>
+                                    {reopenedSessionNoticeState?.templateLabel ? (
+                                        <span><strong>Template:</strong> {reopenedSessionNoticeState.templateLabel}</span>
+                                    ) : null}
+                                    {reopenedSessionNoticeState?.templateConflictMessage ? (
+                                        <span>{reopenedSessionNoticeState.templateConflictMessage}</span>
+                                    ) : null}
+                                </>
+                            ) : null}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    {(Array.isArray(reopenedSessionNoticeState?.metaChips) ? reopenedSessionNoticeState.metaChips : []).map((chip) => (
+                                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                    ))}
+                                    {reopenedExportActionState ? (
+                                        <>
+                                            <Button small minimal disabled={reopenedExportActionState.submitDisabled} onClick={triggerReopenedExport}>
+                                                {reopenedExportActionState.submitLabel}
+                                            </Button>
+                                            <Button small minimal onClick={() => setReopenedExportRequestOpen((current) => !current)}>
+                                                {reopenedExportActionState.inspectLabel}
+                                            </Button>
+                                        </>
+                                    ) : null}
+                                    {(Array.isArray(reopenedSessionLifecycleActionState?.actions)
+                                        ? reopenedSessionLifecycleActionState.actions
+                                        : []
+                                    ).map((action) => (
+                                        <Button
+                                            key={action.id}
+                                            small
+                                            minimal
+                                            disabled={action.disabled}
+                                            title={action.disabledReason || ""}
+                                            aria-label={action.disabledReason ? `${action.label}. ${action.disabledReason}` : action.label}
+                                            onClick={() => triggerReopenedSessionLifecycleAction(action.id)}
+                                        >
+                                            {action.label}
                                         </Button>
-                                        <Button small minimal onClick={() => setReopenedExportRequestOpen((current) => !current)}>
-                                            {reopenedExportRequestOpen ? "Hide export" : "Inspect export"}
-                                        </Button>
-                                    </>
-                                ) : null}
-                                <Button small minimal onClick={restoreHydratedReportDocumentSession}>
-                                    Restore live builder
-                                </Button>
-                            </div>
-                        </div>
+                                    ))}
+                                    <Button small minimal onClick={restoreHydratedReportDocumentSession}>
+                                        Restore live builder
+                                    </Button>
+                                </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(reopenedSemanticBindingViewState, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(reopenedSemanticBindingViewState, { marginTop: 10 })}
+                            {renderScopeSummaryItems(reopenedScopeSummaryState, { marginTop: 10 })}
+                            {renderReopenSourceResolution(reopenedSessionNoticeState, { marginTop: 10 })}
+                            {renderShareableArtifactState(reopenedSessionNoticeState, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
                     ) : null}
-                    {reopenedExportRequestOpen && reopenedExportRequestInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Reopened export request summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{reopenedExportRequestInspector.from}</span>
-                                <span className="forge-report-builder__result-meta-chip">{reopenedExportRequestInspector.format}</span>
-                                <span className="forge-report-builder__result-meta-chip">{reopenedExportRequestInspector.artifactRef}</span>
-                            </div>
-                            <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 10 }}>
-                                <Button small minimal onClick={() => setReopenedExportRequestOpen(false)}>
-                                    Hide export request
-                                </Button>
-                                <Button small minimal onClick={downloadReopenedExportRequest}>
-                                    Download export request
-                                </Button>
-                            </div>
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {reopenedExportRequestInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {reopenedExportJobSummary ? (
-                        <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${reopenedExportJobSummary.hasFailure ? "warning" : "info"}`}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Reopened export:</strong> {hydratedReportDocumentSession?.title || "Report"}
-                                </span>
-                                {reopenedExportJobSummary.error ? (
-                                    <span>{reopenedExportJobSummary.error}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{reopenedExportJobSummary.jobId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{reopenedExportJobSummary.status}</span>
-                                {reopenedExportJobSummary.artifactId ? (
-                                    <span className="forge-report-builder__result-meta-chip">{reopenedExportJobSummary.artifactId}</span>
-                                ) : null}
-                                <Button
-                                    small
-                                    minimal
-                                    disabled={reopenedExportStatusLoading || !reopenedExportJobSummary.canRefresh}
-                                    onClick={refreshReopenedExportStatus}
-                                >
-                                    {reopenedExportStatusLoading ? "Refreshing..." : "Refresh status"}
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    disabled={reopenedExportArtifactLoading || !reopenedExportJobSummary.hasArtifact}
-                                    onClick={downloadReopenedExportArtifact}
-                                >
-                                    {reopenedExportArtifactLoading ? "Loading artifact..." : "Download artifact"}
-                                </Button>
-                            </div>
-                            {renderExportFailureDiagnostics(reopenedExportFailureNotice)}
-                        </div>
-                    ) : null}
+                    {renderInspectorNoticePanel(reopenedExportRequestPanelState, {
+                        ariaLabel: "Reopened export request summary",
+                        hide: () => setReopenedExportRequestOpen(false),
+                        hideLabel: reopenedExportRequestPanelState?.hideLabel || "",
+                        download: downloadReopenedExportRequest,
+                        downloadLabel: reopenedExportRequestPanelState?.downloadLabel || "",
+                        includeSemanticBindingChips: true,
+                    })}
+                    {renderExportJobPanelNotice(reopenedExportJobPanelState, {
+                        refreshStatus: refreshReopenedExportStatus,
+                        downloadArtifact: downloadReopenedExportArtifact,
+                        failureNotice: reopenedExportFailureNotice,
+                    })}
                     {hydratedReportDocumentSession && !reopenedReportDocumentCompileValidation.valid ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning">
-                            <span>
-                                <strong>Reopened compile warning:</strong> {reopenedReportDocumentCompileValidation.message}
-                            </span>
+                        <ReportBuilderSummaryNotice
+                            level="warning"
+                            label="Reopened compile warning"
+                            value={reopenedReportDocumentCompileValidation.message}
+                            footer={(
                                 <div className="forge-report-builder__result-header-actions">
                                     {reopenedReportDocumentCompileValidation.blockingDiagnostics.map((diagnostic) => (
                                         diagnostic.blockId ? (
@@ -7110,614 +10937,1742 @@ export default function ReportBuilder({ container, context }) {
                                                 onClick={() => openDocumentBlockDialogForDiagnostic(diagnostic)}
                                                 aria-label={`Edit authored block ${diagnostic.blockId}`}
                                             >
-                                            Edit {diagnostic.blockId}
-                                        </Button>
-                                    ) : null
-                                ))}
-                            </div>
-                        </div>
+                                                Edit {diagnostic.blockId}
+                                            </Button>
+                                        ) : null
+                                    ))}
+                                </div>
+                            )}
+                        />
                     ) : null}
                     {hydratedReportDocumentSession ? renderCompileDiagnosticsNotice(reopenedCompileDiagnosticsNotice, {
                         actionForDiagnostic: openDocumentBlockDialogForDiagnostic,
                     }) : null}
-                    {draftExportRequestOpen && draftExportRequestInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Draft export request summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{draftExportRequestInspector.from}</span>
-                                <span className="forge-report-builder__result-meta-chip">{draftExportRequestInspector.format}</span>
-                                <span className="forge-report-builder__result-meta-chip">{draftExportRequestInspector.artifactRef}</span>
-                                {draftExportRequestInspector.hasReportPrint ? (
-                                    <span className="forge-report-builder__result-meta-chip">reportPrint</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 10 }}>
-                                <Button small minimal onClick={() => setDraftExportRequestOpen(false)}>
-                                    Hide export request
-                                </Button>
-                                <Button small minimal onClick={downloadDraftExportRequest}>
-                                    Download export request
-                                </Button>
-                            </div>
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {draftExportRequestInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {draftExportJobSummary ? (
-                        <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${draftExportJobSummary.hasFailure ? "warning" : "info"}`}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Draft export:</strong> {draftExportRequestSummary?.title || "Report"}
-                                </span>
-                                {draftExportJobSummary.error ? (
-                                    <span>{draftExportJobSummary.error}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{draftExportJobSummary.jobId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{draftExportJobSummary.status}</span>
-                                {draftExportJobSummary.artifactId ? (
-                                    <span className="forge-report-builder__result-meta-chip">{draftExportJobSummary.artifactId}</span>
-                                ) : null}
-                                <Button
-                                    small
-                                    minimal
-                                    disabled={draftExportStatusLoading || !draftExportJobSummary.canRefresh}
-                                    onClick={refreshDraftExportStatus}
-                                >
-                                    {draftExportStatusLoading ? "Refreshing..." : "Refresh status"}
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    disabled={draftExportArtifactLoading || !draftExportJobSummary.hasArtifact}
-                                    onClick={downloadDraftExportArtifact}
-                                >
-                                    {draftExportArtifactLoading ? "Loading artifact..." : "Download artifact"}
-                                </Button>
-                            </div>
-                            {renderExportFailureDiagnostics(draftExportFailureNotice)}
-                        </div>
-                    ) : null}
-                    {savedExplorationArtifactSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Saved exploration artifact:</strong> {savedExplorationArtifactSummary.title}
-                                    {savedExplorationArtifactSummary.sourceLabel ? ` (${savedExplorationArtifactSummary.sourceLabel})` : ""}
-                                </span>
-                                {savedExplorationArtifactSummary.subtitle ? (
-                                    <span>{savedExplorationArtifactSummary.subtitle}</span>
-                                ) : null}
-                                {savedExplorationArtifactSummary.description ? (
-                                    <span>{savedExplorationArtifactSummary.description}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{savedExplorationArtifactSummary.blockCount} blocks</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedExplorationArtifactSummary.datasetCount} dataset</span>
-                                <Button small minimal onClick={prepareSavedReportPayload}>
-                                    Prepare report payload
-                                </Button>
-                                <Button small minimal onClick={() => setSavedExplorationArtifactOpen((current) => !current)}>
-                                    {savedExplorationArtifactOpen ? "Hide artifact" : "Inspect artifact"}
-                                </Button>
-                                <Button small minimal onClick={downloadExplorationArtifact}>
-                                    Download artifact
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {savedExplorationArtifactOpen && savedExplorationArtifactInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Saved exploration artifact summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{savedExplorationArtifactInspector.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedExplorationArtifactInspector.artifactId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedExplorationArtifactInspector.sourceKind}</span>
-                            </div>
-                            {savedExplorationArtifactInspector.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {savedExplorationArtifactInspector.headerSubtitle}
-                                </div>
+                    {renderInspectorNoticePanel(draftExportRequestPanelState, {
+                        ariaLabel: "Draft export request summary",
+                        hide: () => setDraftExportRequestOpen(false),
+                        hideLabel: draftExportRequestPanelState?.hideLabel || "",
+                        download: downloadDraftExportRequest,
+                        downloadLabel: draftExportRequestPanelState?.downloadLabel || "",
+                        includeSemanticBindingChips: true,
+                    })}
+                    {renderExportJobPanelNotice(draftExportJobPanelState, {
+                        refreshStatus: refreshDraftExportStatus,
+                        downloadArtifact: downloadDraftExportArtifact,
+                        failureNotice: draftExportFailureNotice,
+                    })}
+                    {importedStandaloneReportFillPanelState ? (
+                        <ReportBuilderSummaryNotice
+                            level={importedStandaloneReportFillPanelState.summaryNotice?.tone || "info"}
+                            label={importedStandaloneReportFillPanelState.summaryLabel}
+                            value={importedStandaloneReportFillPanelState.summaryValue}
+                            subtitle={importedStandaloneReportFillPanelState.description}
+                            description={importedStandaloneReportFillPanelState.compatibilityMessage}
+                            supplemental={importedStandaloneReportFillPanelState.summaryNotice?.templateLabel || importedStandaloneReportFillPanelState.summaryNotice?.templateConflictMessage ? (
+                                <>
+                                    {importedStandaloneReportFillPanelState.summaryNotice?.templateLabel ? (
+                                        <span><strong>Template:</strong> {importedStandaloneReportFillPanelState.summaryNotice.templateLabel}</span>
+                                    ) : null}
+                                    {importedStandaloneReportFillPanelState.summaryNotice?.templateConflictMessage ? (
+                                        <span>{importedStandaloneReportFillPanelState.summaryNotice.templateConflictMessage}</span>
+                                    ) : null}
+                                </>
                             ) : null}
-                            {savedExplorationArtifactInspector.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {savedExplorationArtifactInspector.headerDescription}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    {importedStandaloneReportFillPanelState.metaChips.map((chip) => (
+                                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                    ))}
+                                    {importedStandaloneReportFillPanelState.attachAction ? (
+                                        importedStandaloneReportFillPanelState.attachAction.mode === "detach" ? (
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={() => setImportedPipelineCompanionFillAttached(false)}
+                                            >
+                                                {importedStandaloneReportFillPanelState.attachAction.label}
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                small
+                                                minimal
+                                                disabled={importedStandaloneReportFillPanelState.attachAction.disabled}
+                                                onClick={() => setImportedPipelineCompanionFillAttached(true)}
+                                            >
+                                                {importedStandaloneReportFillPanelState.attachAction.label}
+                                            </Button>
+                                        )
+                                    ) : null}
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => setImportedStandaloneReportFillOpen((current) => !current)}
+                                    >
+                                        {importedStandaloneReportFillPanelState.inspectLabel}
+                                    </Button>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={downloadImportedStandaloneReportFill}
+                                    >
+                                        {importedStandaloneReportFillPanelState.downloadLabel}
+                                    </Button>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => {
+                                            setImportedStandaloneReportFillOpen(false);
+                                            setImportedStandaloneReportFill(null);
+                                        }}
+                                    >
+                                        {importedStandaloneReportFillPanelState.hideLabel}
+                                    </Button>
                                 </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {savedExplorationArtifactInspector.payload}
-                            </pre>
-                        </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(importedStandaloneReportFillPanelState, { marginTop: 10 })}
+                            {renderSemanticBindingFieldGroups(importedStandaloneReportFillPanelState, { marginTop: 10 })}
+                            {renderScopeSummaryItems(importedStandaloneReportFillPanelState, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
                     ) : null}
-                    {savedReportPayloadSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Saved report payload:</strong> {savedReportPayloadSummary.title}
-                                    {savedReportPayloadSummary.sourceLabel ? ` (${savedReportPayloadSummary.sourceLabel})` : ""}
-                                </span>
-                                {savedReportPayloadSummary.subtitle ? (
-                                    <span>{savedReportPayloadSummary.subtitle}</span>
-                                ) : null}
-                                {savedReportPayloadSummary.description ? (
-                                    <span>{savedReportPayloadSummary.description}</span>
-                                ) : null}
-                                {savedReportPayloadSummary.templateLabel ? (
-                                    <span><strong>Template:</strong> {savedReportPayloadSummary.templateLabel}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                {savedReportPayloadSummary.compileStatus ? (
-                                    <span className="forge-report-builder__result-meta-chip">{savedReportPayloadSummary.compileStatus}</span>
-                                ) : null}
-                                {savedReportPayloadSummary.templateLabel ? (
-                                    <span className="forge-report-builder__result-meta-chip">{savedReportPayloadSummary.templateLabel}</span>
-                                ) : null}
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadSummary.blockCount} blocks</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadSummary.datasetCount} dataset</span>
-                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
-                                    <span>Document version</span>
-                                    <input
-                                        aria-label="Document version"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        value={reportDocumentVersionDraft}
-                                        onChange={(event) => setReportDocumentVersionDraft(event.target.value)}
-                                        style={{
-                                            width: 72,
-                                            minHeight: 28,
-                                            padding: "4px 8px",
-                                            borderRadius: 8,
-                                            border: "1px solid #c8d6e5",
-                                            background: "#ffffff",
-                                            color: "#183247",
-                                        }}
-                                    />
-                                </label>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareGetReportDocumentResponse}
-                                    disabled={!reportDocumentVersionState.valid}
-                                >
-                                    Prepare get response
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareListReportDocumentsResponse}
-                                    disabled={!reportDocumentVersionState.valid}
-                                >
-                                    Prepare list response
-                                </Button>
-                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
-                                    <span>Expected version</span>
-                                    <input
-                                        aria-label="Expected version"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        value={updateReportDocumentExpectedVersionDraft}
-                                        onChange={(event) => setUpdateReportDocumentExpectedVersionDraft(event.target.value)}
-                                        style={{
-                                            width: 72,
-                                            minHeight: 28,
-                                            padding: "4px 8px",
-                                            borderRadius: 8,
-                                            border: "1px solid #c8d6e5",
-                                            background: "#ffffff",
-                                            color: "#183247",
-                                        }}
-                                    />
-                                </label>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareUpdateReportDocumentPayload}
-                                    disabled={!updateReportDocumentExpectedVersionState.valid || !reportDocumentPayloadCompileValidation.valid}
-                                >
-                                    Prepare update payload
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareCreateReportDocumentPayload}
-                                    disabled={!reportDocumentPayloadCompileValidation.valid}
-                                >
-                                    Prepare create payload
-                                </Button>
-                                <Button small minimal onClick={() => setSavedReportPayloadOpen((current) => !current)}>
-                                    {savedReportPayloadOpen ? "Hide report payload" : "Inspect report payload"}
-                                </Button>
-                                <Button small minimal onClick={downloadSavedReportPayload}>
-                                    Download report payload
-                                </Button>
-                                {savedReportPayloadExportRequestSummary ? (
-                                    <>
-                                        <Button
-                                            small
-                                            minimal
-                                            disabled={savedReportPayloadExportSubmitting}
-                                            onClick={triggerSavedReportPayloadExport}
-                                        >
-                                            {reportExportHandler ? "Export snapshot" : "Review export"}
-                                        </Button>
-                                        <Button
-                                            small
-                                            minimal
-                                            onClick={() => setSavedReportPayloadExportRequestOpen((current) => !current)}
-                                        >
-                                            {savedReportPayloadExportRequestOpen ? "Hide export" : "Inspect export"}
-                                        </Button>
-                                    </>
-                                ) : (
+                    {renderInspectorNoticePanel(importedStandaloneReportFillInspectorState, {
+                        ariaLabel: "Imported ReportFill summary",
+                        hide: () => setImportedStandaloneReportFillOpen(false),
+                        hideLabel: importedStandaloneReportFillInspectorState?.inspectLabel || "Hide ReportFill",
+                        download: downloadImportedStandaloneReportFill,
+                        downloadLabel: importedStandaloneReportFillInspectorState?.downloadLabel || "Download ReportFill",
+                        includeSemanticBindingChips: true,
+                        metaChips: importedStandaloneReportFillInspectorState?.expandedMetaChips || [],
+                        content: importedStandaloneReportFill ? JSON.stringify(importedStandaloneReportFill, null, 2) : "",
+                    })}
+                    {importedStandaloneReportPrintPanelState ? (
+                        <ReportBuilderSummaryNotice
+                            level={importedStandaloneReportPrintPanelState.summaryNotice?.tone || "info"}
+                            label={importedStandaloneReportPrintPanelState.summaryLabel}
+                            value={importedStandaloneReportPrintPanelState.summaryValue}
+                            subtitle={importedStandaloneReportPrintPanelState.description}
+                            supplemental={importedStandaloneReportPrintPanelState.summaryNotice?.templateLabel || importedStandaloneReportPrintPanelState.summaryNotice?.templateConflictMessage ? (
+                                <>
+                                    {importedStandaloneReportPrintPanelState.summaryNotice?.templateLabel ? (
+                                        <span><strong>Template:</strong> {importedStandaloneReportPrintPanelState.summaryNotice.templateLabel}</span>
+                                    ) : null}
+                                    {importedStandaloneReportPrintPanelState.summaryNotice?.templateConflictMessage ? (
+                                        <span>{importedStandaloneReportPrintPanelState.summaryNotice.templateConflictMessage}</span>
+                                    ) : null}
+                                </>
+                            ) : null}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    {importedStandaloneReportPrintPanelState.metaChips.map((chip) => (
+                                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                    ))}
                                     <span className="forge-report-builder__result-meta-chip">No export snapshot</span>
-                                )}
-                            </div>
-                            {reportPayloadValidationNotice ? (
-                                <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
-                                    <span>{reportPayloadValidationNotice.message}</span>
-                                    {reportPayloadValidationNotice.blockingDiagnostics[0]?.blockId ? (
-                                        <Button
-                                            small
-                                            minimal
-                                            onClick={() => openDocumentBlockDialogForDiagnostic(reportPayloadValidationNotice.blockingDiagnostics[0])}
-                                            aria-label={`Edit authored block ${reportPayloadValidationNotice.blockingDiagnostics[0].blockId}`}
-                                        >
-                                            Edit {reportPayloadValidationNotice.blockingDiagnostics[0].blockId}
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => setImportedStandaloneReportPrintOpen((current) => !current)}
+                                    >
+                                        {importedStandaloneReportPrintPanelState.inspectLabel}
+                                    </Button>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={downloadImportedStandaloneReportPrint}
+                                    >
+                                        {importedStandaloneReportPrintPanelState.downloadLabel}
+                                    </Button>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => {
+                                            setImportedStandaloneReportPrintOpen(false);
+                                            setImportedStandaloneReportPrint(null);
+                                        }}
+                                    >
+                                        {importedStandaloneReportPrintPanelState.hideLabel}
+                                    </Button>
+                                </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(importedStandaloneReportPrintPanelState, { marginTop: 10 })}
+                            {renderSemanticBindingFieldGroups(importedStandaloneReportPrintPanelState, { marginTop: 10 })}
+                            {renderScopeSummaryItems(importedStandaloneReportPrintPanelState, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {renderInspectorNoticePanel(importedStandaloneReportPrintInspectorState, {
+                        ariaLabel: "Imported ReportPrint summary",
+                        hide: () => setImportedStandaloneReportPrintOpen(false),
+                        hideLabel: importedStandaloneReportPrintInspectorState?.inspectLabel || "Hide ReportPrint",
+                        download: downloadImportedStandaloneReportPrint,
+                        downloadLabel: importedStandaloneReportPrintInspectorState?.downloadLabel || "Download ReportPrint",
+                        includeSemanticBindingChips: true,
+                        metaChips: importedStandaloneReportPrintInspectorState?.expandedMetaChips || [],
+                        content: importedStandaloneReportPrint ? JSON.stringify(importedStandaloneReportPrint, null, 2) : "",
+                    })}
+                    {importedStandaloneExportRequestPanelState ? (
+                        <ReportBuilderSummaryNotice
+                            level={importedStandaloneExportRequestPanelState.summaryNotice?.tone || "info"}
+                            label={importedStandaloneExportRequestPanelState.summaryLabel}
+                            value={importedStandaloneExportRequestPanelState.summaryValue}
+                            subtitle={importedStandaloneExportRequestPanelState.description}
+                            supplemental={importedStandaloneExportRequestPanelState.summaryNotice?.templateLabel || importedStandaloneExportRequestPanelState.summaryNotice?.templateConflictMessage ? (
+                                <>
+                                    {importedStandaloneExportRequestPanelState.summaryNotice?.templateLabel ? (
+                                        <span><strong>Template:</strong> {importedStandaloneExportRequestPanelState.summaryNotice.templateLabel}</span>
+                                    ) : null}
+                                    {importedStandaloneExportRequestPanelState.summaryNotice?.templateConflictMessage ? (
+                                        <span>{importedStandaloneExportRequestPanelState.summaryNotice.templateConflictMessage}</span>
+                                    ) : null}
+                                </>
+                            ) : null}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    {importedStandaloneExportRequestPanelState.metaChips.map((chip) => (
+                                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                    ))}
+                                    {importedStandaloneExportActionState ? (
+                                        <>
+                                            <Button
+                                                small
+                                                minimal
+                                                disabled={importedStandaloneExportActionState.submitDisabled}
+                                                onClick={triggerImportedStandaloneExport}
+                                            >
+                                                {importedStandaloneExportActionState.submitLabel}
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={() => setImportedStandaloneExportRequestOpen((current) => !current)}
+                                            >
+                                                {importedStandaloneExportActionState.inspectLabel}
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={downloadImportedStandaloneExportRequest}
+                                            >
+                                                {importedStandaloneExportRequestPanelState.downloadLabel}
+                                            </Button>
+                                        </>
+                                    ) : null}
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => setImportedStandaloneExportRequest(null)}
+                                    >
+                                        {importedStandaloneExportRequestPanelState.hideLabel}
+                                    </Button>
+                                </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(importedStandaloneExportRequestPanelState, { marginTop: 10 })}
+                            {renderSemanticBindingFieldGroups(importedStandaloneExportRequestPanelState, { marginTop: 10 })}
+                            {renderScopeSummaryItems(importedStandaloneExportRequestPanelState, { marginTop: 10 })}
+                            {renderReopenSourceResolution(importedStandaloneExportRequestPanelState, { marginTop: 10 })}
+                            {renderShareableArtifactState(importedStandaloneExportRequestPanelState, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {renderInspectorNoticePanel(importedStandaloneExportRequestDetailPanelState, {
+                        ariaLabel: "Imported export request summary",
+                        hide: () => setImportedStandaloneExportRequestOpen(false),
+                        hideLabel: importedStandaloneExportRequestDetailPanelState?.hideLabel || "",
+                        download: downloadImportedStandaloneExportRequest,
+                        downloadLabel: importedStandaloneExportRequestDetailPanelState?.downloadLabel || "",
+                        includeSemanticBindingChips: true,
+                    })}
+                    {renderExportJobPanelNotice(importedStandaloneExportJobPanelState, {
+                        refreshStatus: refreshImportedStandaloneExportStatus,
+                        downloadArtifact: downloadImportedStandaloneExportArtifact,
+                        failureNotice: importedStandaloneExportFailureNotice,
+                    })}
+                    {savedExplorationArtifactSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label="Saved draft snapshot"
+                            value={`${savedExplorationArtifactSummary.title}${savedExplorationArtifactSummary.sourceLabel ? ` (${savedExplorationArtifactSummary.sourceLabel})` : ""}`}
+                            subtitle={savedExplorationArtifactSummary.subtitle}
+                            description={savedExplorationArtifactSummary.description}
+                            supplemental={<span>{savedArtifactViewState.savedExploration.reuseHint}</span>}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">{savedExplorationArtifactSummary.blockCount} blocks</span>
+                                    <span className="forge-report-builder__result-meta-chip">{savedExplorationArtifactSummary.datasetCount} dataset</span>
+                                    {savedReportPayloadSummary?.sourceArtifactId !== savedExplorationArtifactSummary.artifactId ? (
+                                        <Button small minimal onClick={prepareSavedReportPayload}>
+                                            {savedArtifactViewState.savedExploration.prepareLabel}
                                         </Button>
                                     ) : null}
+                                    <Button small minimal onClick={() => setSavedExplorationArtifactOpen((current) => !current)}>
+                                        {savedArtifactViewState.savedExploration.inspectLabel}
+                                    </Button>
+                                    <Button small minimal onClick={downloadExplorationArtifact}>
+                                        {savedArtifactViewState.savedExploration.downloadLabel}
+                                    </Button>
                                 </div>
-                            ) : null}
-                        </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(savedExplorationArtifactSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(savedExplorationArtifactSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(savedExplorationArtifactSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {renderInspectorNoticePanel(savedExplorationArtifactInspector, {
+                        ariaLabel: "Saved exploration artifact summary",
+                        hide: () => setSavedExplorationArtifactOpen(false),
+                        hideLabel: "Hide saved exploration artifact",
+                        download: downloadExplorationArtifact,
+                        downloadLabel: "Download saved exploration artifact",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            savedExplorationArtifactInspector?.kind || "",
+                            savedExplorationArtifactInspector?.artifactId || "",
+                            savedExplorationArtifactInspector?.sourceKind || "",
+                        ].filter(Boolean),
+                        content: savedExplorationArtifactInspector?.payload || "",
+                    })}
+                    {activeSavedArtifactSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level={activeSavedArtifactNoticeState?.level || "info"}
+                            label={savedReportPayloadSummary ? "Saved report file" : "Active saved artifact"}
+                            value={`${activeSavedArtifactSummary.title}${activeSavedArtifactSummary.sourceLabel ? ` (${activeSavedArtifactSummary.sourceLabel})` : ""}`}
+                            subtitle={activeSavedArtifactSummary.subtitle}
+                            description={activeSavedArtifactSummary.description}
+                            supplemental={(
+                                <>
+                                    {activeSavedArtifactNoticeState?.templateLabel ? (
+                                        <span><strong>Template:</strong> {activeSavedArtifactNoticeState.templateLabel}</span>
+                                    ) : null}
+                                    {activeSavedArtifactNoticeState?.templateConflictMessage ? (
+                                        <span>{activeSavedArtifactNoticeState.templateConflictMessage}</span>
+                                    ) : null}
+                                    {activeSavedArtifactNoticeState?.reuseHint ? (
+                                        <span>{activeSavedArtifactNoticeState.reuseHint}</span>
+                                    ) : null}
+                                </>
+                            )}
+                            footer={(
+                                <>
+                                    <div className="forge-report-builder__result-header-actions">
+                                    {(Array.isArray(activeSavedArtifactNoticeState?.metaChips) ? activeSavedArtifactNoticeState.metaChips : []).map((chip) => (
+                                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                    ))}
+                                    {savedReportPayloadSummary ? (
+                                        <>
+                                            <Button small minimal onClick={() => setSavedReportPayloadApiArtifactsOpen((current) => !current)}>
+                                                {savedArtifactViewState.savedReportPayload.apiArtifactsLabel}
+                                            </Button>
+                                            <Button small minimal onClick={() => setSavedReportPayloadOpen((current) => !current)}>
+                                                {savedArtifactViewState.savedReportPayload.inspectLabel}
+                                            </Button>
+                                            <Button small minimal onClick={downloadSavedReportPayload}>
+                                                {savedArtifactViewState.savedReportPayload.downloadLabel}
+                                            </Button>
+                                        </>
+                                    ) : null}
+                                    {savedReportPayloadExportActionState ? (
+                                        <>
+                                            <Button
+                                                small
+                                                minimal
+                                                disabled={savedReportPayloadExportActionState.submitDisabled}
+                                                onClick={triggerSavedReportPayloadExport}
+                                            >
+                                                {savedReportPayloadExportActionState.submitLabel}
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={() => setSavedReportPayloadExportRequestOpen((current) => !current)}
+                                            >
+                                                {savedReportPayloadExportActionState.inspectLabel}
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <span className="forge-report-builder__result-meta-chip">No export snapshot</span>
+                                    )}
+                                    {(Array.isArray(activeSavedArtifactLifecycleActionState?.actions)
+                                        ? activeSavedArtifactLifecycleActionState.actions
+                                        : []
+                                    ).map((action) => (
+                                        <Button
+                                            key={action.id}
+                                            small
+                                            minimal
+                                            disabled={action.disabled}
+                                            title={action.disabledReason || ""}
+                                            aria-label={action.disabledReason ? `${action.label}. ${action.disabledReason}` : action.label}
+                                            onClick={() => triggerActiveSavedArtifactLifecycleAction(action.id)}
+                                        >
+                                            {action.label}
+                                        </Button>
+                                    ))}
+                                    </div>
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen ? (
+                                        <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8, flexWrap: "wrap" }}>
+                                            <span className="forge-report-builder__result-meta-chip">Delivery handoff</span>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                                <span>{savedArtifactViewState.savedReportPayload.documentVersionLabel}</span>
+                                                <input
+                                                    aria-label="Document version"
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
+                                                    value={reportDocumentVersionDraft}
+                                                    onChange={(event) => setReportDocumentVersionDraft(event.target.value)}
+                                                    style={{
+                                                        width: 72,
+                                                        minHeight: 28,
+                                                        padding: "4px 8px",
+                                                        borderRadius: 8,
+                                                        border: "1px solid #c8d6e5",
+                                                        background: "#ffffff",
+                                                        color: "#183247",
+                                                    }}
+                                                />
+                                            </label>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareGetReportDocumentResponse}
+                                                disabled={!reportDocumentVersionState.valid}
+                                            >
+                                                {savedArtifactViewState.savedReportPayload.prepareGetResponseLabel}
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareListReportDocumentsResponse}
+                                                disabled={!reportDocumentVersionState.valid}
+                                            >
+                                                {savedArtifactViewState.savedReportPayload.prepareListResponseLabel}
+                                            </Button>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                                <span>{savedArtifactViewState.savedReportPayload.expectedVersionLabel}</span>
+                                                <input
+                                                    aria-label="Expected version"
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
+                                                    value={updateReportDocumentExpectedVersionDraft}
+                                                    onChange={(event) => setUpdateReportDocumentExpectedVersionDraft(event.target.value)}
+                                                    style={{
+                                                        width: 72,
+                                                        minHeight: 28,
+                                                        padding: "4px 8px",
+                                                        borderRadius: 8,
+                                                        border: "1px solid #c8d6e5",
+                                                        background: "#ffffff",
+                                                        color: "#183247",
+                                                    }}
+                                                />
+                                            </label>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareUpdateReportDocumentPayload}
+                                                disabled={!updateReportDocumentExpectedVersionState.valid || !reportDocumentPayloadCompileValidation.valid}
+                                            >
+                                                {savedArtifactViewState.savedReportPayload.prepareUpdatePayloadLabel}
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareCreateReportDocumentPayload}
+                                                disabled={!reportDocumentPayloadCompileValidation.valid}
+                                            >
+                                                {savedArtifactViewState.savedReportPayload.prepareCreatePayloadLabel}
+                                            </Button>
+                                            <span style={{ fontSize: 11, color: "#486579" }}>
+                                                {reportDocumentVersionState.helperText}
+                                            </span>
+                                            <span style={{ fontSize: 11, color: "#486579" }}>
+                                                {updateReportDocumentExpectedVersionState.helperText}
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen ? (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                flexWrap: "wrap",
+                                                gap: 10,
+                                                marginTop: 8,
+                                            }}
+                                        >
+                                            {savedReportPayloadApiArtifactEntries.length > 0 ? (
+                                                savedReportPayloadApiArtifactEntries.map((artifact) => {
+                                                    const actions = [];
+                                                    if (artifact.id === "getReportDocumentResponse") {
+                                                        actions.push(
+                                                            {
+                                                                id: `${artifact.id}:reopen`,
+                                                                label: "Reopen in builder",
+                                                                onClick: reopenGetReportDocumentResponse,
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:inspect`,
+                                                                label: artifact.inspectLabel,
+                                                                onClick: () => setGetReportDocumentResponseOpen((current) => !current),
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:download`,
+                                                                label: artifact.downloadLabel,
+                                                                onClick: downloadGetReportDocumentResponse,
+                                                            },
+                                                        );
+                                                    }
+                                                    if (artifact.id === "listReportDocumentsResponse") {
+                                                        actions.push(
+                                                            {
+                                                                id: `${artifact.id}:inspect`,
+                                                                label: artifact.inspectLabel,
+                                                                onClick: () => setListReportDocumentsResponseOpen((current) => !current),
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:download`,
+                                                                label: artifact.downloadLabel,
+                                                                onClick: downloadListReportDocumentsResponse,
+                                                            },
+                                                        );
+                                                    }
+                                                    if (artifact.id === "reopenReportDocumentDiagnostic") {
+                                                        actions.push(
+                                                            {
+                                                                id: `${artifact.id}:inspect`,
+                                                                label: artifact.inspectLabel,
+                                                                onClick: () => setReopenReportDocumentDiagnosticOpen((current) => !current),
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:download`,
+                                                                label: artifact.downloadLabel,
+                                                                onClick: downloadReopenReportDocumentDiagnostic,
+                                                            },
+                                                        );
+                                                    }
+                                                    if (artifact.id === "createReportDocumentPayload") {
+                                                        actions.push(
+                                                            {
+                                                                id: `${artifact.id}:inspect`,
+                                                                label: artifact.inspectLabel,
+                                                                onClick: () => setCreateReportDocumentPayloadOpen((current) => !current),
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:download`,
+                                                                label: artifact.downloadLabel,
+                                                                onClick: downloadCreateReportDocumentPayload,
+                                                            },
+                                                        );
+                                                    }
+                                                    if (artifact.id === "getReportDocumentRequest") {
+                                                        actions.push(
+                                                            {
+                                                                id: `${artifact.id}:inspect`,
+                                                                label: artifact.inspectLabel,
+                                                                onClick: () => setGetReportDocumentRequestPayloadOpen((current) => !current),
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:download`,
+                                                                label: artifact.downloadLabel,
+                                                                onClick: downloadGetReportDocumentRequestPayload,
+                                                            },
+                                                        );
+                                                    }
+                                                    if (artifact.id === "updateReportDocumentPayload") {
+                                                        actions.push(
+                                                            {
+                                                                id: `${artifact.id}:inspect`,
+                                                                label: artifact.inspectLabel,
+                                                                onClick: () => setUpdateReportDocumentPayloadOpen((current) => !current),
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:download`,
+                                                                label: artifact.downloadLabel,
+                                                                onClick: downloadUpdateReportDocumentPayload,
+                                                            },
+                                                        );
+                                                    }
+                                                    if (artifact.id === "updateReportDocumentConflictDiagnostic") {
+                                                        actions.push(
+                                                            {
+                                                                id: `${artifact.id}:inspect`,
+                                                                label: artifact.inspectLabel,
+                                                                onClick: () => setUpdateReportDocumentConflictDiagnosticOpen((current) => !current),
+                                                            },
+                                                            {
+                                                                id: `${artifact.id}:download`,
+                                                                label: artifact.downloadLabel,
+                                                                onClick: downloadUpdateReportDocumentConflictDiagnostic,
+                                                            },
+                                                        );
+                                                    }
+                                                    return (
+                                                        <ReportBuilderPreparedArtifactCard
+                                                            key={artifact.id}
+                                                            artifact={artifact}
+                                                            actions={actions}
+                                                        />
+                                                    );
+                                                })
+                                            ) : (
+                                                <ReportBuilderInlineNotice
+                                                    notice={{
+                                                        level: "info",
+                                                        message: "No prepared API artifacts yet. Use the controls above to prepare a reopen bundle, catalog response, create request, or update request.",
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && listReportDocumentsResponseSummary ? (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                flexWrap: "wrap",
+                                                gap: 10,
+                                                marginTop: 8,
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span className="forge-report-builder__result-meta-chip">Catalog delivery</span>
+                                            {listReportDocumentsEntryOptions.length > 0 ? (
+                                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                                    <span>Entry</span>
+                                                    <select
+                                                        aria-label="API handoff list response entry"
+                                                        value={listReportDocumentsSelectedReportId}
+                                                        onChange={(event) => handleListReportDocumentsSelectedReportIdChange(event.target.value)}
+                                                        style={{
+                                                            minHeight: 28,
+                                                            padding: "4px 8px",
+                                                            borderRadius: 8,
+                                                            border: "1px solid #c8d6e5",
+                                                            background: "#ffffff",
+                                                            color: "#183247",
+                                                        }}
+                                                    >
+                                                        {listReportDocumentsEntryOptions.map((entry) => (
+                                                            <option key={entry.selectionKey || entry.reportId} value={entry.selectionKey || entry.reportId}>
+                                                                {buildReportBuilderListReportDocumentsEntryOptionLabel(entry)}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                            ) : null}
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareListEntryReopenDiagnostic}
+                                                disabled={!listReportDocumentsSelectedReportId}
+                                            >
+                                                Check reopen compatibility
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareGetReportDocumentRequestPayload}
+                                                disabled={!listReportDocumentsSelectedReportId}
+                                            >
+                                                Prepare get request
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareSelectedGetReportDocumentResponse}
+                                                disabled={!listReportDocumentsSelectedReportId}
+                                            >
+                                                Prepare selected get response
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
+                                                disabled={!listReportDocumentsSelectedReportId}
+                                            >
+                                                Open selected response
+                                            </Button>
+                                            {selectedListEntryExportActionState ? (
+                                                <>
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        disabled={selectedListEntryExportActionState.submitDisabled || !listReportDocumentsSelectedReportId}
+                                                        onClick={triggerSelectedListEntryExport}
+                                                    >
+                                                        {selectedListEntryExportActionState.submitLabel}
+                                                    </Button>
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        disabled={!listReportDocumentsSelectedReportId}
+                                                        onClick={() => setSelectedListEntryExportRequestOpen((current) => !current)}
+                                                    >
+                                                        {selectedListEntryExportActionState.inspectLabel}
+                                                    </Button>
+                                                </>
+                                            ) : null}
+                                            {(Array.isArray(selectedListEntryLifecycleActionState?.actions)
+                                                ? selectedListEntryLifecycleActionState.actions
+                                                : []
+                                            ).map((action) => (
+                                                <Button
+                                                    key={`handoff_${action.id}`}
+                                                    small
+                                                    minimal
+                                                    disabled={action.disabled || !listReportDocumentsSelectedReportId}
+                                                    title={action.disabledReason || ""}
+                                                    aria-label={action.disabledReason ? `${action.label}. ${action.disabledReason}` : action.label}
+                                                    onClick={() => triggerSelectedListEntryLifecycleAction(action.id)}
+                                                >
+                                                    {action.label}
+                                                </Button>
+                                            ))}
+                                            {selectedListReportDocumentsEntry?.subtitle ? (
+                                                <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.subtitle}</span>
+                                            ) : null}
+                                            {selectedListReportDocumentsEntryMetaChips.map((chip) => (
+                                                <span key={`handoff_${chip}`} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                            ))}
+                                            {!selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
+                                                <span className="forge-report-builder__result-meta-chip">No local payload backing</span>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && !selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
+                                        <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                                            <span>
+                                                This imported catalog entry can prepare a get request and reopen diagnostic, but it cannot expand into a local reopen bundle until a matching local reopen artifact is available.
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && selectedBackendSharedArtifactHydrationNotice ? (
+                                        <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                                            <span>
+                                                {selectedBackendSharedArtifactHydrationNotice.message}
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary ? (
+                                        renderInspectorNoticePanel(selectedListEntryExportRequestPanelState, {
+                                            ariaLabel: "API handoff selected catalog entry export request summary",
+                                            hide: () => setSelectedListEntryExportRequestOpen(false),
+                                            hideLabel: selectedListEntryExportRequestPanelState?.hideLabel || "",
+                                            download: downloadSelectedListEntryExportRequest,
+                                            downloadLabel: selectedListEntryExportRequestPanelState?.downloadLabel || "",
+                                            includeSemanticBindingChips: true,
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary ? (
+                                        renderExportJobPanelNotice(selectedListEntryExportJobPanelState, {
+                                            refreshStatus: refreshSelectedListEntryExportStatus,
+                                            downloadArtifact: downloadSelectedListEntryExportArtifact,
+                                            failureNotice: selectedListEntryExportFailureNotice,
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntryCompileValidation.valid ? (
+                                        <ReportBuilderSummaryNotice
+                                            level="warning"
+                                            label="Selected entry compile warning"
+                                            value={selectedListReportDocumentsEntryCompileValidation.message}
+                                            footer={(
+                                                <div className="forge-report-builder__result-header-actions">
+                                                    {selectedListReportDocumentsEntry?.reportRef?.reportId ? (
+                                                        <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.reportRef.reportId}</span>
+                                                    ) : null}
+                                                    {selectedListReportDocumentsEntrySummary?.title ? (
+                                                        <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntrySummary.title}</span>
+                                                    ) : null}
+                                                    {selectedListReportDocumentsEntry?.compileState?.status ? (
+                                                        <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.compileState.status}</span>
+                                                    ) : null}
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
+                                                        disabled={!listReportDocumentsSelectedReportId}
+                                                    >
+                                                        Open selected response
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        />
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && selectedListReportDocumentsEntry ? renderCompileDiagnosticsNotice(selectedListEntryCompileDiagnosticsNotice, {
+                                        actionForDiagnostic: openDocumentBlockDialogForDiagnostic,
+                                    }) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && updateReportDocumentPayloadSummary ? (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                flexWrap: "wrap",
+                                                gap: 10,
+                                                marginTop: 8,
+                                                alignItems: "center",
+                                            }}
+                                        >
+                                            <span className="forge-report-builder__result-meta-chip">Conflict review</span>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                                <span>Current version</span>
+                                                <input
+                                                    aria-label="API handoff current version"
+                                                    type="number"
+                                                    min="1"
+                                                    step="1"
+                                                    value={updateReportDocumentCurrentVersionDraft}
+                                                    onChange={handleUpdateReportDocumentCurrentVersionDraftChange}
+                                                    style={{
+                                                        width: 72,
+                                                        minHeight: 28,
+                                                        padding: "4px 8px",
+                                                        borderRadius: 8,
+                                                        border: "1px solid #c8d6e5",
+                                                        background: "#ffffff",
+                                                        color: "#183247",
+                                                    }}
+                                                />
+                                            </label>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={prepareUpdateReportDocumentConflictDiagnostic}
+                                                disabled={!updateReportDocumentConflictVersionState.conflictReady}
+                                            >
+                                                Prepare conflict diagnostic
+                                            </Button>
+                                            <span style={{ fontSize: 11, color: "#486579" }}>
+                                                {updateReportDocumentConflictVersionState.helperText}
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffGetResponseSummary ? (
+                                        renderInspectorNoticePanel(getReportDocumentResponseInspector, {
+                                            ariaLabel: "API handoff get ReportDocument response summary",
+                                            hide: () => setGetReportDocumentResponseOpen(false),
+                                            hideLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.inspectLabel || "Hide reopen bundle",
+                                            download: downloadGetReportDocumentResponse,
+                                            downloadLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.downloadLabel || "Download reopen bundle file",
+                                            includeSemanticBindingChips: true,
+                                            metaChips: [
+                                                "getReportDocumentResponse",
+                                                getReportDocumentResponseSummary?.documentVersion > 0 ? `v${getReportDocumentResponseSummary.documentVersion}` : "",
+                                                getReportDocumentResponseInspector?.title || "",
+                                                getReportDocumentResponseInspector?.templateLabel || "",
+                                                getReportDocumentResponseInspector?.templateConflictLabel || "",
+                                            ].filter(Boolean),
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffReopenDiagnosticSummary ? (
+                                        renderInspectorNoticePanel(reopenReportDocumentDiagnosticInspector, {
+                                            level: "warning",
+                                            ariaLabel: "API handoff reopen diagnostic summary",
+                                            hide: () => setReopenReportDocumentDiagnosticOpen(false),
+                                            hideLabel: savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.inspectLabel || "Hide reopen review",
+                                            download: downloadReopenReportDocumentDiagnostic,
+                                            downloadLabel: savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.downloadLabel || "Download reopen diagnostic file",
+                                            includeSemanticBindingChips: true,
+                                            metaChips: [
+                                                reopenReportDocumentDiagnosticInspector?.kind || "",
+                                                reopenReportDocumentDiagnosticInspector?.code || "",
+                                                reopenReportDocumentDiagnosticInspector?.severity || "",
+                                                reopenReportDocumentDiagnosticInspector?.templateLabel || "",
+                                                reopenReportDocumentDiagnosticInspector?.templateConflictLabel || "",
+                                            ].filter(Boolean),
+                                            detailColor: "#5f3411",
+                                            contentStyle: {
+                                                background: "#fff9f5",
+                                                color: "#5f3411",
+                                            },
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary ? (
+                                        renderInspectorNoticePanel(listReportDocumentsResponseInspector, {
+                                            ariaLabel: "API handoff list ReportDocuments response summary",
+                                            hide: () => setListReportDocumentsResponseOpen(false),
+                                            hideLabel: savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.inspectLabel || "Hide catalog response",
+                                            download: downloadListReportDocumentsResponse,
+                                            downloadLabel: savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.downloadLabel || "Download catalog response file",
+                                            includeSemanticBindingChips: true,
+                                            metaChips: [
+                                                "listReportDocumentsResponse",
+                                                `${listReportDocumentsResponseSummary?.entryCount || 0} entries`,
+                                                listReportDocumentsResponseInspector?.selectedEntry?.title || "",
+                                                listReportDocumentsResponseInspector?.lifecycle || "",
+                                                listReportDocumentsResponseInspector?.artifactId || "",
+                                                listReportDocumentsResponseInspector?.sourceArtifactId || "",
+                                                listReportDocumentsResponseInspector?.templateLabel || "",
+                                                listReportDocumentsResponseInspector?.templateConflictLabel || "",
+                                            ].filter(Boolean),
+                                            content: listReportDocumentsResponseContent,
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffGetRequestSummary ? (
+                                        renderInspectorNoticePanel(getReportDocumentRequestPayloadInspector, {
+                                            ariaLabel: "API handoff get ReportDocument request summary",
+                                            hide: () => setGetReportDocumentRequestPayloadOpen(false),
+                                            hideLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.inspectLabel || "Hide get request artifact",
+                                            download: downloadGetReportDocumentRequestPayload,
+                                            downloadLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.downloadLabel || "Download get request file",
+                                            includeSemanticBindingChips: true,
+                                            metaChips: [
+                                                getReportDocumentRequestPayloadInspector?.kind || "",
+                                                getReportDocumentRequestPayloadInspector?.reportId || "",
+                                                getReportDocumentRequestPayloadInspector?.title || "",
+                                            ].filter(Boolean),
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffCreatePayloadSummary ? (
+                                        renderInspectorNoticePanel(createReportDocumentPayloadInspector, {
+                                            ariaLabel: "API handoff create ReportDocument payload summary",
+                                            hide: () => setCreateReportDocumentPayloadOpen(false),
+                                            hideLabel: savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.inspectLabel || "Hide create request",
+                                            download: downloadCreateReportDocumentPayload,
+                                            downloadLabel: savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.downloadLabel || "Download create request file",
+                                            includeSemanticBindingChips: true,
+                                            metaChips: [
+                                                createReportDocumentPayloadInspector?.kind || "",
+                                                createReportDocumentPayloadInspector?.reportId || "",
+                                                createReportDocumentPayloadInspector?.compileStatus || "",
+                                            ].filter(Boolean),
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffUpdatePayloadSummary ? (
+                                        renderInspectorNoticePanel(updateReportDocumentPayloadInspector, {
+                                            ariaLabel: "API handoff update ReportDocument payload summary",
+                                            hide: () => setUpdateReportDocumentPayloadOpen(false),
+                                            hideLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.inspectLabel || "Hide update request",
+                                            download: downloadUpdateReportDocumentPayload,
+                                            downloadLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.downloadLabel || "Download update request file",
+                                            includeSemanticBindingChips: true,
+                                            metaChips: [
+                                                updateReportDocumentPayloadInspector?.kind || "",
+                                                updateReportDocumentPayloadInspector?.reportId || "",
+                                                updateReportDocumentPayloadInspector?.expectedVersion ? `v${updateReportDocumentPayloadInspector.expectedVersion}` : "",
+                                            ].filter(Boolean),
+                                        })
+                                    ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffUpdateConflictSummary ? (
+                                        renderInspectorNoticePanel(updateReportDocumentConflictDiagnosticInspector, {
+                                            level: "warning",
+                                            ariaLabel: "API handoff update conflict diagnostic summary",
+                                            hide: () => setUpdateReportDocumentConflictDiagnosticOpen(false),
+                                            hideLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.inspectLabel || "Hide conflict review",
+                                            download: downloadUpdateReportDocumentConflictDiagnostic,
+                                            downloadLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.downloadLabel || "Download conflict diagnostic file",
+                                            includeSemanticBindingChips: true,
+                                            metaChips: [
+                                                updateReportDocumentConflictDiagnosticInspector?.kind || "",
+                                                updateReportDocumentConflictDiagnosticInspector?.code || "",
+                                                updateReportDocumentConflictDiagnosticInspector?.severity || "",
+                                            ].filter(Boolean),
+                                            detailColor: "#5f3411",
+                                            contentStyle: {
+                                                background: "#fff9f5",
+                                                color: "#5f3411",
+                                            },
+                                        })
+                                    ) : null}
+                                    {reportPayloadValidationNotice ? (
+                                        <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                                            <span>{reportPayloadValidationNotice.message}</span>
+                                            {reportPayloadValidationNotice.blockingDiagnostics[0]?.blockId ? (
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    onClick={() => openDocumentBlockDialogForDiagnostic(reportPayloadValidationNotice.blockingDiagnostics[0])}
+                                                    aria-label={`Edit authored block ${reportPayloadValidationNotice.blockingDiagnostics[0].blockId}`}
+                                                >
+                                                    Edit {reportPayloadValidationNotice.blockingDiagnostics[0].blockId}
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+                                </>
+                            )}
+                        >
+                            {renderSemanticBindingChips(activeSavedArtifactSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(activeSavedArtifactSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(activeSavedArtifactSummary, { marginTop: 10 })}
+                            {renderReopenSourceResolution(activeSavedArtifactSummary, { marginTop: 10 })}
+                            {renderShareableArtifactState(activeSavedArtifactSummary, { marginTop: 10 })}
+                            {renderAuthoredDocumentProgress(activeSavedArtifactSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
                     ) : null}
                     {savedReportPayloadSummary ? renderCompileDiagnosticsNotice(savedPayloadCompileDiagnosticsNotice, {
                         actionForDiagnostic: openDocumentBlockDialogForDiagnostic,
                     }) : null}
-                    {savedReportPayloadOpen && savedReportPayloadInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Saved report payload summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadInspector.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadInspector.payloadId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadInspector.sourceArtifactId}</span>
-                                {savedReportPayloadInspector.compileStatus ? (
-                                    <span className="forge-report-builder__result-meta-chip">{savedReportPayloadInspector.compileStatus}</span>
-                                ) : null}
-                                {savedReportPayloadInspector.templateLabel ? (
-                                    <span className="forge-report-builder__result-meta-chip">{savedReportPayloadInspector.templateLabel}</span>
-                                ) : null}
-                            </div>
-                            {savedReportPayloadInspector.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {savedReportPayloadInspector.headerSubtitle}
-                                </div>
-                            ) : null}
-                            {savedReportPayloadInspector.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {savedReportPayloadInspector.headerDescription}
-                                </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {savedReportPayloadInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {savedReportPayloadExportRequestOpen && savedReportPayloadExportRequestInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Saved export request summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadExportRequestInspector.from}</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadExportRequestInspector.format}</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadExportRequestInspector.artifactRef}</span>
-                                {savedReportPayloadExportRequestInspector.documentVersion ? (
-                                    <span className="forge-report-builder__result-meta-chip">v{savedReportPayloadExportRequestInspector.documentVersion}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 10 }}>
-                                <Button small minimal onClick={() => setSavedReportPayloadExportRequestOpen(false)}>
-                                    Hide export request
-                                </Button>
-                                <Button small minimal onClick={downloadSavedReportPayloadExportRequest}>
-                                    Download export request
-                                </Button>
-                            </div>
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {savedReportPayloadExportRequestInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {savedReportPayloadExportJobSummary ? (
-                        <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${savedReportPayloadExportJobSummary.hasFailure ? "warning" : "info"}`}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {latestLifecycleSharedArtifactSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="success"
+                            label="Latest shared artifact"
+                            value={`${latestLifecycleSharedArtifactSummary.title}${latestLifecycleSharedArtifactSummary.sourceLabel ? ` (${latestLifecycleSharedArtifactSummary.sourceLabel})` : ""}`}
+                            subtitle={latestLifecycleSharedArtifactSummary.subtitle}
+                            description={latestLifecycleSharedArtifactSummary.description}
+                            supplemental={(
                                 <span>
-                                    <strong>Saved export:</strong> {savedReportPayloadSummary?.title || "Report"}
+                                    {normalizeString(latestLifecycleSharedArtifactSummary?.kind) === "reportBuilder.publishedSnapshot"
+                                        ? "The latest publish action returned an immutable snapshot artifact for this report."
+                                        : "The latest share action returned an immutable shared artifact for this report."}
                                 </span>
-                                {savedReportPayloadExportJobSummary.error ? (
-                                    <span>{savedReportPayloadExportJobSummary.error}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadExportJobSummary.jobId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{savedReportPayloadExportJobSummary.status}</span>
-                                {savedReportPayloadExportJobSummary.artifactId ? (
-                                    <span className="forge-report-builder__result-meta-chip">{savedReportPayloadExportJobSummary.artifactId}</span>
+                            )}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">
+                                        {buildReportBuilderExportArtifactKindLabel(latestLifecycleSharedArtifactSummary?.kind)}
+                                    </span>
+                                    {latestLifecycleSharedArtifactSummary?.sourceArtifactId ? (
+                                        <span className="forge-report-builder__result-meta-chip">{latestLifecycleSharedArtifactSummary.sourceArtifactId}</span>
+                                    ) : null}
+                                    {latestLifecycleSharedArtifactSummary?.compileStatus ? (
+                                        <span className="forge-report-builder__result-meta-chip">{latestLifecycleSharedArtifactSummary.compileStatus}</span>
+                                    ) : null}
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={() => setLatestLifecycleSharedArtifactOpen((current) => !current)}
+                                    >
+                                        {latestLifecycleSharedArtifactOpen ? "Hide artifact" : "Inspect artifact"}
+                                    </Button>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={downloadLatestLifecycleSharedArtifact}
+                                    >
+                                        Download artifact
+                                    </Button>
+                                    {latestLifecycleSharedArtifactExportActionState ? (
+                                        <>
+                                            <Button
+                                                small
+                                                minimal
+                                                disabled={latestLifecycleSharedArtifactExportActionState.submitDisabled}
+                                                onClick={triggerLatestLifecycleSharedArtifactExport}
+                                            >
+                                                {latestLifecycleSharedArtifactExportActionState.submitLabel}
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={() => setLatestLifecycleSharedArtifactExportRequestOpen((current) => !current)}
+                                            >
+                                                {latestLifecycleSharedArtifactExportActionState.inspectLabel}
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <span className="forge-report-builder__result-meta-chip">No export-ready bundle</span>
+                                    )}
+                                </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(latestLifecycleSharedArtifactSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(latestLifecycleSharedArtifactSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(latestLifecycleSharedArtifactSummary, { marginTop: 10 })}
+                            {renderReopenSourceResolution(latestLifecycleSharedArtifactSummary, { marginTop: 10 })}
+                            {renderShareableArtifactState(latestLifecycleSharedArtifactSummary, { marginTop: 10 })}
+                            {renderAuthoredDocumentProgress(latestLifecycleSharedArtifactSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {renderInspectorNoticePanel(latestLifecycleSharedArtifactInspector, {
+                        ariaLabel: "Latest shared artifact summary",
+                        hide: () => setLatestLifecycleSharedArtifactOpen(false),
+                        hideLabel: "Hide shared artifact",
+                        download: downloadLatestLifecycleSharedArtifact,
+                        downloadLabel: "Download shared artifact",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            latestLifecycleSharedArtifactInspector?.kind || "",
+                            latestLifecycleSharedArtifactInspector?.sourceArtifactId || "",
+                            latestLifecycleSharedArtifactInspector?.compileStatus || "",
+                            latestLifecycleSharedArtifactInspector?.templateLabel || "",
+                            latestLifecycleSharedArtifactInspector?.templateConflictLabel || "",
+                        ].filter(Boolean),
+                    })}
+                    {renderInspectorNoticePanel(latestLifecycleSharedArtifactExportRequestPanelState, {
+                        ariaLabel: "Latest shared artifact export request summary",
+                        hide: () => setLatestLifecycleSharedArtifactExportRequestOpen(false),
+                        hideLabel: latestLifecycleSharedArtifactExportRequestPanelState?.hideLabel || "",
+                        download: downloadLatestLifecycleSharedArtifactExportRequest,
+                        downloadLabel: latestLifecycleSharedArtifactExportRequestPanelState?.downloadLabel || "",
+                        includeSemanticBindingChips: true,
+                    })}
+                    {renderExportJobPanelNotice(latestLifecycleSharedArtifactExportJobPanelState, {
+                        refreshStatus: refreshLatestLifecycleSharedArtifactExportStatus,
+                        downloadArtifact: downloadLatestLifecycleSharedArtifactExportArtifact,
+                        failureNotice: latestLifecycleSharedArtifactExportFailureNotice,
+                    })}
+                    {renderInspectorNoticePanel(savedReportPayloadInspector, {
+                        ariaLabel: "Saved report payload summary",
+                        hide: () => setSavedReportPayloadOpen(false),
+                        hideLabel: "Hide saved report payload",
+                        download: downloadSavedReportPayload,
+                        downloadLabel: "Download saved report payload",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            savedReportPayloadInspector?.kind || "",
+                            savedReportPayloadInspector?.payloadId || "",
+                            savedReportPayloadInspector?.sourceArtifactId || "",
+                            savedReportPayloadInspector?.compileStatus || "",
+                            savedReportPayloadInspector?.templateLabel || "",
+                            savedReportPayloadInspector?.templateConflictLabel || "",
+                        ].filter(Boolean),
+                    })}
+                    {renderInspectorNoticePanel(savedReportPayloadExportRequestPanelState, {
+                        ariaLabel: "Saved export request summary",
+                        hide: () => setSavedReportPayloadExportRequestOpen(false),
+                        hideLabel: savedReportPayloadExportRequestPanelState?.hideLabel || "",
+                        download: downloadSavedReportPayloadExportRequest,
+                        downloadLabel: savedReportPayloadExportRequestPanelState?.downloadLabel || "",
+                        includeSemanticBindingChips: true,
+                    })}
+                    {renderExportJobPanelNotice(savedReportPayloadExportJobPanelState, {
+                        refreshStatus: refreshSavedReportPayloadExportStatus,
+                        downloadArtifact: downloadSavedReportPayloadArtifact,
+                        failureNotice: savedReportPayloadExportFailureNotice,
+                    })}
+                    {savedReportPayloadExportHistoryAvailable ? (
+                        <div
+                            style={{
+                                display: "grid",
+                                gap: 10,
+                                marginTop: 10,
+                            }}
+                        >
+                            <div
+                                className="forge-report-builder__result-header-actions"
+                                style={{ alignItems: "center", flexWrap: "wrap" }}
+                            >
+                                <span className="forge-report-builder__result-meta-chip">Recent exports</span>
+                                {savedReportPayloadRecentExportEntries.length > 0 ? (
+                                    <span className="forge-report-builder__result-meta-chip">
+                                        {savedReportPayloadRecentExportEntries.length} recent
+                                    </span>
                                 ) : null}
                                 <Button
                                     small
                                     minimal
-                                    disabled={savedReportPayloadExportStatusLoading || !savedReportPayloadExportJobSummary.canRefresh}
-                                    onClick={refreshSavedReportPayloadExportStatus}
+                                    disabled={savedReportPayloadExportHistoryLoading}
+                                    onClick={() => refreshSavedReportPayloadExportHistory()}
                                 >
-                                    {savedReportPayloadExportStatusLoading ? "Refreshing..." : "Refresh status"}
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    disabled={savedReportPayloadExportArtifactLoading || !savedReportPayloadExportJobSummary.hasArtifact}
-                                    onClick={downloadSavedReportPayloadArtifact}
-                                >
-                                    {savedReportPayloadExportArtifactLoading ? "Loading artifact..." : "Download artifact"}
+                                    {savedReportPayloadExportHistoryLoading ? "Refreshing history..." : "Refresh history"}
                                 </Button>
                             </div>
-                            {renderExportFailureDiagnostics(savedReportPayloadExportFailureNotice)}
+                            {savedReportPayloadRecentExportEntries.length > 0 ? (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 10,
+                                    }}
+                                >
+                                    {savedReportPayloadRecentExportEntries.map((entry) => {
+                                        const actions = [
+                                            {
+                                                id: `${entry.id}:review`,
+                                                label: entry.reviewLabel || "Use current",
+                                                onClick: () => selectSavedReportPayloadExportHistoryEntry({
+                                                    job: entry.job,
+                                                    artifact: entry.artifact,
+                                                }),
+                                            },
+                                        ];
+                                        if (entry.hasArtifact) {
+                                            actions.push({
+                                                id: `${entry.id}:download`,
+                                                label: entry.downloadLabel || "Download artifact",
+                                                onClick: () => downloadSavedReportPayloadExportHistoryArtifact({
+                                                    artifactId: entry.artifact?.artifactId || entry.job?.artifactId || "",
+                                                    title: savedReportPayloadSummary?.title || entry.title || "Report",
+                                                    format: entry.artifact?.format || entry.job?.format || savedReportPayloadExportRequestSummary?.format || "pdf",
+                                                    artifact: entry.artifact || null,
+                                                }),
+                                            });
+                                        }
+                                        if (entry.canRefresh) {
+                                            actions.push({
+                                                id: `${entry.id}:refresh`,
+                                                label: "Refresh status",
+                                                onClick: async () => {
+                                                    selectSavedReportPayloadExportHistoryEntry({
+                                                        job: entry.job,
+                                                        artifact: entry.artifact,
+                                                    });
+                                                    await refreshSavedReportPayloadExportStatus({
+                                                        jobId: entry.job?.jobId || "",
+                                                    });
+                                                },
+                                            });
+                                        }
+                                        return (
+                                            <ReportBuilderPreparedArtifactCard
+                                                key={entry.id}
+                                                artifact={entry}
+                                                actions={actions}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <ReportBuilderInlineNotice
+                                    notice={{
+                                        level: "info",
+                                        message: savedReportPayloadExportHistoryLoading
+                                            ? "Loading recent exports."
+                                            : "No recent saved exports yet.",
+                                    }}
+                                />
+                            )}
                         </div>
                     ) : null}
-                    {savedReportPayloadSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <span>{reportDocumentVersionState.helperText}</span>
-                        </div>
-                    ) : null}
-                    {savedReportPayloadSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <span>{updateReportDocumentExpectedVersionState.helperText}</span>
-                        </div>
-                    ) : null}
-                    {getReportDocumentResponseSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Get ReportDocument response:</strong> {getReportDocumentResponseSummary.title}
-                                </span>
-                                {getReportDocumentResponseSummary.subtitle ? (
-                                    <span>{getReportDocumentResponseSummary.subtitle}</span>
-                                ) : null}
-                                {getReportDocumentResponseSummary.description ? (
-                                    <span>{getReportDocumentResponseSummary.description}</span>
-                                ) : null}
-                                {getReportDocumentResponseSummary.templateLabel ? (
+                    {getReportDocumentResponseSummary && !hideSavedPayloadHandoffGetResponseSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level={getReportDocumentResponseSummary.templateConflict ? "warning" : "info"}
+                            label={savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.label || "Reopen bundle"}
+                            value={getReportDocumentResponseSummary.title}
+                            subtitle={getReportDocumentResponseSummary.subtitle}
+                            description={getReportDocumentResponseSummary.description}
+                            supplemental={getReportDocumentResponseSummary.templateLabel ? (
+                                <>
                                     <span><strong>Template:</strong> {getReportDocumentResponseSummary.templateLabel}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">v{getReportDocumentResponseSummary.documentVersion}</span>
-                                <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.compileStatus}</span>
-                                {getReportDocumentResponseSummary.templateLabel ? (
-                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.templateLabel}</span>
-                                ) : null}
-                                <Button small minimal onClick={reopenGetReportDocumentResponse}>
-                                    Reopen in builder
-                                </Button>
-                                <Button small minimal onClick={() => setGetReportDocumentResponseOpen((current) => !current)}>
-                                    {getReportDocumentResponseOpen ? "Hide get response" : "Inspect get response"}
-                                </Button>
-                                <Button small minimal onClick={downloadGetReportDocumentResponse}>
-                                    Download get response
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {getReportDocumentResponseSummary && !getReportDocumentResponseCompileValidation.valid ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning">
-                            <span>
-                                <strong>Persisted compile warning:</strong> {getReportDocumentResponseCompileValidation.message}
-                            </span>
-                        </div>
-                    ) : null}
-                    {getReportDocumentResponseOpen && getReportDocumentResponseContent ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Get ReportDocument response summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">getReportDocumentResponse</span>
-                                <span className="forge-report-builder__result-meta-chip">v{getReportDocumentResponseSummary?.documentVersion || 0}</span>
-                                {getReportDocumentResponseInspector?.title ? (
-                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseInspector.title}</span>
-                                ) : null}
-                                {getReportDocumentResponseInspector?.templateLabel ? (
-                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseInspector.templateLabel}</span>
-                                ) : null}
-                            </div>
-                            {getReportDocumentResponseInspector?.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {getReportDocumentResponseInspector.headerSubtitle}
-                                </div>
+                                    {getReportDocumentResponseSummary.templateConflictMessage ? (
+                                        <span>{getReportDocumentResponseSummary.templateConflictMessage}</span>
+                                    ) : null}
+                                </>
                             ) : null}
-                            {getReportDocumentResponseInspector?.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {getReportDocumentResponseInspector.headerDescription}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.reportId}</span>
+                                    {getReportDocumentResponseSummary.documentVersion > 0 ? (
+                                        <span className="forge-report-builder__result-meta-chip">v{getReportDocumentResponseSummary.documentVersion}</span>
+                                    ) : null}
+                                    {getReportDocumentResponseSummary.lifecycle ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.lifecycle}</span>
+                                    ) : null}
+                                    {getReportDocumentResponseSummary.artifactId ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.artifactId}</span>
+                                    ) : null}
+                                    {getReportDocumentResponseSummary.sourceArtifactId ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.sourceArtifactId}</span>
+                                    ) : null}
+                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.compileStatus}</span>
+                                    {getReportDocumentResponseSummary.templateLabel ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.templateLabel}</span>
+                                    ) : null}
+                                    {getReportDocumentResponseSummary.templateConflictLabel ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.templateConflictLabel}</span>
+                                    ) : null}
+                                    {Number(getReportDocumentResponseSummary.authoredBlockCount || 0) > 0 ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.authoredBlockCount} authored blocks</span>
+                                    ) : null}
+                                    {Number(getReportDocumentResponseSummary.drillHierarchyCount || 0) > 0 ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.drillHierarchyCount} drill hierarchies</span>
+                                    ) : null}
+                                    {Number(getReportDocumentResponseSummary.detailTargetCount || 0) > 0 ? (
+                                        <span className="forge-report-builder__result-meta-chip">{getReportDocumentResponseSummary.detailTargetCount} detail targets</span>
+                                    ) : null}
+                                    <Button small minimal onClick={reopenGetReportDocumentResponse}>
+                                        Reopen in builder
+                                    </Button>
+                                    <Button small minimal onClick={() => setGetReportDocumentResponseOpen((current) => !current)}>
+                                        {savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.inspectLabel || (getReportDocumentResponseOpen ? "Hide reopen bundle" : "Review reopen bundle")}
+                                    </Button>
+                                    <Button small minimal onClick={downloadGetReportDocumentResponse}>
+                                        {savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.downloadLabel || "Download reopen bundle file"}
+                                    </Button>
                                 </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(getReportDocumentResponseSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(getReportDocumentResponseSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(getReportDocumentResponseSummary, { marginTop: 10 })}
+                            {renderReopenSourceResolution(getReportDocumentResponseSummary, { marginTop: 10 })}
+                            {renderShareableArtifactState(getReportDocumentResponseSummary, { marginTop: 10 })}
+                            {renderAuthoredDocumentProgress(getReportDocumentResponseSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {getReportDocumentResponseSummary && !getReportDocumentResponseCompileValidation.valid && !hideSavedPayloadHandoffGetResponseSummary ? (
+                        <ReportBuilderInlineNotice
+                            notice={{
+                                level: "warning",
+                                message: `Persisted compile warning: ${getReportDocumentResponseCompileValidation.message}`,
+                            }}
+                        />
+                    ) : null}
+                    {!hideSavedPayloadHandoffGetResponseSummary ? renderInspectorNoticePanel(getReportDocumentResponseInspector, {
+                        ariaLabel: `${savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.label || "Reopen bundle"} summary`,
+                        hide: () => setGetReportDocumentResponseOpen(false),
+                        hideLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.inspectLabel || "Hide reopen bundle",
+                        download: downloadGetReportDocumentResponse,
+                        downloadLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.downloadLabel || "Download reopen bundle file",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            "getReportDocumentResponse",
+                            getReportDocumentResponseSummary?.documentVersion > 0 ? `v${getReportDocumentResponseSummary.documentVersion}` : "",
+                            getReportDocumentResponseInspector?.lifecycle || "",
+                            getReportDocumentResponseInspector?.artifactId || "",
+                            getReportDocumentResponseInspector?.sourceArtifactId || "",
+                            getReportDocumentResponseInspector?.title || "",
+                            getReportDocumentResponseInspector?.templateLabel || "",
+                            getReportDocumentResponseInspector?.templateConflictLabel || "",
+                        ].filter(Boolean),
+                    }) : null}
+                    {reopenReportDocumentDiagnosticSummary && !hideSavedPayloadHandoffReopenDiagnosticSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="warning"
+                            label={savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.label || "Reopen diagnostic"}
+                            value={reopenReportDocumentDiagnosticSummary.title}
+                            subtitle={reopenReportDocumentDiagnosticSummary.subtitle}
+                            description={reopenReportDocumentDiagnosticSummary.description}
+                            supplemental={reopenReportDocumentDiagnosticSummary.templateLabel || reopenReportDocumentDiagnosticSummary.templateConflictMessage ? (
+                                <>
+                                    {reopenReportDocumentDiagnosticSummary.templateLabel ? (
+                                        <span><strong>Template:</strong> {reopenReportDocumentDiagnosticSummary.templateLabel}</span>
+                                    ) : null}
+                                    {reopenReportDocumentDiagnosticSummary.templateConflictMessage ? (
+                                        <span>{reopenReportDocumentDiagnosticSummary.templateConflictMessage}</span>
+                                    ) : null}
+                                </>
                             ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {getReportDocumentResponseContent}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {reopenReportDocumentDiagnosticSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Reopen diagnostic:</strong> {reopenReportDocumentDiagnosticSummary.title}
-                                </span>
-                                {reopenReportDocumentDiagnosticSummary.subtitle ? (
-                                    <span>{reopenReportDocumentDiagnosticSummary.subtitle}</span>
-                                ) : null}
-                                {reopenReportDocumentDiagnosticSummary.description ? (
-                                    <span>{reopenReportDocumentDiagnosticSummary.description}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticSummary.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticSummary.code}</span>
-                                <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticSummary.severity}</span>
-                                <Button small minimal onClick={() => setReopenReportDocumentDiagnosticOpen((current) => !current)}>
-                                    {reopenReportDocumentDiagnosticOpen ? "Hide reopen diagnostic" : "Inspect reopen diagnostic"}
-                                </Button>
-                                <Button small minimal onClick={downloadReopenReportDocumentDiagnostic}>
-                                    Download reopen diagnostic
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {reopenReportDocumentDiagnosticOpen && reopenReportDocumentDiagnosticInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Reopen diagnostic summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticInspector.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticInspector.code}</span>
-                                <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticInspector.severity}</span>
-                            </div>
-                            {reopenReportDocumentDiagnosticInspector.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#5f3411" }}>
-                                    {reopenReportDocumentDiagnosticInspector.headerSubtitle}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticSummary.reportId}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticSummary.code}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticSummary.severity}</span>
+                                    {reopenReportDocumentDiagnosticSummary.templateConflictLabel ? (
+                                        <span className="forge-report-builder__result-meta-chip">{reopenReportDocumentDiagnosticSummary.templateConflictLabel}</span>
+                                    ) : null}
+                                    <Button small minimal onClick={() => setReopenReportDocumentDiagnosticOpen((current) => !current)}>
+                                        {savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.inspectLabel || (reopenReportDocumentDiagnosticOpen ? "Hide reopen review" : "Review reopen diagnostic")}
+                                    </Button>
+                                    <Button small minimal onClick={downloadReopenReportDocumentDiagnostic}>
+                                        {savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.downloadLabel || "Download reopen diagnostic file"}
+                                    </Button>
                                 </div>
-                            ) : null}
-                            {reopenReportDocumentDiagnosticInspector.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#5f3411" }}>
-                                    {reopenReportDocumentDiagnosticInspector.headerDescription}
-                                </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fff9f5",
-                                    color: "#5f3411",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {reopenReportDocumentDiagnosticInspector.content}
-                            </pre>
-                        </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(reopenReportDocumentDiagnosticSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(reopenReportDocumentDiagnosticSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(reopenReportDocumentDiagnosticSummary, { marginTop: 10 })}
+                            {renderReopenSourceResolution(reopenReportDocumentDiagnosticSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
                     ) : null}
-                    {listReportDocumentsResponseSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>List ReportDocuments response:</strong> {listReportDocumentsResponseSummary.entryCount} entries
-                                </span>
-                                {selectedListReportDocumentsEntrySummary?.title ? (
-                                    <span><strong>Selected entry:</strong> {selectedListReportDocumentsEntrySummary.title}</span>
-                                ) : null}
-                                {selectedListReportDocumentsEntrySummary?.subtitle ? (
-                                    <span>{selectedListReportDocumentsEntrySummary.subtitle}</span>
-                                ) : null}
-                                {selectedListReportDocumentsEntrySummary?.description ? (
-                                    <span>{selectedListReportDocumentsEntrySummary.description}</span>
-                                ) : null}
-                                {selectedListReportDocumentsEntrySummary?.templateLabel ? (
-                                    <span><strong>Template:</strong> {selectedListReportDocumentsEntrySummary.templateLabel}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseSummary.cursor || "no-cursor"}</span>
-                                <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseSummary.hasMore ? "has-more" : "complete"}</span>
-                                {listReportDocumentsEntryOptions.length > 0 ? (
+                    {reopenReportDocumentDiagnosticOpen && reopenReportDocumentDiagnosticInspector && !hideSavedPayloadHandoffReopenDiagnosticSummary ? renderInspectorNoticePanel(reopenReportDocumentDiagnosticInspector, {
+                        level: "warning",
+                        ariaLabel: `${savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.label || "Reopen diagnostic"} summary`,
+                        hide: () => setReopenReportDocumentDiagnosticOpen(false),
+                        hideLabel: savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.inspectLabel || "Hide reopen review",
+                        download: downloadReopenReportDocumentDiagnostic,
+                        downloadLabel: savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.downloadLabel || "Download reopen diagnostic file",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            reopenReportDocumentDiagnosticInspector?.kind || "",
+                            reopenReportDocumentDiagnosticInspector?.code || "",
+                            reopenReportDocumentDiagnosticInspector?.severity || "",
+                            reopenReportDocumentDiagnosticInspector?.templateLabel || "",
+                            reopenReportDocumentDiagnosticInspector?.templateConflictLabel || "",
+                        ].filter(Boolean),
+                        detailColor: "#5f3411",
+                        contentStyle: {
+                            background: "#fff9f5",
+                            color: "#5f3411",
+                        },
+                    }) : null}
+                    {importedLocalReopenablePanelState ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label={importedLocalReopenablePanelState.title}
+                            value={importedLocalReopenablePanelState.description}
+                            footer={(
+                                <>
+                                    <div className="forge-report-builder__result-header-actions">
+                                        {importedLocalReopenablePanelState.metaChips.map((chip) => (
+                                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                        ))}
+                                        <Button small minimal onClick={clearImportedLocalReopenables}>
+                                            {importedLocalReopenablePanelState.clearAllLabel}
+                                        </Button>
+                                    </div>
+                                    <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8, flexWrap: "wrap" }}>
+                                        {importedLocalReopenablePanelState.entries.map((entry) => (
+                                            <ReportBuilderArtifactEntryCard
+                                                key={entry.id}
+                                                entry={entry}
+                                                renderSemanticBindingChips={renderSemanticBindingChips}
+                                                renderSemanticBindingFieldGroups={renderSemanticBindingFieldGroups}
+                                                renderScopeSummaryItems={renderScopeSummaryItems}
+                                                renderReopenSourceResolution={renderReopenSourceResolution}
+                                                renderAuthoredDocumentProgress={renderAuthoredDocumentProgress}
+                                                onActivate={entry.activateLabel ? () => activateImportedLocalReopenable(entry.id, entry.title) : null}
+                                                onRemove={() => removeImportedLocalReopenable(entry.id, entry.title)}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        />
+                    ) : null}
+                    {importedLocalSavedRecordPanelState ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label={importedLocalSavedRecordPanelState.title}
+                            value={importedLocalSavedRecordPanelState.description}
+                            footer={(
+                                <>
+                                    <div className="forge-report-builder__result-header-actions">
+                                        {importedLocalSavedRecordPanelState.metaChips.map((chip) => (
+                                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                        ))}
+                                        <Button small minimal onClick={clearImportedLocalSavedRecords}>
+                                            {importedLocalSavedRecordPanelState.clearAllLabel}
+                                        </Button>
+                                    </div>
+                                    <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8, flexWrap: "wrap" }}>
+                                        {importedLocalSavedRecordPanelState.entries.map((entry) => (
+                                            <ReportBuilderArtifactEntryCard
+                                                key={entry.id}
+                                                entry={entry}
+                                                renderSemanticBindingChips={renderSemanticBindingChips}
+                                                renderSemanticBindingFieldGroups={renderSemanticBindingFieldGroups}
+                                                renderScopeSummaryItems={renderScopeSummaryItems}
+                                                renderReopenSourceResolution={renderReopenSourceResolution}
+                                                renderAuthoredDocumentProgress={renderAuthoredDocumentProgress}
+                                                onActivate={entry.activateLabel ? () => activateImportedLocalSavedRecord(entry.id, entry.title) : null}
+                                                onRemove={() => removeImportedLocalSavedRecord(entry.id, entry.title)}
+                                            />
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        />
+                    ) : null}
+                    {listReportDocumentsResponseSummary && !hideSavedPayloadHandoffListResponseSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level={selectedListReportDocumentsEntrySummary?.templateConflict ? "warning" : "info"}
+                            label={savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.label || "Catalog response"}
+                            value={`${listReportDocumentsResponseSummary.entryCount} entries`}
+                            supplemental={(
+                                <>
+                                    {selectedListReportDocumentsEntrySummary?.title ? (
+                                        <span><strong>Selected entry:</strong> {selectedListReportDocumentsEntrySummary.title}</span>
+                                    ) : null}
+                                    {selectedListReportDocumentsEntrySummary?.subtitle ? (
+                                        <span>{selectedListReportDocumentsEntrySummary.subtitle}</span>
+                                    ) : null}
+                                    {selectedListReportDocumentsEntrySummary?.description ? (
+                                        <span>{selectedListReportDocumentsEntrySummary.description}</span>
+                                    ) : null}
+                                    {selectedListReportDocumentsEntrySummary?.templateLabel ? (
+                                        <span><strong>Template:</strong> {selectedListReportDocumentsEntrySummary.templateLabel}</span>
+                                    ) : null}
+                                    {selectedListReportDocumentsEntrySummary?.templateConflictMessage ? (
+                                        <span>{selectedListReportDocumentsEntrySummary.templateConflictMessage}</span>
+                                    ) : null}
+                                </>
+                            )}
+                            footer={(
+                                <>
+                                    <div className="forge-report-builder__result-header-actions">
+                                        <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseSummary.cursor || "no-cursor"}</span>
+                                        <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseSummary.hasMore ? "has-more" : "complete"}</span>
+                                        {listReportDocumentsEntryOptions.length > 0 ? (
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
+                                                <span>Entry</span>
+                                                <select
+                                                    aria-label="List response entry"
+                                                    value={listReportDocumentsSelectedReportId}
+                                                    onChange={(event) => handleListReportDocumentsSelectedReportIdChange(event.target.value)}
+                                                    style={{
+                                                        minHeight: 28,
+                                                        padding: "4px 8px",
+                                                        borderRadius: 8,
+                                                        border: "1px solid #c8d6e5",
+                                                        background: "#ffffff",
+                                                        color: "#183247",
+                                                    }}
+                                                >
+                                                    {listReportDocumentsEntryOptions.map((entry) => (
+                                                        <option key={entry.selectionKey || entry.reportId} value={entry.selectionKey || entry.reportId}>
+                                                            {buildReportBuilderListReportDocumentsEntryOptionLabel(entry)}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                        ) : null}
+                                        {selectedListReportDocumentsEntry?.subtitle ? (
+                                            <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.subtitle}</span>
+                                        ) : null}
+                                        {selectedListReportDocumentsEntryMetaChips.map((chip) => (
+                                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                        ))}
+                                        {!selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
+                                            <span className="forge-report-builder__result-meta-chip">No local payload backing</span>
+                                        ) : null}
+                                        <Button
+                                            small
+                                            minimal
+                                            onClick={prepareListEntryReopenDiagnostic}
+                                            disabled={!listReportDocumentsSelectedReportId}
+                                        >
+                                            Check reopen compatibility
+                                        </Button>
+                                        <Button
+                                            small
+                                            minimal
+                                            onClick={prepareGetReportDocumentRequestPayload}
+                                            disabled={!listReportDocumentsSelectedReportId}
+                                        >
+                                            Prepare get request
+                                        </Button>
+                                        <Button
+                                            small
+                                            minimal
+                                            onClick={prepareSelectedGetReportDocumentResponse}
+                                            disabled={!listReportDocumentsSelectedReportId}
+                                        >
+                                            Prepare selected get response
+                                        </Button>
+                                        <Button
+                                            small
+                                            minimal
+                                            onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
+                                            disabled={!listReportDocumentsSelectedReportId}
+                                        >
+                                            Open selected response
+                                        </Button>
+                                        {selectedListEntryExportActionState ? (
+                                            <>
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    disabled={selectedListEntryExportActionState.submitDisabled || !listReportDocumentsSelectedReportId}
+                                                    onClick={triggerSelectedListEntryExport}
+                                                >
+                                                    {selectedListEntryExportActionState.submitLabel}
+                                                </Button>
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    disabled={!listReportDocumentsSelectedReportId}
+                                                    onClick={() => setSelectedListEntryExportRequestOpen((current) => !current)}
+                                                >
+                                                    {selectedListEntryExportActionState.inspectLabel}
+                                                </Button>
+                                            </>
+                                        ) : null}
+                                        {(Array.isArray(selectedListEntryLifecycleActionState?.actions)
+                                            ? selectedListEntryLifecycleActionState.actions
+                                            : []
+                                        ).map((action) => (
+                                            <Button
+                                                key={action.id}
+                                                small
+                                                minimal
+                                                disabled={action.disabled || !listReportDocumentsSelectedReportId}
+                                                title={action.disabledReason || ""}
+                                                aria-label={action.disabledReason ? `${action.label}. ${action.disabledReason}` : action.label}
+                                                onClick={() => triggerSelectedListEntryLifecycleAction(action.id)}
+                                            >
+                                                {action.label}
+                                            </Button>
+                                        ))}
+                                        <Button small minimal onClick={() => setListReportDocumentsResponseOpen((current) => !current)}>
+                                            {savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.inspectLabel || (listReportDocumentsResponseOpen ? "Hide catalog response" : "Review catalog response")}
+                                        </Button>
+                                        <Button small minimal onClick={downloadListReportDocumentsResponse}>
+                                            {savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.downloadLabel || "Download catalog response file"}
+                                        </Button>
+                                    </div>
+                                    {!selectedListEntryExportRequestSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntrySummary?.reopenable ? (
+                                        <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                                            <span>
+                                                This imported catalog entry can prepare a get request and reopen diagnostic, but it cannot expand into a local reopen bundle until a matching local reopen artifact is available.
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                    {selectedBackendSharedArtifactHydrationNotice ? (
+                                        <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                                            <span>
+                                                {selectedBackendSharedArtifactHydrationNotice.message}
+                                            </span>
+                                        </div>
+                                    ) : null}
+                                </>
+                            )}
+                        >
+                            {renderSemanticBindingChips(selectedListReportDocumentsEntrySummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(selectedListReportDocumentsEntrySummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(selectedListReportDocumentsEntrySummary, { marginTop: 10 })}
+                            {renderReopenSourceResolution(selectedListReportDocumentsEntrySummary, { marginTop: 10 })}
+                            {renderShareableArtifactState(selectedListReportDocumentsEntrySummary, { marginTop: 10 })}
+                            {renderAuthoredDocumentProgress(selectedListReportDocumentsEntrySummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {!hideSavedPayloadHandoffListResponseSummary ? renderInspectorNoticePanel(selectedListEntryExportRequestPanelState, {
+                        ariaLabel: "Selected catalog entry export request summary",
+                        hide: () => setSelectedListEntryExportRequestOpen(false),
+                        hideLabel: selectedListEntryExportRequestPanelState?.hideLabel || "",
+                        download: downloadSelectedListEntryExportRequest,
+                        downloadLabel: selectedListEntryExportRequestPanelState?.downloadLabel || "",
+                        includeSemanticBindingChips: true,
+                    }) : null}
+                    {!hideSavedPayloadHandoffListResponseSummary ? renderExportJobPanelNotice(selectedListEntryExportJobPanelState, {
+                        refreshStatus: refreshSelectedListEntryExportStatus,
+                        downloadArtifact: downloadSelectedListEntryExportArtifact,
+                        failureNotice: selectedListEntryExportFailureNotice,
+                    }) : null}
+                    {selectedListReportDocumentsEntry && !selectedListReportDocumentsEntryCompileValidation.valid && !hideSavedPayloadHandoffListResponseSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="warning"
+                            label="Selected entry compile warning"
+                            value={selectedListReportDocumentsEntryCompileValidation.message}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    {selectedListReportDocumentsEntry?.reportRef?.reportId ? (
+                                        <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.reportRef.reportId}</span>
+                                    ) : null}
+                                    {selectedListReportDocumentsEntrySummary?.title ? (
+                                        <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntrySummary.title}</span>
+                                    ) : null}
+                                    {selectedListReportDocumentsEntry?.compileState?.status ? (
+                                        <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.compileState.status}</span>
+                                    ) : null}
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
+                                        disabled={!listReportDocumentsSelectedReportId}
+                                    >
+                                        Open selected response
+                                    </Button>
+                                </div>
+                            )}
+                        />
+                    ) : null}
+                    {selectedListReportDocumentsEntry && !hideSavedPayloadHandoffListResponseSummary ? renderCompileDiagnosticsNotice(selectedListEntryCompileDiagnosticsNotice, {
+                        actionForDiagnostic: openDocumentBlockDialogForDiagnostic,
+                    }) : null}
+                    {!hideSavedPayloadHandoffListResponseSummary ? renderInspectorNoticePanel(listReportDocumentsResponseInspector, {
+                        ariaLabel: `${savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.label || "Catalog response"} summary`,
+                        hide: () => setListReportDocumentsResponseOpen(false),
+                        hideLabel: savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.inspectLabel || "Hide catalog response",
+                        download: downloadListReportDocumentsResponse,
+                        downloadLabel: savedReportPayloadApiArtifactEntriesById.listReportDocumentsResponse?.downloadLabel || "Download catalog response file",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            "listReportDocumentsResponse",
+                            `${listReportDocumentsResponseSummary?.entryCount || 0} entries`,
+                            listReportDocumentsResponseInspector?.selectedEntry?.title || "",
+                            listReportDocumentsResponseInspector?.lifecycle || "",
+                            listReportDocumentsResponseInspector?.artifactId || "",
+                            listReportDocumentsResponseInspector?.sourceArtifactId || "",
+                            listReportDocumentsResponseInspector?.templateLabel || "",
+                            listReportDocumentsResponseInspector?.templateConflictLabel || "",
+                        ].filter(Boolean),
+                        content: listReportDocumentsResponseContent,
+                    }) : null}
+                    {getReportDocumentRequestPayloadSummary && !hideSavedPayloadHandoffGetRequestSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label={savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.label || "Get request"}
+                            value={getReportDocumentRequestPayloadSummary.title || getReportDocumentRequestPayloadSummary.reportId}
+                            subtitle={getReportDocumentRequestPayloadSummary.subtitle}
+                            description={getReportDocumentRequestPayloadSummary.description}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentRequestPayloadSummary.kind}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentRequestPayloadSummary.reportId}</span>
+                                    <Button small minimal onClick={() => setGetReportDocumentRequestPayloadOpen((current) => !current)}>
+                                        {savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.inspectLabel || (getReportDocumentRequestPayloadOpen ? "Hide get request artifact" : "Review get request")}
+                                    </Button>
+                                    <Button small minimal onClick={downloadGetReportDocumentRequestPayload}>
+                                        {savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.downloadLabel || "Download get request file"}
+                                    </Button>
+                                </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(getReportDocumentRequestPayloadSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(getReportDocumentRequestPayloadSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(getReportDocumentRequestPayloadSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {!hideSavedPayloadHandoffGetRequestSummary ? renderInspectorNoticePanel(getReportDocumentRequestPayloadInspector, {
+                        ariaLabel: `${savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.label || "Get request"} summary`,
+                        hide: () => setGetReportDocumentRequestPayloadOpen(false),
+                        hideLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.inspectLabel || "Hide get request artifact",
+                        download: downloadGetReportDocumentRequestPayload,
+                        downloadLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentRequest?.downloadLabel || "Download get request file",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            getReportDocumentRequestPayloadInspector?.kind || "",
+                            getReportDocumentRequestPayloadInspector?.reportId || "",
+                            getReportDocumentRequestPayloadInspector?.title || "",
+                        ].filter(Boolean),
+                    }) : null}
+                    {createReportDocumentPayloadSummary && !hideSavedPayloadHandoffCreatePayloadSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label={savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.label || "Create request"}
+                            value={createReportDocumentPayloadSummary.title}
+                            subtitle={createReportDocumentPayloadSummary.subtitle}
+                            description={createReportDocumentPayloadSummary.description}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.reportId}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.compileStatus}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.blockCount} blocks</span>
+                                    <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.datasetCount} dataset</span>
+                                    <Button small minimal onClick={() => setCreateReportDocumentPayloadOpen((current) => !current)}>
+                                        {savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.inspectLabel || (createReportDocumentPayloadOpen ? "Hide create request" : "Review create request")}
+                                    </Button>
+                                    <Button small minimal onClick={downloadCreateReportDocumentPayload}>
+                                        {savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.downloadLabel || "Download create request file"}
+                                    </Button>
+                                </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(createReportDocumentPayloadSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(createReportDocumentPayloadSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(createReportDocumentPayloadSummary, { marginTop: 10 })}
+                            {renderReopenSourceResolution(createReportDocumentPayloadSummary, { marginTop: 10 })}
+                            {renderShareableArtifactState(createReportDocumentPayloadSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
+                    ) : null}
+                    {!hideSavedPayloadHandoffCreatePayloadSummary ? renderInspectorNoticePanel(createReportDocumentPayloadInspector, {
+                        ariaLabel: `${savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.label || "Create request"} summary`,
+                        hide: () => setCreateReportDocumentPayloadOpen(false),
+                        hideLabel: savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.inspectLabel || "Hide create request",
+                        download: downloadCreateReportDocumentPayload,
+                        downloadLabel: savedReportPayloadApiArtifactEntriesById.createReportDocumentPayload?.downloadLabel || "Download create request file",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            createReportDocumentPayloadInspector?.kind || "",
+                            createReportDocumentPayloadInspector?.reportId || "",
+                            createReportDocumentPayloadInspector?.compileStatus || "",
+                        ].filter(Boolean),
+                    }) : null}
+                    {updateReportDocumentPayloadSummary && !hideSavedPayloadHandoffUpdatePayloadSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label={savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.label || "Update request"}
+                            value={updateReportDocumentPayloadSummary.title}
+                            subtitle={updateReportDocumentPayloadSummary.subtitle}
+                            description={updateReportDocumentPayloadSummary.description}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.reportId}</span>
+                                    <span className="forge-report-builder__result-meta-chip">v{updateReportDocumentPayloadSummary.expectedVersion}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.compileStatus}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.blockCount} blocks</span>
+                                    <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.datasetCount} dataset</span>
                                     <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
-                                        <span>Entry</span>
-                                        <select
-                                            aria-label="List response entry"
-                                            value={listReportDocumentsSelectedReportId}
-                                            onChange={(event) => {
-                                                setListReportDocumentsSelectedReportId(event.target.value);
-                                                setGetReportDocumentRequestPayload(null);
-                                                setGetReportDocumentRequestPayloadOpen(false);
-                                                setGetReportDocumentResponse(null);
-                                                setGetReportDocumentResponseOpen(false);
-                                                setReopenReportDocumentDiagnostic(null);
-                                                setReopenReportDocumentDiagnosticOpen(false);
-                                            }}
+                                        <span>Current version</span>
+                                        <input
+                                            aria-label="Current version"
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={updateReportDocumentCurrentVersionDraft}
+                                            onChange={handleUpdateReportDocumentCurrentVersionDraftChange}
                                             style={{
+                                                width: 72,
                                                 minHeight: 28,
                                                 padding: "4px 8px",
                                                 borderRadius: 8,
@@ -7725,522 +12680,100 @@ export default function ReportBuilder({ container, context }) {
                                                 background: "#ffffff",
                                                 color: "#183247",
                                             }}
-                                        >
-                                            {listReportDocumentsEntryOptions.map((entry) => (
-                                                <option key={entry.reportId} value={entry.reportId}>
-                                                    {entry.title || entry.reportId}{entry.compileStatus && entry.compileStatus !== "clean" ? ` (${entry.compileStatus})` : ""}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        />
                                     </label>
-                                ) : null}
-                                {selectedListReportDocumentsEntry?.subtitle ? (
-                                    <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.subtitle}</span>
-                                ) : null}
-                                {selectedListReportDocumentsEntrySummary?.templateLabel ? (
-                                    <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntrySummary.templateLabel}</span>
-                                ) : null}
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareListEntryReopenDiagnostic}
-                                    disabled={!listReportDocumentsSelectedReportId}
-                                >
-                                    Check reopen compatibility
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareGetReportDocumentRequestPayload}
-                                    disabled={!listReportDocumentsSelectedReportId}
-                                >
-                                    Prepare get request
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareSelectedGetReportDocumentResponse}
-                                    disabled={!listReportDocumentsSelectedReportId}
-                                >
-                                    Prepare selected get response
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
-                                    disabled={!listReportDocumentsSelectedReportId}
-                                >
-                                    Open selected response
-                                </Button>
-                                {selectedListEntryExportRequestSummary ? (
-                                    <>
-                                        <Button
-                                            small
-                                            minimal
-                                            disabled={selectedListEntryExportSubmitting || !listReportDocumentsSelectedReportId}
-                                            onClick={triggerSelectedListEntryExport}
-                                        >
-                                            {reportExportHandler ? "Export selected" : "Review export"}
-                                        </Button>
-                                        <Button
-                                            small
-                                            minimal
-                                            disabled={!listReportDocumentsSelectedReportId}
-                                            onClick={() => setSelectedListEntryExportRequestOpen((current) => !current)}
-                                        >
-                                            {selectedListEntryExportRequestOpen ? "Hide export" : "Inspect export"}
-                                        </Button>
-                                    </>
-                                ) : null}
-                                <Button small minimal onClick={() => setListReportDocumentsResponseOpen((current) => !current)}>
-                                    {listReportDocumentsResponseOpen ? "Hide list response" : "Inspect list response"}
-                                </Button>
-                                <Button small minimal onClick={downloadListReportDocumentsResponse}>
-                                    Download list response
-                                </Button>
-                            </div>
-                        </div>
+                                    <Button
+                                        small
+                                        minimal
+                                        onClick={prepareUpdateReportDocumentConflictDiagnostic}
+                                        disabled={!updateReportDocumentConflictVersionState.conflictReady}
+                                    >
+                                        Prepare conflict diagnostic
+                                    </Button>
+                                    <Button small minimal onClick={() => setUpdateReportDocumentPayloadOpen((current) => !current)}>
+                                        {savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.inspectLabel || (updateReportDocumentPayloadOpen ? "Hide update request" : "Review update request")}
+                                    </Button>
+                                    <Button small minimal onClick={downloadUpdateReportDocumentPayload}>
+                                        {savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.downloadLabel || "Download update request file"}
+                                    </Button>
+                                </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(updateReportDocumentPayloadSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(updateReportDocumentPayloadSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(updateReportDocumentPayloadSummary, { marginTop: 10 })}
+                            {renderReopenSourceResolution(updateReportDocumentPayloadSummary, { marginTop: 10 })}
+                            {renderShareableArtifactState(updateReportDocumentPayloadSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
                     ) : null}
-                    {selectedListEntryExportRequestOpen && selectedListEntryExportRequestInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Selected list entry export request summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{selectedListEntryExportRequestInspector.from}</span>
-                                <span className="forge-report-builder__result-meta-chip">{selectedListEntryExportRequestInspector.format}</span>
-                                <span className="forge-report-builder__result-meta-chip">{selectedListEntryExportRequestInspector.artifactRef}</span>
-                            </div>
-                            <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 10 }}>
-                                <Button small minimal onClick={() => setSelectedListEntryExportRequestOpen(false)}>
-                                    Hide export request
-                                </Button>
-                                <Button small minimal onClick={downloadSelectedListEntryExportRequest}>
-                                    Download export request
-                                </Button>
-                            </div>
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {selectedListEntryExportRequestInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {selectedListEntryExportJobSummary ? (
-                        <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${selectedListEntryExportJobSummary.hasFailure ? "warning" : "info"}`}>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Selected export:</strong> {selectedListReportDocumentsEntrySummary?.title || "Report"}
-                                </span>
-                                {selectedListEntryExportJobSummary.error ? (
-                                    <span>{selectedListEntryExportJobSummary.error}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{selectedListEntryExportJobSummary.jobId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{selectedListEntryExportJobSummary.status}</span>
-                                {selectedListEntryExportJobSummary.artifactId ? (
-                                    <span className="forge-report-builder__result-meta-chip">{selectedListEntryExportJobSummary.artifactId}</span>
-                                ) : null}
-                                <Button
-                                    small
-                                    minimal
-                                    disabled={selectedListEntryExportStatusLoading || !selectedListEntryExportJobSummary.canRefresh}
-                                    onClick={refreshSelectedListEntryExportStatus}
-                                >
-                                    {selectedListEntryExportStatusLoading ? "Refreshing..." : "Refresh status"}
-                                </Button>
-                                <Button
-                                    small
-                                    minimal
-                                    disabled={selectedListEntryExportArtifactLoading || !selectedListEntryExportJobSummary.hasArtifact}
-                                    onClick={downloadSelectedListEntryExportArtifact}
-                                >
-                                    {selectedListEntryExportArtifactLoading ? "Loading artifact..." : "Download artifact"}
-                                </Button>
-                            </div>
-                            {renderExportFailureDiagnostics(selectedListEntryExportFailureNotice)}
-                        </div>
-                    ) : null}
-                    {selectedListReportDocumentsEntry && !selectedListReportDocumentsEntryCompileValidation.valid ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning">
-                            <span>
-                                <strong>Selected entry compile warning:</strong> {selectedListReportDocumentsEntryCompileValidation.message}
-                            </span>
-                            <div className="forge-report-builder__result-header-actions">
-                                {selectedListReportDocumentsEntry?.reportRef?.reportId ? (
-                                    <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.reportRef.reportId}</span>
-                                ) : null}
-                                {selectedListReportDocumentsEntrySummary?.title ? (
-                                    <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntrySummary.title}</span>
-                                ) : null}
-                                {selectedListReportDocumentsEntry?.compileState?.status ? (
-                                    <span className="forge-report-builder__result-meta-chip">{selectedListReportDocumentsEntry.compileState.status}</span>
-                                ) : null}
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareSelectedGetReportDocumentResponseFromListEntry}
-                                    disabled={!listReportDocumentsSelectedReportId}
-                                >
-                                    Open selected response
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {selectedListReportDocumentsEntry ? renderCompileDiagnosticsNotice(selectedListEntryCompileDiagnosticsNotice, {
-                        actionForDiagnostic: openDocumentBlockDialogForDiagnostic,
+                    {!hideSavedPayloadHandoffUpdatePayloadSummary ? renderInspectorNoticePanel(updateReportDocumentPayloadInspector, {
+                        ariaLabel: `${savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.label || "Update request"} summary`,
+                        hide: () => setUpdateReportDocumentPayloadOpen(false),
+                        hideLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.inspectLabel || "Hide update request",
+                        download: downloadUpdateReportDocumentPayload,
+                        downloadLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.downloadLabel || "Download update request file",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            updateReportDocumentPayloadInspector?.kind || "",
+                            updateReportDocumentPayloadInspector?.reportId || "",
+                            updateReportDocumentPayloadInspector?.expectedVersion ? `v${updateReportDocumentPayloadInspector.expectedVersion}` : "",
+                        ].filter(Boolean),
                     }) : null}
-                    {listReportDocumentsResponseOpen && listReportDocumentsResponseContent ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="List ReportDocuments response summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">listReportDocumentsResponse</span>
-                                <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseSummary?.entryCount || 0} entries</span>
-                                {listReportDocumentsResponseInspector?.selectedEntry?.title ? (
-                                    <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseInspector.selectedEntry.title}</span>
-                                ) : null}
-                                {listReportDocumentsResponseInspector?.templateLabel ? (
-                                    <span className="forge-report-builder__result-meta-chip">{listReportDocumentsResponseInspector.templateLabel}</span>
-                                ) : null}
-                            </div>
-                            {listReportDocumentsResponseInspector?.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {listReportDocumentsResponseInspector.headerSubtitle}
+                    {updateReportDocumentPayloadSummary && !hideSavedPayloadHandoffUpdatePayloadSummary ? (
+                        <ReportBuilderInlineNotice
+                            notice={{
+                                level: "info",
+                                message: updateReportDocumentConflictVersionState.helperText,
+                            }}
+                        />
+                    ) : null}
+                    {updateReportDocumentConflictDiagnosticSummary && !hideSavedPayloadHandoffUpdateConflictSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="warning"
+                            label={savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.label || "Conflict diagnostic"}
+                            value={updateReportDocumentConflictDiagnosticSummary.title}
+                            subtitle={updateReportDocumentConflictDiagnosticSummary.subtitle}
+                            description={updateReportDocumentConflictDiagnosticSummary.description}
+                            footer={(
+                                <div className="forge-report-builder__result-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">{updateReportDocumentConflictDiagnosticSummary.reportId}</span>
+                                    <span className="forge-report-builder__result-meta-chip">expected v{updateReportDocumentConflictDiagnosticSummary.expectedVersion}</span>
+                                    <span className="forge-report-builder__result-meta-chip">current v{updateReportDocumentConflictDiagnosticSummary.currentVersion}</span>
+                                    <span className="forge-report-builder__result-meta-chip">{updateReportDocumentConflictDiagnosticSummary.code}</span>
+                                    <Button small minimal onClick={() => setUpdateReportDocumentConflictDiagnosticOpen((current) => !current)}>
+                                        {savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.inspectLabel || (updateReportDocumentConflictDiagnosticOpen ? "Hide conflict review" : "Review conflict diagnostic")}
+                                    </Button>
+                                    <Button small minimal onClick={downloadUpdateReportDocumentConflictDiagnostic}>
+                                        {savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.downloadLabel || "Download conflict diagnostic file"}
+                                    </Button>
                                 </div>
-                            ) : null}
-                            {listReportDocumentsResponseInspector?.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {listReportDocumentsResponseInspector.headerDescription}
-                                </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {listReportDocumentsResponseContent}
-                            </pre>
-                        </div>
+                            )}
+                        >
+                            {renderSemanticBindingChips(updateReportDocumentConflictDiagnosticSummary, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(updateReportDocumentConflictDiagnosticSummary, { marginTop: 10 })}
+                            {renderScopeSummaryItems(updateReportDocumentConflictDiagnosticSummary, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
                     ) : null}
-                    {getReportDocumentRequestPayloadSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Get ReportDocument request:</strong> {getReportDocumentRequestPayloadSummary.title || getReportDocumentRequestPayloadSummary.reportId}
-                                </span>
-                                {getReportDocumentRequestPayloadSummary.subtitle ? (
-                                    <span>{getReportDocumentRequestPayloadSummary.subtitle}</span>
-                                ) : null}
-                                {getReportDocumentRequestPayloadSummary.description ? (
-                                    <span>{getReportDocumentRequestPayloadSummary.description}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{getReportDocumentRequestPayloadSummary.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{getReportDocumentRequestPayloadSummary.reportId}</span>
-                                <Button small minimal onClick={() => setGetReportDocumentRequestPayloadOpen((current) => !current)}>
-                                    {getReportDocumentRequestPayloadOpen ? "Hide get request" : "Inspect get request"}
-                                </Button>
-                                <Button small minimal onClick={downloadGetReportDocumentRequestPayload}>
-                                    Download get request
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {getReportDocumentRequestPayloadOpen && getReportDocumentRequestPayloadInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Get ReportDocument request summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{getReportDocumentRequestPayloadInspector.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{getReportDocumentRequestPayloadInspector.reportId}</span>
-                                {getReportDocumentRequestPayloadInspector.title ? (
-                                    <span className="forge-report-builder__result-meta-chip">{getReportDocumentRequestPayloadInspector.title}</span>
-                                ) : null}
-                            </div>
-                            {getReportDocumentRequestPayloadInspector.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {getReportDocumentRequestPayloadInspector.headerSubtitle}
-                                </div>
-                            ) : null}
-                            {getReportDocumentRequestPayloadInspector.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {getReportDocumentRequestPayloadInspector.headerDescription}
-                                </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {getReportDocumentRequestPayloadInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {createReportDocumentPayloadSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Create ReportDocument payload:</strong> {createReportDocumentPayloadSummary.title}
-                                </span>
-                                {createReportDocumentPayloadSummary.subtitle ? (
-                                    <span>{createReportDocumentPayloadSummary.subtitle}</span>
-                                ) : null}
-                                {createReportDocumentPayloadSummary.description ? (
-                                    <span>{createReportDocumentPayloadSummary.description}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.compileStatus}</span>
-                                <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.blockCount} blocks</span>
-                                <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadSummary.datasetCount} dataset</span>
-                                <Button small minimal onClick={() => setCreateReportDocumentPayloadOpen((current) => !current)}>
-                                    {createReportDocumentPayloadOpen ? "Hide create payload" : "Inspect create payload"}
-                                </Button>
-                                <Button small minimal onClick={downloadCreateReportDocumentPayload}>
-                                    Download create payload
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {createReportDocumentPayloadOpen && createReportDocumentPayloadInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Create ReportDocument payload summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadInspector.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadInspector.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">{createReportDocumentPayloadInspector.compileStatus}</span>
-                            </div>
-                            {createReportDocumentPayloadInspector.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {createReportDocumentPayloadInspector.headerSubtitle}
-                                </div>
-                            ) : null}
-                            {createReportDocumentPayloadInspector.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {createReportDocumentPayloadInspector.headerDescription}
-                                </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {createReportDocumentPayloadInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {updateReportDocumentPayloadSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Update ReportDocument payload:</strong> {updateReportDocumentPayloadSummary.title}
-                                </span>
-                                {updateReportDocumentPayloadSummary.subtitle ? (
-                                    <span>{updateReportDocumentPayloadSummary.subtitle}</span>
-                                ) : null}
-                                {updateReportDocumentPayloadSummary.description ? (
-                                    <span>{updateReportDocumentPayloadSummary.description}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">v{updateReportDocumentPayloadSummary.expectedVersion}</span>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.compileStatus}</span>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.blockCount} blocks</span>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadSummary.datasetCount} dataset</span>
-                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#486579", fontSize: 11 }}>
-                                    <span>Current version</span>
-                                    <input
-                                        aria-label="Current version"
-                                        type="number"
-                                        min="1"
-                                        step="1"
-                                        value={updateReportDocumentCurrentVersionDraft}
-                                        onChange={handleUpdateReportDocumentCurrentVersionDraftChange}
-                                        style={{
-                                            width: 72,
-                                            minHeight: 28,
-                                            padding: "4px 8px",
-                                            borderRadius: 8,
-                                            border: "1px solid #c8d6e5",
-                                            background: "#ffffff",
-                                            color: "#183247",
-                                        }}
-                                    />
-                                </label>
-                                <Button
-                                    small
-                                    minimal
-                                    onClick={prepareUpdateReportDocumentConflictDiagnostic}
-                                    disabled={!updateReportDocumentConflictVersionState.conflictReady}
-                                >
-                                    Prepare conflict diagnostic
-                                </Button>
-                                <Button small minimal onClick={() => setUpdateReportDocumentPayloadOpen((current) => !current)}>
-                                    {updateReportDocumentPayloadOpen ? "Hide update payload" : "Inspect update payload"}
-                                </Button>
-                                <Button small minimal onClick={downloadUpdateReportDocumentPayload}>
-                                    Download update payload
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {updateReportDocumentPayloadOpen && updateReportDocumentPayloadInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Update ReportDocument payload summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadInspector.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentPayloadInspector.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">v{updateReportDocumentPayloadInspector.expectedVersion}</span>
-                            </div>
-                            {updateReportDocumentPayloadInspector.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {updateReportDocumentPayloadInspector.headerSubtitle}
-                                </div>
-                            ) : null}
-                            {updateReportDocumentPayloadInspector.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#486579" }}>
-                                    {updateReportDocumentPayloadInspector.headerDescription}
-                                </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fbfdff",
-                                    color: "#294256",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {updateReportDocumentPayloadInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {updateReportDocumentPayloadSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
-                            <span>{updateReportDocumentConflictVersionState.helperText}</span>
-                        </div>
-                    ) : null}
-                    {updateReportDocumentConflictDiagnosticSummary ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning">
-                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                                <span>
-                                    <strong>Update conflict diagnostic:</strong> {updateReportDocumentConflictDiagnosticSummary.title}
-                                </span>
-                                {updateReportDocumentConflictDiagnosticSummary.subtitle ? (
-                                    <span>{updateReportDocumentConflictDiagnosticSummary.subtitle}</span>
-                                ) : null}
-                                {updateReportDocumentConflictDiagnosticSummary.description ? (
-                                    <span>{updateReportDocumentConflictDiagnosticSummary.description}</span>
-                                ) : null}
-                            </div>
-                            <div className="forge-report-builder__result-header-actions">
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentConflictDiagnosticSummary.reportId}</span>
-                                <span className="forge-report-builder__result-meta-chip">expected v{updateReportDocumentConflictDiagnosticSummary.expectedVersion}</span>
-                                <span className="forge-report-builder__result-meta-chip">current v{updateReportDocumentConflictDiagnosticSummary.currentVersion}</span>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentConflictDiagnosticSummary.code}</span>
-                                <Button small minimal onClick={() => setUpdateReportDocumentConflictDiagnosticOpen((current) => !current)}>
-                                    {updateReportDocumentConflictDiagnosticOpen ? "Hide conflict diagnostic" : "Inspect conflict diagnostic"}
-                                </Button>
-                                <Button small minimal onClick={downloadUpdateReportDocumentConflictDiagnostic}>
-                                    Download conflict diagnostic
-                                </Button>
-                            </div>
-                        </div>
-                    ) : null}
-                    {updateReportDocumentConflictDiagnosticOpen && updateReportDocumentConflictDiagnosticInspector ? (
-                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning" style={{ display: "block" }}>
-                            <div className="forge-report-builder__result-meta" aria-label="Update conflict diagnostic summary" style={{ marginBottom: 10 }}>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentConflictDiagnosticInspector.kind}</span>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentConflictDiagnosticInspector.code}</span>
-                                <span className="forge-report-builder__result-meta-chip">{updateReportDocumentConflictDiagnosticInspector.severity}</span>
-                            </div>
-                            {updateReportDocumentConflictDiagnosticInspector.headerSubtitle ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#5f3411" }}>
-                                    {updateReportDocumentConflictDiagnosticInspector.headerSubtitle}
-                                </div>
-                            ) : null}
-                            {updateReportDocumentConflictDiagnosticInspector.headerDescription ? (
-                                <div style={{ marginBottom: 8, fontSize: 12, color: "#5f3411" }}>
-                                    {updateReportDocumentConflictDiagnosticInspector.headerDescription}
-                                </div>
-                            ) : null}
-                            <pre
-                                className="forge-report-builder__saved-artifact-json"
-                                style={{
-                                    margin: 0,
-                                    padding: "12px 14px",
-                                    borderRadius: 10,
-                                    border: "1px solid #d7e2ee",
-                                    background: "#fff9f5",
-                                    color: "#5f3411",
-                                    fontSize: 11,
-                                    lineHeight: 1.5,
-                                    whiteSpace: "pre-wrap",
-                                    overflow: "auto",
-                                    maxHeight: 320,
-                                }}
-                            >
-                                {updateReportDocumentConflictDiagnosticInspector.content}
-                            </pre>
-                        </div>
-                    ) : null}
-                    {chartApplyFeedback?.message ? (
-                        <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${chartApplyFeedback.level || "warning"}`}>
-                            <span>{chartApplyFeedback.message}</span>
-                            {chartApplyFeedback.action === "runReport" ? (
-                                <Button small minimal onClick={runReport}>Run now</Button>
-                            ) : null}
-                        </div>
-                    ) : null}
+                    {updateReportDocumentConflictDiagnosticOpen && updateReportDocumentConflictDiagnosticInspector && !hideSavedPayloadHandoffUpdateConflictSummary ? renderInspectorNoticePanel(updateReportDocumentConflictDiagnosticInspector, {
+                        level: "warning",
+                        ariaLabel: `${savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.label || "Conflict diagnostic"} summary`,
+                        hide: () => setUpdateReportDocumentConflictDiagnosticOpen(false),
+                        hideLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.inspectLabel || "Hide conflict review",
+                        download: downloadUpdateReportDocumentConflictDiagnostic,
+                        downloadLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.downloadLabel || "Download conflict diagnostic file",
+                        includeSemanticBindingChips: true,
+                        metaChips: [
+                            updateReportDocumentConflictDiagnosticInspector?.kind || "",
+                            updateReportDocumentConflictDiagnosticInspector?.code || "",
+                            updateReportDocumentConflictDiagnosticInspector?.severity || "",
+                        ].filter(Boolean),
+                        detailColor: "#5f3411",
+                        contentStyle: {
+                            background: "#fff9f5",
+                            color: "#5f3411",
+                        },
+                    }) : null}
+                    {renderChartApplyFeedbackNotice({ onAction: runReport })}
 
                     <div className="forge-report-builder__result-frame">
                         {activeResultLoading ? (
@@ -8249,6 +12782,7 @@ export default function ReportBuilder({ container, context }) {
                                 eyebrow="Loading"
                                 title="Refreshing report data"
                                 description="Preparing the latest result set for the current scope."
+                                animated
                             />
                         ) : null}
                         {activeResultError ? (
@@ -8270,9 +12804,8 @@ export default function ReportBuilder({ container, context }) {
                                 description={emptyResultState.description}
                                 actionLabel={emptyResultState.actionLabel}
                                 onAction={
-                                    emptyResultState.action === "retrySemanticValidation"
-                                        ? retrySemanticValidation
-                                        : (canRunReport && !hasCompletedCurrentRun ? runReport : undefined)
+                                    resolveReadinessActionHandler(emptyResultState.action)
+                                    || (canRunReport && !hasCompletedCurrentRun ? runReport : undefined)
                                 }
                             />
                         ) : null}
@@ -8345,6 +12878,7 @@ export default function ReportBuilder({ container, context }) {
                             </div>
                         </div>
                     ) : null}
+                    {renderImportedRuntimePreview()}
                     {renderRuntimePreview()}
                     {renderCompactBottomBar()}
                 </main>

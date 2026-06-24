@@ -26,6 +26,8 @@ const provider = {
       detailTarget: {
         targetRef,
         navigationMode: "hostRoute",
+        title: "Order details",
+        description: "Open the resolved order detail view.",
         parameters: {
           orderId: "$row.adOrderId",
         },
@@ -37,7 +39,7 @@ const provider = {
       actions: [
         { id: "keep", label: "Keep only", kind: "keep" },
         { id: "exclude", label: "Exclude", kind: "exclude" },
-        { id: "detail", label: "Show details", kind: "detail", targetRef: "target://steward/performance/order-detail" },
+        { id: "detail", label: "Show details", kind: "detail", targetRef: "target://example/performance/order-detail" },
         { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
       ],
     };
@@ -68,15 +70,19 @@ assert.deepEqual(normalizeDrillHierarchy({
 
 assert.deepEqual(normalizeDetailTarget({
   detailTarget: {
-    targetRef: "target://steward/performance/order-detail",
+    targetRef: "target://example/performance/order-detail",
     navigationMode: "hostRoute",
+    title: "Order details",
+    description: "Open the resolved order detail view.",
     parameters: {
       orderId: "$row.adOrderId",
     },
   },
 }), {
-  targetRef: "target://steward/performance/order-detail",
+  targetRef: "target://example/performance/order-detail",
   navigationMode: "hostRoute",
+  title: "Order details",
+  description: "Open the resolved order detail view.",
   parameters: {
     orderId: "$row.adOrderId",
   },
@@ -86,14 +92,14 @@ assert.deepEqual(normalizeRefinementActions({
   actions: [
     { id: "keep", label: "Keep only", kind: "keep" },
     { id: "exclude", label: "Exclude", kind: "exclude" },
-    { id: "detail", label: "Show details", kind: "detail", targetRef: "target://steward/performance/order-detail" },
+    { id: "detail", label: "Show details", kind: "detail", targetRef: "target://example/performance/order-detail" },
     { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
     { id: "broken", label: "Broken", kind: "unknown" },
   ],
 }), [
   { id: "keep", label: "Keep only", kind: "keep" },
   { id: "exclude", label: "Exclude", kind: "exclude" },
-  { id: "detail", label: "Show details", kind: "detail", targetRef: "target://steward/performance/order-detail" },
+  { id: "detail", label: "Show details", kind: "detail", targetRef: "target://example/performance/order-detail" },
   { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
 ]);
 
@@ -105,9 +111,11 @@ assert.deepEqual(await wrapped.getDrillHierarchy("stateCode"), {
     { id: "dma", field: "dma", label: "DMA" },
   ],
 });
-assert.deepEqual(await wrapped.getDetailTarget("target://steward/performance/order-detail"), {
-  targetRef: "target://steward/performance/order-detail",
+assert.deepEqual(await wrapped.getDetailTarget("target://example/performance/order-detail"), {
+  targetRef: "target://example/performance/order-detail",
   navigationMode: "hostRoute",
+  title: "Order details",
+  description: "Open the resolved order detail view.",
   parameters: {
     orderId: "$row.adOrderId",
   },
@@ -115,7 +123,7 @@ assert.deepEqual(await wrapped.getDetailTarget("target://steward/performance/ord
 assert.deepEqual(await wrapped.listAvailableRefinements("chartBlock", "region"), [
   { id: "keep", label: "Keep only", kind: "keep" },
   { id: "exclude", label: "Exclude", kind: "exclude" },
-  { id: "detail", label: "Show details", kind: "detail", targetRef: "target://steward/performance/order-detail" },
+  { id: "detail", label: "Show details", kind: "detail", targetRef: "target://example/performance/order-detail" },
   { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
 ]);
 

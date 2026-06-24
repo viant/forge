@@ -5,13 +5,13 @@ import { mergeReportBuilderReopenedConfig } from "./reportBuilderConfigMerge.js"
 const baseConfig = {
     title: "Demo",
     reportDocumentSavedPayloads: [
-        { savedReportPayload: { reportDocument: { id: "forecastingQ3" } } },
+        { savedReportPayload: { reportDocument: { id: "capacityQ3" } } },
     ],
     reportDocumentListEntries: [
-        { reportRef: { reportId: "forecastingQ3" } },
+        { reportRef: { reportId: "capacityQ3" } },
     ],
     reportDocumentTemplates: [
-        { id: "forecast_inventory_brief" },
+        { id: "capacity_inventory_brief" },
     ],
     result: {
         defaultMode: "table",
@@ -28,13 +28,13 @@ const reopenedConfig = {
 assert.deepEqual(mergeReportBuilderReopenedConfig(baseConfig, reopenedConfig), {
     title: "Reopened Demo",
     reportDocumentSavedPayloads: [
-        { savedReportPayload: { reportDocument: { id: "forecastingQ3" } } },
+        { savedReportPayload: { reportDocument: { id: "capacityQ3" } } },
     ],
     reportDocumentListEntries: [
-        { reportRef: { reportId: "forecastingQ3" } },
+        { reportRef: { reportId: "capacityQ3" } },
     ],
     reportDocumentTemplates: [
-        { id: "forecast_inventory_brief" },
+        { id: "capacity_inventory_brief" },
     ],
     result: {
         defaultMode: "chart",

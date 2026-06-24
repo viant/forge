@@ -90,6 +90,8 @@ export const reportSpecSchema = {
         label: { type: "string" },
         description: { type: "string" },
         format: { type: "string" },
+        category: { type: "string" },
+        definitionRef: { type: "string" },
         governance: { $ref: "#/$defs/semanticGovernance" },
       },
     },
@@ -110,6 +112,10 @@ export const reportSpecSchema = {
           items: { $ref: "#/$defs/semanticSummaryField" },
         },
         selectedMeasures: {
+          type: "array",
+          items: { $ref: "#/$defs/semanticSummaryField" },
+        },
+        selectedParameters: {
           type: "array",
           items: { $ref: "#/$defs/semanticSummaryField" },
         },
@@ -173,6 +179,7 @@ export const reportSpecSchema = {
         id: { type: "string" },
         kind: { type: "string" },
         label: { type: "string" },
+        description: { type: "string" },
         required: { type: "boolean" },
         value: { $ref: "#/$defs/jsonValue" },
       },
@@ -846,6 +853,8 @@ export const reportSpecSchema = {
       properties: {
         targetRef: { type: "string" },
         navigationMode: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
         parameters: { type: "object" },
       },
     },

@@ -11,6 +11,7 @@ import {
   resolveReportRuntimeDatasetRequest,
   resolveReportRuntimeRefinementFields,
   resolveReportRuntimePrimaryBlocks,
+  resolveReportRuntimeScopeSummary,
 } from "./reportRuntimeModel.js";
 
 const reportSpec = {
@@ -29,23 +30,25 @@ const reportSpec = {
   },
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["available_impressions", "household_uniques"],
   },
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
     selectedDimensions: [
-      { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+      { id: "event_date", rawId: "eventDate", label: "Delivery Date", category: "Time" },
       {
         id: "channel",
         rawId: "channelV2",
         label: "Channel",
+        category: "Delivery",
+        definitionRef: "semantic://example/channel",
         governance: {
           status: "draft",
         },
@@ -56,6 +59,7 @@ const reportSpec = {
         id: "available_impressions",
         rawId: "avails",
         label: "Available Impressions",
+        category: "Metrics",
         governance: {
           status: "approved",
           certification: "certified",
@@ -71,6 +75,17 @@ const reportSpec = {
         },
       },
     ],
+    selectedParameters: [
+      {
+        id: "reporting_window",
+        rawId: "dateRange",
+        label: "Reporting Window",
+        category: "Scope",
+        governance: {
+          status: "approved",
+        },
+      },
+    ],
   },
   datasets: [
     {
@@ -83,6 +98,19 @@ const reportSpec = {
       },
     },
   ],
+  scope: {
+    params: [
+      {
+        id: "dateRange",
+        label: "Reporting Window",
+        description: "Approved reporting window for semantic preview.",
+        value: {
+          start: "2026-05-01",
+          end: "2026-05-07",
+        },
+      },
+    ],
+  },
 };
 
 const reportFill = {
@@ -125,21 +153,30 @@ assert.deepEqual(
 assert.deepEqual(resolveReportRuntimeBindingSummary(reportSpec), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
   dimensionCount: 2,
   measureCount: 2,
+  parameterCount: 1,
   selectedDimensions: [
-    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
-    { id: "channel", rawId: "channelV2", label: "Channel", governance: { status: "draft" } },
+    { id: "event_date", rawId: "eventDate", label: "Delivery Date", category: "Time" },
+    {
+      id: "channel",
+      rawId: "channelV2",
+      label: "Channel",
+      category: "Delivery",
+      definitionRef: "semantic://example/channel",
+      governance: { status: "draft" },
+    },
   ],
   selectedMeasures: [
     {
       id: "available_impressions",
       rawId: "avails",
       label: "Available Impressions",
+      category: "Metrics",
       governance: {
         status: "approved",
         certification: "certified",
@@ -155,6 +192,15 @@ assert.deepEqual(resolveReportRuntimeBindingSummary(reportSpec), {
       },
     },
   ],
+  selectedParameters: [
+    {
+      id: "reporting_window",
+      rawId: "dateRange",
+      label: "Reporting Window",
+      category: "Scope",
+      governance: { status: "approved" },
+    },
+  ],
   governanceCounts: {
     draft: 1,
     deprecated: 1,
@@ -164,7 +210,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary(reportSpec), {
 assert.deepEqual(resolveReportRuntimeBindingSummary({
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["available_impressions", "household_uniques"],
@@ -172,7 +218,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 }), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   entity: "line_delivery",
   dimensionCount: 2,
   measureCount: 2,
@@ -193,7 +239,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 assert.deepEqual(resolveReportRuntimeBindingSummary({
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -244,11 +290,19 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
         },
       },
     ],
+    selectedParameters: [
+      {
+        id: "reporting_window",
+        rawId: "dateRange",
+        label: "Reporting Window",
+        category: "Scope",
+      },
+    ],
   },
 }), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -272,6 +326,10 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
     { id: "household_uniques", rawId: "hhUniqs", label: "Household Uniques" },
     { id: "reach_rate", rawId: "reachRate", label: "Reach Rate", governance: { status: "draft" } },
   ],
+  parameterCount: 1,
+  selectedParameters: [
+    { id: "reporting_window", rawId: "dateRange", label: "Reporting Window", category: "Scope" },
+  ],
   governanceCounts: {
     draft: 1,
     deprecated: 2,
@@ -280,23 +338,27 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 
 assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
   kind: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
   dimensionCount: 4,
   measureCount: 4,
   selectedDimensions: [
-    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
-    { id: "channel", rawId: "channelV2", label: "Channel", governance: { status: "deprecated" } },
-    { id: "country_code", rawId: "country", label: "Market", governance: { status: "deprecated" } },
-    { id: "region", rawId: "region", label: "Region" },
+    { id: "event_date", rawId: "eventDate", label: "Delivery Date", category: "Time" },
+    { id: "channel", rawId: "channelV2", label: "Channel", category: "Delivery", definitionRef: "semantic://example/channel", governance: { status: "deprecated", ownerRef: "team://example/performance" } },
+    { id: "country_code", rawId: "country", label: "Market", category: "Location", definitionRef: "harmonizer://feature/location", governance: { status: "deprecated", ownerRef: "team://example/performance" } },
+    { id: "region", rawId: "region", label: "Region", category: "Location", definitionRef: "harmonizer://feature/location" },
   ],
   selectedMeasures: [
-    { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
-    { id: "household_uniques", rawId: "hhUniqs", label: "Household Uniques" },
-    { id: "reach_rate", rawId: "reachRate", label: "Reach Rate", governance: { status: "draft" } },
-    { id: "reach_share", rawId: "reachShare", label: "Reach Share" },
+    { id: "available_impressions", rawId: "avails", label: "Available Impressions", category: "Metrics", governance: { ownerRef: "team://example/performance" } },
+    { id: "household_uniques", rawId: "hhUniqs", label: "Household Uniques", category: "Metrics" },
+    { id: "reach_rate", rawId: "reachRate", label: "Reach Rate", category: "Metrics", governance: { status: "draft" } },
+    { id: "reach_share", rawId: "reachShare", label: "Reach Share", category: "Metrics" },
+  ],
+  parameterCount: 1,
+  selectedParameters: [
+    { id: "reporting_window", rawId: "dateRange", label: "Reporting Window", category: "Scope", definitionRef: "semantic://example/reporting_window", governance: { ownerRef: "team://example/performance" } },
   ],
   governanceCounts: {
     draft: 1,
@@ -307,13 +369,33 @@ assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
   "Entity Line Delivery",
   "Dimensions Delivery Date, Channel +2",
   "Measures Available Impressions, Household Uniques +2",
+  "Parameters Reporting Window",
+  "Categories Time, Delivery +3",
+  "Owner team://example/performance",
+  "Lineage semantic://example/channel +2",
   "2 deprecated",
   "1 draft",
 ]);
 
+assert.deepEqual(resolveReportRuntimeScopeSummary(reportSpec), {
+  title: "Report Scope",
+  paramCount: 1,
+  params: [
+    {
+      id: "dateRange",
+      label: "Reporting Window",
+      description: "Approved reporting window for semantic preview.",
+      value: {
+        start: "2026-05-01",
+        end: "2026-05-07",
+      },
+    },
+  ],
+});
+
 assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
   kind: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   entity: "line_delivery",
   dimensionCount: 0,
   measureCount: 0,
@@ -324,7 +406,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
     deprecated: 0,
   },
 }), [
-  "Model model://steward/performance/ad_delivery@v1",
+  "Model model://example/performance/delivery@v1",
   "Entity line_delivery",
   "0 dimensions",
   "0 measures",
@@ -333,7 +415,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
 assert.deepEqual(resolveReportRuntimeBindingSummary({
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -394,7 +476,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 }), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -421,14 +503,14 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 assert.deepEqual(resolveReportRuntimeBindingSummary({
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["available_impressions", "household_uniques"],
   },
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -447,7 +529,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 }), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -476,14 +558,14 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 assert.deepEqual(resolveReportRuntimeBindingSummary({
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["available_impressions", "household_uniques"],
   },
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -502,7 +584,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 }), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -531,14 +613,14 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 assert.deepEqual(resolveReportRuntimeBindingSummary({
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["available_impressions", "household_uniques"],
   },
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -548,7 +630,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 }), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   entity: "line_delivery",
   entityLabel: "Line Delivery",
@@ -571,7 +653,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 assert.deepEqual(resolveReportRuntimeBindingSummary({
   semanticSummary: {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     modelDescription: "Governed reporting model for the report builder preview.",
     entity: "line_delivery",
@@ -595,7 +677,7 @@ assert.deepEqual(resolveReportRuntimeBindingSummary({
 }), {
   kind: "semantic",
   title: "Semantic Binding",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   modelLabel: "Ad Delivery",
   modelDescription: "Governed reporting model for the report builder preview.",
   entity: "line_delivery",
@@ -807,5 +889,105 @@ assert.deepEqual(
     message: "Runtime refinement actions are unavailable for Date because no backend runtime filter mapping is declared.",
   }],
 );
+
+assert.deepEqual(resolveReportRuntimeBindingSummary({
+  reportSpec: {
+    title: "Thin Runtime Spec",
+    semanticSummary: {
+      kind: "semantic",
+      selectedDimensions: [],
+      selectedMeasures: [],
+    },
+  },
+  reportDocument: {
+    title: "Document Backed Runtime",
+    semanticSummary: {
+      kind: "semantic",
+      modelRef: "model://example/audience/performance@v1",
+      modelLabel: "Audience Performance",
+      entity: "audience_segment",
+      entityLabel: "Audience Segment",
+      selectedDimensions: [
+        {
+          id: "audience_segment",
+          rawId: "audienceSegment",
+          label: "Audience Segment",
+        },
+      ],
+      selectedMeasures: [
+        {
+          id: "audience_index",
+          rawId: "audienceIndex",
+          label: "Audience Index",
+        },
+      ],
+    },
+  },
+}), {
+  kind: "semantic",
+  title: "Semantic Binding",
+  modelRef: "model://example/audience/performance@v1",
+  modelLabel: "Audience Performance",
+  entity: "audience_segment",
+  entityLabel: "Audience Segment",
+  dimensionCount: 1,
+  measureCount: 1,
+  selectedDimensions: [
+    {
+      id: "audience_segment",
+      rawId: "audienceSegment",
+      label: "Audience Segment",
+    },
+  ],
+  selectedMeasures: [
+    {
+      id: "audience_index",
+      rawId: "audienceIndex",
+      label: "Audience Index",
+    },
+  ],
+  governanceCounts: {
+    draft: 0,
+    deprecated: 0,
+  },
+});
+
+assert.deepEqual(resolveReportRuntimeScopeSummary({
+  reportSpec: {
+    title: "Thin Runtime Scope",
+    scope: {
+      params: [],
+    },
+  },
+  reportDocument: {
+    scope: {
+      params: [
+        {
+          id: "dateRange",
+          label: "Reporting Window",
+          description: "Recovered from the embedded runtime document.",
+          value: {
+            start: "2026-06-01",
+            end: "2026-06-07",
+          },
+        },
+      ],
+    },
+  },
+}), {
+  title: "Report Scope",
+  paramCount: 1,
+  params: [
+    {
+      id: "dateRange",
+      label: "Reporting Window",
+      description: "Recovered from the embedded runtime document.",
+      value: {
+        start: "2026-06-01",
+        end: "2026-06-07",
+      },
+    },
+  ],
+});
 
 console.log("reportRuntimeModel ✓ orders runtime blocks and summarizes scope and semantic binding");

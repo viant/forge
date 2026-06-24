@@ -112,6 +112,8 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
         snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
         snapshotBuilder: connectorConfig?.uiBridge?.snapshotBuilder,
         clientId: connectorConfig?.uiBridge?.clientId,
+        snapshotEvents: connectorConfig?.uiBridge?.snapshotEvents,
+        authReadyEvents: connectorConfig?.uiBridge?.authReadyEvents,
         startupReadyEvent: connectorConfig?.uiBridge?.startupReadyEvent,
         startupReadyTimeoutMs: connectorConfig?.uiBridge?.startupReadyTimeoutMs,
       });
@@ -124,6 +126,7 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
         snapshotOptions: connectorConfig?.uiBridge?.snapshotOptions,
         snapshotBuilder: connectorConfig?.uiBridge?.snapshotBuilder,
         clientId: connectorConfig?.uiBridge?.clientId,
+        snapshotEvents: connectorConfig?.uiBridge?.snapshotEvents,
         startupReadyEvent: connectorConfig?.uiBridge?.startupReadyEvent,
         startupReadyTimeoutMs: connectorConfig?.uiBridge?.startupReadyTimeoutMs,
       });

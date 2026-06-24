@@ -13,13 +13,53 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
+export function resolveReportBuilderSemanticRuntimeFallbackPreference({
+  preferFallbackMetadata = null,
+  providerAvailable = false,
+  modelLoading = false,
+  modelError = "",
+  model = null,
+} = {}) {
+  if (preferFallbackMetadata != null) {
+    return preferFallbackMetadata === true;
+  }
+  if (model && typeof model === "object" && !Array.isArray(model)) {
+    return false;
+  }
+  return providerAvailable === true
+    && modelLoading === true
+    && !normalizeString(modelError);
+}
+
+export function resolveReportBuilderSemanticRuntimeFallbackAllowance({
+  allowFallbackMetadata = null,
+  providerAvailable = false,
+  modelLoading = false,
+  modelError = "",
+  model = null,
+} = {}) {
+  if (allowFallbackMetadata != null) {
+    return allowFallbackMetadata === true;
+  }
+  if (model && typeof model === "object" && !Array.isArray(model)) {
+    return true;
+  }
+  return providerAvailable === true
+    && modelLoading === true
+    && !normalizeString(modelError);
+}
+
 export function resolveReportBuilderSemanticRuntimeState({
   config = {},
   state = {},
   binding = null,
   model = null,
+  providerAvailable = false,
+  modelLoading = false,
+  modelError = "",
   fallbackSummary = null,
   fallbackFingerprint = "",
+  allowFallbackMetadata = null,
   preferFallbackMetadata = null,
 } = {}) {
   const semanticDisplayConfig = applyReportBuilderSemanticConfig(config, binding, model);
@@ -47,7 +87,20 @@ export function resolveReportBuilderSemanticRuntimeState({
       fallbackSummary,
       currentFingerprint: semanticValidationFingerprint,
       fallbackFingerprint,
-      preferFallbackMetadata: preferFallbackMetadata == null ? !model : preferFallbackMetadata === true,
+      allowFallbackMetadata: resolveReportBuilderSemanticRuntimeFallbackAllowance({
+        allowFallbackMetadata,
+        providerAvailable,
+        modelLoading,
+        modelError,
+        model,
+      }),
+      preferFallbackMetadata: resolveReportBuilderSemanticRuntimeFallbackPreference({
+        preferFallbackMetadata,
+        providerAvailable,
+        modelLoading,
+        modelError,
+        model,
+      }),
     }),
   };
 }
@@ -84,11 +137,15 @@ export function useReportBuilderSemanticRuntimeState({
       state,
       binding,
       model: semanticModelState.model,
+      providerAvailable: !!semanticModelProvider,
+      modelLoading: semanticModelState.loading,
+      modelError: semanticModelState.error,
       fallbackSummary,
       fallbackFingerprint,
+      allowFallbackMetadata: null,
       preferFallbackMetadata,
     }),
-    [binding, config, fallbackFingerprint, fallbackSummary, preferFallbackMetadata, semanticModelState.model, state],
+    [binding, config, fallbackFingerprint, fallbackSummary, preferFallbackMetadata, semanticModelProvider, semanticModelState.error, semanticModelState.loading, semanticModelState.model, state],
   );
   return {
     semanticModelRef,

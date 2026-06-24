@@ -3,6 +3,9 @@ import {
     normalizeReportCalculatedFields,
     parseReportCalculatedFieldExpression,
 } from "../../reporting/calculatedFieldModel.js";
+import {
+    listReportCalculatedFieldTableCalculationSpecs,
+} from "../../reporting/calculationContracts.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -235,46 +238,22 @@ function formatCalculatedFieldValidationError(error = {}) {
     };
 }
 
-export const REPORT_BUILDER_TABLE_CALC_FUNCTIONS = [
-    {
-        value: "percentOfTotal",
-        label: "Percent of Total",
-        supportsPartition: true,
-        supportsDecimals: true,
-        defaultFormat: "percent",
-    },
-    {
-        value: "runningTotal",
-        label: "Running Total",
-        supportsPartition: true,
-        requiresOrder: true,
-        defaultFormat: "number",
-    },
-    {
-        value: "rank",
-        label: "Rank",
-        supportsPartition: true,
-        supportsRankDirection: true,
-        supportsTieBreaker: true,
-        defaultFormat: "number",
-    },
-    {
-        value: "deltaFromPrevious",
-        label: "Delta From Previous",
-        supportsPartition: true,
-        requiresOrder: true,
-        defaultFormat: "number",
-    },
-    {
-        value: "movingAverage",
-        label: "Moving Average",
-        supportsPartition: true,
-        requiresOrder: true,
-        supportsDecimals: true,
-        requiresWindowSize: true,
-        defaultFormat: "number",
-    },
-];
+export const REPORT_BUILDER_TABLE_CALC_FUNCTIONS = listReportCalculatedFieldTableCalculationSpecs()
+    .map((entry) => ({
+        value: normalizeString(entry?.name),
+        label: normalizeString(entry?.label || entry?.name),
+        supportsPartition: entry?.supportsPartition === true,
+        // Rank always orders by its source field in the current authoring UX,
+        // so it only needs a direction/tie-breaker control rather than a
+        // separate order-by field selector.
+        requiresOrder: entry?.requiresOrder === true && normalizeString(entry?.name) !== "rank",
+        supportsRankDirection: entry?.supportsRankDirection === true,
+        supportsTieBreaker: entry?.supportsTieBreaker === true,
+        requiresWindowSize: entry?.requiresWindowSize === true,
+        supportsDecimals: entry?.supportsDecimals === true,
+        defaultFormat: normalizeString(entry?.defaultFormat),
+    }))
+    .filter((entry) => entry.value && entry.label);
 
 function tableCalculationFunctionMeta(functionId = "") {
     const normalizedFunctionId = normalizeString(functionId);

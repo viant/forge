@@ -1,4 +1,9 @@
-import { createDrillMetadataProvider } from "../../reporting/drillMetadataProvider.js";
+import {
+  createDrillMetadataProvider,
+  normalizeDetailTarget,
+  normalizeDrillHierarchy,
+  normalizeRefinementActions,
+} from "../../reporting/drillMetadataProvider.js";
 import { normalizeReportRuntimeHostIntent } from "../../reporting/reportRuntimeHostIntent.js";
 import { resolveReportRuntimeDetailTarget } from "../../reporting/reportRuntimeDetailTarget.js";
 import { buildReportRuntimeDetailDiagnosticMessage } from "./reportRuntimeDetailDiagnosticModel.js";
@@ -9,6 +14,14 @@ function hasDetailProviderMethods(provider = null) {
     && typeof provider.getDrillHierarchy === "function"
     && typeof provider.getDetailTarget === "function"
     && typeof provider.listAvailableRefinements === "function";
+}
+
+function hasAnyDetailProviderMethods(provider = null) {
+  return !!provider && (
+    typeof provider.getDrillHierarchy === "function"
+    || typeof provider.getDetailTarget === "function"
+    || typeof provider.listAvailableRefinements === "function"
+  );
 }
 
 function normalizeString(value = "") {
@@ -27,34 +40,89 @@ function dedupeRefinementActions(actions = []) {
   });
 }
 
+function normalizeDetailProviderHierarchyResult(payload = null) {
+  return payload ? normalizeDrillHierarchy(payload) : null;
+}
+
+function normalizeDetailProviderTargetResult(payload = null) {
+  return payload ? normalizeDetailTarget(payload) : null;
+}
+
+function normalizeDetailProviderActionsResult(payload = null) {
+  return normalizeRefinementActions(payload || []);
+}
+
 function mergeDetailProviders(primaryProvider = null, fallbackProvider = null) {
-  if (!hasDetailProviderMethods(primaryProvider)) {
+  if (!hasAnyDetailProviderMethods(primaryProvider)) {
     return fallbackProvider;
   }
-  if (!hasDetailProviderMethods(fallbackProvider)) {
-    return primaryProvider;
+  if (!hasAnyDetailProviderMethods(fallbackProvider)) {
+    return hasDetailProviderMethods(primaryProvider)
+      ? primaryProvider
+      : null;
   }
-  return createDrillMetadataProvider({
-    async getDrillHierarchy(fieldRef = "", options = {}) {
-      const primary = await primaryProvider.getDrillHierarchy(fieldRef, options);
-      return primary || fallbackProvider.getDrillHierarchy(fieldRef, options);
-    },
-    async getDetailTarget(targetRef = "", options = {}) {
-      const primary = await primaryProvider.getDetailTarget(targetRef, options);
-      return primary || fallbackProvider.getDetailTarget(targetRef, options);
-    },
-    async listAvailableRefinements(blockKind = "", fieldRef = "", options = {}) {
-      const primary = await primaryProvider.listAvailableRefinements(blockKind, fieldRef, options);
-      const fallback = await fallbackProvider.listAvailableRefinements(blockKind, fieldRef, options);
-      const primaryActions = Array.isArray(primary) ? primary : (Array.isArray(primary?.actions) ? primary.actions : []);
-      const fallbackActions = Array.isArray(fallback) ? fallback : (Array.isArray(fallback?.actions) ? fallback.actions : []);
+  const getDrillHierarchy = (typeof primaryProvider?.getDrillHierarchy === "function" || typeof fallbackProvider?.getDrillHierarchy === "function")
+    ? async (fieldRef = "", options = {}) => {
+      const primary = typeof primaryProvider?.getDrillHierarchy === "function"
+        ? normalizeDetailProviderHierarchyResult(await primaryProvider.getDrillHierarchy(fieldRef, options))
+        : null;
+      if (primary) {
+        return primary;
+      }
+      return typeof fallbackProvider?.getDrillHierarchy === "function"
+        ? normalizeDetailProviderHierarchyResult(await fallbackProvider.getDrillHierarchy(fieldRef, options))
+        : null;
+    }
+    : null;
+  const getDetailTarget = (typeof primaryProvider?.getDetailTarget === "function" || typeof fallbackProvider?.getDetailTarget === "function")
+    ? async (targetRef = "", options = {}) => {
+      const primary = typeof primaryProvider?.getDetailTarget === "function"
+        ? normalizeDetailProviderTargetResult(await primaryProvider.getDetailTarget(targetRef, options))
+        : null;
+      const fallback = typeof fallbackProvider?.getDetailTarget === "function"
+        ? normalizeDetailProviderTargetResult(await fallbackProvider.getDetailTarget(targetRef, options))
+        : null;
+      if (!primary) {
+        return fallback;
+      }
+      if (!fallback) {
+        return primary;
+      }
+      return {
+        ...fallback,
+        ...primary,
+        parameters: {
+          ...(fallback?.parameters && typeof fallback.parameters === "object" && !Array.isArray(fallback.parameters) ? fallback.parameters : {}),
+          ...(primary?.parameters && typeof primary.parameters === "object" && !Array.isArray(primary.parameters) ? primary.parameters : {}),
+        },
+      };
+    }
+    : null;
+  const listAvailableRefinements = (typeof primaryProvider?.listAvailableRefinements === "function" || typeof fallbackProvider?.listAvailableRefinements === "function")
+    ? async (blockKind = "", fieldRef = "", options = {}) => {
+      const primary = typeof primaryProvider?.listAvailableRefinements === "function"
+        ? normalizeDetailProviderActionsResult(await primaryProvider.listAvailableRefinements(blockKind, fieldRef, options))
+        : null;
+      const fallback = typeof fallbackProvider?.listAvailableRefinements === "function"
+        ? normalizeDetailProviderActionsResult(await fallbackProvider.listAvailableRefinements(blockKind, fieldRef, options))
+        : null;
+      const primaryActions = Array.isArray(primary) ? primary : [];
+      const fallbackActions = Array.isArray(fallback) ? fallback : [];
       return {
         actions: dedupeRefinementActions([
           ...primaryActions,
           ...fallbackActions,
         ]),
       };
-    },
+    }
+    : null;
+  if (!getDrillHierarchy || !getDetailTarget || !listAvailableRefinements) {
+    return null;
+  }
+  return createDrillMetadataProvider({
+    getDrillHierarchy,
+    getDetailTarget,
+    listAvailableRefinements,
   });
 }
 
@@ -66,11 +134,11 @@ export function resolveReportRuntimePreviewDetailProvider({
     reportSpec,
     runtimeHandlers: null,
   });
-  if (!hasDetailProviderMethods(semanticModelHandler)) {
+  if (!hasAnyDetailProviderMethods(semanticModelHandler)) {
     return fallbackProvider;
   }
   return mergeDetailProviders(
-    createDrillMetadataProvider(semanticModelHandler),
+    semanticModelHandler,
     fallbackProvider,
   );
 }
@@ -127,8 +195,8 @@ function setReportRuntimeResolvedDetailState({
   }
   const nextHostIntent = normalizeReportRuntimeHostIntent({
     intentKind: "detailTarget",
-    title: "Resolved detail target",
-    description,
+    title: normalizeString(resolvedDetailTarget?.title) || "Resolved detail target",
+    description: normalizeString(resolvedDetailTarget?.description) || description,
     ...resolvedDetailTarget,
   });
   if (typeof setHostIntent === "function") {

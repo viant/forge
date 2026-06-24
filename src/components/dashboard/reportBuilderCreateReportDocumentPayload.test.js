@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
     buildReportBuilderCreateReportDocumentPayload,
@@ -6,9 +7,16 @@ import {
     buildReportBuilderCreateReportDocumentPayloadDownload,
     buildReportBuilderCreateReportDocumentPayloadInspectorState,
     buildReportBuilderCreateReportDocumentPayloadSummary,
+    mergeReportBuilderCreateReportDocumentPayloadSharedArtifact,
     resolveReportBuilderCreateReportDocumentPayloadSeed,
     serializeReportBuilderCreateReportDocumentPayload,
 } from "./reportBuilderCreateReportDocumentPayload.js";
+const audienceArtifactFixture = JSON.parse(
+    readFileSync(
+        new URL("../../reporting/fixtures/capacity-audience-artifact-fixture.v1.json", import.meta.url),
+        "utf8",
+    ),
+);
 
 const savedReportPayload = {
     version: 1,
@@ -31,18 +39,31 @@ const savedReportPayload = {
         title: "Exploration Demo",
         subtitle: "Executive Snapshot",
         description: "Create payload metadata summary.",
+        scope: {
+            params: [
+                {
+                    id: "dateRange",
+                    label: "Reporting Window",
+                    description: "Approved reporting window for create payload metadata.",
+                    value: {
+                        start: "2026-05-01",
+                        end: "2026-05-04",
+                    },
+                },
+            ],
+        },
         semanticSummary: {
             kind: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
-            modelLabel: "Ad Delivery",
-            entity: "line_delivery",
-            entityLabel: "Line Delivery",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Revenue Operations",
+            entity: "store_performance",
+            entityLabel: "Store Performance",
             selectedDimensions: [
-                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
-                { id: "channel", rawId: "channelV2", label: "Channel" },
+                { id: "event_date", rawId: "eventDate", label: "Transaction Date" },
+                { id: "channel", rawId: "channelV2", label: "Category" },
             ],
             selectedMeasures: [
-                { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
+                { id: "available_impressions", rawId: "avails", label: "Net Revenue", format: "compactNumber" },
             ],
         },
     },
@@ -115,18 +136,31 @@ assert.deepEqual(payload, {
         title: "Exploration Demo",
         subtitle: "Executive Snapshot",
         description: "Create payload metadata summary.",
+        scope: {
+            params: [
+                {
+                    id: "dateRange",
+                    label: "Reporting Window",
+                    description: "Approved reporting window for create payload metadata.",
+                    value: {
+                        start: "2026-05-01",
+                        end: "2026-05-04",
+                    },
+                },
+            ],
+        },
         semanticSummary: {
             kind: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
-            modelLabel: "Ad Delivery",
-            entity: "line_delivery",
-            entityLabel: "Line Delivery",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Revenue Operations",
+            entity: "store_performance",
+            entityLabel: "Store Performance",
             selectedDimensions: [
-                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
-                { id: "channel", rawId: "channelV2", label: "Channel" },
+                { id: "event_date", rawId: "eventDate", label: "Transaction Date" },
+                { id: "channel", rawId: "channelV2", label: "Category" },
             ],
             selectedMeasures: [
-                { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
+                { id: "available_impressions", rawId: "avails", label: "Net Revenue", format: "compactNumber" },
             ],
         },
     },
@@ -161,6 +195,39 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadSummary(payload), 
     compileStatus: "clean",
     blockCount: 1,
     datasetCount: 1,
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: [
+        "Model Revenue Operations",
+        "Entity Store Performance",
+        "Dimensions Transaction Date, Category",
+        "Measures Net Revenue",
+    ],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for create payload metadata.",
+        },
+    ],
+    semanticBindingFieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (2)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Transaction Date" },
+                { id: "channel", rawId: "channelV2", label: "Category" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Net Revenue", format: "compactNumber" },
+            ],
+        },
+    ],
 });
 
 assert.match(
@@ -193,14 +260,567 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadInspectorState(pay
     compileStatus: "clean",
     blockCount: 1,
     datasetCount: 1,
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: [
+        "Model Revenue Operations",
+        "Entity Store Performance",
+        "Dimensions Transaction Date, Category",
+        "Measures Net Revenue",
+    ],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for create payload metadata.",
+        },
+    ],
+    semanticBindingFieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (2)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Transaction Date" },
+                { id: "channel", rawId: "channelV2", label: "Category" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Net Revenue", format: "compactNumber" },
+            ],
+        },
+    ],
     content: serializeReportBuilderCreateReportDocumentPayload(payload),
 });
+
+const mergedCreatePayload = mergeReportBuilderCreateReportDocumentPayloadSharedArtifact(payload, {
+    kind: "reportBuilder.publishedSnapshot",
+    reportId: "demoReportBuilder",
+    source: {
+        kind: "reportBuilder.publishedSnapshot",
+        sourceArtifactId: "published_snapshot_demo_report",
+        reportId: "demoReportBuilder",
+    },
+});
+assert.equal(mergedCreatePayload?.source?.kind, "reportBuilder.savedReportPayload");
+assert.equal(mergedCreatePayload?.source?.sourceArtifactId, "rbexploration_rbexplore_1000_5000");
+const sourceLessMergedCreatePayload = mergeReportBuilderCreateReportDocumentPayloadSharedArtifact({
+    ...payload,
+    source: undefined,
+}, {
+    kind: "reportBuilder.publishedSnapshot",
+    reportId: "demoReportBuilder",
+    source: {
+        kind: "reportBuilder.publishedSnapshot",
+        sourceArtifactId: "published_snapshot_demo_report",
+        reportId: "demoReportBuilder",
+    },
+});
+assert.equal(sourceLessMergedCreatePayload?.source?.kind, "reportBuilder.publishedSnapshot");
+assert.equal(sourceLessMergedCreatePayload?.source?.sourceArtifactId, "published_snapshot_demo_report");
+const nonMatchingMergedCreatePayload = mergeReportBuilderCreateReportDocumentPayloadSharedArtifact({
+    ...payload,
+    source: {
+        kind: "reportBuilder.savedView",
+        sourceArtifactId: "saved_view_demo_report",
+        reportId: "demoReportBuilder",
+    },
+}, {
+    kind: "reportBuilder.publishedSnapshot",
+    reportId: "demoReportBuilder",
+    source: {
+        kind: "reportBuilder.publishedSnapshot",
+        sourceArtifactId: "published_snapshot_demo_report",
+        reportId: "demoReportBuilder",
+    },
+});
+assert.equal(nonMatchingMergedCreatePayload?.source?.kind, "reportBuilder.savedView");
+assert.equal(nonMatchingMergedCreatePayload?.source?.sourceArtifactId, "saved_view_demo_report");
+
+const savedViewBackedCreatePayloadSummary = buildReportBuilderCreateReportDocumentPayloadSummary({
+    version: 1,
+    kind: "createReportDocumentPayload",
+    reportRef: {
+        reportId: "capacityQ3",
+    },
+    title: "Capacity Q3 Saved View",
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "capacityQ3",
+        title: "Capacity Q3 Saved View",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+    source: {
+        kind: "reportBuilder.savedView",
+        sourceArtifactId: "saved_view_capacity_q3",
+        reportId: "capacityQ3",
+    },
+}, {
+    localSavedPayloads: [
+        {
+            reportId: "capacityQ3",
+            documentVersion: 8,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityQ3",
+                title: "Capacity Q3 Saved View",
+            },
+            source: {
+                kind: "reportBuilder.savedView",
+                sourceArtifactId: "saved_view_capacity_q3",
+                reportId: "capacityQ3",
+            },
+            savedViewOverlay: {
+                baseReportRef: {
+                    artifactRef: "report://capacityQ3",
+                    reportId: "capacityQ3",
+                    documentVersion: 7,
+                },
+                overlay: {
+                    presentation: {
+                        viewMode: "table",
+                    },
+                },
+            },
+        },
+        {
+            reportId: "capacityQ3",
+            documentVersion: 7,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityQ3",
+                title: "Capacity Q3 Base",
+            },
+            source: {
+                kind: "reportBuilder.savedReportPayload",
+                sourceArtifactId: "capacity_q3_base",
+                reportId: "capacityQ3",
+            },
+        },
+    ],
+});
+assert.deepEqual(savedViewBackedCreatePayloadSummary.savedViewOverlayChips, [
+    "table view",
+    "Base v7",
+]);
+assert.deepEqual(savedViewBackedCreatePayloadSummary.reopenSourceResolutionChips, [
+    "Base report file capacity_q3_base • capacityQ3",
+]);
+
+const sourceLessSavedViewBackedCreatePayloadSummary = buildReportBuilderCreateReportDocumentPayloadSummary({
+    version: 1,
+    kind: "createReportDocumentPayload",
+    reportRef: {
+        reportId: "capacityQ3",
+    },
+    title: "Capacity Q3 Saved View",
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "capacityQ3",
+        title: "Capacity Q3 Saved View",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+    source: undefined,
+}, {
+    localSavedPayloads: [
+        {
+            reportId: "capacityQ3",
+            documentVersion: 8,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityQ3",
+                title: "Capacity Q3 Saved View",
+            },
+            source: {
+                kind: "reportBuilder.savedView",
+                sourceArtifactId: "saved_view_capacity_q3",
+                reportId: "capacityQ3",
+            },
+            savedViewOverlay: {
+                baseReportRef: {
+                    artifactRef: "report://capacityQ3",
+                    reportId: "capacityQ3",
+                    documentVersion: 7,
+                },
+                overlay: {
+                    presentation: {
+                        viewMode: "table",
+                    },
+                },
+            },
+        },
+    ],
+});
+assert.deepEqual(sourceLessSavedViewBackedCreatePayloadSummary.savedViewOverlayChips, [
+    "table view",
+    "Base v7",
+]);
+assert.equal(sourceLessSavedViewBackedCreatePayloadSummary.reopenSourceResolutionTitle, undefined);
+
+const ambiguousSourceLessCreatePayloadSummary = buildReportBuilderCreateReportDocumentPayloadSummary({
+    version: 1,
+    kind: "createReportDocumentPayload",
+    reportRef: {
+        reportId: "capacityQ3",
+    },
+    title: "Capacity Q3 Saved View",
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "capacityQ3",
+        title: "Capacity Q3 Saved View",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+    source: undefined,
+}, {
+    localSavedPayloads: [
+        {
+            reportId: "capacityQ3",
+            documentVersion: 8,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityQ3",
+                title: "Capacity Q3 Saved View",
+            },
+            source: {
+                kind: "reportBuilder.savedView",
+                sourceArtifactId: "saved_view_capacity_q3",
+                reportId: "capacityQ3",
+            },
+            savedViewOverlay: {
+                baseReportRef: {
+                    artifactRef: "report://capacityQ3",
+                    reportId: "capacityQ3",
+                    documentVersion: 7,
+                },
+                overlay: {
+                    presentation: {
+                        viewMode: "table",
+                    },
+                },
+            },
+        },
+        {
+            reportId: "capacityQ3",
+            documentVersion: 9,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "capacityQ3",
+                title: "Capacity Q3 Published Snapshot",
+            },
+            source: {
+                kind: "reportBuilder.publishedSnapshot",
+                sourceArtifactId: "published_snapshot_capacity_q3",
+                reportId: "capacityQ3",
+            },
+        },
+    ],
+});
+assert.equal(ambiguousSourceLessCreatePayloadSummary.savedViewOverlayTitle, undefined);
+assert.equal(ambiguousSourceLessCreatePayloadSummary.reopenSourceResolutionTitle, undefined);
 
 assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadDownload(payload), {
     filename: "Exploration Demo-create-report-document.json",
     mimeType: "application/json;charset=utf-8",
     payload: serializeReportBuilderCreateReportDocumentPayload(payload),
 });
+
+const thinCreatePayloadWithSpecMetadata = {
+    version: 1,
+    kind: "createReportDocumentPayload",
+    reportRef: {
+        reportId: "capacityTrendQ3",
+    },
+    title: "Capacity Trend Q3",
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "capacityTrendQ3",
+        title: "Capacity Trend Q3",
+        subtitle: "Imported create payload",
+        description: "Thin document with semantic metadata only on reportSpec.",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+        },
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Imported Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Imported Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Imported Delivery Date", category: "Time" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Imported Available Impressions", category: "Metrics" },
+            ],
+            selectedParameters: [
+                { id: "reporting_window", rawId: "dateRange", label: "Imported Reporting Window", category: "Scope" },
+            ],
+        },
+        scope: {
+            params: [
+                {
+                    id: "dateRange",
+                    label: "Imported Reporting Window",
+                    description: "Imported scope from reportSpec.",
+                },
+            ],
+        },
+    },
+    compileState: {
+        status: "clean",
+        blockCount: 2,
+        datasetCount: 1,
+    },
+    source: {
+        kind: "reportBuilder.savedReportPayload",
+        payloadId: "rbreport_capacity_q3_channel_trend",
+        sourceArtifactId: "capacity_q3_channel_trend",
+    },
+};
+
+assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadSummary(thinCreatePayloadWithSpecMetadata), {
+    title: "Capacity Trend Q3",
+    subtitle: "Imported create payload",
+    description: "Thin document with semantic metadata only on reportSpec.",
+    kind: "createReportDocumentPayload",
+    reportId: "capacityTrendQ3",
+    payloadId: "rbreport_capacity_q3_channel_trend",
+    sourceArtifactId: "capacity_q3_channel_trend",
+    compileStatus: "clean",
+    blockCount: 2,
+    datasetCount: 1,
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: [
+        "Model Imported Ad Delivery",
+        "Entity Imported Line Delivery",
+        "Dimensions Imported Delivery Date",
+        "Measures Imported Available Impressions",
+        "Parameters Imported Reporting Window",
+        "Categories Time, Metrics +1",
+    ],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Imported Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Imported Reporting Window",
+            description: "Imported scope from reportSpec.",
+        },
+    ],
+    semanticBindingFieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (1)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Imported Delivery Date", category: "Time" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Imported Available Impressions", category: "Metrics" },
+            ],
+        },
+        {
+            id: "parameters",
+            title: "Selected parameters (1)",
+            fields: [
+                { id: "reporting_window", rawId: "dateRange", label: "Imported Reporting Window", category: "Scope" },
+            ],
+        },
+    ],
+});
+
+assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadInspectorState(thinCreatePayloadWithSpecMetadata), {
+    title: "Capacity Trend Q3",
+    subtitle: "Imported create payload",
+    description: "Thin document with semantic metadata only on reportSpec.",
+    headerSubtitle: "Imported create payload",
+    headerDescription: "Thin document with semantic metadata only on reportSpec.",
+    kind: "createReportDocumentPayload",
+    reportId: "capacityTrendQ3",
+    payloadId: "rbreport_capacity_q3_channel_trend",
+    sourceArtifactId: "capacity_q3_channel_trend",
+    compileStatus: "clean",
+    blockCount: 2,
+    datasetCount: 1,
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: [
+        "Model Imported Ad Delivery",
+        "Entity Imported Line Delivery",
+        "Dimensions Imported Delivery Date",
+        "Measures Imported Available Impressions",
+        "Parameters Imported Reporting Window",
+        "Categories Time, Metrics +1",
+    ],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Imported Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Imported Reporting Window",
+            description: "Imported scope from reportSpec.",
+        },
+    ],
+    semanticBindingFieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (1)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Imported Delivery Date", category: "Time" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Imported Available Impressions", category: "Metrics" },
+            ],
+        },
+        {
+            id: "parameters",
+            title: "Selected parameters (1)",
+            fields: [
+                { id: "reporting_window", rawId: "dateRange", label: "Imported Reporting Window", category: "Scope" },
+            ],
+        },
+    ],
+    content: serializeReportBuilderCreateReportDocumentPayload(thinCreatePayloadWithSpecMetadata),
+});
+
+const embeddedSemanticCreateSavedReportPayload = {
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_embedded_binding_create",
+    sourceArtifactId: "embedded_binding_create",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "embeddedBindingCreate",
+        title: "Embedded Binding Create",
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    kind: "dashboard.reportBuilder",
+                    dataSourceRef: "demoReportSource",
+                },
+                config: {
+                    dimensions: [
+                        { id: "eventDate", key: "eventDate", semanticRef: "event_date", label: "Delivery Date", category: "Time" },
+                        { id: "channelV2", key: "channelV2", semanticRef: "channel", label: "Channel", category: "Delivery" },
+                    ],
+                    measures: [
+                        { id: "avails", key: "avails", semanticRef: "available_impressions", label: "Available Impressions", category: "Metrics", format: "compactNumber" },
+                    ],
+                    staticFilters: [
+                        {
+                            id: "dateRange",
+                            type: "dateRange",
+                            label: "Reporting Window",
+                            description: "Embedded create payload scope.",
+                            required: true,
+                        },
+                    ],
+                    binding: {
+                        mode: "semantic",
+                        modelRef: "model://example/performance/delivery@v1",
+                        entity: "line_delivery",
+                        selectedDimensions: ["event_date"],
+                        selectedMeasures: ["available_impressions"],
+                    },
+                },
+                state: {
+                    binding: {
+                        mode: "semantic",
+                        modelRef: "model://example/performance/delivery@v1",
+                        entity: "line_delivery",
+                        selectedDimensions: ["event_date", "channel"],
+                        selectedMeasures: ["available_impressions"],
+                    },
+                    selectedDimensions: ["eventDate", "channelV2"],
+                    selectedMeasures: ["avails"],
+                    staticFilters: {
+                        dateRange: {
+                            start: "2026-05-01",
+                            end: "2026-05-04",
+                        },
+                    },
+                },
+            },
+        ],
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+    compileState: {
+        status: "clean",
+        blockCount: 1,
+        datasetCount: 1,
+    },
+    source: {
+        kind: "reportBuilder.savedReportPayload",
+        payloadId: "rbreport_embedded_binding_create",
+        sourceArtifactId: "embedded_binding_create",
+    },
+};
+
+const embeddedSemanticCreatePayload = buildReportBuilderCreateReportDocumentPayload(embeddedSemanticCreateSavedReportPayload, {
+    createdAt: 9100,
+});
+assert.equal(embeddedSemanticCreatePayload.document.semanticSummary.modelRef, "model://example/performance/delivery@v1");
+assert.equal(embeddedSemanticCreatePayload.document.semanticSummary.selectedDimensions[1].label, "Channel");
+assert.equal(embeddedSemanticCreatePayload.document.scope.params[0].label, "Reporting Window");
+assert.deepEqual(embeddedSemanticCreatePayload.document.scope.params[0].value, {
+    start: "2026-05-01",
+    end: "2026-05-04",
+});
+assert.equal(
+    buildReportBuilderCreateReportDocumentPayloadSummary(embeddedSemanticCreatePayload).semanticBindingChips.includes("Dimensions Delivery Date, Channel"),
+    true,
+);
+assert.equal(
+    buildReportBuilderCreateReportDocumentPayloadInspectorState(embeddedSemanticCreatePayload).scopeSummaryText,
+    "Reporting Window",
+);
 
 assert.equal(buildReportBuilderCreateReportDocumentPayload(null), null);
 assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(null), null);
@@ -209,13 +829,13 @@ assert.equal(buildReportBuilderCreateReportDocumentPayloadInspectorState(null), 
 assert.equal(buildReportBuilderCreateReportDocumentPayloadDownload(null), null);
 assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReportPayload, {
     hydratedReportDocumentSession: {
-        reportId: "forecastingTrendQ3",
-        title: "Forecasting Trend Q3",
+        reportId: "capacityTrendQ3",
+        title: "Capacity Trend Q3",
         documentVersion: 6,
         savedSource: {
             kind: "reportBuilder.savedReportPayload",
-            payloadId: "rbreport_forecasting_q3_channel_trend",
-            sourceArtifactId: "forecasting_q3_channel_trend",
+            payloadId: "rbreport_capacity_q3_channel_trend",
+            sourceArtifactId: "capacity_q3_channel_trend",
         },
     },
     getReportDocumentResponse: null,
@@ -223,19 +843,19 @@ assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReport
     version: 1,
     kind: "getReportDocumentResponse",
     reportRef: {
-        reportId: "forecastingTrendQ3",
+        reportId: "capacityTrendQ3",
     },
     documentVersion: 6,
     document: {
         version: 1,
         kind: "reportDocument",
-        id: "forecastingTrendQ3",
-        title: "Forecasting Trend Q3",
+        id: "capacityTrendQ3",
+        title: "Capacity Trend Q3",
     },
     source: {
         kind: "reportBuilder.savedReportPayload",
-        payloadId: "rbreport_forecasting_q3_channel_trend",
-        sourceArtifactId: "forecasting_q3_channel_trend",
+        payloadId: "rbreport_capacity_q3_channel_trend",
+        sourceArtifactId: "capacity_q3_channel_trend",
     },
 });
 assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReportPayload, {
@@ -244,8 +864,8 @@ assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReport
 }), savedReportPayload);
 assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReportPayload, {
     hydratedReportDocumentSession: {
-        reportId: "forecastingTrendQ3",
-        title: "Forecasting Trend Q3",
+        reportId: "capacityTrendQ3",
+        title: "Capacity Trend Q3",
         documentVersion: 0,
         source: {
             kind: "reportBuilder.savedReportPayload",
@@ -258,13 +878,13 @@ assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReport
     version: 1,
     kind: "getReportDocumentResponse",
     reportRef: {
-        reportId: "forecastingTrendQ3",
+        reportId: "capacityTrendQ3",
     },
     document: {
         version: 1,
         kind: "reportDocument",
-        id: "forecastingTrendQ3",
-        title: "Forecasting Trend Q3",
+        id: "capacityTrendQ3",
+        title: "Capacity Trend Q3",
     },
     source: {
         kind: "reportBuilder.savedReportPayload",
@@ -274,33 +894,33 @@ assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReport
 });
 assert.deepEqual(resolveReportBuilderCreateReportDocumentPayloadSeed(savedReportPayload, {
     hydratedReportDocumentSession: {
-        reportId: "forecastingTrendQ3",
-        title: "Forecasting Trend Q3",
+        reportId: "capacityTrendQ3",
+        title: "Capacity Trend Q3",
     },
     getReportDocumentResponse: {
         version: 1,
         kind: "getReportDocumentResponse",
         reportRef: {
-            reportId: "forecastingTrendQ3",
+            reportId: "capacityTrendQ3",
         },
         document: {
             version: 1,
             kind: "reportDocument",
-            id: "forecastingTrendQ3",
-            title: "Forecasting Trend Q3",
+            id: "capacityTrendQ3",
+            title: "Capacity Trend Q3",
         },
     },
 }), {
     version: 1,
     kind: "getReportDocumentResponse",
     reportRef: {
-        reportId: "forecastingTrendQ3",
+        reportId: "capacityTrendQ3",
     },
     document: {
         version: 1,
         kind: "reportDocument",
-        id: "forecastingTrendQ3",
-        title: "Forecasting Trend Q3",
+        id: "capacityTrendQ3",
+        title: "Capacity Trend Q3",
     },
 });
 assert.equal(
@@ -393,7 +1013,7 @@ const explicitSemanticSummaryCreatePayload = buildReportBuilderCreateReportDocum
         },
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
             selectedDimensions: ["event_date"],
             selectedMeasures: ["available_impressions"],
@@ -406,7 +1026,7 @@ const explicitSemanticSummaryCreatePayload = buildReportBuilderCreateReportDocum
         viewMode: "table",
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
             selectedDimensions: ["event_date"],
             selectedMeasures: ["available_impressions"],
@@ -414,7 +1034,7 @@ const explicitSemanticSummaryCreatePayload = buildReportBuilderCreateReportDocum
     },
     semanticSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Explicit Summary",
         entity: "line_delivery",
         entityLabel: "Explicit Entity",
@@ -426,7 +1046,7 @@ const explicitSemanticSummaryCreatePayload = buildReportBuilderCreateReportDocum
         ],
     },
     semanticModel: {
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         version: 1,
         label: "Ad Delivery",
         entities: [
@@ -502,7 +1122,7 @@ const derivedCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBu
         },
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
             selectedDimensions: ["event_date", "channel"],
             selectedMeasures: ["available_impressions"],
@@ -521,7 +1141,7 @@ const derivedCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBu
         },
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
             selectedDimensions: ["event_date", "channel"],
             selectedMeasures: ["available_impressions"],
@@ -529,7 +1149,7 @@ const derivedCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBu
     },
     savedAt: 9410,
     semanticModel: {
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         version: 1,
         label: "Ad Delivery",
         entities: [
@@ -561,18 +1181,179 @@ assert.equal(derivedCreatePayload.document.blocks[0].config.measures[0].label, "
 assert.equal(derivedCreatePayload.document.blocks[0].config.dimensions[0].label, "Delivery Date");
 assert.equal(derivedCreatePayload.compileState.diagnostics[0].code, "semanticProviderDiagnostics");
 assert.equal(derivedCreatePayload.createdAt, 9420);
+
+const dependentDerivedCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBuilderState({
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_dependent_create_payload",
+    savedAt: 9421,
+    title: "Dependent Derived Create Demo",
+    sourceArtifactId: "dependent_derived_create_demo",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "dependentDerivedCreateDemo",
+        title: "Dependent Derived Create Demo",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        title: "Report Builder Demo",
+        dataSourceRef: "demoReportSource",
+    },
+    config: {
+        measures: [
+            { id: "avails", key: "avails", semanticRef: "available_impressions", label: "Avails", default: true, format: "compactNumber" },
+        ],
+        dimensions: [
+            { id: "eventDate", key: "eventDate", semanticRef: "event_date", label: "Event Date", default: true, chartAxis: true, format: "date" },
+            { id: "channelV2", key: "channelV2", semanticRef: "channel", label: "Channel", default: true },
+        ],
+        staticFilters: [
+            {
+                id: "dateRange",
+                type: "dateRange",
+                required: true,
+                startParamPath: "filters.From",
+                endParamPath: "filters.To",
+            },
+        ],
+        result: {
+            chartCreationMode: "explicit",
+            defaultMode: "chart",
+            pageSize: 50,
+            orderFields: [
+                { value: "eventDate", field: "eventDate", default: true, defaultDirection: "asc" },
+            ],
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["available_impressions"],
+        },
+    },
+    state: {
+        selectedMeasures: ["runningCtvAvails"],
+        primaryMeasure: "runningCtvAvails",
+        selectedDimensions: ["eventDate", "channelV2"],
+        viewMode: "chart",
+        chartSpec: {
+            title: "Running CTV Avails by Date",
+            type: "line",
+            xField: "eventDate",
+            yFields: ["runningCtvAvails"],
+        },
+        staticFilters: {
+            dateRange: {
+                start: "2026-05-01",
+                end: "2026-05-04",
+            },
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["available_impressions"],
+        },
+        localCalculatedFields: [
+            {
+                id: "ctvAvails",
+                key: "ctvAvails",
+                kind: "rowCalc",
+                label: "CTV Avails",
+                dataType: "number",
+                format: "compactNumber",
+                datasetRef: "primary",
+                dependencies: ["channelV2", "avails"],
+                expr: "if(channelV2 = 'CTV', avails, null)",
+            },
+        ],
+        localTableCalculations: [
+            {
+                id: "runningCtvAvails",
+                key: "runningCtvAvails",
+                kind: "tableCalc",
+                label: "Running CTV Avails",
+                dataType: "number",
+                format: "compactNumber",
+                datasetRef: "primary",
+                dependencies: ["ctvAvails", "eventDate", "channelV2"],
+                compute: {
+                    type: "runningTotal",
+                    sourceField: "ctvAvails",
+                    partitionBy: ["channelV2"],
+                    orderBy: [
+                        { field: "eventDate", direction: "asc" },
+                    ],
+                },
+            },
+        ],
+    },
+    savedAt: 9422,
+    semanticModel: {
+        modelRef: "model://example/performance/delivery@v1",
+        version: 1,
+        label: "Ad Delivery",
+        entities: [
+            {
+                id: "line_delivery",
+                label: "Line Delivery",
+                dimensions: [
+                    { id: "event_date", label: "Delivery Date" },
+                    { id: "channel", label: "Channel" },
+                ],
+                measures: [
+                    { id: "available_impressions", label: "Available Impressions", format: "compactNumber" },
+                ],
+            },
+        ],
+    },
+    createdAt: 9423,
+});
+
+assert.equal(dependentDerivedCreatePayload.document.semanticSummary.modelLabel, "Ad Delivery");
+assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.selectedMeasures[0], "runningCtvAvails");
+assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.localCalculatedFields[0].id, "ctvAvails");
+assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.localTableCalculations[0].id, "runningCtvAvails");
+assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.localTableCalculations[0].compute.sourceField, "ctvAvails");
+assert.equal(dependentDerivedCreatePayload.document.blocks[0].config.measures[0].label, "Available Impressions");
+assert.equal(dependentDerivedCreatePayload.compileState.status, "clean");
+assert.equal(dependentDerivedCreatePayload.compileState.reportSpecVersion, 1);
+assert.equal(dependentDerivedCreatePayload.createdAt, 9423);
+
 assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadDownload({
-    reportRef: { reportId: "forecasting/q2" },
-    document: { title: "Forecasting Q2" },
+    reportRef: { reportId: "capacity/q2" },
+    document: { title: "Capacity Q2" },
     compileState: { status: "clean", blockCount: 1, datasetCount: 1 },
 }), {
-    filename: "Forecasting Q2-create-report-document.json",
+    filename: "Capacity Q2-create-report-document.json",
     mimeType: "application/json;charset=utf-8",
     payload: serializeReportBuilderCreateReportDocumentPayload({
-        reportRef: { reportId: "forecasting/q2" },
-        document: { title: "Forecasting Q2" },
+        reportRef: { reportId: "capacity/q2" },
+        document: { title: "Capacity Q2" },
         compileState: { status: "clean", blockCount: 1, datasetCount: 1 },
     }),
 });
+
+const audienceCreatePayload = buildReportBuilderCreateReportDocumentPayload(audienceArtifactFixture.legacySavedReportPayload, {
+    createdAt: 9376,
+});
+assert.equal(audienceCreatePayload.document.semanticSummary.selectedMeasures[0].definitionRef, "harmonizer://feature/user.segment.index");
+assert.equal(audienceCreatePayload.document.semanticSummary.selectedMeasures[0].category, "Audience");
+assert.equal(audienceCreatePayload.document.semanticSummary.selectedParameters[1].definitionRef, "harmonizer://feature/user.segment");
+assert.equal(audienceCreatePayload.document.semanticSummary.selectedParameters[1].category, "Audience");
+assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(audienceCreatePayload).semanticBindingChips.includes("Measures Audience Index"), true);
+assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(audienceCreatePayload).semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
+assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(audienceCreatePayload).scopeSummaryText, "Date Range • Channels • Audience Segment");
 
 console.log("reportBuilderCreateReportDocumentPayload ✓ adapts saved builder payloads into createReportDocument requests");

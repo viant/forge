@@ -110,7 +110,7 @@ const rawPrint = buildReportPrintFromReportFill({
 });
 
 const semanticModel = {
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   version: 1,
   label: "Ad Delivery",
   entities: [
@@ -143,14 +143,14 @@ const semanticConfig = applyReportBuilderSemanticConfig({
   )),
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "channel"],
     selectedMeasures: ["spend", "impressions"],
   },
 }, {
   mode: "semantic",
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   entity: "line_delivery",
   selectedDimensions: ["event_date", "channel"],
   selectedMeasures: ["spend", "impressions"],

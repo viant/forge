@@ -1,11 +1,24 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
+    buildReportBuilderAuthoredRuntimePreviewState,
     buildReportBuilderCompileDiagnosticsNotice,
     buildReportBuilderEmptyResultState,
     buildReportBuilderRuntimePreviewBlockedState,
     resolveReportBuilderActiveResultState,
 } from "./reportBuilderResultFrame.js";
+
+const audienceArtifactFixture = JSON.parse(
+    readFileSync(
+        new URL("../../reporting/fixtures/capacity-audience-artifact-fixture.v1.json", import.meta.url),
+        "utf8",
+    ),
+);
+const reportBuilderSource = readFileSync(
+    new URL("./ReportBuilder.jsx", import.meta.url),
+    "utf8",
+);
 
 assert.deepEqual(resolveReportBuilderActiveResultState({
     loading: true,
@@ -207,12 +220,26 @@ assert.deepEqual(buildReportBuilderEmptyResultState({
 
 assert.deepEqual(buildReportBuilderEmptyResultState({
     canRunReport: false,
+    readinessReason: "semantic",
+    readinessMessage: "Semantic model provider unavailable.",
+    readinessAction: "retrySemanticModelLoad",
+}), {
+    icon: "database",
+    eyebrow: "Semantic model",
+    title: "Reload semantic model metadata",
+    description: "Semantic model provider unavailable.",
+    actionLabel: "Retry model load",
+    action: "retrySemanticModelLoad",
+});
+
+assert.deepEqual(buildReportBuilderEmptyResultState({
+    canRunReport: false,
     readinessReason: "scope",
 }), {
     icon: "filter-list",
     eyebrow: "Scope required",
     title: "Choose the required scope",
-    description: "Select an advertiser, campaign, ad order, or audience before running the report.",
+    description: "Select the required scope before running the report.",
     actionLabel: "",
     action: "",
 });
@@ -264,19 +291,495 @@ assert.deepEqual(buildReportBuilderRuntimePreviewBlockedState({
 
 assert.deepEqual(buildReportBuilderRuntimePreviewBlockedState({
     canRunReport: false,
+    readinessReason: "semantic",
+    readinessMessage: "Semantic model provider unavailable.",
+    readinessAction: "retrySemanticModelLoad",
+}), {
+    icon: "database",
+    eyebrow: "Semantic model",
+    title: "Reload semantic model metadata",
+    description: "Semantic model provider unavailable.",
+    actionLabel: "Retry model load",
+    action: "retrySemanticModelLoad",
+    tone: "error",
+    diagnosticsTitle: "",
+    diagnosticsDescription: "",
+    diagnostics: [],
+});
+
+assert.deepEqual(buildReportBuilderRuntimePreviewBlockedState({
+    canRunReport: false,
     readinessReason: "scope",
     readinessMessage: "Select a required scope first.",
 }), {
     icon: "filter-list",
     eyebrow: "Scope required",
     title: "Choose the required scope",
-    description: "Select an advertiser, campaign, ad order, or audience before running the report.",
+    description: "Select the required scope before running the report.",
     actionLabel: "",
     action: "",
     tone: "neutral",
     diagnosticsTitle: "",
     diagnosticsDescription: "",
     diagnostics: [],
+});
+
+assert.equal(buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: false,
+}), null);
+
+assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        document: {
+            title: "Capacity Trend Q3",
+            subtitle: "Preview subtitle",
+            description: "Preview description",
+        },
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    reportSpec: {
+                        scope: {
+                            params: [
+                                {
+                                    id: "dateRange",
+                                    label: "Reporting Window",
+                                    description: "Approved reporting window for runtime preview.",
+                                },
+                            ],
+                        },
+                    },
+                    reportFill: {
+                        datasets: [
+                            {
+                                id: "primary",
+                                rows: [],
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: {
+        loading: true,
+    },
+    canRunReport: true,
+}), {
+    eyebrow: "Authored Runtime",
+    title: "Capacity Trend Q3",
+    subtitle: "Preview subtitle",
+    description: "Preview description",
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for runtime preview.",
+        },
+    ],
+    runtimeConfig: {
+        reportSpec: {
+            scope: {
+                params: [
+                    {
+                        id: "dateRange",
+                        label: "Reporting Window",
+                        description: "Approved reporting window for runtime preview.",
+                    },
+                ],
+            },
+        },
+        reportFill: {
+            datasets: [
+                {
+                    id: "primary",
+                    rows: [],
+                },
+            ],
+        },
+    },
+    hasRuntimeRows: false,
+    loadingState: {
+        icon: "refresh",
+        eyebrow: "Runtime preview",
+        title: "Refreshing authored runtime",
+        description: "Executing the compiled runtime request for the current builder state.",
+        animated: true,
+    },
+    blockedState: null,
+    errorState: null,
+    canRenderRuntime: true,
+});
+
+const audienceRuntimePreviewState = buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        document: audienceArtifactFixture.savedReportPayload.reportDocument,
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    reportSpec: audienceArtifactFixture.reportExportRequest.reportSpec,
+                    reportFill: audienceArtifactFixture.reportExportRequest.reportFill,
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: {
+        loading: false,
+    },
+    canRunReport: true,
+});
+assert.equal(audienceRuntimePreviewState.title, "Capacity Audience Segment Index Q3");
+assert.equal(audienceRuntimePreviewState.semanticBindingChips.includes("Measures Audience Index"), true);
+assert.equal(audienceRuntimePreviewState.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
+assert.equal(audienceRuntimePreviewState.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(
+    audienceRuntimePreviewState.semanticBindingFieldGroups[1].fields[0].definitionRef,
+    "harmonizer://feature/user.segment.index",
+);
+assert.equal(
+    audienceRuntimePreviewState.semanticBindingFieldGroups[2].fields[1].definitionRef,
+    "harmonizer://feature/user.segment",
+);
+assert.equal(audienceRuntimePreviewState.hasRuntimeRows, true);
+
+const audienceRuntimePreviewStateWithEmptySpec = buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        document: audienceArtifactFixture.savedReportPayload.reportDocument,
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    reportSpec: {
+                        version: 1,
+                        kind: "reportSpec",
+                        scope: {
+                            params: [],
+                        },
+                    },
+                    reportFill: audienceArtifactFixture.reportExportRequest.reportFill,
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: {
+        loading: false,
+    },
+    canRunReport: true,
+});
+assert.equal(audienceRuntimePreviewStateWithEmptySpec.semanticBindingChips.includes("Measures Audience Index"), true);
+assert.equal(audienceRuntimePreviewStateWithEmptySpec.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
+assert.equal(audienceRuntimePreviewStateWithEmptySpec.scopeSummaryText, "Date Range • Channels • Audience Segment");
+
+const runtimePreviewStateFromCarriedSemanticBinding = buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        document: {
+            title: "Carried Semantic Runtime",
+        },
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    semanticBindingViewState: {
+                        title: "Semantic Binding",
+                        chips: [
+                            "Model Ad Delivery",
+                            "Entity Line Delivery",
+                            "Measures Available Impressions",
+                        ],
+                        fieldGroups: [
+                            {
+                                id: "measures",
+                                title: "Selected measures (1)",
+                                fields: [
+                                    { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+                                ],
+                            },
+                        ],
+                    },
+                    reportSpec: {
+                        version: 1,
+                        kind: "reportSpec",
+                        scope: {
+                            params: [],
+                        },
+                    },
+                    reportFill: {
+                        datasets: [
+                            {
+                                id: "primary",
+                                rows: [],
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: {
+        loading: false,
+    },
+    canRunReport: true,
+});
+assert.equal(runtimePreviewStateFromCarriedSemanticBinding.semanticBindingChips.includes("Measures Available Impressions"), true);
+assert.equal(runtimePreviewStateFromCarriedSemanticBinding.semanticBindingFieldGroups[0].fields[0].label, "Available Impressions");
+assert.equal(reportBuilderSource.includes("ReportBuilderAuthoredRuntimePreviewHeader"), true);
+
+assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        document: {
+            title: "Semantic Capacity Trend Q3",
+        },
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    reportSpec: {
+                        scope: {
+                            params: [
+                                {
+                                    id: "dateRange",
+                                    label: "Reporting Window",
+                                    description: "Approved reporting window for runtime preview.",
+                                },
+                            ],
+                        },
+                        binding: {
+                            mode: "semantic",
+                            modelRef: "model://example/performance/delivery@v1",
+                            entity: "line_delivery",
+                        },
+                        semanticSummary: {
+                            kind: "semantic",
+                            modelRef: "model://example/performance/delivery@v1",
+                            modelLabel: "Ad Delivery",
+                            entity: "line_delivery",
+                            entityLabel: "Line Delivery",
+                            selectedDimensions: [
+                                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                                { id: "channel", rawId: "channelV2", label: "Channel" },
+                            ],
+                            selectedMeasures: [
+                                { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+                            ],
+                        },
+                    },
+                    reportFill: {
+                        datasets: [
+                            {
+                                id: "primary",
+                                rows: [],
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: {
+        loading: false,
+    },
+    canRunReport: true,
+}), {
+    eyebrow: "Authored Runtime",
+    title: "Semantic Capacity Trend Q3",
+    subtitle: "",
+    description: "Refine the current builder result through the compiled ReportDocument, ReportSpec, and ReportFill flow.",
+    semanticBindingTitle: "Semantic Binding",
+    semanticBindingChips: [
+        "Model Ad Delivery",
+        "Entity Line Delivery",
+        "Dimensions Delivery Date, Channel",
+        "Measures Available Impressions",
+    ],
+    scopeSummaryTitle: "Report Scope",
+    scopeSummaryText: "Reporting Window",
+    scopeSummaryItems: [
+        {
+            id: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window for runtime preview.",
+        },
+    ],
+    semanticBindingFieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (2)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                { id: "channel", rawId: "channelV2", label: "Channel" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+            ],
+        },
+    ],
+    runtimeConfig: {
+        reportSpec: {
+            scope: {
+                params: [
+                    {
+                        id: "dateRange",
+                        label: "Reporting Window",
+                        description: "Approved reporting window for runtime preview.",
+                    },
+                ],
+            },
+            binding: {
+                mode: "semantic",
+                modelRef: "model://example/performance/delivery@v1",
+                entity: "line_delivery",
+            },
+            semanticSummary: {
+                kind: "semantic",
+                modelRef: "model://example/performance/delivery@v1",
+                modelLabel: "Ad Delivery",
+                entity: "line_delivery",
+                entityLabel: "Line Delivery",
+                selectedDimensions: [
+                    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                    { id: "channel", rawId: "channelV2", label: "Channel" },
+                ],
+                selectedMeasures: [
+                    { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
+                ],
+            },
+        },
+        reportFill: {
+            datasets: [
+                {
+                    id: "primary",
+                    rows: [],
+                },
+            ],
+        },
+    },
+    hasRuntimeRows: false,
+    loadingState: null,
+    blockedState: null,
+    errorState: null,
+    canRenderRuntime: true,
+});
+
+assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    reportFill: {
+                        datasets: [
+                            {
+                                id: "primary",
+                                rows: [],
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: {
+        loading: false,
+        error: new Error("runtime failed"),
+    },
+    canRunReport: false,
+    readinessReason: "semantic",
+    runtimePreviewArtifactDiagnostics: [{ code: "semantic.providerUnavailable" }],
+    runtimePreviewBlockedState: {
+        title: "Blocked",
+    },
+    runtimePreviewErrorDescription: "Runtime provider failed.",
+}), {
+    eyebrow: "Authored Runtime",
+    title: "Compiled Runtime Preview",
+    subtitle: "",
+    description: "Refine the current builder result through the compiled ReportDocument, ReportSpec, and ReportFill flow.",
+    runtimeConfig: {
+        reportFill: {
+            datasets: [
+                {
+                    id: "primary",
+                    rows: [],
+                },
+            ],
+        },
+    },
+    hasRuntimeRows: false,
+    loadingState: null,
+    blockedState: {
+        title: "Blocked",
+    },
+    errorState: {
+        tone: "error",
+        icon: "warning-sign",
+        eyebrow: "Runtime preview",
+        title: "We couldn't compile these runtime results",
+        description: "Runtime provider failed.",
+    },
+    canRenderRuntime: true,
+});
+
+assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    reportFill: {
+                        datasets: [
+                            {
+                                id: "primary",
+                                rows: [
+                                    { value: 1 },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: {
+        loading: true,
+        error: new Error("ignored when rows exist"),
+    },
+    canRunReport: false,
+    readinessReason: "scope",
+    runtimePreviewArtifactDiagnostics: [],
+    runtimePreviewBlockedState: {
+        title: "Blocked",
+    },
+    runtimePreviewErrorDescription: "Ignored.",
+}), {
+    eyebrow: "Authored Runtime",
+    title: "Compiled Runtime Preview",
+    subtitle: "",
+    description: "Refine the current builder result through the compiled ReportDocument, ReportSpec, and ReportFill flow.",
+    runtimeConfig: {
+        reportFill: {
+            datasets: [
+                {
+                    id: "primary",
+                    rows: [
+                        { value: 1 },
+                    ],
+                },
+            ],
+        },
+    },
+    hasRuntimeRows: true,
+    loadingState: null,
+    blockedState: null,
+    errorState: null,
+    canRenderRuntime: false,
 });
 
 assert.deepEqual(buildReportBuilderCompileDiagnosticsNotice({

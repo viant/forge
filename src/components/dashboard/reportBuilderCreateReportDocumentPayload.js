@@ -1,6 +1,17 @@
 import { buildCreateReportDocumentPayload } from "../../reporting/reportDocumentStore.js";
-import { buildReportBuilderDocumentCompileDiagnostics } from "./reportBuilderDocumentBlocks.js";
+import {
+    buildReportBuilderDocumentCompileDiagnostics,
+    buildReportBuilderScopeSummaryFromParams,
+} from "./reportBuilderDocumentBlocks.js";
 import { buildReportBuilderSavedReportPayloadFromBuilderState } from "./reportBuilderSavedReportPayload.js";
+import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
+import {
+    normalizeReportBuilderSavedReportRecords,
+    resolveReportBuilderSavedReportRecordBySource,
+} from "./reportBuilderSavedReportRecords.js";
+import { buildSavedViewOverlaySummary } from "../../reporting/views/savedViewOverlayModel.js";
+import { resolveReportBuilderSavedViewOverlayReopenSourceResolution } from "./reportBuilderReopenSourceResolution.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -64,6 +75,48 @@ function normalizePositiveInteger(value = 0) {
     return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 0;
 }
 
+function resolveUniqueSavedReportRecordByReportId(records = [], reportId = "") {
+    const normalizedReportId = normalizeString(reportId);
+    if (!normalizedReportId) {
+        return null;
+    }
+    const matches = normalizeReportBuilderSavedReportRecords(records)
+        .filter((record) => normalizeString(record?.reportId) === normalizedReportId);
+    return matches.length === 1 ? matches[0] : null;
+}
+
+function normalizeSourceIdentity(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+    const source = value?.source && typeof value.source === "object" && !Array.isArray(value.source)
+        ? value.source
+        : value;
+    const kind = normalizeString(source?.kind || value?.kind);
+    const payloadId = normalizeString(source?.payloadId || value?.payloadId);
+    const sourceArtifactId = normalizeString(source?.sourceArtifactId || value?.sourceArtifactId || value?.id);
+    const reportId = normalizeString(source?.reportId || value?.reportRef?.reportId || value?.reportId);
+    if (!kind && !payloadId && !sourceArtifactId && !reportId) {
+        return null;
+    }
+    return {
+        ...(kind ? { kind } : {}),
+        ...(payloadId ? { payloadId } : {}),
+        ...(sourceArtifactId ? { sourceArtifactId } : {}),
+        ...(reportId ? { reportId } : {}),
+    };
+}
+
+function matchesSourceIdentity(left = null, right = null) {
+    if (!left || !right) {
+        return false;
+    }
+    return normalizeString(left?.kind) === normalizeString(right?.kind)
+        && normalizeString(left?.reportId) === normalizeString(right?.reportId)
+        && normalizeString(left?.sourceArtifactId) === normalizeString(right?.sourceArtifactId)
+        && (!normalizeString(left?.payloadId) || !normalizeString(right?.payloadId) || normalizeString(left?.payloadId) === normalizeString(right?.payloadId));
+}
+
 export function resolveReportBuilderCreateReportDocumentPayloadSeed(savedReportPayload = null, {
     hydratedReportDocumentSession = null,
     getReportDocumentResponse = null,
@@ -103,12 +156,15 @@ export function buildReportBuilderCreateReportDocumentPayload(savedReportPayload
     if (!savedReportPayload || typeof savedReportPayload !== "object" || Array.isArray(savedReportPayload)) {
         return null;
     }
-    const document = savedReportPayload?.reportDocument && typeof savedReportPayload.reportDocument === "object" && !Array.isArray(savedReportPayload.reportDocument)
-        ? cloneValue(savedReportPayload.reportDocument)
-        : null;
     const reportSpec = savedReportPayload?.reportSpec && typeof savedReportPayload.reportSpec === "object" && !Array.isArray(savedReportPayload.reportSpec)
         ? cloneValue(savedReportPayload.reportSpec)
         : null;
+    const payloadContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec,
+        document: savedReportPayload?.reportDocument || null,
+        title: savedReportPayload?.title || "",
+    });
+    const document = payloadContext?.document ? cloneValue(payloadContext.document) : null;
     if (!document || !reportSpec) {
         return null;
     }
@@ -119,6 +175,28 @@ export function buildReportBuilderCreateReportDocumentPayload(savedReportPayload
         createdAt,
         source: buildNormalizedSource(savedReportPayload),
     });
+}
+
+export function mergeReportBuilderCreateReportDocumentPayloadSharedArtifact(payload = null, value = null) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) || normalizeString(payload?.kind) !== "createReportDocumentPayload") {
+        return payload;
+    }
+    const nextSource = normalizeSourceIdentity(value?.source || value);
+    if (!nextSource) {
+        return cloneValue(payload);
+    }
+    const payloadSource = normalizeSourceIdentity(payload?.source || null);
+    const sourceMatch = payloadSource && matchesSourceIdentity(payloadSource, nextSource);
+    const reportMatch = !payloadSource
+        && normalizeString(payload?.reportRef?.reportId)
+        && normalizeString(payload?.reportRef?.reportId) === normalizeString(nextSource?.reportId);
+    if (!sourceMatch && !reportMatch) {
+        return cloneValue(payload);
+    }
+    return {
+        ...cloneValue(payload),
+        source: cloneValue(value?.source || nextSource),
+    };
 }
 
 export function buildReportBuilderCreateReportDocumentPayloadFromBuilderState(savedReportPayload = null, {
@@ -148,16 +226,49 @@ export function buildReportBuilderCreateReportDocumentPayloadFromBuilderState(sa
     });
 }
 
-export function buildReportBuilderCreateReportDocumentPayloadSummary(payload = null) {
+export function buildReportBuilderCreateReportDocumentPayloadSummary(payload = null, {
+    localSavedPayloads = [],
+} = {}) {
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
         return null;
     }
+    const payloadContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: payload?.reportSpec || null,
+        document: payload?.document || null,
+        title: payload?.title || "",
+    });
+    const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
+        semanticSummary: payloadContext?.semanticSummary || null,
+        binding: payloadContext?.binding || null,
+    });
+    const scopeSummary = buildReportBuilderScopeSummaryFromParams(payloadContext?.scopeParams);
     const normalizedTitle = normalizeString(payload?.title)
+        || normalizeString(payloadContext?.title)
         || normalizeString(payload?.document?.title)
         || normalizeString(payload?.reportRef?.reportId)
         || "Report";
-    const subtitle = normalizeString(payload?.document?.subtitle);
-    const description = normalizeString(payload?.document?.description);
+    const subtitle = normalizeString(payloadContext?.document?.subtitle || payload?.document?.subtitle);
+    const description = normalizeString(payloadContext?.document?.description || payload?.document?.description);
+    const companionRecord = resolveReportBuilderSavedReportRecordBySource(localSavedPayloads, payload?.source || payload)
+        || resolveUniqueSavedReportRecordByReportId(
+            localSavedPayloads,
+            payload?.reportRef?.reportId || payload?.document?.id || "",
+        );
+    const savedViewOverlaySummary = companionRecord?.savedViewOverlay
+        ? buildSavedViewOverlaySummary(
+            { kind: "reportBuilder.savedView", savedViewOverlay: companionRecord.savedViewOverlay },
+            {
+                document: payloadContext?.document || null,
+                reportSpec: payloadContext?.reportSpec || null,
+            },
+        )
+        : null;
+    const reopenSourceResolutionState = companionRecord?.savedViewOverlay
+        ? resolveReportBuilderSavedViewOverlayReopenSourceResolution(
+            companionRecord.savedViewOverlay,
+            localSavedPayloads,
+        )?.state
+        : null;
     return {
         title: normalizedTitle,
         ...(subtitle ? { subtitle } : {}),
@@ -169,6 +280,27 @@ export function buildReportBuilderCreateReportDocumentPayloadSummary(payload = n
         compileStatus: normalizeString(payload?.compileState?.status),
         blockCount: Number(payload?.compileState?.blockCount || 0) || 0,
         datasetCount: Number(payload?.compileState?.datasetCount || 0) || 0,
+        ...(semanticBindingViewState ? {
+            semanticBindingTitle: semanticBindingViewState.title,
+            semanticBindingChips: semanticBindingViewState.chips,
+            ...(Array.isArray(semanticBindingViewState.fieldGroups) && semanticBindingViewState.fieldGroups.length > 0
+                ? { semanticBindingFieldGroups: semanticBindingViewState.fieldGroups }
+                : {}),
+        } : {}),
+        ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
+            scopeSummaryTitle: "Report Scope",
+            scopeSummaryText: scopeSummary.text,
+            scopeSummaryItems: scopeSummary.items,
+        } : {}),
+        ...(savedViewOverlaySummary ? {
+            savedViewOverlayTitle: savedViewOverlaySummary.title,
+            savedViewOverlayText: savedViewOverlaySummary.text,
+            savedViewOverlayChips: savedViewOverlaySummary.chips,
+            ...(Array.isArray(savedViewOverlaySummary.diagnostics) && savedViewOverlaySummary.diagnostics.length > 0
+                ? { savedViewOverlayDiagnostics: savedViewOverlaySummary.diagnostics }
+                : {}),
+        } : {}),
+        ...(reopenSourceResolutionState ? reopenSourceResolutionState : {}),
     };
 }
 
@@ -183,8 +315,12 @@ export function serializeReportBuilderCreateReportDocumentPayload(payload = null
         : JSON.stringify(payload, null, 2);
 }
 
-export function buildReportBuilderCreateReportDocumentPayloadInspectorState(payload = null) {
-    const summary = buildReportBuilderCreateReportDocumentPayloadSummary(payload);
+export function buildReportBuilderCreateReportDocumentPayloadInspectorState(payload = null, {
+    localSavedPayloads = [],
+} = {}) {
+    const summary = buildReportBuilderCreateReportDocumentPayloadSummary(payload, {
+        localSavedPayloads,
+    });
     if (!summary) {
         return null;
     }
@@ -192,6 +328,9 @@ export function buildReportBuilderCreateReportDocumentPayloadInspectorState(payl
         ...summary,
         ...(summary.subtitle ? { headerSubtitle: summary.subtitle } : {}),
         ...(summary.description ? { headerDescription: summary.description } : {}),
+        ...(Array.isArray(summary.semanticBindingFieldGroups) && summary.semanticBindingFieldGroups.length > 0
+            ? { semanticBindingFieldGroups: summary.semanticBindingFieldGroups }
+            : {}),
         content: serializeReportBuilderCreateReportDocumentPayload(payload),
     };
 }

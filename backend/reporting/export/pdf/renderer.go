@@ -178,6 +178,8 @@ func (r *renderer) renderOperation(operation renderOperation) {
 		r.renderLineOperation(*operation.line)
 	case "rect":
 		r.renderRectOperation(*operation.rect)
+	case "image":
+		r.renderImageOperation(*operation.image)
 	case "tableCellText":
 		r.renderTextOperation(*operation.text)
 	case "tableCellDataBar":
@@ -189,6 +191,15 @@ func (r *renderer) renderOperation(operation renderOperation) {
 	case "svg":
 		r.renderSVGProgram(operation.svg)
 	}
+}
+
+func (r *renderer) renderImageOperation(operation imagePaintOperation) {
+	options := fpdf.ImageOptions{
+		ImageType: operation.imageType,
+		ReadDpi:   true,
+	}
+	r.pdf.RegisterImageOptionsReader(operation.cacheKey, options, bytes.NewReader(operation.payload))
+	r.pdf.ImageOptions(operation.cacheKey, operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, false, options, 0, "")
 }
 
 func (r *renderer) renderTextOperation(operation textPaintOperation) {

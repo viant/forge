@@ -981,6 +981,8 @@ export const reportFillSchema = {
                 required: ["id", "value"],
                 properties: {
                   id: { type: "string" },
+                  label: { type: "string" },
+                  description: { type: "string" },
                   value: {},
                 },
               },

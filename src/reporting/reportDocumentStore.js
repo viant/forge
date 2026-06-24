@@ -1,3 +1,5 @@
+import { extractReportDocumentTemplateIdentity } from "./reportDocumentModel.js";
+
 function normalizeString(value = "") {
   return String(value || "").trim();
 }
@@ -48,6 +50,24 @@ function normalizeCompileDiagnostics(diagnostics = []) {
       };
     })
     .filter(Boolean);
+}
+
+function normalizeOptionalObject(value = null) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? cloneValue(value)
+    : null;
+}
+
+function resolveReportDocumentTemplateIdentity(entry = null, document = null) {
+  const templateId = normalizeString(entry?.templateId);
+  const templateLabel = normalizeString(entry?.templateLabel);
+  if (templateId || templateLabel) {
+    return {
+      ...(templateId ? { templateId } : {}),
+      ...(templateLabel ? { templateLabel } : {}),
+    };
+  }
+  return extractReportDocumentTemplateIdentity(document);
 }
 
 export function buildReportDocumentRef(value = null) {
@@ -241,6 +261,7 @@ export function buildGetReportDocumentResponse({
   const normalizedCompileState = compileState && typeof compileState === "object" && !Array.isArray(compileState)
     ? cloneValue(compileState)
     : null;
+  const templateIdentity = extractReportDocumentTemplateIdentity(document);
   return {
     version: 1,
     kind: "getReportDocumentResponse",
@@ -248,6 +269,7 @@ export function buildGetReportDocumentResponse({
     documentVersion: normalizedVersion,
     savedAt: normalizeTimestamp(savedAt),
     document: cloneValue(document),
+    ...(templateIdentity ? templateIdentity : {}),
     ...(normalizedCompileState ? { compileState: normalizedCompileState } : {}),
     ...(source && typeof source === "object" && !Array.isArray(source) ? { source: cloneValue(source) } : {}),
   };
@@ -282,6 +304,7 @@ export function buildListReportDocumentsResponse({
       const title = normalizeString(entry?.title || entry?.document?.title || reportRef?.reportId);
       const subtitle = normalizeString(entry?.subtitle || entry?.document?.subtitle);
       const description = normalizeString(entry?.description || entry?.document?.description);
+      const templateIdentity = resolveReportDocumentTemplateIdentity(entry, entry?.document);
       if (!reportRef || documentVersion < 1 || !title) {
         return null;
       }
@@ -291,6 +314,7 @@ export function buildListReportDocumentsResponse({
         title,
         ...(subtitle ? { subtitle } : {}),
         ...(description ? { description } : {}),
+        ...(templateIdentity ? templateIdentity : {}),
         ...(entry?.savedAt != null ? { savedAt: normalizeTimestamp(entry.savedAt) } : {}),
         ...(entry?.compileState && typeof entry.compileState === "object" && !Array.isArray(entry.compileState)
           ? { compileState: cloneValue(entry.compileState) }
@@ -298,6 +322,9 @@ export function buildListReportDocumentsResponse({
         ...(entry?.source && typeof entry.source === "object" && !Array.isArray(entry.source)
           ? { source: cloneValue(entry.source) }
           : {}),
+        ...(normalizeOptionalObject(entry?.semanticSummary) ? { semanticSummary: normalizeOptionalObject(entry.semanticSummary) } : {}),
+        ...(normalizeOptionalObject(entry?.binding) ? { binding: normalizeOptionalObject(entry.binding) } : {}),
+        ...(normalizeOptionalObject(entry?.scope) ? { scope: normalizeOptionalObject(entry.scope) } : {}),
       };
     })
     .filter(Boolean);

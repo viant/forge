@@ -1,0 +1,138 @@
+import { buildPreviewBootstrapSteps } from "./report-builder-preview-scenario-builders.mjs";
+
+export default {
+  baseUrl: "http://127.0.0.1:5175",
+  viewport: {
+    width: 1280,
+    height: 720,
+  },
+  steps: [
+    ...buildPreviewBootstrapSteps(),
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Performance metrics settings",
+    },
+    {
+      type: "waitForDomContains",
+      text: "BREAK DOWN BY",
+      timeoutMs: 60000,
+    },
+    {
+      type: "selectSelector",
+      selector: "select",
+      index: 0,
+      value: "agegroupId",
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Validating the semantic selection against the provider.') || text.includes('Semantic provider diagnostics') || text.includes('Resolve semantic selection issues'); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Semantic provider diagnostics",
+      timeoutMs: 60000,
+    },
+    {
+      type: "reload",
+    },
+    {
+      type: "waitForDomContains",
+      text: "Semantic provider diagnostics",
+      timeoutMs: 60000,
+    },
+    {
+      type: "assertDomContains",
+      text: "Audience Age Group is not supported for this semantic selection in the demo provider.",
+    },
+    {
+      type: "assertDomContains",
+      text: "Household Uniques cannot be combined with Audience Age Group in this demo semantic provider.",
+    },
+    {
+      type: "assertDomContains",
+      text: "Resolve semantic selection issues",
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const runButtons = Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run'); return runButtons.length === 1 && runButtons[0].disabled === true; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Performance metrics settings",
+    },
+    {
+      type: "waitForDomContains",
+      text: "BREAK DOWN BY",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "document.querySelectorAll('select')[0]?.value === 'agegroupId'",
+      timeoutMs: 60000,
+    },
+    {
+      type: "selectSelector",
+      selector: "select",
+      index: 0,
+      value: "",
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; const runButtons = Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run'); return text.includes('Validating the semantic selection against the provider.') || (!text.includes('Semantic provider diagnostics') && !text.includes('Resolve semantic selection issues') && !text.includes('Audience Age Group is not supported for this semantic selection in the demo provider.') && !text.includes('Household Uniques cannot be combined with Audience Age Group in this demo semantic provider.') && runButtons.length === 1 && runButtons[0].disabled === false); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "reload",
+    },
+    {
+      type: "waitForDomContains",
+      text: "Semantic binding: Ad Delivery • Entity: Line Delivery",
+      timeoutMs: 60000,
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Semantic provider diagnostics",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Resolve semantic selection issues",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Audience Age Group is not supported for this semantic selection in the demo provider.",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Household Uniques cannot be combined with Audience Age Group in this demo semantic provider.",
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const runButtons = Array.from(document.querySelectorAll('button')).filter((button) => (button.innerText || '').trim() === 'Run'); return runButtons.length === 1 && runButtons[0].disabled === false; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Performance metrics settings",
+    },
+    {
+      type: "waitForDomContains",
+      text: "BREAK DOWN BY",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "document.querySelectorAll('select')[0]?.value === ''",
+      timeoutMs: 60000,
+    },
+    {
+      type: "screenshot",
+      file: "report-builder-preview-semantic-persistence-proof.png",
+      fullPage: true,
+    },
+  ],
+};

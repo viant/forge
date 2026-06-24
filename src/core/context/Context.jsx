@@ -63,6 +63,11 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         };
     }
     const connectorRuntime = services?.__connectorRuntime || {};
+    const actorRef = String(
+        services?.actorRef
+        || connectorRuntime?.targetContext?.actorRef
+        || ""
+    ).trim();
     const dataSourceContextCache = {};
     const dialogContextCache = {}
     const signalIds = {}
@@ -82,7 +87,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
     const {ns} = metadata || [];
     return {
 
-        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId},
+        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, ...(actorRef ? { actorRef } : {})},
         windowState: services?.windowState || null,
         resources: {},
         metadata: metadata,

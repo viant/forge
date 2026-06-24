@@ -18,6 +18,9 @@ import {
     resolveReportBuilderSemanticSelections,
 } from "./reportBuilderSemantic.js";
 import {
+    resolveReportBuilderDrillMetadata,
+} from "../../reporting/reportBuilderDrillMetadata.js";
+import {
     ALL_SUPPORTED_CHART_TYPES,
     chartFamilyAllowsSeriesOptions,
     chartFamilyForType,
@@ -82,6 +85,13 @@ export function shouldAutoCollapseReportBuilderFilters({
         && Number.isFinite(runSequence)
         && runSequence > 0
         && runSequence !== lastCollapsed;
+}
+
+export function collapseReportBuilderFilterBodyState(filterPanels = {}) {
+    if (!filterPanels || typeof filterPanels !== "object" || Array.isArray(filterPanels)) {
+        return { common: false };
+    }
+    return filterPanels.common ? { ...filterPanels, common: false } : filterPanels;
 }
 
 export function resolveReportBuilderRailFilterState({
@@ -1066,12 +1076,16 @@ export function isReportBuilderChartSpecStale(config = {}, chartSpec = null, col
 
 export function buildReportBuilderSettingsHash(state = {}) {
     const binding = normalizeSemanticBinding(state?.binding);
+    const drillMetadata = normalizeReportBuilderDrillMetadataState(state?.drillMetadata);
     const signature = JSON.stringify({
         ...(binding ? { binding } : {}),
         dimensions: normalizeStringArray(state?.selectedDimensions),
         measures: normalizeStringArray(state?.selectedMeasures),
         localCalculatedFields: normalizeReportBuilderLocalCalculatedFields(state?.localCalculatedFields),
         localTableCalculations: normalizeReportBuilderLocalTableCalculations(state?.localTableCalculations),
+        ...(drillMetadata
+            ? { drillMetadata }
+            : {}),
     });
     let hash = 5381;
     for (let i = 0; i < signature.length; i += 1) {
@@ -1088,6 +1102,19 @@ function resolveValidSemanticBinding(binding = null) {
     }
     const validation = validateSemanticBinding(normalized);
     return validation.valid ? validation.normalizedBinding : null;
+}
+
+function normalizeReportBuilderDrillMetadataState(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+    const normalized = resolveReportBuilderDrillMetadata({}, value);
+    const next = {
+        ...(Object.prototype.hasOwnProperty.call(value, "hierarchies") ? { hierarchies: normalized.hierarchies } : {}),
+        ...(Object.prototype.hasOwnProperty.call(value, "detailTargets") ? { detailTargets: normalized.detailTargets } : {}),
+        ...(Object.prototype.hasOwnProperty.call(value, "fieldActions") ? { fieldActions: normalized.fieldActions } : {}),
+    };
+    return Object.keys(next).length > 0 ? next : null;
 }
 
 function normalizeActiveTablePreset(preset = null) {
@@ -2018,6 +2045,7 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
 
     next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
     next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
+    next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
     const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
     Object.keys(next).forEach((key) => {
         if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
@@ -2029,6 +2057,9 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
     next.selectedMeasures = normalizeArray(next.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
     next.selectedDimensions = normalizeArray(next.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean);
     next.binding = resolveMergedSemanticBinding(config?.binding, next.binding);
+    if (!next.drillMetadata) {
+        delete next.drillMetadata;
+    }
     next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures[0] || defaults.primaryMeasure || "").trim();
     next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
     next.viewMode = String(next.viewMode || defaults.viewMode || "chart").trim() || "chart";
@@ -2060,6 +2091,7 @@ export function sanitizeReportBuilderState(config = {}, state = {}) {
     next.dynamicGroups = dynamicGroups;
     next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
     next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
+    next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
     const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
     Object.keys(next).forEach((key) => {
         if (!Object.prototype.hasOwnProperty.call(normalizedExplorationState || {}, key)) {
@@ -2069,6 +2101,9 @@ export function sanitizeReportBuilderState(config = {}, state = {}) {
     Object.assign(next, normalizedExplorationState || {});
     const effectiveConfig = buildReportBuilderCalculatedFieldConfig(config, next);
     next.binding = resolveMergedSemanticBinding(config?.binding, next.binding);
+    if (!next.drillMetadata) {
+        delete next.drillMetadata;
+    }
     next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
     next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures?.[0] || "").trim();
     next.selectedMeasures = normalizeArray(next.selectedMeasures).map((entry) => String(entry || "").trim()).filter(Boolean);

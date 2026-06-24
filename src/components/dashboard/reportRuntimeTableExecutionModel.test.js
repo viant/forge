@@ -23,7 +23,7 @@ const executions = buildReportRuntimeTableActionExecutions({
       kind: "detail",
       fieldValueKey: "channelV2",
       label: "Show channel details",
-      targetRef: "target://steward/performance/channel-detail",
+      targetRef: "target://example/performance/channel-detail",
     },
   ],
   field: {
@@ -80,7 +80,7 @@ assert.deepEqual(executions, [
         id: "detail_channel",
         kind: "detail",
         label: "Show channel details",
-        targetRef: "target://steward/performance/channel-detail",
+        targetRef: "target://example/performance/channel-detail",
       },
       item: {
         channelV2: 1,

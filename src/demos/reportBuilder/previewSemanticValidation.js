@@ -10,6 +10,53 @@ export function normalizePreviewSemanticSelectionIds(values = []) {
     .filter(Boolean);
 }
 
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizePreviewSemanticParameterValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizePreviewSemanticParameterValue(entry));
+  }
+  if (isPlainObject(value)) {
+    return Object.keys(value)
+      .sort()
+      .reduce((accumulator, key) => {
+        const normalizedKey = String(key || "").trim();
+        if (!normalizedKey) {
+          return accumulator;
+        }
+        accumulator[normalizedKey] = normalizePreviewSemanticParameterValue(value[key]);
+        return accumulator;
+      }, {});
+  }
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  return value;
+}
+
+export function normalizePreviewSemanticSelectionParameters(parameters = null) {
+  if (!isPlainObject(parameters)) {
+    return {};
+  }
+  return Object.keys(parameters)
+    .sort()
+    .reduce((accumulator, key) => {
+      const normalizedKey = String(key || "").trim();
+      if (!normalizedKey) {
+        return accumulator;
+      }
+      accumulator[normalizedKey] = normalizePreviewSemanticParameterValue(parameters[key]);
+      return accumulator;
+    }, {});
+}
+
+export function previewSemanticSelectionParametersEqual(left = null, right = null) {
+  return JSON.stringify(normalizePreviewSemanticSelectionParameters(left))
+    === JSON.stringify(normalizePreviewSemanticSelectionParameters(right));
+}
+
 export function previewSemanticSelectionIdsEqual(left = [], right = []) {
   const normalizedLeft = normalizePreviewSemanticSelectionIds(left);
   const normalizedRight = normalizePreviewSemanticSelectionIds(right);
@@ -29,6 +76,7 @@ export function normalizePreviewSemanticValidationBehavior(behavior = {}) {
     ...(String(match.entity || '').trim() ? { entity: String(match.entity).trim() } : {}),
     ...(Array.isArray(match.dimensions) ? { dimensions: normalizePreviewSemanticSelectionIds(match.dimensions) } : {}),
     ...(Array.isArray(match.measures) ? { measures: normalizePreviewSemanticSelectionIds(match.measures) } : {}),
+    ...(isPlainObject(match.parameters) ? { parameters: normalizePreviewSemanticSelectionParameters(match.parameters) } : {}),
   };
   const delayMs = Math.max(0, Number(behavior.delayMs || 0) || 0);
   const errorMessage = String(behavior.error?.message || behavior.errorMessage || behavior.error || '').trim();
@@ -117,6 +165,7 @@ export function consumePreviewSemanticValidationBehavior(metrics = {}, modelRef 
   const normalizedEntity = String(selection?.entity || '').trim();
   const normalizedDimensions = normalizePreviewSemanticSelectionIds(selection?.dimensions);
   const normalizedMeasures = normalizePreviewSemanticSelectionIds(selection?.measures);
+  const normalizedParameters = normalizePreviewSemanticSelectionParameters(selection?.parameters);
   const index = behaviors.findIndex((behavior) => {
     if (!behavior || typeof behavior !== 'object') {
       return false;
@@ -132,6 +181,9 @@ export function consumePreviewSemanticValidationBehavior(metrics = {}, modelRef 
       return false;
     }
     if (Array.isArray(match.measures) && !previewSemanticSelectionIdsEqual(match.measures, normalizedMeasures)) {
+      return false;
+    }
+    if (isPlainObject(match.parameters) && !previewSemanticSelectionParametersEqual(match.parameters, normalizedParameters)) {
       return false;
     }
     return true;

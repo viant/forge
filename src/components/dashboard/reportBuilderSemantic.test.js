@@ -24,7 +24,7 @@ import {
 } from "./reportBuilderSemantic.js";
 
 const model = {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     version: 1,
     label: "Ad Delivery",
     entities: [
@@ -56,7 +56,65 @@ const model = {
                     governance: {
                         status: "approved",
                         certification: "certified",
-                        ownerRef: "team://steward/performance",
+                        ownerRef: "team://example/performance",
+                    },
+                },
+            ],
+            parameters: [
+                {
+                    id: "reporting_window",
+                    label: "Reporting Window",
+                    description: "Approved reporting window",
+                    dataType: "date",
+                },
+            ],
+        },
+    ],
+};
+
+const flatFieldModel = {
+    modelRef: "model://example/performance/delivery@v1",
+    version: 1,
+    label: "Ad Delivery",
+    entities: [
+        {
+            id: "line_delivery",
+            label: "Line Delivery",
+            fields: [
+                {
+                    id: "publisher",
+                    label: "Publisher",
+                    featureType: "dimension",
+                    category: "Inventory",
+                    definitionRef: "harmonizer://feature/publisher",
+                    governance: {
+                        status: "approved",
+                        certification: "reviewed",
+                        classification: "harmonizer.audience",
+                    },
+                },
+                {
+                    id: "audience_index",
+                    label: "Audience Index",
+                    featureType: "measure",
+                    category: "Audience",
+                    format: "number",
+                    definitionRef: "harmonizer://feature/user.segment.index",
+                    governance: {
+                        status: "approved",
+                        certification: "reviewed",
+                        classification: "harmonizer.audience",
+                    },
+                },
+                {
+                    id: "audience_segment",
+                    label: "Audience Segment",
+                    featureType: "parameter",
+                    category: "Audience",
+                    definitionRef: "harmonizer://feature/user.segment",
+                    governance: {
+                        status: "approved",
+                        classification: "harmonizer.audience",
                     },
                 },
             ],
@@ -88,9 +146,14 @@ assert.equal(applyReportBuilderSemanticConfig(rawConfig, { mode: "raw" }, model)
 
 assert.equal(resolveReportBuilderSemanticEntity(model, {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
 }).label, "Line Delivery");
+assert.equal(resolveReportBuilderSemanticEntity(flatFieldModel, {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+}).measures[0].id, "audience_index");
 
 const overlaid = applyReportBuilderSemanticConfig({
     measures: [
@@ -99,6 +162,9 @@ const overlaid = applyReportBuilderSemanticConfig({
     dimensions: [
         { id: "eventDate", semanticRef: "event_date", label: "Event Date", paramPath: "dimensions.eventDate" },
     ],
+    staticFilters: [
+        { id: "dateRange", semanticRef: "reporting_window", label: "Date Range", type: "dateRange" },
+    ],
     groupBy: {
         options: [
             { value: "eventDate", label: "Event Date", dimensionId: "eventDate" },
@@ -106,21 +172,45 @@ const overlaid = applyReportBuilderSemanticConfig({
     },
 }, {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
 }, model);
 assert.equal(overlaid.measures[0].label, "Spend");
 assert.equal(overlaid.measures[0].format, "currency");
 assert.equal(overlaid.measures[0].semanticRef, "spend");
 assert.equal(overlaid.dimensions[0].label, "Date");
+assert.equal(overlaid.staticFilters[0].label, "Reporting Window");
+assert.equal(overlaid.staticFilters[0].description, "Approved reporting window");
+assert.equal(overlaid.staticFilters[0].semanticDataType, "date");
+assert.equal(overlaid.staticFilters[0].semanticRef, "reporting_window");
 assert.equal(overlaid.groupBy.options[0].label, "Date");
+
+const flatFieldOverlaid = applyReportBuilderSemanticConfig({
+    measures: [
+        { id: "audienceIndex", semanticRef: "audience_index", label: "Audience Index" },
+    ],
+    dimensions: [
+        { id: "publisherId", semanticRef: "publisher", label: "Publisher" },
+    ],
+    staticFilters: [
+        { id: "audienceSegmentFilter", semanticRef: "audience_segment", label: "Audience Segment", multiple: true },
+    ],
+}, {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+}, flatFieldModel);
+assert.equal(flatFieldOverlaid.measures[0].category, "Audience");
+assert.equal(flatFieldOverlaid.measures[0].definitionRef, "harmonizer://feature/user.segment.index");
+assert.equal(flatFieldOverlaid.dimensions[0].category, "Inventory");
+assert.equal(flatFieldOverlaid.staticFilters[0].definitionRef, "harmonizer://feature/user.segment");
 
 assert.deepEqual(resolveReportBuilderSemanticSelections({
     measures: [{ id: "totalSpend", semanticRef: "spend" }],
     dimensions: [{ id: "eventDate", semanticRef: "event_date" }],
 }, {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date"],
     selectedMeasures: ["spend"],
@@ -134,6 +224,7 @@ assert.deepEqual(resolveReportBuilderSemanticSelections({
 assert.deepEqual(buildReportBuilderSemanticSelection({
     measures: [{ id: "totalSpend", semanticRef: "spend" }],
     dimensions: [{ id: "eventDate", semanticRef: "event_date" }, { id: "channelId", semanticRef: "channel" }],
+    staticFilters: [{ id: "dateRange", type: "dateRange", semanticRef: "reporting_window" }],
     groupBy: {
         options: [
             { value: "channel", dimensionId: "channelId", label: "Channel" },
@@ -141,47 +232,65 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["totalSpend"],
     groupBy: "channel",
+    staticFilters: {
+        dateRange: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
 }), {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selection: {
         dimensions: ["event_date", "channel"],
         measures: ["spend"],
     },
     refinements: [],
-    parameters: {},
+    parameters: {
+        reporting_window: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
 });
 
 assert.deepEqual(buildReportBuilderSemanticSelection({
     measures: [{ id: "totalSpend", semanticRef: "spend" }, { id: "ctr" }],
     dimensions: [{ id: "eventDate", semanticRef: "event_date" }, { id: "siteType" }],
+    staticFilters: [{ id: "dateRange", type: "dateRange", semanticRef: "reporting_window" }],
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     selectedDimensions: ["eventDate", "siteType"],
     selectedMeasures: ["totalSpend", "ctr"],
+    staticFilters: {
+        dateRange: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
 }), {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selection: {
         dimensions: ["event_date"],
@@ -192,12 +301,64 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
         measures: ["ctr"],
     },
     refinements: [],
-    parameters: {},
+    parameters: {
+        reporting_window: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
+});
+
+assert.deepEqual(buildReportBuilderSemanticSelection({
+    measures: [{ id: "totalSpend", semanticRef: "spend" }],
+    dimensions: [{ id: "eventDate", semanticRef: "event_date" }],
+    staticFilters: [
+        { id: "dateRange", type: "dateRange", semanticRef: "reporting_window" },
+        { id: "channelsFilter", multiple: true, semanticRef: "", label: "Channels" },
+    ],
+    binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+    },
+}, {
+    binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+    },
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    staticFilters: {
+        dateRange: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+        channelsFilter: ["CTV"],
+    },
+}), {
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+    selection: {
+        dimensions: ["event_date"],
+        measures: ["spend"],
+    },
+    unmapped: {
+        parameters: ["channelsFilter"],
+    },
+    refinements: [],
+    parameters: {
+        reporting_window: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
 });
 
 assert.deepEqual(buildReportBuilderSemanticValidationRequest({
     measures: [{ id: "totalSpend", semanticRef: "spend" }],
     dimensions: [{ id: "eventDate", semanticRef: "event_date" }, { id: "channelId", semanticRef: "channel" }],
+    staticFilters: [{ id: "dateRange", type: "dateRange", semanticRef: "reporting_window" }],
     groupBy: {
         options: [
             { value: "channel", dimensionId: "channelId", label: "Channel" },
@@ -205,25 +366,36 @@ assert.deepEqual(buildReportBuilderSemanticValidationRequest({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["totalSpend"],
     groupBy: "channel",
+    staticFilters: {
+        dateRange: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
 }), {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     selection: {
         entity: "line_delivery",
         dimensions: ["event_date", "channel"],
         measures: ["spend"],
-        parameters: {},
+        parameters: {
+            reporting_window: {
+                start: "2026-05-01",
+                end: "2026-05-07",
+            },
+        },
     },
 });
 
@@ -246,9 +418,12 @@ assert.deepEqual(buildReportBuilderSemanticSummary({
             { id: "eventDate", semanticRef: "event_date", label: "Date" },
             { id: "channelId", semanticRef: "channel", label: "Channel" },
         ],
+        staticFilters: [
+            { id: "dateRange", type: "dateRange", semanticRef: "reporting_window", label: "Date Range" },
+        ],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
             selectedDimensions: ["event_date", "channel"],
             selectedMeasures: ["spend"],
@@ -257,9 +432,15 @@ assert.deepEqual(buildReportBuilderSemanticSummary({
     state: {
         selectedMeasures: ["ctr"],
         selectedDimensions: ["eventDate", "channelId"],
+        staticFilters: {
+            dateRange: {
+                start: "2026-05-01",
+                end: "2026-05-07",
+            },
+        },
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
             selectedDimensions: ["event_date", "channel"],
             selectedMeasures: ["spend"],
@@ -267,7 +448,7 @@ assert.deepEqual(buildReportBuilderSemanticSummary({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["spend"],
@@ -275,7 +456,7 @@ assert.deepEqual(buildReportBuilderSemanticSummary({
     model,
 }), {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -303,15 +484,23 @@ assert.deepEqual(buildReportBuilderSemanticSummary({
             governance: {
                 status: "approved",
                 certification: "certified",
-                ownerRef: "team://steward/performance",
+                ownerRef: "team://example/performance",
             },
+        },
+    ],
+    selectedParameters: [
+        {
+            id: "reporting_window",
+            rawId: "dateRange",
+            label: "Reporting Window",
+            description: "Approved reporting window",
         },
     ],
 });
 
 assert.deepEqual(normalizeReportBuilderSemanticSummary({
     kind: "semantic",
-    modelRef: " model://steward/performance/ad_delivery@v1 ",
+    modelRef: " model://example/performance/delivery@v1 ",
     modelLabel: " Ad Delivery ",
     entity: " line_delivery ",
     entityLabel: " Line Delivery ",
@@ -331,7 +520,7 @@ assert.deepEqual(normalizeReportBuilderSemanticSummary({
     ],
 }), {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -354,7 +543,7 @@ assert.deepEqual(normalizeReportBuilderSemanticSummary({
 assert.deepEqual(resolveReportBuilderSemanticSummary({
     currentSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: [
             { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
@@ -365,7 +554,7 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
     },
     fallbackSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -384,11 +573,11 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
             },
         ],
     },
-    currentFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\"}",
-    fallbackFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\"}",
+    currentFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\"}",
+    fallbackFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\"}",
 }), {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -411,14 +600,14 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
 assert.deepEqual(resolveReportBuilderSemanticSummary({
     currentSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: [],
         selectedMeasures: [],
     },
     fallbackSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -429,22 +618,26 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
             { id: "spend", rawId: "totalSpend", label: "Spend" },
         ],
     },
-    currentFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\"}",
-    fallbackFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\"}",
+    currentFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\"}",
+    fallbackFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\"}",
 }), {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
-    selectedDimensions: [],
-    selectedMeasures: [],
+    selectedDimensions: [
+        { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+    ],
+    selectedMeasures: [
+        { id: "spend", rawId: "totalSpend", label: "Spend" },
+    ],
 });
 
 assert.deepEqual(resolveReportBuilderSemanticSummary({
     currentSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: [
             { id: "event_date", rawId: "eventDate", label: "Current Delivery Date" },
@@ -455,7 +648,7 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
     },
     fallbackSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -466,11 +659,11 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
             { id: "spend", rawId: "totalSpend", label: "Spend" },
         ],
     },
-    currentFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\",\"selection\":\"current\"}",
-    fallbackFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\",\"selection\":\"reopened\"}",
+    currentFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\",\"selection\":\"current\"}",
+    fallbackFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\",\"selection\":\"reopened\"}",
 }), {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: [
         { id: "event_date", rawId: "eventDate", label: "Current Delivery Date" },
@@ -483,7 +676,7 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
 assert.deepEqual(resolveReportBuilderSemanticSummary({
     currentSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: [
             { id: "event_date", rawId: "eventDate", label: "Date" },
@@ -494,7 +687,7 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
     },
     fallbackSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -505,12 +698,12 @@ assert.deepEqual(resolveReportBuilderSemanticSummary({
             { id: "spend", rawId: "totalSpend", label: "Available Impressions", format: "compactNumber" },
         ],
     },
-    currentFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\"}",
-    fallbackFingerprint: "{\"modelRef\":\"model://steward/performance/ad_delivery@v1\"}",
+    currentFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\"}",
+    fallbackFingerprint: "{\"modelRef\":\"model://example/performance/delivery@v1\"}",
     preferFallbackMetadata: true,
 }), {
     kind: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     modelLabel: "Ad Delivery",
     entity: "line_delivery",
     entityLabel: "Line Delivery",
@@ -554,7 +747,7 @@ assert.deepEqual(buildReportBuilderSemanticDiagnosticTargets({
         ],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
     },
@@ -565,7 +758,7 @@ assert.deepEqual(buildReportBuilderSemanticDiagnosticTargets({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     diagnostics: [
@@ -609,6 +802,7 @@ assert.deepEqual(buildReportBuilderSemanticDiagnosticTargets({
             },
         ],
     },
+    parameterDiagnosticsById: {},
     groupByDiagnostics: [
         {
             code: "unsupportedBreakdown",
@@ -627,6 +821,55 @@ assert.deepEqual(buildReportBuilderSemanticDiagnosticTargets({
     ],
 });
 
+assert.deepEqual(buildReportBuilderSemanticDiagnosticTargets({
+    config: {
+        staticFilters: [
+            { id: "dateRange", type: "dateRange", semanticRef: "reporting_window", label: "Date Range" },
+        ],
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+        },
+    },
+    state: {
+        staticFilters: {
+            dateRange: {
+                start: "2026-05-01",
+                end: "2026-05-07",
+            },
+        },
+    },
+    binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+    },
+    diagnostics: [
+        {
+            code: "invalidParameter",
+            severity: "error",
+            path: "selection.parameters.reporting_window",
+            message: "Reporting Window is outside the supported semantic window.",
+        },
+    ],
+}), {
+    measureDiagnosticsById: {},
+    dimensionDiagnosticsById: {},
+    parameterDiagnosticsById: {
+        dateRange: [
+            {
+                code: "invalidParameter",
+                severity: "error",
+                path: "selection.parameters.reporting_window",
+                message: "Reporting Window is outside the supported semantic window.",
+            },
+        ],
+    },
+    groupByDiagnostics: [],
+    unmatchedDiagnostics: [],
+});
+
 assert.equal(
     summarizeReportBuilderSemanticDiagnostics([
         {
@@ -641,19 +884,24 @@ assert.deepEqual(resolveSemanticGovernanceBadges({
     governance: {
         status: "approved",
         certification: "certified",
+        ownerRef: "team://example/performance",
     },
 }), [
+    { id: "approved", label: "Approved", tone: "approved" },
     { id: "certified", label: "Certified", tone: "certified" },
+    { id: "owner:team://example/performance", label: "Owner team://example/performance", tone: "owner" },
 ]);
 
 assert.deepEqual(resolveSemanticGovernanceBadges({
     governance: {
         status: "deprecated",
         certification: "reviewed",
+        ownerRef: "team://example/performance",
     },
 }), [
     { id: "reviewed", label: "Reviewed", tone: "reviewed" },
     { id: "deprecated", label: "Deprecated", tone: "deprecated" },
+    { id: "owner:team://example/performance", label: "Owner team://example/performance", tone: "owner" },
 ]);
 
 assert.deepEqual(resolveSemanticGovernanceBadges({
@@ -694,12 +942,12 @@ assert.deepEqual(buildReportBuilderSemanticGovernanceNotice({
         ],
         dimensions: [
             { id: "eventDate", label: "Delivery Date", governance: { status: "approved" } },
-            { id: "agegroupId", label: "Audience Age Group", governance: { status: "draft" } },
-            { id: "country", label: "Market", governance: { status: "deprecated" } },
+            { id: "agegroupId", label: "Audience Age Group", governance: { status: "draft", ownerRef: "team://example/performance" } },
+            { id: "country", label: "Market", governance: { status: "deprecated", ownerRef: "team://example/performance" } },
         ],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
     },
@@ -710,7 +958,7 @@ assert.deepEqual(buildReportBuilderSemanticGovernanceNotice({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }), {
@@ -719,19 +967,19 @@ assert.deepEqual(buildReportBuilderSemanticGovernanceNotice({
     title: "Selected Semantic Governance Warnings",
     description: "Some selected semantic fields are deprecated or still in draft status. Review them before sharing or publishing this report.",
     items: [
-        "Market • Deprecated",
-        "Audience Age Group • Draft",
+        "Market • Owner team://example/performance • Deprecated",
+        "Audience Age Group • Owner team://example/performance • Draft",
     ],
 });
 
 assert.deepEqual(buildReportBuilderSemanticGovernanceNotice({
     config: {
         dimensions: [
-            { id: "agegroupId", label: "Audience Age Group", governance: { status: "draft" } },
+            { id: "agegroupId", label: "Audience Age Group", governance: { status: "draft", ownerRef: "team://example/performance" } },
         ],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
     },
@@ -740,7 +988,7 @@ assert.deepEqual(buildReportBuilderSemanticGovernanceNotice({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }), {
@@ -749,7 +997,7 @@ assert.deepEqual(buildReportBuilderSemanticGovernanceNotice({
     title: "Selected Draft Semantic Fields",
     description: "These selected semantic fields are still marked as draft in the provider metadata.",
     items: [
-        "Audience Age Group • Draft",
+        "Audience Age Group • Owner team://example/performance • Draft",
     ],
 });
 
@@ -798,7 +1046,7 @@ assert.deepEqual(buildReportBuilderSemanticDiagnosticsNotice({
 assert.deepEqual(buildReportBuilderSemanticRuntimeDiagnostics({
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     semanticStatus: {
@@ -860,7 +1108,7 @@ assert.deepEqual(buildReportBuilderSemanticRuntimeDiagnostics({
 assert.deepEqual(buildReportBuilderSemanticRuntimeDiagnostics({
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     semanticFieldValidation: {
@@ -897,7 +1145,7 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
         dimensions: [{ id: "eventDate", semanticRef: "event_date" }, { id: "siteType" }],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
     },
@@ -907,7 +1155,7 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     model,
@@ -969,7 +1217,8 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
             message: "siteType is not mapped to the current semantic model.",
         },
     },
-    message: "2 selected fields are not valid for the current semantic entity. Remove them or add valid semantic mappings before running the report.",
+    parameterIssuesById: {},
+    message: "2 selected fields or scope parameters are not valid for the current semantic entity. Remove them or add valid semantic mappings before running the report.",
 });
 
 assert.deepEqual(buildReportBuilderSemanticFieldValidation({
@@ -986,7 +1235,7 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
         dimensions: [{ id: "eventDate", semanticRef: "event_date" }],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
     },
@@ -996,7 +1245,7 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     model,
@@ -1006,6 +1255,7 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
     selectedIssues: [],
     measureIssuesById: {},
     dimensionIssuesById: {},
+    parameterIssuesById: {},
     message: "",
 });
 
@@ -1013,7 +1263,7 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
     config: {
         measures: [{ id: "totalSpend", semanticRef: "spend" }],
         calculatedFields: [{
-            id: "forecastLift",
+            id: "projectedLift",
             expr: "if(channelId = 'CTV', totalSpend, null)",
         }],
         dimensions: [
@@ -1022,17 +1272,17 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
         ],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
     },
     state: {
         selectedDimensions: ["eventDate"],
-        selectedMeasures: ["forecastLift"],
+        selectedMeasures: ["projectedLift"],
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     model,
@@ -1042,13 +1292,82 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
     selectedIssues: [],
     measureIssuesById: {},
     dimensionIssuesById: {},
+    parameterIssuesById: {},
     message: "",
+});
+
+assert.deepEqual(buildReportBuilderSemanticFieldValidation({
+    config: {
+        measures: [{ id: "totalSpend", semanticRef: "spend" }],
+        dimensions: [{ id: "eventDate", semanticRef: "event_date" }],
+        staticFilters: [
+            { id: "dateRange", type: "dateRange", semanticRef: "reporting_window", label: "Date Range" },
+            { id: "channelsFilter", multiple: true, semanticRef: "", label: "Channels" },
+        ],
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+        },
+    },
+    state: {
+        selectedDimensions: ["eventDate"],
+        selectedMeasures: ["totalSpend"],
+        staticFilters: {
+            dateRange: {
+                start: "2026-05-01",
+                end: "2026-05-07",
+            },
+            channelsFilter: ["CTV"],
+        },
+    },
+    binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+    },
+    model,
+}), {
+    canRun: false,
+    issues: [
+        {
+            id: "channelsFilter",
+            label: "Channels",
+            semanticRef: "",
+            code: "missingSemanticRef",
+            selected: true,
+            message: "Channels is not mapped to the current semantic model.",
+        },
+    ],
+    selectedIssues: [
+        {
+            id: "channelsFilter",
+            label: "Channels",
+            semanticRef: "",
+            code: "missingSemanticRef",
+            selected: true,
+            message: "Channels is not mapped to the current semantic model.",
+        },
+    ],
+    measureIssuesById: {},
+    dimensionIssuesById: {},
+    parameterIssuesById: {
+        channelsFilter: {
+            id: "channelsFilter",
+            label: "Channels",
+            semanticRef: "",
+            code: "missingSemanticRef",
+            selected: true,
+            message: "Channels is not mapped to the current semantic model.",
+        },
+    },
+    message: "Channels is not mapped to the current semantic model. Remove it or add a valid semantic mapping before running the report.",
 });
 
 assert.deepEqual(buildReportBuilderSemanticSelection({
     measures: [{ id: "totalSpend", semanticRef: "spend" }],
     calculatedFields: [{
-        id: "forecastLift",
+        id: "projectedLift",
         expr: "if(channelId = 'CTV', totalSpend, null)",
     }],
     dimensions: [
@@ -1057,19 +1376,19 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     ],
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     selectedDimensions: ["eventDate"],
-    selectedMeasures: ["forecastLift"],
+    selectedMeasures: ["projectedLift"],
 }), {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selection: {
         dimensions: ["event_date", "channel"],
@@ -1098,19 +1417,19 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     ],
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["runningSpend"],
 }), {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selection: {
         dimensions: ["event_date", "channel"],
@@ -1136,19 +1455,19 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     ],
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["reachShare"],
 }), {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selection: {
         dimensions: ["event_date", "channel"],
@@ -1160,11 +1479,12 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
 
 assert.match(semanticFieldTitle(overlaid.measures[0]), /Certified spend metric/);
 assert.match(semanticFieldTitle(overlaid.measures[0]), /approved/);
+assert.match(semanticFieldTitle(overlaid.measures[0]), /Owner team:\/\/example\/performance/);
 
 assert.deepEqual(buildReportBuilderSemanticStatus({
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     providerAvailable: true,
@@ -1180,7 +1500,7 @@ assert.deepEqual(buildReportBuilderSemanticStatus({
 assert.deepEqual(buildReportBuilderSemanticStatus({
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
     providerAvailable: false,

@@ -29,13 +29,13 @@ assert.deepEqual(normalizeReportRefinement({
   op: "detail",
   field: "orderId",
   values: [2667545],
-  targetRef: "target://steward/performance/order-detail",
+  targetRef: "target://example/performance/order-detail",
 }), {
   id: "detail_1",
   op: "detail",
   field: "orderId",
   values: [2667545],
-  targetRef: "target://steward/performance/order-detail",
+  targetRef: "target://example/performance/order-detail",
 });
 
 assert.deepEqual(normalizeReportRefinements([

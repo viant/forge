@@ -961,7 +961,14 @@ function buildFilterBarLines(block = {}) {
   if (params.length === 0) {
     return ["No active filter parameters."];
   }
-  return params.map((param) => `${normalizeString(param?.id) || "param"}: ${formatReportPrintValue(param?.value)}`);
+  return params.flatMap((param) => {
+    const label = normalizeString(param?.label || param?.id) || "param";
+    const description = normalizeString(param?.description);
+    return [
+      `${label}: ${formatReportPrintValue(param?.value)}`,
+      ...(description ? [description] : []),
+    ];
+  });
 }
 
 function buildRefinementBarLines(block = {}) {

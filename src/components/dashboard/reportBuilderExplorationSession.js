@@ -99,6 +99,53 @@ export function buildReportBuilderExplorationSourceContextFromChartSelection({
     };
 }
 
+export function buildReportBuilderExplorationSourceContextFromTableRow({
+    row = null,
+    rowIndex = 0,
+    labelSelectors = ["eventDate", "channelV2", "channelId"],
+    metadataSelectors = [],
+    fallbackLabel = "Selected row",
+} = {}) {
+    const record = row && typeof row === "object" && !Array.isArray(row)
+        ? row
+        : {};
+    const selectors = (Array.isArray(labelSelectors) ? labelSelectors : [])
+        .map((selector) => normalizeString(selector))
+        .filter(Boolean);
+    const metadataKeys = (Array.isArray(metadataSelectors) && metadataSelectors.length > 0
+        ? metadataSelectors
+        : selectors)
+        .map((selector) => normalizeString(selector))
+        .filter(Boolean);
+    const seenValues = new Set();
+    const labelParts = [];
+    selectors.forEach((selector) => {
+        const value = normalizeString(record?.[selector]);
+        if (!value || seenValues.has(value)) {
+            return;
+        }
+        seenValues.add(value);
+        labelParts.push(value);
+    });
+    const dimensionValues = {};
+    metadataKeys.forEach((selector) => {
+        const value = record?.[selector];
+        if (value === undefined || value === null || value === "") {
+            return;
+        }
+        dimensionValues[selector] = cloneValue(value);
+    });
+    return {
+        label: labelParts.length > 0
+            ? labelParts.join(" • ")
+            : (normalizeString(fallbackLabel) || "Selected row"),
+        metadata: {
+            rowIndex: Math.max(0, Number(rowIndex || 0) || 0),
+            ...(Object.keys(dimensionValues).length > 0 ? { dimensionValues } : {}),
+        },
+    };
+}
+
 function buildReportBuilderExplorationHintItems(sourceRef = {}) {
     const kind = normalizeString(sourceRef?.kind);
     switch (kind) {
@@ -116,7 +163,7 @@ function buildReportBuilderExplorationHintItems(sourceRef = {}) {
             ];
         case "reportBuilder.tableRow":
             return [
-                "Use this row as a starting point for local changes.",
+                "Use the selected row as a starting point.",
                 "Switch to chart view to compare the same scope visually.",
                 "Keep the draft only if the changes are worth saving.",
             ];
@@ -127,6 +174,20 @@ function buildReportBuilderExplorationHintItems(sourceRef = {}) {
                 "Keep the draft only if the result is worth saving.",
             ];
     }
+}
+
+function formatExplorationTtlRemaining(expiresAt = 0, nowMs = 0) {
+    const remainingMs = Math.max(0, Number(expiresAt || 0) - Number(nowMs || 0));
+    if (!remainingMs) {
+        return "Expired";
+    }
+    const totalMinutes = Math.ceil(remainingMs / (1000 * 60));
+    if (totalMinutes < 60) {
+        return `${totalMinutes}m left`;
+    }
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return minutes > 0 ? `${hours}h ${minutes}m left` : `${hours}h left`;
 }
 
 export function normalizeReportBuilderExplorationSession(session = null, {
@@ -311,6 +372,7 @@ export function buildReportBuilderExplorationBannerState(state = {}, options = {
     if (!session) {
         return null;
     }
+    const nowMs = resolveExplorationNow(options);
     const canUndo = session.historyIndex > 0;
     const canRedo = session.historyIndex < session.history.length - 1;
     return {
@@ -327,5 +389,8 @@ export function buildReportBuilderExplorationBannerState(state = {}, options = {
         canKeep: session.dirty,
         canSaveArtifact: session.dirty,
         sourceRef: session.sourceRef,
+        ttlMs: session.ttlMs,
+        expiresAt: session.expiresAt,
+        ttlLabel: formatExplorationTtlRemaining(session.expiresAt, nowMs),
     };
 }

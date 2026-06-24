@@ -5,11 +5,11 @@ import { buildReportRuntimeChartInteractionState } from "./reportRuntimeChartInt
 const providerActionsByField = new Map([
   ["primaryChart:eventDate", [
     { id: "keep_date", label: "Keep only", kind: "keep" },
-    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
   ]],
   ["primaryChart:channelV2", [
     { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
-    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
   ]],
 ]);
 
@@ -103,7 +103,7 @@ const authoredDerived = buildReportRuntimeChartInteractionState({
       { id: "drill_region", label: "Drill to Region", kind: "drill", nextFieldRef: "region" },
     ]],
     ["reachRateTrend:channelV2", [
-      { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+      { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
     ]],
   ]),
   interactionSupport: {

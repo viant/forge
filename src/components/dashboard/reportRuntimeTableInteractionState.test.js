@@ -9,13 +9,13 @@ const providerActionsByField = new Map([
   ["comparisonTable:eventDate", [
     { label: "Keep only", kind: "keep" },
     { label: "Exclude", kind: "exclude" },
-    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://steward/performance/date-detail" },
+    { id: "detail_date", label: "Show date details", kind: "detail", targetRef: "target://example/performance/date-detail" },
   ]],
   ["comparisonTable:channelV2", [
     { label: "Keep only", kind: "keep" },
     { label: "Exclude", kind: "exclude" },
     { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
-    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
   ]],
 ]);
 

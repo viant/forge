@@ -1,11 +1,30 @@
-import { mergeReportBuilderState, sanitizeReportBuilderState } from "./reportBuilderUtils.js";
+import {
+    buildReportBuilderChartFields,
+    mergeReportBuilderState,
+    sanitizeReportBuilderState,
+    validateReportBuilderChartSpec,
+} from "./reportBuilderUtils.js";
 import { resolveReportBuilderReopenCompatibility } from "./reportBuilderHydratedReportDocumentDiagnostic.js";
 import {
     buildReportBuilderSemanticValidationRequest,
     normalizeReportBuilderSemanticSummary,
 } from "./reportBuilderSemantic.js";
+import {
+    extractReportDocumentTemplateIdentity as extractReportDocumentTemplateIdentityFromModel,
+    normalizeReportBuilderDocumentBlocks,
+} from "../../reporting/reportDocumentModel.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import { normalizeReportRuntimeInteractionState } from "./reportRuntimeInteractionStateModel.js";
-import { normalizeReportBuilderDocumentBlocks } from "../../reporting/reportDocumentModel.js";
+import {
+    applySavedViewOverlayScopeParams,
+    applySavedViewOverlayToBuilderState,
+    buildSavedViewOverlaySummary,
+    extractSavedViewOverlayArtifactState,
+} from "../../reporting/views/savedViewOverlayModel.js";
+import { normalizeReportBuilderSavedReportRecords } from "./reportBuilderSavedReportRecords.js";
+import {
+    resolveReportBuilderSavedViewOverlayReferencedRecord as resolveSavedViewOverlayReferencedRecord,
+} from "./reportBuilderReopenSourceResolution.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -35,6 +54,43 @@ function normalizeSavedReportPayloadSource(source = null) {
         ...(payloadId ? { payloadId } : {}),
         ...(sourceArtifactId ? { sourceArtifactId } : {}),
         ...(reportId ? { reportId } : {}),
+    };
+}
+
+function normalizeSavedViewOverlayResolvedSource(source = null) {
+    return normalizeSavedReportPayloadSource(source);
+}
+
+function normalizeHydratedSharedArtifactState(value = null, {
+    fallbackKind = "",
+} = {}) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+    const artifactId = normalizeString(value?.artifactId || value?.id);
+    const artifactKind = normalizeString(value?.artifactKind || fallbackKind);
+    const lifecycle = normalizeString(value?.lifecycle).toLowerCase();
+    const ownerRef = normalizeString(value?.ownerRef);
+    const policyRef = normalizeString(value?.policyRef);
+    const artifactRef = normalizeString(value?.artifactRef);
+    const shareableVersion = Number(value?.shareableVersion || 0) || 0;
+    const badges = Array.isArray(value?.badges) ? cloneValue(value.badges) : [];
+    const capabilities = isPlainObject(value?.capabilities) ? cloneValue(value.capabilities) : null;
+    const grants = Array.isArray(value?.grants) ? cloneValue(value.grants) : [];
+    if (!artifactId && !lifecycle && !ownerRef && !policyRef && !artifactRef && shareableVersion < 1 && badges.length === 0 && !capabilities && grants.length === 0) {
+        return null;
+    }
+    return {
+        ...(artifactId ? { artifactId } : {}),
+        ...(artifactKind ? { artifactKind } : {}),
+        ...(artifactRef ? { artifactRef } : {}),
+        ...(lifecycle ? { lifecycle } : {}),
+        ...(ownerRef ? { ownerRef } : {}),
+        ...(policyRef ? { policyRef } : {}),
+        ...(shareableVersion > 0 ? { shareableVersion } : {}),
+        ...(badges.length > 0 ? { badges } : {}),
+        ...(capabilities ? { capabilities } : {}),
+        ...(grants.length > 0 ? { grants } : {}),
     };
 }
 
@@ -81,7 +137,204 @@ function normalizeReportBuilderHydratedCompileState(compileState = null) {
     };
 }
 
+function mergeHydratedCompileState(compileState = null, diagnostics = []) {
+    const normalizedCompileState = normalizeReportBuilderHydratedCompileState(compileState);
+    const normalizedDiagnostics = normalizeCompileDiagnostics(diagnostics);
+    if (!normalizedCompileState && normalizedDiagnostics.length === 0) {
+        return null;
+    }
+    const nextState = normalizedCompileState
+        ? cloneValue(normalizedCompileState)
+        : { status: "clean" };
+    if (normalizedDiagnostics.length > 0) {
+        nextState.diagnostics = [
+            ...(Array.isArray(nextState?.diagnostics) ? nextState.diagnostics : []),
+            ...normalizedDiagnostics,
+        ];
+        if (normalizedDiagnostics.some((diagnostic) => normalizeString(diagnostic?.severity).toLowerCase() === "error")) {
+            nextState.status = "invalid";
+        } else if (!normalizeString(nextState.status)) {
+            nextState.status = "clean";
+        }
+    }
+    return nextState;
+}
+
+function buildSavedViewOverlayApplicationDiagnostics(savedViewOverlay = null, state = {}, config = {}) {
+    const diagnostics = [];
+    const requestedOrderField = normalizeString(savedViewOverlay?.overlay?.order?.field);
+    if (requestedOrderField && normalizeString(state?.orderField) !== requestedOrderField) {
+        diagnostics.push({
+            code: "savedViewOverlayOrderFieldIncompatible",
+            severity: "warning",
+            path: "$.savedViewOverlay.overlay.order.field",
+            message: `Saved view overlay order field '${requestedOrderField}' is not compatible with the reopened builder state.`,
+        });
+    }
+    const activePresetTitle = normalizeString(savedViewOverlay?.overlay?.presentation?.activeTablePreset);
+    if (activePresetTitle && normalizeString(state?.activeTablePreset?.title) !== activePresetTitle) {
+        diagnostics.push({
+            code: "savedViewOverlayActiveTablePresetIncompatible",
+            severity: "warning",
+            path: "$.savedViewOverlay.overlay.presentation.activeTablePreset",
+            message: `Saved view overlay active table preset '${activePresetTitle}' is not compatible with the reopened builder state.`,
+        });
+    }
+    const lastPresetTitle = normalizeString(savedViewOverlay?.overlay?.presentation?.lastTablePreset);
+    if (lastPresetTitle && normalizeString(state?.lastTablePreset?.title) !== lastPresetTitle) {
+        diagnostics.push({
+            code: "savedViewOverlayLastTablePresetIncompatible",
+            severity: "warning",
+            path: "$.savedViewOverlay.overlay.presentation.lastTablePreset",
+            message: `Saved view overlay last table preset '${lastPresetTitle}' is not compatible with the reopened builder state.`,
+        });
+    }
+    const requestedChartSpec = savedViewOverlay?.overlay?.presentation?.chartSpec
+        && typeof savedViewOverlay.overlay.presentation.chartSpec === "object"
+        && !Array.isArray(savedViewOverlay.overlay.presentation.chartSpec)
+        ? savedViewOverlay.overlay.presentation.chartSpec
+        : null;
+    if (requestedChartSpec) {
+        const chartFields = buildReportBuilderChartFields(config, state);
+        const validation = validateReportBuilderChartSpec(config, requestedChartSpec, chartFields);
+        if (!validation.valid) {
+            diagnostics.push({
+                code: "savedViewOverlayChartSpecIncompatible",
+                severity: "warning",
+                path: "$.savedViewOverlay.overlay.presentation.chartSpec",
+                message: "Saved view overlay chartSpec is not compatible with the reopened builder state.",
+            });
+        }
+    }
+    return diagnostics;
+}
+
+function buildSavedViewOverlayReferenceDiagnostics(savedViewOverlay = null, {
+    reportId = "",
+} = {}) {
+    const diagnostics = [];
+    const normalizedReportId = normalizeString(reportId);
+    const baseReportId = normalizeString(savedViewOverlay?.baseReportRef?.reportId);
+    if (savedViewOverlay?.baseReportRef && !baseReportId) {
+        diagnostics.push({
+            code: "savedViewOverlayBaseReportUnresolved",
+            severity: "warning",
+            path: "$.savedViewOverlay.baseReportRef",
+            message: "Saved view overlay base report identity cannot be verified against the reopened report.",
+        });
+    }
+    if (baseReportId && normalizedReportId && baseReportId !== normalizedReportId) {
+        diagnostics.push({
+            code: "savedViewOverlayBaseReportMismatch",
+            severity: "warning",
+            path: "$.savedViewOverlay.baseReportRef.reportId",
+            message: `Saved view overlay base report '${baseReportId}' does not match reopened report '${normalizedReportId}'.`,
+        });
+    }
+    const snapshotReportId = normalizeString(savedViewOverlay?.publishedSnapshotRef?.reportId);
+    if (savedViewOverlay?.publishedSnapshotRef && !snapshotReportId) {
+        diagnostics.push({
+            code: "savedViewOverlayPublishedSnapshotReportUnresolved",
+            severity: "warning",
+            path: "$.savedViewOverlay.publishedSnapshotRef",
+            message: "Saved view overlay published snapshot identity cannot be verified against the reopened report.",
+        });
+    }
+    if (snapshotReportId && normalizedReportId && snapshotReportId !== normalizedReportId) {
+        diagnostics.push({
+            code: "savedViewOverlayPublishedSnapshotReportMismatch",
+            severity: "warning",
+            path: "$.savedViewOverlay.publishedSnapshotRef.reportId",
+            message: `Saved view overlay published snapshot report '${snapshotReportId}' does not match reopened report '${normalizedReportId}'.`,
+        });
+    }
+    return diagnostics;
+}
+
+function buildSavedViewOverlayResolvedRecordDiagnostics({
+    savedViewOverlay = null,
+    baseRecord = null,
+    baseResolution = null,
+    snapshotRecord = null,
+    snapshotResolution = null,
+} = {}) {
+    const diagnostics = [];
+    if (savedViewOverlay?.baseReportRef && baseResolution?.reason === "notFound") {
+        diagnostics.push({
+            code: "savedViewOverlayBaseReportNotFound",
+            severity: "warning",
+            path: "$.savedViewOverlay.baseReportRef",
+            message: "Saved view overlay base report could not be resolved locally.",
+        });
+    }
+    if (savedViewOverlay?.baseReportRef && baseResolution?.reason === "versionMismatch") {
+        diagnostics.push({
+            code: "savedViewOverlayBaseReportVersionMismatch",
+            severity: "warning",
+            path: "$.savedViewOverlay.baseReportRef.documentVersion",
+            message: `Saved view overlay base report version ${baseResolution.requestedVersion} could not be resolved locally; found version ${baseResolution.resolvedVersion} instead.`,
+        });
+    }
+    if (savedViewOverlay?.publishedSnapshotRef && snapshotResolution?.reason === "notFound") {
+        diagnostics.push({
+            code: "savedViewOverlayPublishedSnapshotNotFound",
+            severity: "warning",
+            path: "$.savedViewOverlay.publishedSnapshotRef",
+            message: "Saved view overlay published snapshot could not be resolved locally.",
+        });
+    }
+    if (savedViewOverlay?.publishedSnapshotRef && snapshotResolution?.reason === "versionMismatch") {
+        diagnostics.push({
+            code: "savedViewOverlayPublishedSnapshotVersionMismatch",
+            severity: "warning",
+            path: "$.savedViewOverlay.publishedSnapshotRef.documentVersion",
+            message: `Saved view overlay published snapshot version ${snapshotResolution.requestedVersion} could not be resolved locally; found version ${snapshotResolution.resolvedVersion} instead.`,
+        });
+    }
+    if (baseRecord && snapshotRecord && normalizeString(baseRecord?.reportId) !== normalizeString(snapshotRecord?.reportId)) {
+        diagnostics.push({
+            code: "savedViewOverlayResolvedSnapshotBaseReportMismatch",
+            severity: "warning",
+            path: "$.savedViewOverlay.publishedSnapshotRef.reportId",
+            message: `Resolved published snapshot report '${normalizeString(snapshotRecord?.reportId)}' does not match resolved base report '${normalizeString(baseRecord?.reportId)}'.`,
+        });
+    }
+    return diagnostics;
+}
+
+function normalizeHydratedScopeParams(params = []) {
+    return (Array.isArray(params) ? params : [])
+        .filter((param) => param && typeof param === "object" && !Array.isArray(param))
+        .map((param) => {
+            const id = normalizeString(param?.id);
+            const label = normalizeString(param?.label || param?.id);
+            if (!id || !label) {
+                return null;
+            }
+            const description = normalizeString(param?.description);
+            return {
+                id,
+                label,
+                ...(description ? { description } : {}),
+            };
+        })
+        .filter(Boolean);
+}
+
 const REPORT_DOCUMENT_REOPEN_SESSION_KEY = "reportDocumentReopenSession";
+const BLOCKING_SAVED_VIEW_OVERLAY_DIAGNOSTIC_CODES = new Set([
+    "savedViewOverlaySnapshotBaseReportMismatch",
+    "savedViewOverlaySnapshotBaseVersionStale",
+    "savedViewOverlayBaseReportUnresolved",
+    "savedViewOverlayBaseReportMismatch",
+    "savedViewOverlayBaseReportNotFound",
+    "savedViewOverlayBaseReportVersionMismatch",
+    "savedViewOverlayPublishedSnapshotReportUnresolved",
+    "savedViewOverlayPublishedSnapshotReportMismatch",
+    "savedViewOverlayPublishedSnapshotNotFound",
+    "savedViewOverlayPublishedSnapshotVersionMismatch",
+    "savedViewOverlayResolvedSnapshotBaseReportMismatch",
+]);
 
 function normalizePositiveInteger(value) {
     const numeric = Number(value);
@@ -104,13 +357,14 @@ function buildHydratedDocumentSemanticFingerprint(config = {}, state = {}) {
 }
 
 function extractHydratedDocumentTemplateIdentity(hydratedDocument = null) {
+    const documentTemplateIdentity = extractReportDocumentTemplateIdentityFromModel(hydratedDocument?.document);
     const templateId = normalizeString(
-        hydratedDocument?.state?.reportDocumentTemplateId
-        || hydratedDocument?.document?.blocks?.find?.((block) => normalizeString(block?.kind) === "reportBuilderBlock")?.state?.reportDocumentTemplateId,
+        documentTemplateIdentity?.templateId
+        || hydratedDocument?.state?.reportDocumentTemplateId,
     );
     const templateLabel = normalizeString(
-        hydratedDocument?.state?.reportDocumentTemplateLabel
-        || hydratedDocument?.document?.blocks?.find?.((block) => normalizeString(block?.kind) === "reportBuilderBlock")?.state?.reportDocumentTemplateLabel,
+        documentTemplateIdentity?.templateLabel
+        || hydratedDocument?.state?.reportDocumentTemplateLabel,
     );
     if (!templateId && !templateLabel) {
         return null;
@@ -133,9 +387,10 @@ function extractReportBuilderAdditionalBlocks(document = null) {
     );
 }
 
-function applyReportDocumentScopeBindings(document = {}, block = {}) {
+function applyReportDocumentScopeBindings(document = {}, block = {}, scopeParams = []) {
+    const documentScopeParams = Array.isArray(document?.scope?.params) ? document.scope.params : [];
     const params = new Map(
-        (Array.isArray(document?.scope?.params) ? document.scope.params : [])
+        ((documentScopeParams.length > 0 ? documentScopeParams : scopeParams))
             .map((entry) => [normalizeString(entry?.id), entry])
             .filter(([id]) => !!id),
     );
@@ -163,42 +418,39 @@ function applyReportDocumentScopeBindings(document = {}, block = {}) {
     return nextState;
 }
 
-function resolveHydratedSemanticSummary(document = null, reportSpec = null) {
-    return normalizeReportBuilderSemanticSummary(reportSpec?.semanticSummary)
-        || normalizeReportBuilderSemanticSummary(document?.semanticSummary);
-}
-
 export function buildHydratedReportBuilderDocument(getResponse = null, {
     container = {},
     builderIdentity = {},
+    localSavedPayloads = [],
 } = {}) {
     if (!getResponse || typeof getResponse !== "object" || Array.isArray(getResponse)) {
         return {
             valid: false,
             code: "missingResponse",
-            message: "A getReportDocument response is required to reopen the builder.",
+            message: "A reopen bundle is required to reopen the builder.",
         };
     }
     if (normalizeString(getResponse?.kind) !== "getReportDocumentResponse") {
         return {
             valid: false,
             code: "unsupportedResponse",
-            message: "Only getReportDocument responses can be reopened into the builder.",
+            message: "Only reopen bundles can be reopened into the builder.",
         };
     }
     if (normalizePositiveInteger(getResponse?.version) < 1) {
         return {
             valid: false,
             code: "unsupportedResponseVersion",
-            message: "The saved getReportDocument response version is not supported for reopen.",
+            message: "The saved reopen bundle version is not supported.",
         };
     }
-    const document = getResponse?.document && typeof getResponse.document === "object" && !Array.isArray(getResponse.document)
-        ? cloneValue(getResponse.document)
-        : null;
-    const reportSpec = getResponse?.reportSpec && typeof getResponse.reportSpec === "object" && !Array.isArray(getResponse.reportSpec)
-        ? cloneValue(getResponse.reportSpec)
-        : null;
+    const hydratedContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: getResponse?.reportSpec || null,
+        document: getResponse?.document || null,
+        title: getResponse?.title || getResponse?.reportRef?.reportId || "",
+    });
+    const document = hydratedContext?.document ? cloneValue(hydratedContext.document) : null;
+    const reportSpec = hydratedContext?.reportSpec ? cloneValue(hydratedContext.reportSpec) : null;
     if (normalizeString(document?.kind) !== "reportDocument") {
         return {
             valid: false,
@@ -213,19 +465,63 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
             message: "The saved ReportDocument version is not supported for reopen.",
         };
     }
-    const block = extractReportBuilderBlock(document);
-    const config = block?.config && typeof block.config === "object" && !Array.isArray(block.config)
-        ? cloneValue(block.config)
+    const savedViewOverlay = extractSavedViewOverlayArtifactState(getResponse);
+    const reportId = normalizeString(getResponse?.reportRef?.reportId || document?.id);
+    const hasLocalSavedPayloadContext = Array.isArray(localSavedPayloads) && localSavedPayloads.length > 0;
+    const baseResolution = savedViewOverlay?.baseReportRef && hasLocalSavedPayloadContext
+        ? resolveSavedViewOverlayReferencedRecord(savedViewOverlay.baseReportRef, localSavedPayloads, {
+            expectedSourceKind: "reportBuilder.savedReportPayload",
+            requireExactVersion: true,
+        })
+        : { record: null, reason: "" };
+    const snapshotResolution = savedViewOverlay?.publishedSnapshotRef && hasLocalSavedPayloadContext
+        ? resolveSavedViewOverlayReferencedRecord(savedViewOverlay.publishedSnapshotRef, localSavedPayloads, {
+            expectedSourceKind: "reportBuilder.publishedSnapshot",
+            requireExactVersion: true,
+        })
+        : { record: null, reason: "" };
+    const resolvedBaseRecord = baseResolution?.record || null;
+    const resolvedSnapshotRecord = snapshotResolution?.record || null;
+    const overlayReferenceDiagnostics = savedViewOverlay
+        ? buildSavedViewOverlayReferenceDiagnostics(savedViewOverlay, {
+            reportId,
+        })
+        : [];
+    const overlayResolvedRecordDiagnostics = savedViewOverlay
+        ? buildSavedViewOverlayResolvedRecordDiagnostics({
+            savedViewOverlay,
+            baseRecord: resolvedBaseRecord,
+            baseResolution,
+            snapshotRecord: resolvedSnapshotRecord,
+            snapshotResolution,
+        })
+        : [];
+    const sourceDocument = resolvedSnapshotRecord?.document || resolvedBaseRecord?.document || document;
+    const sourceReportSpec = resolvedSnapshotRecord?.reportSpec || resolvedBaseRecord?.reportSpec || reportSpec;
+    const sourceHydratedContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: sourceReportSpec || null,
+        document: sourceDocument || null,
+        title: getResponse?.title || getResponse?.reportRef?.reportId || "",
+    });
+    const overlaySummary = savedViewOverlay
+        ? buildSavedViewOverlaySummary(getResponse, {
+            document: sourceDocument,
+            reportSpec: sourceReportSpec,
+        })
         : null;
-    if (!document || !block || !config) {
+    const sourceBlock = extractReportBuilderBlock(sourceDocument);
+    const config = sourceBlock?.config && typeof sourceBlock.config === "object" && !Array.isArray(sourceBlock.config)
+        ? cloneValue(sourceBlock.config)
+        : null;
+    if (!sourceDocument || !sourceBlock || !config) {
         return {
             valid: false,
             code: "invalidDocument",
             message: "The saved ReportDocument does not contain a compatible reportBuilderBlock.",
         };
     }
-    const source = block?.source && typeof block.source === "object" && !Array.isArray(block.source)
-        ? cloneValue(block.source)
+    const source = sourceBlock?.source && typeof sourceBlock.source === "object" && !Array.isArray(sourceBlock.source)
+        ? cloneValue(sourceBlock.source)
         : {};
     const compatibility = resolveReportBuilderReopenCompatibility(source, {
         containerId: normalizeString(builderIdentity?.containerId || container?.id),
@@ -238,25 +534,75 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
             code: compatibility.code,
             message: compatibility.message,
             source,
+            ...(savedViewOverlay ? { savedViewOverlay } : {}),
+            ...(resolvedBaseRecord?.source ? { savedViewOverlayBaseSource: cloneValue(resolvedBaseRecord.source) } : {}),
+            ...(resolvedSnapshotRecord?.source ? { savedViewOverlayPublishedSnapshotSource: cloneValue(resolvedSnapshotRecord.source) } : {}),
         };
     }
+    const hasBlockingSavedViewOverlayDiagnostics = [
+        ...(Array.isArray(overlaySummary?.diagnostics) ? overlaySummary.diagnostics : []),
+        ...overlayReferenceDiagnostics,
+        ...overlayResolvedRecordDiagnostics,
+    ].some((diagnostic) => BLOCKING_SAVED_VIEW_OVERLAY_DIAGNOSTIC_CODES.has(normalizeString(diagnostic?.code)));
+    const rawScopeParams = Array.isArray(sourceHydratedContext?.scopeParams)
+        ? cloneValue(sourceHydratedContext.scopeParams)
+        : (Array.isArray(hydratedContext?.scopeParams)
+        ? cloneValue(hydratedContext.scopeParams)
+        : []);
+    const effectiveScopeParams = savedViewOverlay && !hasBlockingSavedViewOverlayDiagnostics
+        ? applySavedViewOverlayScopeParams(getResponse, {
+            scopeParams: rawScopeParams,
+        })
+        : rawScopeParams;
+    const scopeBindingDocument = savedViewOverlay && !hasBlockingSavedViewOverlayDiagnostics
+        ? {
+            ...cloneValue(sourceDocument),
+            scope: {
+                ...(sourceDocument?.scope && typeof sourceDocument.scope === "object" && !Array.isArray(sourceDocument.scope)
+                    ? cloneValue(sourceDocument.scope)
+                    : {}),
+                params: cloneValue(effectiveScopeParams),
+            },
+        }
+        : sourceDocument;
     const hydratedState = sanitizeReportBuilderState(
         config,
-        applyReportDocumentScopeBindings(document, block),
+        applySavedViewOverlayToBuilderState(savedViewOverlay && !hasBlockingSavedViewOverlayDiagnostics ? getResponse : null, {
+            document: sourceDocument,
+            reportSpec: sourceReportSpec,
+            state: applyReportDocumentScopeBindings(scopeBindingDocument, sourceBlock, effectiveScopeParams),
+        }),
     );
-    const additionalBlocks = extractReportBuilderAdditionalBlocks(document);
-    if (additionalBlocks.length > 0 && (!isPlainObject(document?.layout) || !Array.isArray(document?.layout?.items))) {
+    const overlayApplicationDiagnostics = savedViewOverlay
+        ? buildSavedViewOverlayApplicationDiagnostics(savedViewOverlay, hydratedState, config)
+        : [];
+    const templateIdentity = extractHydratedDocumentTemplateIdentity({
+        document: sourceDocument,
+        state: hydratedState,
+    });
+    const additionalBlocks = extractReportBuilderAdditionalBlocks(sourceDocument);
+    if (additionalBlocks.length > 0 && (!isPlainObject(sourceDocument?.layout) || !Array.isArray(sourceDocument?.layout?.items))) {
         return {
             valid: false,
             code: "invalidDocumentLayout",
             message: "The saved ReportDocument contains authored blocks but does not define a compatible layout.",
         };
     }
-    const reportId = normalizeString(getResponse?.reportRef?.reportId || document?.id || block?.source?.stateKey);
     const title = normalizeString(document?.title || getResponse?.title || reportId || "Report");
     const documentVersion = Number(getResponse?.documentVersion || 0) || 0;
-    const compileState = normalizeReportBuilderHydratedCompileState(getResponse?.compileState);
+    const compileState = mergeHydratedCompileState(
+        getResponse?.compileState,
+        [
+            ...(Array.isArray(overlaySummary?.diagnostics) ? overlaySummary.diagnostics : []),
+            ...overlayReferenceDiagnostics,
+            ...overlayResolvedRecordDiagnostics,
+            ...overlayApplicationDiagnostics,
+        ],
+    );
     const savedSource = normalizeSavedReportPayloadSource(getResponse?.source);
+    const sharedArtifactState = normalizeHydratedSharedArtifactState(getResponse, {
+        fallbackKind: savedSource?.kind || "",
+    });
     return {
         valid: true,
         reportId,
@@ -264,18 +610,25 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
         documentVersion,
         source,
         ...(savedSource ? { savedSource } : {}),
+        ...(sharedArtifactState ? sharedArtifactState : {}),
         config,
         ...(compileState ? { compileState } : {}),
+        ...(effectiveScopeParams.length > 0 ? { scopeParams: cloneValue(effectiveScopeParams) } : {}),
+        ...(savedViewOverlay ? { savedViewOverlay } : {}),
+        ...(resolvedBaseRecord?.source ? { savedViewOverlayBaseSource: cloneValue(resolvedBaseRecord.source) } : {}),
+        ...(resolvedSnapshotRecord?.source ? { savedViewOverlayPublishedSnapshotSource: cloneValue(resolvedSnapshotRecord.source) } : {}),
         state: {
             ...hydratedState,
             ...(normalizeString(document?.title) ? { reportDocumentTitle: normalizeString(document.title) } : {}),
             ...(normalizeString(document?.subtitle) ? { reportDocumentSubtitle: normalizeString(document.subtitle) } : {}),
             ...(normalizeString(document?.description) ? { reportDocumentDescription: normalizeString(document.description) } : {}),
+            ...(templateIdentity?.templateId ? { reportDocumentTemplateId: templateIdentity.templateId } : {}),
+            ...(templateIdentity?.templateLabel ? { reportDocumentTemplateLabel: templateIdentity.templateLabel } : {}),
             ...(additionalBlocks.length > 0 ? { reportDocumentBlocks: additionalBlocks } : {}),
-            ...(additionalBlocks.length > 0 && document?.layout ? { reportDocumentLayout: cloneValue(document.layout) } : {}),
+            ...(additionalBlocks.length > 0 && sourceDocument?.layout ? { reportDocumentLayout: cloneValue(sourceDocument.layout) } : {}),
         },
-        document,
-        ...(reportSpec ? { reportSpec } : {}),
+        document: sourceDocument,
+        ...(sourceReportSpec ? { reportSpec: sourceReportSpec } : {}),
     };
 }
 
@@ -296,9 +649,18 @@ export function normalizeReportBuilderHydratedDocumentSession(session = null) {
         return null;
     }
     const reopenedSemanticSummary = normalizeReportBuilderSemanticSummary(session?.reopenedSemanticSummary);
+    const reopenedScopeParams = normalizeHydratedScopeParams(session?.reopenedScopeParams);
     const reopenedSemanticFingerprint = normalizeString(session?.reopenedSemanticFingerprint);
     const reopenedCompileState = normalizeReportBuilderHydratedCompileState(session?.reopenedCompileState);
     const savedSource = normalizeSavedReportPayloadSource(session?.savedSource);
+    const sharedArtifactState = normalizeHydratedSharedArtifactState(session, {
+        fallbackKind: savedSource?.kind || "",
+    });
+    const savedViewOverlay = session?.savedViewOverlay && typeof session.savedViewOverlay === "object" && !Array.isArray(session.savedViewOverlay)
+        ? cloneValue(session.savedViewOverlay)
+        : null;
+    const savedViewOverlayBaseSource = normalizeSavedViewOverlayResolvedSource(session?.savedViewOverlayBaseSource);
+    const savedViewOverlayPublishedSnapshotSource = normalizeSavedViewOverlayResolvedSource(session?.savedViewOverlayPublishedSnapshotSource);
     const runtimePreviewInteraction = normalizeReportRuntimeInteractionState(
         session?.runtimePreviewInteraction,
         { allowEmpty: false },
@@ -313,11 +675,16 @@ export function normalizeReportBuilderHydratedDocumentSession(session = null) {
             ? cloneValue(session.source)
             : {},
         ...(savedSource ? { savedSource } : {}),
+        ...(sharedArtifactState ? sharedArtifactState : {}),
         reopenedConfig,
         ...(reopenedSemanticSummary ? { reopenedSemanticSummary } : {}),
+        ...(reopenedScopeParams.length > 0 ? { reopenedScopeParams } : {}),
         ...(reopenedSemanticFingerprint ? { reopenedSemanticFingerprint } : {}),
         ...(reopenedCompileState ? { reopenedCompileState } : {}),
         ...(runtimePreviewInteraction ? { runtimePreviewInteraction } : {}),
+        ...(savedViewOverlay ? { savedViewOverlay } : {}),
+        ...(savedViewOverlayBaseSource ? { savedViewOverlayBaseSource } : {}),
+        ...(savedViewOverlayPublishedSnapshotSource ? { savedViewOverlayPublishedSnapshotSource } : {}),
         liveSnapshot: {
             config: liveSnapshotConfig,
             state: liveSnapshotState,
@@ -347,10 +714,13 @@ export function buildReportBuilderHydratedDocumentSession(hydratedDocument = nul
     if (!liveSnapshot) {
         return null;
     }
-    const reopenedSemanticSummary = resolveHydratedSemanticSummary(
-        hydratedDocument?.document,
-        hydratedDocument?.reportSpec,
-    );
+    const hydratedContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: hydratedDocument?.reportSpec || null,
+        document: hydratedDocument?.document || null,
+        title: hydratedDocument?.title || hydratedDocument?.reportId || "",
+    });
+    const reopenedSemanticSummary = normalizeReportBuilderSemanticSummary(hydratedContext?.semanticSummary);
+    const reopenedScopeParams = normalizeHydratedScopeParams(hydratedDocument?.scopeParams || hydratedContext?.scopeParams);
     const reopenedSemanticFingerprint = buildHydratedDocumentSemanticFingerprint(
         hydratedDocument.config,
         hydratedDocument.state,
@@ -361,6 +731,9 @@ export function buildReportBuilderHydratedDocumentSession(hydratedDocument = nul
         runtimePreviewInteraction,
         { allowEmpty: false },
     );
+    const sharedArtifactState = normalizeHydratedSharedArtifactState(hydratedDocument, {
+        fallbackKind: hydratedDocument?.savedSource?.kind || "",
+    });
     return {
         reportId: normalizeString(hydratedDocument.reportId),
         title: normalizeString(hydratedDocument.title || hydratedDocument.reportId || "Report"),
@@ -368,12 +741,42 @@ export function buildReportBuilderHydratedDocumentSession(hydratedDocument = nul
         ...(templateIdentity ? templateIdentity : {}),
         source: cloneValue(hydratedDocument.source || {}),
         ...(normalizeSavedReportPayloadSource(hydratedDocument.savedSource) ? { savedSource: normalizeSavedReportPayloadSource(hydratedDocument.savedSource) } : {}),
+        ...(sharedArtifactState ? sharedArtifactState : {}),
         reopenedConfig: cloneValue(hydratedDocument.config),
         ...(reopenedSemanticSummary ? { reopenedSemanticSummary } : {}),
+        ...(reopenedScopeParams.length > 0 ? { reopenedScopeParams } : {}),
         ...(reopenedSemanticFingerprint ? { reopenedSemanticFingerprint } : {}),
         ...(reopenedCompileState ? { reopenedCompileState } : {}),
         ...(normalizedRuntimePreviewInteraction ? { runtimePreviewInteraction: normalizedRuntimePreviewInteraction } : {}),
         liveSnapshot,
+        ...(hydratedDocument?.savedViewOverlay ? { savedViewOverlay: cloneValue(hydratedDocument.savedViewOverlay) } : {}),
+        ...(normalizeSavedViewOverlayResolvedSource(hydratedDocument?.savedViewOverlayBaseSource)
+            ? { savedViewOverlayBaseSource: normalizeSavedViewOverlayResolvedSource(hydratedDocument.savedViewOverlayBaseSource) }
+            : {}),
+        ...(normalizeSavedViewOverlayResolvedSource(hydratedDocument?.savedViewOverlayPublishedSnapshotSource)
+            ? { savedViewOverlayPublishedSnapshotSource: normalizeSavedViewOverlayResolvedSource(hydratedDocument.savedViewOverlayPublishedSnapshotSource) }
+            : {}),
+    };
+}
+
+export function setReportBuilderHydratedDocumentSessionSharedArtifact(session = null, value = null) {
+    const normalizedSession = normalizeReportBuilderHydratedDocumentSession(session);
+    if (!normalizedSession) {
+        return null;
+    }
+    const sharedArtifactState = normalizeHydratedSharedArtifactState(value, {
+        fallbackKind: normalizedSession?.savedSource?.kind || "",
+    });
+    if (!sharedArtifactState) {
+        return cloneValue(normalizedSession);
+    }
+    const nextSavedSource = normalizeSavedReportPayloadSource(value?.source || value);
+    const nextDocumentVersion = Number(value?.documentVersion || 0) || 0;
+    return {
+        ...cloneValue(normalizedSession),
+        ...sharedArtifactState,
+        ...(nextSavedSource ? { savedSource: nextSavedSource } : {}),
+        ...(nextDocumentVersion > 0 ? { documentVersion: nextDocumentVersion } : {}),
     };
 }
 

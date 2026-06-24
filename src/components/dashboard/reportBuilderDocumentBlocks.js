@@ -57,6 +57,7 @@ function normalizeScopeParamOptions(options = []) {
             return {
                 value,
                 label: normalizeString(option?.label || value),
+                ...(normalizeString(option?.description) ? { description: normalizeString(option.description) } : {}),
                 kind: normalizeString(option?.kind || "value") || "value",
                 required: option?.required === true,
             };
@@ -440,6 +441,47 @@ function normalizeStringArray(values = []) {
     return (Array.isArray(values) ? values : [])
         .map((value) => normalizeString(value))
         .filter(Boolean);
+}
+
+export function buildReportBuilderScopeParamSummary(paramIds = [], scopeParamOptions = []) {
+    const normalizedScopeParamOptions = normalizeScopeParamOptions(scopeParamOptions);
+    const scopeParamIndex = new Map(
+        normalizedScopeParamOptions
+            .map((option) => [normalizeString(option?.value), option])
+            .filter(([value]) => !!value),
+    );
+    const items = normalizeStringArray(paramIds).map((paramId) => {
+        const option = scopeParamIndex.get(paramId);
+        const label = normalizeString(option?.label || paramId);
+        if (!label) {
+            return null;
+        }
+        const description = normalizeString(option?.description);
+        return {
+            id: paramId,
+            label,
+            ...(description ? { description } : {}),
+        };
+    }).filter(Boolean);
+    return {
+        items,
+        text: items.length > 0
+            ? items.map((item) => item.label).join(" • ")
+            : "No shared scope parameters",
+    };
+}
+
+export function buildReportBuilderScopeSummaryFromParams(scopeParams = []) {
+    return buildReportBuilderScopeParamSummary(
+        (Array.isArray(scopeParams) ? scopeParams : [])
+            .map((param) => normalizeString(param?.id))
+            .filter(Boolean),
+        (Array.isArray(scopeParams) ? scopeParams : []).map((param) => ({
+            value: normalizeString(param?.id),
+            label: normalizeString(param?.label || param?.id),
+            description: normalizeString(param?.description),
+        })),
+    );
 }
 
 function orderAuthoringFieldsBySelection(fields = [], selectedIds = new Set()) {
@@ -1244,6 +1286,7 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
             return {
                 value,
                 label: normalizeString(filter?.label || value),
+                ...(normalizeString(filter?.description) ? { description: normalizeString(filter.description) } : {}),
                 kind: normalizeString(filter?.type || (filter?.multiple ? "multiSelect" : "value")) || "value",
                 required: filter?.required === true,
             };

@@ -11,17 +11,17 @@ import { buildPreviewReportDocumentTemplates } from "./previewReportDocumentTemp
 import { runPreviewRuntimeRequest } from "./previewRuntimeQuery.js";
 
 const container = {
-  id: "forecastingPreview",
-  stateKey: "forecastingPreview",
-  title: "Forecasting Preview",
+  id: "capacityPreview",
+  stateKey: "capacityPreview",
+  title: "Capacity Preview",
   dataSourceRef: "demoReportSource",
 };
 
 const config = {
-  title: "Forecasting Preview",
+  title: "Capacity Preview",
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["channel", "country_code"],
     selectedMeasures: ["available_impressions", "household_uniques"],
@@ -125,8 +125,8 @@ const config = {
   drillMetadata: {
     hierarchies: [
       {
-        id: "forecast_inventory",
-        label: "Forecast Inventory",
+        id: "capacity_inventory",
+        label: "Capacity Inventory",
         levels: [
           { field: "channelV2", label: "Channel" },
           { field: "publisher", label: "Publisher" },
@@ -134,8 +134,8 @@ const config = {
         ],
       },
       {
-        id: "forecast_location",
-        label: "Forecast Location",
+        id: "capacity_location",
+        label: "Capacity Location",
         levels: [
           { field: "country", label: "Market" },
           { field: "region", label: "Region" },
@@ -161,7 +161,7 @@ const config = {
 const templates = buildPreviewReportDocumentTemplates();
 assert.deepEqual(
   templates.map((template) => template.id),
-  ["market_brief", "market_efficiency_brief", "forecast_inventory_brief", "forecast_location_brief"],
+  ["market_brief", "market_efficiency_brief", "capacity_inventory_brief", "capacity_location_brief"],
 );
 
 function buildTemplateRuntime(templateId = "", {
@@ -212,8 +212,8 @@ function hasDrillAction(actions = [], nextFieldRef = "") {
   ));
 }
 
-const inventoryBase = buildTemplateRuntime("forecast_inventory_brief");
-assert.equal(inventoryBase.instantiated.nextState.reportDocumentTitle, "Forecast Inventory Brief");
+const inventoryBase = buildTemplateRuntime("capacity_inventory_brief");
+assert.equal(inventoryBase.instantiated.nextState.reportDocumentTitle, "Capacity Inventory Brief");
 assert.deepEqual(inventoryBase.instantiated.nextState.reportDocumentLayout, {
   type: "stack",
   items: [
@@ -235,7 +235,7 @@ assert.deepEqual(inventoryBase.model.reportSpec.layoutIntent.items, [
 const inventoryProvider = resolveReportRuntimeDrillMetadataProvider({
   reportSpec: inventoryBase.model.reportSpec,
 });
-assert.ok(inventoryProvider, "Forecast inventory template should expose runtime drill metadata.");
+assert.ok(inventoryProvider, "Capacity inventory template should expose runtime drill metadata.");
 assert.equal(
   hasDrillAction(await inventoryProvider.listAvailableRefinements("tableBlock", "channelV2"), "publisher"),
   true,
@@ -346,7 +346,7 @@ assert.equal(
   false,
 );
 
-const inventoryDrilled = buildTemplateRuntime("forecast_inventory_brief", {
+const inventoryDrilled = buildTemplateRuntime("capacity_inventory_brief", {
   refinements: [
     {
       id: "drill:channelV2:primaryTable",
@@ -388,8 +388,8 @@ assert.deepEqual(
   ["Open Web", "Private Marketplace"],
 );
 
-const locationBase = buildTemplateRuntime("forecast_location_brief");
-assert.equal(locationBase.instantiated.nextState.reportDocumentTitle, "Forecast Location Brief");
+const locationBase = buildTemplateRuntime("capacity_location_brief");
+assert.equal(locationBase.instantiated.nextState.reportDocumentTitle, "Capacity Location Brief");
 assert.deepEqual(locationBase.instantiated.nextState.reportDocumentLayout, {
   type: "stack",
   items: [
@@ -403,7 +403,7 @@ assert.deepEqual(locationBase.instantiated.nextState.reportDocumentLayout, {
 const locationProvider = resolveReportRuntimeDrillMetadataProvider({
   reportSpec: locationBase.model.reportSpec,
 });
-assert.ok(locationProvider, "Forecast location template should expose runtime drill metadata.");
+assert.ok(locationProvider, "Capacity location template should expose runtime drill metadata.");
 assert.equal(
   hasDrillAction(await locationProvider.listAvailableRefinements("tableBlock", "country"), "region"),
   true,
@@ -413,7 +413,7 @@ assert.equal(
   true,
 );
 
-const locationDrilled = buildTemplateRuntime("forecast_location_brief", {
+const locationDrilled = buildTemplateRuntime("capacity_location_brief", {
   refinements: [
     {
       id: "drill:country:primaryTable",
@@ -455,4 +455,4 @@ assert.deepEqual(
   ["Los Angeles DMA", "New York DMA"],
 );
 
-console.log("previewReportDocumentTemplates ✓ forecasting authored templates preserve layout sizing and align with 3-step drill ladders");
+console.log("previewReportDocumentTemplates ✓ capacity authored templates preserve layout sizing and align with 3-step drill ladders");

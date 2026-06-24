@@ -71,6 +71,8 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
         const [background = '#dbeafe', foreground = '#2563eb'] = visualState.palette || [];
         return (
             <span
+                className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--data-bar"
+                data-visual-kind="dataBar"
                 style={{
                     position: 'relative',
                     display: 'inline-flex',
@@ -108,6 +110,9 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
     const letterSpacing = visualState.kind === 'badge' ? '0.03em' : 'normal';
     return (
         <span
+            className={`forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--${visualState.kind} forge-dashboard-table-cell-visual--${visualState.tone || 'info'}`}
+            data-visual-kind={visualState.kind}
+            data-visual-tone={visualState.tone || 'info'}
             style={{
                 display: 'inline-flex',
                 alignItems: 'center',

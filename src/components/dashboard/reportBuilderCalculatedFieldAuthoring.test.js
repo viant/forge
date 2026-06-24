@@ -6,6 +6,7 @@ import {
     buildReportBuilderCalculatedFieldReferenceOptions,
     buildReportBuilderTableCalculationDraft,
     buildReportBuilderTableCalculationFieldOptions,
+    REPORT_BUILDER_TABLE_CALC_FUNCTIONS,
     removeReportBuilderLocalCalculatedFieldState,
     removeReportBuilderLocalTableCalculationState,
     upsertReportBuilderLocalCalculatedFieldState,
@@ -14,6 +15,7 @@ import {
     validateReportBuilderCalculatedFieldDraft,
     validateReportBuilderTableCalculationDraft,
 } from "./reportBuilderCalculatedFieldAuthoring.js";
+import { listReportCalculatedFieldTableCalculationSpecs } from "../../reporting/calculationContracts.js";
 
 const config = {
     measures: [
@@ -54,9 +56,9 @@ const config = {
 const localCalculatedState = {
     localCalculatedFields: [
         {
-            id: "forecastLift",
-            key: "forecastLift",
-            label: "Forecast Lift",
+            id: "projectedLift",
+            key: "projectedLift",
+            label: "Projected Lift",
             dataType: "number",
             format: "currency",
             expr: "if(channelId = 'CTV', totalSpend, null)",
@@ -79,6 +81,20 @@ const localCalculatedState = {
 
 const mergedConfig = buildReportBuilderCalculatedFieldConfig(config, localCalculatedState);
 assert.deepEqual(
+    REPORT_BUILDER_TABLE_CALC_FUNCTIONS,
+    listReportCalculatedFieldTableCalculationSpecs().map((entry) => ({
+        value: entry.name,
+        label: entry.label,
+        supportsPartition: entry.supportsPartition === true,
+        requiresOrder: entry.requiresOrder === true && entry.name !== "rank",
+        supportsRankDirection: entry.supportsRankDirection === true,
+        supportsTieBreaker: entry.supportsTieBreaker === true,
+        requiresWindowSize: entry.requiresWindowSize === true,
+        supportsDecimals: entry.supportsDecimals === true,
+        defaultFormat: entry.defaultFormat || "",
+    })),
+);
+assert.deepEqual(
     mergedConfig.calculatedFields.map((field) => ({
         id: field.id,
         section: field.section,
@@ -86,7 +102,7 @@ assert.deepEqual(
     })),
     [
         {
-            id: "forecastLift",
+            id: "projectedLift",
             section: "calculated",
             authoringEditable: true,
         },
@@ -120,9 +136,9 @@ assert.deepEqual(
 assert.deepEqual(
     buildReportBuilderCalculatedFieldDraft(localCalculatedState.localCalculatedFields[0]),
     {
-        id: "forecastLift",
-        key: "forecastLift",
-        label: "Forecast Lift",
+        id: "projectedLift",
+        key: "projectedLift",
+        label: "Projected Lift",
         dataType: "number",
         format: "currency",
         expr: "if(channelId = 'CTV', totalSpend, null)",
@@ -153,8 +169,8 @@ assert.deepEqual(
         "dimension:channelId",
         "dimension:eventDate",
         "measure:ctr",
-        "measure:forecastLift",
         "measure:impressions",
+        "measure:projectedLift",
         "measure:totalSpend",
     ],
 );
@@ -163,16 +179,16 @@ assert.deepEqual(
     {
         sourceFields: [
             { id: "ctr", label: "CTR", kind: "measure", isRowCalculated: true, isTableCalculated: false },
-            { id: "forecastLift", label: "Forecast Lift", kind: "measure", isRowCalculated: true, isTableCalculated: false },
             { id: "impressions", label: "Impressions", kind: "measure", isRowCalculated: false, isTableCalculated: false },
+            { id: "projectedLift", label: "Projected Lift", kind: "measure", isRowCalculated: true, isTableCalculated: false },
             { id: "totalSpend", label: "Spend", kind: "measure", isRowCalculated: false, isTableCalculated: false },
         ],
         orderFields: [
             { id: "channelId", label: "Channel", kind: "dimension", isRowCalculated: false, isTableCalculated: false },
             { id: "eventDate", label: "Date", kind: "dimension", isRowCalculated: false, isTableCalculated: false },
             { id: "ctr", label: "CTR", kind: "measure", isRowCalculated: true, isTableCalculated: false },
-            { id: "forecastLift", label: "Forecast Lift", kind: "measure", isRowCalculated: true, isTableCalculated: false },
             { id: "impressions", label: "Impressions", kind: "measure", isRowCalculated: false, isTableCalculated: false },
+            { id: "projectedLift", label: "Projected Lift", kind: "measure", isRowCalculated: true, isTableCalculated: false },
             { id: "totalSpend", label: "Spend", kind: "measure", isRowCalculated: false, isTableCalculated: false },
         ],
         partitionDimensions: [
@@ -213,6 +229,46 @@ assert.deepEqual(
                 field: "expr",
                 code: "unknownDependency",
                 message: "Unknown fields in expression: missingMetric.",
+            },
+        ],
+        field: null,
+    },
+);
+
+assert.deepEqual(
+    validateReportBuilderCalculatedFieldDraft({
+        id: "unsupportedFn",
+        label: "Unsupported Fn",
+        dataType: "number",
+        expr: "foo(totalSpend)",
+    }, mergedConfig),
+    {
+        valid: false,
+        errors: [
+            {
+                field: "expr",
+                code: "invalidSyntax",
+                message: "Invalid calculated field expression at 0: unsupported function \"foo\"",
+            },
+        ],
+        field: null,
+    },
+);
+
+assert.deepEqual(
+    validateReportBuilderCalculatedFieldDraft({
+        id: "badRound",
+        label: "Bad Round",
+        dataType: "number",
+        expr: "round(totalSpend, 2, 1)",
+    }, mergedConfig),
+    {
+        valid: false,
+        errors: [
+            {
+                field: "expr",
+                code: "invalidSyntax",
+                message: "Invalid calculated field expression at 0: function \"round\" accepts at most 2 arguments",
             },
         ],
         field: null,
@@ -323,8 +379,8 @@ const createdState = upsertReportBuilderLocalCalculatedFieldState({
     localCalculatedFields: [],
     localTableCalculations: [],
 }, {
-    id: "forecastLift",
-    label: "Forecast Lift",
+    id: "projectedLift",
+    label: "Projected Lift",
     dataType: "number",
     format: "currency",
     expr: "if(channelId = 'CTV', totalSpend, null)",
@@ -332,18 +388,18 @@ const createdState = upsertReportBuilderLocalCalculatedFieldState({
 assert.equal(createdState.valid, true);
 assert.deepEqual(createdState.nextState.localCalculatedFields, [
     {
-        id: "forecastLift",
-        key: "forecastLift",
+        id: "projectedLift",
+        key: "projectedLift",
         kind: "rowCalc",
-        label: "Forecast Lift",
+        label: "Projected Lift",
         dataType: "number",
         format: "currency",
         dependencies: ["channelId", "totalSpend"],
         expr: "if(channelId = 'CTV', totalSpend, null)",
     },
 ]);
-assert.deepEqual(createdState.nextState.selectedMeasures, ["totalSpend", "forecastLift"]);
-assert.equal(createdState.nextState.primaryMeasure, "forecastLift");
+assert.deepEqual(createdState.nextState.selectedMeasures, ["totalSpend", "projectedLift"]);
+assert.equal(createdState.nextState.primaryMeasure, "projectedLift");
 
 const createdTableCalculationState = upsertReportBuilderLocalTableCalculationState({
     selectedMeasures: ["totalSpend"],
@@ -446,51 +502,51 @@ assert.equal(editedTableCalculationDraftState.nextState.primaryMeasure, "running
 
 const removedState = removeReportBuilderLocalCalculatedFieldState({
     localCalculatedFields: createdState.nextState.localCalculatedFields,
-    selectedMeasures: ["totalSpend", "forecastLift"],
-    primaryMeasure: "forecastLift",
-    orderField: "forecastLift",
+    selectedMeasures: ["totalSpend", "projectedLift"],
+    primaryMeasure: "projectedLift",
+    orderField: "projectedLift",
     chartSpec: {
-        title: "Forecast Lift by Date",
+        title: "Projected Lift by Date",
         type: "line",
         xField: "eventDate",
-        yFields: ["forecastLift", "totalSpend"],
+        yFields: ["projectedLift", "totalSpend"],
         seriesOptions: {
-            forecastLift: { axis: "right" },
+            projectedLift: { axis: "right" },
         },
     },
     activeTablePreset: {
         id: "preset_1",
-        title: "Forecast Lift",
+        title: "Projected Lift",
         dimensions: ["eventDate"],
-        measures: ["forecastLift", "totalSpend"],
+        measures: ["projectedLift", "totalSpend"],
         columns: [
             { key: "eventDate" },
-            { key: "forecastLift" },
+            { key: "projectedLift" },
         ],
     },
     lastTablePreset: {
         id: "preset_2",
-        title: "Forecast Lift Saved",
+        title: "Projected Lift Saved",
         dimensions: ["eventDate"],
-        measures: ["forecastLift"],
+        measures: ["projectedLift"],
         columns: [
-            { key: "forecastLift" },
+            { key: "projectedLift" },
         ],
     },
-}, "forecastLift");
+}, "projectedLift");
 assert.deepEqual(removedState.localCalculatedFields, []);
 assert.deepEqual(removedState.selectedMeasures, ["totalSpend"]);
 assert.equal(removedState.primaryMeasure, "totalSpend");
 assert.equal(removedState.orderField, "");
 assert.deepEqual(removedState.chartSpec, {
-    title: "Forecast Lift by Date",
+    title: "Projected Lift by Date",
     type: "line",
     xField: "eventDate",
     yFields: ["totalSpend"],
 });
 assert.deepEqual(removedState.activeTablePreset, {
     id: "preset_1",
-    title: "Forecast Lift",
+    title: "Projected Lift",
     dimensions: ["eventDate"],
     measures: ["totalSpend"],
     columns: [
@@ -499,7 +555,7 @@ assert.deepEqual(removedState.activeTablePreset, {
 });
 assert.deepEqual(removedState.lastTablePreset, {
     id: "preset_2",
-    title: "Forecast Lift Saved",
+    title: "Projected Lift Saved",
     dimensions: ["eventDate"],
     measures: [],
     columns: [],

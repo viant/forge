@@ -1,5 +1,11 @@
 export const SEMANTIC_BINDING_MODES = ["raw", "semantic"];
 
+export const SEMANTIC_FIELD_TYPES = [
+    "dimension",
+    "measure",
+    "parameter",
+];
+
 export const SEMANTIC_DATA_TYPES = [
     "string",
     "number",

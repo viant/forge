@@ -2,7 +2,13 @@ import {
     buildReportDocumentCompileState,
     buildReportDocumentRef,
 } from "../../reporting/reportDocumentStore.js";
+import { extractReportDocumentTemplateIdentity } from "../../reporting/reportDocumentModel.js";
 import { buildReportBuilderDocumentCompileDiagnostics } from "./reportBuilderDocumentBlocks.js";
+import {
+    resolveEmbeddedReportDocumentCompileState,
+} from "./reportBuilderImportedDocumentMetadata.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
+import { extractSavedViewOverlayArtifactState } from "../../reporting/views/savedViewOverlayModel.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -12,21 +18,11 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
-function extractReportDocumentTemplateIdentity(document = null) {
-    const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
-    const reportBuilderBlock = blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null;
-    const templateId = normalizeString(reportBuilderBlock?.state?.reportDocumentTemplateId);
-    const templateLabel = normalizeString(reportBuilderBlock?.state?.reportDocumentTemplateLabel);
-    if (!templateId && !templateLabel) {
-        return null;
-    }
-    return {
-        ...(templateId ? { templateId } : {}),
-        ...(templateLabel ? { templateLabel } : {}),
-    };
-}
-
 function extractSavedPayloadTemplateIdentity(payload = null) {
+    const explicitTemplateIdentity = extractReportDocumentTemplateIdentity(payload?.reportDocument || payload?.document || null);
+    if (explicitTemplateIdentity) {
+        return explicitTemplateIdentity;
+    }
     const sourceTemplateId = normalizeString(payload?.sourceSession?.sourceRef?.templateId);
     const sourceTemplateLabel = normalizeString(payload?.sourceSession?.sourceRef?.templateLabel);
     if (sourceTemplateId || sourceTemplateLabel) {
@@ -35,7 +31,7 @@ function extractSavedPayloadTemplateIdentity(payload = null) {
             ...(sourceTemplateLabel ? { templateLabel: sourceTemplateLabel } : {}),
         };
     }
-    return extractReportDocumentTemplateIdentity(payload?.reportDocument || payload?.document || null);
+    return null;
 }
 
 function normalizeTimestamp(value, fallback = Date.now()) {
@@ -52,6 +48,7 @@ export function normalizeReportBuilderSavedPayloadSourceIdentity(value = null) {
         : value;
     const payloadId = normalizeString(source?.payloadId || value?.payloadId);
     const sourceArtifactId = normalizeString(source?.sourceArtifactId || value?.sourceArtifactId);
+    const kind = normalizeString(source?.kind || source?.artifactKind || value?.kind || value?.artifactKind);
     const reportId = normalizeString(
         source?.reportId
         || value?.reportRef?.reportId
@@ -59,10 +56,11 @@ export function normalizeReportBuilderSavedPayloadSourceIdentity(value = null) {
         || value?.document?.id
         || value?.reportId,
     );
-    if (!payloadId && !sourceArtifactId && !reportId) {
+    if (!payloadId && !sourceArtifactId && !reportId && !kind) {
         return null;
     }
     return {
+        ...(kind ? { kind } : {}),
         payloadId,
         sourceArtifactId,
         reportId,
@@ -75,10 +73,16 @@ export function matchesReportBuilderSavedPayloadSourceIdentity(expected = null, 
     }
     const expectedPayloadId = normalizeString(expected?.payloadId);
     const actualPayloadId = normalizeString(actual?.payloadId);
+    const expectedKind = normalizeString(expected?.kind || expected?.artifactKind);
+    const actualKind = normalizeString(actual?.kind || actual?.artifactKind);
     if (expectedPayloadId || actualPayloadId) {
-        return expectedPayloadId && actualPayloadId && expectedPayloadId === actualPayloadId;
+        return expectedPayloadId
+            && actualPayloadId
+            && expectedPayloadId === actualPayloadId
+            && (!expectedKind || !actualKind || expectedKind === actualKind);
     }
     return normalizeString(expected?.sourceArtifactId) === normalizeString(actual?.sourceArtifactId)
+        && (!expectedKind || !actualKind || expectedKind === actualKind)
         && normalizeString(expected?.reportId) === normalizeString(actual?.reportId);
 }
 
@@ -113,10 +117,16 @@ export function normalizeReportBuilderSavedReportRecord(record = null, {
         && record?.source && typeof record.source === "object" && !Array.isArray(record.source)
     ) {
         const sourceIdentity = normalizeReportBuilderSavedPayloadSourceIdentity(record?.source || record);
+        const savedViewOverlay = extractSavedViewOverlayArtifactState(
+            normalizeString(record?.source?.kind) === "reportBuilder.savedView"
+                ? record
+                : null,
+        );
         return {
             ...cloneValue(record),
             sourceIdentity,
             exportable: !!record?.exportRequest,
+            ...(savedViewOverlay ? { savedViewOverlay } : {}),
         };
     }
     const savedReportPayload = record?.savedReportPayload && typeof record.savedReportPayload === "object" && !Array.isArray(record.savedReportPayload)
@@ -125,26 +135,31 @@ export function normalizeReportBuilderSavedReportRecord(record = null, {
     if (!savedReportPayload) {
         return null;
     }
-    const document = savedReportPayload?.reportDocument && typeof savedReportPayload.reportDocument === "object" && !Array.isArray(savedReportPayload.reportDocument)
-        ? cloneValue(savedReportPayload.reportDocument)
-        : null;
-    const reportSpec = savedReportPayload?.reportSpec && typeof savedReportPayload.reportSpec === "object" && !Array.isArray(savedReportPayload.reportSpec)
-        ? cloneValue(savedReportPayload.reportSpec)
-        : null;
+    const context = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: savedReportPayload?.reportSpec || null,
+        document: savedReportPayload?.reportDocument || null,
+        title: savedReportPayload?.title || "",
+    });
+    const reportSpec = context?.reportSpec ? cloneValue(context.reportSpec) : null;
+    const document = context?.document ? cloneValue(context.document) : null;
     const reportRef = buildReportDocumentRef(document);
     if (!document || !reportRef) {
         return null;
     }
     const compileState = savedReportPayload?.compileState && typeof savedReportPayload.compileState === "object" && !Array.isArray(savedReportPayload.compileState)
         ? cloneValue(savedReportPayload.compileState)
-        : buildReportDocumentCompileState(reportSpec, {
-            diagnostics: buildReportBuilderDocumentCompileDiagnostics({
-                document,
-            }),
-        });
+        : (
+            resolveEmbeddedReportDocumentCompileState(document, reportSpec)
+            || buildReportDocumentCompileState(reportSpec, {
+                diagnostics: buildReportBuilderDocumentCompileDiagnostics({
+                    document,
+                }),
+            })
+        );
     const normalizedVersion = Number(record?.documentVersion ?? savedReportPayload?.documentVersion ?? documentVersion) || 0;
     const source = buildSavedReportPayloadSource(savedReportPayload);
     const sourceIdentity = normalizeReportBuilderSavedPayloadSourceIdentity(savedReportPayload);
+    const importedArtifactKind = normalizeString(record?.importedArtifactKind);
     return {
         reportId: reportRef.reportId,
         title: normalizeString(document?.title || reportRef.reportId),
@@ -160,6 +175,7 @@ export function normalizeReportBuilderSavedReportRecord(record = null, {
             ? { exportRequest: cloneValue(record.exportRequest) }
             : {}),
         exportable: !!record?.exportRequest,
+        ...(importedArtifactKind ? { importedArtifactKind } : {}),
         ...(extractSavedPayloadTemplateIdentity(savedReportPayload) || {}),
     };
 }

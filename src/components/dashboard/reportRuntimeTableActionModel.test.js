@@ -7,7 +7,7 @@ const providerActionsByField = new Map([
     { id: "keep_channel", label: "Keep only", kind: "keep" },
     { id: "drill_publisher", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisher" },
     { id: "drill_market", label: "Drill to Market", kind: "drill", nextFieldRef: "country" },
-    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://steward/performance/channel-detail" },
+    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
   ]],
 ]);
 
@@ -45,7 +45,7 @@ assert.deepEqual(buildReportRuntimeTableActionDescriptors({
     kind: "detail",
     fieldValueKey: "channelV2",
     label: "Show channel details",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
 ]);
 
@@ -63,7 +63,7 @@ assert.deepEqual(buildReportRuntimeTableActionDescriptors({
     kind: "detail",
     fieldValueKey: "channelV2",
     label: "Show channel details",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
 ]);
 

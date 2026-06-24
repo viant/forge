@@ -417,6 +417,9 @@ assert.equal(dashboardCapabilities.schema.$defs.dashboardConfig.properties.visib
 assert.equal(dashboardCapabilities.schema.$defs.dashboardConfig.properties.reportOptions.$ref, '#/$defs/reportConfig');
 assert.equal(dashboardCapabilities.schema.$defs.dashboardConfig.properties.reportRuntime.$ref, '#/$defs/reportRuntimeConfig');
 assert.equal(dashboardCapabilities.schema.$defs.reportRuntimeConfig.properties.hostIntent.properties.intentKind.enum.includes('detailTarget'), true);
+assert.equal(dashboardCapabilities.schema.$defs.reportRuntimeConfig.properties.reportPrint.type, 'object');
+assert.equal(dashboardCapabilities.schema.$defs.reportRuntimeConfig.properties.semanticBindingViewState.type, 'object');
+assert.equal(dashboardCapabilities.schema.$defs.reportRuntimeConfig.properties.semanticBindingViewState.properties.chips.type, 'array');
 assert.equal(dashboardCapabilities.schema.$defs.dashboardConfig.properties.geo.$ref, '#/$defs/geoConfig');
 assert.equal(dashboardCapabilities.schema.$defs.geoConfig.properties.color.properties.rules.type, 'array');
 assert.equal(dashboardCapabilities.schema.$defs.geoConfig.properties.limit.minimum, 1);

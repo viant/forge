@@ -19,8 +19,10 @@ function cloneValue(value) {
 function normalizeTargetSpec(spec) {
     if (!spec) return null;
     if (typeof spec === 'string') {
+        const platform = spec.trim();
+        if (!platform) return null;
         return {
-            platforms: [spec],
+            platforms: [platform],
             excludePlatforms: [],
             formFactors: [],
             capabilities: []
@@ -28,7 +30,7 @@ function normalizeTargetSpec(spec) {
     }
     if (Array.isArray(spec)) {
         const normalized = {
-            platforms: spec.filter((item) => typeof item === 'string'),
+            platforms: spec.map((item) => typeof item === 'string' ? item.trim() : '').filter(Boolean),
             excludePlatforms: [],
             formFactors: [],
             capabilities: []
@@ -37,12 +39,21 @@ function normalizeTargetSpec(spec) {
     }
     if (!isPlainObject(spec)) return null;
     const normalized = {
-        platforms: Array.isArray(spec.platforms) ? spec.platforms.filter((item) => typeof item === 'string') : [],
-        excludePlatforms: Array.isArray(spec.excludePlatforms) ? spec.excludePlatforms.filter((item) => typeof item === 'string') : [],
-        formFactors: Array.isArray(spec.formFactors) ? spec.formFactors.filter((item) => typeof item === 'string') : [],
-        capabilities: Array.isArray(spec.capabilities) ? spec.capabilities.filter((item) => typeof item === 'string') : []
+        platforms: trimmedStringList(spec.platforms),
+        excludePlatforms: trimmedStringList(spec.excludePlatforms),
+        formFactors: trimmedStringList(spec.formFactors),
+        capabilities: trimmedStringList(spec.capabilities)
     };
     return hasTargetCriteria(normalized) ? normalized : null;
+}
+
+function trimmedStringList(value) {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed ? [trimmed] : [];
+    }
+    if (!Array.isArray(value)) return [];
+    return value.map((item) => typeof item === 'string' ? item.trim() : '').filter(Boolean);
 }
 
 function hasTargetCriteria(normalized) {
@@ -127,7 +138,7 @@ function targetOverrideKeys(targetContext = {}) {
     const formFactor = String(targetContext.formFactor || '').trim();
     const surface = String(targetContext.surface || '').trim();
     const mobilePlatforms = new Set(['android', 'ios']);
-    const mobileFormFactors = new Set(['phone', 'tablet']);
+    const mobileFormFactors = new Set(['phone', 'tablet', 'foldable']);
     const isMobile = mobilePlatforms.has(platform) || mobileFormFactors.has(formFactor);
     const keys = [];
 
@@ -154,8 +165,13 @@ function targetOverrideKeys(targetContext = {}) {
         keys.push(`${platform}.${formFactor}`);
         keys.push(`${platform}/${formFactor}`);
         keys.push(`${platform}:${formFactor}`);
+        keys.push(platformFormFactorAlias(platform, formFactor));
     }
     return keys;
+}
+
+function platformFormFactorAlias(platform, formFactor) {
+    return `${platform}${formFactor.charAt(0).toUpperCase()}${formFactor.slice(1)}`;
 }
 
 function resolveValue(node, targetContext = {}) {

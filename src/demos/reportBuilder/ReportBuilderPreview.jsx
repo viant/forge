@@ -18,15 +18,6 @@ import {
   resolveReportBuilderHydratedDocumentSessionFromState,
 } from '../../components/dashboard/reportBuilderHydratedReportDocument.js';
 import { mergeReportBuilderState } from '../../components/dashboard/reportBuilderUtils.js';
-import { validateSemanticBinding } from '../../semantic/modelValidation.js';
-import {
-  applyPreviewSemanticValidationBehavior,
-  persistPreviewSemanticValidationBehaviors,
-} from './previewSemanticValidation.js';
-import {
-  applyPreviewSemanticModelBehavior,
-  persistPreviewSemanticModelBehaviors,
-} from './previewSemanticModel.js';
 import {
   ensureReportBuilderPreviewMetrics,
   incrementReportBuilderPreviewMetric,
@@ -43,14 +34,13 @@ import {
   buildPreviewRuntimeInteractionSnapshot,
 } from './previewRuntimeInteractionSession.js';
 import { applyPreviewFetchBehavior } from './previewFetchBehaviors.js';
-import { applyPreviewDetailTargetBehavior } from './previewDetailTargetBehaviors.js';
-import { applyPreviewRuntimeActionBehavior } from './previewRuntimeActionBehaviors.js';
+import { applyPreviewExportBehavior } from './previewExportBehaviors.js';
 import { buildPreviewAuthoredReport, buildPreviewAuthoredReportModel } from './previewAuthoredReport.js';
 import { buildPreviewReportDocumentTemplates } from './previewReportDocumentTemplates.js';
 import {
-  normalizeReportBuilderDrillHierarchies,
-} from '../../reporting/reportBuilderDrillHierarchy.js';
-import { createReportBuilderDrillMetadataProvider } from '../../reporting/reportBuilderDrillMetadata.js';
+  createDemoSemanticModelHandler as createBaseDemoSemanticModelHandler,
+  validateDemoSemanticRequest,
+} from './previewSemanticModelHandler.js';
 import { runPreviewRuntimeRequest } from './previewRuntimeQuery.js';
 import {
   buildReportRuntimePreviewRequestKey,
@@ -66,11 +56,17 @@ import { RAW_ROWS } from './previewDemoRows.js';
 import {
   PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
   buildPreviewSavedReportPayloadRecord,
+  buildPreviewSavedReportPayloadRecordFromSeed,
 } from './previewSavedReportPayload.js';
+import {
+  buildPreviewExportArtifactList,
+  buildPreviewExportJobList,
+  applyPreviewExportStatusResult,
+} from './previewExportHistory.js';
 import { mergeReportBuilderReopenedConfig } from '../../components/dashboard/reportBuilderConfigMerge.js';
 
 const DEMO_SEMANTIC_MODEL = {
-  modelRef: 'model://steward/performance/ad_delivery@v1',
+  modelRef: 'model://example/performance/delivery@v1',
   version: 1,
   label: 'Ad Delivery',
   description: 'Governed reporting model for the report builder preview.',
@@ -83,83 +79,103 @@ const DEMO_SEMANTIC_MODEL = {
           id: 'event_date',
           label: 'Delivery Date',
           description: 'Daily delivery grain',
+          category: 'Time',
           dataType: 'date',
           format: 'date',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'channel',
           label: 'Channel',
           description: 'Approved buying channel',
+          category: 'Delivery',
           dataType: 'string',
           governance: {
             status: 'approved',
             certification: 'reviewed',
-            ownerRef: 'team://steward/performance',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'age_group',
           label: 'Audience Age Group',
           description: 'Curated age range bucket',
+          category: 'Audience',
           dataType: 'string',
+          definitionRef: 'harmonizer://feature/user.demographic.age',
           governance: {
             status: 'draft',
-            ownerRef: 'team://steward/performance',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'country_code',
           label: 'Market',
           description: 'Delivery market',
+          category: 'Location',
           dataType: 'string',
+          definitionRef: 'harmonizer://feature/location',
           governance: {
             status: 'deprecated',
-            ownerRef: 'team://steward/performance',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'publisher',
           label: 'Publisher',
-          description: 'Forecast inventory publisher grouping',
+          description: 'Capacity inventory publisher grouping',
+          category: 'Inventory',
           dataType: 'string',
+          definitionRef: 'harmonizer://feature/publisher',
           governance: {
             status: 'approved',
             certification: 'reviewed',
-            ownerRef: 'team://steward/performance',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'site_type',
           label: 'Site Type',
-          description: 'Forecast inventory site-type grouping',
+          description: 'Capacity inventory site-type grouping',
+          category: 'Inventory',
           dataType: 'string',
+          definitionRef: 'harmonizer://feature/ad.site.type',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'region',
           label: 'Region',
-          description: 'Forecast geographic region grouping',
+          description: 'Capacity geographic region grouping',
+          category: 'Location',
           dataType: 'string',
+          definitionRef: 'harmonizer://feature/location',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'metro_code',
           label: 'Metro Area',
-          description: 'Forecast metropolitan area grouping',
+          description: 'Capacity metropolitan area grouping',
+          category: 'Location',
           dataType: 'string',
+          definitionRef: 'harmonizer://feature/location.metrocode',
           governance: {
             status: 'approved',
-            ownerRef: 'team://steward/performance',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
       ],
@@ -168,26 +184,85 @@ const DEMO_SEMANTIC_MODEL = {
           id: 'available_impressions',
           label: 'Available Impressions',
           description: 'Certified available inventory',
+          category: 'Metrics',
           format: 'compactNumber',
           dataType: 'number',
           aggregation: 'sum',
           governance: {
             status: 'approved',
             certification: 'certified',
-            ownerRef: 'team://steward/performance',
+            classification: 'reporting.metric',
+            ownerRef: 'team://example/performance',
+          },
+        },
+        {
+          id: 'audience_index',
+          label: 'Audience Index',
+          description: 'Harmonized audience segment index.',
+          category: 'Audience',
+          format: 'number',
+          dataType: 'number',
+          aggregation: 'avg',
+          definitionRef: 'harmonizer://feature/user.segment.index',
+          governance: {
+            status: 'approved',
+            certification: 'reviewed',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
         {
           id: 'household_uniques',
           label: 'Household Uniques',
           description: 'Approved household reach metric',
+          category: 'Metrics',
           format: 'compactNumber',
           dataType: 'number',
           aggregation: 'sum',
           governance: {
             status: 'approved',
             certification: 'reviewed',
-            ownerRef: 'team://steward/performance',
+            classification: 'reporting.metric',
+            ownerRef: 'team://example/performance',
+          },
+        },
+      ],
+      parameters: [
+        {
+          id: 'reporting_window',
+          label: 'Date Range',
+          description: 'Approved reporting window for the semantic preview scope.',
+          category: 'Scope',
+          dataType: 'date',
+          governance: {
+            status: 'approved',
+            certification: 'reviewed',
+            ownerRef: 'team://example/performance',
+          },
+        },
+        {
+          id: 'delivery_channels_filter',
+          label: 'Channels',
+          description: 'Approved channel scope applied across the authored report preview.',
+          category: 'Scope',
+          dataType: 'string',
+          governance: {
+            status: 'approved',
+            certification: 'reviewed',
+            ownerRef: 'team://example/performance',
+          },
+        },
+        {
+          id: 'audience_segment',
+          label: 'Audience Segment',
+          description: 'Harmonized audience segment scope applied to the authored preview.',
+          category: 'Audience',
+          dataType: 'string',
+          definitionRef: 'harmonizer://feature/user.segment',
+          governance: {
+            status: 'approved',
+            classification: 'harmonizer.audience',
+            ownerRef: 'team://example/performance',
           },
         },
       ],
@@ -197,8 +272,8 @@ const DEMO_SEMANTIC_MODEL = {
 
 const DEMO_DRILL_HIERARCHIES = normalizeReportBuilderDrillHierarchies([
   {
-    id: 'forecast_inventory',
-    label: 'Forecast Inventory',
+    id: 'capacity_inventory',
+    label: 'Capacity Inventory',
     levels: [
       { field: 'channelV2', label: 'Channel' },
       { field: 'publisher', label: 'Publisher' },
@@ -206,8 +281,8 @@ const DEMO_DRILL_HIERARCHIES = normalizeReportBuilderDrillHierarchies([
     ],
   },
   {
-    id: 'forecast_location',
-    label: 'Forecast Location',
+    id: 'capacity_location',
+    label: 'Capacity Location',
     levels: [
       { field: 'country', label: 'Market' },
       { field: 'region', label: 'Region' },
@@ -220,189 +295,14 @@ function clonePreviewValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function semanticDiagnostics(errors = []) {
-  return (Array.isArray(errors) ? errors : []).map((error) => ({
-    code: error?.code || 'invalidSelection',
-    severity: 'error',
-    path: error?.field || '',
-    message: error?.message || 'Semantic selection is invalid.',
-  }));
-}
-
-function createDemoSemanticModelHandler({ drillMetadata = {} } = {}) {
-  const configBackedDrillProvider = createReportBuilderDrillMetadataProvider(drillMetadata);
-  const pendingModelRequests = new Map();
-
-  async function resolveDemoSemanticModel(modelRef = '') {
-    const metrics = ensurePreviewMetrics();
-    if (metrics) {
-      incrementReportBuilderPreviewMetric(metrics, 'getModelCount');
-    }
-    let behaviorResult = null;
-    try {
-      behaviorResult = await applyPreviewSemanticModelBehavior(metrics, modelRef);
-    } finally {
-      persistPreviewSemanticModelBehaviors(typeof window !== 'undefined' ? window.sessionStorage : null, metrics?.semanticModelBehaviors || []);
-    }
-    if (behaviorResult && typeof behaviorResult === 'object') {
-      return clonePreviewValue(behaviorResult);
-    }
-    if (String(modelRef || '').trim() !== DEMO_SEMANTIC_MODEL.modelRef) {
-      throw new Error(`Unknown semantic model '${modelRef}'.`);
-    }
-    return clonePreviewValue(DEMO_SEMANTIC_MODEL);
-  }
-
-  return {
-    async listModels(namespace = '') {
-      return {
-        rows: [
-          {
-            modelRef: DEMO_SEMANTIC_MODEL.modelRef,
-            label: DEMO_SEMANTIC_MODEL.label,
-            version: DEMO_SEMANTIC_MODEL.version,
-            namespace,
-            status: 'active',
-          },
-        ],
-        nextCursor: '',
-      };
-    },
-    async getModel(modelRef = '') {
-      const normalizedRef = String(modelRef || '').trim();
-      if (!pendingModelRequests.has(normalizedRef)) {
-        const request = resolveDemoSemanticModel(normalizedRef)
-          .finally(() => {
-            pendingModelRequests.delete(normalizedRef);
-          });
-        pendingModelRequests.set(normalizedRef, request);
-      }
-      return pendingModelRequests.get(normalizedRef)
-        .then((payload) => clonePreviewValue(payload));
-    },
-    async validateSelection(modelRef = '', selection = {}) {
-      const metrics = ensurePreviewMetrics();
-      if (metrics) {
-        incrementReportBuilderPreviewMetric(metrics, 'validateSelectionCount');
-      }
-      const normalizedRef = String(modelRef || '').trim();
-      if (normalizedRef !== DEMO_SEMANTIC_MODEL.modelRef) {
-        return {
-          valid: false,
-          normalizedSelection: null,
-          diagnostics: [{
-            code: 'unknownModel',
-            severity: 'error',
-            path: 'selection.modelRef',
-            message: `Unknown semantic model '${modelRef}'.`,
-          }],
-        };
-      }
-      let behaviorResult = null;
-      try {
-        behaviorResult = await applyPreviewSemanticValidationBehavior(metrics, normalizedRef, selection);
-      } finally {
-        persistPreviewSemanticValidationBehaviors(typeof window !== 'undefined' ? window.sessionStorage : null, metrics?.semanticValidationBehaviors || []);
-      }
-      if (behaviorResult) {
-        return behaviorResult;
-      }
-      const validation = validateSemanticBinding({
-        mode: 'semantic',
-        modelRef: normalizedRef,
-        entity: selection?.entity,
-        selectedDimensions: selection?.dimensions,
-        selectedMeasures: selection?.measures,
-      }, DEMO_SEMANTIC_MODEL);
-      if (validation.valid) {
-        const dimensions = validation.normalizedBinding?.selectedDimensions || [];
-        const measures = validation.normalizedBinding?.selectedMeasures || [];
-        if (dimensions.includes('age_group') && measures.includes('household_uniques')) {
-          const ageGroupIndex = dimensions.indexOf('age_group');
-          const householdUniquesIndex = measures.indexOf('household_uniques');
-          return {
-            valid: false,
-            normalizedSelection: {
-              entity: validation.normalizedBinding.entity,
-              dimensions,
-              measures,
-            },
-            diagnostics: [
-              ...(ageGroupIndex >= 0 ? [{
-                code: 'unsupportedBreakdown',
-                severity: 'error',
-                path: `selection.dimensions[${ageGroupIndex}]`,
-                message: 'Audience Age Group is not supported for this semantic selection in the demo provider.',
-                suggestedFix: 'Remove Audience Age Group or choose a different breakdown to continue.',
-              }] : []),
-              ...(householdUniquesIndex >= 0 ? [{
-                code: 'unsupportedMeasure',
-                severity: 'error',
-                path: `selection.measures[${householdUniquesIndex}]`,
-                message: 'Household Uniques cannot be combined with Audience Age Group in this demo semantic provider.',
-                suggestedFix: 'Remove Household Uniques or switch to Available Impressions to continue.',
-              }] : []),
-            ],
-          };
-        }
-      }
-      return {
-        valid: validation.valid,
-        normalizedSelection: validation.normalizedBinding
-          ? {
-            entity: validation.normalizedBinding.entity,
-            dimensions: validation.normalizedBinding.selectedDimensions,
-            measures: validation.normalizedBinding.selectedMeasures,
-          }
-          : null,
-        diagnostics: semanticDiagnostics(validation.errors),
-      };
-    },
-    async getDrillHierarchy(fieldRef = '') {
-      return configBackedDrillProvider.getDrillHierarchy(fieldRef);
-    },
-    async getDetailTarget(targetRef = '') {
-      const metrics = ensurePreviewMetrics();
-      const overridden = await applyPreviewDetailTargetBehavior(metrics, {
-        targetRef,
-      });
-      if (overridden !== undefined) {
-        return overridden;
-      }
-      return configBackedDrillProvider.getDetailTarget(targetRef);
-    },
-    async listAvailableRefinements(_blockKind = '', fieldRef = '') {
-      const fallbackActions = await configBackedDrillProvider.listAvailableRefinements(_blockKind, fieldRef);
-      const metrics = ensurePreviewMetrics();
-      return await applyPreviewRuntimeActionBehavior(metrics, _blockKind, fieldRef, fallbackActions);
-    },
-  };
-}
-
-async function validateDemoSemanticRequest(request = {}, semanticModelHandler = null) {
-  const semanticSelection = request?.semanticSelection;
-  if (!semanticSelection || !semanticModelHandler) {
-    return null;
-  }
-  const unmappedDimensions = semanticSelection?.unmapped?.dimensions || [];
-  const unmappedMeasures = semanticSelection?.unmapped?.measures || [];
-  if (unmappedDimensions.length > 0 || unmappedMeasures.length > 0) {
-    throw new Error([
-      unmappedDimensions.length > 0 ? `Unmapped semantic dimensions: ${unmappedDimensions.join(', ')}` : '',
-      unmappedMeasures.length > 0 ? `Unmapped semantic measures: ${unmappedMeasures.join(', ')}` : '',
-    ].filter(Boolean).join(' • '));
-  }
-  const result = await semanticModelHandler.validateSelection(semanticSelection.modelRef, {
-    entity: semanticSelection.entity,
-    dimensions: semanticSelection?.selection?.dimensions || [],
-    measures: semanticSelection?.selection?.measures || [],
-    parameters: semanticSelection?.parameters || {},
+function createDemoSemanticModelHandler({ drillMetadata = {}, staticFilters = [] } = {}) {
+  return createBaseDemoSemanticModelHandler({
+    semanticModel: DEMO_SEMANTIC_MODEL,
+    drillMetadata,
+    staticFilters,
+    getMetrics: () => ensurePreviewMetrics(),
+    getStorage: () => (typeof window !== 'undefined' ? window.sessionStorage : null),
   });
-  if (result?.valid) {
-    return result;
-  }
-  const first = Array.isArray(result?.diagnostics) ? result.diagnostics[0] : null;
-  throw new Error(first?.message || 'Semantic selection is invalid.');
 }
 
 function ensurePreviewMetrics() {
@@ -438,7 +338,9 @@ function createDemoContext() {
   };
   const semanticModel = createDemoSemanticModelHandler({
     drillMetadata: container?.dashboard?.reportBuilder?.drillMetadata || {},
+    staticFilters: container?.dashboard?.reportBuilder?.staticFilters || [],
   });
+  let semanticModelProviderAvailable = true;
 
   const fetchCollection = async () => {
     const metrics = ensurePreviewMetrics();
@@ -448,7 +350,7 @@ function createDemoContext() {
     const request = input.peek()?.parameters || {};
     control.value = { loading: true, error: null };
     try {
-      await validateDemoSemanticRequest(request, semanticModel);
+      await validateDemoSemanticRequest(request, ctx.handlers?.semanticModel || null);
       const { rows, hasMore } = runPreviewRuntimeRequest(RAW_ROWS, request, container?.dashboard?.reportBuilder || {});
       collection.value = rows;
       collectionInfo.value = { hasMore };
@@ -465,36 +367,74 @@ function createDemoContext() {
     reportExport: {
       async submitRequest({ request, source } = {}) {
         const metrics = ensurePreviewMetrics();
+        const formatName = String(request?.target?.format || 'export').trim().toLowerCase() || 'export';
+        const title = String(request?.source?.title || request?.reportSpec?.title || 'Report').trim() || 'Report';
+        const artifactRef = String(request?.source?.artifactRef || '').trim();
+        if (metrics) {
+          incrementReportBuilderPreviewMetric(metrics, 'exportRequestCount');
+        }
+        const overridden = await applyPreviewExportBehavior(metrics, {
+          phase: 'submit',
+          source: String(source || '').trim(),
+          format: formatName,
+          artifactRef,
+          title,
+        });
+        if (overridden) {
+          if (metrics) {
+            const exportRecord = {
+              source: String(source || '').trim(),
+              format: formatName,
+              artifactRef,
+              title,
+              jobId: String(overridden?.jobId || '').trim(),
+              artifactId: String(overridden?.artifactId || '').trim(),
+            };
+            metrics.lastExportRequest = exportRecord;
+            metrics.exportRequestHistory = [
+              ...(Array.isArray(metrics.exportRequestHistory) ? metrics.exportRequestHistory : []),
+              exportRecord,
+            ];
+          }
+          return {
+            ok: true,
+            ...overridden,
+          };
+        }
         exportSequence += 1;
         const jobId = `demo-export-job-${exportSequence}`;
         const artifactId = `demo-export-artifact-${exportSequence}`;
-        const formatName = String(request?.target?.format || 'export').trim().toLowerCase() || 'export';
-        const title = String(request?.source?.title || request?.reportSpec?.title || 'Report').trim() || 'Report';
+        const submittedAt = new Date().toISOString();
+        const retentionTtl = 2 * 60 * 60 * 1_000_000_000;
         exportJobs.set(jobId, {
           jobId,
           status: 'queued',
           artifactId,
-          artifactRef: String(request?.source?.artifactRef || '').trim(),
+          artifactRef,
           format: formatName,
           scope: String(request?.source?.from || source || '').trim(),
           title,
           pollCount: 0,
+          submittedAt,
+          completedAt: '',
+          retentionTtl,
         });
         const pdfBytes = new TextEncoder().encode(`%PDF-demo ${title}`);
         exportArtifacts.set(artifactId, {
           artifactId,
           jobId,
-          artifactRef: String(request?.source?.artifactRef || '').trim(),
+          artifactRef,
           format: formatName,
           contentType: formatName === 'pdf' ? 'application/pdf' : 'application/octet-stream',
           bytes: pdfBytes,
+          createdAt: '',
+          retentionTtl,
         });
         if (metrics) {
-          incrementReportBuilderPreviewMetric(metrics, 'exportRequestCount');
           const exportRecord = {
             source: String(source || '').trim(),
             format: formatName,
-            artifactRef: String(request?.source?.artifactRef || '').trim(),
+            artifactRef,
             title,
             jobId,
             artifactId,
@@ -510,7 +450,7 @@ function createDemoContext() {
           jobId,
           status: 'queued',
           artifactId: '',
-          artifactRef: String(request?.source?.artifactRef || '').trim(),
+          artifactRef,
           format: formatName,
           message: `Accepted ${formatName.toUpperCase()} export for ${title}.`,
         };
@@ -522,14 +462,64 @@ function createDemoContext() {
         if (!job) {
           throw new Error(`Unknown export job ${normalizedJobId}.`);
         }
+        const overridden = await applyPreviewExportBehavior(metrics, {
+          phase: 'status',
+          jobId: normalizedJobId,
+          artifactId: String(job?.artifactId || '').trim(),
+          artifactRef: String(job?.artifactRef || '').trim(),
+          format: String(job?.format || '').trim(),
+          source: String(job?.scope || '').trim(),
+          title: String(job?.title || '').trim(),
+        });
+        if (overridden) {
+          const nextJob = applyPreviewExportStatusResult(
+            exportJobs,
+            exportArtifacts,
+            normalizedJobId,
+            {
+              artifactRef: String(job?.artifactRef || '').trim(),
+              format: String(job?.format || '').trim(),
+              ...overridden,
+            },
+            {
+              completedAt: new Date().toISOString(),
+            },
+          );
+          const result = {
+            jobId: normalizedJobId,
+            artifactRef: String(nextJob?.artifactRef || job?.artifactRef || '').trim(),
+            format: String(nextJob?.format || job?.format || '').trim(),
+            status: String(nextJob?.status || overridden?.status || '').trim(),
+            artifactId: String(nextJob?.status || '').trim() === 'succeeded'
+              ? String(nextJob?.artifactId || '').trim()
+              : '',
+            submittedAt: String(nextJob?.submittedAt || '').trim(),
+            completedAt: String(nextJob?.completedAt || '').trim(),
+            retentionTtl: Number(nextJob?.retentionTtl || 0) || 0,
+            ...(String(nextJob?.error || '').trim() ? { error: String(nextJob.error).trim() } : {}),
+          };
+          if (metrics) {
+            metrics.lastExportStatus = {
+              jobId: normalizedJobId,
+              status: String(result?.status || '').trim(),
+            };
+          }
+          return result;
+        }
         const nextPollCount = Number(job.pollCount || 0) + 1;
         const nextStatus = nextPollCount > 1 ? 'succeeded' : 'queued';
-        const nextJob = {
-          ...job,
-          pollCount: nextPollCount,
-          status: nextStatus,
-        };
-        exportJobs.set(normalizedJobId, nextJob);
+        const nextJob = applyPreviewExportStatusResult(
+          exportJobs,
+          exportArtifacts,
+          normalizedJobId,
+          {
+            pollCount: nextPollCount,
+            status: nextStatus,
+          },
+          {
+            completedAt: new Date().toISOString(),
+          },
+        );
         if (metrics) {
           metrics.lastExportStatus = {
             jobId: normalizedJobId,
@@ -542,6 +532,9 @@ function createDemoContext() {
           artifactId: nextStatus === 'succeeded' ? nextJob.artifactId : '',
           artifactRef: nextJob.artifactRef,
           format: nextJob.format,
+          submittedAt: String(nextJob?.submittedAt || '').trim(),
+          completedAt: String(nextJob?.completedAt || '').trim(),
+          retentionTtl: Number(nextJob?.retentionTtl || 0) || 0,
         };
       },
       async getArtifact({ artifactId } = {}) {
@@ -550,14 +543,42 @@ function createDemoContext() {
         if (!artifact) {
           throw new Error(`Unknown export artifact ${normalizedArtifactId}.`);
         }
-        return {
+        const overridden = await applyPreviewExportBehavior(ensurePreviewMetrics(), {
+          phase: 'artifact',
+          artifactId: normalizedArtifactId,
+          jobId: String(artifact?.jobId || '').trim(),
+          artifactRef: String(artifact?.artifactRef || '').trim(),
+          format: String(artifact?.format || '').trim(),
+        });
+        if (overridden) {
+          return {
           artifactId: artifact.artifactId,
           jobId: artifact.jobId,
           artifactRef: artifact.artifactRef,
           format: artifact.format,
           contentType: artifact.contentType,
           bytes: artifact.bytes,
+          createdAt: String(artifact?.createdAt || '').trim(),
+          retentionTtl: Number(artifact?.retentionTtl || 0) || 0,
+          ...overridden,
         };
+      }
+      return {
+        artifactId: artifact.artifactId,
+        jobId: artifact.jobId,
+        artifactRef: artifact.artifactRef,
+        format: artifact.format,
+        contentType: artifact.contentType,
+        bytes: artifact.bytes,
+        createdAt: String(artifact?.createdAt || '').trim(),
+        retentionTtl: Number(artifact?.retentionTtl || 0) || 0,
+      };
+    },
+      async listJobs({ artifactRef = '', limit = 0 } = {}) {
+        return buildPreviewExportJobList(exportJobs, { artifactRef, limit });
+      },
+      async listArtifacts({ artifactRef = '', limit = 0 } = {}) {
+        return buildPreviewExportArtifactList(exportArtifacts, { artifactRef, limit });
       },
     },
     dataSource: {
@@ -582,7 +603,7 @@ function createDemoContext() {
         const requestKey = `${requestFingerprint}::${Number(metrics?.fetchRecordsCount || 0)}`;
         const requestType = requestKind || 'chartQuery';
         try {
-          await validateDemoSemanticRequest(parameters || {}, semanticModel);
+          await validateDemoSemanticRequest(parameters || {}, ctx.handlers?.semanticModel || null);
           if (metrics) {
             const requestMeta = {
               type: requestType,
@@ -657,6 +678,12 @@ function createDemoContext() {
       fetchCollection,
     },
   };
+  ctx.getSemanticModelProviderAvailable = () => semanticModelProviderAvailable;
+  ctx.setSemanticModelProviderAvailable = (enabled = true) => {
+    semanticModelProviderAvailable = enabled !== false;
+    ctx.handlers.semanticModel = semanticModelProviderAvailable ? semanticModel : null;
+    return semanticModelProviderAvailable;
+  };
   ctx.Context = () => ctx;
   return ctx;
 }
@@ -679,6 +706,7 @@ const container = {
       },
       measures: [
         { id: 'avails', key: 'avails', semanticRef: 'available_impressions', label: 'Avails', format: 'compactNumber', default: true, color: '#2f6de1' },
+        { id: 'audienceIndex', key: 'audienceIndex', semanticRef: 'audience_index', label: 'Audience Index', format: 'number', aggregation: 'avg', color: '#d97706' },
         { id: 'hhUniqs', key: 'hhUniqs', semanticRef: 'household_uniques', label: 'HH Uniques', format: 'compactNumber', default: true, color: '#13a36f' },
       ],
       computedMeasures: [
@@ -805,26 +833,26 @@ const container = {
           {
             fieldRef: 'eventDate',
             actions: [
-              { id: 'detail_date', label: 'Show date details', kind: 'detail', targetRef: 'target://steward/performance/date-detail' },
+              { id: 'detail_date', label: 'Show date details', kind: 'detail', targetRef: 'target://example/performance/date-detail' },
             ],
           },
           {
             fieldRef: 'channelV2',
             actions: [
               { id: 'drill_market', label: 'Drill to Market', kind: 'drill', nextFieldRef: 'country' },
-              { id: 'detail_channel', label: 'Show channel details', kind: 'detail', targetRef: 'target://steward/performance/channel-detail' },
+              { id: 'detail_channel', label: 'Show channel details', kind: 'detail', targetRef: 'target://example/performance/channel-detail' },
             ],
           },
           {
             fieldRef: 'country',
             actions: [
-              { id: 'detail_market', label: 'Show market details', kind: 'detail', targetRef: 'target://steward/performance/market-detail' },
+              { id: 'detail_market', label: 'Show market details', kind: 'detail', targetRef: 'target://example/performance/market-detail' },
             ],
           },
         ],
         detailTargets: [
           {
-            targetRef: 'target://steward/performance/channel-detail',
+            targetRef: 'target://example/performance/channel-detail',
             navigationMode: 'hostRoute',
             parameters: {
               channel: '$value',
@@ -832,14 +860,14 @@ const container = {
             },
           },
           {
-            targetRef: 'target://steward/performance/date-detail',
+            targetRef: 'target://example/performance/date-detail',
             navigationMode: 'hostRoute',
             parameters: {
               eventDate: '$value',
             },
           },
           {
-            targetRef: 'target://steward/performance/market-detail',
+            targetRef: 'target://example/performance/market-detail',
             navigationMode: 'hostRoute',
             parameters: {
               country: '$value',
@@ -859,6 +887,7 @@ const container = {
       staticFilters: [
         {
           id: 'dateRange',
+          semanticRef: 'reporting_window',
           label: 'Date Range',
           type: 'dateRange',
           required: true,
@@ -868,11 +897,22 @@ const container = {
         },
         {
           id: 'channelsFilter',
+          semanticRef: 'delivery_channels_filter',
           label: 'Channels',
           multiple: true,
           options: [
             { label: 'Display', value: 'Display' },
             { label: 'CTV', value: 'CTV' },
+          ],
+        },
+        {
+          id: 'audienceSegmentFilter',
+          semanticRef: 'audience_segment',
+          label: 'Audience Segment',
+          multiple: true,
+          options: [
+            { label: 'Young Adults', value: 'Young Adults' },
+            { label: 'Established Adults', value: 'Established Adults' },
           ],
         },
         {
@@ -957,12 +997,12 @@ const container = {
         defaultTablePresets: [
           {
             title: 'Inventory Ladder',
-            group: 'Forecasting Ladders',
-            groupDescription: 'Forecast-first tables that start at the governed top level and drill deeper through authored runtime actions.',
-            eyebrow: 'Forecast Inventory',
+            group: 'Capacity Ladders',
+            groupDescription: 'Capacity-first tables that start at the governed top level and drill deeper through authored runtime actions.',
+            eyebrow: 'Capacity Inventory',
             accentTone: 'delivery',
             highlights: ['3-Level Drill', 'Channel First', 'Publisher -> Site Type'],
-            description: 'Channel-first forecasting preset with authored drill actions through Publisher and Site Type.',
+            description: 'Channel-first capacity preset with authored drill actions through Publisher and Site Type.',
             dimensions: ['channelV2'],
             measures: ['avails', 'hhUniqs', 'reachRate'],
             columns: [
@@ -1019,12 +1059,12 @@ const container = {
           },
           {
             title: 'Location Ladder',
-            group: 'Forecasting Ladders',
-            groupDescription: 'Forecast-first tables that start at the governed top level and drill deeper through authored runtime actions.',
-            eyebrow: 'Forecast Location',
+            group: 'Capacity Ladders',
+            groupDescription: 'Capacity-first tables that start at the governed top level and drill deeper through authored runtime actions.',
+            eyebrow: 'Capacity Location',
             accentTone: 'household',
             highlights: ['3-Level Drill', 'Market First', 'Region -> Metro Area'],
-            description: 'Market-first forecasting preset with authored drill actions through Region and Metro Area.',
+            description: 'Market-first capacity preset with authored drill actions through Region and Metro Area.',
             dimensions: ['country'],
             measures: ['avails', 'hhUniqs', 'reachRate'],
             columns: [
@@ -1233,8 +1273,8 @@ const container = {
           {
             title: 'Inventory · Top Channels',
             group: 'Inventory',
-            groupDescription: 'Forecast-first visual presets that stay aligned with authored runtime drill ladders.',
-            eyebrow: 'Forecast Inventory',
+            groupDescription: 'Capacity-first visual presets that stay aligned with authored runtime drill ladders.',
+            eyebrow: 'Capacity Inventory',
             accentTone: 'delivery',
             highlights: ['3-Level Drill', 'Channel First', 'Publisher -> Site Type'],
             type: 'horizontal_bar',
@@ -1250,8 +1290,8 @@ const container = {
           {
             title: 'Locations · Top Markets',
             group: 'Location',
-            groupDescription: 'Forecast-first visual presets that stay aligned with authored runtime drill ladders.',
-            eyebrow: 'Forecast Location',
+            groupDescription: 'Capacity-first visual presets that stay aligned with authored runtime drill ladders.',
+            eyebrow: 'Capacity Location',
             accentTone: 'household',
             highlights: ['3-Level Drill', 'Market First', 'Region -> Metro Area'],
             type: 'horizontal_bar',
@@ -1284,16 +1324,16 @@ const container = {
       },
       reportDocumentListEntries: [
         {
-          reportRef: { reportId: 'forecastingArchive' },
+          reportRef: { reportId: 'capacityArchive' },
           documentVersion: 7,
-          title: 'Forecasting Archive',
+          title: 'Capacity Archive',
           subtitle: 'Historical Snapshot',
           description: 'Archived report entry used for reopen compatibility diagnostics.',
           source: {
             kind: 'dashboard.reportBuilder',
-            containerId: 'forecastingArchive',
-            stateKey: 'forecastingArchive',
-            dataSourceRef: 'forecastArchiveSource',
+            containerId: 'capacityArchive',
+            stateKey: 'capacityArchive',
+            dataSourceRef: 'capacityArchiveSource',
           },
         },
       ],
@@ -1307,12 +1347,12 @@ container.dashboard.reportBuilder.reportDocumentSavedPayloads = [
     reportBuilderConfig: container?.dashboard?.reportBuilder || {},
     rows: RAW_ROWS,
     semanticModel: DEMO_SEMANTIC_MODEL,
-    reportId: 'forecastingQ3',
-    title: 'Forecasting Q3',
-    templateId: 'forecast_inventory_brief',
+    reportId: 'capacityQ3',
+    title: 'Capacity Q3',
+    templateId: 'capacity_inventory_brief',
     presetTitle: 'Inventory Ladder',
     documentVersion: 4,
-    artifactId: 'forecasting_q3_inventory_ladder',
+    artifactId: 'capacity_q3_inventory_ladder',
     savedAt: 9100,
     pageGeometry: PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
   }),
@@ -1321,12 +1361,12 @@ container.dashboard.reportBuilder.reportDocumentSavedPayloads = [
     reportBuilderConfig: container?.dashboard?.reportBuilder || {},
     rows: RAW_ROWS,
     semanticModel: DEMO_SEMANTIC_MODEL,
-    reportId: 'forecastingLocationQ3',
-    title: 'Forecasting Location Q3',
-    templateId: 'forecast_location_brief',
+    reportId: 'capacityLocationQ3',
+    title: 'Capacity Location Q3',
+    templateId: 'capacity_location_brief',
     presetTitle: 'Location Ladder',
     documentVersion: 5,
-    artifactId: 'forecasting_q3_location_ladder',
+    artifactId: 'capacity_q3_location_ladder',
     savedAt: 9200,
     pageGeometry: PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
   }),
@@ -1335,12 +1375,12 @@ container.dashboard.reportBuilder.reportDocumentSavedPayloads = [
     reportBuilderConfig: container?.dashboard?.reportBuilder || {},
     rows: RAW_ROWS,
     semanticModel: DEMO_SEMANTIC_MODEL,
-    reportId: 'forecastingTrendQ3',
-    title: 'Forecasting Trend Q3',
+    reportId: 'capacityTrendQ3',
+    title: 'Capacity Trend Q3',
     presetKind: 'chart',
     presetTitle: 'Avails by Date and Channel',
     documentVersion: 6,
-    artifactId: 'forecasting_q3_channel_trend',
+    artifactId: 'capacity_q3_channel_trend',
     savedAt: 9300,
   }),
   buildPreviewSavedReportPayloadRecord({
@@ -1348,13 +1388,13 @@ container.dashboard.reportBuilder.reportDocumentSavedPayloads = [
     reportBuilderConfig: container?.dashboard?.reportBuilder || {},
     rows: RAW_ROWS,
     semanticModel: DEMO_SEMANTIC_MODEL,
-    reportId: 'forecastingInventoryTopChannelsQ3',
-    title: 'Forecasting Inventory Top Channels Q3',
-    templateId: 'forecast_inventory_brief',
+    reportId: 'capacityInventoryTopChannelsQ3',
+    title: 'Capacity Inventory Top Channels Q3',
+    templateId: 'capacity_inventory_brief',
     presetKind: 'chart',
     presetTitle: 'Inventory · Top Channels',
     documentVersion: 7,
-    artifactId: 'forecasting_q3_inventory_top_channels',
+    artifactId: 'capacity_q3_inventory_top_channels',
     savedAt: 9400,
     pageGeometry: PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
   }),
@@ -1363,13 +1403,13 @@ container.dashboard.reportBuilder.reportDocumentSavedPayloads = [
     reportBuilderConfig: container?.dashboard?.reportBuilder || {},
     rows: RAW_ROWS,
     semanticModel: DEMO_SEMANTIC_MODEL,
-    reportId: 'forecastingLocationsTopMarketsQ3',
-    title: 'Forecasting Locations Top Markets Q3',
-    templateId: 'forecast_location_brief',
+    reportId: 'capacityLocationsTopMarketsQ3',
+    title: 'Capacity Locations Top Markets Q3',
+    templateId: 'capacity_location_brief',
     presetKind: 'chart',
     presetTitle: 'Locations · Top Markets',
     documentVersion: 8,
-    artifactId: 'forecasting_q3_locations_top_markets',
+    artifactId: 'capacity_q3_locations_top_markets',
     savedAt: 9500,
     pageGeometry: PREVIEW_LANDSCAPE_PAGE_GEOMETRY,
   }),
@@ -1395,6 +1435,7 @@ export default function ReportBuilderPreview() {
   const lastObservedWindowFormJSONRef = useRef(undefined);
   const lastObservedInputJSONRef = useRef(undefined);
   const [previewRuntimeRunSequence, setPreviewRuntimeRunSequence] = useState(0);
+  const [, setPreviewSemanticModelProviderRevision] = useState(0);
   const [, setPreviewConfigRevision] = useState(0);
   const [, setPreviewSeededReportPayloadRevision] = useState(0);
 
@@ -1487,6 +1528,7 @@ export default function ReportBuilderPreview() {
   const {
     semanticDisplayConfig: previewSemanticDisplayConfig,
     resolvedSemanticSummary: previewResolvedSemanticSummary,
+    semanticModelState: previewSemanticModelState,
   } = useReportBuilderSemanticRuntimeState({
     builderContext: context,
     config: previewConfig,
@@ -1508,11 +1550,15 @@ export default function ReportBuilderPreview() {
     refinements: runtimeRefinements,
     drillTransitions: runtimeDrillTransitions,
     semanticSummary: previewResolvedSemanticSummary,
+    binding: previewSemanticBinding,
+    semanticModel: previewSemanticModelState.model,
   }), [
     container,
     previewBuilderState,
     previewDisplayConfig,
     previewResolvedSemanticSummary,
+    previewSemanticBinding,
+    previewSemanticModelState.model,
     runtimeDrillTransitions,
     runtimeRefinements,
   ]);
@@ -1586,6 +1632,14 @@ export default function ReportBuilderPreview() {
         container.dashboard.reportBuilder = clonePreviewValue(nextBuilderConfig || {});
         setPreviewConfigRevision((current) => current + 1);
       },
+      getSemanticModelProviderAvailable() {
+        return context?.getSemanticModelProviderAvailable?.() === true;
+      },
+      setSemanticModelProviderAvailable(enabled = true) {
+        const nextValue = context?.setSemanticModelProviderAvailable?.(enabled);
+        setPreviewSemanticModelProviderRevision((current) => current + 1);
+        return nextValue;
+      },
       getWindowFormState() {
         return typeof context?.signals?.windowForm?.peek === 'function'
           ? (context.signals.windowForm.peek() || {})
@@ -1631,22 +1685,12 @@ export default function ReportBuilderPreview() {
         setPreviewSeededReportPayloadRevision((current) => current + 1);
       },
       buildSavedReportPayloadRecord(seed = {}) {
-        const normalizedSeed = seed && typeof seed === 'object' && !Array.isArray(seed)
-          ? seed
-          : {};
-        const {
-          container: _ignoredContainer,
-          reportBuilderConfig: _ignoredReportBuilderConfig,
-          rows: _ignoredRows,
-          semanticModel: _ignoredSemanticModel,
-          ...recordSeed
-        } = normalizedSeed;
-        return buildPreviewSavedReportPayloadRecord({
+        return buildPreviewSavedReportPayloadRecordFromSeed({
           container,
           reportBuilderConfig: container?.dashboard?.reportBuilder || {},
           rows: RAW_ROWS,
-          semanticModel: DEMO_SEMANTIC_MODEL,
-          ...recordSeed,
+          semanticModel: previewSemanticModelState.model || DEMO_SEMANTIC_MODEL,
+          seed,
         });
       },
       runtimeSurface,

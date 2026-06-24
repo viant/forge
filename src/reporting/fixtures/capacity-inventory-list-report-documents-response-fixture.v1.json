@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "kind": "listReportDocumentsResponse",
+  "entries": [
+    {
+      "reportRef": {
+        "reportId": "capacityInventoryTopChannelsQ3"
+      },
+      "documentVersion": 7,
+      "title": "Capacity Inventory Top Channels Q3",
+      "subtitle": "Q2 Channel Ladder",
+      "description": "Capacity-first authored report starter seeded for Channel -> Publisher -> Site Type drill flows.",
+      "templateId": "capacity_inventory_brief",
+      "templateLabel": "Capacity Inventory Brief",
+      "savedAt": 9400,
+      "compileState": {
+        "status": "clean",
+        "reportSpecVersion": 1,
+        "blockCount": 6,
+        "datasetCount": 1
+      },
+      "source": {
+        "kind": "reportBuilder.savedReportPayload",
+        "payloadId": "rbreport_capacity_q3_inventory_top_channels",
+        "sourceArtifactId": "capacity_q3_inventory_top_channels"
+      },
+      "semanticSummary": {
+        "kind": "semantic",
+        "modelRef": "model://example/performance/delivery@v1",
+        "modelLabel": "Ad Delivery",
+        "entity": "line_delivery",
+        "entityLabel": "Line Delivery",
+        "selectedDimensions": [
+          {
+            "id": "channel",
+            "rawId": "channelV2",
+            "label": "Channel"
+          }
+        ],
+        "selectedMeasures": [
+          {
+            "id": "available_impressions",
+            "rawId": "avails",
+            "label": "Available Impressions",
+            "format": "compactNumber"
+          }
+        ]
+      },
+      "binding": {
+        "mode": "semantic",
+        "modelRef": "model://example/performance/delivery@v1",
+        "entity": "line_delivery",
+        "selectedDimensions": [
+          "event_date",
+          "channel",
+          "country_code"
+        ],
+        "selectedMeasures": [
+          "available_impressions"
+        ]
+      },
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "dateRange",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          {
+            "id": "channelsFilter",
+            "kind": "multiSelect",
+            "label": "Channels",
+            "required": false,
+            "value": []
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      }
+    }
+  ],
+  "cursor": "",
+  "hasMore": false
+}

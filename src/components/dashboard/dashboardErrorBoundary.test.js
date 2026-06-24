@@ -34,7 +34,7 @@ function findElementByType(element, type) {
 
 const okChild = React.createElement("div", { id: "ok-child" }, "Recovered child");
 const boundary = new DashboardErrorBoundary({
-    container: { id: "chartBlock", title: "Forecasting Chart" },
+    container: { id: "chartBlock", title: "Capacity Chart" },
     children: okChild,
 });
 syncState(boundary);

@@ -16,6 +16,7 @@ import {
     buildReportBuilderSettingsHash,
     canAutoFetchReportBuilder,
     clearReportBuilderGroupByWhenMissing,
+    collapseReportBuilderFilterBodyState,
     prepareReportBuilderAutoChartApplication,
     getSelectableReportBuilderMeasures,
     getReportBuilderSupportedChartTypes,
@@ -146,7 +147,7 @@ const semanticMappedConfig = {
     }),
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date"],
         selectedMeasures: ["spend"],
@@ -183,6 +184,19 @@ assert.equal(shouldAutoCollapseReportBuilderFilters({
     manualRunSequence: 2,
     collapsedRunSequence: 1,
 }), false);
+assert.deepEqual(
+    collapseReportBuilderFilterBodyState({ common: true, advanced: true }),
+    { common: false, advanced: true },
+);
+const alreadyCollapsedFilterPanels = { common: false, advanced: true };
+assert.equal(
+    collapseReportBuilderFilterBodyState(alreadyCollapsedFilterPanels),
+    alreadyCollapsedFilterPanels,
+);
+assert.deepEqual(
+    collapseReportBuilderFilterBodyState(null),
+    { common: false },
+);
 assert.deepEqual(
     resolveReportBuilderRailFilterState({
         panelOpen: false,
@@ -259,14 +273,14 @@ assert.deepEqual(
     getSelectableReportBuilderMeasures({
         ...config,
         calculatedFields: [{
-            id: "forecastLift",
-            key: "forecastLift",
-            label: "Forecast Lift",
+            id: "projectedLift",
+            key: "projectedLift",
+            label: "Projected Lift",
             dataType: "number",
             expr: "if(channelId = 'CTV', totalSpend, null)",
         }],
     }).map((entry) => entry.id),
-    ["totalSpend", "impressions", "clicks", "forecastLift", "ctr"],
+    ["totalSpend", "impressions", "clicks", "projectedLift", "ctr"],
 );
 assert.deepEqual(
     getVisibleReportBuilderDimensions(config).map((entry) => entry.id),
@@ -283,9 +297,9 @@ assert.notEqual(
         selectedDimensions: ["eventDate"],
         selectedMeasures: ["totalSpend"],
         localCalculatedFields: [{
-            id: "forecastLift",
-            key: "forecastLift",
-            label: "Forecast Lift",
+            id: "projectedLift",
+            key: "projectedLift",
+            label: "Projected Lift",
             dataType: "number",
             expr: "if(channelId = 'CTV', totalSpend, null)",
         }],
@@ -325,7 +339,7 @@ assert.deepEqual(semanticDefaultState.selectedMeasures, ["totalSpend"]);
 assert.deepEqual(semanticDefaultState.selectedDimensions, ["eventDate"]);
 assert.deepEqual(semanticDefaultState.binding, {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date"],
     selectedMeasures: ["spend"],
@@ -348,7 +362,7 @@ assert.notEqual(
         selectedMeasures: ["totalSpend"],
         binding: {
             mode: "semantic",
-            modelRef: "model://steward/performance/ad_delivery@v1",
+            modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
     }),
@@ -1011,7 +1025,7 @@ const semanticRequestState = mergeReportBuilderState(semanticMappedConfig, {
     },
 });
 assert.deepEqual(buildReportBuilderRequest(semanticMappedConfig, semanticRequestState).semanticSelection, {
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selection: {
         dimensions: ["event_date", "channel"],
@@ -1025,13 +1039,13 @@ const mergedSemanticBinding = mergeReportBuilderState({
     ...config,
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date"],
         selectedMeasures: ["spend"],
@@ -1039,7 +1053,7 @@ const mergedSemanticBinding = mergeReportBuilderState({
 });
 assert.deepEqual(mergedSemanticBinding.binding, {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date"],
     selectedMeasures: ["spend"],
@@ -1049,14 +1063,14 @@ const mergedSemanticConfigOverride = mergeReportBuilderState({
     ...semanticMappedConfig,
     binding: {
         ...semanticMappedConfig.binding,
-        modelRef: "model://steward/performance/ad_delivery@v2",
+        modelRef: "model://example/performance/delivery@v2",
     },
 }, {
     binding: semanticMappedConfig.binding,
 });
 assert.deepEqual(mergedSemanticConfigOverride.binding, {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v2",
+    modelRef: "model://example/performance/delivery@v2",
     entity: "line_delivery",
     selectedDimensions: ["event_date"],
     selectedMeasures: ["spend"],
@@ -1066,7 +1080,7 @@ const mergedSemanticFallback = mergeReportBuilderState({
     ...config,
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
     },
 }, {
@@ -1078,7 +1092,7 @@ const mergedSemanticFallback = mergeReportBuilderState({
 });
 assert.deepEqual(mergedSemanticFallback.binding, {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: [],
     selectedMeasures: [],
@@ -1115,7 +1129,7 @@ const semanticPersistedPreviewConfig = {
     },
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["available_impressions", "household_uniques"],
@@ -1138,7 +1152,7 @@ assert.deepEqual(mergedSemanticPersistedPreviewState.binding, semanticPersistedP
 assert.deepEqual(
     buildReportBuilderRequest(semanticPersistedPreviewConfig, mergedSemanticPersistedPreviewState).semanticSelection,
     {
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selection: {
             dimensions: ["event_date", "channel", "age_group"],
@@ -1208,16 +1222,16 @@ const expressionComputedConfig = {
     ...config,
     calculatedFields: [
         {
-            id: "forecastLift",
-            key: "forecastLift",
-            label: "Forecast Lift",
+            id: "projectedLift",
+            key: "projectedLift",
+            label: "Projected Lift",
             dataType: "number",
             expr: "if(channelId = 'CTV', totalSpend, null)",
         },
     ],
 };
 const expressionComputedRequest = buildReportBuilderRequest(expressionComputedConfig, mergeReportBuilderState(expressionComputedConfig, {
-    selectedMeasures: ["forecastLift"],
+    selectedMeasures: ["projectedLift"],
     selectedDimensions: ["eventDate"],
 }));
 assert.equal(expressionComputedRequest.measures.totalSpend, true);
@@ -1228,47 +1242,47 @@ assert.deepEqual(
         { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 140 },
     ], expressionComputedConfig),
     [
-        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100, ctr: 0, forecastLift: null },
-        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 140, ctr: 0, forecastLift: 140 },
+        { eventDate: "2026-05-01", channelId: "Display", totalSpend: 100, ctr: 0, projectedLift: null },
+        { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 140, ctr: 0, projectedLift: 140 },
     ],
 );
 
 const localExpressionState = mergeReportBuilderState(config, {
     localCalculatedFields: [
         {
-            id: "forecastLift",
-            key: "forecastLift",
-            label: "Forecast Lift",
+            id: "projectedLift",
+            key: "projectedLift",
+            label: "Projected Lift",
             dataType: "number",
             expr: "if(channelId = 'CTV', totalSpend, null)",
         },
     ],
-    selectedMeasures: ["forecastLift"],
-    primaryMeasure: "forecastLift",
+    selectedMeasures: ["projectedLift"],
+    primaryMeasure: "projectedLift",
     selectedDimensions: ["eventDate"],
     chartSpec: {
-        title: "Forecast Lift by Date",
+        title: "Projected Lift by Date",
         type: "line",
         xField: "eventDate",
-        yFields: ["forecastLift"],
+        yFields: ["projectedLift"],
     },
 });
 assert.deepEqual(localExpressionState.localCalculatedFields, [
     {
-        id: "forecastLift",
-        key: "forecastLift",
+        id: "projectedLift",
+        key: "projectedLift",
         kind: "rowCalc",
-        label: "Forecast Lift",
+        label: "Projected Lift",
         dataType: "number",
         dependencies: ["channelId", "totalSpend"],
         expr: "if(channelId = 'CTV', totalSpend, null)",
     },
 ]);
-assert.equal(localExpressionState.chartSpec.yFields[0], "forecastLift");
+assert.equal(localExpressionState.chartSpec.yFields[0], "projectedLift");
 const localExpressionRequest = buildReportBuilderRequest(config, localExpressionState);
 assert.equal(localExpressionRequest.measures.totalSpend, true);
 assert.equal(localExpressionRequest.dimensions.channelId, true);
-assert.equal(localExpressionRequest.measures.forecastLift, undefined);
+assert.equal(localExpressionRequest.measures.projectedLift, undefined);
 
 const localTableCalculationState = mergeReportBuilderState(config, {
     localTableCalculations: [
@@ -1778,8 +1792,39 @@ const settingsHashC = buildReportBuilderSettingsHash({
     selectedDimensions: ["eventDate", "siteType"],
     selectedMeasures: ["totalSpend"],
 });
+const settingsHashD = buildReportBuilderSettingsHash({
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    drillMetadata: {
+        hierarchies: [
+            {
+                id: "hierarchy:eventDate::siteType",
+                levels: [
+                    { field: "eventDate", label: "Event Date" },
+                    { field: "siteType", label: "Site Type" },
+                ],
+            },
+        ],
+    },
+});
+const settingsHashE = buildReportBuilderSettingsHash({
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    drillMetadata: {
+        hierarchies: [],
+    },
+});
+const settingsHashF = buildReportBuilderSettingsHash({
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend", "impressions"],
+    drillMetadata: {
+        detailTargets: [],
+    },
+});
 assert.equal(settingsHashA, settingsHashB);
 assert.notEqual(settingsHashA, settingsHashC);
+assert.notEqual(settingsHashA, settingsHashD);
+assert.notEqual(settingsHashE, settingsHashF);
 
 const explicitDefaults = buildReportBuilderDefaultState(explicitChartConfig);
 assert.equal(explicitDefaults.viewMode, "table");
@@ -1802,6 +1847,77 @@ const explicitSanitizedMissingField = sanitizeReportBuilderState(explicitChartCo
     viewMode: "chart",
 });
 assert.equal(explicitSanitizedMissingField.chartSpec, null);
+
+const sanitizedDrillMetadataState = sanitizeReportBuilderState(explicitChartConfig, {
+    selectedDimensions: ["eventDate", "siteType"],
+    selectedMeasures: ["totalSpend"],
+    drillMetadata: {
+        hierarchies: [
+            {
+                id: "hierarchy:eventDate::siteType",
+                levels: [
+                    { field: "eventDate", label: "Event Date" },
+                    { field: "siteType", label: "Site Type" },
+                ],
+            },
+        ],
+        detailTargets: [
+            {
+                targetRef: "target://example/site-type-detail",
+                navigationMode: "hostRoute",
+                parameters: {
+                    siteType: "$value",
+                },
+            },
+        ],
+        fieldActions: [
+            {
+                fieldRef: "siteType",
+                actions: [
+                    {
+                        id: "detail:siteType:target:_example_site-type-detail",
+                        label: "Show Site Type details",
+                        kind: "detail",
+                        targetRef: "target://example/site-type-detail",
+                    },
+                ],
+            },
+        ],
+    },
+});
+assert.deepEqual(sanitizedDrillMetadataState.drillMetadata, {
+    hierarchies: [
+        {
+            id: "hierarchy:eventDate::siteType",
+            levels: [
+                { id: "eventDate", field: "eventDate", label: "Event Date" },
+                { id: "siteType", field: "siteType", label: "Site Type" },
+            ],
+        },
+    ],
+    detailTargets: [
+        {
+            targetRef: "target://example/site-type-detail",
+            navigationMode: "hostRoute",
+            parameters: {
+                siteType: "$value",
+            },
+        },
+    ],
+    fieldActions: [
+        {
+            fieldRef: "siteType",
+            actions: [
+                {
+                    id: "detail:siteType:target:_example_site-type-detail",
+                    label: "Show Site Type details",
+                    kind: "detail",
+                    targetRef: "target://example/site-type-detail",
+                },
+            ],
+        },
+    ],
+});
 assert.equal(explicitSanitizedMissingField.viewMode, "table");
 
 const explicitContainer = buildExplicitReportBuilderChartContainer(

@@ -31,16 +31,34 @@ const reportPrint = {
   ],
 };
 
+const semanticBindingViewState = {
+  title: "Semantic Binding",
+  chips: [
+    "Model Ad Delivery",
+    "Entity Line Delivery",
+  ],
+  fieldGroups: [
+    {
+      id: "dimensions",
+      title: "Selected dimensions (1)",
+      fields: [
+        { id: "channel", rawId: "channelV2", label: "Channel" },
+      ],
+    },
+  ],
+};
+
 assert.deepEqual(buildDashboardReportRuntimeBlock({
   id: "authoredRuntime",
   subtitle: "Runtime preview",
   reportSpec,
   reportFill,
   reportPrint,
+  semanticBindingViewState,
   locale: "en-US",
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
     navigationMode: "hostRoute",
     parameters: {
       channel: "Display",
@@ -56,10 +74,11 @@ assert.deepEqual(buildDashboardReportRuntimeBlock({
       reportSpec,
       reportFill,
       reportPrint,
+      semanticBindingViewState,
       locale: "en-US",
       hostIntent: {
         intentKind: "detailTarget",
-        targetRef: "target://steward/performance/channel-detail",
+        targetRef: "target://example/performance/channel-detail",
         navigationMode: "hostRoute",
         parameters: {
           channel: "Display",

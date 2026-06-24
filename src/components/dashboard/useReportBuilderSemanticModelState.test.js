@@ -12,21 +12,21 @@ assert.equal(buildReportBuilderSemanticModelReloadKey({
   documentVersion: 7,
 }), "");
 assert.equal(buildReportBuilderSemanticModelReloadKey({
-  reportId: "forecastingTrendQ3",
+  reportId: "capacityTrendQ3",
   documentVersion: 0,
 }), "");
 assert.equal(buildReportBuilderSemanticModelReloadKey({
-  reportId: " forecastingTrendQ3 ",
+  reportId: " capacityTrendQ3 ",
   documentVersion: "6",
-}), "forecastingTrendQ3::6");
+}), "capacityTrendQ3::6");
 assert.equal(buildReportBuilderSemanticModelReloadKey({
-  reportId: "forecastingTrendQ3",
+  reportId: "capacityTrendQ3",
   documentVersion: 8,
   extra: true,
-}), "forecastingTrendQ3::8");
+}), "capacityTrendQ3::8");
 
 const cachedModel = {
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   label: "Ad Delivery",
 };
 
@@ -47,7 +47,7 @@ assert.deepEqual(resolveReportBuilderSemanticModelSeedState({
   binding: { mode: "semantic" },
   configSemanticModel: cachedModel,
   semanticModelProvider: { getModel() {} },
-  semanticModelRef: "model://steward/performance/ad_delivery@v1",
+  semanticModelRef: "model://example/performance/delivery@v1",
   currentState: {
     loading: true,
     error: "stale",
@@ -63,7 +63,7 @@ assert.deepEqual(resolveReportBuilderSemanticModelSeedState({
   binding: { mode: "semantic" },
   configSemanticModel: null,
   semanticModelProvider: null,
-  semanticModelRef: "model://steward/performance/ad_delivery@v1",
+  semanticModelRef: "model://example/performance/delivery@v1",
   currentState: {
     loading: true,
     error: "",
@@ -95,7 +95,7 @@ assert.deepEqual(resolveReportBuilderSemanticModelSeedState({
   binding: { mode: "semantic" },
   configSemanticModel: null,
   semanticModelProvider: { getModel() {} },
-  semanticModelRef: "model://steward/performance/ad_delivery@v1",
+  semanticModelRef: "model://example/performance/delivery@v1",
   currentState: {
     loading: false,
     error: "",
@@ -111,7 +111,7 @@ assert.deepEqual(resolveReportBuilderSemanticModelSeedState({
   binding: { mode: "semantic" },
   configSemanticModel: null,
   semanticModelProvider: { getModel() {} },
-  semanticModelRef: "model://steward/performance/other@v1",
+  semanticModelRef: "model://example/performance/other@v1",
   currentState: {
     loading: false,
     error: "",

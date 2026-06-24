@@ -30,7 +30,7 @@ assert.deepEqual(buildAuthoredRuntimePreviewSurface(null, runtimeHandlers), {
 assert.deepEqual(buildAuthoredRuntimePreviewSurface({
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
   detailDiagnostic: {
     code: "detailTargetPartial",
@@ -49,7 +49,7 @@ assert.deepEqual(buildAuthoredRuntimePreviewSurface({
 }, runtimeHandlers), {
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
   detailDiagnostic: {
     code: "detailTargetPartial",

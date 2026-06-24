@@ -15,10 +15,8 @@ import {
   buildReportBuilderDocumentCompileDiagnostics,
 } from "../../components/dashboard/reportBuilderDocumentBlocks.js";
 import {
-  buildReportBuilderSemanticFieldValidation,
-  buildReportBuilderSemanticGovernanceNotice,
+  buildReportBuilderSemanticRuntimeDiagnosticsFromState,
   buildReportBuilderSemanticRuntimeDiagnostics,
-  buildReportBuilderSemanticStatus,
 } from "../../components/dashboard/reportBuilderSemantic.js";
 import { resolveReportBuilderSemanticRuntimeState } from "../../components/dashboard/useReportBuilderSemanticRuntimeState.js";
 import { buildPreviewAuthoredReport } from "./previewAuthoredReport.js";
@@ -116,29 +114,14 @@ function buildPreviewSavedReportPayloadCompileState({
   ) {
     return null;
   }
-  const semanticStatus = buildReportBuilderSemanticStatus({
+  const runtimeDiagnostics = buildReportBuilderSemanticRuntimeDiagnosticsFromState({
+    config,
+    state,
     binding,
+    model: semanticModel,
     providerAvailable: !!semanticModel,
-    loading: false,
-    error: "",
-    model: semanticModel,
-  });
-  const semanticFieldValidation = buildReportBuilderSemanticFieldValidation({
-    config,
-    state,
-    binding,
-    model: semanticModel,
-  });
-  const semanticGovernanceNotice = buildReportBuilderSemanticGovernanceNotice({
-    config,
-    state,
-    binding,
-  });
-  const runtimeDiagnostics = buildReportBuilderSemanticRuntimeDiagnostics({
-    binding,
-    semanticStatus,
-    semanticGovernanceNotice,
-    semanticFieldValidation,
+    modelLoading: false,
+    modelError: "",
   });
   const diagnostics = [
     ...buildReportBuilderDocumentCompileDiagnostics({
@@ -182,6 +165,32 @@ function buildDefaultPreviewSavedPayloadBaseState(reportBuilderConfig = {}) {
     },
     binding: cloneValue(reportBuilderConfig.binding || null),
   };
+}
+
+export function buildPreviewSavedReportPayloadRecordFromSeed({
+  container = {},
+  reportBuilderConfig = {},
+  rows = [],
+  semanticModel = null,
+  seed = null,
+} = {}) {
+  const normalizedSeed = seed && typeof seed === "object" && !Array.isArray(seed)
+    ? seed
+    : {};
+  const {
+    container: _ignoredContainer,
+    reportBuilderConfig: _ignoredReportBuilderConfig,
+    rows: _ignoredRows,
+    semanticModel: seededSemanticModel,
+    ...recordSeed
+  } = normalizedSeed;
+  return buildPreviewSavedReportPayloadRecord({
+    container,
+    reportBuilderConfig,
+    rows,
+    semanticModel: seededSemanticModel || semanticModel || null,
+    ...recordSeed,
+  });
 }
 
 export function buildPreviewSavedReportPayloadRecord({
@@ -272,7 +281,7 @@ export function buildPreviewSavedReportPayloadRecord({
       container,
       config: semanticRuntimeState.semanticDisplayConfig,
       state: nextState,
-      semanticSummary: semanticRuntimeState.semanticSummary,
+      semanticSummary: semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
       binding: nextState?.binding || reportBuilderConfig.binding || null,
       semanticModel,
     });
@@ -334,7 +343,7 @@ export function buildPreviewSavedReportPayloadRecord({
       reportSpec,
       rows,
       compileDiagnostics: compileState?.diagnostics || [],
-      semanticSummary: semanticRuntimeState.semanticSummary,
+      semanticSummary: semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
       pageGeometry,
     });
     const exportRequest = buildSavedReportExportRequest({
@@ -364,7 +373,7 @@ export function buildPreviewSavedReportPayloadRecord({
       config: semanticRuntimeState.semanticDisplayConfig,
       state: resolvedBaseState,
       rows,
-      semanticSummary: semanticRuntimeState.semanticSummary,
+      semanticSummary: semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
       pageGeometry,
     });
     if (!authored?.document || !authored?.reportSpec) {
@@ -423,7 +432,7 @@ export function buildPreviewSavedReportPayloadRecord({
       reportSpec,
       rows,
       compileDiagnostics: compileState?.diagnostics || [],
-      semanticSummary: semanticRuntimeState.semanticSummary,
+      semanticSummary: semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
       pageGeometry,
     });
     const exportRequest = buildSavedReportExportRequest({
@@ -476,7 +485,7 @@ export function buildPreviewSavedReportPayloadRecord({
     config: semanticRuntimeState.semanticDisplayConfig,
     state: prepared.nextState,
     rows,
-    semanticSummary: semanticRuntimeState.semanticSummary,
+    semanticSummary: semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
     pageGeometry,
   });
   if (!authored?.document || !authored?.reportSpec) {
@@ -535,7 +544,7 @@ export function buildPreviewSavedReportPayloadRecord({
     reportSpec,
     rows,
     compileDiagnostics: compileState?.diagnostics || [],
-    semanticSummary: semanticRuntimeState.semanticSummary,
+    semanticSummary: semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
     pageGeometry,
   });
   const exportRequest = buildSavedReportExportRequest({

@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "kind": "listReportDocumentsResponse",
+  "entries": [
+    {
+      "reportRef": {
+        "reportId": "capacityAudienceSegmentIndexQ3"
+      },
+      "documentVersion": 13,
+      "title": "Capacity Audience Segment Index Q3",
+      "savedAt": 9375,
+      "compileState": {
+        "status": "clean",
+        "reportSpecVersion": 1,
+        "blockCount": 5,
+        "datasetCount": 1
+      },
+      "source": {
+        "kind": "reportBuilder.savedReportPayload",
+        "payloadId": "rbreport_capacity_audience_segment_index_q3",
+        "sourceArtifactId": "capacity_audience_segment_index_q3"
+      },
+      "semanticSummary": {
+        "kind": "semantic",
+        "modelRef": "model://example/performance/delivery@v1",
+        "modelLabel": "Ad Delivery",
+        "entity": "line_delivery",
+        "entityLabel": "Line Delivery",
+        "selectedDimensions": [
+          {
+            "id": "country_code",
+            "rawId": "country",
+            "label": "Market",
+            "category": "Location",
+            "definitionRef": "harmonizer://feature/location",
+            "governance": {
+              "status": "approved",
+              "classification": "harmonizer.audience"
+            }
+          }
+        ],
+        "selectedMeasures": [
+          {
+            "id": "audience_index",
+            "rawId": "audienceIndex",
+            "label": "Audience Index",
+            "format": "number",
+            "category": "Audience",
+            "definitionRef": "harmonizer://feature/user.segment.index",
+            "governance": {
+              "status": "approved",
+              "certification": "reviewed",
+              "classification": "harmonizer.audience"
+            }
+          }
+        ],
+        "selectedParameters": [
+          {
+            "id": "reporting_window",
+            "rawId": "dateRange",
+            "label": "Date Range",
+            "category": "Scope"
+          },
+          {
+            "id": "audience_segment",
+            "rawId": "audienceSegmentFilter",
+            "label": "Audience Segment",
+            "category": "Audience",
+            "definitionRef": "harmonizer://feature/user.segment",
+            "governance": {
+              "status": "approved",
+              "classification": "harmonizer.audience"
+            }
+          }
+        ]
+      },
+      "binding": {
+        "mode": "semantic",
+        "modelRef": "model://example/performance/delivery@v1",
+        "entity": "line_delivery",
+        "selectedDimensions": [
+          "event_date",
+          "channel",
+          "country_code"
+        ],
+        "selectedMeasures": [
+          "available_impressions"
+        ]
+      },
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "Date Range",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          {
+            "id": "channelsFilter",
+            "kind": "multiSelect",
+            "label": "Channels",
+            "required": false,
+            "value": null
+          },
+          {
+            "id": "audienceSegmentFilter",
+            "kind": "multiSelect",
+            "label": "Audience Segment",
+            "required": false,
+            "value": [
+              "Young Adults"
+            ]
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      }
+    }
+  ],
+  "cursor": "",
+  "hasMore": false
+}

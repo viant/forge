@@ -7,6 +7,9 @@ import (
 	reportprint "github.com/viant/forge/backend/reporting/print"
 )
 
+const tinyPNGBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aF9sAAAAASUVORK5CYII="
+const tinyWEBPBase64 = "UklGRrIBAABXRUJQVlA4TKUBAAAvSsAYAA8w//M///MfeJAkbXvaSG7m8Q3GfYSBJekwQztm/IcZlgwnmWImn2BK7aFmBtnVir6q//8VOkFE/xm4baTIu8c48ArEo6+B3zFKYln3pqClSCKX0begFTAXFOLXHSyF8cCNcZEG4OywuA4KVVfJCiArU7GAgJI8+lJP/OKMT/fBAjevg1cYB7YVkFuWga2lyPi5I0HFy5YTpWIHg0RZpkniRVW9odHAKOwosWuOGdxIyn2OvaCDvhg/we6TwadPBPbqBV58MsLmMJ8yZnOWk8SRz4N+QoyPL+MnamzMvcE1rHNEr91F9GKZPVUcS9w7PhhH36suB9qPeYb/oLk6cuTiJ0wOK3m5h1cKjW6EVZCYMK7dxcKCBdgP9HkKr9gkAO2P8GKZGWVdIAatQa+1IDpt6qyorVwdy01xdW8Jkfk6xjEXmVQQ+HQdFr6OKhIN34dXWq0+0qr6EJSCeeVLH9+gvGTLyqM65PQ44ihzlTXxQKjKbAvshXgir7Lil9w4L2bvMycmjQcqXaMCO6BlY28i+FOLzbfI1vEqxAhotocAAA=="
+
 func TestBuildRenderPlan_ReturnsNilForNilProgram(t *testing.T) {
 	require.Nil(t, buildRenderPlan(nil))
 	require.Nil(t, buildRenderPlan(&documentProgram{}))
@@ -57,7 +60,7 @@ func TestBuildRenderPlan_CompilesSupportedOperationsAndDiagnostics(t *testing.T)
 						Box:  reportprint.Box{X: 36, Y: 200, Width: 100, Height: 50},
 						Image: &reportprint.Image{
 							MimeType: "image/png",
-							Payload:  "ignored",
+							Payload:  tinyPNGBase64,
 						},
 					},
 				},
@@ -70,11 +73,12 @@ func TestBuildRenderPlan_CompilesSupportedOperationsAndDiagnostics(t *testing.T)
 
 	require.NotNil(t, plan)
 	require.Len(t, plan.pages, 1)
-	require.Len(t, plan.pages[0].operations, 2)
+	require.Len(t, plan.pages[0].operations, 3)
 	require.Equal(t, "text", plan.pages[0].operations[0].kind)
 	require.Equal(t, "svg", plan.pages[0].operations[1].kind)
+	require.Equal(t, "image", plan.pages[0].operations[2].kind)
 	require.NotNil(t, plan.pages[0].operations[1].svg)
-	require.Len(t, plan.pages[0].operations[1].svg.operations, 2)
+	require.Len(t, plan.pages[0].operations[1].svg.operations, 3)
 	require.Equal(t, "text", plan.pages[0].operations[1].svg.operations[0].kind)
 	require.NotNil(t, plan.pages[0].operations[1].svg.operations[0].text)
 	require.Equal(t, 46.0, plan.pages[0].operations[1].svg.operations[0].text.x)
@@ -82,12 +86,197 @@ func TestBuildRenderPlan_CompilesSupportedOperationsAndDiagnostics(t *testing.T)
 	require.Equal(t, "path", plan.pages[0].operations[1].svg.operations[1].kind)
 	require.NotNil(t, plan.pages[0].operations[1].svg.operations[1].path)
 	require.Equal(t, "D", plan.pages[0].operations[1].svg.operations[1].path.style)
+	require.Equal(t, "circle", plan.pages[0].operations[1].svg.operations[2].kind)
+	require.NotNil(t, plan.pages[0].operations[1].svg.operations[2].circle)
+	require.InDelta(t, 8.0, plan.pages[0].operations[1].svg.operations[2].circle.radiusX, 0.001)
+	require.InDelta(t, 6.0, plan.pages[0].operations[1].svg.operations[2].circle.radiusY, 0.001)
+	require.Empty(t, plan.diagnostics)
+}
 
-	require.Len(t, plan.diagnostics, 2)
-	require.Equal(t, "unsupportedReportPrintSVGChild", plan.diagnostics[0].Code)
-	require.Equal(t, "$.pages[0].elements[1].svg[2]", plan.diagnostics[0].Path)
-	require.Equal(t, "unsupportedReportPrintElement", plan.diagnostics[1].Code)
-	require.Equal(t, "$.pages[0].elements[2]", plan.diagnostics[1].Path)
+func TestBuildRenderPlan_ReportsInvalidImagePayloadDiagnostic(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "invalidImageBuilder",
+			StateKey:      "invalidImageBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Invalid Image",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "invalid_image",
+						Kind: "image",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
+						Image: &reportprint.Image{
+							MimeType: "image/png",
+							Payload:  "aGVsbG8=",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Empty(t, plan.pages[0].operations)
+	require.Len(t, plan.diagnostics, 1)
+	require.Equal(t, "invalidReportPrintImagePayload", plan.diagnostics[0].Code)
+	require.Equal(t, "invalid_image", plan.diagnostics[0].ElementID)
+	require.Contains(t, plan.diagnostics[0].Message, "could not validate image payload")
+}
+
+func TestBuildRenderPlan_CompilesImageWithMimeParameters(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "parameterizedImageBuilder",
+			StateKey:      "parameterizedImageBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Parameterized Image",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "image_with_params",
+						Kind: "image",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
+						Image: &reportprint.Image{
+							MimeType: "image/png;base64",
+							Payload:  tinyPNGBase64,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "image", plan.pages[0].operations[0].kind)
+	require.Empty(t, plan.diagnostics)
+}
+
+func TestBuildRenderPlan_CompilesWebPImage(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "unsupportedImageBuilder",
+			StateKey:      "unsupportedImageBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Unsupported Image",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "webp_image",
+						Kind: "image",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
+						Image: &reportprint.Image{
+							MimeType: "image/webp",
+							Payload:  tinyWEBPBase64,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "image", plan.pages[0].operations[0].kind)
+	require.Equal(t, "png", plan.pages[0].operations[0].image.imageType)
+	require.NotEmpty(t, plan.pages[0].operations[0].image.payload)
+	require.Empty(t, plan.diagnostics)
+}
+
+func TestBuildRenderPlan_ReportsUnsupportedImageMimeTypeDiagnostic(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "unsupportedImageBuilder",
+			StateKey:      "unsupportedImageBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Unsupported Image",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "unsupported_image",
+						Kind: "image",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 120, Height: 90},
+						Image: &reportprint.Image{
+							MimeType: "image/tiff",
+							Payload:  tinyPNGBase64,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Empty(t, plan.pages[0].operations)
+	require.Len(t, plan.diagnostics, 1)
+	require.Equal(t, "unsupportedReportPrintImageMimeType", plan.diagnostics[0].Code)
+	require.Equal(t, "unsupported_image", plan.diagnostics[0].ElementID)
+	require.Contains(t, plan.diagnostics[0].Message, "image/tiff")
 }
 
 func TestBuildRenderPlan_ReportsInvalidSVGPathDuringPlanning(t *testing.T) {
@@ -133,6 +322,157 @@ func TestBuildRenderPlan_ReportsInvalidSVGPathDuringPlanning(t *testing.T) {
 	require.Equal(t, "$.pages[0].elements[0].svg[0]", plan.diagnostics[0].Path)
 }
 
+func TestBuildRenderPlan_FlattensSupportedSVGGroup(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "unsupportedSvgBuilder",
+			StateKey:      "unsupportedSvgBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Unsupported SVG",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "grouped_svg",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG: `<svg viewBox="0 0 220 80" width="220" height="80">
+						  <g fill="#ff0000"><rect x="10" y="10" width="20" height="20" /></g>
+						</svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "svg", plan.pages[0].operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg)
+	require.Len(t, plan.pages[0].operations[0].svg.operations, 1)
+	require.Equal(t, "rect", plan.pages[0].operations[0].svg.operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg.operations[0].rect)
+	require.Equal(t, "#ff0000", plan.pages[0].operations[0].svg.operations[0].rect.fillColor)
+	require.Empty(t, plan.diagnostics)
+}
+
+func TestBuildRenderPlan_CompilesTranslatedSVGGroup(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "unsupportedSvgBuilder",
+			StateKey:      "unsupportedSvgBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Unsupported SVG",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "translated_svg",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG: `<svg viewBox="0 0 220 80" width="220" height="80">
+						  <g transform="translate(10,10)"><rect x="10" y="10" width="20" height="20" /></g>
+						</svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "svg", plan.pages[0].operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg)
+	require.Len(t, plan.pages[0].operations[0].svg.operations, 1)
+	require.Equal(t, "rect", plan.pages[0].operations[0].svg.operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg.operations[0].rect)
+	require.InDelta(t, 56.0, plan.pages[0].operations[0].svg.operations[0].rect.box.X, 0.001)
+	require.InDelta(t, 104.0, plan.pages[0].operations[0].svg.operations[0].rect.box.Y, 0.001)
+	require.Empty(t, plan.diagnostics)
+}
+
+func TestBuildRenderPlan_CompilesTranslatedSVGPathGroup(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "translatedSvgPathBuilder",
+			StateKey:      "translatedSvgPathBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Translated SVG Path",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "translated_svg_path",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG: `<svg viewBox="0 0 220 80" width="220" height="80">
+						  <g transform="translate(10,10)"><path d="M10,10 L30,10" fill="none" stroke="#ff0000" stroke-width="2" /></g>
+						</svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "svg", plan.pages[0].operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg)
+	require.Len(t, plan.pages[0].operations[0].svg.operations, 1)
+	require.Equal(t, "path", plan.pages[0].operations[0].svg.operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg.operations[0].path)
+	require.InDelta(t, 46.0, plan.pages[0].operations[0].svg.operations[0].path.originX, 0.001)
+	require.InDelta(t, 94.0, plan.pages[0].operations[0].svg.operations[0].path.originY, 0.001)
+	require.Equal(t, "#ff0000", plan.pages[0].operations[0].svg.operations[0].path.strokeColor)
+	require.Equal(t, "D", plan.pages[0].operations[0].svg.operations[0].path.style)
+	require.Empty(t, plan.diagnostics)
+}
+
 func TestBuildRenderPlan_ReportsUnsupportedSVGGroupDiagnostic(t *testing.T) {
 	report := &reportprint.ReportPrint{
 		Version:     1,
@@ -161,7 +501,7 @@ func TestBuildRenderPlan_ReportsUnsupportedSVGGroupDiagnostic(t *testing.T) {
 						Kind: "svg",
 						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
 						SVG: `<svg viewBox="0 0 220 80" width="220" height="80">
-						  <g fill="#ff0000"><rect x="10" y="10" width="20" height="20" /></g>
+						  <g transform="scale(2)"><rect x="10" y="10" width="20" height="20" /></g>
 						</svg>`,
 					},
 				},
@@ -176,6 +516,100 @@ func TestBuildRenderPlan_ReportsUnsupportedSVGGroupDiagnostic(t *testing.T) {
 	require.Len(t, plan.diagnostics, 1)
 	require.Equal(t, "unsupportedReportPrintSVGGroup", plan.diagnostics[0].Code)
 	require.Equal(t, "$.pages[0].elements[0].svg[0]", plan.diagnostics[0].Path)
+}
+
+func TestBuildRenderPlan_CompilesSupportedSVGStyleAttribute(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "unsupportedSvgStyleBuilder",
+			StateKey:      "unsupportedSvgStyleBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Unsupported SVG Style",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "supported_svg_style",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><rect x="40" y="10" width="20" height="20" style="fill:#00ff00" /></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "svg", plan.pages[0].operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg)
+	require.Len(t, plan.pages[0].operations[0].svg.operations, 1)
+	require.Equal(t, "rect", plan.pages[0].operations[0].svg.operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg.operations[0].rect)
+	require.Equal(t, "#00ff00", plan.pages[0].operations[0].svg.operations[0].rect.fillColor)
+	require.Empty(t, plan.diagnostics)
+}
+
+func TestBuildRenderPlan_CompilesSVGDashPattern(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "dashedSvgBuilder",
+			StateKey:      "dashedSvgBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Dashed SVG",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "dashed_svg",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><line x1="10" y1="10" x2="200" y2="10" stroke="#ff0000" stroke-width="2" stroke-dasharray="4 2" /></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "svg", plan.pages[0].operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg)
+	require.Len(t, plan.pages[0].operations[0].svg.operations, 1)
+	require.Equal(t, "line", plan.pages[0].operations[0].svg.operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg.operations[0].line)
+	require.Equal(t, []float64{4, 2}, plan.pages[0].operations[0].svg.operations[0].line.dashPattern)
+	require.Empty(t, plan.diagnostics)
 }
 
 func TestBuildRenderPlan_ReportsUnsupportedSVGStyleAttributeDiagnostic(t *testing.T) {
@@ -205,7 +639,7 @@ func TestBuildRenderPlan_ReportsUnsupportedSVGStyleAttributeDiagnostic(t *testin
 						ID:   "unsupported_svg_style",
 						Kind: "svg",
 						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
-						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><rect x="40" y="10" width="20" height="20" style="fill:#00ff00" /></svg>`,
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><rect x="40" y="10" width="20" height="20" style="transform:scale(2)" /></svg>`,
 					},
 				},
 			},
@@ -219,6 +653,55 @@ func TestBuildRenderPlan_ReportsUnsupportedSVGStyleAttributeDiagnostic(t *testin
 	require.Len(t, plan.diagnostics, 1)
 	require.Equal(t, "unsupportedReportPrintSVGStyleAttribute", plan.diagnostics[0].Code)
 	require.Equal(t, "$.pages[0].elements[0].svg[0]", plan.diagnostics[0].Path)
+}
+
+func TestBuildRenderPlan_CompilesSupportedSVGStyleTranslate(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "supportedSvgTranslateStyleBuilder",
+			StateKey:      "supportedSvgTranslateStyleBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Supported SVG Style Translate",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "supported_svg_translate_style",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 80},
+						SVG:  `<svg viewBox="0 0 220 80" width="220" height="80"><rect x="40" y="10" width="20" height="20" style="transform:translate(10px, 0);fill:#00ff00" /></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "svg", plan.pages[0].operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg)
+	require.Len(t, plan.pages[0].operations[0].svg.operations, 1)
+	require.Equal(t, "rect", plan.pages[0].operations[0].svg.operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg.operations[0].rect)
+	require.InDelta(t, 86.0, plan.pages[0].operations[0].svg.operations[0].rect.box.X, 0.001)
+	require.InDelta(t, 94.0, plan.pages[0].operations[0].svg.operations[0].rect.box.Y, 0.001)
+	require.Equal(t, "#00ff00", plan.pages[0].operations[0].svg.operations[0].rect.fillColor)
+	require.Empty(t, plan.diagnostics)
 }
 
 func TestBuildRenderPlan_CompilesPrimitivePaintOperations(t *testing.T) {

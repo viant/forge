@@ -1,4 +1,10 @@
 import { resolveKey } from "../utils/selector.js";
+import {
+  REPORT_CALCULATED_FIELD_FUNCTION_SPECS,
+  REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS,
+  listReportCalculatedFieldFunctionSpecs,
+  listReportCalculatedFieldTableCalculationSpecs,
+} from "./calculationContracts.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -336,6 +342,43 @@ function collectReportCalculatedFieldExpressionDependencies(node = null, depende
   return dependencies;
 }
 
+function validateReportCalculatedFieldExpressionAst(node = null) {
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  if (node.type === "literal" || node.type === "identifier") {
+    return;
+  }
+  if (node.type === "unary") {
+    validateReportCalculatedFieldExpressionAst(node.argument);
+    return;
+  }
+  if (node.type === "binary") {
+    validateReportCalculatedFieldExpressionAst(node.left);
+    validateReportCalculatedFieldExpressionAst(node.right);
+    return;
+  }
+  if (node.type === "call") {
+    const normalizedCallee = normalizeString(node.callee).toLowerCase();
+    const spec = REPORT_CALCULATED_FIELD_FUNCTION_SPECS[normalizedCallee];
+    if (!spec) {
+      throw buildExpressionError(`unsupported function "${node.callee}"`);
+    }
+    const argCount = Array.isArray(node.args) ? node.args.length : 0;
+    if (Number.isFinite(spec.minArgs) && argCount < spec.minArgs) {
+      throw buildExpressionError(`function "${node.callee}" requires at least ${spec.minArgs} argument${spec.minArgs === 1 ? "" : "s"}`);
+    }
+    if (Number.isFinite(spec.maxArgs) && argCount > spec.maxArgs) {
+      throw buildExpressionError(`function "${node.callee}" accepts at most ${spec.maxArgs} argument${spec.maxArgs === 1 ? "" : "s"}`);
+    }
+    (Array.isArray(node.args) ? node.args : []).forEach((arg) => {
+      validateReportCalculatedFieldExpressionAst(arg);
+    });
+    return;
+  }
+  throw buildExpressionError(`unsupported expression node "${String(node.type || "unknown")}"`);
+}
+
 export function parseReportCalculatedFieldExpression(expression = "") {
   const normalizedExpression = normalizeString(expression);
   if (!normalizedExpression) {
@@ -343,6 +386,7 @@ export function parseReportCalculatedFieldExpression(expression = "") {
   }
   const tokens = tokenizeReportCalculatedFieldExpression(normalizedExpression);
   const ast = parseReportCalculatedFieldExpressionTokens(tokens);
+  validateReportCalculatedFieldExpressionAst(ast);
   return {
     expr: normalizedExpression,
     ast,
@@ -964,13 +1008,13 @@ export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
       const decimals = Number.isFinite(Number(definition?.compute?.decimals)) ? Number(definition.compute.decimals) : null;
       buildPartitionGroups(withTableCalcs, definition?.compute?.partitionBy).forEach((groupRows) => {
         const total = groupRows.reduce((sum, row) => {
-          const value = Number(resolveKey(row, sourceField));
-          return Number.isFinite(value) ? sum + value : sum;
+          const value = toFiniteNumber(resolveKey(row, sourceField));
+          return value != null ? sum + value : sum;
         }, 0);
         groupRows.forEach((row) => {
-          const sourceValue = Number(resolveKey(row, sourceField));
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
           let value = 0;
-          if (Number.isFinite(sourceValue) && total !== 0) {
+          if (sourceValue != null && total !== 0) {
             value = (sourceValue / total) * scale;
           }
           if (decimals != null) {
@@ -993,13 +1037,13 @@ export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
         const sortedRows = sortRowsByOrder(groupRows, orderBy);
         let previousValue = null;
         sortedRows.forEach((row) => {
-          const sourceValue = Number(resolveKey(row, sourceField));
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
           let value = 0;
-          if (Number.isFinite(sourceValue) && Number.isFinite(previousValue)) {
+          if (sourceValue != null && previousValue != null) {
             value = sourceValue - previousValue;
           }
           row[outputKey] = value;
-          previousValue = Number.isFinite(sourceValue) ? sourceValue : previousValue;
+          previousValue = sourceValue != null ? sourceValue : previousValue;
         });
       });
     });
@@ -1016,8 +1060,8 @@ export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
         const sortedRows = sortRowsByOrder(groupRows, orderBy);
         let runningValue = 0;
         sortedRows.forEach((row) => {
-          const sourceValue = Number(resolveKey(row, sourceField));
-          if (Number.isFinite(sourceValue)) {
+          const sourceValue = toFiniteNumber(resolveKey(row, sourceField));
+          if (sourceValue != null) {
             runningValue += sourceValue;
           }
           row[outputKey] = runningValue;
@@ -1039,8 +1083,8 @@ export function applyReportCalculatedFields(rows = [], calculatedFields = [], {
         sortedRows.forEach((row, index) => {
           const windowRows = sortedRows.slice(Math.max(0, index - windowSize + 1), index + 1);
           const numericValues = windowRows
-            .map((entry) => Number(resolveKey(entry, sourceField)))
-            .filter((value) => Number.isFinite(value));
+            .map((entry) => toFiniteNumber(resolveKey(entry, sourceField)))
+            .filter((value) => value != null);
           let value = 0;
           if (numericValues.length > 0) {
             value = numericValues.reduce((sum, entry) => sum + entry, 0) / numericValues.length;

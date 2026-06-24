@@ -5,13 +5,16 @@ import {
     buildReportBuilderExportJobSummary,
     buildReportBuilderExportRequestIdentity,
     normalizeReportBuilderExportArtifact,
+    normalizeReportBuilderExportArtifactList,
     normalizeReportBuilderExportJob,
+    normalizeReportBuilderExportJobList,
 } from "./reportBuilderExportLifecycle.js";
 import {
     buildReportBuilderExportRequestDownload,
     buildReportBuilderExportRequestInspectorState,
     buildReportBuilderExportRequestSummary,
 } from "./reportBuilderExportRequest.js";
+import { recordReportBuilderExportAuditEvent } from "./reportBuilderAuditHandler.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -19,6 +22,76 @@ function normalizeString(value = "") {
 
 function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function normalizeMetadata(value = null) {
+    return value && typeof value === "object" && !Array.isArray(value)
+        ? cloneValue(value)
+        : {};
+}
+
+function buildExportFailureMessage({
+    error = null,
+    message = "",
+    format = "",
+    title = "",
+} = {}) {
+    const normalizedErrorMessage = normalizeString(error?.message || error);
+    if (normalizedErrorMessage) {
+        return normalizedErrorMessage;
+    }
+    const normalizedMessage = normalizeString(message);
+    if (normalizedMessage) {
+        return normalizedMessage;
+    }
+    const normalizedFormat = normalizeString(format);
+    const normalizedTitle = normalizeString(title);
+    if (normalizedFormat && normalizedTitle) {
+        return `Could not submit ${normalizedFormat} export for ${normalizedTitle}.`;
+    }
+    if (normalizedFormat) {
+        return `Could not submit ${normalizedFormat} export.`;
+    }
+    if (normalizedTitle) {
+        return `Could not submit export for ${normalizedTitle}.`;
+    }
+    return "Could not submit export.";
+}
+
+export function resolveReportBuilderExportSubmitFailure(error = null, {
+    format = "",
+    title = "",
+} = {}) {
+    const normalizedJob = normalizeReportBuilderExportJob(
+        error?.toolResult
+        ?? error?.job
+        ?? error?.responseEnvelope?.result
+        ?? null,
+    );
+    return {
+        job: normalizedJob,
+        message: normalizeString(normalizedJob?.error)
+            || buildExportFailureMessage({ error, format, title }),
+    };
+}
+
+export function resolveReportBuilderExportStatusFailure(error = null, {
+    jobId = "",
+} = {}) {
+    const normalizedJob = normalizeReportBuilderExportJob(
+        error?.toolResult
+        ?? error?.job
+        ?? error?.responseEnvelope?.result
+        ?? null,
+    );
+    return {
+        job: normalizedJob,
+        message: normalizeString(normalizedJob?.error)
+            || buildExportFailureMessage({
+                error,
+                message: normalizeString(jobId) ? `Could not refresh export ${normalizeString(jobId)}.` : "Could not refresh export.",
+            }),
+    };
 }
 
 function triggerDownload({ filename = "", mimeType = "application/octet-stream", payload = null } = {}) {
@@ -47,19 +120,28 @@ function triggerDownload({ filename = "", mimeType = "application/octet-stream",
 export function useReportBuilderExportExecution({
     request = null,
     sourceKind = "",
+    localSavedPayloads = [],
     reportExportHandler = null,
+    reportAuditHandler = null,
+    reportAuditActorRef = "",
+    reportAuditMetadata = {},
     setFeedback = () => {},
     missingRequestMessage = "No export request is available.",
     missingJobMessage = "No export job is available to refresh.",
     missingArtifactMessage = "No completed export artifact is available yet.",
+    historyEnabled = false,
 } = {}) {
     const requestSummary = React.useMemo(
-        () => buildReportBuilderExportRequestSummary(request),
-        [request],
+        () => buildReportBuilderExportRequestSummary(request, {
+            localSavedPayloads,
+        }),
+        [localSavedPayloads, request],
     );
     const requestInspector = React.useMemo(
-        () => buildReportBuilderExportRequestInspectorState(request),
-        [request],
+        () => buildReportBuilderExportRequestInspectorState(request, {
+            localSavedPayloads,
+        }),
+        [localSavedPayloads, request],
     );
     const requestIdentity = React.useMemo(
         () => buildReportBuilderExportRequestIdentity(request),
@@ -71,19 +153,95 @@ export function useReportBuilderExportExecution({
     const [statusLoading, setStatusLoading] = React.useState(false);
     const [artifact, setArtifact] = React.useState(null);
     const [artifactLoading, setArtifactLoading] = React.useState(false);
+    const [historyLoading, setHistoryLoading] = React.useState(false);
+    const [historyJobs, setHistoryJobs] = React.useState([]);
+    const [historyArtifacts, setHistoryArtifacts] = React.useState([]);
+    const historyRequestVersionRef = React.useRef(0);
     const jobSummary = React.useMemo(
         () => buildReportBuilderExportJobSummary(job),
         [job],
     );
+    const historyArtifactRef = React.useMemo(
+        () => normalizeString(request?.source?.artifactRef),
+        [request],
+    );
+    const historyAvailable = !!historyEnabled
+        && !!historyArtifactRef
+        && (
+            typeof reportExportHandler?.listJobs === "function"
+            || typeof reportExportHandler?.listArtifacts === "function"
+        );
 
     React.useEffect(() => {
+        historyRequestVersionRef.current += 1;
         setRequestOpen(false);
         setSubmitting(false);
         setJob(null);
         setStatusLoading(false);
         setArtifact(null);
         setArtifactLoading(false);
+        setHistoryLoading(false);
+        setHistoryJobs([]);
+        setHistoryArtifacts([]);
     }, [requestIdentity]);
+
+    const selectHistoryEntry = React.useCallback(({ job: nextJob = null, artifact: nextArtifact = null } = {}) => {
+        const normalizedJob = normalizeReportBuilderExportJob(nextJob);
+        const normalizedArtifact = normalizeReportBuilderExportArtifact(nextArtifact);
+        if (normalizedJob) {
+            setJob(normalizedJob);
+        }
+        setArtifact(
+            normalizedArtifact
+            && normalizedJob
+            && normalizeString(normalizedArtifact.artifactId) === normalizeString(normalizedJob.artifactId)
+                ? normalizedArtifact
+                : null,
+        );
+        return normalizedJob;
+    }, []);
+
+    const refreshHistory = React.useCallback(async ({ silent = false } = {}) => {
+        if (!historyAvailable) {
+            return { jobs: [], artifacts: [] };
+        }
+        const requestVersion = historyRequestVersionRef.current + 1;
+        historyRequestVersionRef.current = requestVersion;
+        setHistoryLoading(true);
+        try {
+            const [jobsResult, artifactsResult] = await Promise.all([
+                typeof reportExportHandler?.listJobs === "function"
+                    ? reportExportHandler.listJobs({ artifactRef: historyArtifactRef, limit: 6 })
+                    : Promise.resolve([]),
+                typeof reportExportHandler?.listArtifacts === "function"
+                    ? reportExportHandler.listArtifacts({ artifactRef: historyArtifactRef, limit: 6 })
+                    : Promise.resolve([]),
+            ]);
+            const nextJobs = normalizeReportBuilderExportJobList(jobsResult);
+            const nextArtifacts = normalizeReportBuilderExportArtifactList(artifactsResult);
+            if (historyRequestVersionRef.current !== requestVersion) {
+                return null;
+            }
+            setHistoryJobs(nextJobs);
+            setHistoryArtifacts(nextArtifacts);
+            return {
+                jobs: nextJobs,
+                artifacts: nextArtifacts,
+            };
+        } catch (error) {
+            if (!silent) {
+                setFeedback({
+                    level: "warning",
+                    message: normalizeString(error?.message || error) || "Could not load recent exports.",
+                });
+            }
+            return null;
+        } finally {
+            if (historyRequestVersionRef.current === requestVersion) {
+                setHistoryLoading(false);
+            }
+        }
+    }, [historyArtifactRef, historyAvailable, reportExportHandler, setFeedback]);
 
     const submit = React.useCallback(async () => {
         const normalizedSourceKind = normalizeString(sourceKind);
@@ -115,24 +273,51 @@ export function useReportBuilderExportExecution({
                 setJob(normalizedJob);
                 setArtifact(null);
             }
-            setFeedback({
-                level: "success",
-                message: normalizeString(result?.message) || `Submitted ${format} export for ${title}.`,
+            const auditResult = await recordReportBuilderExportAuditEvent(request, {
+                handler: reportAuditHandler,
+                actorRef: reportAuditActorRef,
+                metadata: {
+                    ...normalizeMetadata(reportAuditMetadata),
+                    ...(normalizedSourceKind ? { triggerSource: normalizedSourceKind } : {}),
+                },
             });
+            setFeedback({
+                level: auditResult.issue ? "warning" : "success",
+                message: `${normalizeString(result?.message) || `Submitted ${format} export for ${title}.`}${auditResult.issue ? ` ${auditResult.issue}` : ""}`,
+            });
+            if (historyAvailable) {
+                Promise.resolve().then(() => refreshHistory({ silent: true }));
+            }
             return result || { ok: true };
         } catch (error) {
+            const failure = resolveReportBuilderExportSubmitFailure(error, { format, title });
+            if (failure.job) {
+                setJob(failure.job);
+                setArtifact(null);
+            }
             setFeedback({
                 level: "warning",
-                message: normalizeString(error?.message || error) || `Could not submit ${format} export for ${title}.`,
+                message: failure.message,
             });
             return null;
         } finally {
             setSubmitting(false);
         }
-    }, [missingRequestMessage, reportExportHandler, request, setFeedback, sourceKind]);
+    }, [
+        historyAvailable,
+        missingRequestMessage,
+        refreshHistory,
+        reportAuditActorRef,
+        reportAuditHandler,
+        reportAuditMetadata,
+        reportExportHandler,
+        request,
+        setFeedback,
+        sourceKind,
+    ]);
 
-    const refreshStatus = React.useCallback(async () => {
-        const jobId = normalizeString(job?.jobId);
+    const refreshStatus = React.useCallback(async ({ jobId: requestedJobId = "" } = {}) => {
+        const jobId = normalizeString(requestedJobId || job?.jobId);
         if (!jobId) {
             setFeedback({
                 level: "warning",
@@ -152,37 +337,56 @@ export function useReportBuilderExportExecution({
             const nextJob = normalizeReportBuilderExportJob(await reportExportHandler.getStatus({ jobId }));
             if (nextJob) {
                 setJob(nextJob);
+                if (!normalizeString(nextJob.artifactId)) {
+                    setArtifact(null);
+                }
                 setFeedback({
                     level: nextJob.status === "failed" ? "warning" : "success",
                     message: nextJob.status === "failed"
                         ? (normalizeString(nextJob.error) || `Export ${jobId} failed.`)
                         : `Export ${jobId} is ${nextJob.status}.`,
                 });
+                if (historyAvailable) {
+                    Promise.resolve().then(() => refreshHistory({ silent: true }));
+                }
             }
             return nextJob;
         } catch (error) {
+            const failure = resolveReportBuilderExportStatusFailure(error, { jobId });
+            if (failure.job) {
+                setJob(failure.job);
+                if (!normalizeString(failure.job.artifactId)) {
+                    setArtifact(null);
+                }
+            }
             setFeedback({
                 level: "warning",
-                message: normalizeString(error?.message || error) || `Could not refresh export ${jobId}.`,
+                message: failure.message,
             });
             return null;
         } finally {
             setStatusLoading(false);
         }
-    }, [job, missingJobMessage, reportExportHandler, setFeedback]);
+    }, [historyAvailable, job, missingJobMessage, refreshHistory, reportExportHandler, setFeedback]);
 
-    const downloadArtifact = React.useCallback(async () => {
-        const artifactId = normalizeString(job?.artifactId);
-        const title = normalizeString(request?.source?.title || request?.reportSpec?.title || "Report") || "Report";
-        const format = normalizeString(request?.target?.format || job?.format || "pdf").toLowerCase() || "pdf";
-        let resolvedArtifact = artifact?.artifactId === artifactId ? artifact : null;
-        if (!artifactId) {
+    const downloadArtifactByReference = React.useCallback(async ({
+        artifactId = "",
+        title = "",
+        format = "",
+        preferredArtifact = null,
+        unavailableMessage = "",
+    } = {}) => {
+        const normalizedArtifactId = normalizeString(artifactId);
+        if (!normalizedArtifactId) {
             setFeedback({
                 level: "warning",
-                message: missingArtifactMessage,
+                message: normalizeString(unavailableMessage) || missingArtifactMessage,
             });
             return false;
         }
+        let resolvedArtifact = preferredArtifact?.artifactId === normalizedArtifactId
+            ? preferredArtifact
+            : null;
         if (!resolvedArtifact) {
             if (typeof reportExportHandler?.getArtifact !== "function") {
                 setFeedback({
@@ -193,15 +397,17 @@ export function useReportBuilderExportExecution({
             }
             setArtifactLoading(true);
             try {
-                const nextArtifact = normalizeReportBuilderExportArtifact(await reportExportHandler.getArtifact({ artifactId }));
+                const nextArtifact = normalizeReportBuilderExportArtifact(await reportExportHandler.getArtifact({ artifactId: normalizedArtifactId }));
                 if (nextArtifact) {
                     resolvedArtifact = nextArtifact;
-                    setArtifact(nextArtifact);
+                    if (job?.artifactId === normalizedArtifactId) {
+                        setArtifact(nextArtifact);
+                    }
                 }
             } catch (error) {
                 setFeedback({
                     level: "warning",
-                    message: normalizeString(error?.message || error) || `Could not load export artifact ${artifactId}.`,
+                    message: normalizeString(error?.message || error) || `Could not load export artifact ${normalizedArtifactId}.`,
                 });
                 setArtifactLoading(false);
                 return false;
@@ -216,7 +422,7 @@ export function useReportBuilderExportExecution({
         if (!descriptor) {
             setFeedback({
                 level: "warning",
-                message: `Export artifact ${artifactId} is unavailable for download.`,
+                message: normalizeString(unavailableMessage) || `Export artifact ${normalizedArtifactId} is unavailable for download.`,
             });
             return false;
         }
@@ -225,10 +431,51 @@ export function useReportBuilderExportExecution({
             mimeType: descriptor.mimeType,
             payload: descriptor.bytes,
         });
-    }, [artifact, job, missingArtifactMessage, reportExportHandler, request, setFeedback]);
+    }, [job?.artifactId, missingArtifactMessage, reportExportHandler, setFeedback]);
+
+    const downloadArtifact = React.useCallback(async () => {
+        const artifactId = normalizeString(job?.artifactId);
+        const title = normalizeString(request?.source?.title || request?.reportSpec?.title || "Report") || "Report";
+        const format = normalizeString(request?.target?.format || job?.format || "pdf").toLowerCase() || "pdf";
+        return downloadArtifactByReference({
+            artifactId,
+            title,
+            format,
+            preferredArtifact: artifact?.artifactId === artifactId ? artifact : null,
+            unavailableMessage: `Export artifact ${artifactId} is unavailable for download.`,
+        });
+    }, [artifact, downloadArtifactByReference, job, request]);
+
+    const downloadHistoryArtifact = React.useCallback(async ({
+        artifactId = "",
+        title = "",
+        format = "",
+        artifact: preferredArtifact = null,
+    } = {}) => downloadArtifactByReference({
+        artifactId,
+        title,
+        format,
+        preferredArtifact,
+        unavailableMessage: normalizeString(artifactId)
+            ? `Export artifact ${normalizeString(artifactId)} is unavailable for download.`
+            : "Selected export artifact is unavailable for download.",
+    }), [downloadArtifactByReference]);
+
+    React.useEffect(() => {
+        if (!historyAvailable) {
+            historyRequestVersionRef.current += 1;
+            setHistoryLoading(false);
+            setHistoryJobs([]);
+            setHistoryArtifacts([]);
+            return;
+        }
+        refreshHistory({ silent: true });
+    }, [historyAvailable, refreshHistory, requestIdentity]);
 
     const downloadRequest = React.useCallback(() => {
-        const descriptor = buildReportBuilderExportRequestDownload(request);
+        const descriptor = buildReportBuilderExportRequestDownload(request, {
+            localSavedPayloads,
+        });
         if (!descriptor) {
             return false;
         }
@@ -237,7 +484,7 @@ export function useReportBuilderExportExecution({
             mimeType: descriptor.mimeType,
             payload: descriptor.payload,
         });
-    }, [request]);
+    }, [localSavedPayloads, request]);
 
     return {
         requestOpen,
@@ -250,8 +497,15 @@ export function useReportBuilderExportExecution({
         statusLoading,
         artifact,
         artifactLoading,
+        historyAvailable,
+        historyLoading,
+        historyJobs,
+        historyArtifacts,
         submit,
         refreshStatus,
+        refreshHistory,
+        selectHistoryEntry,
+        downloadHistoryArtifact,
         downloadArtifact,
         downloadRequest,
     };

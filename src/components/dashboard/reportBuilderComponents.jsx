@@ -6,6 +6,8 @@ import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { resolveKey } from "../../utils/selector.js";
 import { REPORT_BUILDER_TABLE_CALC_FUNCTIONS } from "./reportBuilderCalculatedFieldAuthoring.js";
+import { summarizeReportBuilderSemanticDiagnostics } from "./reportBuilderSemantic.js";
+import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGovernanceView.js";
 import {
     chartFamilyForType,
     chartFamilyHelperText,
@@ -14,6 +16,509 @@ import {
     SINGLE_MEASURE_CATEGORY_TYPES,
     supportsStackForSeries,
 } from "./reportBuilderChartRules.js";
+
+export function buildFilterCategoryChipViewModel({
+    label = "",
+    active = false,
+    configuredCount = 0,
+    issue = null,
+    providerDiagnostics = [],
+} = {}) {
+    const normalizedLabel = String(label || "").trim();
+    const issueMessage = String(issue?.message || "").trim();
+    const providerDiagnosticsSummary = Array.isArray(providerDiagnostics) && providerDiagnostics.length > 0
+        ? summarizeReportBuilderSemanticDiagnostics(providerDiagnostics)
+        : "";
+    const diagnosticSummary = issueMessage || providerDiagnosticsSummary;
+    const stateLabel = configuredCount > 0 ? String(configuredCount) : (active ? "Shown" : "Add");
+    const title = [
+        normalizedLabel,
+        configuredCount > 0 ? `${configuredCount} configured` : "",
+        active ? "shown" : "available",
+        diagnosticSummary,
+    ].filter(Boolean).join(" • ");
+    return {
+        className: [
+            "forge-report-builder__category-chip",
+            active ? "is-active" : "is-inactive",
+            configuredCount > 0 ? "has-configured-state" : "",
+            issueMessage ? "is-semantic-invalid" : "",
+            providerDiagnosticsSummary ? "is-semantic-provider-invalid" : "",
+        ].filter(Boolean).join(" "),
+        title,
+        stateLabel,
+        diagnosticSummary,
+    };
+}
+
+export function ReportBuilderInlineNotice({
+    notice = null,
+    onAction = null,
+    children = null,
+}) {
+    const normalizedNotice = notice && typeof notice === "object" && !Array.isArray(notice)
+        ? notice
+        : null;
+    const message = String(normalizedNotice?.message || "").trim();
+    const hasChildren = children !== null && children !== undefined && children !== false;
+    if (!message && !hasChildren) {
+        return null;
+    }
+    const actionLabel = String(normalizedNotice?.actionLabel || "").trim();
+    const hasAction = !!actionLabel && typeof onAction === "function";
+    return (
+        <div className={`forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--${String(normalizedNotice?.level || "info").trim() || "info"}`}>
+            {message ? <span>{message}</span> : null}
+            {children}
+            {hasAction ? (
+                <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                    <Button
+                        small
+                        minimal
+                        onClick={onAction}
+                    >
+                        {actionLabel}
+                    </Button>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+export function ReportBuilderInspectorNotice({
+    level = "info",
+    ariaLabel = "",
+    metaChips = [],
+    children = null,
+    actions = null,
+    content = "",
+    contentStyle = null,
+}) {
+    const normalizedContent = String(content || "");
+    const normalizedMetaChips = (Array.isArray(metaChips) ? metaChips : []).filter(Boolean);
+    const normalizedLevel = String(level || "info").trim() || "info";
+    const resolvedContentStyle = contentStyle && typeof contentStyle === "object" && !Array.isArray(contentStyle)
+        ? contentStyle
+        : {};
+    return (
+        <ReportBuilderInlineNotice
+            notice={{
+                level: normalizedLevel,
+                message: "",
+            }}
+        >
+            {normalizedMetaChips.length > 0 ? (
+                <div className="forge-report-builder__result-meta" aria-label={String(ariaLabel || "").trim() || undefined} style={{ marginBottom: 10 }}>
+                    {normalizedMetaChips.map((chip) => (
+                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                    ))}
+                </div>
+            ) : null}
+            {children}
+            {actions ? (
+                <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 10 }}>
+                    {actions}
+                </div>
+            ) : null}
+            <pre
+                className="forge-report-builder__saved-artifact-json"
+                style={{
+                    margin: 0,
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #d7e2ee",
+                    background: "#fbfdff",
+                    color: "#294256",
+                    fontSize: 11,
+                    lineHeight: 1.5,
+                    whiteSpace: "pre-wrap",
+                    overflow: "auto",
+                    maxHeight: 320,
+                    ...resolvedContentStyle,
+                }}
+            >
+                {normalizedContent}
+            </pre>
+        </ReportBuilderInlineNotice>
+    );
+}
+
+export function ReportBuilderSummaryNotice({
+    level = "info",
+    label = "",
+    value = "",
+    subtitle = "",
+    description = "",
+    supplemental = null,
+    children = null,
+    footer = null,
+}) {
+    const normalizedLabel = String(label || "").trim();
+    const normalizedValue = String(value || "").trim();
+    const normalizedSubtitle = String(subtitle || "").trim();
+    const normalizedDescription = String(description || "").trim();
+    const hasContent = normalizedLabel || normalizedValue || normalizedSubtitle || normalizedDescription || supplemental || children || footer;
+    if (!hasContent) {
+        return null;
+    }
+    return (
+        <ReportBuilderInlineNotice
+            notice={{
+                level: String(level || "info").trim() || "info",
+                message: "",
+            }}
+        >
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {normalizedLabel || normalizedValue ? (
+                    <span>
+                        {normalizedLabel ? <strong>{normalizedLabel}:</strong> : null}
+                        {normalizedLabel && normalizedValue ? " " : ""}
+                        {normalizedValue || null}
+                    </span>
+                ) : null}
+                {normalizedSubtitle ? (
+                    <span>{normalizedSubtitle}</span>
+                ) : null}
+                {normalizedDescription ? (
+                    <span>{normalizedDescription}</span>
+                ) : null}
+                {supplemental}
+            </div>
+            {children}
+            {footer}
+        </ReportBuilderInlineNotice>
+    );
+}
+
+export function ReportBuilderSemanticBindingChips({
+    bindingState = null,
+    marginTop = 0,
+    marginBottom = 0,
+}) {
+    const chips = Array.isArray(bindingState?.semanticBindingChips)
+        ? bindingState.semanticBindingChips.filter(Boolean)
+        : (Array.isArray(bindingState?.chips) ? bindingState.chips.filter(Boolean) : []);
+    if (chips.length === 0) {
+        return null;
+    }
+    const title = String(bindingState?.semanticBindingTitle || "").trim();
+    return (
+        <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
+            {title ? (
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                    {title}
+                </div>
+            ) : null}
+            <div
+                className="forge-report-builder__result-meta"
+                aria-label={bindingState?.semanticBindingTitle || bindingState?.title || "Semantic binding"}
+            >
+                {chips.map((chip) => (
+                    <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export function ReportBuilderSemanticFieldGroups({
+    bindingState = null,
+    marginTop = 0,
+    marginBottom = 0,
+}) {
+    const fieldGroups = Array.isArray(bindingState?.semanticBindingFieldGroups)
+        ? bindingState.semanticBindingFieldGroups
+        : (Array.isArray(bindingState?.fieldGroups) ? bindingState.fieldGroups : []);
+    if (fieldGroups.length === 0) {
+        return null;
+    }
+    return (
+        <div style={{ display: "grid", gap: 12, marginTop, marginBottom }}>
+            {fieldGroups.map((group) => {
+                const groupId = String(group?.id || group?.title || "").trim();
+                const groupTitle = String(group?.title || group?.id || "").trim();
+                const fields = Array.isArray(group?.fields) ? group.fields : [];
+                if (!groupId || !groupTitle || fields.length === 0) {
+                    return null;
+                }
+                return (
+                    <div key={groupId} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            {groupTitle}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                            {fields.map((field, index) => {
+                                const label = String(field?.label || field?.id || "").trim();
+                                const rawId = String(field?.rawId || "").trim();
+                                const description = String(field?.description || "").trim();
+                                const category = String(field?.category || "").trim();
+                                const definitionRef = String(field?.definitionRef || "").trim();
+                                const governance = field?.governance && typeof field.governance === "object" && !Array.isArray(field.governance)
+                                    ? field.governance
+                                    : {};
+                                const classification = String(governance.classification || "").trim();
+                                const governanceLabels = buildSemanticFieldGovernanceChipViewModels(governance)
+                                    .map((chip) => String(chip?.label || "").trim())
+                                    .filter(Boolean);
+                                const metadataChips = [
+                                    category,
+                                    classification,
+                                    ...governanceLabels,
+                                ].filter(Boolean);
+                                if (!label) {
+                                    return null;
+                                }
+                                return (
+                                    <div
+                                        key={`${groupId}:${String(field?.id || field?.rawId || label).trim()}:${index}`}
+                                        style={{
+                                            border: "1px solid #d7e2ee",
+                                            borderRadius: 10,
+                                            background: "#fbfdff",
+                                            padding: "10px 12px",
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 6,
+                                        }}
+                                    >
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{label}</div>
+                                        {metadataChips.length > 0 ? (
+                                            <div className="forge-report-builder__result-meta" aria-label={`${label} metadata`}>
+                                                {metadataChips.map((chip) => (
+                                                    <span key={`${label}:${chip}`} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                        {rawId ? (
+                                            <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                                {rawId}
+                                            </div>
+                                        ) : null}
+                                        {definitionRef ? (
+                                            <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.45 }}>
+                                                {definitionRef}
+                                            </div>
+                                        ) : null}
+                                        {description ? (
+                                            <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>
+                                                {description}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+export function ReportBuilderScopeSummary({
+    summaryState = null,
+    marginTop = 0,
+    marginBottom = 0,
+}) {
+    const items = Array.isArray(summaryState?.scopeSummaryItems) ? summaryState.scopeSummaryItems : [];
+    const title = String(summaryState?.scopeSummaryTitle || "Report Scope").trim();
+    if (items.length === 0 || !title) {
+        return null;
+    }
+    return (
+        <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                {title}
+            </div>
+            <div style={{ display: "grid", gap: 8 }}>
+                {items.map((item) => (
+                    <div
+                        key={String(item?.id || item?.label || "").trim()}
+                        style={{
+                            border: "1px solid #d7e2ee",
+                            borderRadius: 10,
+                            background: "#fbfdff",
+                            padding: "10px 12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 4,
+                        }}
+                    >
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{String(item?.label || item?.id || "").trim()}</div>
+                        {String(item?.description || "").trim() ? (
+                            <div style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>{String(item?.description || "").trim()}</div>
+                        ) : null}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+export function ReportBuilderArtifactEntryCard({
+    entry = null,
+    renderSemanticBindingChips = null,
+    renderSemanticBindingFieldGroups = null,
+    renderScopeSummaryItems = null,
+    renderReopenSourceResolution = null,
+    renderAuthoredDocumentProgress = null,
+    onActivate = null,
+    onRemove = null,
+}) {
+    const normalizedEntry = entry && typeof entry === "object" && !Array.isArray(entry)
+        ? entry
+        : null;
+    const title = String(normalizedEntry?.title || "").trim();
+    if (!normalizedEntry || !title) {
+        return null;
+    }
+    return (
+        <div
+            style={{
+                display: "inline-flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: 8,
+                padding: "10px 12px",
+                borderRadius: 14,
+                border: "1px solid #d7e2ee",
+                background: normalizedEntry.active ? "#eef6ff" : "#f8fbff",
+                maxWidth: 420,
+            }}
+        >
+            <span style={{ fontSize: 12, color: "#183247", fontWeight: 600 }}>
+                {title}
+            </span>
+            {normalizedEntry.notice && typeof normalizedEntry.notice === "object" && !Array.isArray(normalizedEntry.notice)
+                ? <ReportBuilderInlineNotice notice={normalizedEntry.notice} />
+                : null}
+            {typeof renderSemanticBindingChips === "function"
+                ? renderSemanticBindingChips(normalizedEntry)
+                : null}
+            {Array.isArray(normalizedEntry.semanticBindingFieldGroups) && normalizedEntry.semanticBindingFieldGroups.length > 0 && typeof renderSemanticBindingFieldGroups === "function"
+                ? renderSemanticBindingFieldGroups(normalizedEntry, { marginTop: 2 })
+                : null}
+            {typeof renderScopeSummaryItems === "function"
+                ? renderScopeSummaryItems(normalizedEntry, { marginTop: 2 })
+                : null}
+            {typeof renderReopenSourceResolution === "function"
+                ? renderReopenSourceResolution(normalizedEntry, { marginTop: 2 })
+                : null}
+            {typeof renderAuthoredDocumentProgress === "function"
+                ? renderAuthoredDocumentProgress(normalizedEntry, { marginTop: 2 })
+                : null}
+            <div style={{ display: "inline-flex", flexWrap: "wrap", gap: 6 }}>
+                {(Array.isArray(normalizedEntry.metaChips) ? normalizedEntry.metaChips : []).map((chip) => (
+                    <span key={`${normalizedEntry.id || title}:${chip}`} className="forge-report-builder__result-meta-chip">{chip}</span>
+                ))}
+            </div>
+            <div className="forge-report-builder__result-header-actions">
+                {normalizedEntry.activateLabel && typeof onActivate === "function" ? (
+                    <Button
+                        small
+                        minimal
+                        onClick={onActivate}
+                    >
+                        Use
+                    </Button>
+                ) : null}
+                {typeof onRemove === "function" ? (
+                    <Button
+                        small
+                        minimal
+                        onClick={onRemove}
+                    >
+                        Remove
+                    </Button>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+export function ReportBuilderPreparedArtifactCard({
+    artifact = null,
+    actions = [],
+}) {
+    const normalizedArtifact = artifact && typeof artifact === "object" && !Array.isArray(artifact)
+        ? artifact
+        : null;
+    const normalizedTitle = String(normalizedArtifact?.title || "").trim();
+    if (!normalizedArtifact || !normalizedTitle) {
+        return null;
+    }
+    const normalizedActions = (Array.isArray(actions) ? actions : [])
+        .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+        .map((entry) => ({
+            id: String(entry.id || entry.label || "").trim(),
+            label: String(entry.label || "").trim(),
+            disabled: !!entry.disabled,
+            onClick: typeof entry.onClick === "function" ? entry.onClick : null,
+        }))
+        .filter((entry) => entry.id && entry.label && entry.onClick);
+    return (
+        <div
+            style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "1px solid #d7e2ee",
+                background: "#f8fbff",
+                minWidth: 220,
+                maxWidth: 340,
+                flex: "1 1 240px",
+            }}
+        >
+            {String(normalizedArtifact?.label || "").trim() ? (
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                    {String(normalizedArtifact.label || "").trim()}
+                </div>
+            ) : null}
+            <div style={{ display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#183247" }}>
+                    {normalizedTitle}
+                </div>
+                {String(normalizedArtifact?.subtitle || "").trim() ? (
+                    <div style={{ fontSize: 12, color: "#486579" }}>
+                        {String(normalizedArtifact.subtitle || "").trim()}
+                    </div>
+                ) : null}
+                {String(normalizedArtifact?.description || "").trim() ? (
+                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>
+                        {String(normalizedArtifact.description || "").trim()}
+                    </div>
+                ) : null}
+            </div>
+            {normalizedArtifact.notice && typeof normalizedArtifact.notice === "object" && !Array.isArray(normalizedArtifact.notice) ? (
+                <ReportBuilderInlineNotice notice={normalizedArtifact.notice} />
+            ) : null}
+            {(Array.isArray(normalizedArtifact?.metaChips) ? normalizedArtifact.metaChips : []).length > 0 ? (
+                <div className="forge-report-builder__result-meta">
+                    {(normalizedArtifact.metaChips || []).map((chip) => (
+                        <span key={`${normalizedArtifact.id || normalizedTitle}:${chip}`} className="forge-report-builder__result-meta-chip">{chip}</span>
+                    ))}
+                </div>
+            ) : null}
+            {normalizedActions.length > 0 ? (
+                <div className="forge-report-builder__result-header-actions">
+                    {normalizedActions.map((action) => (
+                        <Button
+                            key={action.id}
+                            small
+                            minimal
+                            disabled={action.disabled}
+                            onClick={action.onClick}
+                        >
+                            {action.label}
+                        </Button>
+                    ))}
+                </div>
+            ) : null}
+        </div>
+    );
+}
 
 function collectOptionRows(rows = [], childKeys = ["children", "childNodes"], result = []) {
     (rows || []).forEach((row) => {
@@ -382,28 +887,29 @@ export function ReportBuilderCalculatedFieldDialog({
                         <span>Field ID</span>
                         <input
                             type="text"
-                            name="tableCalcId"
+                            name="calculatedFieldId"
                             disabled={isEditing}
                             className={errorByField.has("id") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
                             value={draft?.id || ""}
                             onChange={(event) => setDraftPatch({ id: event.target.value, key: event.target.value })}
-                            placeholder="forecastLift"
+                            placeholder="projectedLift"
                         />
                     </label>
                     <label className="forge-report-builder__chart-field">
                         <span>Label</span>
                         <input
                             type="text"
-                            name="tableCalcLabel"
+                            name="calculatedFieldLabel"
                             className={errorByField.has("label") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
                             value={draft?.label || ""}
                             onChange={(event) => setDraftPatch({ label: event.target.value })}
-                            placeholder="Forecast Lift"
+                            placeholder="Projected Lift"
                         />
                     </label>
                     <label className="forge-report-builder__chart-field">
                         <span>Data type</span>
                         <select
+                            name="calculatedFieldDataType"
                             className={errorByField.has("dataType") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
                             value={draft?.dataType || "number"}
                             onChange={(event) => setDraftPatch({ dataType: event.target.value })}
@@ -416,6 +922,7 @@ export function ReportBuilderCalculatedFieldDialog({
                     <label className="forge-report-builder__chart-field">
                         <span>Format</span>
                         <select
+                            name="calculatedFieldFormat"
                             className="forge-report-builder-select"
                             value={draft?.format || ""}
                             onChange={(event) => setDraftPatch({ format: event.target.value })}
@@ -428,6 +935,7 @@ export function ReportBuilderCalculatedFieldDialog({
                     <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
                         <span>Expression</span>
                         <textarea
+                            name="calculatedFieldExpr"
                             className={errorByField.has("expr") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
                             value={draft?.expr || ""}
                             onChange={(event) => setDraftPatch({ expr: event.target.value })}
@@ -988,6 +1496,11 @@ export function ReportBuilderDocumentBlockDialog({
                                         >
                                             <span className="forge-report-builder__pill-copy">
                                                 <span className="forge-report-builder__pill-text">{option.label}</span>
+                                                {option.description ? (
+                                                    <span className="forge-report-builder__quick-option-description">
+                                                        {option.description}
+                                                    </span>
+                                                ) : null}
                                             </span>
                                             {option.required ? <span className="forge-report-builder__result-meta-chip">Required</span> : null}
                                             {selected ? <span aria-hidden="true">✓</span> : null}
@@ -1440,14 +1953,24 @@ export function ReportBuilderResultState({
     description = "",
     actionLabel = "",
     onAction,
+    animated = false,
 }) {
     return (
         <div className={[
             "forge-report-builder__result-state",
             tone ? `forge-report-builder__result-state--${tone}` : "",
+            animated ? "is-animated" : "",
         ].filter(Boolean).join(" ")}>
-            <div className="forge-report-builder__result-state-icon" aria-hidden="true">
-                <Icon icon={icon} size={16} />
+            <div
+                className={[
+                    "forge-report-builder__result-state-icon",
+                    animated ? "is-animated" : "",
+                ].filter(Boolean).join(" ")}
+                aria-hidden="true"
+            >
+                <span className="forge-report-builder__result-state-icon-glyph">
+                    <Icon icon={icon} size={16} />
+                </span>
             </div>
             <div className="forge-report-builder__result-state-copy">
                 {eyebrow ? <div className="forge-report-builder__result-state-eyebrow">{eyebrow}</div> : null}
@@ -1477,7 +2000,14 @@ export function ReportBuilderCompactSheetTab({ active = false, icon = "panel-tab
     );
 }
 
-export function InlineStaticFilterControl({ filter, value, onToggle, onDateRange }) {
+export function InlineStaticFilterControl({
+    filter,
+    value,
+    onToggle,
+    onDateRange,
+    issue = null,
+    providerDiagnostics = [],
+}) {
     if (!filter) {
         return null;
     }
@@ -1485,59 +2015,97 @@ export function InlineStaticFilterControl({ filter, value, onToggle, onDateRange
     const activeValues = filter.multiple
         ? (Array.isArray(value) ? value : [])
         : (value == null || value === "" ? [] : [value]);
+    const description = String(filter?.description || "").trim();
+    const providerDiagnosticsSummary = providerDiagnostics.length > 0
+        ? summarizeReportBuilderSemanticDiagnostics(providerDiagnostics)
+        : "";
+    const semanticNotice = issue?.message || providerDiagnosticsSummary;
+    const title = [semanticNotice, description, String(filter?.label || filter?.id || "").trim()]
+        .filter(Boolean)
+        .join(" — ") || undefined;
+    const rootClassName = [
+        "forge-report-builder__inline-filter-control",
+        filter.type === "dateRange" ? "forge-report-builder__inline-filter-control--date-range" : "",
+        issue ? "is-semantic-invalid" : "",
+        providerDiagnosticsSummary ? "is-semantic-provider-invalid" : "",
+    ].filter(Boolean).join(" ");
 
     if (filter.type === "dateRange") {
         return (
-            <div className="forge-report-builder__inline-filter-control forge-report-builder__inline-filter-control--date-range">
-                <span className="forge-report-builder__inline-filter-label">{filter.label || filter.id}</span>
-                <div className="forge-report-builder__date-range forge-report-builder__date-range--inline">
-                    <input
-                        type="date"
-                        value={value?.start || ""}
-                        onChange={(event) => onDateRange("start", event.target.value)}
-                    />
-                    <span>to</span>
-                    <input
-                        type="date"
-                        value={value?.end || ""}
-                        onChange={(event) => onDateRange("end", event.target.value)}
-                    />
+            <div className={rootClassName} title={title}>
+                <div className="forge-report-builder__inline-filter-row">
+                    <span className="forge-report-builder__inline-filter-label">{filter.label || filter.id}</span>
+                    <div className="forge-report-builder__date-range forge-report-builder__date-range--inline">
+                        <input
+                            type="date"
+                            value={value?.start || ""}
+                            onChange={(event) => onDateRange("start", event.target.value)}
+                        />
+                        <span>to</span>
+                        <input
+                            type="date"
+                            value={value?.end || ""}
+                            onChange={(event) => onDateRange("end", event.target.value)}
+                        />
+                    </div>
                 </div>
+                {description ? <div className="forge-report-builder__inline-filter-description">{description}</div> : null}
+                {semanticNotice ? (
+                    <div className={`forge-report-builder__inline-filter-description ${issue ? "forge-report-builder__inline-filter-description--danger" : "forge-report-builder__inline-filter-description--warning"}`}>
+                        {semanticNotice}
+                    </div>
+                ) : null}
             </div>
         );
     }
 
     return (
-        <div className="forge-report-builder__inline-filter-control">
-            <span className="forge-report-builder__inline-filter-label">{filter.label || filter.id}</span>
-            <div className={String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
-                {options.map((option) => {
-                    const active = activeValues.includes(option.value);
-                    return (
-                        <button
-                            key={String(option.value)}
-                            type="button"
-                            className={[
-                                "forge-report-builder-icon-button",
-                                String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-button--compact" : "",
-                                active ? "is-active" : "",
-                            ].filter(Boolean).join(" ")}
-                            onClick={() => onToggle(option.value)}
-                            title={option.label}
-                        >
-                            <span className="forge-report-builder-icon-button__icon">
-                                {option.icon ? <Icon icon={option.icon} size={18} /> : null}
-                            </span>
-                            <span className="forge-report-builder-icon-button__label">{option.label}</span>
-                        </button>
-                    );
-                })}
+        <div className={rootClassName} title={title}>
+            <div className="forge-report-builder__inline-filter-row">
+                <span className="forge-report-builder__inline-filter-label">{filter.label || filter.id}</span>
+                <div className={String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
+                    {options.map((option) => {
+                        const active = activeValues.includes(option.value);
+                        return (
+                            <button
+                                key={String(option.value)}
+                                type="button"
+                                className={[
+                                    "forge-report-builder-icon-button",
+                                    String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-button--compact" : "",
+                                    active ? "is-active" : "",
+                                ].filter(Boolean).join(" ")}
+                                onClick={() => onToggle(option.value)}
+                                title={option.label}
+                            >
+                                <span className="forge-report-builder-icon-button__icon">
+                                    {option.icon ? <Icon icon={option.icon} size={18} /> : null}
+                                </span>
+                                <span className="forge-report-builder-icon-button__label">{option.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
+            {description ? <div className="forge-report-builder__inline-filter-description">{description}</div> : null}
+            {semanticNotice ? (
+                <div className={`forge-report-builder__inline-filter-description ${issue ? "forge-report-builder__inline-filter-description--danger" : "forge-report-builder__inline-filter-description--warning"}`}>
+                    {semanticNotice}
+                </div>
+            ) : null}
         </div>
     );
 }
 
-export function StaticFilterSection({ filter, context, value, onToggle, onDateRange }) {
+export function StaticFilterSection({
+    filter,
+    context,
+    value,
+    onToggle,
+    onDateRange,
+    issue = null,
+    providerDiagnostics = [],
+}) {
     useSignals();
     const optionContext = filter.optionsDataSourceRef && typeof context?.Context === "function"
         ? context.Context(filter.optionsDataSourceRef)
@@ -1556,6 +2124,14 @@ export function StaticFilterSection({ filter, context, value, onToggle, onDateRa
         [filter, optionCollection],
     );
     const activeValues = filter.multiple ? (Array.isArray(value) ? value : []) : [value];
+    const description = String(filter?.description || "").trim();
+    const providerDiagnosticsSummary = Array.isArray(providerDiagnostics) && providerDiagnostics.length > 0
+        ? summarizeReportBuilderSemanticDiagnostics(providerDiagnostics)
+        : "";
+    const semanticNotice = issue?.message || providerDiagnosticsSummary;
+    const panelTitle = [semanticNotice, description, String(filter?.label || filter?.id || "").trim()]
+        .filter(Boolean)
+        .join(" — ") || undefined;
 
     if (filter.type === "dateRange") {
         return (
@@ -1564,10 +2140,18 @@ export function StaticFilterSection({ filter, context, value, onToggle, onDateRa
                 "forge-report-builder__panel--bottom",
                 "forge-report-builder__panel--date-range",
                 filter.required ? "forge-report-builder__panel--required" : "",
-            ].filter(Boolean).join(" ")}>
+                issue ? "is-semantic-invalid" : "",
+                providerDiagnosticsSummary ? "is-semantic-provider-invalid" : "",
+            ].filter(Boolean).join(" ")} title={panelTitle}>
                 <div className="forge-report-builder__panel-headerline">
                     <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
                 </div>
+                {description ? <div className="forge-report-builder__bottom-description">{description}</div> : null}
+                {semanticNotice ? (
+                    <div className={`forge-report-builder__bottom-description ${issue ? "forge-report-builder__bottom-description--danger" : "forge-report-builder__bottom-description--warning"}`}>
+                        {semanticNotice}
+                    </div>
+                ) : null}
                 <div className="forge-report-builder__date-range">
                     <input
                         type="date"
@@ -1590,10 +2174,18 @@ export function StaticFilterSection({ filter, context, value, onToggle, onDateRa
             "forge-report-builder__panel",
             "forge-report-builder__panel--bottom",
             filter.required ? "forge-report-builder__panel--required" : "",
-        ].filter(Boolean).join(" ")}>
+            issue ? "is-semantic-invalid" : "",
+            providerDiagnosticsSummary ? "is-semantic-provider-invalid" : "",
+        ].filter(Boolean).join(" ")} title={panelTitle}>
             <div className="forge-report-builder__panel-headerline">
                 <div className="forge-report-builder__panel-title">{filter.label || filter.id}</div>
             </div>
+            {description ? <div className="forge-report-builder__bottom-description">{description}</div> : null}
+            {semanticNotice ? (
+                <div className={`forge-report-builder__bottom-description ${issue ? "forge-report-builder__bottom-description--danger" : "forge-report-builder__bottom-description--warning"}`}>
+                    {semanticNotice}
+                </div>
+            ) : null}
             <div className={String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
                 {options.map((option) => {
                     const active = activeValues.includes(option.value);

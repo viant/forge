@@ -502,7 +502,7 @@
       "title": "Semantic Performance Report",
       "binding": {
         "mode": "semantic",
-        "modelRef": "model://steward/performance/ad_delivery@v1",
+        "modelRef": "model://example/performance/delivery@v1",
         "entity": "line_delivery",
         "selectedDimensions": [
           "event_date",
@@ -550,7 +550,7 @@
               "to": "2026-05-04"
             },
             "semanticSelection": {
-              "modelRef": "model://steward/performance/ad_delivery@v1",
+              "modelRef": "model://example/performance/delivery@v1",
               "entity": "line_delivery",
               "selection": {
                 "dimensions": [
@@ -667,7 +667,7 @@
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:5f804d9a",
+      "specHash": "fnv1a:8ac7ab54",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "semanticPerformanceBuilder",
@@ -703,7 +703,7 @@
               "to": "2026-05-04"
             },
             "semanticSelection": {
-              "modelRef": "model://steward/performance/ad_delivery@v1",
+              "modelRef": "model://example/performance/delivery@v1",
               "entity": "line_delivery",
               "selection": {
                 "dimensions": [
@@ -726,7 +726,7 @@
             ]
           },
           "provenance": {
-            "requestHash": "fnv1a:5cc68e29",
+            "requestHash": "fnv1a:cefe44cf",
             "rowCount": 2,
             "truncated": true,
             "hasMore": true,

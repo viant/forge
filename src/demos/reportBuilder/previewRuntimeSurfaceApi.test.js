@@ -30,7 +30,7 @@ const baseRuntimeInteraction = {
   ],
   hostIntent: {
     intentKind: "detailTarget",
-    targetRef: "target://steward/performance/market-detail",
+    targetRef: "target://example/performance/market-detail",
     navigationMode: "hostRoute",
     parameters: {
       country: "US",
@@ -79,11 +79,11 @@ const restoredBuilderState = {
   selectedDimensions: ["country"],
   viewMode: "chart",
   reportDocumentReopenSession: {
-    reportId: "forecastingLocationsTopMarketsQ3",
-    title: "Forecasting Locations Top Markets Q3",
+    reportId: "capacityLocationsTopMarketsQ3",
+    title: "Capacity Locations Top Markets Q3",
     documentVersion: 8,
-    templateId: "forecast_location_brief",
-    templateLabel: "Forecast Location Brief",
+    templateId: "capacity_location_brief",
+    templateLabel: "Capacity Location Brief",
     source: {
       kind: "dashboard.reportBuilder",
       containerId: "demoReportBuilder",
@@ -97,7 +97,7 @@ const restoredBuilderState = {
     },
     reopenedSemanticSummary: {
       kind: "semantic",
-      modelRef: "model://steward/performance/ad_delivery@v1",
+      modelRef: "model://example/performance/delivery@v1",
       modelLabel: "Ad Delivery",
       entity: "line_delivery",
       entityLabel: "Line Delivery",
@@ -134,6 +134,10 @@ let currentBuilderConfig = {
   measures: [
     { id: "avails", label: "Avails" },
   ],
+  dimensions: [
+    { id: "publisher", label: "Publisher" },
+    { id: "country", label: "Country" },
+  ],
 };
 let currentCollectionRows = [{ country: "US", avails: 153100 }];
 let currentCollectionInfo = { hasMore: false };
@@ -142,8 +146,8 @@ let currentSavedReportPayloads = [
   {
     savedReportPayload: {
       reportDocument: {
-        id: "forecastingLocationQ3",
-        title: "Forecasting Location Q3",
+        id: "capacityLocationQ3",
+        title: "Capacity Location Q3",
       },
       compileState: {
         status: "clean",
@@ -168,6 +172,7 @@ let standaloneUndoSnapshot = baseRuntimeInteraction;
 let standaloneRedoSnapshot = baseRuntimeInteraction;
 let standaloneCanUndo = false;
 let standaloneCanRedo = false;
+let semanticModelProviderAvailable = true;
 const metrics = {};
 
 attachPreviewRuntimeSurfaceApi(metrics, {
@@ -176,6 +181,13 @@ attachPreviewRuntimeSurfaceApi(metrics, {
   },
   setBuilderConfig(nextBuilderConfig) {
     currentBuilderConfig = nextBuilderConfig;
+  },
+  getSemanticModelProviderAvailable() {
+    return semanticModelProviderAvailable;
+  },
+  setSemanticModelProviderAvailable(enabled) {
+    semanticModelProviderAvailable = enabled === true;
+    return semanticModelProviderAvailable;
   },
   getWindowFormState() {
     return currentWindowFormState;
@@ -205,8 +217,8 @@ attachPreviewRuntimeSurfaceApi(metrics, {
     return {
       savedReportPayload: {
         reportDocument: {
-          id: seed.reportId || "forecastingAppended",
-          title: seed.title || "Forecasting Appended",
+          id: seed.reportId || "capacityAppended",
+          title: seed.title || "Capacity Appended",
         },
       },
       documentVersion: Number(seed.documentVersion || 0) || 0,
@@ -250,6 +262,11 @@ attachPreviewRuntimeSurfaceApi(metrics, {
 
 assert.deepEqual(metrics.getBuilderState(), restoredBuilderState);
 assert.deepEqual(metrics.getBuilderConfig(), currentBuilderConfig);
+assert.equal(metrics.getSemanticModelProviderAvailable(), true);
+assert.equal(metrics.setSemanticModelProviderAvailable(false), false);
+assert.equal(metrics.getSemanticModelProviderAvailable(), false);
+assert.equal(metrics.setSemanticModelProviderAvailable(true), true);
+assert.deepEqual(metrics.getHydratedReportDocumentSession(), restoredBuilderState.reportDocumentReopenSession);
 assert.deepEqual(metrics.getStandaloneRuntimeHistoryCapabilities(), {
   canUndo: false,
   canRedo: false,
@@ -284,6 +301,10 @@ assert.deepEqual(currentBuilderConfig, {
   measures: [
     { id: "avails", label: "Avails" },
   ],
+  dimensions: [
+    { id: "publisher", label: "Publisher" },
+    { id: "country", label: "Country" },
+  ],
   dynamicFilterGroups: [
     {
       id: "scopeRules",
@@ -315,6 +336,10 @@ assert.deepEqual(currentBuilderConfig, {
   measures: [
     { id: "avails", label: "Avails" },
   ],
+  dimensions: [
+    { id: "publisher", label: "Publisher" },
+    { id: "country", label: "Country" },
+  ],
   dynamicFilterGroups: [
     {
       id: "scopeRules",
@@ -336,6 +361,55 @@ assert.deepEqual(lastPersistedBuilderState, {
   viewMode: "table",
 });
 
+const startedDraftState = metrics.beginStandaloneDraft({
+  sourceLabel: "the current result state",
+  patch: {
+    __scenarioDraft: true,
+  },
+  nowMs: 1700000000000,
+});
+
+assert.equal(startedDraftState.explorationSession.sessionId, "rbexplore_1700000000000");
+assert.equal(startedDraftState.explorationSession.sourceRef.kind, "reportBuilder.result");
+assert.equal(startedDraftState.explorationSession.sourceRef.contextLabel, "the current result state");
+assert.equal(startedDraftState.explorationSession.dirty, true);
+assert.equal(Array.isArray(startedDraftState.explorationSession.history), true);
+assert.equal(startedDraftState.explorationSession.history.length, 2);
+assert.equal(startedDraftState.__scenarioDraft, true);
+assert.equal(currentWindowFormState.demoReportBuilder.explorationSession.sessionId, "rbexplore_1700000000000");
+assert.equal(currentWindowFormState.demoReportBuilder.__scenarioDraft, true);
+assert.equal(lastPersistedBuilderState.explorationSession.sessionId, "rbexplore_1700000000000");
+assert.equal(lastPersistedBuilderState.__scenarioDraft, true);
+
+const startedTableRowDraftState = metrics.beginStandaloneDraft({
+  sourceKind: "reportBuilder.tableRow",
+  sourceContext: {
+    label: "2026-05-01 • Display",
+    metadata: {
+      rowIndex: 0,
+      dimensionValues: {
+        eventDate: "2026-05-01",
+        channelV2: "Display",
+      },
+    },
+  },
+  patch: {
+    __scenarioTableRowDraft: true,
+  },
+  nowMs: 1700000001000,
+});
+
+assert.equal(startedTableRowDraftState.explorationSession.sourceRef.kind, "reportBuilder.tableRow");
+assert.equal(startedTableRowDraftState.explorationSession.sourceRef.contextLabel, "2026-05-01 • Display");
+assert.deepEqual(startedTableRowDraftState.explorationSession.sourceRef.context, {
+  rowIndex: 0,
+  dimensionValues: {
+    eventDate: "2026-05-01",
+    channelV2: "Display",
+  },
+});
+assert.equal(startedTableRowDraftState.__scenarioTableRowDraft, true);
+
 assert.deepEqual(metrics.getCollectionRows(), [{ country: "US", avails: 153100 }]);
 assert.deepEqual(metrics.replaceCollectionRows([{ country: "CA", avails: 200 }], {
   hasMore: true,
@@ -347,7 +421,7 @@ assert.match(String(currentControl.error?.message || ""), /Preview failed/);
 
 assert.deepEqual(metrics.getSeededSavedReportPayloads(), currentSavedReportPayloads);
 assert.deepEqual(
-  metrics.patchSeededSavedReportPayload("forecastingLocationQ3", {
+  metrics.patchSeededSavedReportPayload("capacityLocationQ3", {
     compileState: {
       status: "invalid",
       diagnostics: [
@@ -364,8 +438,8 @@ assert.deepEqual(
   }),
   {
     reportDocument: {
-      id: "forecastingLocationQ3",
-      title: "Forecasting Location Q3",
+      id: "capacityLocationQ3",
+      title: "Capacity Location Q3",
     },
     compileState: {
       status: "invalid",
@@ -391,14 +465,14 @@ assert.deepEqual(
   metrics.replaceSeededSavedReportPayloads([
     {
       reportDocument: {
-        id: "forecastingReplacement",
+        id: "capacityReplacement",
       },
     },
   ]),
   [
     {
       reportDocument: {
-        id: "forecastingReplacement",
+        id: "capacityReplacement",
       },
     },
   ],
@@ -406,22 +480,22 @@ assert.deepEqual(
 
 assert.deepEqual(
   metrics.appendSeededSavedReportPayloadRecord({
-    reportId: "forecastingAppended",
-    title: "Forecasting Appended",
+    reportId: "capacityAppended",
+    title: "Capacity Appended",
     documentVersion: 9,
   }),
   {
     savedReportPayload: {
       reportDocument: {
-        id: "forecastingAppended",
-        title: "Forecasting Appended",
+        id: "capacityAppended",
+        title: "Capacity Appended",
       },
     },
     documentVersion: 9,
   },
 );
 assert.equal(currentSavedReportPayloads.length, 2);
-assert.equal(currentSavedReportPayloads[1].savedReportPayload.reportDocument.id, "forecastingAppended");
+assert.equal(currentSavedReportPayloads[1].savedReportPayload.reportDocument.id, "capacityAppended");
 
 const failingAppendMetrics = {};
 attachPreviewRuntimeSurfaceApi(failingAppendMetrics, {
@@ -450,7 +524,7 @@ assert.equal(invalidAppendMetrics.appendSeededSavedReportPayloadRecord({ reportI
 currentSavedReportPayloads = [
   {
     reportDocument: {
-      id: "forecastingBarePayload",
+      id: "capacityBarePayload",
     },
     compileState: {
       status: "clean",
@@ -459,7 +533,7 @@ currentSavedReportPayloads = [
 ];
 
 assert.deepEqual(
-  metrics.patchSeededSavedReportPayload("forecastingBarePayload", {
+  metrics.patchSeededSavedReportPayload("capacityBarePayload", {
     compileState: {
       status: "invalid",
       diagnostics: [
@@ -473,7 +547,7 @@ assert.deepEqual(
   }),
   {
     reportDocument: {
-      id: "forecastingBarePayload",
+      id: "capacityBarePayload",
     },
     compileState: {
       status: "invalid",
@@ -490,22 +564,345 @@ assert.deepEqual(
 assert.equal(currentSavedReportPayloads[0].compileState.status, "invalid");
 assert.equal(currentSavedReportPayloads[0].compileState.diagnostics[0].code, "documentBlockColumnUnavailable");
 
+const addedMarkdownBlock = metrics.applyAuthoredDocumentBlock({
+  kind: "markdownBlock",
+  seed: {
+    title: "Inventory Note",
+    markdown: "## Inventory Note\nAuthor-provided inventory context.",
+  },
+});
+
+assert.equal(addedMarkdownBlock.valid, true);
+assert.equal(addedMarkdownBlock.created, true);
+assert.equal(addedMarkdownBlock.block.title, "Inventory Note");
+assert.equal(currentWindowFormState.demoReportBuilder.reportDocumentBlocks.at(-1).title, "Inventory Note");
+
+const addedSecondMarkdownBlock = metrics.applyAuthoredDocumentBlock({
+  kind: "markdownBlock",
+  seed: {
+    title: "Inventory Note Follow-up",
+    markdown: "## Inventory Note Follow-up\nSecond authored note.",
+  },
+});
+
+assert.equal(addedSecondMarkdownBlock.valid, true);
+assert.equal(addedSecondMarkdownBlock.created, true);
+assert.equal(addedSecondMarkdownBlock.block.id, "markdownBlock2");
+assert.equal(addedSecondMarkdownBlock.block.title, "Inventory Note Follow-up");
+assert.equal(currentWindowFormState.demoReportBuilder.reportDocumentBlocks.some((block) => block.id === "markdownBlock2"), true);
+
+const addedKpiBlock = metrics.applyAuthoredDocumentBlock({
+  kind: "kpiBlock",
+  seed: {
+    title: "Reach KPI",
+  },
+});
+
+assert.equal(addedKpiBlock.valid, true);
+assert.equal(addedKpiBlock.created, true);
+assert.equal(addedKpiBlock.block.title, "Reach KPI");
+assert.equal(currentWindowFormState.demoReportBuilder.reportDocumentBlocks.at(-1).title, "Reach KPI");
+
+const addedSecondKpiBlock = metrics.applyAuthoredDocumentBlock({
+  kind: "kpiBlock",
+  seed: {
+    title: "Reach KPI Follow-up",
+  },
+});
+
+assert.equal(addedSecondKpiBlock.valid, true);
+assert.equal(addedSecondKpiBlock.created, true);
+assert.equal(addedSecondKpiBlock.block.id, "kpiBlock2");
+assert.equal(addedSecondKpiBlock.block.title, "Reach KPI Follow-up");
+assert.equal(currentWindowFormState.demoReportBuilder.reportDocumentBlocks.some((block) => block.id === "kpiBlock2"), true);
+
+const movedKpiBlock = metrics.moveAuthoredDocumentBlock("kpiBlock", "up");
+assert.equal(Array.isArray(movedKpiBlock.reportDocumentLayout.items), true);
+assert.deepEqual(
+  currentWindowFormState.demoReportBuilder.reportDocumentLayout.items.map((item) => item.blockId),
+  ["primaryBuilder", "markdownBlock", "kpiBlock", "markdownBlock2", "kpiBlock2"],
+);
+
+const duplicatedMarkdownBlock = metrics.duplicateAuthoredDocumentBlock("markdownBlock");
+assert.equal(duplicatedMarkdownBlock.valid, true);
+assert.equal(duplicatedMarkdownBlock.block.title, "Inventory Note Copy");
+assert.equal(currentWindowFormState.demoReportBuilder.reportDocumentBlocks.some((block) => block.title === "Inventory Note Copy"), true);
+
+const removedMarkdownBlock = metrics.removeAuthoredDocumentBlock("markdownBlock");
+assert.equal(Array.isArray(removedMarkdownBlock.reportDocumentBlocks), true);
+assert.equal(currentWindowFormState.demoReportBuilder.reportDocumentBlocks.some((block) => block.id === "markdownBlock"), false);
+assert.equal(currentWindowFormState.demoReportBuilder.reportDocumentBlocks.some((block) => block.id === "markdownBlock2"), true);
+
+const addedChartBlock = metrics.applyAuthoredDocumentBlock({
+  kind: "chartBlock",
+  seed: {
+    title: "Reach Chart",
+  },
+});
+
+assert.equal(addedChartBlock.valid, true);
+assert.equal(addedChartBlock.created, true);
+assert.equal(addedChartBlock.block.id, "chartBlock");
+assert.equal(addedChartBlock.block.title, "Reach Chart");
+assert.deepEqual(addedChartBlock.block.chartSpec, {
+  title: "Reach Chart",
+  type: "line",
+  xField: "country",
+  yFields: ["avails"],
+  seriesField: "publisher",
+});
+
 assert.deepEqual(
   metrics.replaceSeededSavedReportPayloads([
     {
       reportDocument: {
-        id: "forecastingReplacement",
+        id: "capacityReplacement",
       },
     },
   ]),
   [
     {
       reportDocument: {
-        id: "forecastingReplacement",
+        id: "capacityReplacement",
       },
     },
   ],
 );
+
+let calculatedFieldWindowFormState = {
+  demoReportBuilder: {
+    selectedMeasures: ["avails"],
+    selectedDimensions: ["country"],
+    viewMode: "chart",
+    reportDocumentReopenSession: {
+      reportId: "capacityLocationsTopMarketsQ3",
+      title: "Capacity Locations Top Markets Q3",
+      documentVersion: 8,
+      source: {
+        kind: "dashboard.reportBuilder",
+        containerId: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+      },
+    },
+  },
+};
+let calculatedFieldPersistedState = null;
+const calculatedFieldMetrics = {};
+attachPreviewRuntimeSurfaceApi(calculatedFieldMetrics, {
+  getBuilderConfig() {
+    return {
+      result: {
+        defaultMode: "table",
+      },
+      measures: [
+        { id: "avails", label: "Avails" },
+      ],
+      dimensions: [
+        { id: "country", label: "Country" },
+      ],
+    };
+  },
+  getWindowFormState() {
+    return calculatedFieldWindowFormState;
+  },
+  setWindowFormState(nextWindowFormState) {
+    calculatedFieldWindowFormState = nextWindowFormState;
+  },
+  stateKey: "demoReportBuilder",
+  persistBuilderState(nextBuilderState) {
+    calculatedFieldPersistedState = nextBuilderState;
+  },
+});
+
+const addedLocalCalculatedField = calculatedFieldMetrics.applyLocalCalculatedField({
+  draft: {
+    id: "usAvails",
+    label: "US Avails",
+    expr: "if(country = 'US', avails, null)",
+  },
+});
+const appliedCalculatedFieldState = calculatedFieldMetrics.getBuilderState();
+
+assert.equal(addedLocalCalculatedField.valid, true);
+assert.equal(addedLocalCalculatedField.field.id, "usAvails");
+assert.equal(addedLocalCalculatedField.field.label, "US Avails");
+assert.equal(addedLocalCalculatedField.nextState.localCalculatedFields.at(-1).id, "usAvails");
+assert.equal(addedLocalCalculatedField.nextState.localCalculatedFields.at(-1).expr, "if(country = 'US', avails, null)");
+assert.equal(addedLocalCalculatedField.nextState.selectedMeasures.includes("usAvails"), true);
+assert.equal(addedLocalCalculatedField.nextState.primaryMeasure, "usAvails");
+assert.equal(appliedCalculatedFieldState.localCalculatedFields.at(-1).id, "usAvails");
+assert.equal(appliedCalculatedFieldState.explorationSession?.sourceRef?.kind, "reportBuilder.result");
+assert.equal(appliedCalculatedFieldState.explorationSession?.sourceRef?.contextLabel, "US Avails");
+assert.equal(appliedCalculatedFieldState.explorationSession?.dirty, true);
+assert.equal(Array.isArray(appliedCalculatedFieldState.explorationSession?.history), true);
+assert.equal(appliedCalculatedFieldState.explorationSession.history.length, 2);
+assert.equal(calculatedFieldPersistedState.localCalculatedFields.at(-1).id, "usAvails");
+assert.equal(calculatedFieldPersistedState.explorationSession?.sourceRef?.contextLabel, "US Avails");
+
+const addedDependentCalculatedField = calculatedFieldMetrics.applyLocalCalculatedField({
+  draft: {
+    id: "doubleUsAvails",
+    label: "Double US Avails",
+    expr: "if(usAvails = null, null, usAvails * 2)",
+  },
+});
+const dependentCalculatedFieldState = calculatedFieldMetrics.getBuilderState();
+
+assert.equal(addedDependentCalculatedField.valid, true);
+assert.equal(addedDependentCalculatedField.field.id, "doubleUsAvails");
+assert.equal(addedDependentCalculatedField.nextState.localCalculatedFields.at(-1).id, "doubleUsAvails");
+assert.equal(
+  dependentCalculatedFieldState.localCalculatedFields.some((entry) => entry?.id === "doubleUsAvails" && entry?.expr === "if(usAvails = null, null, usAvails * 2)"),
+  true,
+);
+
+const editedCalculatedField = calculatedFieldMetrics.applyLocalCalculatedField({
+  editingId: "usAvails",
+  draft: {
+    id: "usAvails",
+    label: "US Avails Updated",
+    expr: "if(country = 'US', avails, null)",
+  },
+});
+const editedCalculatedFieldState = calculatedFieldMetrics.getBuilderState();
+
+assert.equal(editedCalculatedField.valid, true);
+assert.equal(editedCalculatedField.field.label, "US Avails Updated");
+assert.equal(
+  editedCalculatedFieldState.localCalculatedFields.some((entry) => entry?.id === "usAvails" && entry?.label === "US Avails Updated"),
+  true,
+);
+
+const addedTableCalculation = calculatedFieldMetrics.applyLocalTableCalculationDraft({
+  draft: {
+    id: "runningUsAvails",
+    label: "Running US Avails",
+    functionId: "runningTotal",
+    sourceField: "usAvails",
+    orderByField: "country",
+    orderDir: "asc",
+  },
+});
+const appliedTableCalculationState = calculatedFieldMetrics.getBuilderState();
+
+assert.equal(addedTableCalculation.valid, true);
+assert.equal(addedTableCalculation.field.id, "runningUsAvails");
+assert.equal(addedTableCalculation.prepared.canApply, true);
+assert.equal(addedTableCalculation.prepared.nextState.viewMode, "table");
+assert.equal(
+  appliedTableCalculationState.localTableCalculations.some((entry) => entry?.id === "runningUsAvails" && entry?.compute?.type === "runningTotal" && entry?.compute?.sourceField === "usAvails"),
+  true,
+);
+assert.equal(appliedTableCalculationState.selectedMeasures.includes("runningUsAvails"), true);
+assert.equal(appliedTableCalculationState.explorationSession?.dirty, true);
+assert.equal(appliedTableCalculationState.explorationSession?.historyIndex, 1);
+
+const editedTableCalculation = calculatedFieldMetrics.applyLocalTableCalculationDraft({
+  editingId: "runningUsAvails",
+  draft: {
+    id: "runningUsAvails",
+    label: "Running US Avails Edited",
+    functionId: "runningTotal",
+    sourceField: "usAvails",
+    orderByField: "country",
+    orderDir: "asc",
+  },
+});
+const editedTableCalculationState = calculatedFieldMetrics.getBuilderState();
+
+assert.equal(editedTableCalculation.valid, true);
+assert.equal(
+  editedTableCalculationState.localTableCalculations.some((entry) => entry?.id === "runningUsAvails" && entry?.label === "Running US Avails Edited"),
+  true,
+);
+
+const removedTableCalculationState = calculatedFieldMetrics.removeLocalTableCalculation("runningUsAvails");
+const postRemovalTableCalculationState = calculatedFieldMetrics.getBuilderState();
+
+assert.equal(
+  Array.isArray(removedTableCalculationState?.localTableCalculations)
+    && !removedTableCalculationState.localTableCalculations.some((entry) => entry?.id === "runningUsAvails"),
+  true,
+);
+assert.equal(
+  !postRemovalTableCalculationState.localTableCalculations.some((entry) => entry?.id === "runningUsAvails"),
+  true,
+);
+
+const quickTableCalculationWindowFormState = {
+  demoReportBuilder: {
+    selectedMeasures: ["hhUniqs"],
+    primaryMeasure: "hhUniqs",
+    selectedDimensions: ["country"],
+    viewMode: "chart",
+  },
+};
+let quickTableCalculationPersistedState = null;
+const quickTableCalculationMetrics = {};
+attachPreviewRuntimeSurfaceApi(quickTableCalculationMetrics, {
+  getBuilderConfig() {
+    return {
+      result: {
+        defaultMode: "chart",
+        pageSize: 50,
+      },
+      measures: [
+        { id: "hhUniqs", label: "HH Uniques" },
+      ],
+      dimensions: [
+        { id: "eventDate", label: "Date" },
+        { id: "channelV2", label: "Channel" },
+        { id: "country", label: "Market" },
+      ],
+      tableCalculations: [
+        {
+          id: "reachRank",
+          key: "reachRank",
+          label: "Reach Rank",
+          format: "number",
+          compute: {
+            type: "rank",
+            sourceField: "hhUniqs",
+            orderBy: [
+              { field: "hhUniqs", direction: "desc" },
+              { field: "country", direction: "asc" },
+              { field: "channelV2", direction: "asc" },
+              { field: "eventDate", direction: "asc" },
+            ],
+          },
+        },
+      ],
+    };
+  },
+  getWindowFormState() {
+    return quickTableCalculationWindowFormState;
+  },
+  setWindowFormState(nextWindowFormState) {
+    quickTableCalculationWindowFormState.demoReportBuilder = nextWindowFormState.demoReportBuilder;
+  },
+  stateKey: "demoReportBuilder",
+  persistBuilderState(nextBuilderState) {
+    quickTableCalculationPersistedState = nextBuilderState;
+  },
+});
+
+const quickRankTableCalculation = quickTableCalculationMetrics.applyQuickTableCalculation("reachRank");
+const quickRankState = quickTableCalculationMetrics.getBuilderState();
+
+assert.equal(quickRankTableCalculation.valid, true);
+assert.equal(quickRankTableCalculation.field.id, "reachRank");
+assert.equal(quickRankTableCalculation.prepared.canApply, true);
+assert.deepEqual(quickRankTableCalculation.prepared.requiredDimensionIds, ["country", "channelV2", "eventDate"]);
+assert.equal(quickRankState.selectedMeasures.includes("reachRank"), true);
+assert.deepEqual(quickRankState.selectedDimensions, ["country", "channelV2", "eventDate"]);
+assert.equal(quickRankState.primaryMeasure, "reachRank");
+assert.equal(quickRankState.viewMode, "table");
+assert.equal(
+  quickRankState.localTableCalculations.some((entry) => entry?.id === "reachRank" && entry?.compute?.type === "rank" && entry?.compute?.sourceField === "hhUniqs"),
+  true,
+);
+assert.equal(quickTableCalculationPersistedState.localTableCalculations.at(-1).id, "reachRank");
 
 assert.equal(metrics.applyStandaloneRuntimeRefinement({
   op: "keep",
@@ -539,8 +936,8 @@ assert.deepEqual(metrics.getStandaloneRuntimeInteraction(), {
   hostIntent: null,
   detailDiagnostic: null,
 });
-assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateId, "forecast_location_brief");
-assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateLabel, "Forecast Location Brief");
+assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateId, "capacity_location_brief");
+assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateLabel, "Capacity Location Brief");
 
 assert.deepEqual(
   metrics.advanceStandaloneRuntimeInteraction((currentSnapshot = null) => (
@@ -583,8 +980,8 @@ assert.deepEqual(
   },
 );
 assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.runtimePreviewInteraction?.drillTransitions?.length, 2);
-assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateId, "forecast_location_brief");
-assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateLabel, "Forecast Location Brief");
+assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateId, "capacity_location_brief");
+assert.equal(lastPersistedBuilderState?.reportDocumentReopenSession?.templateLabel, "Capacity Location Brief");
 
 currentWindowFormState = {
   demoReportBuilder: {
@@ -610,7 +1007,7 @@ currentWindowFormState = {
       },
       reopenedSemanticSummary: {
         kind: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         modelLabel: "Ad Delivery",
         entity: "line_delivery",
         entityLabel: "Line Delivery",
@@ -660,6 +1057,7 @@ standaloneRedoSnapshot = marketEfficiencyRuntimeInteraction;
 standaloneCanUndo = true;
 standaloneCanRedo = false;
 assert.deepEqual(metrics.getStandaloneRuntimeInteraction(), marketEfficiencyRuntimeInteraction);
+assert.deepEqual(metrics.getHydratedReportDocumentSession(), currentWindowFormState.demoReportBuilder.reportDocumentReopenSession);
 assert.deepEqual(metrics.getStandaloneRuntimeHistoryCapabilities(), {
   canUndo: true,
   canRedo: false,
@@ -711,6 +1109,7 @@ attachPreviewRuntimeSurfaceApi(invalidMetrics, {
   stateKey: "",
 });
 assert.equal(invalidMetrics.getBuilderState(), null);
+assert.equal(invalidMetrics.getHydratedReportDocumentSession(), null);
 assert.equal(invalidMetrics.patchBuilderState({ viewMode: "table" }), null);
 assert.equal(invalidMetrics.applyStandaloneRuntimeRefinement({
   op: "keep",
@@ -734,12 +1133,42 @@ attachPreviewRuntimeSurfaceApi(malformedBuilderConfigMetrics, {
   },
 });
 assert.equal(malformedBuilderConfigMetrics.patchBuilderConfig({ result: { defaultMode: "chart" } }), null);
+assert.equal(malformedBuilderConfigMetrics.applyLocalCalculatedField({
+  draft: {
+    id: "broken",
+    label: "Broken",
+    expr: "avails",
+  },
+}), null);
+assert.equal(malformedBuilderConfigMetrics.applyLocalTableCalculationDraft({
+  draft: {
+    id: "brokenTableCalc",
+    label: "Broken Table Calc",
+    functionId: "runningTotal",
+    sourceField: "avails",
+    orderByField: "country",
+  },
+}), null);
+assert.equal(malformedBuilderConfigMetrics.applyQuickTableCalculation("reachRank"), null);
+assert.equal(malformedBuilderConfigMetrics.removeLocalTableCalculation("brokenTableCalc"), null);
 
 detachPreviewRuntimeSurfaceApi(metrics);
 assert.equal(metrics.getBuilderConfig, undefined);
+assert.equal(metrics.getSemanticModelProviderAvailable, undefined);
+assert.equal(metrics.setSemanticModelProviderAvailable, undefined);
 assert.equal(metrics.patchBuilderConfig, undefined);
 assert.equal(metrics.getBuilderState, undefined);
+assert.equal(metrics.getHydratedReportDocumentSession, undefined);
 assert.equal(metrics.patchBuilderState, undefined);
+assert.equal(metrics.beginStandaloneDraft, undefined);
+assert.equal(metrics.applyAuthoredDocumentBlock, undefined);
+assert.equal(metrics.applyLocalCalculatedField, undefined);
+assert.equal(metrics.applyLocalTableCalculationDraft, undefined);
+assert.equal(metrics.applyQuickTableCalculation, undefined);
+assert.equal(metrics.removeLocalTableCalculation, undefined);
+assert.equal(metrics.duplicateAuthoredDocumentBlock, undefined);
+assert.equal(metrics.moveAuthoredDocumentBlock, undefined);
+assert.equal(metrics.removeAuthoredDocumentBlock, undefined);
 assert.equal(metrics.getCollectionRows, undefined);
 assert.equal(metrics.replaceCollectionRows, undefined);
 assert.equal(metrics.applyStandaloneRuntimeRefinement, undefined);

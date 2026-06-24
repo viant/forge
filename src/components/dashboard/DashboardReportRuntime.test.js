@@ -18,7 +18,7 @@ const container = {
 };
 
 const semanticModel = {
-  modelRef: "model://steward/performance/ad_delivery@v1",
+  modelRef: "model://example/performance/delivery@v1",
   version: 1,
   label: "Ad Delivery",
   entities: [
@@ -34,7 +34,7 @@ const semanticModel = {
           dataType: "string",
           governance: {
             status: "deprecated",
-            ownerRef: "team://steward/performance",
+            ownerRef: "team://example/performance",
           },
         },
         { id: "region", label: "Region", dataType: "string" },
@@ -49,7 +49,7 @@ const semanticModel = {
           aggregation: "sum",
           governance: {
             status: "draft",
-            ownerRef: "team://steward/performance",
+            ownerRef: "team://example/performance",
           },
         },
         {
@@ -68,7 +68,7 @@ const reportBuilderConfig = {
   title: "Dashboard Report Runtime Demo",
   binding: {
     mode: "semantic",
-    modelRef: "model://steward/performance/ad_delivery@v1",
+    modelRef: "model://example/performance/delivery@v1",
     entity: "line_delivery",
     selectedDimensions: ["event_date", "country_code"],
     selectedMeasures: ["available_impressions", "household_uniques"],
@@ -135,8 +135,8 @@ const reportBuilderConfig = {
   drillMetadata: {
     hierarchies: [
       {
-        id: "forecast_location",
-        label: "Forecast Location",
+        id: "capacity_location",
+        label: "Capacity Location",
         levels: [
           { field: "country", label: "Market" },
           { field: "region", label: "Region" },
@@ -182,12 +182,12 @@ const savedRecord = buildPreviewSavedReportPayloadRecord({
   reportBuilderConfig,
   rows: RAW_ROWS,
   semanticModel,
-  reportId: "forecastingLocationRuntimeVisibility",
-  title: "Forecasting Location Runtime Visibility",
+  reportId: "capacityLocationRuntimeVisibility",
+  title: "Capacity Location Runtime Visibility",
   presetKind: "table",
   presetTitle: "Location Ladder",
   documentVersion: 5,
-  artifactId: "forecasting_location_runtime_visibility",
+  artifactId: "capacity_location_runtime_visibility",
   savedAt: 9200,
 });
 
@@ -250,11 +250,12 @@ assert.ok(html.includes("Model Ad Delivery"));
 assert.ok(html.includes("Entity Line Delivery"));
 assert.ok(html.includes("Dimensions Market"));
 assert.ok(html.includes("Measures Available Impressions, Household Uniques"));
+assert.ok(html.includes("Owner team://example/performance"));
 assert.ok(html.includes("1 deprecated"));
 assert.ok(html.includes("1 draft"));
 assert.ok(html.includes("Runtime Diagnostics"));
-assert.ok(html.includes("Market • Deprecated"));
-assert.ok(html.includes("Available Impressions • Draft"));
+assert.ok(html.includes("Market • Owner team://example/performance • Deprecated"));
+assert.ok(html.includes("Available Impressions • Owner team://example/performance • Draft"));
 assert.ok(html.includes("Primary Table references unavailable table column"));
 assert.ok(html.includes("Re-select the field in the builder or edit the table block to use one of the current selected dimensions or measures."));
 assert.ok(html.includes("documentBlockColumnUnavailable"));

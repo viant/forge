@@ -6,7 +6,7 @@ assert.deepEqual(normalizeReportRuntimeHostIntent({
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -16,7 +16,7 @@ assert.deepEqual(normalizeReportRuntimeHostIntent({
   intentKind: "detailTarget",
   title: "Resolved detail target",
   description: "Ready for host routing.",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
   parameters: {
     channel: "Display",
@@ -26,7 +26,7 @@ assert.deepEqual(normalizeReportRuntimeHostIntent({
 
 assert.equal(normalizeReportRuntimeHostIntent({
   intentKind: "unknown",
-  targetRef: "target://steward/performance/channel-detail",
+  targetRef: "target://example/performance/channel-detail",
   navigationMode: "hostRoute",
 }), null);
 

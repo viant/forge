@@ -83,6 +83,8 @@ export function resolveReportRuntimeDetailTarget(target = {}, context = {}) {
   return {
     targetRef: target?.targetRef,
     navigationMode: target?.navigationMode,
+    ...(normalizeString(target?.title) ? { title: normalizeString(target.title) } : {}),
+    ...(normalizeString(target?.description) ? { description: normalizeString(target.description) } : {}),
     parameters,
     unresolvedParameters,
   };

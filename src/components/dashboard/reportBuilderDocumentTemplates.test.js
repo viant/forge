@@ -14,7 +14,7 @@ const config = {
     title: "Report Builder Demo",
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["available_impressions"],

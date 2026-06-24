@@ -1,0 +1,1819 @@
+{
+  "version": 1,
+  "kind": "reportPrint",
+  "specVersion": 1,
+  "specHash": "fnv1a:6c7cc6f9",
+  "fillVersion": 1,
+  "fillHash": "fnv1a:f3d9629c",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "demoReportBuilder",
+    "stateKey": "demoReportBuilder",
+    "dataSourceRef": "demoReportSource"
+  },
+  "title": "Capacity Audience Segment Index Q3",
+  "pageGeometry": {
+    "width": 792,
+    "height": 612,
+    "marginTop": 36,
+    "marginRight": 36,
+    "marginBottom": 36,
+    "marginLeft": 36,
+    "headerHeight": 36,
+    "footerHeight": 24
+  },
+  "pages": [
+    {
+      "number": 1,
+      "elements": [
+        {
+          "id": "sharedFilters__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 84,
+            "width": 720,
+            "height": 20
+          },
+          "text": "Report Scope",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "sharedFilters__line_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 108,
+            "width": 720,
+            "height": 16
+          },
+          "text": "dateRange: 2026-05-01 to 2026-05-04",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "sharedFilters__line_1",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 124,
+            "width": 720,
+            "height": 16
+          },
+          "text": "channelsFilter: —",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "sharedFilters__line_2",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 140,
+            "width": 720,
+            "height": 16
+          },
+          "text": "audienceSegmentFilter: Young Adults",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "primaryTable__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 172,
+            "width": 720,
+            "height": 20
+          },
+          "text": "Table",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "primaryTable__header_bg__page_1",
+          "kind": "rect",
+          "box": {
+            "x": 36,
+            "y": 196,
+            "width": 720,
+            "height": 24
+          },
+          "fillColor": "#f8fafc",
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__header__country__page_1",
+          "kind": "text",
+          "box": {
+            "x": 42,
+            "y": 200,
+            "width": 348,
+            "height": 16
+          },
+          "text": "Market",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__header__audienceIndex__page_1",
+          "kind": "text",
+          "box": {
+            "x": 402,
+            "y": 200,
+            "width": 348,
+            "height": 16
+          },
+          "text": "Audience Index",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_0",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 244,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_1__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 224,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "country",
+          "text": "US",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_1__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 224,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "audienceIndex",
+          "text": "118",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_1",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 268,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_2__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 248,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "country",
+          "text": "US",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_2__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 248,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "audienceIndex",
+          "text": "118",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_2",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 292,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_3__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 272,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "country",
+          "text": "US",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_3__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 272,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "audienceIndex",
+          "text": "118",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_3",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 316,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_4__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 296,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "country",
+          "text": "US",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_4__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 296,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "audienceIndex",
+          "text": "118",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_4",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 340,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_5__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 320,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "country",
+          "text": "CA",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_5__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 320,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "audienceIndex",
+          "text": "112",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_5",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 364,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_6__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 344,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "country",
+          "text": "CA",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_6__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 344,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "audienceIndex",
+          "text": "112",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_6",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 388,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_7__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 368,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "country",
+          "text": "CA",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_7__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 368,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "audienceIndex",
+          "text": "112",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_7",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 412,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_8__country__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 392,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "country",
+          "text": "CA",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_8__audienceIndex__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 392,
+            "width": 348,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "audienceIndex",
+          "text": "112",
+          "format": "number",
+          "align": "right"
+        },
+        {
+          "id": "headlineKpi__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 428,
+            "width": 720,
+            "height": 20
+          },
+          "text": "Headline KPI",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "headlineKpi__value_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 452,
+            "width": 720,
+            "height": 24
+          },
+          "text": "Available Impressions: 18000",
+          "fontSize": 20,
+          "fontWeight": "700",
+          "color": "#101828"
+        },
+        {
+          "id": "headlineKpi__detail_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 476,
+            "width": 720,
+            "height": 16
+          },
+          "text": "Channel: Display",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "headlineKpi__detail_1",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 492,
+            "width": 720,
+            "height": 16
+          },
+          "text": "Generic KPI block resolved from the first authored runtime row.",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "comparisonTable__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 524,
+            "width": 720,
+            "height": 20
+          },
+          "text": "Delivery Comparison",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        }
+      ],
+      "headerElements": [
+        {
+          "id": "page_1__header_title",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 36,
+            "width": 720,
+            "height": 28
+          },
+          "text": "Capacity Audience Segment Index Q3",
+          "fontSize": 18,
+          "fontWeight": "700",
+          "color": "#101828"
+        },
+        {
+          "id": "page_1__header_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 70,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        }
+      ],
+      "footerElements": [
+        {
+          "id": "page_1__footer_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 554,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "page_1__footer_page_number",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 558,
+            "width": 720,
+            "height": 16
+          },
+          "text": "Page 1",
+          "fontSize": 11,
+          "color": "#667085",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "elements": [
+        {
+          "id": "comparisonTable__header_bg__page_2",
+          "kind": "rect",
+          "box": {
+            "x": 36,
+            "y": 84,
+            "width": 720,
+            "height": 24
+          },
+          "fillColor": "#f8fafc",
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__header__eventDate__page_2",
+          "kind": "text",
+          "box": {
+            "x": 42,
+            "y": 88,
+            "width": 168,
+            "height": 16
+          },
+          "text": "Date",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__header__channelV2__page_2",
+          "kind": "text",
+          "box": {
+            "x": 222,
+            "y": 88,
+            "width": 168,
+            "height": 16
+          },
+          "text": "Channel",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__header__avails__page_2",
+          "kind": "text",
+          "box": {
+            "x": 402,
+            "y": 88,
+            "width": 168,
+            "height": 16
+          },
+          "text": "Avails",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__header__hhUniqs__page_2",
+          "kind": "text",
+          "box": {
+            "x": 582,
+            "y": 88,
+            "width": 168,
+            "height": 16
+          },
+          "text": "HH Uniques",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_rule_0",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 132,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_1__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "eventDate",
+          "text": "2026-05-01",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_1__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 112,
+            "width": 69,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "channelV2",
+          "label": "Display",
+          "tone": "info",
+          "backgroundColor": "#ebf1f5",
+          "borderColor": "#ced9e0",
+          "textColor": "#30404d"
+        },
+        {
+          "id": "comparisonTable__row_1__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_1__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 112,
+            "width": 133.77777777777777,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "avails",
+          "value": 18000,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_1__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "avails",
+          "text": "18000",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_1__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_1__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 112,
+            "width": 136,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "hhUniqs",
+          "value": 7400,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_1__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "hhUniqs",
+          "text": "7400",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_rule_1",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 156,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_2__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "eventDate",
+          "text": "2026-05-01",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_2__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 136,
+            "width": 41,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "channelV2",
+          "label": "CTV",
+          "tone": "success",
+          "backgroundColor": "#eef8f0",
+          "borderColor": "#0f9960",
+          "textColor": "#0a6640"
+        },
+        {
+          "id": "comparisonTable__row_2__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_2__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 136,
+            "width": 15.555555555555555,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "avails",
+          "value": 14200,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_2__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "avails",
+          "text": "14200",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_2__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_2__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 136,
+            "width": 32,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "hhUniqs",
+          "value": 6100,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_2__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "hhUniqs",
+          "text": "6100",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_rule_2",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 180,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_3__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "eventDate",
+          "text": "2026-05-02",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_3__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 160,
+            "width": 69,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "channelV2",
+          "label": "Display",
+          "tone": "info",
+          "backgroundColor": "#ebf1f5",
+          "borderColor": "#ced9e0",
+          "textColor": "#30404d"
+        },
+        {
+          "id": "comparisonTable__row_3__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_3__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "avails",
+          "value": 19100,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_3__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "avails",
+          "text": "19100",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_3__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_3__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "hhUniqs",
+          "value": 7800,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_3__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "hhUniqs",
+          "text": "7800",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_rule_3",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 204,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_4__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "eventDate",
+          "text": "2026-05-02",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_4__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 184,
+            "width": 41,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "channelV2",
+          "label": "CTV",
+          "tone": "success",
+          "backgroundColor": "#eef8f0",
+          "borderColor": "#0f9960",
+          "textColor": "#0a6640"
+        },
+        {
+          "id": "comparisonTable__row_4__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_4__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 184,
+            "width": 43.55555555555555,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "avails",
+          "value": 15100,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_4__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "avails",
+          "text": "15100",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_4__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_4__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 184,
+            "width": 56,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "hhUniqs",
+          "value": 6400,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_4__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "hhUniqs",
+          "text": "6400",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_rule_4",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 228,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_5__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "eventDate",
+          "text": "2026-05-03",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_5__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 208,
+            "width": 69,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "channelV2",
+          "label": "Display",
+          "tone": "info",
+          "backgroundColor": "#ebf1f5",
+          "borderColor": "#ced9e0",
+          "textColor": "#30404d"
+        },
+        {
+          "id": "comparisonTable__row_5__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_5__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 208,
+            "width": 77.77777777777777,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "avails",
+          "value": 16200,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_5__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "avails",
+          "text": "16200",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_5__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_5__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 208,
+            "width": 88,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "hhUniqs",
+          "value": 6800,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_5__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_5",
+          "columnKey": "hhUniqs",
+          "text": "6800",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_rule_5",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 252,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_6__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 232,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "eventDate",
+          "text": "2026-05-03",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_6__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 232,
+            "width": 41,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "channelV2",
+          "label": "CTV",
+          "tone": "success",
+          "backgroundColor": "#eef8f0",
+          "borderColor": "#0f9960",
+          "textColor": "#0a6640"
+        },
+        {
+          "id": "comparisonTable__row_6__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 232,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_6__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 232,
+            "width": 0,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "avails",
+          "value": 13700,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_6__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 232,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "avails",
+          "text": "13700",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_6__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 232,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_6__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 232,
+            "width": 0,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "hhUniqs",
+          "value": 5700,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_6__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 232,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_6",
+          "columnKey": "hhUniqs",
+          "text": "5700",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_rule_6",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 276,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_7__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 256,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "eventDate",
+          "text": "2026-05-04",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_7__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 256,
+            "width": 69,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "channelV2",
+          "label": "Display",
+          "tone": "info",
+          "backgroundColor": "#ebf1f5",
+          "borderColor": "#ced9e0",
+          "textColor": "#30404d"
+        },
+        {
+          "id": "comparisonTable__row_7__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 256,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_7__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 256,
+            "width": 118.22222222222223,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "avails",
+          "value": 17500,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_7__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 256,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "avails",
+          "text": "17500",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_7__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 256,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_7__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 256,
+            "width": 112,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "hhUniqs",
+          "value": 7100,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_7__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 256,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_7",
+          "columnKey": "hhUniqs",
+          "text": "7100",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_rule_7",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 300,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "comparisonTable__row_8__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 280,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "eventDate",
+          "text": "2026-05-04",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "comparisonTable__row_8__channelV2__badge",
+          "kind": "tableCellBadge",
+          "box": {
+            "x": 222,
+            "y": 280,
+            "width": 41,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "channelV2",
+          "label": "CTV",
+          "tone": "success",
+          "backgroundColor": "#eef8f0",
+          "borderColor": "#0f9960",
+          "textColor": "#0a6640"
+        },
+        {
+          "id": "comparisonTable__row_8__avails__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 402,
+            "y": 280,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dbeafe",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_8__avails__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 402,
+            "y": 280,
+            "width": 24.888888888888886,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "avails",
+          "value": 14500,
+          "min": 13700,
+          "max": 19100,
+          "fillColor": "#2563eb",
+          "backgroundColor": "#dbeafe"
+        },
+        {
+          "id": "comparisonTable__row_8__avails__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 280,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "avails",
+          "text": "14500",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "comparisonTable__row_8__hhUniqs__bar_track",
+          "kind": "rect",
+          "box": {
+            "x": 582,
+            "y": 280,
+            "width": 168,
+            "height": 16
+          },
+          "fillColor": "#dcfce7",
+          "radius": 8
+        },
+        {
+          "id": "comparisonTable__row_8__hhUniqs__bar",
+          "kind": "tableCellDataBar",
+          "box": {
+            "x": 582,
+            "y": 280,
+            "width": 24,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "hhUniqs",
+          "value": 6000,
+          "min": 5700,
+          "max": 7800,
+          "fillColor": "#16a34a",
+          "backgroundColor": "#dcfce7"
+        },
+        {
+          "id": "comparisonTable__row_8__hhUniqs__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 280,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_8",
+          "columnKey": "hhUniqs",
+          "text": "6000",
+          "format": "compactNumber",
+          "align": "right"
+        }
+      ],
+      "headerElements": [
+        {
+          "id": "page_2__header_title",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 36,
+            "width": 720,
+            "height": 28
+          },
+          "text": "Capacity Audience Segment Index Q3",
+          "fontSize": 18,
+          "fontWeight": "700",
+          "color": "#101828"
+        },
+        {
+          "id": "page_2__header_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 70,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        }
+      ],
+      "footerElements": [
+        {
+          "id": "page_2__footer_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 554,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "page_2__footer_page_number",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 558,
+            "width": 720,
+            "height": 16
+          },
+          "text": "Page 2",
+          "fontSize": 11,
+          "color": "#667085",
+          "align": "right"
+        }
+      ]
+    }
+  ],
+  "bookmarks": [
+    {
+      "id": "bookmark.sharedFilters",
+      "title": "Report Scope",
+      "pageNumber": 1,
+      "level": 1,
+      "elementId": "sharedFilters__title_0",
+      "y": 84
+    },
+    {
+      "id": "bookmark.primaryTable",
+      "title": "Table",
+      "pageNumber": 1,
+      "level": 1,
+      "elementId": "primaryTable__title_0",
+      "y": 172
+    },
+    {
+      "id": "bookmark.headlineKpi",
+      "title": "Headline KPI",
+      "pageNumber": 1,
+      "level": 1,
+      "elementId": "headlineKpi__title_0",
+      "y": 428
+    },
+    {
+      "id": "bookmark.comparisonTable",
+      "title": "Delivery Comparison",
+      "pageNumber": 1,
+      "level": 1,
+      "elementId": "comparisonTable__title_0",
+      "y": 524
+    }
+  ],
+  "diagnostics": []
+}

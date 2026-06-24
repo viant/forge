@@ -25,7 +25,9 @@ try {
   let visibilityState = 'visible';
   let focused = true;
   globalThis.document = {
-    visibilityState,
+    get visibilityState() {
+      return visibilityState;
+    },
     hasFocus: () => focused,
     addEventListener: windowTarget.addEventListener.bind(windowTarget),
     removeEventListener: windowTarget.removeEventListener.bind(windowTarget),
@@ -72,7 +74,7 @@ try {
   });
 
   await sleep(25);
-  window.dispatchEvent(new Event('agently:authorized'));
+  window.dispatchEvent(new Event('forge:authorized'));
   await sleep(25);
   stop();
 
@@ -122,11 +124,59 @@ try {
   });
 
   await sleep(25);
-  window.dispatchEvent(new Event('agently:authorized'));
+  window.dispatchEvent(new Event('forge:authorized'));
   await sleep(40);
   stopUnauthorizedHello();
   assert.deepEqual(authHelloCalls.slice(0, 4), ['ui.hello', 'ui.hello', 'ui.snapshot.get', 'ui.snapshot']);
   console.log('bridge startup auth retry ✓ retries ui.hello after authorization instead of failing permanently');
+
+  const configuredAuthCalls = [];
+  let configuredHelloAttempts = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    configuredAuthCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-configured-auth-retry' });
+    if (body.method === 'ui.hello') {
+      configuredHelloAttempts += 1;
+      if (configuredHelloAttempts === 1) {
+        return new Response(JSON.stringify({ error: { message: 'unauthorized' } }), { status: 401, headers });
+      }
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { snapshot: { selected: { windowId: 'chat/new', tabId: 'chat/new' }, windows: [] } }
+      }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopConfiguredUnauthorizedHello = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 10_000,
+    authReadyEvents: ['agently:authorized'],
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [],
+      conversationId: 'conv-configured-auth-retry',
+    })
+  });
+
+  await sleep(25);
+  window.dispatchEvent(new Event('agently:authorized'));
+  await sleep(40);
+  stopConfiguredUnauthorizedHello();
+  assert.deepEqual(configuredAuthCalls.slice(0, 4), ['ui.hello', 'ui.hello', 'ui.snapshot.get', 'ui.snapshot']);
+  console.log('bridge configured auth retry ✓ supports host-provided authorization events');
 
   const orderedCalls = [];
   let snapshotGetResolved = false;
@@ -306,7 +356,7 @@ try {
 
   const commandCalls = [];
   let commandPollCount = 0;
-  const openedWindowId = 'forecastingCubeBuilder__conv-command';
+  const openedWindowId = 'capacityCubeBuilder__conv-command';
   visibilityState = 'visible';
   focused = true;
   globalThis.fetch = async (_url, options = {}) => {
@@ -335,12 +385,12 @@ try {
           result: {
             method: 'ui.command',
             params: {
-              id: 'cmd-open-forecasting',
+              id: 'cmd-open-capacity',
               method: 'ui.window.open',
               params: {
                 windowId: openedWindowId,
-                windowKey: 'forecastingCubeBuilder',
-                windowTitle: 'Forecasting',
+                windowKey: 'capacityCubeBuilder',
+                windowTitle: 'Capacity',
                 parameters: {},
                 options: {
                   conversationId: 'conv-command',
@@ -369,7 +419,7 @@ try {
 
   await sleep(120);
   stopCommandOrder();
-  const responseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-open-forecasting');
+  const responseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-open-capacity');
   assert.equal(responseIndex > 0, true);
   let snapshotBeforeResponse = null;
   for (let i = responseIndex - 1; i >= 0; i -= 1) {
@@ -385,7 +435,7 @@ try {
   const commandFailureCalls = [];
   const commandFailureResponses = [];
   let commandFailurePollCount = 0;
-  const rejectedWindowId = 'forecastingCubeBuilder__conv-snapshot-fail';
+  const rejectedWindowId = 'capacityCubeBuilder__conv-snapshot-fail';
   visibilityState = 'visible';
   focused = true;
   globalThis.fetch = async (_url, options = {}) => {
@@ -422,8 +472,8 @@ try {
               method: 'ui.window.open',
               params: {
                 windowId: rejectedWindowId,
-                windowKey: 'forecastingCubeBuilder',
-                windowTitle: 'Forecasting',
+                windowKey: 'capacityCubeBuilder',
+                windowTitle: 'Capacity',
                 parameters: {},
                 options: {
                   conversationId: 'conv-snapshot-fail',

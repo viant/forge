@@ -1,0 +1,113 @@
+import {
+  buildChartQueryBaselineResetSteps,
+  buildChartQueryBaselineStableWaitStep,
+  buildPreviewBootstrapSteps,
+} from "./report-builder-preview-scenario-builders.mjs";
+
+export default {
+  baseUrl: "http://127.0.0.1:5175",
+  viewport: {
+    width: 1280,
+    height: 960,
+  },
+  steps: [
+    ...buildPreviewBootstrapSteps(),
+    {
+      type: "clickSelector",
+      selector: ".forge-report-builder__chart-action-button--quick",
+    },
+    {
+      type: "clickSelectorContains",
+      selector: "[role=\"menuitem\"]",
+      text: "Inventory Ladder",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Inventory Ladder",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Local Draft.",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || ''; return root?.getAttribute('data-report-builder-view-mode') === 'table' && text.includes('1 BREAKDOWN') && text.includes('Local Draft.'); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "eval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.resetCounters !== 'function' || typeof preview.replaceFetchBehaviors !== 'function') { throw new Error('Preview fetch behavior APIs are unavailable.'); } preview.resetCounters(); preview.replaceFetchBehaviors([{ match: { type: 'chartquery' }, delayMs: 1500 }]); return true; })()",
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; return !!preview && Array.isArray(preview.fetchBehaviors) && preview.fetchBehaviors.length === 1 && preview.fetchBehaviors[0]?.match?.type === 'chartquery' && preview.fetchBehaviors[0]?.delayMs === 1500; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickSelector",
+      selector: ".forge-report-builder__chart-action-button--quick",
+    },
+    {
+      type: "clickSelectorContains",
+      selector: "[role=\"menuitem\"]",
+      text: "Avails by Date and Channel",
+      index: 0,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Avails by Date and Channel",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || ''; return root?.getAttribute('data-report-builder-view-mode') === 'chart' && root?.getAttribute('data-report-builder-state') !== 'loading' && !text.includes('Refreshing report data') && text.includes(\"Applied this preset's required measures and breakdowns.\") && text.includes('05/01') && text.includes('Display') && text.includes('CTV'); })()",
+      timeoutMs: 60000,
+    },
+    ...buildChartQueryBaselineResetSteps({
+      baselineKey: "__explorationChartToggleResponseBaseline",
+      missingResetMessage: "Preview resetCounters API not available.",
+    }),
+    {
+      type: "clickSelectorContains",
+      selector: ".forge-report-builder__result-header .forge-report-builder__view-toggle button",
+      text: "table",
+      index: 0,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || ''; return root?.getAttribute('data-report-builder-view-mode') === 'table' && !text.includes('Refreshing report data') && text.includes('Table view for the active scope.') && text.includes('Local Draft.'); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickSelectorContains",
+      selector: ".forge-report-builder__result-header .forge-report-builder__view-toggle button",
+      text: "chart",
+      index: 0,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || ''; return root?.getAttribute('data-report-builder-view-mode') === 'chart' && root?.getAttribute('data-report-builder-state') !== 'loading' && !text.includes('Refreshing report data') && text.includes('Click a chart mark or series legend to apply authored runtime actions.') && text.includes('Display') && text.includes('CTV'); })()",
+      timeoutMs: 60000,
+    },
+    buildChartQueryBaselineStableWaitStep({
+      baselineKey: "__explorationChartToggleResponseBaseline",
+    }),
+    {
+      type: "eval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.replaceFetchBehaviors !== 'function') { throw new Error('Preview fetch behavior APIs are unavailable.'); } preview.replaceFetchBehaviors([]); return true; })()",
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; return !!preview && Array.isArray(preview.fetchBehaviors) && preview.fetchBehaviors.length === 0; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "screenshot",
+      file: "report-builder-preview-semantic-exploration-chart-toggle-response.png",
+      fullPage: true,
+    },
+  ],
+};

@@ -29,35 +29,35 @@ global.window = {
 };
 
 assert.equal(
-    reportBuilderStateStorageKey("forecastingCubeBuilder"),
-    "reportBuilder.state.forecastingCubeBuilder",
+    reportBuilderStateStorageKey("capacityCubeBuilder"),
+    "reportBuilder.state.capacityCubeBuilder",
 );
 
-assert.equal(loadStoredReportBuilderState("forecastingCubeBuilder"), null);
+assert.equal(loadStoredReportBuilderState("capacityCubeBuilder"), null);
 
 assert.equal(
     resolveReportBuilderStateStorageScope({
-        stateKey: "forecastingCubeBuilder",
-        windowId: "forecastingWindowA",
-        dataSourceRef: "forecastingCube",
-        containerId: "forecastingCubeBuilder",
+        stateKey: "capacityCubeBuilder",
+        windowId: "capacityWindowA",
+        dataSourceRef: "capacityCube",
+        containerId: "capacityCubeBuilder",
     }),
-    "forecastingCubeBuilder.forecastingWindowA",
+    "capacityCubeBuilder.capacityWindowA",
 );
 assert.equal(
     resolveReportBuilderStateStorageScope({
-        stateKey: "forecastingCubeBuilder",
-        dataSourceRef: "forecastingCube",
-        containerId: "forecastingCubeBuilder",
+        stateKey: "capacityCubeBuilder",
+        dataSourceRef: "capacityCube",
+        containerId: "capacityCubeBuilder",
     }),
-    "forecastingCubeBuilder.forecastingCube.forecastingCubeBuilder",
+    "capacityCubeBuilder.capacityCube.capacityCubeBuilder",
 );
 assert.deepEqual(
     resolveLegacyReportBuilderStateStorageScopes({
-        stateKey: "forecastingCubeBuilder",
-        stateStorageScope: "forecastingCubeBuilder.forecastingWindowA",
+        stateKey: "capacityCubeBuilder",
+        stateStorageScope: "capacityCubeBuilder.capacityWindowA",
     }),
-    ["forecastingCubeBuilder"],
+    ["capacityCubeBuilder"],
 );
 
 assert.equal(hasStoredReportBuilderState(null), false);
@@ -106,14 +106,14 @@ assert.equal(
     true,
 );
 
-persistStoredReportBuilderState("forecastingCubeBuilder", {
+persistStoredReportBuilderState("capacityCubeBuilder", {
     selectedMeasures: ["avails"],
     selectedDimensions: ["eventDate"],
     viewMode: "chart",
 });
 
 assert.deepEqual(
-    loadStoredReportBuilderState("forecastingCubeBuilder"),
+    loadStoredReportBuilderState("capacityCubeBuilder"),
     {
         selectedMeasures: ["avails"],
         selectedDimensions: ["eventDate"],
@@ -121,8 +121,8 @@ assert.deepEqual(
     },
 );
 
-persistStoredReportBuilderState("forecastingCubeBuilder", null);
-assert.equal(loadStoredReportBuilderState("forecastingCubeBuilder"), null);
+persistStoredReportBuilderState("capacityCubeBuilder", null);
+assert.equal(loadStoredReportBuilderState("capacityCubeBuilder"), null);
 
 persistStoredReportBuilderState("", { selectedMeasures: ["default"] });
 assert.deepEqual(
@@ -138,7 +138,7 @@ const semanticPersistedState = {
     groupBy: "agegroupId",
     binding: {
         mode: "semantic",
-        modelRef: "model://steward/performance/ad_delivery@v1",
+        modelRef: "model://example/performance/delivery@v1",
         entity: "line_delivery",
         selectedDimensions: ["event_date", "channel"],
         selectedMeasures: ["available_impressions", "household_uniques"],
@@ -162,7 +162,7 @@ assert.equal(loadStoredReportBuilderState("semanticPreviewWindow"), null);
 assert.deepEqual(
     replaceReportBuilderWindowState(
         {
-            forecastingCubeBuilder: {
+            capacityCubeBuilder: {
                 chartSpec: {
                     title: "Area by Date and Channel",
                     type: "area",
@@ -176,7 +176,7 @@ assert.deepEqual(
                 untouched: true,
             },
         },
-        "forecastingCubeBuilder",
+        "capacityCubeBuilder",
         {
             chartSpec: {
                 title: "Avails by Date",
@@ -188,7 +188,7 @@ assert.deepEqual(
         },
     ),
     {
-        forecastingCubeBuilder: {
+        capacityCubeBuilder: {
             chartSpec: {
                 title: "Avails by Date",
                 type: "line",
@@ -203,27 +203,27 @@ assert.deepEqual(
     },
 );
 
-persistStoredReportBuilderState("forecastingCubeBuilder", {
+persistStoredReportBuilderState("capacityCubeBuilder", {
     selectedMeasures: ["legacy"],
 });
 assert.deepEqual(
     loadStoredReportBuilderState(
-        "forecastingCubeBuilder.forecastingWindowA",
-        ["forecastingCubeBuilder"],
+        "capacityCubeBuilder.capacityWindowA",
+        ["capacityCubeBuilder"],
     ),
     {
         selectedMeasures: ["legacy"],
     },
 );
 persistStoredReportBuilderState(
-    "forecastingCubeBuilder.forecastingWindowA",
+    "capacityCubeBuilder.capacityWindowA",
     { selectedMeasures: ["window"] },
-    ["forecastingCubeBuilder"],
+    ["capacityCubeBuilder"],
 );
 assert.deepEqual(
-    loadStoredReportBuilderState("forecastingCubeBuilder.forecastingWindowA"),
+    loadStoredReportBuilderState("capacityCubeBuilder.capacityWindowA"),
     { selectedMeasures: ["window"] },
 );
-assert.equal(loadStoredReportBuilderState("forecastingCubeBuilder"), null);
+assert.equal(loadStoredReportBuilderState("capacityCubeBuilder"), null);
 
 console.log("reportBuilderPersistence ✓ local report-builder state storage");

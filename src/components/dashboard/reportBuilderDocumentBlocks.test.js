@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 
 import {
+    buildReportBuilderScopeParamSummary,
+    buildReportBuilderScopeSummaryFromParams,
     buildReportBuilderDocumentCompileValidation,
     buildReportBuilderDocumentBlockFieldOptions,
     buildReportBuilderDocumentCompileDiagnostics,
@@ -63,6 +65,42 @@ assert.deepEqual(filterBarDraft, {
     id: "filterBar",
     title: "Report Scope",
     paramIds: ["dateRange"],
+});
+
+assert.deepEqual(buildReportBuilderScopeParamSummary(["dateRange", "channelsFilter"], [
+    { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "dateRange", required: true },
+    { value: "channelsFilter", label: "Channels", description: "Approved channel scope for the authored report.", kind: "multiSelect", required: false },
+]), {
+    items: [
+        { id: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview." },
+        { id: "channelsFilter", label: "Channels", description: "Approved channel scope for the authored report." },
+    ],
+    text: "Date Range • Channels",
+});
+
+assert.deepEqual(buildReportBuilderScopeParamSummary([], [
+    { value: "dateRange", label: "Date Range", kind: "dateRange", required: true },
+]), {
+    items: [],
+    text: "No shared scope parameters",
+});
+
+assert.deepEqual(buildReportBuilderScopeSummaryFromParams([
+    {
+        id: "dateRange",
+        label: "Date Range",
+        description: "Approved reporting window for semantic preview.",
+    },
+    {
+        id: "channelsFilter",
+        label: "Channels",
+    },
+]), {
+    items: [
+        { id: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview." },
+        { id: "channelsFilter", label: "Channels" },
+    ],
+    text: "Date Range • Channels",
 });
 
 const refinementBarDraft = buildReportBuilderDocumentBlockDraft("refinementBarBlock");
@@ -578,7 +616,7 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
             { id: "channelV2", label: "Channel" },
         ],
         staticFilters: [
-            { id: "dateRange", label: "Date Range", type: "dateRange", required: true },
+            { id: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", type: "dateRange", required: true },
         ],
         result: {
             supportedChartTypes: ["line", "horizontal_bar"],
@@ -604,7 +642,7 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
         { key: "avails", label: "Avails", kind: "measure" },
     ],
     scopeParamOptions: [
-        { value: "dateRange", label: "Date Range", kind: "dateRange", required: true },
+        { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "dateRange", required: true },
     ],
     chartFieldOptions: [
         { key: "channelV2", aliases: ["channelV2"], label: "Channel", kind: "dimension", format: undefined, align: undefined },
@@ -623,7 +661,7 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
             { id: "channelV2", label: "Channel" },
         ],
         staticFilters: [
-            { id: "dateRange", label: "Date Range", type: "dateRange", required: true },
+            { id: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", type: "dateRange", required: true },
         ],
         result: {
             supportedChartTypes: ["line", "horizontal_bar"],

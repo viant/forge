@@ -22,9 +22,9 @@ describe('mergeWindowFormValues', () => {
     });
   });
 
-  it('replacing a nested subtree should not preserve omitted nested keys', () => {
+  it('merges nested subtrees unless a replacement sentinel is used', () => {
     const previous = {
-      forecastingCubeBuilder: {
+      capacityCubeBuilder: {
         chartSpec: {
           title: 'Area by Date and Channel',
           type: 'area',
@@ -35,7 +35,7 @@ describe('mergeWindowFormValues', () => {
       },
     };
     const next = {
-      forecastingCubeBuilder: {
+      capacityCubeBuilder: {
         chartSpec: {
           title: 'Avails by Date',
           type: 'line',
@@ -45,13 +45,62 @@ describe('mergeWindowFormValues', () => {
       },
     };
     expect(mergeWindowFormValues(previous, next)).toEqual({
-      forecastingCubeBuilder: {
+      capacityCubeBuilder: {
         chartSpec: {
           title: 'Avails by Date',
           type: 'line',
           xField: 'eventDate',
           yFields: ['avails'],
           seriesField: 'channelV2',
+        },
+      },
+    });
+  });
+
+  it('replaces only subtrees marked with the window-form replace sentinel', () => {
+    const previous = {
+      prefill: {
+        includeCountry: ['US'],
+        includeDealsPmp: [101, 102],
+        includePostalCodeList: [303],
+      },
+      capacityCubeBuilder: {
+        chartSpec: {
+          title: 'Area by Date and Channel',
+          seriesField: 'channelV2',
+        },
+      },
+    };
+    const next = {
+      prefill: {
+        includeDealsPmp: {
+          $replace: true,
+          value: [201],
+        },
+        includePostalCodeList: {
+          $replace: true,
+          value: [],
+        },
+      },
+      capacityCubeBuilder: {
+        chartSpec: {
+          $replace: true,
+          value: {
+            title: 'Avails by Date',
+          },
+        },
+      },
+    };
+
+    expect(mergeWindowFormValues(previous, next)).toEqual({
+      prefill: {
+        includeCountry: ['US'],
+        includeDealsPmp: [201],
+        includePostalCodeList: [],
+      },
+      capacityCubeBuilder: {
+        chartSpec: {
+          title: 'Avails by Date',
         },
       },
     });

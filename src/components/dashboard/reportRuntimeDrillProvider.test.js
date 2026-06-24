@@ -49,9 +49,35 @@ const explicitProvider = {
 assert.equal(resolveReportRuntimeDrillMetadataProvider({
   reportSpec,
   runtimeHandlers: {
+    drillMetadataProvider: {
+      async getDrillHierarchy() {
+        return null;
+      },
+      async getDetailTarget() {
+        return null;
+      },
+      async listAvailableRefinements() {
+        return [{ id: "keep", label: "Keep only", kind: "keep" }];
+      },
+    },
+  },
+})?.listAvailableRefinements instanceof Function, true);
+
+const fallbackFromPartialProvider = resolveReportRuntimeDrillMetadataProvider({
+  reportSpec,
+  runtimeHandlers: {
     drillMetadataProvider: explicitProvider,
   },
-}), explicitProvider);
+});
+assert.notEqual(fallbackFromPartialProvider, explicitProvider);
+assert.equal(typeof fallbackFromPartialProvider?.getDetailTarget, "function");
+assert.deepEqual(await fallbackFromPartialProvider.getDetailTarget("target://demo/date-detail"), {
+  targetRef: "target://demo/date-detail",
+  navigationMode: "hostRoute",
+  parameters: {
+    eventDate: "$value",
+  },
+});
 
 const provider = resolveReportRuntimeDrillMetadataProvider({ reportSpec, runtimeHandlers: {} });
 assert.equal(typeof provider?.listAvailableRefinements, "function");
@@ -78,6 +104,13 @@ assert.deepEqual(await provider.listAvailableRefinements("tableBlock", "channelV
 assert.equal(resolveReportRuntimeDrillMetadataProvider({
   reportSpec: { kind: "reportSpec" },
   runtimeHandlers: {},
+}), null);
+
+assert.equal(resolveReportRuntimeDrillMetadataProvider({
+  reportSpec: { kind: "reportSpec" },
+  runtimeHandlers: {
+    drillMetadataProvider: explicitProvider,
+  },
 }), null);
 
 console.log("reportRuntimeDrillProvider ✓ resolves explicit or report-spec-backed drill providers for runtime");

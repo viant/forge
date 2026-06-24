@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     beginReportBuilderExplorationSession,
     buildReportBuilderExplorationSourceContextFromChartSelection,
+    buildReportBuilderExplorationSourceContextFromTableRow,
     buildReportBuilderExplorationBannerState,
     discardReportBuilderExplorationState,
     keepReportBuilderExplorationState,
@@ -49,25 +50,52 @@ const startedFromRow = beginReportBuilderExplorationSession(baseState, {
         stateKey: "demoReportBuilder",
     },
     sourceKind: "reportBuilder.tableRow",
-    sourceContext: {
-        label: "Display • 2026-05-01",
-        metadata: {
-            rowIndex: 0,
-            dimensionValues: {
-                channelId: "Display",
-                eventDate: "2026-05-01",
-            },
+    sourceContext: buildReportBuilderExplorationSourceContextFromTableRow({
+        row: {
+            eventDate: "2026-05-01",
+            channelId: "Display",
         },
-    },
+        rowIndex: 0,
+        labelSelectors: ["eventDate", "channelId"],
+    }),
     nowMs: 1500,
 });
 assert.equal(startedFromRow.explorationSession.sourceRef.kind, "reportBuilder.tableRow");
-assert.equal(startedFromRow.explorationSession.sourceRef.contextLabel, "Display • 2026-05-01");
+assert.equal(startedFromRow.explorationSession.sourceRef.contextLabel, "2026-05-01 • Display");
 assert.deepEqual(startedFromRow.explorationSession.sourceRef.context, {
     rowIndex: 0,
     dimensionValues: {
-        channelId: "Display",
         eventDate: "2026-05-01",
+        channelId: "Display",
+    },
+});
+
+const startedFromChartSelection = beginReportBuilderExplorationSession(baseState, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+    },
+    sourceKind: "reportBuilder.chartSelection",
+    sourceContext: buildReportBuilderExplorationSourceContextFromChartSelection({
+        chartTitle: "Avails by Date and Channel",
+        selection: {
+            source: "legend",
+            displaySeriesKey: "Display",
+            seriesKey: "Display",
+            selectionRows: [{ channelV2: "Display" }],
+        },
+    }),
+    nowMs: 1750,
+});
+assert.equal(startedFromChartSelection.explorationSession.sourceRef.kind, "reportBuilder.chartSelection");
+assert.equal(startedFromChartSelection.explorationSession.sourceRef.contextLabel, "Display");
+assert.deepEqual(startedFromChartSelection.explorationSession.sourceRef.context, {
+    chartTitle: "Avails by Date and Channel",
+    selection: {
+        source: "legend",
+        displaySeriesKey: "Display",
+        seriesKey: "Display",
+        selectionRows: [{ channelV2: "Display" }],
     },
 });
 
@@ -120,7 +148,7 @@ assert.deepEqual(
     baseState,
 );
 
-assert.deepEqual(buildReportBuilderExplorationBannerState(started), {
+assert.deepEqual(buildReportBuilderExplorationBannerState(started, { nowMs: 1000 }), {
     active: true,
     sessionId: "rbexplore_1000",
     title: "Local Draft",
@@ -135,6 +163,9 @@ assert.deepEqual(buildReportBuilderExplorationBannerState(started), {
     canRedo: false,
     canKeep: false,
     canSaveArtifact: false,
+    ttlMs: 5000,
+    expiresAt: 6000,
+    ttlLabel: "1m left",
     sourceRef: {
         kind: "reportBuilder.result",
         containerId: "demoReportBuilder",
@@ -147,9 +178,67 @@ assert.equal(buildReportBuilderExplorationBannerState(withHistory)?.canKeep, tru
 assert.equal(buildReportBuilderExplorationBannerState(withHistory)?.canSaveArtifact, true);
 assert.equal(buildReportBuilderExplorationBannerState(undone)?.canKeep, false);
 assert.equal(buildReportBuilderExplorationBannerState(undone)?.canSaveArtifact, false);
+assert.equal(buildReportBuilderExplorationBannerState(withHistory, { nowMs: 5900 })?.ttlLabel, "1m left");
 assert.match(
     buildReportBuilderExplorationBannerState(startedFromRow).description,
-    /Display • 2026-05-01/,
+    /2026-05-01 • Display/,
+);
+assert.deepEqual(buildReportBuilderExplorationBannerState(startedFromChartSelection, { nowMs: 1750 }), {
+    active: true,
+    sessionId: "rbexplore_1750",
+    title: "Local Draft",
+    description: "No local changes are active for Display. Edit the result to create a draft you can keep or save, or discard this empty draft.",
+    hintItems: [
+        "Use the selected chart value as a starting point.",
+        "Switch to the table to inspect matching rows locally.",
+        "Keep the draft only if the changes are worth saving.",
+    ],
+    dirty: false,
+    canUndo: false,
+    canRedo: false,
+    canKeep: false,
+    canSaveArtifact: false,
+    ttlMs: 1000 * 60 * 60,
+    expiresAt: 1750 + (1000 * 60 * 60),
+    ttlLabel: "1h left",
+    sourceRef: {
+        kind: "reportBuilder.chartSelection",
+        containerId: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        viewMode: "table",
+        primaryMeasure: "totalSpend",
+        contextLabel: "Display",
+        context: {
+            chartTitle: "Avails by Date and Channel",
+            selection: {
+                source: "legend",
+                displaySeriesKey: "Display",
+                seriesKey: "Display",
+                selectionRows: [{ channelV2: "Display" }],
+            },
+        },
+    },
+});
+
+assert.deepEqual(
+    buildReportBuilderExplorationSourceContextFromTableRow({
+        row: {
+            eventDate: "2026-05-01",
+            channelV2: "Display",
+            campaign: "Prospect Sprint",
+        },
+        rowIndex: 2,
+    }),
+    {
+        label: "2026-05-01 • Display",
+        metadata: {
+            rowIndex: 2,
+            dimensionValues: {
+                eventDate: "2026-05-01",
+                channelV2: "Display",
+            },
+        },
+    },
 );
 
 assert.deepEqual(

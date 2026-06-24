@@ -1,3 +1,5 @@
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
+
 function normalizeString(value = "") {
   return String(value || "").trim();
 }
@@ -36,6 +38,26 @@ function normalizeLayoutItem(item = null) {
     : { blockId };
 }
 
+function isPlainObject(value = null) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function resolveReportRuntimeMetadataContext(reportSpecOrContext = {}, reportDocument = null) {
+  const explicitContext = isPlainObject(reportSpecOrContext)
+    && (
+      Object.prototype.hasOwnProperty.call(reportSpecOrContext, "reportSpec")
+      || Object.prototype.hasOwnProperty.call(reportSpecOrContext, "reportDocument")
+      || Object.prototype.hasOwnProperty.call(reportSpecOrContext, "document")
+    );
+  return resolveNormalizedReportSpecDocumentContext({
+    reportSpec: explicitContext ? (reportSpecOrContext.reportSpec || null) : reportSpecOrContext,
+    document: explicitContext
+      ? (reportSpecOrContext.reportDocument || reportSpecOrContext.document || reportDocument)
+      : reportDocument,
+    title: explicitContext ? normalizeString(reportSpecOrContext.title || "") : "",
+  });
+}
+
 function normalizeSemanticSummaryFields(fields = []) {
   return (Array.isArray(fields) ? fields : [])
     .map((field) => {
@@ -62,6 +84,8 @@ function normalizeSemanticSummaryFields(fields = []) {
         ...(normalizeString(field?.rawId) ? { rawId: normalizeString(field.rawId) } : {}),
         ...(normalizeString(field?.description) ? { description: normalizeString(field.description) } : {}),
         ...(normalizeString(field?.format) ? { format: normalizeString(field.format) } : {}),
+        ...(normalizeString(field?.category) ? { category: normalizeString(field.category) } : {}),
+        ...(normalizeString(field?.definitionRef) ? { definitionRef: normalizeString(field.definitionRef) } : {}),
         ...(governance && Object.keys(governance).length > 0 ? { governance } : {}),
       };
     })
@@ -93,6 +117,68 @@ function summarizeSemanticGovernance(fields = []) {
     draft: 0,
     deprecated: 0,
   });
+}
+
+function uniqueSemanticFieldMetadataValues(fields = [], property = "") {
+  const values = [];
+  const seen = new Set();
+  (Array.isArray(fields) ? fields : []).forEach((field) => {
+    const value = normalizeString(field?.[property]);
+    if (!value || seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    values.push(value);
+  });
+  return values;
+}
+
+function uniqueSemanticGovernanceValues(fields = [], property = "") {
+  const values = [];
+  const seen = new Set();
+  (Array.isArray(fields) ? fields : []).forEach((field) => {
+    const value = normalizeString(field?.governance?.[property]);
+    if (!value || seen.has(value)) {
+      return;
+    }
+    seen.add(value);
+    values.push(value);
+  });
+  return values;
+}
+
+function summarizeMetadataChip(label = "", values = [], maxVisible = 2) {
+  const normalizedLabel = normalizeString(label);
+  const resolvedValues = Array.isArray(values) ? values.filter(Boolean) : [];
+  if (!normalizedLabel || resolvedValues.length === 0) {
+    return "";
+  }
+  if (resolvedValues.length <= maxVisible) {
+    return `${normalizedLabel} ${resolvedValues.join(", ")}`;
+  }
+  return `${normalizedLabel} ${resolvedValues.slice(0, maxVisible).join(", ")} +${resolvedValues.length - maxVisible}`;
+}
+
+function normalizeScopeParams(params = []) {
+  return (Array.isArray(params) ? params : [])
+    .map((param) => {
+      if (!param || typeof param !== "object" || Array.isArray(param)) {
+        return null;
+      }
+      const id = normalizeString(param?.id);
+      const label = normalizeString(param?.label || id);
+      if (!id || !label) {
+        return null;
+      }
+      const description = normalizeString(param?.description);
+      return {
+        id,
+        label,
+        ...(description ? { description } : {}),
+        value: cloneValue(param?.value),
+      };
+    })
+    .filter(Boolean);
 }
 
 function resolveReportRuntimeFieldColumn(reportSpec = {}, datasetRef = "", fieldKey = "") {
@@ -211,16 +297,18 @@ export function resolveReportRuntimePrimaryBlocks(reportSpec = {}, reportFill = 
   };
 }
 
-export function resolveReportRuntimeBindingSummary(reportSpec = {}) {
-  const semanticSummary = reportSpec?.semanticSummary && typeof reportSpec.semanticSummary === "object" && !Array.isArray(reportSpec.semanticSummary)
-    ? reportSpec.semanticSummary
+export function resolveReportRuntimeBindingSummary(reportSpecOrContext = {}, reportDocument = null) {
+  const metadataContext = resolveReportRuntimeMetadataContext(reportSpecOrContext, reportDocument);
+  const semanticSummary = metadataContext?.semanticSummary && typeof metadataContext.semanticSummary === "object" && !Array.isArray(metadataContext.semanticSummary)
+    ? metadataContext.semanticSummary
     : null;
-  const binding = reportSpec?.binding;
+  const binding = metadataContext?.binding;
   const bindingSelectedDimensions = normalizeBindingSelectionFields(binding?.selectedDimensions);
   const bindingSelectedMeasures = normalizeBindingSelectionFields(binding?.selectedMeasures);
   if (normalizeString(semanticSummary?.kind).toLowerCase() === "semantic") {
     const selectedDimensions = normalizeSemanticSummaryFields(semanticSummary?.selectedDimensions);
     const selectedMeasures = normalizeSemanticSummaryFields(semanticSummary?.selectedMeasures);
+    const selectedParameters = normalizeSemanticSummaryFields(semanticSummary?.selectedParameters);
     const resolvedSelectedDimensions = selectedDimensions.length > 0
       ? selectedDimensions
       : bindingSelectedDimensions;
@@ -238,11 +326,14 @@ export function resolveReportRuntimeBindingSummary(reportSpec = {}) {
       ...(normalizeString(semanticSummary?.entityDescription) ? { entityDescription: normalizeString(semanticSummary?.entityDescription) } : {}),
       dimensionCount: resolvedSelectedDimensions.length,
       measureCount: resolvedSelectedMeasures.length,
+      ...(selectedParameters.length > 0 ? { parameterCount: selectedParameters.length } : {}),
       selectedDimensions: resolvedSelectedDimensions,
       selectedMeasures: resolvedSelectedMeasures,
+      ...(selectedParameters.length > 0 ? { selectedParameters } : {}),
       governanceCounts: summarizeSemanticGovernance([
         ...resolvedSelectedDimensions,
         ...resolvedSelectedMeasures,
+        ...selectedParameters,
       ]),
     };
   }
@@ -276,15 +367,44 @@ export function resolveReportRuntimeBindingSummaryChips(bindingSummary = null) {
       .map((field) => normalizeString(field?.label))
       .filter(Boolean);
     if (labels.length === 0) {
-      return title === "Dimensions"
-        ? `${Number(count || 0)} dimensions`
-        : `${Number(count || 0)} measures`;
+      const normalizedTitle = normalizeString(title).toLowerCase();
+      if (normalizedTitle === "dimensions") {
+        return `${Number(count || 0)} dimensions`;
+      }
+      if (normalizedTitle === "measures") {
+        return `${Number(count || 0)} measures`;
+      }
+      if (normalizedTitle === "parameters") {
+        return `${Number(count || 0)} parameters`;
+      }
+      return `${Number(count || 0)} ${normalizedTitle}`;
     }
     if (labels.length <= 2) {
       return `${title} ${labels.join(", ")}`;
     }
     return `${title} ${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
   };
+  const semanticFields = [
+    ...(Array.isArray(bindingSummary.selectedDimensions) ? bindingSummary.selectedDimensions : []),
+    ...(Array.isArray(bindingSummary.selectedMeasures) ? bindingSummary.selectedMeasures : []),
+    ...(Array.isArray(bindingSummary.selectedParameters) ? bindingSummary.selectedParameters : []),
+  ];
+  const categoryChip = summarizeMetadataChip(
+    "Categories",
+    uniqueSemanticFieldMetadataValues(semanticFields, "category"),
+    2,
+  );
+  const ownerRefs = uniqueSemanticGovernanceValues(semanticFields, "ownerRef");
+  const ownerChip = ownerRefs.length === 0
+    ? ""
+    : ownerRefs.length === 1
+      ? `Owner ${ownerRefs[0]}`
+      : summarizeMetadataChip("Owners", ownerRefs, 1);
+  const lineageChip = summarizeMetadataChip(
+    "Lineage",
+    uniqueSemanticFieldMetadataValues(semanticFields, "definitionRef"),
+    1,
+  );
   return [
     normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)
       ? `Model ${normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)}`
@@ -294,6 +414,12 @@ export function resolveReportRuntimeBindingSummaryChips(bindingSummary = null) {
       : "",
     summarizeSelectedLabels("Dimensions", bindingSummary.selectedDimensions, bindingSummary.dimensionCount),
     summarizeSelectedLabels("Measures", bindingSummary.selectedMeasures, bindingSummary.measureCount),
+    Number(bindingSummary.parameterCount || 0) > 0
+      ? summarizeSelectedLabels("Parameters", bindingSummary.selectedParameters, bindingSummary.parameterCount)
+      : "",
+    categoryChip,
+    ownerChip,
+    lineageChip,
     Number(bindingSummary.governanceCounts?.deprecated || 0) > 0
       ? `${Number(bindingSummary.governanceCounts.deprecated)} deprecated`
       : "",
@@ -301,6 +427,19 @@ export function resolveReportRuntimeBindingSummaryChips(bindingSummary = null) {
       ? `${Number(bindingSummary.governanceCounts.draft)} draft`
       : "",
   ].filter(Boolean);
+}
+
+export function resolveReportRuntimeScopeSummary(reportSpecOrContext = {}, reportDocument = null) {
+  const metadataContext = resolveReportRuntimeMetadataContext(reportSpecOrContext, reportDocument);
+  const params = normalizeScopeParams(metadataContext?.scopeParams);
+  if (params.length === 0) {
+    return null;
+  }
+  return {
+    title: "Report Scope",
+    paramCount: params.length,
+    params,
+  };
 }
 
 export function resolveReportRuntimeRefinementFields(reportSpec = {}, block = {}) {

@@ -367,7 +367,7 @@ const mixedProvider = {
           id: "detail_channel",
           label: "Show channel details",
           kind: "detail",
-          targetRef: "target://steward/performance/channel-detail",
+          targetRef: "target://example/performance/channel-detail",
         },
       ];
     }
@@ -426,7 +426,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     label: "Show channel details",
     value: "Display",
     displayValue: "Display",
-    targetRef: "target://steward/performance/channel-detail",
+    targetRef: "target://example/performance/channel-detail",
   },
 ]);
 
