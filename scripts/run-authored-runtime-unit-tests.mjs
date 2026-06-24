@@ -130,6 +130,7 @@ const runtimeUnitTests = [
   "scripts/report-builder-preview-list-entry-published-snapshot-export-status-failure-scenario-assets.test.mjs",
   "scripts/report-builder-preview-list-entry-published-snapshot-export-artifact-failure-scenario-assets.test.mjs",
   "scripts/report-builder-preview-list-response-download-metadata-scenario-assets.test.mjs",
+  "scripts/report-builder-preview-selected-entry-ambiguous-local-backing-scenario-assets.test.mjs",
   "scripts/report-builder-preview-saved-report-payload-scenario-assets.test.mjs",
   "scripts/report-builder-preview-create-report-document-payload-scenario-assets.test.mjs",
   "scripts/report-builder-preview-semantic-update-report-document-payload-scenario-assets.test.mjs",
