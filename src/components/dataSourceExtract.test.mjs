@@ -21,6 +21,8 @@ const { records, info } = extractData(
 assert.equal(records.length, 2);
 assert.equal(info.pageCount, 61389);
 assert.equal(info.totalCount, 1227774);
+assert.doesNotThrow(() => JSON.stringify(info));
+assert.equal(Object.prototype.hasOwnProperty.call(info, 'value'), false);
 console.log('extractData ✓ falls back to recordCount for totalCount');
 
 const projectedPayload = {
