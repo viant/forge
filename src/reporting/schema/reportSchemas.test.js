@@ -74,7 +74,7 @@ const state = {
   pageSize: 25,
   orderField: "totalSpend",
   orderDir: "desc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
@@ -659,6 +659,22 @@ const authoredLayoutSpec = {
   },
 };
 assert.deepEqual(validateReportSpec(authoredLayoutSpec), {
+  valid: true,
+  errors: [],
+});
+
+const spanAuthoredLayoutSpec = {
+  ...kpiSpec,
+  layoutIntent: {
+    ...kpiSpec.layoutIntent,
+    items: [
+      { blockId: "primaryTable" },
+      { blockId: "primaryChart" },
+      { blockId: "headlineKpi", span: 8 },
+    ],
+  },
+};
+assert.deepEqual(validateReportSpec(spanAuthoredLayoutSpec), {
   valid: true,
   errors: [],
 });

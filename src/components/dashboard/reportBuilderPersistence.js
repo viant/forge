@@ -18,6 +18,47 @@ function normalizeScopeList(scopes = []) {
         .filter(Boolean)));
 }
 
+function listStoredReportBuilderStateEntries(storagePrefix = "") {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return [];
+    }
+    const normalizedPrefix = normalizeScopeValue(storagePrefix);
+    if (!normalizedPrefix) {
+        return [];
+    }
+    const keyPrefix = `${REPORT_BUILDER_STATE_PREFIX}.${normalizedPrefix}.`;
+    const storage = window.localStorage;
+    const next = [];
+    if (typeof storage.length === "number" && typeof storage.key === "function") {
+        for (let index = 0; index < storage.length; index += 1) {
+            const key = storage.key(index);
+            if (!normalizeScopeValue(key).startsWith(keyPrefix)) {
+                continue;
+            }
+            next.push(key);
+        }
+    }
+    return next;
+}
+
+function listAllStoredReportBuilderStateEntries() {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return [];
+    }
+    const storage = window.localStorage;
+    const next = [];
+    if (typeof storage.length === "number" && typeof storage.key === "function") {
+        for (let index = 0; index < storage.length; index += 1) {
+            const key = storage.key(index);
+            if (!normalizeScopeValue(key).startsWith(`${REPORT_BUILDER_STATE_PREFIX}.`)) {
+                continue;
+            }
+            next.push(key);
+        }
+    }
+    return next;
+}
+
 export function resolveLegacyReportBuilderStateStorageScopes({
     stateKey = "",
     stateStorageScope = "",
@@ -55,11 +96,146 @@ export function hasStoredReportBuilderState(value) {
         && Object.keys(value).length > 0;
 }
 
+function hasHydratedReportBuilderSessionState(value) {
+    return !!value
+        && typeof value === "object"
+        && !Array.isArray(value)
+        && !!value.reportDocumentReopenSession
+        && typeof value.reportDocumentReopenSession === "object"
+        && !Array.isArray(value.reportDocumentReopenSession)
+        && (
+            !!normalizeScopeValue(value.reportDocumentReopenSession.reportId)
+            || (Number(value.reportDocumentReopenSession.documentVersion || 0) || 0) > 0
+            || (
+                !!value.reportDocumentReopenSession.reopenedConfig
+                && typeof value.reportDocumentReopenSession.reopenedConfig === "object"
+                && !Array.isArray(value.reportDocumentReopenSession.reopenedConfig)
+            )
+            || !!normalizeScopeValue(value.reportDocumentReopenSession.reopenedSemanticFingerprint)
+        );
+}
+
+function summarizeHydratedReportBuilderSessionState(value) {
+    const session = hasHydratedReportBuilderSessionState(value)
+        ? value.reportDocumentReopenSession
+        : null;
+    if (!session) {
+        return null;
+    }
+    const authoredBlocks = Array.isArray(value?.reportDocumentBlocks) ? value.reportDocumentBlocks : [];
+    const authoredBlockCount = authoredBlocks.filter((block) => (
+        block && typeof block === "object" && !Array.isArray(block)
+    )).length;
+    const authoredTableColumnCount = authoredBlocks.reduce((total, block) => {
+        if (!block || typeof block !== "object" || Array.isArray(block)) {
+            return total;
+        }
+        if (normalizeScopeValue(block?.kind) !== "tableBlock") {
+            return total;
+        }
+        if (Array.isArray(block?.columns)) {
+            return total + block.columns.filter((column) => column && typeof column === "object" && !Array.isArray(column)).length;
+        }
+        if (Array.isArray(block?.columnKeys)) {
+            return total + block.columnKeys.filter((entry) => normalizeScopeValue(entry)).length;
+        }
+        return total;
+    }, 0);
+    return {
+        reportId: normalizeScopeValue(session?.reportId),
+        documentVersion: Number(session?.documentVersion || 0) || 0,
+        hasSemanticModel: !!session?.reopenedConfig?.semanticModel
+            && typeof session.reopenedConfig.semanticModel === "object"
+            && !Array.isArray(session.reopenedConfig.semanticModel),
+        hasTruncatedSemanticModel: JSON.stringify(session?.reopenedConfig?.semanticModel || {}).includes("[MaxDepth]"),
+        semanticModelRef: normalizeScopeValue(session?.reopenedConfig?.semanticModel?.modelRef),
+        bindingEntity: normalizeScopeValue(session?.reopenedConfig?.binding?.entity),
+        hasLiveSnapshot: !!session?.liveSnapshot?.config
+            && typeof session.liveSnapshot.config === "object"
+            && !Array.isArray(session.liveSnapshot.config)
+            && !!session?.liveSnapshot?.state
+            && typeof session.liveSnapshot.state === "object"
+            && !Array.isArray(session.liveSnapshot.state),
+        authoredBlockCount,
+        authoredTableColumnCount,
+    };
+}
+
+function shouldPreferStoredHydratedReportBuilderSessionState(windowState, storedState) {
+    const windowSession = summarizeHydratedReportBuilderSessionState(windowState);
+    const storedSession = summarizeHydratedReportBuilderSessionState(storedState);
+    if (!storedSession) {
+        return false;
+    }
+    if (!windowSession) {
+        return true;
+    }
+    if (
+        storedSession.reportId
+        && windowSession.reportId
+        && storedSession.reportId !== windowSession.reportId
+    ) {
+        return false;
+    }
+    if (
+        storedSession.documentVersion > 0
+        && windowSession.documentVersion > 0
+        && storedSession.documentVersion < windowSession.documentVersion
+    ) {
+        return false;
+    }
+    if (storedSession.documentVersion > windowSession.documentVersion) {
+        return true;
+    }
+    if (!storedSession.hasTruncatedSemanticModel && windowSession.hasTruncatedSemanticModel) {
+        return true;
+    }
+    if (storedSession.hasSemanticModel && !windowSession.hasSemanticModel) {
+        return true;
+    }
+    if (storedSession.semanticModelRef && !windowSession.semanticModelRef) {
+        return true;
+    }
+    if (storedSession.bindingEntity && !windowSession.bindingEntity) {
+        return true;
+    }
+    if (storedSession.hasLiveSnapshot && !windowSession.hasLiveSnapshot) {
+        return true;
+    }
+    const sameReportId = storedSession.reportId && windowSession.reportId && storedSession.reportId === windowSession.reportId;
+    const sameDocumentVersion = storedSession.documentVersion > 0
+        && storedSession.documentVersion === windowSession.documentVersion;
+    if (sameReportId && sameDocumentVersion) {
+        if (storedSession.authoredTableColumnCount > windowSession.authoredTableColumnCount) {
+            return true;
+        }
+        if (
+            storedSession.authoredTableColumnCount === windowSession.authoredTableColumnCount
+            && storedSession.authoredBlockCount > windowSession.authoredBlockCount
+        ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export function resolveEffectiveReportBuilderState(windowState = null, storedState = null) {
+    if (
+        hasHydratedReportBuilderSessionState(storedState)
+        && shouldPreferStoredHydratedReportBuilderSessionState(windowState, storedState)
+    ) {
+        return storedState;
+    }
     return hasStoredReportBuilderState(windowState) ? windowState : storedState;
 }
 
 export function shouldHydrateStoredReportBuilderWindowState(windowState = null, storedState = null) {
+    if (
+        hasHydratedReportBuilderSessionState(storedState)
+        && shouldPreferStoredHydratedReportBuilderSessionState(windowState, storedState)
+    ) {
+        return true;
+    }
     return !hasStoredReportBuilderState(windowState) && hasStoredReportBuilderState(storedState);
 }
 
@@ -91,6 +267,29 @@ export function loadStoredReportBuilderState(storageScope = "", legacyScopes = [
             }
             const parsed = JSON.parse(raw);
             if (parsed && typeof parsed === "object") {
+                return parsed;
+            }
+        }
+        const scopePrefixes = Array.from(new Set(
+            scopes
+                .map((scope) => normalizeScopeValue(scope).split(".")[0])
+                .filter(Boolean),
+        ));
+        for (const prefix of scopePrefixes) {
+            const matchingKeys = listStoredReportBuilderStateEntries(prefix);
+            if (matchingKeys.length !== 1) {
+                continue;
+            }
+            const raw = window.localStorage.getItem(matchingKeys[0]);
+            if (!raw) {
+                continue;
+            }
+            const parsed = JSON.parse(raw);
+            if (
+                parsed
+                && typeof parsed === "object"
+                && hasHydratedReportBuilderSessionState(parsed)
+            ) {
                 return parsed;
             }
         }

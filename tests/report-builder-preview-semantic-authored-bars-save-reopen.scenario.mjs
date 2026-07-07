@@ -158,7 +158,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const root = document.querySelector('.forge-report-builder__runtime-preview'); const text = root?.innerText || root?.textContent || ''; return text.includes('Inventory Scope') && text.includes('Date Range') && !text.includes('Inventory Trail') && !text.includes('No inventory drill path') && !text.includes('Active Refinements') && !text.includes('Report Scope'); })()",
+      expression: "(() => { const root = document.querySelector('.forge-report-builder__runtime-preview'); const text = root?.innerText || root?.textContent || ''; return text.includes('Inventory Scope') && text.includes('Date Range') && !text.includes('Inventory Trail') && !text.includes('No inventory drill path') && !text.includes('Active Refinements') && !text.includes('Filters'); })()",
       timeoutMs: 60000,
     },
     {

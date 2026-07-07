@@ -101,4 +101,26 @@ assert.deepEqual(mismatchedRequestSource, {
     loading: false,
 });
 
+const fetchedRowsPreferredOverEmptyCollectionSource = resolveReportBuilderRuntimePreviewRowsSource({
+    currentRequestFingerprint: '{"dimensions":{"country":true}}',
+    requestDispatchFingerprint: '{"dimensions":{"country":true}}::fetch',
+    currentRequestShouldFetch: true,
+    runtimePreviewFingerprint: '{"dimensions":{"country":true}}',
+    collection: [],
+    collectionInfo: { hasMore: false },
+    loading: false,
+    error: null,
+    fetchedRows: [{ country: "US", avails: 153100 }],
+    fetchedHasMore: false,
+    fetchedError: null,
+    fetchedLoading: false,
+});
+assert.deepEqual(fetchedRowsPreferredOverEmptyCollectionSource, {
+    source: "runtimePreview",
+    rows: [{ country: "US", avails: 153100 }],
+    hasMore: false,
+    error: null,
+    loading: false,
+});
+
 console.log("reportBuilderRuntimePreviewSource ✓ reuses visible result rows only when the compiled runtime request matches the current builder request");

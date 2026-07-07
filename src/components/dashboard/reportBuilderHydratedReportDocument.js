@@ -13,6 +13,8 @@ import {
     extractReportDocumentTemplateIdentity as extractReportDocumentTemplateIdentityFromModel,
     normalizeReportBuilderDocumentBlocks,
 } from "../../reporting/reportDocumentModel.js";
+import { resolveScopeBindingFilterId } from "../../reporting/scopeBindingModel.js";
+import { mergeScopeParamValues } from "../../reporting/scopeStateModel.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import { normalizeReportRuntimeInteractionState } from "./reportRuntimeInteractionStateModel.js";
 import {
@@ -321,6 +323,38 @@ function normalizeHydratedScopeParams(params = []) {
         .filter(Boolean);
 }
 
+function mergeHydratedScopeParamsWithSemanticSummary(scopeParams = [], semanticSummary = null) {
+    const normalizedScopeParams = normalizeHydratedScopeParams(scopeParams);
+    const normalizedSemanticSummary = normalizeReportBuilderSemanticSummary(semanticSummary);
+    const semanticParameterIndex = new Map(
+        (Array.isArray(normalizedSemanticSummary?.selectedParameters) ? normalizedSemanticSummary.selectedParameters : [])
+            .map((parameter) => [
+                normalizeString(parameter?.rawId || parameter?.id),
+                parameter,
+            ])
+            .filter(([id, parameter]) => !!id && !!parameter),
+    );
+    return normalizedScopeParams.map((param) => {
+        const parameter = semanticParameterIndex.get(normalizeString(param?.id)) || null;
+        if (!parameter) {
+            return param;
+        }
+        const currentLabel = normalizeString(param?.label);
+        const semanticLabel = normalizeString(parameter?.label);
+        const currentDescription = normalizeString(param?.description);
+        const semanticDescription = normalizeString(parameter?.description);
+        return {
+            ...param,
+            label: currentLabel && currentLabel !== normalizeString(param?.id)
+                ? currentLabel
+                : (semanticLabel || currentLabel || normalizeString(param?.id)),
+            ...(currentDescription
+                ? { description: currentDescription }
+                : (semanticDescription ? { description: semanticDescription } : {})),
+        };
+    });
+}
+
 const REPORT_DOCUMENT_REOPEN_SESSION_KEY = "reportDocumentReopenSession";
 const BLOCKING_SAVED_VIEW_OVERLAY_DIAGNOSTIC_CODES = new Set([
     "savedViewOverlaySnapshotBaseReportMismatch",
@@ -394,28 +428,20 @@ function applyReportDocumentScopeBindings(document = {}, block = {}, scopeParams
             .map((entry) => [normalizeString(entry?.id), entry])
             .filter(([id]) => !!id),
     );
-    const nextState = stripExplorationSession(block?.state || {});
-    const nextStaticFilters = {
-        ...(nextState.staticFilters || {}),
-    };
+    const boundScopeValues = {};
     (Array.isArray(block?.scopeBindings) ? block.scopeBindings : []).forEach((binding) => {
         const paramId = normalizeString(binding?.paramId);
-        const target = normalizeString(binding?.target);
-        if (!paramId || !target.startsWith("staticFilters.")) {
+        const filterId = resolveScopeBindingFilterId(binding?.target);
+        if (!paramId || !filterId) {
             return;
         }
         const param = params.get(paramId);
         if (!param || !Object.prototype.hasOwnProperty.call(param, "value")) {
             return;
         }
-        const filterId = normalizeString(target.slice("staticFilters.".length));
-        if (!filterId) {
-            return;
-        }
-        nextStaticFilters[filterId] = cloneValue(param.value);
+        boundScopeValues[filterId] = cloneValue(param.value);
     });
-    nextState.staticFilters = nextStaticFilters;
-    return nextState;
+    return mergeScopeParamValues(stripExplorationSession(block?.state || {}), boundScopeValues);
 }
 
 export function buildHydratedReportBuilderDocument(getResponse = null, {
@@ -600,6 +626,10 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
         ],
     );
     const savedSource = normalizeSavedReportPayloadSource(getResponse?.source);
+    const runtimePreviewInteraction = normalizeReportRuntimeInteractionState(
+        getResponse?.sourceSession?.runtimePreviewInteraction,
+        { allowEmpty: false },
+    );
     const sharedArtifactState = normalizeHydratedSharedArtifactState(getResponse, {
         fallbackKind: savedSource?.kind || "",
     });
@@ -613,6 +643,7 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
         ...(sharedArtifactState ? sharedArtifactState : {}),
         config,
         ...(compileState ? { compileState } : {}),
+        ...(runtimePreviewInteraction ? { runtimePreviewInteraction } : {}),
         ...(effectiveScopeParams.length > 0 ? { scopeParams: cloneValue(effectiveScopeParams) } : {}),
         ...(savedViewOverlay ? { savedViewOverlay } : {}),
         ...(resolvedBaseRecord?.source ? { savedViewOverlayBaseSource: cloneValue(resolvedBaseRecord.source) } : {}),
@@ -649,7 +680,10 @@ export function normalizeReportBuilderHydratedDocumentSession(session = null) {
         return null;
     }
     const reopenedSemanticSummary = normalizeReportBuilderSemanticSummary(session?.reopenedSemanticSummary);
-    const reopenedScopeParams = normalizeHydratedScopeParams(session?.reopenedScopeParams);
+    const reopenedScopeParams = mergeHydratedScopeParamsWithSemanticSummary(
+        session?.reopenedScopeParams,
+        reopenedSemanticSummary,
+    );
     const reopenedSemanticFingerprint = normalizeString(session?.reopenedSemanticFingerprint);
     const reopenedCompileState = normalizeReportBuilderHydratedCompileState(session?.reopenedCompileState);
     const savedSource = normalizeSavedReportPayloadSource(session?.savedSource);
@@ -720,7 +754,10 @@ export function buildReportBuilderHydratedDocumentSession(hydratedDocument = nul
         title: hydratedDocument?.title || hydratedDocument?.reportId || "",
     });
     const reopenedSemanticSummary = normalizeReportBuilderSemanticSummary(hydratedContext?.semanticSummary);
-    const reopenedScopeParams = normalizeHydratedScopeParams(hydratedDocument?.scopeParams || hydratedContext?.scopeParams);
+    const reopenedScopeParams = mergeHydratedScopeParamsWithSemanticSummary(
+        hydratedDocument?.scopeParams || hydratedContext?.scopeParams,
+        reopenedSemanticSummary,
+    );
     const reopenedSemanticFingerprint = buildHydratedDocumentSemanticFingerprint(
         hydratedDocument.config,
         hydratedDocument.state,

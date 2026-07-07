@@ -64,6 +64,9 @@ func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey 
 	if assetErr != nil {
 		assetPath, assetErr = loader.ResolveWindowAsset(ctx, filePath, ".js", target)
 	}
+	if assetErr != nil {
+		assetPath, assetErr = loader.ResolveWindowAsset(ctx, url.Join(baseURL, key), ".js", target)
+	}
 	if assetErr == nil {
 		code, err := loader.Download(context.Background(), assetPath)
 		if err != nil {

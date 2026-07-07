@@ -62,7 +62,7 @@ const semanticState = {
     selectedMeasures: ["totalSpend", "hhUniqs"],
     selectedDimensions: ["eventDate", "channelId"],
     groupBy: "agegroupId",
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-04",
@@ -85,7 +85,7 @@ assert.deepEqual(resolveReportBuilderStateReadiness({
     config: semanticConfig,
     state: {
         ...semanticState,
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "",
                 end: "",
@@ -334,6 +334,74 @@ assert.deepEqual(resolveReportBuilderStateReadiness({
     canRun: false,
     reason: "semantic",
     message: "Date Range start date must be on or before the end date. Adjust the date range so the start date is not after the end date.",
+});
+
+assert.deepEqual(resolveReportBuilderStateReadiness({
+    config: semanticConfig,
+    state: semanticState,
+    semanticModelProvider: { validateSelection() {} },
+    semanticModelState: {
+        loading: false,
+        error: "",
+        model: semanticModel,
+    },
+    semanticSelectionValidationState: {
+        fingerprint: semanticValidationFingerprint,
+        requestKey: `${semanticValidationFingerprint}::0`,
+        loading: false,
+        error: "",
+        valid: false,
+        diagnostics: [
+            {
+                code: "semanticModelError",
+                severity: "error",
+                path: "selection.modelRef",
+                message: "Semantic model metadata failed.",
+                suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
+            },
+        ],
+    },
+    semanticRetryAvailable: true,
+}), {
+    canRun: false,
+    reason: "semantic",
+    message: "Semantic model metadata failed. Retry loading the semantic model or choose a different semantic binding.",
+    issueKind: "semanticModelResolution",
+    action: "retrySemanticValidation",
+});
+
+assert.deepEqual(resolveReportBuilderStateReadiness({
+    config: semanticConfig,
+    state: semanticState,
+    semanticModelProvider: { validateSelection() {} },
+    semanticModelState: {
+        loading: false,
+        error: "",
+        model: semanticModel,
+    },
+    semanticSelectionValidationState: {
+        fingerprint: semanticValidationFingerprint,
+        requestKey: `${semanticValidationFingerprint}::0`,
+        loading: false,
+        error: "",
+        valid: false,
+        diagnostics: [
+            {
+                code: "semanticModelUnavailable",
+                severity: "error",
+                path: "selection.modelRef",
+                message: "Semantic model provider unavailable.",
+                suggestedFix: "Retry loading the semantic model or restore the semantic model provider.",
+            },
+        ],
+    },
+    semanticRetryAvailable: true,
+}), {
+    canRun: false,
+    reason: "semantic",
+    message: "Semantic model provider unavailable. Retry loading the semantic model or restore the semantic model provider.",
+    issueKind: "semanticModelResolution",
+    action: "retrySemanticValidation",
 });
 
 console.log("reportBuilderReadiness ✓ semantic provider gating and recovery");

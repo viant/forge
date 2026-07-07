@@ -1,4 +1,6 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceAbsentStep,
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildPreviewBootstrapSteps,
   buildReopenedHydratedSessionVerificationSteps,
   buildSavedPayloadPreparationSteps,
@@ -99,11 +101,15 @@ export default {
       text: "Semantic model error: Semantic model metadata failed.",
       timeoutMs: 60000,
     },
-    {
-      type: "waitForEval",
-      expression: "(() => { const preview = document.querySelector('[aria-label=\"Authored runtime preview\"]'); const text = preview?.innerText || preview?.textContent || ''; return !!preview && text.includes('Capacity Trend Q3') && !text.includes('Model Ad Delivery') && !text.includes('Entity Line Delivery') && !text.includes('Dimensions Delivery Date, Channel') && !text.includes('Measures Available Impressions'); })()",
-      timeoutMs: 60000,
-    },
+    buildAuthoredRuntimeSemanticSurfaceAbsentStep({
+      requiredTexts: ["Capacity Trend Q3"],
+      forbiddenTexts: [
+        "Model Ad Delivery",
+        "Entity Line Delivery",
+        "Dimensions Delivery Date, Channel",
+        "Measures Available Impressions",
+      ],
+    }),
     {
       type: "waitForEval",
       expression: "(() => { const metrics = window.__REPORT_BUILDER_PREVIEW__; return !!metrics && Number(metrics.getModelCount || 0) >= 1; })()",
@@ -143,26 +149,10 @@ export default {
       text: "Compiled Report Runtime Preview",
       timeoutMs: 60000,
     },
-    {
-      type: "waitForDomContains",
-      text: "Model Ad Delivery",
-      timeoutMs: 60000,
-    },
-    {
-      type: "waitForDomContains",
-      text: "Entity Line Delivery",
-      timeoutMs: 60000,
-    },
-    {
-      type: "waitForDomContains",
-      text: "Dimensions Delivery Date, Channel",
-      timeoutMs: 60000,
-    },
-    {
-      type: "waitForDomContains",
-      text: "Measures Available Impressions",
-      timeoutMs: 60000,
-    },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date, Channel",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "screenshot",
       file: "report-builder-preview-semantic-reopen-report-document-model-error-runtime-reload.png",

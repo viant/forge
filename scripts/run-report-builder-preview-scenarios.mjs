@@ -61,6 +61,7 @@ function printHelp() {
   console.log("Groups:");
   console.log("- all");
   console.log("- semantic");
+  console.log("- semantic-left-rail");
   console.log("- legacy");
 }
 

@@ -67,6 +67,30 @@ func TestLoadWindow_LoadsRootSiblingActionCodeForSingleFileWindow(t *testing.T) 
 	}
 }
 
+func TestLoadWindow_LoadsRootSiblingActionCodeForFolderizedWindow(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "window", "metricReportBuilder")
+	mustWriteHandlerMetaFile(t, filepath.Join(base, "shared", "main.yaml"), "namespace: Performance Metrics\nview:\n  content: {}\n")
+	mustWriteHandlerMetaFile(t, filepath.Join(root, "window", "metricReportBuilder.js"), "(() => ({ stewardReportBuilder: { buildRequest: () => ({}) } }))()")
+
+	baseURL := "file://" + filepath.ToSlash(filepath.Join(root, "window"))
+	loader := meta.New(afs.New(), baseURL)
+	window, err := LoadWindow(context.Background(), loader, baseURL, "metricReportBuilder", "", &meta.TargetContext{
+		Platform:   "web",
+		FormFactor: "desktop",
+		Surface:    "app",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if window == nil {
+		t.Fatalf("expected window")
+	}
+	if got := strings.TrimSpace(window.Actions.Code); got == "" {
+		t.Fatalf("expected folderized root sibling action code to load")
+	}
+}
+
 func mustWriteHandlerMetaFile(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

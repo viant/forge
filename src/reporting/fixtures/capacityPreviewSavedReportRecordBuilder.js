@@ -543,7 +543,7 @@ export function buildCapacityAudienceSegmentSavedReportRecord() {
       orderField: "audienceIndex",
       orderDir: "desc",
       pageSize: 50,
-      staticFilters: {
+      scopeParams: {
         dateRange: {
           start: "2026-05-01",
           end: "2026-05-04",

@@ -1,10 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import Chart from "../Chart.jsx";
+import {
+  REPORT_LAYOUT_GRID_COLUMNS,
+  resolveReportLayoutSpan,
+} from "../../reporting/reportLayoutModel.js";
+import { setSelector } from "../../utils/selector.js";
 import DashboardTableContent from "./DashboardTableContent.jsx";
 import {
   formatReportRuntimeRefinement,
+  resolveReportRuntimeCompactBindingSummaryChips,
   formatReportRuntimeScopeValue,
+  resolveReportRuntimeActiveScopeSummary,
   resolveReportRuntimeChartActionFields,
   resolveReportRuntimeBindingSummaryChips,
   resolveReportRuntimeBindingSummary,
@@ -42,9 +49,48 @@ import {
 import { resolveReportRuntimeDrillMetadataProvider } from "./reportRuntimeDrillProvider.js";
 import { DEFAULT_GEO_PALETTE, US_STATE_TILES, normalizeGeoKey } from "./geoMapUtils.js";
 import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGovernanceView.js";
+import { formatDashboardValue } from "./dashboardUtils.js";
+import { resolveDashboardRowActionIdentity } from "./dashboardRowActionPresentation.js";
+import { InlineStaticFilterControl } from "./reportBuilderComponents.jsx";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
+}
+
+function cloneValue(value) {
+  return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function titleizeRuntimeField(value = "") {
+  const normalized = normalizeString(value);
+  if (!normalized) {
+    return "";
+  }
+  return normalized
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\bid\b/gi, "ID")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((segment) => segment.slice(0, 1).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function formatRuntimeRefinementChipLabel(refinement = {}) {
+  const label = normalizeString(refinement?.label);
+  const op = normalizeString(refinement?.op).toLowerCase();
+  if (op === "drill" && label && /^drill\b/i.test(label)) {
+    const sourceValueMatch = label.match(/:\s*([^=]+?)\s*=\s*(.+)$/);
+    if (sourceValueMatch) {
+      return `${normalizeString(sourceValueMatch[1])} = ${normalizeString(sourceValueMatch[2])}`;
+    }
+    const valueOnlyMatch = label.match(/=\s*(.+)$/);
+    const fieldLabel = normalizeString(refinement?.fieldLabel) || titleizeRuntimeField(refinement?.field);
+    if (valueOnlyMatch && fieldLabel) {
+      return `${fieldLabel} = ${normalizeString(valueOnlyMatch[1])}`;
+    }
+  }
+  return formatReportRuntimeRefinement(refinement);
 }
 
 function supportsReportRuntimeExecution(execution = null, runtimeHandlers = null) {
@@ -109,6 +155,27 @@ function createRuntimeContext(dataset = {}, locale = "en-US") {
   };
 }
 
+function buildRuntimeTableRows(block = {}, dataset = {}) {
+  const resolvedRows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
+  const originalRows = Array.isArray(dataset?.rows) ? dataset.rows : [];
+  if (resolvedRows.length === 0) {
+    return originalRows;
+  }
+  return resolvedRows.map((resolvedRow, rowIndex) => {
+    const cells = Array.isArray(resolvedRow?.cells) ? resolvedRow.cells : [];
+    return cells.reduce((acc, cell) => {
+      const sourceKey = normalizeString(cell?.sourceKey || cell?.key);
+      const displayKey = normalizeString(cell?.displayKey || cell?.key);
+      const next = sourceKey
+        ? setSelector(acc, sourceKey, cloneValue(cell?.value))
+        : acc;
+      return displayKey && displayKey !== sourceKey
+        ? setSelector(next, displayKey, cloneValue(cell?.displayValue))
+        : next;
+    }, cloneValue(originalRows[rowIndex]) || {});
+  });
+}
+
 function RuntimePanel({ title = "", subtitle = "", children, className = "" }) {
   return (
     <section
@@ -135,12 +202,27 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "" }) {
   );
 }
 
-function resolveRuntimeLayoutSize(block = {}) {
-  return normalizeString(block?.layoutItem?.size).toLowerCase() === "half" ? "half" : "full";
+function resolveRuntimeLayoutSpanForBlock(block = {}) {
+  const requestedSpan = resolveReportLayoutSpan(block?.layoutItem);
+  const normalizedKind = normalizeString(block?.kind).toLowerCase();
+  const columns = Array.isArray(block?.content?.columns)
+    ? block.content.columns
+    : (Array.isArray(block?.columns) ? block.columns : []);
+  if (normalizedKind === "tableblock" && columns.length >= 5) {
+    return REPORT_LAYOUT_GRID_COLUMNS;
+  }
+  if (normalizedKind === "tableblock" && columns.length >= 3 && requestedSpan <= 6) {
+    return REPORT_LAYOUT_GRID_COLUMNS;
+  }
+  if (normalizedKind === "tableblock" && columns.length >= 3) {
+    return Math.max(requestedSpan, 8);
+  }
+  return requestedSpan;
 }
 
 function resolveRuntimeLayoutGridColumn(block = {}) {
-  return resolveRuntimeLayoutSize(block) === "half" ? "span 1" : "1 / -1";
+  const span = resolveRuntimeLayoutSpanForBlock(block);
+  return span >= REPORT_LAYOUT_GRID_COLUMNS ? "1 / -1" : `span ${span}`;
 }
 
 function formatKpiValue(value) {
@@ -157,7 +239,86 @@ function formatKpiValue(value) {
   return normalized || String(value);
 }
 
-function ChartSelectionPanel({
+function resolveRuntimeKpiToneStyles(tone = "") {
+  const normalizedTone = normalizeString(tone).toLowerCase();
+  if (normalizedTone === "danger") {
+    return {
+      accent: "#d64545",
+      chipBackground: "#fff1f0",
+      chipBorder: "#f5c2c0",
+      chipText: "#a82a2a",
+    };
+  }
+  if (normalizedTone === "warning") {
+    return {
+      accent: "#d9822b",
+      chipBackground: "#fff7e1",
+      chipBorder: "#f5d28c",
+      chipText: "#8a5d00",
+    };
+  }
+  if (normalizedTone === "success") {
+    return {
+      accent: "#16a34a",
+      chipBackground: "#eef8f0",
+      chipBorder: "#cfe7d6",
+      chipText: "#0f6b3a",
+    };
+  }
+  if (normalizedTone === "info") {
+    return {
+      accent: "#2f6de1",
+      chipBackground: "#eef4ff",
+      chipBorder: "#cddcfd",
+      chipText: "#2457b8",
+    };
+  }
+  return {
+    accent: "#d8e2eb",
+    chipBackground: "#f7fafc",
+    chipBorder: "#d8e2eb",
+    chipText: "#486581",
+  };
+}
+
+function resolveRuntimeBadgeToneStyles(tone = "") {
+  const normalizedTone = normalizeString(tone).toLowerCase();
+  if (normalizedTone === "danger") {
+    return {
+      background: "#fff1f0",
+      border: "#f5c2c0",
+      text: "#a82a2a",
+    };
+  }
+  if (normalizedTone === "warning") {
+    return {
+      background: "#fff7e1",
+      border: "#f5d28c",
+      text: "#8a5d00",
+    };
+  }
+  if (normalizedTone === "success") {
+    return {
+      background: "#eef8f0",
+      border: "#cfe7d6",
+      text: "#0f6b3a",
+    };
+  }
+  if (normalizedTone === "info") {
+    return {
+      background: "#eef4ff",
+      border: "#cddcfd",
+      text: "#2457b8",
+    };
+  }
+  return {
+    background: "#f7fafc",
+    border: "#d8e2eb",
+    text: "#486581",
+  };
+}
+
+export function ChartSelectionPanel({
   viewModel = null,
   onAction = null,
   onClearSelection = null,
@@ -217,6 +378,9 @@ function ChartSelectionPanel({
               key={action.id}
               type="button"
               className="forge-report-runtime-chart-action"
+              data-testid="report-runtime-chart-action"
+              data-action-id={resolveDashboardRowActionIdentity(action)}
+              data-action-kind={normalizeString(action?.kind).toLowerCase() || "action"}
               onClick={() => onAction?.(action.id)}
               style={{
                 border: "1px solid #d8e1e8",
@@ -259,6 +423,45 @@ function BindingChips({ bindingSummary = null }) {
             borderRadius: 999,
             padding: "4px 10px",
             letterSpacing: "0.02em",
+          }}
+        >
+          {chip}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CompactBindingChips({ bindingSummary = null }) {
+  const chips = resolveReportRuntimeCompactBindingSummaryChips(bindingSummary);
+  if (chips.length === 0) {
+    return null;
+  }
+  return (
+    <div
+      data-report-runtime-binding-panel="semantic-compact"
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 8,
+      }}
+      aria-label="Semantic binding"
+    >
+      {chips.map((chip) => (
+        <span
+          key={chip}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            border: "1px solid #d8e1e8",
+            borderRadius: 999,
+            background: "#f5f8fb",
+            color: "#30404d",
+            padding: "4px 10px",
+            fontSize: 11,
+            fontWeight: 600,
+            lineHeight: 1.35,
           }}
         >
           {chip}
@@ -440,11 +643,14 @@ function BindingMetadataCard({ label = "", value = "", description = "" }) {
   );
 }
 
-function BindingDetailsPanel({ bindingSummary = null }) {
+function BindingDetailsPanel({ bindingSummary = null, presentationMode = "preview" }) {
   if (!bindingSummary || typeof bindingSummary !== "object" || Array.isArray(bindingSummary)) {
     return null;
   }
   if (normalizeString(bindingSummary.kind).toLowerCase() !== "semantic") {
+    return null;
+  }
+  if (normalizeString(presentationMode).toLowerCase() === "report") {
     return null;
   }
   return (
@@ -498,7 +704,59 @@ function BindingDetailsPanel({ bindingSummary = null }) {
   );
 }
 
-function ScopeDetailsPanel({ scopeSummary = null }) {
+function ActiveScopeSummary({ activeScopeSummary = null }) {
+  if (!activeScopeSummary || typeof activeScopeSummary !== "object" || Array.isArray(activeScopeSummary)) {
+    return null;
+  }
+  const items = Array.isArray(activeScopeSummary?.items) ? activeScopeSummary.items : [];
+  if (items.length === 0) {
+    return null;
+  }
+  return (
+    <div
+      data-report-runtime-active-scope-summary="true"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        borderTop: "1px dashed #cfdced",
+        paddingTop: 12,
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
+          {normalizeString(activeScopeSummary.title || "Active Refinements")} ({activeScopeSummary.count})
+        </div>
+        <div style={{ fontSize: 11, lineHeight: 1.5, color: "#5f6b7c" }}>
+          {normalizeString(activeScopeSummary.description)}
+        </div>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {items.map((item) => (
+          <span
+            key={item.id}
+            className="forge-report-runtime-active-scope-chip"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#21538f",
+              background: "#eef4fb",
+              border: "1px solid #cfdced",
+              borderRadius: 999,
+              padding: "4px 10px",
+            }}
+          >
+            {item.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScopeDetailsPanel({ scopeSummary = null, activeScopeSummary = null, presentationMode = "preview" }) {
   if (!scopeSummary || typeof scopeSummary !== "object" || Array.isArray(scopeSummary)) {
     return null;
   }
@@ -519,10 +777,12 @@ function ScopeDetailsPanel({ scopeSummary = null }) {
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
-          {normalizeString(scopeSummary.title || "Report Scope")}
+          {normalizeString(scopeSummary.title || "Filters")} (baseline)
         </div>
         <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>
-          Shared scope parameters compiled into this runtime artifact.
+          {normalizeString(presentationMode).toLowerCase() === "report"
+            ? "Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."
+            : "Baseline filters compiled into this runtime. Live keep, exclude, and drill changes appear in Active refinements."}
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
@@ -535,6 +795,7 @@ function ScopeDetailsPanel({ scopeSummary = null }) {
           />
         ))}
       </div>
+      <ActiveScopeSummary activeScopeSummary={activeScopeSummary} />
     </div>
   );
 }
@@ -752,6 +1013,50 @@ function buildBlockDiagnosticsIndex(diagnostics = []) {
   return next;
 }
 
+function resolveDatasetBackedBlockDiagnostics(block = {}, diagnostics = [], dataset = null) {
+  const resolvedDiagnostics = Array.isArray(diagnostics) ? diagnostics : [];
+  const datasetDiagnostics = Array.isArray(dataset?.provenance?.diagnostics)
+    ? dataset.provenance.diagnostics
+    : [];
+  if (datasetDiagnostics.length === 0) {
+    return resolvedDiagnostics;
+  }
+  const normalizedBlockId = normalizeString(block?.id);
+  const combined = [...resolvedDiagnostics];
+  const seen = new Set(
+    combined.map((diagnostic) => [
+      normalizeString(diagnostic?.severity),
+      normalizeString(diagnostic?.code),
+      normalizeString(diagnostic?.path),
+      normalizeString(diagnostic?.message),
+      normalizeString(diagnostic?.suggestedFix),
+    ].join("::")),
+  );
+  datasetDiagnostics.forEach((diagnostic, index) => {
+    if (!diagnostic || typeof diagnostic !== "object" || Array.isArray(diagnostic)) {
+      return;
+    }
+    const normalizedDiagnostic = {
+      ...cloneValue(diagnostic),
+      ...(normalizedBlockId ? { blockId: normalizedBlockId } : {}),
+      ...(normalizeString(diagnostic?.id) ? {} : { id: `${normalizedBlockId || "block"}:datasetDiagnostic:${index + 1}` }),
+    };
+    const key = [
+      normalizeString(normalizedDiagnostic?.severity),
+      normalizeString(normalizedDiagnostic?.code),
+      normalizeString(normalizedDiagnostic?.path),
+      normalizeString(normalizedDiagnostic?.message),
+      normalizeString(normalizedDiagnostic?.suggestedFix),
+    ].join("::");
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    combined.push(normalizedDiagnostic);
+  });
+  return combined;
+}
+
 function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
   const viewModel = buildReportRuntimeHostIntentViewModel(hostIntent, {
     canClearHostIntent: typeof runtimeHandlers?.clearDetailState === "function"
@@ -837,8 +1142,16 @@ function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
 function MarkdownBlock({ block = {} }) {
   const markdown = String(block?.content?.markdown || block?.markdown || "");
   const lines = markdown.split(/\n+/).filter((line) => line.length > 0);
+  const title = normalizeString(block?.title || block?.content?.title);
+  const firstLine = normalizeString(lines[0] || "");
+  const firstHeadingText = firstLine.startsWith("## ")
+    ? normalizeString(firstLine.slice(3))
+    : (firstLine.startsWith("# ") ? normalizeString(firstLine.slice(2)) : "");
+  const panelTitle = firstHeadingText && title && firstHeadingText.toLowerCase() === title.toLowerCase()
+    ? ""
+    : title;
   return (
-    <RuntimePanel title={normalizeString(block?.title || block?.content?.title)}>
+    <RuntimePanel title={panelTitle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {lines.map((line, index) => {
           if (line.startsWith("## ")) {
@@ -854,6 +1167,71 @@ function MarkdownBlock({ block = {} }) {
   );
 }
 
+function BadgesBlock({ block = {}, locale = "en-US" }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  const items = (Array.isArray(content?.items) ? content.items : Array.isArray(block?.items) ? block.items : [])
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+    .map((item) => {
+      const explicitDisplayValue = item?.displayValue;
+      const formattedDisplayValue = normalizeString(item?.format)
+        && item?.value !== undefined
+        && item?.value !== null
+        && String(item?.value) !== ""
+          ? formatDashboardValue(item.value, item.format, locale)
+          : item?.value;
+      const resolvedDisplayValue = explicitDisplayValue !== undefined && explicitDisplayValue !== null && String(explicitDisplayValue) !== ""
+        ? explicitDisplayValue
+        : formattedDisplayValue;
+      return {
+        id: normalizeString(item?.id || item?.label || item?.value),
+        label: normalizeString(item?.label),
+        value: item?.value,
+        displayValue: resolvedDisplayValue === undefined || resolvedDisplayValue === null || String(resolvedDisplayValue) === ""
+          ? ""
+          : String(resolvedDisplayValue),
+        tone: normalizeString(item?.tone || "info"),
+      };
+    })
+    .filter((item) => item.label || item.displayValue);
+  return (
+    <RuntimePanel title={normalizeString(block?.title || content?.title || "Status Pills")}>
+      {items.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+          No pills configured.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {items.map((item, index) => {
+            const toneStyles = resolveRuntimeBadgeToneStyles(item.tone);
+            return (
+              <span
+                key={item.id || `${item.label}_${index + 1}`}
+                data-report-runtime-badge-tone={normalizeString(item.tone).toLowerCase() || "info"}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: toneStyles.text,
+                  background: toneStyles.background,
+                  border: `1px solid ${toneStyles.border}`,
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                }}
+              >
+                {item.displayValue ? `${item.label}: ${item.displayValue}` : item.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </RuntimePanel>
+  );
+}
+
 function KpiBlock({ block = {}, diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
@@ -863,15 +1241,29 @@ function KpiBlock({ block = {}, diagnostics = [], onRetryProviderActions = null,
   const hasSecondaryValue = !!content?.secondaryField
     && content?.secondaryValue !== undefined
     && content?.secondaryValue !== null;
+  const toneStyles = resolveRuntimeKpiToneStyles(content?.tone);
+  const blockTitle = normalizeString(block?.title || content?.title || "KPI");
+  const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
+  const showValueLabel = !!valueLabel && valueLabel.toLowerCase() !== blockTitle.toLowerCase();
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
   return (
     <RuntimePanel
       className="forge-report-runtime-kpi-panel"
-      title={normalizeString(block?.title || content?.title || "KPI")}
+      title={blockTitle}
       subtitle={normalizeString(content?.description)}
     >
+      <div
+        data-report-runtime-kpi-tone={normalizeString(content?.tone).toLowerCase() || "neutral"}
+        style={{
+          height: 4,
+          width: 32,
+          borderRadius: 999,
+          background: toneStyles.accent,
+          marginBottom: 2,
+        }}
+      />
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       {invalidDiagnostic ? (
         <BlockErrorCallout diagnostic={invalidDiagnostic} />
@@ -882,9 +1274,11 @@ function KpiBlock({ block = {}, diagnostics = [], onRetryProviderActions = null,
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
-              {normalizeString(content?.valueLabel || content?.valueField || "Value")}
-            </span>
+            {showValueLabel ? (
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
+                {valueLabel}
+              </span>
+            ) : null}
             <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
               {formatKpiValue(content?.value)}
             </span>
@@ -907,6 +1301,9 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
+  const columns = Array.isArray(block?.content?.columns)
+    ? block.content.columns
+    : (Array.isArray(block?.columns) ? block.columns : []);
   if (invalidDiagnostic) {
     return (
       <RuntimePanel
@@ -924,6 +1321,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
     fields: refinementFields,
     providerActionsByField,
   });
+  const runtimeTableRows = buildRuntimeTableRows(block, dataset);
   const rowActions = tableInteractionState.actions
     .filter((action) => supportsReportRuntimeExecution(action, runtimeHandlers))
     .map((action) => ({
@@ -939,6 +1337,11 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       title={normalizeString(block?.title || "Table")}
     >
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+      {columns.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+          No table fields selected. Edit this table block in Design to choose at least one field.
+        </div>
+      ) : (
       <DashboardTableContent
         container={{
           id: block.id,
@@ -947,32 +1350,76 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
           dataSourceRef: normalizeString(dataset?.dataSourceRef || block?.datasetRef),
           dashboard: {
             table: {
-              columns: Array.isArray(block?.content?.columns) ? block.content.columns : (block?.columns || []),
+              columns,
               density: "compact",
               limit: Math.max(1, Number(dataset?.provenance?.rowCount || reportSpec?.parameters?.pageSize || 50) || 50),
+              rowActionDisplay: "compact",
               rowActions,
             },
           },
         }}
-        context={createRuntimeContext(dataset, locale)}
+        context={createRuntimeContext({
+          ...dataset,
+          rows: runtimeTableRows,
+        }, locale)}
         locale={locale}
       />
+      )}
     </RuntimePanel>
   );
 }
 
-function FilterBarBlock({ block = {}, scopeParams = new Map() }) {
+function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummary = null, presentationMode = "preview", runtimeHandlers = null }) {
   const params = Array.isArray(block?.content?.params) ? block.content.params : [];
+  const normalizedDatasetRef = normalizeString(block?.datasetRef || params.find((param) => normalizeString(param?.datasetRef))?.datasetRef || "primary") || "primary";
+  const isPrimaryScope = normalizedDatasetRef === "primary";
+  const canEditFilterParams = params.some((param) => (
+    (normalizeString(param?.type).toLowerCase() === "daterange" && typeof runtimeHandlers?.setScopeParamDate === "function")
+    || (Array.isArray(param?.options) && param.options.length > 0 && typeof runtimeHandlers?.toggleScopeParamOption === "function")
+  ));
   return (
     <RuntimePanel
-      title={normalizeString(block?.content?.title || block?.title || "Report Scope")}
-      subtitle="Shared scope parameters compiled from the live builder state."
+      title={canEditFilterParams
+        ? normalizeString(block?.content?.title || block?.title || "Filters")
+        : `${normalizeString(block?.content?.title || block?.title || "Filters")} (baseline)`}
+      subtitle={canEditFilterParams
+        ? (
+            isPrimaryScope
+              ? "Change these baseline report filters here. Live keep, exclude, and drill changes appear in Active refinements."
+              : "Change filters for this block here. These filters apply to this data block only."
+          )
+        : (normalizeString(presentationMode).toLowerCase() === "report"
+            ? "Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."
+            : "Baseline filters compiled from the live builder state. Live keep, exclude, and drill changes appear in Active refinements.")}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         {params.map((param) => {
           const metadata = scopeParams.get(normalizeString(param?.id)) || {};
-          const label = normalizeString(metadata?.label || param?.id);
+          const label = normalizeString(metadata?.label || param?.label || param?.id);
           const description = normalizeString(metadata?.description || param?.description);
+          const interactiveFilter = {
+            ...metadata,
+            ...param,
+            id: normalizeString(param?.id),
+            label,
+            description,
+          };
+          const canEditDateRange = normalizeString(interactiveFilter?.type).toLowerCase() === "daterange"
+            && typeof runtimeHandlers?.setScopeParamDate === "function";
+          const canEditOptions = Array.isArray(interactiveFilter?.options)
+            && interactiveFilter.options.length > 0
+            && typeof runtimeHandlers?.toggleScopeParamOption === "function";
+          if (canEditDateRange || canEditOptions) {
+            return (
+              <InlineStaticFilterControl
+                key={param?.id}
+                filter={interactiveFilter}
+                value={param?.value}
+                onToggle={(optionValue) => runtimeHandlers.toggleScopeParamOption(interactiveFilter, optionValue)}
+                onDateRange={(edge, value) => runtimeHandlers.setScopeParamDate(interactiveFilter, edge, value)}
+              />
+            );
+          }
           return (
             <span
               key={param?.id}
@@ -1000,8 +1447,9 @@ function FilterBarBlock({ block = {}, scopeParams = new Map() }) {
             </span>
           );
         })}
-        {params.length === 0 ? <span style={{ fontSize: 12, color: "#5f6b7c" }}>No shared scope parameters.</span> : null}
+        {params.length === 0 ? <span style={{ fontSize: 12, color: "#5f6b7c" }}>No report filters.</span> : null}
       </div>
+      <ActiveScopeSummary activeScopeSummary={activeScopeSummary} />
     </RuntimePanel>
   );
 }
@@ -1039,19 +1487,29 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
   if (refinements.length === 0 && !undoEnabled && !redoEnabled) {
     return null;
   }
+  const refinementBarTitle = normalizeString(block?.content?.title || block?.title) || "Active Refinements";
   return (
-    <div
-      className="forge-report-runtime-refinement-strip"
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        alignItems: "center",
-        gap: 8,
-      }}
-    >
+    <div className="forge-report-runtime-refinement-block" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="forge-report-runtime-refinement-block__header" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", color: "#182026" }}>
+          {refinementBarTitle}
+        </span>
+        <span style={{ fontSize: 11, lineHeight: 1.4, color: "#5f6b7c" }}>
+          This session — live keep, exclude, and drill changes layered on top of the baseline scope.
+        </span>
+      </div>
+      <div
+        className="forge-report-runtime-refinement-strip"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
       {refinements.map((refinement, index) => {
         const refinementId = normalizeString(refinement?.id);
-        const refinementLabel = formatReportRuntimeRefinement(refinement);
+        const refinementLabel = formatRuntimeRefinementChipLabel(refinement);
         const canRemoveRefinement = canRemoveRefinements && !!refinementId;
         return (
           <span
@@ -1167,6 +1625,7 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
           Redo
         </button>
       ) : null}
+      </div>
     </div>
   );
 }
@@ -1392,7 +1851,20 @@ export default function ReportRuntime({
   locale = "en-US",
   runtimeHandlers = null,
   hostIntent = null,
+  presentationMode = "preview",
+  showContextSummary = true,
+  suppressFilterBarBlocks = false,
+  suppressFilterBarBlockDatasetRefs = [],
 }) {
+  const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
+  const suppressedFilterBarDatasetRefs = useMemo(
+    () => new Set(
+      (Array.isArray(suppressFilterBarBlockDatasetRefs) ? suppressFilterBarBlockDatasetRefs : [])
+        .map((entry) => normalizeString(entry))
+        .filter(Boolean),
+    ),
+    [suppressFilterBarBlockDatasetRefs],
+  );
   const datasetIndex = useMemo(() => new Map(
     (Array.isArray(reportFill?.datasets) ? reportFill.datasets : [])
       .map((dataset) => [normalizeString(dataset?.id), dataset])
@@ -1411,6 +1883,10 @@ export default function ReportRuntime({
       .map((param) => [normalizeString(param?.id), param])
       .filter(([id]) => !!id),
   ), [scopeSummary]);
+  const activeScopeSummary = useMemo(
+    () => resolveReportRuntimeActiveScopeSummary(reportFill?.refinements),
+    [reportFill?.refinements],
+  );
   const bindingSummary = useMemo(
     () => resolveReportRuntimeBindingSummary({
       reportSpec,
@@ -1429,6 +1905,26 @@ export default function ReportRuntime({
   );
   const hasTopLevelFilterBarBlock = useMemo(
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "filterBarBlock"),
+    [allRuntimeBlocks],
+  );
+  const topFilterBarBlocks = useMemo(
+    () => reportPresentation
+      ? allRuntimeBlocks.filter((block) => {
+          if (normalizeString(block?.kind) !== "filterBarBlock") {
+            return false;
+          }
+          const normalizedDatasetRef = normalizeString(
+            block?.datasetRef
+            || (Array.isArray(block?.content?.params) ? block.content.params.find((param) => normalizeString(param?.datasetRef))?.datasetRef : "")
+            || "primary",
+          ) || "primary";
+          return !suppressedFilterBarDatasetRefs.has(normalizedDatasetRef);
+        })
+      : [],
+    [allRuntimeBlocks, reportPresentation, suppressedFilterBarDatasetRefs],
+  );
+  const hasTopLevelRefinementBarBlock = useMemo(
+    () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "refinementBarBlock"),
     [allRuntimeBlocks],
   );
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
@@ -1501,16 +1997,39 @@ export default function ReportRuntime({
     setSelectedChartSelectionsByBlock((previous) => clearReportRuntimeChartSelection(previous, normalizedBlockId));
   };
 
+  const renderFilterBarBlock = (block) => (
+    <FilterBarBlock
+      key={block.id}
+      block={block}
+      scopeParams={scopeParamIndex}
+      activeScopeSummary={hasTopLevelRefinementBarBlock ? null : activeScopeSummary}
+      presentationMode={presentationMode}
+      runtimeHandlers={runtimeHandlers}
+    />
+  );
+
   const renderBlock = (block) => {
     const kind = normalizeString(block?.kind);
     if (kind === "markdownBlock") {
       return <MarkdownBlock key={block.id} block={block} />;
     }
+    if (kind === "badgesBlock") {
+      return <BadgesBlock key={block.id} block={block} locale={locale} />;
+    }
     if (kind === "kpiBlock") {
-      return <KpiBlock key={block.id} block={block} diagnostics={blockDiagnosticsIndex.get(normalizeString(block?.id)) || []} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
+      const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || null;
+      return <KpiBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     if (kind === "filterBarBlock") {
-      return <FilterBarBlock key={block.id} block={block} scopeParams={scopeParamIndex} />;
+      const normalizedDatasetRef = normalizeString(
+        block?.datasetRef
+        || (Array.isArray(block?.content?.params) ? block.content.params.find((param) => normalizeString(param?.datasetRef))?.datasetRef : "")
+        || "primary",
+      ) || "primary";
+      if (suppressFilterBarBlocks || suppressedFilterBarDatasetRefs.has(normalizedDatasetRef) || (reportPresentation && topFilterBarBlocks.length > 0)) {
+        return null;
+      }
+      return renderFilterBarBlock(block);
     }
     if (kind === "refinementBarBlock") {
       if (!shouldRenderRefinementBarBlock(block, runtimeHandlers)) {
@@ -1524,7 +2043,7 @@ export default function ReportRuntime({
         <TableBlock
           key={block.id}
           block={block}
-          diagnostics={blockDiagnosticsIndex.get(normalizeString(block?.id)) || []}
+          diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)}
           dataset={dataset}
           reportSpec={reportSpec}
           providerActionsByField={providerActionsByField}
@@ -1537,7 +2056,7 @@ export default function ReportRuntime({
     }
     if (kind === "chartBlock") {
       const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || { id: block?.datasetRef, rows: [] };
-      const diagnostics = blockDiagnosticsIndex.get(normalizeString(block?.id)) || [];
+      const diagnostics = resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset);
       const invalidDiagnostic = diagnostics
         .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
         || null;
@@ -1612,24 +2131,28 @@ export default function ReportRuntime({
               context={createRuntimeContext(dataset, locale)}
               isActive
               embedded={false}
-              onDatumSelect={chartInteractionEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
-              onLegendItemSelect={chartInteractionSupport.legendEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
+              showControls={!reportPresentation}
+              onDatumSelect={!reportPresentation && chartInteractionEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
+              onLegendItemSelect={!reportPresentation && chartInteractionSupport.legendEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
             />
           ) : (
             <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
               Chart actions are unavailable because this authored chart does not compile to a runtime chart model.
             </div>
           )}
-          <ChartSelectionPanel
-            viewModel={chartSelectionViewModel}
-            onAction={(actionId) => executeReportRuntimeAction(chartExecutionsById.get(normalizeString(actionId)), runtimeHandlers)}
-            onClearSelection={chartInteractionEnabled ? (() => clearSelectedChartSelection(block.id)) : null}
-          />
+          {!reportPresentation ? (
+            <ChartSelectionPanel
+              viewModel={chartSelectionViewModel}
+              onAction={(actionId) => executeReportRuntimeAction(chartExecutionsById.get(normalizeString(actionId)), runtimeHandlers)}
+              onClearSelection={chartInteractionEnabled ? (() => clearSelectedChartSelection(block.id)) : null}
+            />
+          ) : null}
         </RuntimePanel>
       );
     }
     if (kind === "geoMapBlock") {
-      return <GeoMapBlock key={block.id} block={block} diagnostics={blockDiagnosticsIndex.get(normalizeString(block?.id)) || []} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
+      const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || null;
+      return <GeoMapBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     return <UnsupportedBlock key={block?.id || kind} block={block} />;
   };
@@ -1642,7 +2165,7 @@ export default function ReportRuntime({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
           gap: 16,
         }}
       >
@@ -1650,7 +2173,7 @@ export default function ReportRuntime({
           <div
             key={`${keyPrefix}:${block?.id || "block"}`}
             data-report-runtime-block-id={normalizeString(block?.id)}
-            data-report-runtime-layout-size={resolveRuntimeLayoutSize(block)}
+            data-report-runtime-layout-span={resolveRuntimeLayoutSpanForBlock(block)}
             style={{
               minWidth: 0,
               gridColumn: resolveRuntimeLayoutGridColumn(block),
@@ -1665,14 +2188,34 @@ export default function ReportRuntime({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <RuntimePanel
-        title={normalizeString(title || reportDocument?.title || reportSpec?.title || "Report Runtime Preview")}
-        subtitle={normalizeString(subtitle)}
-      >
-        <BindingChips bindingSummary={bindingSummary} />
-        <BindingDetailsPanel bindingSummary={bindingSummary} />
-        {!hasTopLevelFilterBarBlock ? <ScopeDetailsPanel scopeSummary={scopeSummary} /> : null}
-      </RuntimePanel>
+      {showContextSummary ? (
+        <RuntimePanel
+          title={normalizeString(title || reportDocument?.title || reportSpec?.title || (reportPresentation ? "Report" : "Report Runtime Preview"))}
+          subtitle={normalizeString(subtitle)}
+        >
+          {!reportPresentation ? <BindingChips bindingSummary={bindingSummary} /> : null}
+          <BindingDetailsPanel bindingSummary={bindingSummary} presentationMode={presentationMode} />
+          {!hasTopLevelFilterBarBlock ? (
+            <ScopeDetailsPanel
+              scopeSummary={scopeSummary}
+              activeScopeSummary={hasTopLevelRefinementBarBlock ? null : activeScopeSummary}
+              presentationMode={presentationMode}
+            />
+          ) : null}
+        </RuntimePanel>
+      ) : null}
+      {!showContextSummary ? <CompactBindingChips bindingSummary={bindingSummary} /> : null}
+      {topFilterBarBlocks.length > 0 ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: topFilterBarBlocks.length > 1 ? "repeat(auto-fit, minmax(320px, 1fr))" : "minmax(0, 1fr)",
+            gap: 16,
+          }}
+        >
+          {topFilterBarBlocks.map((block) => renderFilterBarBlock(block))}
+        </div>
+      ) : null}
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
       <DiagnosticsPanel diagnostics={[
         ...runtimeDiagnostics,

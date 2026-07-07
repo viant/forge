@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
     aggregateDirectSeriesData,
     buildPieChartData,
+    buildPieSliceCellKey,
     formatTimestamp,
+    materializeChartDisplayRows,
     resolveChartBodyState,
     resolveChartLoadingState,
     resolveVisibleChartState,
@@ -121,6 +123,103 @@ assert.deepEqual(pieData, [
 ]);
 assert.equal(Array.isArray(pieData[0].__chartSelectionRows), true);
 assert.equal(pieData[0].__chartSelectionRows.length, 2);
+assert.equal(buildPieSliceCellKey({ name: "unknown" }, 0), "unknown-0");
+assert.equal(buildPieSliceCellKey({ name: "unknown" }, 1), "unknown-1");
+assert.equal(buildPieSliceCellKey({}, 2), "unknown-2");
+
+assert.deepEqual(materializeChartDisplayRows({
+    type: 'line',
+    xAxis: { dataKey: 'eventDate' },
+    series: {
+        nameKey: 'channelName',
+        sourceNameKey: 'channelId',
+        displayValueMap: {
+            '1': 'Display',
+            '2': 'CTV',
+        },
+        valueKey: 'spend',
+        values: [{ value: 'spend', label: 'Spend', color: '#1f77b4', type: 'line' }],
+        palette: ['#1f77b4'],
+    },
+}, [
+    { eventDate: '2026-05-14T00:00:00Z', channelId: 1, spend: 10 },
+    { eventDate: '2026-05-15T00:00:00Z', channelId: 2, spend: 12 },
+]), [
+    { eventDate: '2026-05-14T00:00:00Z', channelId: 1, channelName: 'Display', spend: 10 },
+    { eventDate: '2026-05-15T00:00:00Z', channelId: 2, channelName: 'CTV', spend: 12 },
+]);
+
+assert.deepEqual(materializeChartDisplayRows({
+    type: 'line',
+    xAxis: { dataKey: 'eventDate' },
+    series: {
+        nameKey: 'channelId',
+        sourceNameKey: 'channelId',
+        displayValueMap: {
+            '1': 'Display',
+            '2': 'CTV',
+        },
+        valueKey: 'spend',
+        values: [{ value: 'spend', label: 'Spend', color: '#1f77b4', type: 'line' }],
+        palette: ['#1f77b4'],
+    },
+}, [
+    { eventDate: '2026-05-14T00:00:00Z', channelId: 1, spend: 10 },
+    { eventDate: '2026-05-15T00:00:00Z', channelId: 2, spend: 12 },
+]), [
+    { eventDate: '2026-05-14T00:00:00Z', channelId: 'Display', spend: 10 },
+    { eventDate: '2026-05-15T00:00:00Z', channelId: 'CTV', spend: 12 },
+]);
+
+const preservedSelectionRows = materializeChartDisplayRows({
+    type: 'line',
+    xAxis: { dataKey: 'eventDate' },
+    series: {
+        nameKey: 'channelName',
+        sourceNameKey: 'channelId',
+        displayValueMap: {
+            '1': 'Display',
+        },
+        valueKey: 'spend',
+        values: [{ value: 'spend', label: 'Spend', color: '#1f77b4', type: 'line' }],
+        palette: ['#1f77b4'],
+    },
+}, [
+    Object.defineProperty({ eventDate: '2026-05-14T00:00:00Z', channelId: 1, spend: 10 }, '__chartSelectionRows', {
+        value: [{ campaign: 'Prospect Sprint' }],
+        enumerable: false,
+        writable: true,
+        configurable: true,
+    }),
+]);
+assert.deepEqual(preservedSelectionRows[0].__chartSelectionRows, [{ campaign: 'Prospect Sprint' }]);
+
+assert.deepEqual(transformData(materializeChartDisplayRows({
+    type: 'line',
+    xAxis: { dataKey: 'eventDate' },
+    series: {
+        nameKey: 'channelName',
+        sourceNameKey: 'channelId',
+        displayValueMap: {
+            '1': 'Display',
+            '2': 'CTV',
+        },
+        valueKey: 'spend',
+        values: [{ value: 'spend', label: 'Spend', color: '#1f77b4', type: 'line' }],
+        palette: ['#1f77b4'],
+    },
+}, [
+    { eventDate: '2026-05-14T00:00:00Z', channelId: 1, spend: 10 },
+    { eventDate: '2026-05-14T00:00:00Z', channelId: 2, spend: 5 },
+]), {
+    xAxis: { dataKey: 'eventDate' },
+    series: { nameKey: 'channelName' },
+}, 'spend'), {
+    data: [
+        { eventDate: '2026-05-14T00:00:00Z', Display: 10, CTV: 5 },
+    ],
+    keys: ['Display', 'CTV'],
+});
 
 assert.deepEqual(resolveChartBodyState({
     loading: true,

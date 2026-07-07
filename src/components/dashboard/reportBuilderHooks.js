@@ -3,6 +3,10 @@ import {
     applyReportBuilderFilterAliases,
     projectLookupSelections,
 } from "./reportBuilderUtils.js";
+import {
+    applyReportBuilderPredicatePrefill,
+    resolveReportBuilderDynamicFilterGroups,
+} from "./reportBuilderPredicates.js";
 
 export function resolveReportBuilderNotices(config = {}, state = {}) {
     const notices = Array.isArray(config?.notices) ? config.notices : [];
@@ -27,37 +31,58 @@ export function resolveReportBuilderHookHandler(builderContext, handlerName = ""
     if (!directName || !builderContext?.lookupHandler) {
         return null;
     }
-    try {
-        return builderContext.lookupHandler(directName);
-    } catch (error) {
-        const namespace = String(builderContext?.metadata?.namespace || "").trim();
-        const namespacedName = namespace && !directName.startsWith(`${namespace}.`)
-            ? `${namespace}.${directName}`
-            : "";
-        if (!namespacedName) {
-            throw error;
+    const namespace = String(builderContext?.metadata?.namespace || "").trim();
+    const namespacedPrefix = namespace ? `${namespace}.` : "";
+    const candidateNames = [];
+    const seen = new Set();
+    const pushCandidate = (value = "") => {
+        const normalized = String(value || "").trim();
+        if (!normalized || seen.has(normalized)) {
+            return;
         }
-        return builderContext.lookupHandler(namespacedName);
+        seen.add(normalized);
+        candidateNames.push(normalized);
+    };
+    const segments = directName.split(".").map((segment) => String(segment || "").trim()).filter(Boolean);
+    pushCandidate(directName);
+    if (namespacedPrefix && directName.startsWith(namespacedPrefix)) {
+        pushCandidate(directName.slice(namespacedPrefix.length));
     }
+    if (namespace && !directName.startsWith(namespacedPrefix)) {
+        pushCandidate(`${namespace}.${directName}`);
+    }
+    for (let index = 1; index < segments.length; index += 1) {
+        pushCandidate(segments.slice(index).join("."));
+    }
+    let lastError = null;
+    for (const candidateName of candidateNames) {
+        try {
+            return builderContext.lookupHandler(candidateName);
+        } catch (error) {
+            lastError = error;
+        }
+    }
+    throw lastError || new Error(`missing ${directName}`);
 }
 
 export function applyReportBuilderStateHook(builderContext, config = {}, state = {}, windowForm = {}) {
+    const prefilledState = applyReportBuilderPredicatePrefill(config, state, windowForm);
     const handlerName = String(config?.hooks?.initializeState || "").trim();
     if (!handlerName || !builderContext?.lookupHandler) {
-        return state;
+        return prefilledState;
     }
     try {
         const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
         const result = handler({
             context: builderContext,
-            state,
+            state: prefilledState,
             config,
             windowForm,
         });
-        return (result && typeof result === "object" && !Array.isArray(result)) ? result : state;
+        return (result && typeof result === "object" && !Array.isArray(result)) ? result : prefilledState;
     } catch (error) {
         console.error("reportBuilder state hook failed", error);
-        return state;
+        return prefilledState;
     }
 }
 
@@ -154,7 +179,7 @@ function selectionNeedsLabelHydration(selection = {}) {
 
 export function buildLookupHydrationJobs(builderContext, config = {}, state = {}, resolveLookup) {
     const jobs = [];
-    (config.dynamicFilterGroups || []).forEach((group) => {
+    resolveReportBuilderDynamicFilterGroups(config).forEach((group) => {
         const groupId = String(group?.id || "").trim();
         if (!groupId) return;
         (state?.dynamicGroups?.[groupId] || []).forEach((row) => {

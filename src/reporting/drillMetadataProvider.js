@@ -109,6 +109,48 @@ export function normalizeRefinementActions(payload = {}) {
     .filter(Boolean);
 }
 
+export function resolveRefinementActionIdentityKey(action = {}) {
+  const kind = normalizeString(action?.kind).toLowerCase();
+  if (!kind) {
+    return "";
+  }
+  if (kind === "drill") {
+    const nextFieldRef = normalizeString(action?.nextFieldRef);
+    return nextFieldRef ? `drill:${nextFieldRef}` : `drill:${normalizeString(action?.id)}`;
+  }
+  if (kind === "detail") {
+    const targetRef = normalizeString(action?.targetRef);
+    return targetRef ? `detail:${targetRef}` : `detail:${normalizeString(action?.id)}`;
+  }
+  if (kind === "keep" || kind === "exclude") {
+    return kind;
+  }
+  return `${kind}:${normalizeString(action?.id)}`;
+}
+
+export function dedupeRefinementActions(actions = []) {
+  const deduped = [];
+  const indexByKey = new Map();
+  (Array.isArray(actions) ? actions : []).forEach((action) => {
+    const normalized = normalizeRefinementActions([action])[0] || null;
+    if (!normalized) {
+      return;
+    }
+    const identityKey = resolveRefinementActionIdentityKey(normalized);
+    if (!identityKey) {
+      return;
+    }
+    const existingIndex = indexByKey.get(identityKey);
+    if (existingIndex === undefined) {
+      indexByKey.set(identityKey, deduped.length);
+      deduped.push(normalized);
+      return;
+    }
+    deduped[existingIndex] = normalized;
+  });
+  return deduped;
+}
+
 export function createDrillMetadataProvider(provider = {}) {
   const validation = validateDrillMetadataProvider(provider);
   if (!validation.valid) {

@@ -35,7 +35,7 @@
             "width": 720,
             "height": 20
           },
-          "text": "Report Scope",
+          "text": "Filters",
           "fontSize": 14,
           "fontWeight": "600",
           "color": "#101828"
@@ -1784,7 +1784,7 @@
   "bookmarks": [
     {
       "id": "bookmark.sharedFilters",
-      "title": "Report Scope",
+      "title": "Filters",
       "pageNumber": 1,
       "level": 1,
       "elementId": "sharedFilters__title_0",

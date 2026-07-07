@@ -1,3 +1,10 @@
+import {
+  listReportBuilderPinnedPredicates,
+  resolveReportBuilderScopeParamFilters,
+} from "../../components/dashboard/reportBuilderPredicates.js";
+import { isSupportedScopeBindingTarget } from "../scopeBindingModel.js";
+import { mergeScopeParamValues } from "../scopeStateModel.js";
+
 function normalizeString(value = "") {
   return String(value || "").trim();
 }
@@ -117,14 +124,15 @@ function extractReportBuilderBlock(document = null) {
   return blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null;
 }
 
-function collectStaticFilterIds(document = null) {
+function collectScopeFilterIds(document = null) {
   const block = extractReportBuilderBlock(document);
-  const staticFilters = Array.isArray(block?.config?.staticFilters) ? block.config.staticFilters : [];
-  return new Set(
-    staticFilters
+  const config = isPlainObject(block?.config) ? block.config : {};
+  return new Set([
+    ...listReportBuilderPinnedPredicates(config).map((predicate) => predicate.id),
+    ...resolveReportBuilderScopeParamFilters(config)
       .map((entry) => normalizeString(entry?.id || entry?.key))
       .filter(Boolean),
-  );
+  ]);
 }
 
 function collectScopeBindingTargets(document = null) {
@@ -538,13 +546,13 @@ export function buildSavedViewOverlaySummary(value = null, {
     });
   }
 
-  const staticFilterIds = collectStaticFilterIds(document);
+  const scopeFilterIds = collectScopeFilterIds(document);
   const scopeBindingTargets = collectScopeBindingTargets(document);
   const baseBuilderState = isPlainObject(extractReportBuilderBlock(document)?.state)
     ? extractReportBuilderBlock(document).state
     : {};
   Object.keys(isPlainObject(overlayState.overlay?.filters) ? overlayState.overlay.filters : {}).forEach((filterId) => {
-    if (staticFilterIds.size > 0 && !staticFilterIds.has(filterId)) {
+    if (scopeFilterIds.size > 0 && !scopeFilterIds.has(filterId)) {
       pushDiagnostic(diagnostics, {
         code: "savedViewOverlayUnknownFilter",
         path: `${overlayPath}.filters.${filterId}`,
@@ -572,7 +580,7 @@ export function buildSavedViewOverlaySummary(value = null, {
       });
       return;
     }
-    const supportedTargets = bindingTargets.filter((target) => target.startsWith("staticFilters."));
+    const supportedTargets = bindingTargets.filter((target) => isSupportedScopeBindingTarget(target));
     if (supportedTargets.length === 0) {
       pushDiagnostic(diagnostics, {
         code: "savedViewOverlayUnsupportedParameterTarget",
@@ -679,25 +687,26 @@ export function applySavedViewOverlayToBuilderState(value = null, {
 } = {}) {
   const overlayState = extractSavedViewOverlayArtifactState(value);
   const overlay = overlayState?.overlay;
-  const nextState = isPlainObject(state) ? cloneValue(state) : {};
+  let nextState = isPlainObject(state) ? cloneValue(state) : {};
   if (!overlay) {
     return nextState;
   }
-  const staticFilterIds = collectStaticFilterIds(document);
+  const scopeFilterIds = collectScopeFilterIds(document);
   const fieldKeys = collectBuilderFieldKeys(document, reportSpec);
   const presetMap = collectPresetMap(document);
   if (isPlainObject(overlay.filters)) {
-    nextState.staticFilters = isPlainObject(nextState.staticFilters) ? nextState.staticFilters : {};
+    const overlayScopeValues = {};
     Object.entries(overlay.filters).forEach(([filterId, filterValue]) => {
       const normalizedFilterId = normalizeString(filterId);
       if (!normalizedFilterId) {
         return;
       }
-      if (staticFilterIds.size > 0 && !staticFilterIds.has(normalizedFilterId)) {
+      if (scopeFilterIds.size > 0 && !scopeFilterIds.has(normalizedFilterId)) {
         return;
       }
-      nextState.staticFilters[normalizedFilterId] = cloneValue(filterValue);
+      overlayScopeValues[normalizedFilterId] = cloneValue(filterValue);
     });
+    nextState = mergeScopeParamValues(nextState, overlayScopeValues);
   }
   if (isPlainObject(overlay.order)) {
     const orderField = normalizeString(overlay.order.field);

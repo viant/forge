@@ -1,4 +1,5 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildClearSemanticValidationBehaviorsStep,
   buildPreviewBootstrapSteps,
   buildReopenedHydratedSessionVerificationSteps,
@@ -149,6 +150,10 @@ export default {
       text: "Retry validation",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Market",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "waitForEval",
       expression: "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec?.title === 'Locations · Top Markets' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'chart' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions[0] === 'country' && !window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession",
@@ -175,6 +180,10 @@ export default {
       expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return !text.includes('Semantic validation: Semantic provider unavailable.') && !text.includes('Retry validation') && text.includes('Locations · Top Markets'); })()",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Market",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "waitForEval",
       expression: "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec?.title === 'Locations · Top Markets' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'chart' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions[0] === 'country' && !window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession",

@@ -47,6 +47,10 @@ assert.equal(
   true,
 );
 assert.equal(
+  expressions.some((expression) => expression.includes("data-report-builder-semantic-binding") && expression.includes("Model Ad Delivery") && expression.includes("Entity Line Delivery") && expression.includes("Dimensions Delivery Date, Channel") && expression.includes("Measures Available Impressions") && expression.includes("Semantic binding: Ad Delivery • Entity: Line Delivery")),
+  true,
+);
+assert.equal(
   expressions.filter((expression) => expression.includes(".forge-report-builder__runtime-preview") && expression.includes(".forge-report-runtime-chart-panel") && expression.includes("Capacity Trend Block")).length >= 2,
   true,
 );
@@ -97,6 +101,7 @@ const removeChartIndex = findStepIndex((step) => step?.type === "eval" && String
 const removedStateIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("!Array.from(document.querySelectorAll('.forge-report-builder__document-block-card strong')).some") && String(step.expression || "").includes("Capacity Trend Block"));
 const reopenIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Reopen in builder");
 const reopenedSessionIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("getHydratedReportDocumentSession") && String(step.expression || "").includes("demoReportBuilder"));
+const reopenedSemanticSurfaceIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("data-report-builder-semantic-binding") && String(step.expression || "").includes("Dimensions Delivery Date, Channel") && String(step.expression || "").includes("Measures Available Impressions"));
 const runtimeChartAfterReopenIndex = scenario.steps.findIndex((step, index) => index > reopenIndex && step?.type === "waitForEval" && String(step.expression || "").includes(".forge-report-builder__runtime-preview") && String(step.expression || "").includes(".forge-report-runtime-chart-panel") && String(step.expression || "").includes("Capacity Trend Block"));
 
 assert.notEqual(addChartIndex, -1);
@@ -112,6 +117,7 @@ assert.notEqual(removeChartIndex, -1);
 assert.notEqual(removedStateIndex, -1);
 assert.notEqual(reopenIndex, -1);
 assert.notEqual(reopenedSessionIndex, -1);
+assert.notEqual(reopenedSemanticSurfaceIndex, -1);
 assert.notEqual(runtimeChartAfterReopenIndex, -1);
 
 assert.equal(addChartIndex < runtimeChartBeforeDraftIndex, true);
@@ -126,6 +132,7 @@ assert.equal(inspectGetPayloadIndex < removeChartIndex, true);
 assert.equal(removeChartIndex < removedStateIndex, true);
 assert.equal(removedStateIndex < reopenIndex, true);
 assert.equal(reopenIndex < reopenedSessionIndex, true);
-assert.equal(reopenedSessionIndex < runtimeChartAfterReopenIndex, true);
+assert.equal(reopenedSessionIndex < reopenedSemanticSurfaceIndex, true);
+assert.equal(reopenedSemanticSurfaceIndex < runtimeChartAfterReopenIndex, true);
 
 console.log("report-builder-preview-authored-chart-save-reopen-scenario-assets ✓ authored chart block survives save/get/reopen after post-save removal");

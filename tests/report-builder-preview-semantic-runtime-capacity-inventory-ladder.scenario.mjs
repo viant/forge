@@ -9,28 +9,26 @@ export default {
   steps: [
     ...buildPreviewBootstrapSteps(),
     {
-      type: "clickSelector",
-      selector: ".forge-report-builder__chart-action-button--quick",
-    },
-    {
-      type: "clickSelectorContains",
-      selector: "[role=\"menuitem\"]",
-      text: "Inventory Ladder",
-      index: 0,
+      type: "eval",
+      expression: `(() => {
+        const rows = Array.from(document.querySelectorAll('.forge-report-builder__design-source-grid-row'));
+        const row = rows.find((entry) => ((entry.innerText || entry.textContent || '')).includes('Capacity Inventory Brief'));
+        const button = row?.querySelector('button');
+        if (!button) {
+          throw new Error('Capacity Inventory Brief starter button not found.');
+        }
+        button.click();
+        return true;
+      })()`,
     },
     {
       type: "waitForDomContains",
-      text: "CAPACITY INVENTORY",
+      text: "Capacity Inventory Brief applied.",
       timeoutMs: 60000,
     },
     {
       type: "waitForDomContains",
-      text: "Publisher -> Site Type",
-      timeoutMs: 60000,
-    },
-    {
-      type: "waitForDomContains",
-      text: "Semantic Binding",
+      text: "SEMANTIC BINDING",
       timeoutMs: 60000,
     },
     {
@@ -72,6 +70,22 @@ export default {
     {
       type: "waitForEval",
       expression: "(() => { const headers = Array.from(document.querySelectorAll('.forge-report-runtime-table-panel'))[0]?.querySelectorAll('th') || []; const labels = Array.from(headers).map((entry) => (entry.innerText || entry.textContent || '').trim()); return labels.includes('Publisher') && !labels.includes('Channel'); })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Show publisher details",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickSelectorContains",
+      selector: ".forge-report-runtime-table-panel .forge-dashboard-row-action",
+      text: "Show publisher details",
+      index: 0,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('target://example/publisher-detail') && text.includes('Acme Media') && !text.includes('Detail target resolved with omitted parameters'); })()",
       timeoutMs: 60000,
     },
     {

@@ -13,20 +13,25 @@ export default {
       expression: "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.patchBuilderConfig !== 'function') { throw new Error('patchBuilderConfig API not available.'); } const next = api.patchBuilderConfig({ dynamicFilterGroups: [{ id: 'scopeRules', label: 'Scope Rules', addLabel: 'Add scope rule', filters: [{ id: 'scopeValue', label: 'Scope value', manualEntry: true, manualPlaceholder: 'National' }] }], pinnedDynamicGroupIds: [] }); return Array.isArray(next?.dynamicFilterGroups) && next.dynamicFilterGroups.some((group) => group?.id === 'scopeRules'); })()",
     },
     {
-      type: "waitForDomContains",
-      text: "Scope Rules",
+      type: "clickSelectorContains",
+      selector: "button",
+      text: "Filters & Controls",
       timeoutMs: 60000,
     },
     {
-      type: "clickSelectorContains",
-      selector: "button",
-      text: "Open Filters",
+      type: "waitForEval",
+      expression: "(() => { const editor = document.querySelector('[data-testid=\"report-builder-runtime-filter-editor\"]'); const text = editor?.innerText || editor?.textContent || ''; return !!editor && text.includes('Scope Rules') && !document.querySelector('.forge-report-builder__overlay-shell'); })()",
       timeoutMs: 60000,
     },
     {
       type: "clickRole",
       role: "button",
       name: "Scope Rules • available",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForEval",
+      expression: "(() => { const editor = document.querySelector('[data-testid=\"report-builder-runtime-filter-editor\"]'); const text = editor?.innerText || editor?.textContent || ''; return !!editor && text.includes('Add scope rule'); })()",
       timeoutMs: 60000,
     },
     {

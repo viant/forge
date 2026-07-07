@@ -6,6 +6,7 @@ import {
   buildPreviewScenarioGroups,
   expandPreviewScenarioArgs,
   isSemanticPreviewScenario,
+  isSemanticLeftRailPreviewScenario,
   normalizeScenarioArg,
   parsePreviewScenarioRunnerArgs,
   previewScenarioDisplayName,
@@ -18,10 +19,12 @@ const availableFiles = readdirSync(new URL("../tests/", import.meta.url))
 
 const sortedAvailableFiles = availableFiles.slice().sort();
 const semanticAvailableFiles = sortedAvailableFiles.filter((file) => isSemanticPreviewScenario(file));
+const semanticLeftRailAvailableFiles = sortedAvailableFiles.filter((file) => isSemanticLeftRailPreviewScenario(file));
 const legacyAvailableFiles = sortedAvailableFiles.filter((file) => !isSemanticPreviewScenario(file));
 
 assert.equal(sortedAvailableFiles.length > 0, true);
 assert.equal(semanticAvailableFiles.length > 0, true);
+assert.equal(semanticLeftRailAvailableFiles.length > 0, true);
 assert.equal(legacyAvailableFiles.length > 0, true);
 
 assert.equal(
@@ -42,6 +45,9 @@ assert.equal(
 );
 assert.equal(isSemanticPreviewScenario("report-builder-preview-semantic-stale.scenario.json"), true);
 assert.equal(isSemanticPreviewScenario("report-builder-preview-proof.scenario.json"), false);
+assert.equal(isSemanticLeftRailPreviewScenario("report-builder-preview-semantic-reopen-report-document-validation-retry-left-rail-layout.scenario.mjs"), true);
+assert.equal(isSemanticLeftRailPreviewScenario("report-builder-preview-semantic-reopen-report-document-validation-retry.scenario.mjs"), false);
+assert.equal(isSemanticLeftRailPreviewScenario("report-builder-preview-proof.scenario.json"), false);
 
 assert.deepEqual(parsePreviewScenarioRunnerArgs([
   "--list",
@@ -75,11 +81,13 @@ assert.deepEqual(parsePreviewScenarioRunnerArgs(["--help"]), {
 assert.deepEqual(buildPreviewScenarioGroups(availableFiles), {
   all: sortedAvailableFiles,
   semantic: semanticAvailableFiles,
+  "semantic-left-rail": semanticLeftRailAvailableFiles,
   legacy: legacyAvailableFiles,
 });
 
 assert.deepEqual(expandPreviewScenarioArgs([], availableFiles), sortedAvailableFiles);
 assert.deepEqual(expandPreviewScenarioArgs(["semantic"], availableFiles), semanticAvailableFiles);
+assert.deepEqual(expandPreviewScenarioArgs(["semantic-left-rail"], availableFiles), semanticLeftRailAvailableFiles);
 assert.deepEqual(expandPreviewScenarioArgs(["all"], availableFiles), sortedAvailableFiles);
 assert.deepEqual(expandPreviewScenarioArgs(["legacy"], availableFiles), legacyAvailableFiles);
 assert.deepEqual(expandPreviewScenarioArgs(["semantic", "proof", "semantic-error"], availableFiles), [

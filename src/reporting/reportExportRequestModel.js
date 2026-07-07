@@ -90,6 +90,7 @@ export function buildReportExportRequest({
   reportSpec = null,
   reportFill = null,
   reportPrint = null,
+  metadata = null,
 } = {}) {
   const normalizedFormat = normalizeEnumValue(format, REPORT_EXPORT_FORMATS);
   const normalizedSource = buildReportExportSource(source || {});
@@ -108,6 +109,9 @@ export function buildReportExportRequest({
     ...(reportPrint && typeof reportPrint === "object" && !Array.isArray(reportPrint)
       ? { reportPrint: cloneValue(reportPrint) }
       : {}),
+    ...(metadata && typeof metadata === "object" && !Array.isArray(metadata)
+      ? { metadata: cloneValue(metadata) }
+      : {}),
   };
   return validateReportExportRequest(next).valid ? next : null;
 }
@@ -118,6 +122,7 @@ export function buildDraftReportExportRequest({
   reportFill = null,
   reportPrint = null,
   format = "pdf",
+  metadata = null,
 } = {}) {
   const source = reportSpec?.source && typeof reportSpec.source === "object" && !Array.isArray(reportSpec.source)
     ? reportSpec.source
@@ -140,6 +145,7 @@ export function buildDraftReportExportRequest({
     reportSpec,
     reportFill,
     reportPrint,
+    metadata,
   });
 }
 
@@ -149,6 +155,7 @@ export function buildSavedReportExportRequest({
   reportPrint = null,
   documentVersion = 0,
   format = "pdf",
+  metadata = null,
 } = {}) {
   const payload = savedReportPayload && typeof savedReportPayload === "object" && !Array.isArray(savedReportPayload)
     ? savedReportPayload
@@ -177,6 +184,7 @@ export function buildSavedReportExportRequest({
     reportSpec: payload?.reportSpec,
     reportFill,
     reportPrint,
+    metadata,
   });
 }
 
@@ -187,6 +195,7 @@ export function buildSavedViewReportExportRequest({
   reportPrint = null,
   documentVersion = 0,
   format = "pdf",
+  metadata = null,
 } = {}) {
   const payload = savedView && typeof savedView === "object" && !Array.isArray(savedView)
     ? savedView
@@ -215,6 +224,7 @@ export function buildSavedViewReportExportRequest({
     reportSpec,
     reportFill,
     reportPrint,
+    metadata,
   });
 }
 
@@ -225,6 +235,7 @@ export function buildPublishedSnapshotReportExportRequest({
   reportPrint = null,
   documentVersion = 0,
   format = "pdf",
+  metadata = null,
 } = {}) {
   const payload = publishedSnapshot && typeof publishedSnapshot === "object" && !Array.isArray(publishedSnapshot)
     ? publishedSnapshot
@@ -253,5 +264,6 @@ export function buildPublishedSnapshotReportExportRequest({
     reportSpec,
     reportFill,
     reportPrint,
+    metadata,
   });
 }

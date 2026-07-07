@@ -21,20 +21,42 @@ function hasPresentValue(value) {
   return value !== undefined && value !== null && value !== "";
 }
 
+function resolveDisplayValueMapValue(column = {}, value = undefined) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  const displayValueMap = column?.displayValueMap && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap)
+    ? column.displayValueMap
+    : null;
+  if (!displayValueMap) {
+    return undefined;
+  }
+  const key = String(value);
+  return Object.prototype.hasOwnProperty.call(displayValueMap, key)
+    ? displayValueMap[key]
+    : undefined;
+}
+
 function resolveTableColumnRawValue(row = {}, column = {}) {
   const sourceKey = normalizeString(column?.sourceKey || column?.key);
   return sourceKey ? resolveKey(row, sourceKey) : undefined;
 }
 
 function resolveTableColumnDisplayValue(row = {}, column = {}) {
+  const rawValue = resolveTableColumnRawValue(row, column);
   const displayKey = normalizeString(column?.displayKey);
-  if (displayKey) {
+  const sourceKey = normalizeString(column?.sourceKey || column?.key);
+  if (displayKey && displayKey !== sourceKey) {
     const displayValue = resolveKey(row, displayKey);
     if (hasPresentValue(displayValue)) {
       return displayValue;
     }
   }
-  return resolveTableColumnRawValue(row, column);
+  const mappedDisplayValue = resolveDisplayValueMapValue(column, rawValue);
+  if (hasPresentValue(mappedDisplayValue)) {
+    return mappedDisplayValue;
+  }
+  return rawValue;
 }
 
 function resolveCellVisualValue(row = {}, column = {}) {

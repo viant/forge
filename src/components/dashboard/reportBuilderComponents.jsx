@@ -1,11 +1,18 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
 import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
+import MarkdownEditor from "../MarkdownEditor.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { resolveKey } from "../../utils/selector.js";
 import { REPORT_BUILDER_TABLE_CALC_FUNCTIONS } from "./reportBuilderCalculatedFieldAuthoring.js";
+import {
+    parseReportBuilderBadgeRuleRows,
+    rebindReportBuilderDocumentBlockDraft,
+    resolveReportBuilderBadgeRuleRows,
+    serializeReportBuilderBadgeRuleRows,
+} from "./reportBuilderDocumentBlocks.js";
 import { summarizeReportBuilderSemanticDiagnostics } from "./reportBuilderSemantic.js";
 import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGovernanceView.js";
 import {
@@ -16,6 +23,307 @@ import {
     SINGLE_MEASURE_CATEGORY_TYPES,
     supportsStackForSeries,
 } from "./reportBuilderChartRules.js";
+import { placeReportBuilderTableColumnKeyRelative } from "./reportBuilderTableColumnOrder.js";
+
+const REPORT_BUILDER_TABLE_DND_MIME = "application/x-forge-report-builder-table";
+
+function normalizeFieldOptions(options = []) {
+    const seen = new Set();
+    return (Array.isArray(options) ? options : [])
+        .map((option) => {
+            const value = String(option?.value || option?.key || option?.id || "").trim();
+            if (!value || seen.has(value)) {
+                return null;
+            }
+            seen.add(value);
+            return {
+                value,
+                label: String(option?.label || value).trim() || value,
+                ...(String(option?.rawId || "").trim() ? { rawId: String(option.rawId).trim() } : {}),
+                ...(String(option?.format || "").trim() ? { format: String(option.format).trim() } : {}),
+                ...(String(option?.description || "").trim() ? { description: String(option.description).trim() } : {}),
+                ...(String(option?.category || "").trim() ? { category: String(option.category).trim() } : {}),
+                ...(String(option?.definitionRef || "").trim() ? { definitionRef: String(option.definitionRef).trim() } : {}),
+                ...(String(option?.semanticRef || "").trim() ? { semanticRef: String(option.semanticRef).trim() } : {}),
+                ...(option?.governance && typeof option.governance === "object" && !Array.isArray(option.governance)
+                    ? { governance: JSON.parse(JSON.stringify(option.governance)) }
+                    : {}),
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeTableColumnOptions(options = []) {
+    const seen = new Set();
+    return (Array.isArray(options) ? options : [])
+        .map((option) => {
+            const key = String(option?.key || option?.value || option?.id || "").trim();
+            if (!key || seen.has(key)) {
+                return null;
+            }
+            seen.add(key);
+            return {
+                key,
+                ...(String(option?.sourceKey || "").trim() ? { sourceKey: String(option.sourceKey).trim() } : {}),
+                ...(String(option?.displayKey || option?.displayPath || "").trim()
+                    ? { displayKey: String(option?.displayKey || option?.displayPath).trim() }
+                    : {}),
+                ...(option?.displayValueMap && typeof option.displayValueMap === "object" && !Array.isArray(option.displayValueMap)
+                    ? { displayValueMap: JSON.parse(JSON.stringify(option.displayValueMap)) }
+                    : {}),
+                ...(String(option?.rawId || "").trim() ? { rawId: String(option.rawId).trim() } : {}),
+                label: String(option?.label || key).trim() || key,
+                kind: String(option?.kind || "").trim(),
+                ...(option?.selected === true ? { selected: true } : {}),
+                ...(String(option?.format || "").trim() ? { format: String(option.format).trim() } : {}),
+                ...(String(option?.description || "").trim() ? { description: String(option.description).trim() } : {}),
+                ...(String(option?.category || "").trim() ? { category: String(option.category).trim() } : {}),
+                ...(String(option?.definitionRef || "").trim() ? { definitionRef: String(option.definitionRef).trim() } : {}),
+                ...(String(option?.semanticRef || "").trim() ? { semanticRef: String(option.semanticRef).trim() } : {}),
+                ...(option?.governance && typeof option.governance === "object" && !Array.isArray(option.governance)
+                    ? { governance: JSON.parse(JSON.stringify(option.governance)) }
+                    : {}),
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeScopeParamOptions(options = []) {
+    const seen = new Set();
+    return (Array.isArray(options) ? options : [])
+        .map((option) => {
+            const value = String((option?.value ?? option?.id) || "").trim();
+            if (!value || seen.has(value)) {
+                return null;
+            }
+            seen.add(value);
+            return {
+                value,
+                label: String(option?.label || value).trim() || value,
+                ...(String(option?.description || "").trim() ? { description: String(option.description).trim() } : {}),
+                kind: String(option?.kind || "value").trim() || "value",
+                required: option?.required === true,
+            };
+        })
+        .filter(Boolean);
+}
+
+function resolveDialogScopeParamOptions(selectedDatasetRef = "primary", selectedDatasetOption = null, scopeParamOptions = []) {
+    const normalizedDatasetRef = String(selectedDatasetRef || "primary").trim() || "primary";
+    if (selectedDatasetOption) {
+        const datasetScopedOptions = normalizeScopeParamOptions(selectedDatasetOption?.scopeParamOptions);
+        if (datasetScopedOptions.length > 0) {
+            return datasetScopedOptions;
+        }
+    }
+    return normalizedDatasetRef === "primary"
+        ? normalizeScopeParamOptions(scopeParamOptions)
+        : [];
+}
+
+function parseReportBuilderTableDragPayload(event = null) {
+    const dataTransfer = event?.dataTransfer;
+    if (!dataTransfer) {
+        return null;
+    }
+    const rawPayload = dataTransfer.getData(REPORT_BUILDER_TABLE_DND_MIME)
+        || dataTransfer.getData("text/plain")
+        || "";
+    if (!rawPayload) {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(rawPayload);
+        const columnKey = String(parsed?.columnKey || "").trim();
+        const dragKind = String(parsed?.dragKind || "").trim();
+        if (!columnKey || !dragKind) {
+            return null;
+        }
+        return {
+            columnKey,
+            dragKind,
+        };
+    } catch (_) {
+        return null;
+    }
+}
+
+export function normalizeDialogDatasetOptions(options = [], requestedDatasetRef = "") {
+    const baseOptions = Array.isArray(options)
+        ? options
+            .map((option) => {
+                const value = String(option?.value || "").trim();
+                if (!value) {
+                    return null;
+                }
+                const columnOptions = normalizeTableColumnOptions(option?.columnOptions);
+                const valueFieldOptions = normalizeFieldOptions(option?.valueFieldOptions);
+                const secondaryFieldOptions = normalizeFieldOptions(option?.secondaryFieldOptions);
+                const scopeParamOptions = normalizeScopeParamOptions(option?.scopeParamOptions);
+                const columnCount = columnOptions.length;
+                const measureCount = columnOptions.filter((entry) => entry.kind === "measure").length;
+                const dimensionCount = columnOptions.filter((entry) => entry.kind === "dimension").length;
+                return {
+                    value,
+                    label: String(option?.label || value).trim() || value,
+                    description: String(option?.description || "").trim(),
+                    kindLabel: String(option?.kindLabel || "").trim(),
+                    columnOptions,
+                    valueFieldOptions,
+                    secondaryFieldOptions,
+                    scopeParamOptions,
+                    columnCount,
+                    measureCount,
+                    dimensionCount,
+                    missing: false,
+                };
+            })
+            .filter(Boolean)
+        : [];
+    const normalizedRequestedDatasetRef = String(requestedDatasetRef || "").trim();
+    if (
+        normalizedRequestedDatasetRef
+        && baseOptions.length > 0
+        && !baseOptions.some((option) => option.value === normalizedRequestedDatasetRef)
+    ) {
+        return [
+            {
+                value: normalizedRequestedDatasetRef,
+                label: `Missing source (${normalizedRequestedDatasetRef})`,
+                description: "This authored block is bound to a data source that is no longer available. Choose another source or re-import the missing static dataset.",
+                kindLabel: "Missing",
+                columnOptions: [],
+                valueFieldOptions: [],
+                secondaryFieldOptions: [],
+                scopeParamOptions: [],
+                columnCount: 0,
+                measureCount: 0,
+                dimensionCount: 0,
+                missing: true,
+            },
+            ...baseOptions,
+        ];
+    }
+    return baseOptions;
+}
+
+function ReportBuilderDatasetPicker({
+    label = "Data source",
+    datasetOptions = [],
+    selectedDatasetRef = "",
+    onSelect = null,
+    error = false,
+}) {
+    const normalizedOptions = Array.isArray(datasetOptions) ? datasetOptions : [];
+    if (normalizedOptions.length === 0) {
+        return null;
+    }
+    const selectedOption = normalizedOptions.find((option) => option.value === String(selectedDatasetRef || "").trim()) || normalizedOptions[0] || null;
+    const interactive = typeof onSelect === "function";
+    return (
+        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+            <span>{label}</span>
+            <label className="forge-report-builder__dialog-source-select-wrap">
+                <select
+                    aria-label={label}
+                    className={[
+                        "forge-report-builder-select",
+                        selectedOption?.missing || error ? "is-invalid" : "",
+                    ].filter(Boolean).join(" ")}
+                    value={selectedOption?.value || ""}
+                    onChange={(event) => onSelect?.(event.target.value)}
+                    disabled={!interactive || normalizedOptions.length <= 1}
+                >
+                    {normalizedOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                            {option.label}
+                        </option>
+                    ))}
+                </select>
+            </label>
+            {selectedOption?.missing && selectedOption?.description ? (
+                <div className="forge-report-builder__quick-option-description">
+                    {selectedOption.description}
+                </div>
+            ) : null}
+            {error ? (
+                <div className="forge-report-builder__chart-error">Choose an available source for this block.</div>
+            ) : null}
+        </div>
+    );
+}
+
+export function buildReportBuilderFieldMetadataSummary(option = null) {
+    const normalizedOption = option && typeof option === "object" && !Array.isArray(option)
+        ? option
+        : null;
+    if (!normalizedOption) {
+        return null;
+    }
+    const label = String(normalizedOption?.label || normalizedOption?.value || normalizedOption?.key || "").trim();
+    const rawId = String(normalizedOption?.rawId || "").trim();
+    const description = String(normalizedOption?.description || "").trim();
+    const category = String(normalizedOption?.category || "").trim();
+    const definitionRef = String(normalizedOption?.definitionRef || "").trim();
+    const semanticRef = String(normalizedOption?.semanticRef || "").trim();
+    const format = String(normalizedOption?.format || "").trim();
+    const governance = normalizedOption?.governance && typeof normalizedOption.governance === "object" && !Array.isArray(normalizedOption.governance)
+        ? normalizedOption.governance
+        : {};
+    const governanceLabels = buildSemanticFieldGovernanceChipViewModels(governance)
+        .map((chip) => String(chip?.label || "").trim())
+        .filter(Boolean);
+    const chips = [
+        category,
+        format ? `Format ${format}` : "",
+        ...governanceLabels,
+    ].filter(Boolean);
+    if (!description && !rawId && !definitionRef && !semanticRef && chips.length === 0) {
+        return null;
+    }
+    return {
+        label,
+        rawId,
+        description,
+        definitionRef,
+        semanticRef,
+        chips,
+    };
+}
+
+function normalizeBadgeItemLabelMode(value = "", { hasExplicitLabel = false } = {}) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "manual" || normalized === "field") {
+        return normalized;
+    }
+    return hasExplicitLabel ? "manual" : "field";
+}
+
+export function applyReportBuilderBadgeItemFieldSelection(item = {}, nextValueField = "", fieldOptions = []) {
+    const normalizedItem = item && typeof item === "object" && !Array.isArray(item) ? item : {};
+    const normalizedValueField = String(nextValueField || "").trim();
+    const matchedOption = normalizeTableColumnOptions(fieldOptions).find((option) => option.key === normalizedValueField) || null;
+    const labelMode = normalizeBadgeItemLabelMode(normalizedItem?.labelMode, {
+        hasExplicitLabel: !!String(normalizedItem?.label || "").trim(),
+    });
+    return {
+        ...normalizedItem,
+        valueField: normalizedValueField,
+        format: matchedOption?.format || "",
+        ...(labelMode === "field"
+            ? { label: matchedOption?.label || "" }
+            : {}),
+        labelMode,
+    };
+}
+
+export function resolveReportBuilderBadgeItemFieldLabel(item = {}, fieldOptions = []) {
+    const normalizedItem = item && typeof item === "object" && !Array.isArray(item) ? item : {};
+    return applyReportBuilderBadgeItemFieldSelection({
+        ...normalizedItem,
+        labelMode: "field",
+    }, normalizedItem?.valueField || "", fieldOptions);
+}
 
 export function buildFilterCategoryChipViewModel({
     label = "",
@@ -203,7 +511,11 @@ export function ReportBuilderSemanticBindingChips({
     }
     const title = String(bindingState?.semanticBindingTitle || "").trim();
     return (
-        <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
+        <div
+            data-report-builder-semantic-binding="true"
+            data-report-builder-semantic-title={title || undefined}
+            style={{ display: "grid", gap: 8, marginTop, marginBottom }}
+        >
             {title ? (
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
                     {title}
@@ -321,15 +633,25 @@ export function ReportBuilderScopeSummary({
     marginBottom = 0,
 }) {
     const items = Array.isArray(summaryState?.scopeSummaryItems) ? summaryState.scopeSummaryItems : [];
-    const title = String(summaryState?.scopeSummaryTitle || "Report Scope").trim();
+    const title = String(summaryState?.scopeSummaryTitle || "Filters").trim();
+    const text = String(summaryState?.scopeSummaryText || "").trim();
     if (items.length === 0 || !title) {
         return null;
     }
     return (
-        <div style={{ display: "grid", gap: 8, marginTop, marginBottom }}>
+        <div
+            data-report-builder-scope-summary="true"
+            data-report-builder-scope-title={title || undefined}
+            style={{ display: "grid", gap: 8, marginTop, marginBottom }}
+        >
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
                 {title}
             </div>
+            {text ? (
+                <div style={{ fontSize: 12, lineHeight: 1.5, color: "#486579" }}>
+                    {text}
+                </div>
+            ) : null}
             <div style={{ display: "grid", gap: 8 }}>
                 {items.map((item) => (
                     <div
@@ -555,6 +877,9 @@ export function ReportBuilderChartDialog({
     isOpen = false,
     onClose,
     draft,
+    datasetRef = "primary",
+    datasetOptions = [],
+    onDatasetRefChange = null,
     onDraftChange,
     onApply,
     supportedTypes = [],
@@ -563,6 +888,13 @@ export function ReportBuilderChartDialog({
     validation = { valid: false, errors: [] },
     sanitizeDraftPatch,
     renderChartError,
+    dialogTitle = "Create Chart",
+    dataSourceLabel = "",
+    dataViewLabel = "",
+    dataViewDescription = "",
+    onAdjustMeasures = null,
+    onAdjustBreakdowns = null,
+    semanticBindingState = null,
 }) {
     const errors = Array.isArray(validation?.errors) ? validation.errors : [];
     const errorByField = new Map();
@@ -573,6 +905,11 @@ export function ReportBuilderChartDialog({
     });
     const hasYFieldsError = errors.some((entry) => String(entry?.field || "").startsWith("yFields"));
     const draftType = String(draft?.type || supportedTypes[0] || "line").trim().toLowerCase();
+    const requestedDatasetRef = String(datasetRef || "").trim();
+    const normalizedDatasetOptions = normalizeDialogDatasetOptions(datasetOptions, requestedDatasetRef);
+    const selectedDatasetRef = String(datasetRef || normalizedDatasetOptions[0]?.value || "primary").trim() || "primary";
+    const selectedDatasetOption = normalizedDatasetOptions.find((option) => option.value === selectedDatasetRef) || null;
+    const [chartFieldSearch, setChartFieldSearch] = useState("");
     const family = chartFamilyForType(draftType);
     const isSingleMeasureCategory = SINGLE_MEASURE_CATEGORY_TYPES.has(draftType);
     const xFieldValue = String(draft?.xField || "").trim();
@@ -589,6 +926,33 @@ export function ReportBuilderChartDialog({
         && yFieldList.length > 1
         && !seriesFieldValue;
     const errorContext = { dimensions, measures };
+    const normalizedChartFieldSearch = String(chartFieldSearch || "").trim().toLowerCase();
+    const visibleDimensions = (Array.isArray(dimensions) ? dimensions : []).filter((entry) => {
+        if (!normalizedChartFieldSearch) {
+            return true;
+        }
+        const label = String(entry?.label || entry?.key || "").trim().toLowerCase();
+        const key = String(entry?.key || "").trim().toLowerCase();
+        return label.includes(normalizedChartFieldSearch) || key.includes(normalizedChartFieldSearch);
+    });
+    const visibleMeasures = (Array.isArray(measures) ? measures : []).filter((entry) => {
+        if (!normalizedChartFieldSearch) {
+            return true;
+        }
+        const label = String(entry?.label || entry?.key || "").trim().toLowerCase();
+        const key = String(entry?.key || "").trim().toLowerCase();
+        return label.includes(normalizedChartFieldSearch) || key.includes(normalizedChartFieldSearch);
+    });
+    const selectedMeasureEntries = yFieldList
+        .map((measureKey) => (Array.isArray(measures) ? measures : []).find((entry) => entry.key === measureKey) || null)
+        .filter(Boolean);
+
+    useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+        setChartFieldSearch("");
+    }, [draft?.title, isOpen, selectedDatasetRef]);
 
     const applyPatch = (patch) => {
         const next = sanitizeDraftPatch(draft || {}, patch);
@@ -639,8 +1003,10 @@ export function ReportBuilderChartDialog({
         ].filter(Boolean).join(" ")}>
             {measures.length === 0 ? (
                 <div className="forge-report-builder__chart-empty-hint">No measures available in the current table.</div>
+            ) : normalizedChartFieldSearch && visibleMeasures.length === 0 ? (
+                <div className="forge-report-builder__chart-empty-hint">No measures match the current search.</div>
             ) : null}
-            {measures.map((entry) => {
+            {visibleMeasures.map((entry) => {
                 const active = yFieldList.includes(entry.key);
                 return (
                     <button
@@ -748,10 +1114,50 @@ export function ReportBuilderChartDialog({
         <Dialog
             isOpen={isOpen}
             onClose={onClose}
-            title="Create Chart"
+            title={dialogTitle}
             style={{ width: "min(820px, calc(100vw - 48px))" }}
         >
             <div className="forge-report-builder__chart-dialog">
+                {normalizedDatasetOptions.length > 0 || dataSourceLabel || dataViewLabel ? (
+                    <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full" style={{ marginBottom: 14 }}>
+                        {normalizedDatasetOptions.length > 0 ? (
+                            <ReportBuilderDatasetPicker
+                                label="Data source"
+                                datasetOptions={normalizedDatasetOptions}
+                                selectedDatasetRef={selectedDatasetRef}
+                                onSelect={onDatasetRefChange}
+                                error={errorByField.has("datasetRef")}
+                            />
+                        ) : dataSourceLabel ? (
+                            <div style={{ display: "grid", gap: 6, marginBottom: dataViewLabel ? 12 : 0 }}>
+                                <span>Data source</span>
+                                <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                                    <strong>{dataSourceLabel}</strong>
+                                </div>
+                            </div>
+                        ) : null}
+                        {dataViewLabel ? (
+                            <div style={{ display: "grid", gap: 6 }}>
+                                <span>Starter projection</span>
+                                <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                                    <strong>{dataViewLabel}</strong>
+                                    {semanticBindingState ? (
+                                        <ReportBuilderSemanticBindingChips
+                                            bindingState={semanticBindingState}
+                                            marginTop={8}
+                                            marginBottom={0}
+                                        />
+                                    ) : null}
+                                    {dataViewDescription ? (
+                                        <div className="forge-report-builder__quick-option-description" style={{ marginTop: 6 }}>
+                                            {dataViewDescription}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
                 <div className="forge-report-builder__chart-dialog-grid">
                     <label className="forge-report-builder__chart-field">
                         <span>Title</span>
@@ -775,6 +1181,16 @@ export function ReportBuilderChartDialog({
                             ))}
                         </select>
                     </label>
+                    <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                        <span>Search fields</span>
+                        <input
+                            type="text"
+                            className="forge-report-builder-select"
+                            value={chartFieldSearch}
+                            onChange={(event) => setChartFieldSearch(event.target.value)}
+                            placeholder="Filter dimensions and measures"
+                        />
+                    </label>
                     <label className="forge-report-builder__chart-field">
                         <span>{family === "category" ? "Category" : "X-axis"}</span>
                         <select
@@ -783,7 +1199,7 @@ export function ReportBuilderChartDialog({
                             onChange={(event) => applyPatch({ xField: event.target.value })}
                         >
                             <option value="">Select…</option>
-                            {dimensions.map((entry) => (
+                            {visibleDimensions.map((entry) => (
                                 <option key={entry.key} value={entry.key}>{entry.label}</option>
                             ))}
                         </select>
@@ -799,7 +1215,7 @@ export function ReportBuilderChartDialog({
                                 title={seriesFieldEnabled ? "" : "Available only when a single measure is selected."}
                             >
                                 <option value="">None</option>
-                                {dimensions.filter((entry) => entry.key !== xFieldValue).map((entry) => (
+                                {visibleDimensions.filter((entry) => entry.key !== xFieldValue).map((entry) => (
                                     <option key={entry.key} value={entry.key}>{entry.label}</option>
                                 ))}
                             </select>
@@ -807,6 +1223,15 @@ export function ReportBuilderChartDialog({
                     ) : <span />}
                     <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
                         <span>{isSingleMeasureCategory ? "Measure" : "Measures"}</span>
+                        {selectedMeasureEntries.length > 0 ? (
+                            <div className="forge-report-builder__dimension-selected" style={{ marginBottom: 8 }}>
+                                {selectedMeasureEntries.map((entry) => (
+                                    <span key={`selected_${entry.key}`} className="forge-report-builder__result-meta-chip">
+                                        {entry.label || entry.key}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
                         {renderMeasureChips()}
                     </div>
                 </div>
@@ -1233,8 +1658,15 @@ export function ReportBuilderDocumentBlockDialog({
     valueFieldOptions = [],
     secondaryFieldOptions = [],
     tableColumnOptions = [],
+    datasetOptions = [],
+    projectionOptions = [],
     scopeParamOptions = [],
     isEditing = false,
+    dataViewLabel = "",
+    dataViewDescription = "",
+    onAdjustMeasures = null,
+    onAdjustBreakdowns = null,
+    semanticBindingState = null,
 }) {
     const refinementBarActionOptions = [
         { value: "remove", label: "Remove individual refinements" },
@@ -1267,15 +1699,18 @@ export function ReportBuilderDocumentBlockDialog({
     const isRefinementBarBlock = normalizedKind === "refinementBarBlock";
     const isGeoMapBlock = normalizedKind === "geoMapBlock";
     const isKpiBlock = normalizedKind === "kpiBlock";
+    const isBadgesBlock = normalizedKind === "badgesBlock";
     const isTableBlock = normalizedKind === "tableBlock";
+    const supportsDatasetBinding = isFilterBarBlock || isGeoMapBlock || isKpiBlock || isBadgesBlock || isTableBlock;
     const geo = draft?.geo && typeof draft.geo === "object" && !Array.isArray(draft.geo)
         ? draft.geo
         : {};
     const geoMetric = geo?.metric && typeof geo.metric === "object" && !Array.isArray(geo.metric)
         ? geo.metric
         : {};
-    const geoDimensionOptions = tableColumnOptions.filter((option) => String(option?.kind || "").trim() === "dimension");
-    const geoMetricOptions = tableColumnOptions.filter((option) => String(option?.kind || "").trim() === "measure");
+    const normalizedBaseTableColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
+    const normalizedBaseValueFieldOptions = normalizeFieldOptions(valueFieldOptions);
+    const normalizedBaseSecondaryFieldOptions = normalizeFieldOptions(secondaryFieldOptions);
     const setDraftPatch = (patch = {}) => {
         if (typeof onDraftChange !== "function") {
             return;
@@ -1287,7 +1722,7 @@ export function ReportBuilderDocumentBlockDialog({
     };
     const applyValueField = (value = "") => {
         const normalizedValue = String(value || "").trim();
-        const matched = (Array.isArray(valueFieldOptions) ? valueFieldOptions : [])
+        const matched = normalizedValueFieldOptions
             .find((option) => String(option?.value || "").trim() === normalizedValue);
         setDraftPatch({
             valueField: normalizedValue,
@@ -1296,7 +1731,7 @@ export function ReportBuilderDocumentBlockDialog({
     };
     const applySecondaryField = (value = "") => {
         const normalizedValue = String(value || "").trim();
-        const matched = (Array.isArray(secondaryFieldOptions) ? secondaryFieldOptions : [])
+        const matched = normalizedSecondaryFieldOptions
             .find((option) => String(option?.value || "").trim() === normalizedValue);
         setDraftPatch({
             secondaryField: normalizedValue,
@@ -1306,11 +1741,29 @@ export function ReportBuilderDocumentBlockDialog({
     const selectedColumnKeys = Array.isArray(draft?.columnKeys)
         ? draft.columnKeys.map((entry) => String(entry || "").trim()).filter(Boolean)
         : [];
+    const selectedColumnKeySet = new Set(selectedColumnKeys);
     const selectedParamIds = Array.isArray(draft?.paramIds)
         ? draft.paramIds.map((entry) => String(entry || "").trim()).filter(Boolean)
         : [];
     const selectedRefinementActionKinds = Array.isArray(draft?.actionKinds)
         ? draft.actionKinds.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const badgeItems = Array.isArray(draft?.items)
+        ? draft.items
+            .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+            .map((item, index) => ({
+                id: String(item?.id || `badge_${index + 1}`).trim() || `badge_${index + 1}`,
+                label: String(item?.label || "").trim(),
+                value: String(item?.value || "").trim(),
+                valueField: String(item?.valueField || "").trim(),
+                format: String(item?.format || "").trim(),
+                labelMode: normalizeBadgeItemLabelMode(item?.labelMode, {
+                    hasExplicitLabel: !!String(item?.label || "").trim(),
+                }),
+                rulesText: String(item?.rulesText || "").trim(),
+                rules: resolveReportBuilderBadgeRuleRows(item),
+                tone: String(item?.tone || "info").trim() || "info",
+            }))
         : [];
     const columnVisualKinds = draft?.columnVisualKinds && typeof draft.columnVisualKinds === "object" && !Array.isArray(draft.columnVisualKinds)
         ? draft.columnVisualKinds
@@ -1323,10 +1776,46 @@ export function ReportBuilderDocumentBlockDialog({
         if (!normalizedColumnKey) {
             return;
         }
-        const nextKeys = selectedColumnKeys.includes(normalizedColumnKey)
-            ? selectedColumnKeys.filter((entry) => entry !== normalizedColumnKey)
-            : [...selectedColumnKeys, normalizedColumnKey];
-        setDraftPatch({ columnKeys: nextKeys });
+        if (selectedColumnKeySet.has(normalizedColumnKey)) {
+            setDraftPatch({ columnKeys: selectedColumnKeys.filter((key) => key !== normalizedColumnKey) });
+            return;
+        }
+        setDraftPatch({ columnKeys: [...selectedColumnKeys, normalizedColumnKey] });
+    };
+    const moveColumnKey = (columnKey = "", direction = 0) => {
+        const normalizedColumnKey = String(columnKey || "").trim();
+        const normalizedDirection = Number(direction) || 0;
+        if (!normalizedColumnKey || !normalizedDirection) {
+            return;
+        }
+        const currentIndex = selectedColumnKeys.indexOf(normalizedColumnKey);
+        const nextIndex = currentIndex + normalizedDirection;
+        if (currentIndex === -1 || nextIndex < 0 || nextIndex >= selectedColumnKeys.length) {
+            return;
+        }
+        const nextColumnKeys = [...selectedColumnKeys];
+        nextColumnKeys[currentIndex] = selectedColumnKeys[nextIndex];
+        nextColumnKeys[nextIndex] = selectedColumnKeys[currentIndex];
+        setDraftPatch({ columnKeys: nextColumnKeys });
+    };
+    const placeColumnKeyRelative = (columnKey = "", targetKey = "", placement = "before") => {
+        const normalizedColumnKey = String(columnKey || "").trim();
+        const normalizedTargetKey = String(targetKey || "").trim();
+        const normalizedPlacement = String(placement || "").trim().toLowerCase() === "after"
+            ? "after"
+            : "before";
+        if (!normalizedColumnKey) {
+            return;
+        }
+        const nextColumnKeys = placeReportBuilderTableColumnKeyRelative(
+            selectedColumnKeys,
+            normalizedColumnKey,
+            normalizedTargetKey,
+            normalizedPlacement,
+        );
+        if (nextColumnKeys.join("::") !== selectedColumnKeys.join("::")) {
+            setDraftPatch({ columnKeys: nextColumnKeys });
+        }
     };
     const toggleScopeParam = (paramId = "") => {
         const normalizedParamId = String(paramId || "").trim();
@@ -1347,6 +1836,99 @@ export function ReportBuilderDocumentBlockDialog({
             ? selectedRefinementActionKinds.filter((entry) => entry !== normalizedActionKind)
             : [...selectedRefinementActionKinds, normalizedActionKind];
         setDraftPatch({ actionKinds: nextActionKinds });
+    };
+    const setBadgeItems = (nextItems = []) => {
+        setDraftPatch({
+            items: (Array.isArray(nextItems) ? nextItems : [])
+                .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+                .map((item, index) => ({
+                    id: String(item?.id || `badge_${index + 1}`).trim() || `badge_${index + 1}`,
+                    label: String(item?.label || "").trim(),
+                    value: String(item?.value || "").trim(),
+                    valueField: String(item?.valueField || "").trim(),
+                    format: String(item?.format || "").trim(),
+                    labelMode: normalizeBadgeItemLabelMode(item?.labelMode, {
+                        hasExplicitLabel: !!String(item?.label || "").trim(),
+                    }),
+                    rulesText: String(item?.rulesText || "").trim(),
+                    tone: String(item?.tone || "info").trim() || "info",
+                })),
+        });
+    };
+    const updateBadgeItem = (itemId = "", patch = {}) => {
+        const normalizedItemId = String(itemId || "").trim();
+        if (!normalizedItemId) {
+            return;
+        }
+        setBadgeItems(badgeItems.map((item) => (
+            item.id === normalizedItemId
+                ? {
+                    ...item,
+                    ...(patch || {}),
+                }
+                : item
+        )));
+    };
+    const setBadgeItemRules = (itemId = "", nextRules = []) => {
+        const normalizedItemId = String(itemId || "").trim();
+        if (!normalizedItemId) {
+            return;
+        }
+        const normalizedRules = resolveReportBuilderBadgeRuleRows({ rules: nextRules });
+        updateBadgeItem(normalizedItemId, {
+            rules: normalizedRules,
+            rulesText: serializeReportBuilderBadgeRuleRows(normalizedRules),
+        });
+    };
+    const addBadgeRule = (itemId = "") => {
+        const normalizedItemId = String(itemId || "").trim();
+        const item = badgeItems.find((entry) => entry.id === normalizedItemId) || null;
+        const nextRules = [
+            ...(Array.isArray(item?.rules) ? item.rules : []),
+            { value: "", label: "", tone: "info" },
+        ];
+        setBadgeItemRules(normalizedItemId, nextRules);
+    };
+    const updateBadgeRule = (itemId = "", ruleIndex = 0, patch = {}) => {
+        const normalizedItemId = String(itemId || "").trim();
+        const item = badgeItems.find((entry) => entry.id === normalizedItemId) || null;
+        const nextRules = (Array.isArray(item?.rules) ? item.rules : []).map((rule, index) => (
+            index === ruleIndex
+                ? {
+                    ...rule,
+                    ...(patch || {}),
+                }
+                : rule
+        ));
+        setBadgeItemRules(normalizedItemId, nextRules);
+    };
+    const removeBadgeRule = (itemId = "", ruleIndex = 0) => {
+        const normalizedItemId = String(itemId || "").trim();
+        const item = badgeItems.find((entry) => entry.id === normalizedItemId) || null;
+        const nextRules = (Array.isArray(item?.rules) ? item.rules : []).filter((_, index) => index !== ruleIndex);
+        setBadgeItemRules(normalizedItemId, nextRules);
+    };
+    const addBadgeItem = () => {
+        setBadgeItems([
+            ...badgeItems,
+            {
+                id: `badge_${badgeItems.length + 1}`,
+                label: "",
+                value: "",
+                valueField: "",
+                format: "",
+                labelMode: "field",
+                rulesText: "",
+                tone: "info",
+            },
+        ]);
+    };
+    const removeBadgeItem = (itemId = "") => {
+        const normalizedItemId = String(itemId || "").trim();
+        if (!normalizedItemId) {
+            return;
+        }
+        setBadgeItems(badgeItems.filter((item) => item.id !== normalizedItemId));
     };
     const setColumnVisualKind = (columnKey = "", visualKind = "") => {
         const normalizedColumnKey = String(columnKey || "").trim();
@@ -1404,6 +1986,259 @@ export function ReportBuilderDocumentBlockDialog({
             format: matched?.format === "compactNumber" ? "compact" : matched?.format || undefined,
         });
     };
+    const requestedDatasetRef = String(draft?.datasetRef || "").trim();
+    const normalizedDatasetOptions = normalizeDialogDatasetOptions(datasetOptions, requestedDatasetRef);
+    const normalizedProjectionOptions = Array.isArray(projectionOptions)
+        ? projectionOptions
+            .map((option) => {
+                const value = String(option?.value || "").trim();
+                const label = String(option?.label || value).trim();
+                const columnKeys = Array.isArray(option?.columnKeys)
+                    ? option.columnKeys.map((entry) => String(entry || "").trim()).filter(Boolean)
+                    : [];
+                if (!value || !label || columnKeys.length === 0) {
+                    return null;
+                }
+                return {
+                    value,
+                    label,
+                    description: String(option?.description || "").trim(),
+                    columnKeys,
+                };
+            })
+            .filter(Boolean)
+        : [];
+    const namedProjectionOptions = normalizedProjectionOptions.filter((option) => option.value !== "__current__");
+    const selectedDatasetRef = String(draft?.datasetRef || normalizedDatasetOptions[0]?.value || "primary").trim() || "primary";
+    const selectedDatasetOption = normalizedDatasetOptions.find((option) => option.value === selectedDatasetRef) || null;
+    const usesPrimaryDataset = selectedDatasetRef === "primary";
+    const datasetTableColumnOptions = Array.isArray(selectedDatasetOption?.columnOptions) && selectedDatasetOption.columnOptions.length > 0
+        ? selectedDatasetOption.columnOptions
+        : normalizedBaseTableColumnOptions;
+    const normalizedValueFieldOptions = Array.isArray(selectedDatasetOption?.valueFieldOptions) && selectedDatasetOption.valueFieldOptions.length > 0
+        ? selectedDatasetOption.valueFieldOptions
+        : normalizedBaseValueFieldOptions;
+    const normalizedSecondaryFieldOptions = Array.isArray(selectedDatasetOption?.secondaryFieldOptions) && selectedDatasetOption.secondaryFieldOptions.length > 0
+        ? selectedDatasetOption.secondaryFieldOptions
+        : normalizedBaseSecondaryFieldOptions;
+    const normalizedScopeParamOptions = resolveDialogScopeParamOptions(
+        selectedDatasetRef,
+        selectedDatasetOption,
+        scopeParamOptions,
+    );
+    const geoDimensionOptions = datasetTableColumnOptions.filter((option) => String(option?.kind || "").trim() === "dimension");
+    const geoMetricOptions = datasetTableColumnOptions.filter((option) => String(option?.kind || "").trim() === "measure");
+    const tableBreakdownOptions = datasetTableColumnOptions.filter((option) => String(option?.kind || "").trim() === "dimension");
+    const tableMeasureOptions = datasetTableColumnOptions.filter((option) => String(option?.kind || "").trim() === "measure");
+    const supportsSharedDataViewHandoff = (isGeoMapBlock || isKpiBlock) && usesPrimaryDataset;
+    const unifiedTableFieldOptions = [...tableBreakdownOptions, ...tableMeasureOptions];
+    const selectedTableColumnOptions = selectedColumnKeys
+        .map((columnKey) => unifiedTableFieldOptions.find((option) => option.key === columnKey))
+        .filter(Boolean);
+    const starterSelectionColumnKeys = (() => {
+        const selectedDefaults = datasetTableColumnOptions
+            .filter((option) => option?.selected === true)
+            .map((option) => String(option?.key || "").trim())
+            .filter(Boolean);
+        return selectedDefaults.length > 0
+            ? selectedDefaults
+            : datasetTableColumnOptions
+                .map((option) => String(option?.key || "").trim())
+                .filter(Boolean);
+    })();
+    const matchesProjectionKeys = (projectionColumnKeys = [], currentColumnKeys = []) => {
+        const normalizedProjectionKeys = Array.isArray(projectionColumnKeys)
+            ? projectionColumnKeys.map((entry) => String(entry || "").trim()).filter(Boolean)
+            : [];
+        const normalizedCurrentKeys = Array.isArray(currentColumnKeys)
+            ? currentColumnKeys.map((entry) => String(entry || "").trim()).filter(Boolean)
+            : [];
+        if (normalizedProjectionKeys.length !== normalizedCurrentKeys.length) {
+            return false;
+        }
+        const projectionKeySet = new Set(normalizedProjectionKeys);
+        return normalizedCurrentKeys.every((key) => projectionKeySet.has(key));
+    };
+    const matchedProjectionOption = usesPrimaryDataset ? (normalizedProjectionOptions.find((option) => (
+        matchesProjectionKeys(option.columnKeys, selectedColumnKeys)
+    )) || null) : null;
+    const [tableFieldSearch, setTableFieldSearch] = useState("");
+    const [openColumnSettingsColumnKey, setOpenColumnSettingsColumnKey] = useState("");
+    const [draggingTableColumnKey, setDraggingTableColumnKey] = useState("");
+    const [tableDropTarget, setTableDropTarget] = useState({
+        targetKey: "",
+        placement: "",
+        zone: "",
+    });
+    useEffect(() => {
+        if (!isOpen || !isTableBlock) {
+            return;
+        }
+        setTableFieldSearch("");
+        setOpenColumnSettingsColumnKey("");
+        setDraggingTableColumnKey("");
+        setTableDropTarget({
+            targetKey: "",
+            placement: "",
+            zone: "",
+        });
+    }, [draft?.id, isOpen, isTableBlock, selectedDatasetRef]);
+    const applyProjectionOption = (value = "") => {
+        const normalizedValue = String(value || "").trim();
+        const matched = normalizedProjectionOptions.find((option) => option.value === normalizedValue) || null;
+        if (!matched) {
+            return;
+        }
+        setDraftPatch({ columnKeys: matched.columnKeys });
+    };
+    const applyCurrentSelection = () => {
+        if (starterSelectionColumnKeys.length === 0) {
+            return;
+        }
+        setDraftPatch({ columnKeys: starterSelectionColumnKeys });
+    };
+    const normalizedTableFieldSearch = String(tableFieldSearch || "").trim().toLowerCase();
+    const applyDatasetSelection = (nextDatasetValue = "") => {
+        const normalizedDatasetValue = String(nextDatasetValue || "").trim();
+        const targetDatasetOption = normalizedDatasetOptions.find((option) => option.value === normalizedDatasetValue) || null;
+        const nextDraft = rebindReportBuilderDocumentBlockDraft(draft, {
+            datasetRef: normalizedDatasetValue,
+            valueFieldOptions: Array.isArray(targetDatasetOption?.valueFieldOptions) ? targetDatasetOption.valueFieldOptions : [],
+            secondaryFieldOptions: Array.isArray(targetDatasetOption?.secondaryFieldOptions) ? targetDatasetOption.secondaryFieldOptions : [],
+            tableColumnOptions: Array.isArray(targetDatasetOption?.columnOptions) ? targetDatasetOption.columnOptions : [],
+            scopeParamOptions: Array.isArray(targetDatasetOption?.scopeParamOptions) ? targetDatasetOption.scopeParamOptions : [],
+        });
+        if (typeof onDraftChange === "function" && nextDraft) {
+            onDraftChange(nextDraft);
+        }
+    };
+    const filterProjectionFieldOptions = (options = []) => (Array.isArray(options) ? options : []).filter((option) => {
+        if (!normalizedTableFieldSearch) {
+            return true;
+        }
+        const label = String(option?.label || option?.key || "").trim().toLowerCase();
+        const key = String(option?.key || "").trim().toLowerCase();
+        return label.includes(normalizedTableFieldSearch) || key.includes(normalizedTableFieldSearch);
+    });
+    const startTableDrag = (event, columnKey = "", dragKind = "palette") => {
+        const normalizedColumnKey = String(columnKey || "").trim();
+        const normalizedDragKind = String(dragKind || "").trim() || "palette";
+        if (!normalizedColumnKey || !event?.dataTransfer) {
+            return;
+        }
+        const payload = JSON.stringify({
+            columnKey: normalizedColumnKey,
+            dragKind: normalizedDragKind,
+        });
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData(REPORT_BUILDER_TABLE_DND_MIME, payload);
+        event.dataTransfer.setData("text/plain", payload);
+        setDraggingTableColumnKey(normalizedColumnKey);
+    };
+    const clearTableDragState = () => {
+        setDraggingTableColumnKey("");
+        setTableDropTarget({
+            targetKey: "",
+            placement: "",
+            zone: "",
+        });
+    };
+    // dataTransfer payloads are unreadable during dragover, so recognize table
+    // drags by the advertised MIME type or the locally tracked drag source.
+    const isTableDragEvent = (event) => Array.from(event?.dataTransfer?.types || []).includes(REPORT_BUILDER_TABLE_DND_MIME)
+        || !!draggingTableColumnKey;
+    const handleTableCanvasDragOver = (event) => {
+        if (!isTableDragEvent(event)) {
+            return;
+        }
+        event.preventDefault();
+        if (event?.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+        setTableDropTarget((current) => (
+            current.zone === "canvas" && !current.targetKey
+                ? current
+                : { targetKey: "", placement: "after", zone: "canvas" }
+        ));
+    };
+    const handleTableCanvasDragLeave = (event) => {
+        if (event?.currentTarget?.contains?.(event?.relatedTarget)) {
+            return;
+        }
+        setTableDropTarget((current) => (
+            current.zone
+                ? { targetKey: "", placement: "", zone: "" }
+                : current
+        ));
+    };
+    const updateTableHeaderDropTarget = (event, targetKey = "") => {
+        const normalizedTargetKey = String(targetKey || "").trim();
+        if (!normalizedTargetKey || !isTableDragEvent(event)) {
+            return "";
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        if (event?.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
+        const bounds = event.currentTarget?.getBoundingClientRect?.();
+        const placement = bounds && Number.isFinite(bounds.left) && Number.isFinite(bounds.width)
+            ? ((event.clientX - bounds.left) > (bounds.width / 2) ? "after" : "before")
+            : "before";
+        setTableDropTarget({
+            targetKey: normalizedTargetKey,
+            placement,
+            zone: "header",
+        });
+        return placement;
+    };
+    const handleTableHeaderDrop = (event, targetKey = "") => {
+        const placement = updateTableHeaderDropTarget(event, targetKey) || tableDropTarget.placement || "before";
+        const payload = parseReportBuilderTableDragPayload(event);
+        event.preventDefault();
+        event.stopPropagation();
+        if (!payload?.columnKey) {
+            clearTableDragState();
+            return;
+        }
+        if (payload.columnKey === String(targetKey || "").trim()) {
+            clearTableDragState();
+            return;
+        }
+        placeColumnKeyRelative(payload.columnKey, targetKey, placement);
+        clearTableDragState();
+    };
+    const handleTableCanvasDrop = (event) => {
+        event.preventDefault();
+        const payload = parseReportBuilderTableDragPayload(event);
+        if (!payload?.columnKey) {
+            clearTableDragState();
+            return;
+        }
+        placeColumnKeyRelative(payload.columnKey, "", "after");
+        clearTableDragState();
+    };
+    const visibleUnifiedTableFieldOptions = filterProjectionFieldOptions(unifiedTableFieldOptions);
+    const resolveTableFieldMarker = (option = {}) => {
+        if (option?.calculated === true) {
+            return { kind: "calculated", icon: "function", title: "Calculated field" };
+        }
+        const normalizedKind = String(option?.kind || "").trim();
+        if (normalizedKind === "dimension") {
+            return { kind: "dimension", icon: "tag", title: "Dimension field" };
+        }
+        if (normalizedKind === "measure") {
+            return { kind: "measure", icon: "numerical", title: "Measure field" };
+        }
+        return { kind: "field", icon: "one-column", title: "Field" };
+    };
+    const resolveBadgeFieldOption = (valueField = "") => {
+        const normalizedValueField = String(valueField || "").trim();
+        if (!normalizedValueField) {
+            return null;
+        }
+        return datasetTableColumnOptions.find((option) => option.key === normalizedValueField) || null;
+    };
     return (
         <Dialog
             isOpen={isOpen}
@@ -1417,6 +2252,8 @@ export function ReportBuilderDocumentBlockDialog({
                             ? "Edit Geo Map Block"
                         : isKpiBlock
                             ? "Edit KPI Block"
+                            : isBadgesBlock
+                                ? "Edit Pills Block"
                             : isTableBlock
                                 ? "Edit Table Block"
                                 : "Edit Narrative Block")
@@ -1428,34 +2265,16 @@ export function ReportBuilderDocumentBlockDialog({
                             ? "Add Geo Map Block"
                         : isKpiBlock
                             ? "Add KPI Block"
+                            : isBadgesBlock
+                                ? "Add Pills Block"
                             : isTableBlock
                                 ? "Add Table Block"
                                 : "Add Narrative Block")}
-            style={{ width: "min(720px, calc(100vw - 48px))" }}
+            style={{ width: "min(860px, calc(100vw - 48px))" }}
         >
             <div className="forge-report-builder__chart-dialog">
                 <div className="forge-report-builder__chart-dialog-grid">
-                    <label className="forge-report-builder__chart-field">
-                        <span>Block type</span>
-                        <input
-                            type="text"
-                            disabled
-                            className="forge-report-builder-select"
-                            value={isFilterBarBlock
-                                ? "Filter bar"
-                                : isRefinementBarBlock
-                                    ? "Refinement bar"
-                                    : isGeoMapBlock
-                                        ? "Geo map"
-                                    : isKpiBlock
-                                        ? "KPI"
-                                        : isTableBlock
-                                            ? "Table"
-                                            : "Narrative"}
-                            readOnly
-                        />
-                    </label>
-                    <label className="forge-report-builder__chart-field">
+                    <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
                         <span>Title</span>
                         <input
                             type="text"
@@ -1463,25 +2282,62 @@ export function ReportBuilderDocumentBlockDialog({
                             value={draft?.title || ""}
                             onChange={(event) => setDraftPatch({ title: event.target.value })}
                             placeholder={isFilterBarBlock
-                                ? "Report Scope"
+                                ? "Filters"
                                 : isRefinementBarBlock
                                     ? "Active Refinements"
                                     : isGeoMapBlock
                                         ? "Geo Map"
                                     : isKpiBlock
                                         ? "Headline KPI"
+                                        : isBadgesBlock
+                                            ? "Status Pills"
                                         : isTableBlock
                                             ? "Detail Table"
                                             : "Narrative"}
                         />
                     </label>
+                    {supportsDatasetBinding ? (
+                        normalizedDatasetOptions.length > 0 ? (
+                            <ReportBuilderDatasetPicker
+                                label="Data source"
+                                datasetOptions={normalizedDatasetOptions}
+                                selectedDatasetRef={selectedDatasetRef}
+                                onSelect={applyDatasetSelection}
+                                error={errorByField.has("datasetRef")}
+                            />
+                        ) : null
+                    ) : null}
+                    {supportsSharedDataViewHandoff && dataViewLabel ? (
+                        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                            <span>Starter projection</span>
+                            <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                                <strong>{dataViewLabel}</strong>
+                                {semanticBindingState ? (
+                                    <ReportBuilderSemanticBindingChips
+                                        bindingState={semanticBindingState}
+                                        marginTop={8}
+                                        marginBottom={0}
+                                    />
+                                ) : null}
+                                {dataViewDescription ? (
+                                    <div className="forge-report-builder__quick-option-description" style={{ marginTop: 6 }}>
+                                        {dataViewDescription}
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
+                    ) : null}
                     {isFilterBarBlock ? (
                         <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
-                            <span>Shared scope parameters</span>
+                            <span>{selectedDatasetRef === "primary" ? "Available report filters" : "Available source filters"}</span>
                             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                {scopeParamOptions.length === 0 ? (
-                                    <span style={{ fontSize: 12, color: "#5f6b7c" }}>No shared scope parameters are configured in the current builder.</span>
-                                ) : scopeParamOptions.map((option) => {
+                                {normalizedScopeParamOptions.length === 0 ? (
+                                    <span style={{ fontSize: 12, color: "#5f6b7c" }}>
+                                        {selectedDatasetRef === "primary"
+                                            ? "No report filters are configured in the current builder."
+                                            : "This data source does not expose runtime filters yet."}
+                                    </span>
+                                ) : normalizedScopeParamOptions.map((option) => {
                                     const selected = selectedParamIds.includes(option.value);
                                     return (
                                         <button
@@ -1632,8 +2488,8 @@ export function ReportBuilderDocumentBlockDialog({
                                     value={draft?.valueField || ""}
                                     onChange={(event) => applyValueField(event.target.value)}
                                 >
-                                    <option value="">{valueFieldOptions.length === 0 ? "No available measures" : "Select measure..."}</option>
-                                    {valueFieldOptions.map((option) => (
+                                    <option value="">{normalizedValueFieldOptions.length === 0 ? "No available measures" : "Select measure..."}</option>
+                                    {normalizedValueFieldOptions.map((option) => (
                                         <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                 </select>
@@ -1656,7 +2512,7 @@ export function ReportBuilderDocumentBlockDialog({
                                     onChange={(event) => applySecondaryField(event.target.value)}
                                 >
                                     <option value="">None</option>
-                                    {secondaryFieldOptions.map((option) => (
+                                    {normalizedSecondaryFieldOptions.map((option) => (
                                         <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                 </select>
@@ -1693,94 +2549,565 @@ export function ReportBuilderDocumentBlockDialog({
                                 />
                             </label>
                         </>
+                    ) : isBadgesBlock ? (
+                        <>
+                            <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+                                    <span>Pills</span>
+                                    <Button small minimal icon="add" onClick={addBadgeItem}>
+                                        Add pill
+                                    </Button>
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                                    {badgeItems.length === 0 ? (
+                                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning">
+                                            Add at least one pill for this block.
+                                        </div>
+                                    ) : badgeItems.map((item, index) => (
+                                        <div
+                                            key={item.id}
+                                            style={{
+                                                display: "grid",
+                                                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(120px, 0.6fr) minmax(160px, 0.7fr) auto",
+                                                gap: 10,
+                                                alignItems: "end",
+                                                padding: "12px",
+                                                border: "1px solid #d7e2ee",
+                                                borderRadius: 12,
+                                                background: "#fbfdff",
+                                            }}
+                                        >
+                                            <label style={{ display: "grid", gap: 6 }}>
+                                                <span style={{ fontSize: 12, color: "#486579" }}>Label</span>
+                                                <input
+                                                    type="text"
+                                                    className={errorByField.has("items") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                                    value={item.label}
+                                                    onChange={(event) => updateBadgeItem(item.id, {
+                                                        label: event.target.value,
+                                                        labelMode: "manual",
+                                                    })}
+                                                    placeholder={item.valueField && item.labelMode === "field"
+                                                        ? "Uses selected field label"
+                                                        : `Pill ${index + 1}`}
+                                                />
+                                            </label>
+                                            <label style={{ display: "grid", gap: 6 }}>
+                                                <span style={{ fontSize: 12, color: "#486579" }}>Field</span>
+                                                <select
+                                                    className={errorByField.has(`items.${index}.valueField`) ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                                    value={item.valueField}
+                                                    onChange={(event) => updateBadgeItem(
+                                                        item.id,
+                                                        applyReportBuilderBadgeItemFieldSelection(item, event.target.value, datasetTableColumnOptions),
+                                                    )}
+                                                >
+                                                    <option value="">Static value</option>
+                                                    {datasetTableColumnOptions.map((option) => (
+                                                        <option key={option.key} value={option.key}>{option.label}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            {item.valueField ? (
+                                                <div style={{ display: "grid", gap: 6 }}>
+                                                    <span style={{ fontSize: 12, color: "#486579" }}>Label source</span>
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        onClick={() => updateBadgeItem(item.id, resolveReportBuilderBadgeItemFieldLabel(item, datasetTableColumnOptions))}
+                                                    >
+                                                        {item.labelMode === "field" ? "Using field label" : "Use field label"}
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div />
+                                            )}
+                                            <label style={{ display: "grid", gap: 6 }}>
+                                                <span style={{ fontSize: 12, color: "#486579" }}>Value</span>
+                                                <input
+                                                    type="text"
+                                                    className="forge-report-builder-select"
+                                                    value={item.value}
+                                                    onChange={(event) => updateBadgeItem(item.id, { value: event.target.value })}
+                                                    placeholder={item.valueField ? "Fallback when no row is available" : "Optional"}
+                                                />
+                                            </label>
+                                            {item.format ? (
+                                                <div style={{ display: "grid", gap: 6 }}>
+                                                    <span style={{ fontSize: 12, color: "#486579" }}>Format</span>
+                                                    <div className="forge-report-builder__result-meta-chip">{item.format}</div>
+                                                </div>
+                                            ) : (
+                                                <div />
+                                            )}
+                                            <label style={{ display: "grid", gap: 6 }}>
+                                                <span style={{ fontSize: 12, color: "#486579" }}>Tone</span>
+                                                <select
+                                                    className="forge-report-builder-select"
+                                                    value={item.tone}
+                                                    onChange={(event) => updateBadgeItem(item.id, { tone: event.target.value })}
+                                                >
+                                                    <option value="neutral">Neutral</option>
+                                                    <option value="info">Info</option>
+                                                    <option value="success">Success</option>
+                                                    <option value="warning">Warning</option>
+                                                    <option value="danger">Danger</option>
+                                                </select>
+                                            </label>
+                                            <Button
+                                                small
+                                                minimal
+                                                intent="danger"
+                                                icon="trash"
+                                                aria-label={`Remove pill ${index + 1}`}
+                                                onClick={() => removeBadgeItem(item.id)}
+                                            />
+                                            {item.valueField ? (
+                                                <div style={{ display: "grid", gap: 8, gridColumn: "1 / -1" }}>
+                                                    {(() => {
+                                                        const fieldSummary = buildReportBuilderFieldMetadataSummary(resolveBadgeFieldOption(item.valueField));
+                                                        if (!fieldSummary) {
+                                                            return null;
+                                                        }
+                                                        return (
+                                                            <div
+                                                                style={{
+                                                                    border: "1px solid #d7e2ee",
+                                                                    borderRadius: 10,
+                                                                    background: "#fbfdff",
+                                                                    padding: "10px 12px",
+                                                                    display: "grid",
+                                                                    gap: 6,
+                                                                }}
+                                                            >
+                                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>
+                                                                    {fieldSummary.label}
+                                                                </div>
+                                                                {fieldSummary.chips.length > 0 ? (
+                                                                    <div className="forge-report-builder__result-meta" aria-label={`${fieldSummary.label} semantic metadata`}>
+                                                                        {fieldSummary.chips.map((chip) => (
+                                                                            <span key={`${fieldSummary.label}:${chip}`} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : null}
+                                                                {fieldSummary.rawId ? (
+                                                                    <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                                                        {fieldSummary.rawId}
+                                                                    </div>
+                                                                ) : null}
+                                                                {fieldSummary.semanticRef ? (
+                                                                    <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                                                        {fieldSummary.semanticRef}
+                                                                    </div>
+                                                                ) : null}
+                                                                {fieldSummary.definitionRef ? (
+                                                                    <div style={{ fontSize: 11, color: "#486579", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.45 }}>
+                                                                        {fieldSummary.definitionRef}
+                                                                    </div>
+                                                                ) : null}
+                                                                {fieldSummary.description ? (
+                                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>
+                                                                        {fieldSummary.description}
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                                                        <span style={{ fontSize: 12, color: "#486579", fontWeight: 600 }}>Display rules</span>
+                                                        <Button
+                                                            small
+                                                            minimal
+                                                            icon="add"
+                                                            onClick={() => addBadgeRule(item.id)}
+                                                        >
+                                                            Add rule
+                                                        </Button>
+                                                    </div>
+                                                    {errorByField.has(`items.${index}.rulesText`) ? (
+                                                        <div className="forge-report-builder__chart-error">
+                                                            {errorByField.get(`items.${index}.rulesText`)?.message}
+                                                        </div>
+                                                    ) : null}
+                                                    {Array.isArray(item.rules) && item.rules.length > 0 ? (
+                                                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                                            {item.rules.map((rule, ruleIndex) => (
+                                                                <div
+                                                                    key={`${item.id}_rule_${ruleIndex}`}
+                                                                    style={{
+                                                                        display: "grid",
+                                                                        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) minmax(160px, 0.7fr) auto",
+                                                                        gap: 10,
+                                                                        alignItems: "end",
+                                                                        padding: "10px",
+                                                                        border: "1px solid #d7e2ee",
+                                                                        borderRadius: 10,
+                                                                        background: "#ffffff",
+                                                                    }}
+                                                                >
+                                                                    <label style={{ display: "grid", gap: 6 }}>
+                                                                        <span style={{ fontSize: 12, color: "#486579" }}>Match value</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="forge-report-builder-select"
+                                                                            value={String(rule?.value ?? "")}
+                                                                            onChange={(event) => updateBadgeRule(item.id, ruleIndex, { value: event.target.value })}
+                                                                            placeholder="AE"
+                                                                        />
+                                                                    </label>
+                                                                    <label style={{ display: "grid", gap: 6 }}>
+                                                                        <span style={{ fontSize: 12, color: "#486579" }}>Display label</span>
+                                                                        <input
+                                                                            type="text"
+                                                                            className="forge-report-builder-select"
+                                                                            value={String(rule?.label || "")}
+                                                                            onChange={(event) => updateBadgeRule(item.id, ruleIndex, { label: event.target.value })}
+                                                                            placeholder="United Arab Emirates"
+                                                                        />
+                                                                    </label>
+                                                                    <label style={{ display: "grid", gap: 6 }}>
+                                                                        <span style={{ fontSize: 12, color: "#486579" }}>Tone</span>
+                                                                        <select
+                                                                            className="forge-report-builder-select"
+                                                                            value={String(rule?.tone || "info")}
+                                                                            onChange={(event) => updateBadgeRule(item.id, ruleIndex, { tone: event.target.value })}
+                                                                        >
+                                                                            <option value="neutral">Neutral</option>
+                                                                            <option value="info">Info</option>
+                                                                            <option value="success">Success</option>
+                                                                            <option value="warning">Warning</option>
+                                                                            <option value="danger">Danger</option>
+                                                                        </select>
+                                                                    </label>
+                                                                    <Button
+                                                                        small
+                                                                        minimal
+                                                                        intent="danger"
+                                                                        icon="trash"
+                                                                        aria-label={`Remove rule ${ruleIndex + 1}`}
+                                                                        onClick={() => removeBadgeRule(item.id, ruleIndex)}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                                                            Add a rule only when a raw field value should map to a friendlier label or tone.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
                     ) : isTableBlock ? (
-                        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
-                            <span>Columns</span>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                {tableColumnOptions.length === 0 ? (
-                                    <span style={{ fontSize: 12, color: "#5f6b7c" }}>No available breakdowns or measures are configured for this builder.</span>
-                                ) : tableColumnOptions.map((option) => {
-                                    const selected = selectedColumnKeys.includes(option.key);
-                                    const optionKind = String(option.kind || "").trim();
+                        <>
+                            {selectedDatasetOption?.kindLabel === "missing" || (!usesPrimaryDataset && selectedDatasetOption?.label) ? (
+                                <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                    <span>Table projection</span>
+                                    <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                                        {selectedDatasetOption?.kindLabel === "missing"
+                                            ? selectedDatasetOption.description
+                                            : `Build this table from ${selectedDatasetOption.label}.`}
+                                    </div>
+                                </div>
+                            ) : null}
+                            {usesPrimaryDataset && namedProjectionOptions.length > 0 ? (
+                                <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                    <span>Table projection</span>
+                                    {normalizedProjectionOptions.length > 1 ? (
+                                        <label style={{ display: "grid", gap: 6 }}>
+                                            <span style={{ fontSize: 12, color: "#486579" }}>Starter projection</span>
+                                            <select
+                                                className="forge-report-builder-select"
+                                                value={matchedProjectionOption?.value || "__custom__"}
+                                                onChange={(event) => applyProjectionOption(event.target.value)}
+                                            >
+                                                {matchedProjectionOption?.value === "__current__" ? (
+                                                    <option value="__current__">Current builder selection</option>
+                                                ) : null}
+                                                {!matchedProjectionOption ? (
+                                                    <option value="__custom__">Current builder selection</option>
+                                                ) : null}
+                                                {namedProjectionOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>{option.label}</option>
+                                                ))}
+                                            </select>
+                                            {matchedProjectionOption?.description ? (
+                                                <span className="forge-report-builder__quick-option-description">{matchedProjectionOption.description}</span>
+                                            ) : null}
+                                        </label>
+                                    ) : matchedProjectionOption?.description ? (
+                                        <div className="forge-report-builder__quick-option-description">
+                                            {matchedProjectionOption.description}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
+                            <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Table columns</span>
+                                <label className="forge-report-builder__table-field-search">
+                                    <Icon icon="search" size={12} />
+                                    <input
+                                        type="text"
+                                        aria-label="Search fields"
+                                        value={tableFieldSearch}
+                                        onChange={(event) => setTableFieldSearch(event.target.value)}
+                                        placeholder="Filter fields"
+                                    />
+                                </label>
+                                <div className="forge-report-builder__table-field-list" role="listbox" aria-label="Available fields">
+                                    {unifiedTableFieldOptions.length === 0 ? (
+                                        <span className="forge-report-builder__chart-empty-hint">No fields are available for this source.</span>
+                                    ) : visibleUnifiedTableFieldOptions.length === 0 ? (
+                                        <span className="forge-report-builder__chart-empty-hint">No fields match the current search.</span>
+                                    ) : (
+                                        visibleUnifiedTableFieldOptions.map((option) => {
+                                            const selected = selectedColumnKeySet.has(option.key);
+                                            const marker = resolveTableFieldMarker(option);
+                                            return (
+                                                <button
+                                                    key={option.key}
+                                                    type="button"
+                                                    role="option"
+                                                    draggable
+                                                    aria-selected={selected}
+                                                    data-testid="report-builder-table-field-row"
+                                                    data-field-key={option.key}
+                                                    className={[
+                                                        "forge-report-builder__table-field-row",
+                                                        draggingTableColumnKey === option.key ? "is-dragging" : "",
+                                                        selected ? "is-selected" : "",
+                                                    ].filter(Boolean).join(" ")}
+                                                    onDragStart={(event) => startTableDrag(event, option.key, "palette")}
+                                                    onDragEnd={clearTableDragState}
+                                                    onClick={() => toggleColumnKey(option.key)}
+                                                >
+                                                    <span
+                                                        className={`forge-report-builder__table-field-marker forge-report-builder__table-field-marker--${marker.kind}`}
+                                                        title={marker.title}
+                                                        aria-label={marker.title}
+                                                    >
+                                                        <Icon icon={marker.icon} size={12} aria-hidden="true" />
+                                                    </span>
+                                                    <span className="forge-report-builder__table-field-label">{option.label}</span>
+                                                    {selected ? <Icon icon="tick" size={12} /> : null}
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                                {selectedTableColumnOptions.length === 0 && starterSelectionColumnKeys.length > 0 ? (
+                                    <div className="forge-report-builder__result-header-actions">
+                                        <Button small minimal onClick={applyCurrentSelection}>
+                                            Apply current fields
+                                        </Button>
+                                    </div>
+                                ) : null}
+                            </div>
+                            <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Table layout</span>
+                                {selectedTableColumnOptions.length === 0 ? (
+                                    <div
+                                        className={[
+                                            "forge-report-builder__table-canvas",
+                                            draggingTableColumnKey ? "is-drag-active" : "",
+                                            tableDropTarget.zone === "canvas" ? "is-drop-target" : "",
+                                        ].filter(Boolean).join(" ")}
+                                        data-testid="report-builder-table-canvas-empty"
+                                        onDragOver={handleTableCanvasDragOver}
+                                        onDragLeave={handleTableCanvasDragLeave}
+                                        onDrop={handleTableCanvasDrop}
+                                    >
+                                        <span className="forge-report-builder__chart-empty-hint">No columns selected yet. Drag fields here or choose fields above to build this table.</span>
+                                    </div>
+                                ) : (
+                                    <div
+                                        className={[
+                                            "forge-report-builder__table-canvas",
+                                            draggingTableColumnKey ? "is-drag-active" : "",
+                                            tableDropTarget.zone === "canvas" ? "is-drop-target" : "",
+                                        ].filter(Boolean).join(" ")}
+                                        data-testid="report-builder-table-canvas"
+                                        onDragOver={handleTableCanvasDragOver}
+                                        onDragLeave={handleTableCanvasDragLeave}
+                                        onDrop={handleTableCanvasDrop}
+                                    >
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    {selectedTableColumnOptions.map((option, index) => {
+                                                        const marker = resolveTableFieldMarker(option);
+                                                        const hasVisual = !!String(columnVisualKinds[option.key] || "").trim();
+                                                        const isDropTarget = tableDropTarget.zone === "header" && tableDropTarget.targetKey === option.key;
+                                                        return (
+                                                            <th
+                                                                key={option.key}
+                                                                draggable
+                                                                data-testid="report-builder-table-header"
+                                                                data-field-key={option.key}
+                                                                className={[
+                                                                    "forge-report-builder__table-canvas-head",
+                                                                    `forge-report-builder__table-canvas-head--${marker.kind}`,
+                                                                    draggingTableColumnKey === option.key ? "is-dragging" : "",
+                                                                    isDropTarget ? `is-drop-${tableDropTarget.placement || "before"}` : "",
+                                                                ].filter(Boolean).join(" ")}
+                                                                onDragStart={(event) => startTableDrag(event, option.key, "header")}
+                                                                onDragEnd={clearTableDragState}
+                                                                onDragOver={(event) => updateTableHeaderDropTarget(event, option.key)}
+                                                                onDrop={(event) => handleTableHeaderDrop(event, option.key)}
+                                                            >
+                                                                <div className="forge-report-builder__table-canvas-head-controls">
+                                                                    <button
+                                                                        type="button"
+                                                                        className="forge-report-builder__table-canvas-icon-btn"
+                                                                        aria-label={`Move ${option.label} left`}
+                                                                        disabled={index === 0}
+                                                                        onClick={() => moveColumnKey(option.key, -1)}
+                                                                    >
+                                                                        <Icon icon="chevron-left" size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="forge-report-builder__table-canvas-icon-btn"
+                                                                        aria-label={`Move ${option.label} right`}
+                                                                        disabled={index === selectedTableColumnOptions.length - 1}
+                                                                        onClick={() => moveColumnKey(option.key, 1)}
+                                                                    >
+                                                                        <Icon icon="chevron-right" size={12} />
+                                                                    </button>
+                                                                    <span
+                                                                        className={`forge-report-builder__table-field-marker forge-report-builder__table-field-marker--${marker.kind}`}
+                                                                        title={marker.title}
+                                                                        aria-label={marker.title}
+                                                                    >
+                                                                        <Icon icon={marker.icon} size={12} aria-hidden="true" />
+                                                                    </span>
+                                                                    <button
+                                                                        type="button"
+                                                                        className={[
+                                                                            "forge-report-builder__table-canvas-icon-btn",
+                                                                            hasVisual ? "is-configured" : "",
+                                                                        ].filter(Boolean).join(" ")}
+                                                                        aria-label={`${option.label} visual settings`}
+                                                                        aria-pressed={openColumnSettingsColumnKey === option.key}
+                                                                        onClick={() => setOpenColumnSettingsColumnKey((current) => (current === option.key ? "" : option.key))}
+                                                                    >
+                                                                        <Icon icon="cog" size={12} />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="forge-report-builder__table-canvas-icon-btn"
+                                                                        aria-label={`Remove ${option.label}`}
+                                                                        onClick={() => toggleColumnKey(option.key)}
+                                                                    >
+                                                                        <Icon icon="cross" size={12} />
+                                                                    </button>
+                                                                </div>
+                                                                <div className="forge-report-builder__table-canvas-head-label">{option.label}</div>
+                                                            </th>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    {selectedTableColumnOptions.map((option) => (
+                                                        <td key={option.key} className="forge-report-builder__table-canvas-placeholder-cell">—</td>
+                                                    ))}
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                                {(() => {
+                                    const openColumnSettingsOption = selectedTableColumnOptions.find((option) => option.key === openColumnSettingsColumnKey) || null;
+                                    if (!openColumnSettingsOption) {
+                                        return null;
+                                    }
+                                    const optionKind = String(openColumnSettingsOption.kind || "").trim();
                                     const canShowDataBar = optionKind === "measure";
                                     const canShowBadge = optionKind === "dimension";
                                     const canShowTone = optionKind === "dimension";
-                                    const visualKind = String(columnVisualKinds[option.key] || "");
+                                    const visualKind = String(columnVisualKinds[openColumnSettingsOption.key] || "");
                                     return (
-                                        <div key={option.key} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                                            <button
-                                                type="button"
-                                                className={[
-                                                    "forge-report-builder__dimension-pill",
-                                                    selected ? "is-active" : "",
-                                                ].filter(Boolean).join(" ")}
-                                                onClick={() => toggleColumnKey(option.key)}
-                                                style={{ cursor: "pointer" }}
-                                            >
-                                                <span className="forge-report-builder__pill-copy">
-                                                    <span className="forge-report-builder__pill-text">{option.label}</span>
-                                                </span>
-                                                {selected ? <span aria-hidden="true">✓</span> : null}
-                                            </button>
-                                            {selected && (canShowDataBar || canShowBadge || canShowTone) ? (
-                                                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#486579" }}>
-                                                    <span>Visual</span>
-                                                    <select
-                                                        aria-label={`Visual for ${option.label}`}
-                                                        className="forge-report-builder-select"
-                                                        value={visualKind}
-                                                        onChange={(event) => setColumnVisualKind(option.key, event.target.value)}
-                                                    >
-                                                        <option value="">None</option>
-                                                        {canShowDataBar ? <option value="dataBar">Data bar</option> : null}
-                                                        {canShowBadge ? <option value="badge">Badge</option> : null}
-                                                        {canShowTone ? <option value="tone">Tone</option> : null}
-                                                    </select>
-                                                </label>
-                                            ) : null}
-                                            {selected && (visualKind === "badge" || visualKind === "tone") ? (
-                                                <label style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                                        <div className="forge-report-builder__table-column-settings">
+                                            <div className="forge-report-builder__table-column-settings-header">
+                                                <span>Visual settings — {openColumnSettingsOption.label}</span>
+                                                <button
+                                                    type="button"
+                                                    className="forge-report-builder__table-canvas-icon-btn"
+                                                    aria-label="Close column settings"
+                                                    onClick={() => setOpenColumnSettingsColumnKey("")}
+                                                >
+                                                    <Icon icon="cross" size={12} />
+                                                </button>
+                                            </div>
+                                            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#486579" }}>
+                                                <span>Visual</span>
+                                                <select
+                                                    aria-label={`Visual for ${openColumnSettingsOption.label}`}
+                                                    className="forge-report-builder-select"
+                                                    value={visualKind}
+                                                    onChange={(event) => setColumnVisualKind(openColumnSettingsOption.key, event.target.value)}
+                                                >
+                                                    <option value="">None</option>
+                                                    {canShowDataBar ? <option value="dataBar">Data bar</option> : null}
+                                                    {canShowBadge ? <option value="badge">Badge</option> : null}
+                                                    {canShowTone ? <option value="tone">Tone</option> : null}
+                                                </select>
+                                            </label>
+                                            {visualKind === "badge" || visualKind === "tone" ? (
+                                                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                                     <span style={{ fontSize: 12, color: "#486579" }}>{visualKind === "tone" ? "Tone rules" : "Badge rules"}</span>
                                                     <textarea
-                                                        aria-label={`${visualKind === "tone" ? "Tone" : "Badge"} rules for ${option.label}`}
+                                                        aria-label={`${visualKind === "tone" ? "Tone" : "Badge"} rules for ${openColumnSettingsOption.label}`}
                                                         className={errorByField.has("columnVisualRuleTexts") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
-                                                        value={String(columnVisualRuleTexts[option.key] || "")}
-                                                        onChange={(event) => setColumnVisualRuleText(option.key, event.target.value)}
+                                                        value={String(columnVisualRuleTexts[openColumnSettingsOption.key] || "")}
+                                                        onChange={(event) => setColumnVisualRuleText(openColumnSettingsOption.key, event.target.value)}
                                                         rows={4}
-                                                        placeholder={'[\n  { "value": "Display", "tone": "info", "label": "Display" }\n]'}
+                                                        placeholder={'[\n  { "value": "Example", "tone": "info", "label": "Example" }\n]'}
                                                     />
                                                 </label>
                                             ) : null}
                                         </div>
                                     );
-                                })}
+                                })()}
                             </div>
-                        </div>
+                        </>
                     ) : (
                         <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
-                            <span>Markdown</span>
-                            <textarea
+                            <span>Narrative</span>
+                            <MarkdownEditor
                                 className={errorByField.has("markdown") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
                                 value={draft?.markdown || ""}
-                                onChange={(event) => setDraftPatch({ markdown: event.target.value })}
-                                placeholder={"## Narrative\nAdd authored report context."}
-                                rows={5}
+                                onChange={(value) => setDraftPatch({ markdown: value })}
+                                placeholder="Start with the takeaway, context, and next action."
+                                options={{
+                                    minHeight: "220px",
+                                    textToolbar: true,
+                                    toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "preview"],
+                                }}
                             />
                         </label>
                     )}
                 </div>
                 <div className="forge-report-builder__calculated-field-hint">
                     {isFilterBarBlock
-                        ? <><strong>Filter bar blocks</strong> project the current shared scope parameters into the authored report contract and runtime preview.</>
+                        ? <><strong>Filter bar blocks</strong> project the current report filters into the authored report contract and runtime preview.</>
                         : isRefinementBarBlock
                             ? <><strong>Refinement bar blocks</strong> expose the current drill and keep/exclude trail using the authored report runtime contract.</>
                             : isGeoMapBlock
                                 ? <><strong>Geo map blocks</strong> project one available breakdown and one available measure into the authored report geo contract and runtime preview.</>
                         : isKpiBlock
                         ? <><strong>KPI blocks</strong> bind to the current available measures and optional available breakdowns.</>
+                        : isBadgesBlock
+                            ? <><strong>Pills blocks</strong> surface compact, dashboard-style status chips for labels, values, and short callouts.</>
                         : isTableBlock
-                            ? <><strong>Table blocks</strong> project the current available breakdowns and measures into an authored comparison table. Available measure columns can opt into a generic data bar visual.</>
-                        : <><strong>Narrative blocks</strong> travel through the same authored ReportDocument, ReportSpec, and ReportFill pipeline as the primary builder content.</>}
+                            ? <><strong>Table blocks</strong> define a report-ready table from selected fields, in column order. Use per-column visual settings only when they improve readability.</>
+                        : <><strong>Narrative blocks</strong> let authors write reader-facing context without leaving the report flow.</>}
                 </div>
                 {errors.length > 0 ? (
                     <div className="forge-report-builder__chart-errors">
@@ -1808,7 +3135,7 @@ export function ReportBuilderChartQuickActions({
     onCreate,
     quickOptions = [],
     onSelectQuickOption,
-    buttonLabel = "Quick chart",
+    buttonLabel = "Presets",
     buttonIcon = "timeline-line-chart",
     usePortal = true,
 }) {

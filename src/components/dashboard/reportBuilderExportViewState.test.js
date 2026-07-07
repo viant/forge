@@ -100,7 +100,7 @@ assert.deepEqual(buildReportBuilderExportRequestPanelState({
         hasReportPrint: true,
         semanticBindingTitle: "Semantic Binding",
         semanticBindingChips: ["Model Ad Delivery"],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -119,7 +119,7 @@ assert.deepEqual(buildReportBuilderExportRequestPanelState({
     downloadLabel: "Download export request",
     semanticBindingTitle: "Semantic Binding",
     semanticBindingChips: ["Model Ad Delivery"],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -149,7 +149,7 @@ assert.deepEqual(buildReportBuilderExportRequestPanelState({
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -178,7 +178,7 @@ assert.deepEqual(buildReportBuilderExportRequestPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -226,7 +226,7 @@ assert.deepEqual(buildReportBuilderExportRequestPanelState({
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -255,7 +255,7 @@ assert.deepEqual(buildReportBuilderExportRequestPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -339,7 +339,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -365,7 +365,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -405,7 +405,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -431,7 +431,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -471,7 +471,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -498,7 +498,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -544,7 +544,7 @@ assert.deepEqual(buildReportBuilderExportFailureNotice({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -580,7 +580,7 @@ assert.deepEqual(buildReportBuilderExportFailureNotice({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {

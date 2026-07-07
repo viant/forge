@@ -5,6 +5,7 @@ import { useSignals } from "@preact/signals-react/runtime";
 import Chart from "../Chart.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { resolveKey } from "../../utils/selector.js";
+import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
 import { formatDashboardValue } from "./dashboardUtils.js";
 import { buildReportTableRuntimeColumns } from "./reportTableCellVisuals.js";
 import { renderDashboardTableCell } from "./dashboardVisualUtils.jsx";
@@ -19,7 +20,10 @@ import {
 } from "./reportBuilderChartRules.js";
 import {
     formatCompactDateRangeSummary,
+    resolveCompactSemanticActionLabel,
+    resolveCompactSemanticHintText,
     resolveResultIdentityChip,
+    resolveCompactSemanticSummaryItems,
     resolveCompactStatusText,
     resolveCompactSummaryItems,
     resolveTablePresetTransitionText,
@@ -43,11 +47,11 @@ import {
     buildReportBuilderReopenedExportJobPanelState,
     buildReportBuilderDraftExportRequestPanelState,
     buildReportBuilderLatestSharedArtifactSupplementalText,
+    buildReportBuilderRecentExportEntries,
     buildReportBuilderReopenedExportRequestPanelState,
     buildReportBuilderReopenedSessionNoticeState,
     buildReportBuilderSavedPayloadExportActionState,
     buildReportBuilderSavedPayloadExportFailureNotice,
-    buildReportBuilderSavedPayloadRecentExportEntries,
     buildReportBuilderSavedPayloadExportJobPanelState,
     buildReportBuilderSavedPayloadApiArtifactEntries,
     buildReportBuilderSavedPayloadExportRequestPanelState,
@@ -60,6 +64,24 @@ import {
 import {
     buildReportBuilderSemanticBindingViewState,
 } from "./reportBuilderSemanticBindingViewState.js";
+import { buildReportBuilderSelectedSemanticBindingViewState } from "./reportBuilderSelectedSemanticBinding.js";
+import {
+    buildRepairableReportBuilderDocumentBlockDraft,
+    repairReportBuilderDocumentBlockWithCurrentSelection,
+} from "./reportBuilderCurrentSelectionRepair.js";
+import { resolveReportBuilderInlineSemanticBindingViewState } from "./reportBuilderSemanticInlineState.js";
+import { resolveReportBuilderSemanticRuntimeSummary } from "./reportBuilderSemanticRuntimeSummary.js";
+import { buildReportBuilderSelectedTableInteractionState } from "./reportBuilderSelectedTableInteraction.js";
+import { shouldShowReportBuilderSemanticWorkspace } from "./reportBuilderSemanticWorkspaceAvailability.js";
+import { buildReportBuilderSemanticResultSurfaceState } from "./reportBuilderSemanticResultSurfaceState.js";
+import { resolveReportBuilderVisibleSemanticInlineNotices } from "./reportBuilderSemanticInlineNoticeVisibility.js";
+import { buildReportBuilderSemanticWorkspacePanelState } from "./reportBuilderSemanticWorkspacePanelState.js";
+import { buildReportBuilderSemanticWorkspaceActivationState } from "./reportBuilderSemanticWorkspaceActivationState.js";
+import {
+    buildReportBuilderSemanticWorkspaceImportFeedback,
+    hasSemanticWorkspaceImportActivation,
+    resolveReportBuilderSemanticWorkspaceImportRevealState,
+} from "./reportBuilderSemanticWorkspaceImportState.js";
 import {
     buildReportBuilderActionModel,
 } from "./reportBuilderActionModel.js";
@@ -70,6 +92,9 @@ import {
     buildReportBuilderCompactBottomBarActions,
 } from "./reportBuilderCompactBottomBar.js";
 import {
+    normalizeReportBuilderErrorText,
+} from "./reportBuilderErrorText.js";
+import {
     buildReportBuilderBulkImportFeedback,
     buildReportBuilderImportFeedback,
     buildReportBuilderListEntryCompatibilityFeedback,
@@ -79,6 +104,7 @@ import {
     resolveCompactChartSheetNotice,
 } from "./reportBuilderFeedback.js";
 import {
+    hasRetryableSemanticValidationDiagnostics,
     resolveReportBuilderStateReadiness,
 } from "./reportBuilderReadiness.js";
 import {
@@ -92,16 +118,25 @@ import {
     buildReportBuilderRuntimePreviewModel,
 } from "./reportBuilderRuntimePreview.js";
 import {
+    buildReportBuilderSurfaceAutoRunKey,
+    resolveReportBuilderSurfaceAutoRunAction,
+} from "./reportBuilderSurfaceAutoRun.js";
+import {
     buildReportBuilderAuthoredCapabilityViewModel,
 } from "./reportBuilderAuthoredCapabilities.js";
 import {
+    summarizeReportBuilderAuthoredBlocks,
     summarizeReportBuilderAuthoredDrillMetadata,
 } from "./reportBuilderAuthoredBlockSummary.js";
+import {
+    resolveReportRuntimeProviderActions,
+} from "./reportRuntimeProviderActions.js";
 import {
     resolveReportBuilderRuntimePreviewRowsSource,
 } from "./reportBuilderRuntimePreviewSource.js";
 import {
     buildReportBuilderAuthoredRuntimePreviewState,
+    buildReportBuilderActiveResultErrorDiagnosticsState,
     buildReportBuilderCompileDiagnosticsNotice,
     buildReportBuilderEmptyResultState,
     buildReportBuilderRuntimePreviewBlockedState,
@@ -112,6 +147,20 @@ import {
     resolveReportBuilderResultVisibility,
 } from "./reportBuilderResultVisibility.js";
 import { ReportBuilderAuthoredRuntimePreviewHeader } from "./reportBuilderRuntimePreviewSection.js";
+import { executeReportRuntimeAction } from "./reportRuntimeActionExecutor.js";
+import ReportBuilderRuntimeActionStrip from "./ReportBuilderRuntimeActionStrip.jsx";
+import {
+    resolveReportBuilderCompactMode,
+    isReportBuilderDesignWorkspaceMode,
+    normalizeReportBuilderWorkspaceMode,
+    resolveReportBuilderCompactBreakpoint,
+    resolveReportBuilderWorkspaceModeDescription,
+    resolveReportBuilderWorkspaceModeLabel,
+} from "./reportBuilderWorkspaceMode.js";
+import {
+    isBlankReportBuilderStarterId,
+    shouldShowReportBuilderStarterChooser,
+} from "./reportBuilderStarterChooserState.js";
 import {
     buildReportBuilderChartQueryRequest,
     getReportBuilderChartDataPolicy,
@@ -129,9 +178,13 @@ import {
     resolveReportBuilderChartQuerySettlementPlan,
 } from "./reportBuilderChartQueryLifecycle.js";
 import {
+    buildReportRuntimePreviewExtractConfigFingerprint,
     buildReportRuntimePreviewRequestKey,
     useReportRuntimePreviewRows,
 } from "./useReportRuntimePreviewRows.js";
+import {
+    useReportRuntimePreviewDatasetPayloads,
+} from "./useReportRuntimePreviewDatasetPayloads.js";
 import {
     hasStoredReportBuilderState,
     loadStoredReportBuilderState,
@@ -154,6 +207,7 @@ import {
     resolveReportBuilderLookupDescriptor,
     resolveReportBuilderNotices,
 } from "./reportBuilderHooks.js";
+import { hydrateReportBuilderRuntimeRows } from "./reportBuilderRuntimeRowHydration.js";
 import {
     ReportBuilderArtifactEntryCard,
     buildFilterCategoryChipViewModel,
@@ -176,6 +230,12 @@ import {
     StaticFilterSection,
 } from "./reportBuilderComponents.jsx";
 import { mergeReportBuilderReopenedConfig } from "./reportBuilderConfigMerge.js";
+import {
+    lowerReportBuilderPredicates,
+    resolveReportBuilderDynamicFilterFamilies,
+    resolveReportBuilderDynamicFilterGroups,
+    resolveReportBuilderScopeParamFilters,
+} from "./reportBuilderPredicates.js";
 import {
     buildDynamicFamilyOptions,
     buildDynamicFamilyRows,
@@ -269,6 +329,7 @@ import {
     buildReportBuilderScopeParamSummary,
     buildReportBuilderScopeSummaryFromParams,
     duplicateReportBuilderDocumentBlockState,
+    moveReportBuilderDocumentBlockRelativeState,
     moveReportBuilderDocumentBlockState,
     normalizeReportBuilderDocumentLayoutState,
     removeReportBuilderDocumentBlockState,
@@ -280,9 +341,27 @@ import {
     validateReportBuilderDocumentBlockDraft,
 } from "./reportBuilderDocumentBlocks.js";
 import {
+    buildReportBuilderDocumentOutlineEntries,
+    flattenReportBuilderDocumentOutlineEntries,
+    isReportBuilderScopeRuntimeOnlyOutlineKind,
+    resolveReportBuilderDocumentInsertionTarget,
+    resolveReportBuilderPreferredSelectedEntryId,
+    resolveReportBuilderSelectedDrillBindings,
+    resolveReportBuilderSelectedInsertionGroupIds,
+} from "./reportBuilderDocumentOutline.js";
+import {
+    buildBlankReportBuilderDocumentState,
     instantiateReportBuilderDocumentTemplate,
     normalizeReportBuilderDocumentTemplates,
 } from "./reportBuilderDocumentTemplates.js";
+import { buildReportBuilderImportedStarterFromJsonFile } from "./reportBuilderForgeUiStarter.js";
+import {
+    applyReportBuilderStaticDatasetFieldHints,
+    buildReportBuilderStaticDatasetsFromJsonFile,
+    buildReportBuilderStaticDatasetFromCsvFile,
+    buildReportBuilderStaticDatasetOptions,
+    normalizeReportBuilderStaticDatasets,
+} from "./reportBuilderStaticDatasets.js";
 import {
     beginReportBuilderExplorationSession,
     buildReportBuilderExplorationSourceContextFromChartSelection,
@@ -303,6 +382,7 @@ import {
 } from "./reportBuilderExplorationArtifact.js";
 import {
     buildReportBuilderSavedReportPayload,
+    buildReportBuilderSaveReportRequest,
     buildReportBuilderSavedReportPayloadDownload,
     buildReportBuilderSavedReportExportRequestFromBuilderState,
     buildReportBuilderSavedReportPayloadInspectorState,
@@ -313,16 +393,16 @@ import {
     buildReportBuilderExportArtifactKindLabel,
     buildReportBuilderExportRequestSummary,
     resolveReportBuilderExportHandler,
+    resolveReportBuilderReportStoreHandler,
 } from "./reportBuilderExportRequest.js";
+import { buildDraftReportExportRequest } from "../../reporting/reportExportRequestModel.js";
 import {
     buildReportBuilderExportExecutionConfigs,
 } from "./reportBuilderExportExecutionConfigs.js";
 import {
     buildReportBuilderSavedReportState,
+    matchesReportBuilderSelectedEntryHydratedSession,
 } from "./reportBuilderSavedReportState.js";
-import {
-    matchesReportBuilderSavedReportRecordSource,
-} from "./reportBuilderSavedReportRecords.js";
 import {
     projectReportBuilderLifecycleEnvelopeState,
 } from "./reportBuilderLifecycleSharedArtifactReconciliation.js";
@@ -343,6 +423,7 @@ import {
     buildImportedLocalGetReportDocumentResponseIdentity,
     buildImportedLocalSavedReportRecordIdentity,
     normalizeReportBuilderImportedArtifactState,
+    normalizeImportedLocalSavedReportRecords,
     resolveReportBuilderImportedArtifactImportPreservation,
     resolveImportedLocalSavedRecordActivationResponse,
     resolveImportedLocalSavedRecordRemovalEffect,
@@ -356,6 +437,11 @@ import {
     resolveReportBuilderImportedLocalSavedReportRecordsAfterImport,
     resolveReportBuilderImportedArtifactStateAfterImport,
 } from "./reportBuilderImportedArtifactState.js";
+import {
+    buildImportedLocalReopenablePanelSeedEntry,
+    buildImportedLocalSavedRecordPanelSeedEntry,
+} from "./reportBuilderImportedArtifactPanelSeed.js";
+import { buildReportBuilderImportedResponseActivation } from "./reportBuilderImportedActivation.js";
 import {
     buildImportedPipelineExportActionState,
     buildImportedPipelineExportFailureNotice,
@@ -464,14 +550,24 @@ import {
     stripReportBuilderHydratedDocumentSessionState,
 } from "./reportBuilderHydratedReportDocument.js";
 import {
+    applyReportBuilderPersistedRuntimePreviewInteraction,
+    resolveReportBuilderPersistedRuntimePreviewInteraction,
+} from "./reportBuilderRuntimePreviewInteractionPersistence.js";
+import {
     buildReportBuilderHydratedReportDocumentDiagnostic,
     buildReportBuilderHydratedReportDocumentDiagnosticDownload,
     buildReportBuilderHydratedReportDocumentDiagnosticInspectorState,
     buildReportBuilderHydratedReportDocumentDiagnosticSummary,
     buildReportBuilderListReportDocumentsEntryDiagnostic,
 } from "./reportBuilderHydratedReportDocumentDiagnostic.js";
+import {
+    buildReportBuilderStarterAppliedState,
+    resolveAutoAppliedReportStarterId,
+} from "./reportBuilderStarterState.js";
 import { buildReportBuilderShareableArtifactViewState } from "./reportBuilderShareableArtifactViewState.js";
 import { resolveReportRuntimeChartSelectionSummary } from "./reportRuntimeChartActionModel.js";
+import { resolveReportRuntimeChartInteractionSupport } from "./reportRuntimeChartInteractions.js";
+import { buildReportRuntimeChartInteractionState } from "./reportRuntimeChartInteractionState.js";
 import {
     buildReportBuilderSemanticDiagnosticTargets,
     buildReportBuilderSemanticDiagnosticsNotice,
@@ -485,13 +581,36 @@ import {
     semanticFieldTitle,
 } from "./reportBuilderSemantic.js";
 import { resolveReportBuilderDrillMetadata } from "../../reporting/reportBuilderDrillMetadata.js";
+import {
+    getScopeParamValue,
+    listScopeParamValues,
+    resolveScopeParamId,
+    setScopeParamValue,
+} from "../../reporting/scopeStateModel.js";
 import { normalizeReportRuntimeInteractionState } from "./reportRuntimeInteractionStateModel.js";
 import { useReportRuntimeInteractionState } from "./useReportRuntimeInteractionState.js";
 import { useAuthoredRuntimePreviewSurface } from "./useAuthoredRuntimePreviewSurface.js";
+import { resolveReportRuntimeChartActionFields } from "./reportRuntimeModel.js";
 import {
     buildReportBuilderSemanticModelReloadKey,
 } from "./useReportBuilderSemanticModelState.js";
 import { useReportBuilderSemanticRuntimeState } from "./useReportBuilderSemanticRuntimeState.js";
+import {
+    clampReportBuilderLeftRailWidthPercent,
+    DEFAULT_REPORT_BUILDER_RESULT_PANE_POSITION,
+    DEFAULT_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT,
+    MAX_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT,
+    MIN_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT,
+    normalizeReportBuilderResultPanePosition,
+    resolveReportBuilderConfiguredLeftRailWidthPercent,
+    resolveReportBuilderLeftRailMoveActionLabel,
+    resolveReportBuilderNextResultPanePosition,
+    resolveReportBuilderResultPanePositionActionLabel,
+    resolveReportBuilderResultPanePositionLabel,
+    resolveReportBuilderLeftRailWidthAriaValueText,
+    resolveReportBuilderLeftRailWidthPercentForMove,
+    resolveReportBuilderLeftRailWidthPercentForKey,
+} from "./reportBuilderLeftRailLayout.js";
 
 function getBuilderConfig(container = {}) {
     return container.dashboard?.reportBuilder || container.reportBuilder || container.builder || {};
@@ -513,8 +632,174 @@ function normalizeString(value = "") {
     return String(value || "").trim();
 }
 
+const REPORT_BUILDER_DOCUMENT_BLOCK_DND_MIME = "application/x-forge-report-builder-document-block";
+
+function parseReportBuilderDocumentBlockDragPayload(event = null) {
+    const dataTransfer = event?.dataTransfer;
+    if (!dataTransfer) {
+        return null;
+    }
+    const rawPayload = dataTransfer.getData(REPORT_BUILDER_DOCUMENT_BLOCK_DND_MIME)
+        || dataTransfer.getData("text/plain")
+        || "";
+    if (!rawPayload) {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(rawPayload);
+        const blockId = normalizeString(parsed?.blockId);
+        const dragKind = normalizeString(parsed?.dragKind);
+        if (!blockId || !dragKind) {
+            return null;
+        }
+        return {
+            blockId,
+            dragKind,
+        };
+    } catch (_) {
+        return null;
+    }
+}
+
 function sanitizeFilenameSegment(value = "") {
     return normalizeString(value).replace(/[\\/:*?"<>|]+/g, "-");
+}
+
+function formatReportBuilderSourceLabel(value = "") {
+    const normalized = normalizeString(value);
+    if (!normalized) {
+        return "Workspace-bound published source";
+    }
+    return normalized
+        .split(/[_\-.]+/)
+        .filter(Boolean)
+        .map((segment) => segment.slice(0, 1).toUpperCase() + segment.slice(1))
+        .join(" ");
+}
+
+function formatReportBuilderSourceKindLabel(value = "") {
+    const normalized = normalizeString(value);
+    if (!normalized) {
+        return "Published";
+    }
+    return normalized
+        .split(/[\s_\-.]+/)
+        .filter(Boolean)
+        .map((segment) => segment.slice(0, 1).toUpperCase() + segment.slice(1))
+        .join(" ");
+}
+
+function normalizeReportBuilderStringArray(values = []) {
+    return (Array.isArray(values) ? values : [])
+        .map((entry) => normalizeString(entry))
+        .filter(Boolean);
+}
+
+function buildReportBuilderProjectionColumnKeys(definition = {}) {
+    const explicitColumns = Array.isArray(definition?.columns)
+        ? definition.columns.map((column) => normalizeString(column?.key)).filter(Boolean)
+        : [];
+    const fieldKeys = [
+        ...normalizeReportBuilderStringArray(definition?.dimensions),
+        ...normalizeReportBuilderStringArray(definition?.measures),
+    ];
+    return Array.from(new Set([...fieldKeys, ...explicitColumns]));
+}
+
+function reportBuilderProjectionOptionMatchesState(option = {}, state = {}) {
+    const expectedDimensions = normalizeReportBuilderStringArray(option?.dimensions);
+    const expectedMeasures = normalizeReportBuilderStringArray(option?.measures);
+    const actualDimensions = normalizeReportBuilderStringArray(state?.selectedDimensions);
+    const actualMeasures = normalizeReportBuilderStringArray(state?.selectedMeasures);
+    if (expectedDimensions.length > 0 && JSON.stringify(expectedDimensions) !== JSON.stringify(actualDimensions)) {
+        return false;
+    }
+    if (expectedMeasures.length > 0 && JSON.stringify(expectedMeasures) !== JSON.stringify(actualMeasures)) {
+        return false;
+    }
+    const expectedPrimaryMeasure = normalizeString(option?.primaryMeasure || expectedMeasures[0] || "");
+    if (expectedPrimaryMeasure && expectedPrimaryMeasure !== normalizeString(state?.primaryMeasure || actualMeasures[0] || "")) {
+        return false;
+    }
+    const expectedGroupBy = normalizeString(option?.groupBy);
+    if (expectedGroupBy && expectedGroupBy !== normalizeString(state?.groupBy)) {
+        return false;
+    }
+    const expectedOrderField = normalizeString(option?.orderField);
+    if (expectedOrderField && expectedOrderField !== normalizeString(state?.orderField)) {
+        return false;
+    }
+    const expectedOrderDir = normalizeString(option?.orderDir);
+    if (expectedOrderDir && expectedOrderDir !== normalizeString(state?.orderDir || "desc")) {
+        return false;
+    }
+    const expectedPageSize = Math.max(0, Number(option?.pageSize || 0) || 0);
+    if (expectedPageSize > 0 && expectedPageSize !== Math.max(0, Number(state?.pageSize || 0) || 0)) {
+        return false;
+    }
+    return true;
+}
+
+function formatReportBuilderSummaryList(values = [], limit = 3) {
+    const normalized = (Array.isArray(values) ? values : [])
+        .map((value) => normalizeString(value))
+        .filter(Boolean);
+    if (normalized.length === 0) {
+        return "";
+    }
+    if (normalized.length <= limit) {
+        return normalized.join(", ");
+    }
+    return `${normalized.slice(0, limit).join(", ")} +${normalized.length - limit}`;
+}
+
+function buildReportBuilderSourceDetailGroup(label = "", items = [], limit = 10) {
+    const normalizedLabel = normalizeString(label);
+    const normalizedItems = (Array.isArray(items) ? items : [])
+        .map((item) => normalizeString(item))
+        .filter(Boolean);
+    if (!normalizedLabel || normalizedItems.length === 0) {
+        return null;
+    }
+    return {
+        label: normalizedLabel,
+        items: normalizedItems.slice(0, limit),
+        overflowCount: Math.max(0, normalizedItems.length - Math.max(0, Number(limit || 0) || 0)),
+    };
+}
+
+function hasSemanticImportedArtifact(payload = null) {
+    const reportSpec = payload?.reportSpec && typeof payload.reportSpec === "object" && !Array.isArray(payload.reportSpec)
+        ? payload.reportSpec
+        : null;
+    const document = payload?.document && typeof payload.document === "object" && !Array.isArray(payload.document)
+        ? payload.document
+        : (payload?.reportDocument && typeof payload.reportDocument === "object" && !Array.isArray(payload.reportDocument)
+            ? payload.reportDocument
+            : null);
+    const binding = reportSpec?.binding || document?.binding || null;
+    const semanticSummary = reportSpec?.semanticSummary || document?.semanticSummary || null;
+    if (normalizeString(binding?.mode).toLowerCase() === "semantic") {
+        return true;
+    }
+    return !!semanticSummary && typeof semanticSummary === "object" && !Array.isArray(semanticSummary);
+}
+
+function buildHydratedReportDocumentImportedSourceIdentity(session = null) {
+    if (!session || typeof session !== "object" || Array.isArray(session)) {
+        return "";
+    }
+    const source = session?.savedSource && typeof session.savedSource === "object" && !Array.isArray(session.savedSource)
+        ? session.savedSource
+        : null;
+    const reportId = normalizeString(session?.reportId);
+    const sourceKind = normalizeString(source?.kind);
+    const payloadId = normalizeString(source?.payloadId);
+    const sourceArtifactId = normalizeString(source?.sourceArtifactId);
+    if (payloadId || sourceArtifactId) {
+        return [sourceKind, payloadId, sourceArtifactId, reportId].join("::");
+    }
+    return reportId;
 }
 
 function cloneReportBuilderValue(value) {
@@ -677,20 +962,7 @@ function filterCategoryTitle(label = "", { active = false, configuredCount = 0 }
 }
 
 function renderReportBuilderError(error) {
-    if (error == null) {
-        return "";
-    }
-    if (typeof error === "string") {
-        return error;
-    }
-    if (typeof error?.message === "string" && error.message.trim()) {
-        return error.message.trim();
-    }
-    try {
-        return JSON.stringify(error);
-    } catch (_) {
-        return "Unexpected error";
-    }
+    return normalizeReportBuilderErrorText(error);
 }
 
 function renderSemanticGovernanceBadges(field = {}, { compact = false } = {}) {
@@ -733,6 +1005,9 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
     const groupOption = groupByOption(config, state.groupBy);
     const groupDimension = dimensionById(config, groupOption?.dimensionId || groupOption?.value || state.groupBy);
     const palette = selectedMeasures.map((entry, index) => entry?.color || config.result?.palette?.[index]).filter(Boolean);
+    const xDisplayKey = resolveReportBuilderDimensionDisplayKey(xDimension) || xDimension?.key || xDimension?.id || "name";
+    const xSourceKey = xDimension?.key || xDimension?.id || xDisplayKey;
+    const hasXDisplayValueMap = xDimension?.displayValueMap && typeof xDimension.displayValueMap === "object" && !Array.isArray(xDimension.displayValueMap);
 
     const directSeries = {
         values: selectedMeasures.map((entry, index) => ({
@@ -745,6 +1020,16 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
 
     const groupedSeries = {
         nameKey: resolveReportBuilderDimensionDisplayKey(groupDimension) || groupDimension?.key || groupDimension?.id,
+        ...((groupDimension?.key || groupDimension?.id)
+            && (
+                normalizeString(resolveReportBuilderDimensionDisplayKey(groupDimension)) !== normalizeString(groupDimension?.key || groupDimension?.id)
+                || (groupDimension?.displayValueMap && typeof groupDimension.displayValueMap === "object" && !Array.isArray(groupDimension.displayValueMap))
+            )
+            ? { sourceNameKey: groupDimension?.key || groupDimension?.id }
+            : {}),
+        ...(groupDimension?.displayValueMap && typeof groupDimension.displayValueMap === "object" && !Array.isArray(groupDimension.displayValueMap)
+            ? { displayValueMap: JSON.parse(JSON.stringify(groupDimension.displayValueMap)) }
+            : {}),
         valueKey: primaryMeasure?.key || primaryMeasure?.id,
         palette,
     };
@@ -757,7 +1042,13 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
         chart: {
             type: config.result?.chartType || "line",
             xAxis: {
-                dataKey: resolveReportBuilderDimensionDisplayKey(xDimension) || xDimension?.key || xDimension?.id || "name",
+                dataKey: xDisplayKey,
+                ...(xSourceKey && (normalizeString(xDisplayKey) !== normalizeString(xSourceKey) || hasXDisplayValueMap)
+                    ? { sourceDataKey: xSourceKey }
+                    : {}),
+                ...(hasXDisplayValueMap
+                    ? { displayValueMap: JSON.parse(JSON.stringify(xDimension.displayValueMap)) }
+                    : {}),
                 tickFormat: xDimension?.tickFormat,
             },
             yAxis: {
@@ -769,36 +1060,27 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
 }
 
 function resolveReportBuilderCellValue(row = {}, column = {}) {
-    const displayKey = String(column?.displayKey || "").trim();
-    if (column?.kind === "dimension" && displayKey) {
-        const displayValue = resolveKey(row, displayKey);
-        if (displayValue !== undefined && displayValue !== null && displayValue !== "") {
-            return displayValue;
-        }
-    }
-    return resolveKey(row, column?.key);
+    return resolveDashboardTableColumnValue(row, column, { preferDisplay: true });
 }
 
 const REPORT_BUILDER_CHART_PRESET_PREFIX = "reportBuilder.chartPresets";
 const REPORT_BUILDER_LEFT_RAIL_WIDTH_PREFIX = "reportBuilder.leftRailWidth";
-const DEFAULT_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT = 24;
-const MIN_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT = 20;
-const MAX_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT = 32;
-
-function clampReportBuilderLeftRailWidthPercent(value = DEFAULT_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-        return DEFAULT_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT;
-    }
-    return Math.min(
-        MAX_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT,
-        Math.max(MIN_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT, numeric),
-    );
-}
+const REPORT_BUILDER_RESULT_PANE_POSITION_PREFIX = "reportBuilder.resultPanePosition";
+const REPORT_BUILDER_WORKSPACE_MODE_PREFIX = "reportBuilder.workspaceMode";
 
 function leftRailWidthStorageKey(storageScope = "") {
     const normalized = String(storageScope || "").trim() || "reportBuilder";
     return `${REPORT_BUILDER_LEFT_RAIL_WIDTH_PREFIX}.${normalized}`;
+}
+
+function resultPanePositionStorageKey(storageScope = "") {
+    const normalized = String(storageScope || "").trim() || "reportBuilder";
+    return `${REPORT_BUILDER_RESULT_PANE_POSITION_PREFIX}.${normalized}`;
+}
+
+function workspaceModeStorageKey(storageScope = "", compactMode = false) {
+    const normalized = String(storageScope || "").trim() || "reportBuilder";
+    return `${REPORT_BUILDER_WORKSPACE_MODE_PREFIX}.${compactMode ? "compact" : "desktop"}.${normalized}`;
 }
 
 function chartPresetStorageKey(storageScope = "") {
@@ -886,6 +1168,101 @@ function persistStoredReportBuilderLeftRailWidthPercent(storageScope = "", perce
     } catch (_) {}
 }
 
+function loadStoredReportBuilderResultPanePosition(
+    storageScope = "",
+    legacyScopes = [],
+    fallbackPosition = DEFAULT_REPORT_BUILDER_RESULT_PANE_POSITION,
+) {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return normalizeReportBuilderResultPanePosition(fallbackPosition);
+    }
+    try {
+        const scopes = Array.from(new Set([storageScope, ...(Array.isArray(legacyScopes) ? legacyScopes : [legacyScopes])]
+            .map((entry) => String(entry || "").trim())));
+        if (scopes.length === 0) {
+            scopes.push("");
+        }
+        for (const scope of scopes) {
+            const raw = window.localStorage.getItem(resultPanePositionStorageKey(scope));
+            if (!raw) {
+                continue;
+            }
+            const decoded = JSON.parse(raw);
+            if (decoded != null && decoded !== "") {
+                return normalizeReportBuilderResultPanePosition(decoded);
+            }
+        }
+    } catch (_) {}
+    return normalizeReportBuilderResultPanePosition(fallbackPosition);
+}
+
+function persistStoredReportBuilderResultPanePosition(
+    storageScope = "",
+    position = DEFAULT_REPORT_BUILDER_RESULT_PANE_POSITION,
+    legacyScopes = [],
+) {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return;
+    }
+    try {
+        const normalizedPosition = normalizeReportBuilderResultPanePosition(position);
+        window.localStorage.setItem(resultPanePositionStorageKey(storageScope), JSON.stringify(normalizedPosition));
+        Array.from(new Set((Array.isArray(legacyScopes) ? legacyScopes : [legacyScopes])
+            .map((entry) => String(entry || "").trim())
+            .filter((entry) => entry && entry !== String(storageScope || "").trim()))).forEach((scope) => {
+            window.localStorage.removeItem(resultPanePositionStorageKey(scope));
+        });
+    } catch (_) {}
+}
+
+function loadStoredReportBuilderWorkspaceMode(
+    storageScope = "",
+    compactMode = false,
+    legacyScopes = [],
+) {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return normalizeReportBuilderWorkspaceMode("", { compactMode });
+    }
+    try {
+        const scopes = Array.from(new Set([storageScope, ...(Array.isArray(legacyScopes) ? legacyScopes : [legacyScopes])]
+            .map((entry) => String(entry || "").trim())));
+        if (scopes.length === 0) {
+            scopes.push("");
+        }
+        for (const scope of scopes) {
+            const raw = window.localStorage.getItem(workspaceModeStorageKey(scope, compactMode));
+            if (!raw) {
+                continue;
+            }
+            const decoded = JSON.parse(raw);
+            if (decoded != null && decoded !== "") {
+                return normalizeReportBuilderWorkspaceMode(decoded, { compactMode });
+            }
+        }
+    } catch (_) {}
+    return normalizeReportBuilderWorkspaceMode("", { compactMode });
+}
+
+function persistStoredReportBuilderWorkspaceMode(
+    storageScope = "",
+    mode = "",
+    compactMode = false,
+    legacyScopes = [],
+) {
+    if (typeof window === "undefined" || !window.localStorage) {
+        return;
+    }
+    try {
+        const normalizedMode = normalizeReportBuilderWorkspaceMode(mode, { compactMode });
+        window.localStorage.setItem(workspaceModeStorageKey(storageScope, compactMode), JSON.stringify(normalizedMode));
+        Array.from(new Set((Array.isArray(legacyScopes) ? legacyScopes : [legacyScopes])
+            .map((entry) => String(entry || "").trim())
+            .filter((entry) => entry && entry !== String(storageScope || "").trim()))).forEach((scope) => {
+            window.localStorage.removeItem(workspaceModeStorageKey(scope, compactMode));
+        });
+    } catch (_) {}
+}
+
 function dedupeChartPresets(presets = []) {
     const seen = new Map();
     normalizeArray(presets).forEach((preset) => {
@@ -925,6 +1302,8 @@ function reportBuilderDocumentBlockIcon(kind = "") {
             return "timeline-line-chart";
         case "kpiBlock":
             return "dashboard";
+        case "badgesBlock":
+            return "properties";
         case "tableBlock":
             return "th";
         default:
@@ -1128,7 +1507,7 @@ function resolveDynamicGroupLayout(config = {}, activeGroupIds = []) {
 }
 
 function resolveDynamicFilterFamilies(config = {}) {
-    return normalizeArray(config?.dynamicFilterFamilies).map((entry, index) => ({
+    return resolveReportBuilderDynamicFilterFamilies(config).map((entry, index) => ({
         id: String(entry?.id || "").trim(),
         label: String(entry?.label || entry?.id || "").trim(),
         description: String(entry?.description || "").trim(),
@@ -1148,6 +1527,10 @@ export default function ReportBuilder({ container, context }) {
     const reportExportHandler = useMemo(
         () => resolveReportBuilderExportHandler(builderContext),
         [builderContext?.handlers?.reportExport],
+    );
+    const reportStoreHandler = useMemo(
+        () => resolveReportBuilderReportStoreHandler(builderContext),
+        [builderContext?.handlers?.reportStore],
     );
     const reportLifecycleHandler = useMemo(
         () => resolveReportBuilderLifecycleHandler(builderContext?.handlers?.reportLifecycle),
@@ -1202,7 +1585,9 @@ export default function ReportBuilder({ container, context }) {
         [effectivePersistedState],
     );
     const config = useMemo(
-        () => mergeReportBuilderReopenedConfig(baseConfig, hydratedReportDocumentSession?.reopenedConfig || null),
+        () => lowerReportBuilderPredicates(
+            mergeReportBuilderReopenedConfig(baseConfig, hydratedReportDocumentSession?.reopenedConfig || null),
+        ),
         [baseConfig, hydratedReportDocumentSession?.reopenedConfig],
     );
     const filterPresentation = String(
@@ -1240,7 +1625,7 @@ export default function ReportBuilder({ container, context }) {
         config,
         state,
         binding: semanticBinding,
-        configSemanticModel: config?.semanticModel || null,
+        configSemanticModel: hydratedReportDocumentSession?.reopenedConfig?.semanticModel || config?.semanticModel || null,
         reloadKey: semanticModelReloadKey,
         fallbackSummary: hydratedReportDocumentSession?.reopenedSemanticSummary || null,
         fallbackFingerprint: hydratedReportDocumentSession?.reopenedSemanticFingerprint || "",
@@ -1249,7 +1634,11 @@ export default function ReportBuilder({ container, context }) {
         () => buildReportBuilderCalculatedFieldConfig(semanticDisplayConfig, state),
         [semanticDisplayConfig, state?.localCalculatedFields, state?.localTableCalculations],
     );
-    const resultPanePosition = useMemo(() => getReportBuilderResultPanePosition(displayConfig), [displayConfig]);
+    const configuredLeftRailWidthPercent = useMemo(
+        () => resolveReportBuilderConfiguredLeftRailWidthPercent(displayConfig),
+        [displayConfig],
+    );
+    const configuredResultPanePosition = useMemo(() => getReportBuilderResultPanePosition(displayConfig), [displayConfig]);
     const semanticStatus = useMemo(() => buildReportBuilderSemanticStatus({
         binding: semanticBinding,
         providerAvailable: !!semanticModelProvider,
@@ -1372,28 +1761,75 @@ export default function ReportBuilder({ container, context }) {
         semanticModelRetryAvailable: !!semanticModelProvider
             && !!semanticModelRef
             && !config?.semanticModel,
-        semanticRetryAvailable: String(semanticSelectionValidationState?.error || "").trim() !== ""
-            && String(semanticSelectionValidationState?.fingerprint || "").trim() === semanticValidationFingerprint,
+        semanticRetryAvailable: (
+            String(semanticSelectionValidationState?.fingerprint || "").trim() === semanticValidationFingerprint
+            && (
+                String(semanticSelectionValidationState?.error || "").trim() !== ""
+                || hasRetryableSemanticValidationDiagnostics(semanticSelectionValidationState?.diagnostics)
+            )
+        ),
     }), [config?.semanticModel, displayConfig, semanticModelProvider, semanticModelRef, semanticModelState, semanticSelectionValidationState, semanticValidationFingerprint, state]);
     const readiness = useMemo(() => resolveStateReadiness(state), [resolveStateReadiness, state]);
     const semanticSelectedIssueCount = Array.isArray(semanticFieldValidation?.selectedIssues)
         ? semanticFieldValidation.selectedIssues.length
         : 0;
+    const reopenedSemanticBindingViewState = useMemo(
+        () => buildReportBuilderSemanticBindingViewState({
+            semanticSummary: hydratedReportDocumentSession?.reopenedSemanticSummary || null,
+            binding: hydratedReportDocumentSession?.reopenedConfig?.binding || null,
+        }),
+        [hydratedReportDocumentSession?.reopenedConfig?.binding, hydratedReportDocumentSession?.reopenedSemanticSummary],
+    );
+    const semanticRuntimeSummary = useMemo(() => {
+        return resolveReportBuilderSemanticRuntimeSummary({
+            resolvedSemanticSummary,
+            currentBinding: semanticBinding || null,
+            reopenedSemanticSummary: hydratedReportDocumentSession?.reopenedSemanticSummary || null,
+            reopenedBinding: hydratedReportDocumentSession?.reopenedConfig?.binding || null,
+            semanticStatusTitle: semanticStatus?.title || "",
+            semanticStatusMessage: semanticStatus?.message || "",
+        });
+    }, [
+        hydratedReportDocumentSession?.reopenedConfig?.binding,
+        hydratedReportDocumentSession?.reopenedSemanticSummary,
+        resolvedSemanticSummary,
+        semanticBinding,
+        semanticStatus?.message,
+        semanticStatus?.title,
+    ]);
+    const currentSemanticBindingViewState = useMemo(
+        () => buildReportBuilderSemanticBindingViewState({
+            semanticSummary: semanticRuntimeSummary || null,
+            binding: semanticBinding || null,
+        }),
+        [semanticRuntimeSummary, semanticBinding],
+    );
+    const semanticInlineNoticeBindingViewState = useMemo(() => resolveReportBuilderInlineSemanticBindingViewState({
+        currentSemanticSummary: semanticRuntimeSummary || null,
+        currentBinding: semanticBinding || null,
+        reopenedSemanticSummary: hydratedReportDocumentSession?.reopenedSemanticSummary || null,
+        reopenedBinding: hydratedReportDocumentSession?.reopenedConfig?.binding || null,
+    }), [
+        hydratedReportDocumentSession?.reopenedConfig?.binding,
+        hydratedReportDocumentSession?.reopenedSemanticSummary,
+        semanticBinding,
+        semanticRuntimeSummary,
+    ]);
     const semanticInlineNotices = useMemo(() => buildReportBuilderSemanticInlineNotices({
         semanticStatus,
         readiness,
         semanticFieldValidationMessage: semanticFieldValidation?.message,
         semanticSelectedIssueCount,
         semanticSelectionValidationState,
-    }), [readiness, semanticFieldValidation?.message, semanticSelectedIssueCount, semanticSelectionValidationState, semanticStatus]);
+        semanticBindingViewState: semanticInlineNoticeBindingViewState,
+    }), [readiness, semanticFieldValidation?.message, semanticInlineNoticeBindingViewState, semanticSelectedIssueCount, semanticSelectionValidationState, semanticStatus]);
     const canRunReport = readiness.canRun;
     const requestFingerprintRef = useRef("");
+    const authoredPreviewAutoFetchKeyRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
     const lastAutoCollapsedRunSequenceRef = useRef(0);
     const lastSeededRailFilterCollapseFingerprintRef = useRef("");
     const lastAutoAppliedChartCycleRef = useRef("");
-    const filterOverlayScrollRestoreRef = useRef(0);
-    const filterOverlayWasOpenRef = useRef(false);
     const seededDefaultsRef = useRef(false);
     const appliedPrefillSignatureRef = useRef("");
     const hydrationFingerprintRef = useRef("");
@@ -1410,6 +1846,10 @@ export default function ReportBuilder({ container, context }) {
     const [documentBlockDialogOpen, setDocumentBlockDialogOpen] = useState(false);
     const [documentBlockDraft, setDocumentBlockDraft] = useState(() => buildReportBuilderDocumentBlockDraft("markdownBlock"));
     const [editingDocumentBlockId, setEditingDocumentBlockId] = useState("");
+    const [pendingStaticDatasetImportTargetId, setPendingStaticDatasetImportTargetId] = useState("");
+    const [inspectedDataSourceRef, setInspectedDataSourceRef] = useState("");
+    const [pendingDocumentInsertionAfterId, setPendingDocumentInsertionAfterId] = useState("primaryBuilder");
+    const [pendingDocumentInsertionPlacement, setPendingDocumentInsertionPlacement] = useState("after");
     const [tableCalculationDialogOpen, setTableCalculationDialogOpen] = useState(false);
     const [tableCalculationDraft, setTableCalculationDraft] = useState(() => buildReportBuilderTableCalculationDraft());
     const [editingTableCalculationId, setEditingTableCalculationId] = useState("");
@@ -1418,6 +1858,7 @@ export default function ReportBuilder({ container, context }) {
     const [authoredDetailTargetRefDraft, setAuthoredDetailTargetRefDraft] = useState("");
     const [editingAuthoredDetailTargetRef, setEditingAuthoredDetailTargetRef] = useState("");
     const [authoredDetailNavigationModeDraft, setAuthoredDetailNavigationModeDraft] = useState("hostRoute");
+    const [authoredDetailTargetManualMode, setAuthoredDetailTargetManualMode] = useState(false);
     const [authoredDetailParameterRowsDraft, setAuthoredDetailParameterRowsDraft] = useState(() => normalizeReportBuilderDetailParameterDraftRows());
     const [authoredDetailTitleDraft, setAuthoredDetailTitleDraft] = useState("");
     const [authoredDetailDescriptionDraft, setAuthoredDetailDescriptionDraft] = useState("");
@@ -1433,6 +1874,7 @@ export default function ReportBuilder({ container, context }) {
     const [storedChartPresets, setStoredChartPresets] = useState([]);
     const [selectedQuickChartOption, setSelectedQuickChartOption] = useState("");
     const [selectedBuilderChartSelection, setSelectedBuilderChartSelection] = useState(null);
+    const [selectedBuilderTableRow, setSelectedBuilderTableRow] = useState(null);
     const [importedStandaloneReportFill, setImportedStandaloneReportFill] = useState(null);
     const [importedStandaloneReportFillOpen, setImportedStandaloneReportFillOpen] = useState(false);
     const [importedPipelineCompanionFillAttached, setImportedPipelineCompanionFillAttached] = useState(false);
@@ -1447,6 +1889,7 @@ export default function ReportBuilder({ container, context }) {
     const [savedExplorationArtifactOpen, setSavedExplorationArtifactOpen] = useState(false);
     const [savedReportPayload, setSavedReportPayload] = useState(null);
     const [savedReportPayloadRecord, setSavedReportPayloadRecord] = useState(null);
+    const [storedReportArtifact, setStoredReportArtifact] = useState(null);
     const [localLifecycleSharedArtifactRecords, setLocalLifecycleSharedArtifactRecords] = useState([]);
     const [latestLifecycleSharedArtifactOpen, setLatestLifecycleSharedArtifactOpen] = useState(false);
     const [backendSharedArtifactRecords, setBackendSharedArtifactRecords] = useState([]);
@@ -1490,7 +1933,11 @@ export default function ReportBuilder({ container, context }) {
     const [pendingScrollRowId, setPendingScrollRowId] = useState("");
     const builderRootRef = useRef(null);
     const leftRailRef = useRef(null);
+    const measuresPanelRef = useRef(null);
+    const breakdownPanelRef = useRef(null);
+    const authoredBlocksPanelRef = useRef(null);
     const importReportFileInputRef = useRef(null);
+    const importStaticDatasetFileInputRef = useRef(null);
     const applyPreparedApiArtifactOrigins = React.useCallback((changes = {}) => {
         const entries = Object.entries(changes || {})
             .map(([key, value]) => [normalizeString(key), normalizeString(value)])
@@ -1514,20 +1961,58 @@ export default function ReportBuilder({ container, context }) {
         setPreparedApiArtifactOrigins(buildEmptyPreparedApiArtifactOrigins());
     }, []);
     const [builderWidth, setBuilderWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 0));
+    const [workspaceMode, setWorkspaceMode] = useState(() => (
+        loadStoredReportBuilderWorkspaceMode(
+            stateStorageScope,
+            resolveReportBuilderCompactMode({
+                viewportWidth: typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0,
+                compactBreakpoint: resolveReportBuilderCompactBreakpoint(config),
+            }),
+            legacyStateStorageScopes,
+        )
+    ));
+    const workspaceModeStorageContextKeyRef = useRef("");
+    const workspaceModeStorageLoadedValueRef = useRef("");
+    const workspaceModeStorageReadyRef = useRef(false);
     const [leftRailWidthPercent, setLeftRailWidthPercent] = useState(() => (
-        loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes)
+        configuredLeftRailWidthPercent ?? loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes)
+    ));
+    const [resultPanePosition, setResultPanePosition] = useState(() => (
+        loadStoredReportBuilderResultPanePosition(
+            stateStorageScope,
+            legacyStateStorageScopes,
+            configuredResultPanePosition,
+        )
     ));
     const [leftRailViewportHeight, setLeftRailViewportHeight] = useState(0);
     const [leftRailResizing, setLeftRailResizing] = useState(false);
     const [leftRailCanScrollDown, setLeftRailCanScrollDown] = useState(false);
     const leftRailResizeCleanupRef = useRef(null);
-    const [reportDocumentCollapsed, setReportDocumentCollapsed] = useState(false);
+    const [designWorkspaceFocus, setDesignWorkspaceFocus] = useState("document");
+    const [selectedDocumentOutlineEntryId, setSelectedDocumentOutlineEntryId] = useState("primaryBuilder");
+    const [draggingDocumentBlockId, setDraggingDocumentBlockId] = useState("");
+    const [documentOutlinePointerDragState, setDocumentOutlinePointerDragState] = useState({
+        blockId: "",
+        active: false,
+    });
+    const [documentOutlineDropTarget, setDocumentOutlineDropTarget] = useState({
+        targetId: "",
+        placement: "",
+    });
+    const [authoredDiagnosticsExpanded, setAuthoredDiagnosticsExpanded] = useState(false);
+    const [documentDataViewOpen, setDocumentDataViewOpen] = useState(false);
+    const [reportMetadataPanelOpen, setReportMetadataPanelOpen] = useState(false);
+    const [starterChooserOpen, setStarterChooserOpen] = useState(false);
+    const [semanticPanelOpen, setSemanticPanelOpen] = useState(false);
     const [measuresCollapsed, setMeasuresCollapsed] = useState(false);
     const [authoredBlocksCollapsed, setAuthoredBlocksCollapsed] = useState(false);
+    const [drillAuthoringExpanded, setDrillAuthoringExpanded] = useState(false);
     const [compactSheetOpen, setCompactSheetOpen] = useState(false);
     const [compactSheetTab, setCompactSheetTab] = useState("scope");
     const [compactChartSheetOpen, setCompactChartSheetOpen] = useState(false);
+    const [compactSemanticSheetOpen, setCompactSemanticSheetOpen] = useState(false);
     const reportBuilderMountedRef = useRef(true);
+    const appliedReportStarterIdRef = useRef("");
 
     useEffect(() => {
         reportBuilderMountedRef.current = true;
@@ -1543,11 +2028,28 @@ export default function ReportBuilder({ container, context }) {
         };
     }, []);
 
-    const compactBreakpoint = useMemo(() => {
-        const raw = Number(config?.layout?.compactBreakpoint || config?.compactBreakpoint || 820);
-        return Number.isFinite(raw) && raw > 0 ? raw : 820;
-    }, [config]);
-    const compactMode = builderWidth > 0 && builderWidth <= compactBreakpoint;
+    const compactBreakpoint = useMemo(
+        () => resolveReportBuilderCompactBreakpoint(config),
+        [config],
+    );
+    const compactMode = resolveReportBuilderCompactMode({
+        viewportWidth: typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0,
+        builderWidth,
+        compactBreakpoint,
+    });
+    const designWorkspaceMode = useMemo(
+        () => isReportBuilderDesignWorkspaceMode(workspaceMode, { compactMode }),
+        [compactMode, workspaceMode],
+    );
+    const reportWorkspaceMode = !designWorkspaceMode && workspaceMode === "report";
+    const workspaceSettingsLabel = useMemo(() => {
+        const baseTitle = normalizeString(container?.title || displayConfig?.title || "Report");
+        return `${baseTitle || "Report"} settings`;
+    }, [container?.title, displayConfig?.title]);
+    const workspaceModeDescription = useMemo(
+        () => resolveReportBuilderWorkspaceModeDescription(workspaceMode),
+        [workspaceMode],
+    );
     const measureLeftRailViewportHeight = React.useCallback(() => {
         if (compactMode || typeof window === "undefined") {
             return;
@@ -1647,12 +2149,28 @@ export default function ReportBuilder({ container, context }) {
     }, []);
 
     useEffect(() => {
+        if (configuredLeftRailWidthPercent != null) {
+            setLeftRailWidthPercent(configuredLeftRailWidthPercent);
+            return;
+        }
         setLeftRailWidthPercent(loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes));
-    }, [legacyStateStorageScopes, stateStorageScope]);
+    }, [configuredLeftRailWidthPercent, legacyStateStorageScopes, stateStorageScope]);
 
     useEffect(() => {
         persistStoredReportBuilderLeftRailWidthPercent(stateStorageScope, leftRailWidthPercent, legacyStateStorageScopes);
     }, [leftRailWidthPercent, legacyStateStorageScopes, stateStorageScope]);
+
+    useEffect(() => {
+        setResultPanePosition(loadStoredReportBuilderResultPanePosition(
+            stateStorageScope,
+            legacyStateStorageScopes,
+            configuredResultPanePosition,
+        ));
+    }, [configuredResultPanePosition, legacyStateStorageScopes, stateStorageScope]);
+
+    useEffect(() => {
+        persistStoredReportBuilderResultPanePosition(stateStorageScope, resultPanePosition, legacyStateStorageScopes);
+    }, [legacyStateStorageScopes, resultPanePosition, stateStorageScope]);
 
     useEffect(() => () => {
         if (typeof leftRailResizeCleanupRef.current === "function") {
@@ -1662,14 +2180,62 @@ export default function ReportBuilder({ container, context }) {
     }, []);
 
     useEffect(() => {
+        const loadedMode = loadStoredReportBuilderWorkspaceMode(
+            stateStorageScope,
+            compactMode,
+            legacyStateStorageScopes,
+        );
+        workspaceModeStorageContextKeyRef.current = `${stateStorageScope}::${compactMode ? "compact" : "desktop"}`;
+        workspaceModeStorageLoadedValueRef.current = loadedMode;
+        workspaceModeStorageReadyRef.current = false;
+        setWorkspaceMode(loadedMode);
+    }, [compactMode, legacyStateStorageScopes, stateStorageScope]);
+
+    useEffect(() => {
+        const contextKey = `${stateStorageScope}::${compactMode ? "compact" : "desktop"}`;
+        if (workspaceModeStorageContextKeyRef.current !== contextKey) {
+            return;
+        }
+        const normalizedMode = normalizeReportBuilderWorkspaceMode(workspaceMode, { compactMode });
+        if (!workspaceModeStorageReadyRef.current) {
+            if (normalizedMode !== workspaceModeStorageLoadedValueRef.current) {
+                return;
+            }
+            workspaceModeStorageReadyRef.current = true;
+            return;
+        }
+        persistStoredReportBuilderWorkspaceMode(
+            stateStorageScope,
+            workspaceMode,
+            compactMode,
+            legacyStateStorageScopes,
+        );
+    }, [compactMode, legacyStateStorageScopes, stateStorageScope, workspaceMode]);
+
+    useEffect(() => {
         if (compactMode) {
             setFiltersDrawerOpen(false);
             setSettingsOpen(false);
+            setReportMetadataPanelOpen(false);
+            setSemanticPanelOpen(false);
+        }
+        if (compactMode && normalizeReportBuilderWorkspaceMode(workspaceMode, { compactMode }) === "report") {
+            setCompactSheetOpen(false);
+            setCompactChartSheetOpen(false);
+            setCompactSemanticSheetOpen(false);
+        }
+        if (!designWorkspaceMode) {
+            setDrillAuthoringExpanded(false);
+            setReportMetadataPanelOpen(false);
+            setSemanticPanelOpen(false);
+        }
+        if (compactMode) {
             return;
         }
         setCompactSheetOpen(false);
         setCompactChartSheetOpen(false);
-    }, [compactMode]);
+        setCompactSemanticSheetOpen(false);
+    }, [compactMode, designWorkspaceMode, workspaceMode]);
 
     useEffect(() => {
         if (compactMode || typeof window === "undefined") {
@@ -1728,18 +2294,50 @@ export default function ReportBuilder({ container, context }) {
             node.removeEventListener("scroll", updateScrollState);
             observer?.disconnect();
         };
-    }, [authoredBlocksCollapsed, compactMode, measuresCollapsed, reportDocumentCollapsed, leftRailViewportHeight]);
+    }, [authoredBlocksCollapsed, compactMode, measuresCollapsed, leftRailViewportHeight]);
 
     const resolvedLeftRailWidthPercent = useMemo(
         () => clampReportBuilderLeftRailWidthPercent(leftRailWidthPercent),
         [leftRailWidthPercent],
+    );
+    const moveDividerLeftLabel = useMemo(
+        () => resolveReportBuilderLeftRailMoveActionLabel("left"),
+        [],
+    );
+    const moveDividerRightLabel = useMemo(
+        () => resolveReportBuilderLeftRailMoveActionLabel("right"),
+        [],
+    );
+    const canMoveDividerLeft = useMemo(
+        () => !compactMode && resolveReportBuilderLeftRailWidthPercentForMove(
+            "left",
+            resolvedLeftRailWidthPercent,
+            resultPanePosition,
+        ) !== resolvedLeftRailWidthPercent,
+        [compactMode, resolvedLeftRailWidthPercent, resultPanePosition],
+    );
+    const canMoveDividerRight = useMemo(
+        () => !compactMode && resolveReportBuilderLeftRailWidthPercentForMove(
+            "right",
+            resolvedLeftRailWidthPercent,
+            resultPanePosition,
+        ) !== resolvedLeftRailWidthPercent,
+        [compactMode, resolvedLeftRailWidthPercent, resultPanePosition],
+    );
+    const resultPanePositionLabel = useMemo(
+        () => resolveReportBuilderResultPanePositionLabel(resultPanePosition),
+        [resultPanePosition],
+    );
+    const resultPanePositionActionLabel = useMemo(
+        () => resolveReportBuilderResultPanePositionActionLabel(resultPanePosition),
+        [resultPanePosition],
     );
     const builderRootStyle = useMemo(() => {
         if (compactMode) {
             return undefined;
         }
         return {
-            "--forge-report-builder-left-width": `clamp(264px, ${resolvedLeftRailWidthPercent.toFixed(2)}%, 360px)`,
+            "--forge-report-builder-left-width": `clamp(192px, ${resolvedLeftRailWidthPercent.toFixed(2)}%, 420px)`,
             "--forge-report-builder-left-max-height": leftRailViewportHeight > 0 ? `${leftRailViewportHeight}px` : "calc(100vh - 24px)",
         };
     }, [compactMode, leftRailViewportHeight, resolvedLeftRailWidthPercent]);
@@ -1747,6 +2345,29 @@ export default function ReportBuilder({ container, context }) {
     const resetLeftRailWidth = React.useCallback(() => {
         setLeftRailWidthPercent(DEFAULT_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT);
     }, []);
+
+    const stopLeftRailControlPointerDown = React.useCallback((event) => {
+        event.preventDefault();
+        event.stopPropagation();
+    }, []);
+
+    const toggleResultPanePosition = React.useCallback(() => {
+        if (compactMode) {
+            return;
+        }
+        setResultPanePosition((current) => resolveReportBuilderNextResultPanePosition(current));
+    }, [compactMode]);
+
+    const nudgeLeftRailWidth = React.useCallback((direction = "") => {
+        if (compactMode) {
+            return;
+        }
+        setLeftRailWidthPercent((current) => resolveReportBuilderLeftRailWidthPercentForMove(
+            direction,
+            current,
+            resultPanePosition,
+        ));
+    }, [compactMode, resultPanePosition]);
 
     const scrollLeftRailToBottom = React.useCallback(() => {
         const node = leftRailRef.current;
@@ -1758,13 +2379,87 @@ export default function ReportBuilder({ container, context }) {
             behavior: "smooth",
         });
     }, []);
+    const scrollDesignPanelIntoView = React.useCallback((panelRef = null) => {
+        const node = panelRef?.current;
+        if (!node) {
+            return;
+        }
+        try {
+            node.scrollIntoView({
+                block: "start",
+                inline: "nearest",
+                behavior: "smooth",
+            });
+        } catch (_) {
+            node.scrollIntoView();
+        }
+    }, []);
+    const focusDesignArea = React.useCallback((area = "") => {
+        const normalizedArea = String(area || "").trim().toLowerCase();
+        if (!normalizedArea) {
+            return;
+        }
+        if (normalizedArea === "metadata") {
+            setDesignWorkspaceFocus("document");
+            setDocumentDataViewOpen(false);
+            setSettingsOpen(false);
+            setReportMetadataPanelOpen(true);
+            return;
+        }
+        if (normalizedArea === "semantic") {
+            setSettingsOpen(false);
+            setSemanticPanelOpen(true);
+            return;
+        }
+        if (normalizedArea === "measures") {
+            setDesignWorkspaceFocus("document");
+            setDocumentDataViewOpen(true);
+            setMeasuresCollapsed(false);
+            requestAnimationFrame(() => scrollDesignPanelIntoView(measuresPanelRef));
+            return;
+        }
+        if (normalizedArea === "projection") {
+            setDesignWorkspaceFocus("document");
+            setDocumentDataViewOpen(true);
+            setMeasuresCollapsed(false);
+            setDimensionsCollapsed(false);
+            requestAnimationFrame(() => scrollDesignPanelIntoView(measuresPanelRef));
+            return;
+        }
+        if (normalizedArea === "breakdowns") {
+            setDesignWorkspaceFocus("document");
+            setDocumentDataViewOpen(true);
+            setDimensionsCollapsed(false);
+            requestAnimationFrame(() => scrollDesignPanelIntoView(breakdownPanelRef));
+            return;
+        }
+        if (normalizedArea === "blocks") {
+            setDesignWorkspaceFocus("document");
+            setDocumentDataViewOpen(false);
+            setAuthoredBlocksCollapsed(false);
+            requestAnimationFrame(() => scrollDesignPanelIntoView(authoredBlocksPanelRef));
+            return;
+        }
+        if (normalizedArea === "drill") {
+            setDesignWorkspaceFocus("document");
+            setDocumentDataViewOpen(true);
+            setDimensionsCollapsed(false);
+            setDrillAuthoringExpanded(true);
+            requestAnimationFrame(() => scrollDesignPanelIntoView(breakdownPanelRef));
+            return;
+        }
+    }, [scrollDesignPanelIntoView]);
 
     const startLeftRailResize = React.useCallback((event) => {
         if (compactMode || !builderRootRef.current) {
             return;
         }
+        if (typeof event.button === "number" && event.button !== 0) {
+            return;
+        }
         event.preventDefault();
         const rootNode = builderRootRef.current;
+        const pointerId = Number(event.pointerId);
         const updateFromClientX = (clientX) => {
             const rect = rootNode.getBoundingClientRect();
             if (!rect.width) {
@@ -1776,11 +2471,15 @@ export default function ReportBuilder({ container, context }) {
             setLeftRailWidthPercent(clampReportBuilderLeftRailWidthPercent(nextPercent));
         };
         const handlePointerMove = (moveEvent) => {
+            if (Number.isFinite(pointerId) && Number(moveEvent.pointerId) !== pointerId) {
+                return;
+            }
             updateFromClientX(moveEvent.clientX);
         };
         const stopDragging = () => {
-            window.removeEventListener("mousemove", handlePointerMove);
-            window.removeEventListener("mouseup", stopDragging);
+            window.removeEventListener("pointermove", handlePointerMove);
+            window.removeEventListener("pointerup", stopDragging);
+            window.removeEventListener("pointercancel", stopDragging);
             window.removeEventListener("blur", stopDragging);
             document.body.style.removeProperty("cursor");
             document.body.style.removeProperty("user-select");
@@ -1791,11 +2490,27 @@ export default function ReportBuilder({ container, context }) {
         setLeftRailResizing(true);
         document.body.style.setProperty("cursor", "col-resize");
         document.body.style.setProperty("user-select", "none");
+        try {
+            event.currentTarget?.setPointerCapture?.(pointerId);
+        } catch (_) {}
         updateFromClientX(event.clientX);
-        window.addEventListener("mousemove", handlePointerMove);
-        window.addEventListener("mouseup", stopDragging);
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerup", stopDragging);
+        window.addEventListener("pointercancel", stopDragging);
         window.addEventListener("blur", stopDragging);
     }, [compactMode, resultPanePosition]);
+    const handleLeftRailResizeKeyDown = React.useCallback((event) => {
+        const normalizedKey = String(event.key || "");
+        if (!["ArrowLeft", "ArrowRight", "Home", "End", "Enter", " "].includes(normalizedKey)) {
+            return;
+        }
+        event.preventDefault();
+        setLeftRailWidthPercent((current) => resolveReportBuilderLeftRailWidthPercentForKey(
+            normalizedKey,
+            current,
+            resultPanePosition,
+        ));
+    }, [resultPanePosition]);
 
     const resolveLookup = React.useCallback((group, filterDef, rowId = "") => (
         resolveReportBuilderLookupDescriptor(builderContext, config, state, group, filterDef, rowId)
@@ -1816,8 +2531,18 @@ export default function ReportBuilder({ container, context }) {
         () => `${currentRequestFingerprint}::${currentRequestShouldFetch ? "fetch" : "hold"}`,
         [currentRequestFingerprint, currentRequestShouldFetch],
     );
+    const persistedRuntimePreviewInteractionSnapshot = useMemo(
+        () => resolveReportBuilderPersistedRuntimePreviewInteraction(state),
+        [state],
+    );
+    const persistedRuntimePreviewInteractionFingerprint = useMemo(
+        () => JSON.stringify(persistedRuntimePreviewInteractionSnapshot),
+        [persistedRuntimePreviewInteractionSnapshot],
+    );
     const runtimePreviewInteraction = useReportRuntimeInteractionState({
-        initialState: hydratedReportDocumentSession?.runtimePreviewInteraction || null,
+        initialState: hydratedReportDocumentSession?.runtimePreviewInteraction
+            || persistedRuntimePreviewInteractionSnapshot
+            || null,
         resetKey: currentRequestFingerprint,
     });
     const hasCompletedCurrentRun = canRunReport
@@ -1831,10 +2556,12 @@ export default function ReportBuilder({ container, context }) {
         () => normalizeReportRuntimeInteractionState({
             refinements: runtimePreviewInteraction.refinements,
             drillTransitions: runtimePreviewInteraction.drillTransitions,
+            datasetScopeParams: runtimePreviewInteraction.datasetScopeParams,
             hostIntent: runtimePreviewInteraction.hostIntent,
             detailDiagnostic: runtimePreviewInteraction.detailDiagnostic,
         }, { allowEmpty: false }),
         [
+            runtimePreviewInteraction.datasetScopeParams,
             runtimePreviewInteraction.detailDiagnostic,
             runtimePreviewInteraction.drillTransitions,
             runtimePreviewInteraction.hostIntent,
@@ -1880,6 +2607,7 @@ export default function ReportBuilder({ container, context }) {
         [displayConfig, state?.drillMetadata],
     );
     const runtimePreviewConfig = config?.result?.runtimePreview;
+    const authoredReportBlocksConfigured = Array.isArray(state?.reportDocumentBlocks) && state.reportDocumentBlocks.length > 0;
     const runtimePreviewEnabled = useMemo(() => {
         if (typeof runtimePreviewConfig === "boolean") {
             return runtimePreviewConfig;
@@ -1887,16 +2615,20 @@ export default function ReportBuilder({ container, context }) {
         if (runtimePreviewConfig && typeof runtimePreviewConfig === "object" && Object.prototype.hasOwnProperty.call(runtimePreviewConfig, "enabled")) {
             return runtimePreviewConfig.enabled !== false;
         }
-        return runtimePreviewMetadata.hierarchies.length > 0
+        return authoredReportBlocksConfigured
+            || runtimePreviewMetadata.hierarchies.length > 0
             || runtimePreviewMetadata.detailTargets.length > 0
             || runtimePreviewMetadata.fieldActions.length > 0;
     }, [
+        authoredReportBlocksConfigured,
         runtimePreviewConfig,
         runtimePreviewMetadata.detailTargets.length,
         runtimePreviewMetadata.fieldActions.length,
         runtimePreviewMetadata.hierarchies.length,
     ]);
-    const shouldCompileRuntimePreview = runtimePreviewEnabled
+    const authoredRuntimeSurfaceEnabled = (runtimePreviewEnabled || reportWorkspaceMode)
+        && authoredReportBlocksConfigured;
+    const shouldCompileRuntimePreview = (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
         && (canRunReport || readiness.reason === "semantic");
 
     useEffect(() => {
@@ -2106,6 +2838,171 @@ export default function ReportBuilder({ container, context }) {
     const authoredChartFieldOptions = authoredDocumentFieldOptions.chartFieldOptions || [];
     const authoredChartConfig = authoredDocumentFieldOptions.chartConfig || displayConfig;
     const authoredChartState = authoredDocumentFieldOptions.chartState || state;
+    const authoredStaticDatasets = useMemo(
+        () => normalizeReportBuilderStaticDatasets(state?.reportStaticDatasets),
+        [state?.reportStaticDatasets],
+    );
+    const authoredDatasetOptions = useMemo(() => {
+        const publishedSourceRef = normalizeString(
+            builderContext?.identity?.dataSourceRef
+            || container?.dataSourceRef
+            || displayConfig?.dataSourceRef
+            || config?.dataSourceRef
+            || "",
+        );
+        const configuredPrimarySource = (Array.isArray(displayConfig?.dataSources) ? displayConfig.dataSources : [])
+            .find((entry) => normalizeString(entry?.dataSourceRef || entry?.value || entry?.id) === publishedSourceRef) || null;
+        const configuredPublishedDatasetOptions = (Array.isArray(displayConfig?.dataSources) ? displayConfig.dataSources : [])
+            .map((entry) => {
+                const dataSourceRef = normalizeString(entry?.dataSourceRef || entry?.value || entry?.id);
+                const value = normalizeString(entry?.id || dataSourceRef);
+                if (!dataSourceRef || !value || dataSourceRef === publishedSourceRef) {
+                    return null;
+                }
+                return {
+                    value,
+                    dataSourceRef,
+                    label: normalizeString(entry?.label || formatReportBuilderSourceLabel(dataSourceRef)) || formatReportBuilderSourceLabel(dataSourceRef),
+                    description: normalizeString(entry?.description),
+                    kindLabel: normalizeString(entry?.kindLabel || entry?.kind || "published") || "published",
+                    columnOptions: Array.isArray(entry?.columnOptions) ? entry.columnOptions : [],
+                    valueFieldOptions: Array.isArray(entry?.valueFieldOptions) ? entry.valueFieldOptions : [],
+                    secondaryFieldOptions: Array.isArray(entry?.secondaryFieldOptions) ? entry.secondaryFieldOptions : [],
+                    chartFieldOptions: Array.isArray(entry?.chartFieldOptions) ? entry.chartFieldOptions : [],
+                    scopeParamOptions: Array.isArray(entry?.scopeParamOptions) ? entry.scopeParamOptions : [],
+                };
+            })
+            .filter(Boolean);
+        return [{
+            value: "primary",
+            dataSourceRef: publishedSourceRef,
+            label: normalizeString(configuredPrimarySource?.label || formatReportBuilderSourceLabel(publishedSourceRef)) || formatReportBuilderSourceLabel(publishedSourceRef),
+            description: normalizeString(configuredPrimarySource?.description),
+            kindLabel: normalizeString(configuredPrimarySource?.kindLabel || configuredPrimarySource?.kind || "published") || "published",
+            columnOptions: authoredTableColumnOptions,
+            valueFieldOptions: authoredKpiValueFieldOptions,
+            secondaryFieldOptions: authoredKpiSecondaryFieldOptions,
+            chartFieldOptions: authoredChartFieldOptions,
+            scopeParamOptions: Array.isArray(configuredPrimarySource?.scopeParamOptions) && configuredPrimarySource.scopeParamOptions.length > 0
+                ? configuredPrimarySource.scopeParamOptions
+                : authoredScopeParamOptions,
+        }, ...configuredPublishedDatasetOptions, ...buildReportBuilderStaticDatasetOptions(authoredStaticDatasets)];
+    }, [authoredChartFieldOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredStaticDatasets, authoredTableColumnOptions, builderContext?.identity?.dataSourceRef, config?.dataSourceRef, container?.dataSourceRef, displayConfig?.dataSourceRef, displayConfig?.dataSources]);
+    const authoredDatasetOptionIndex = useMemo(
+        () => new Map(authoredDatasetOptions.map((option) => [normalizeString(option?.value), option]).filter(([key]) => !!key)),
+        [authoredDatasetOptions],
+    );
+    const authoredChartDialogDatasetRef = useMemo(
+        () => normalizeString(authoredChartBlockDraft?.datasetRef || "primary") || "primary",
+        [authoredChartBlockDraft?.datasetRef],
+    );
+    const authoredChartDialogSelectedDatasetOption = useMemo(
+        () => authoredDatasetOptionIndex.get(authoredChartDialogDatasetRef) || authoredDatasetOptions[0] || null,
+        [authoredChartDialogDatasetRef, authoredDatasetOptionIndex, authoredDatasetOptions],
+    );
+    const authoredChartDialogFieldOptions = useMemo(() => {
+        const optionFieldOptions = Array.isArray(authoredChartDialogSelectedDatasetOption?.chartFieldOptions)
+            ? authoredChartDialogSelectedDatasetOption.chartFieldOptions
+            : [];
+        if (optionFieldOptions.length > 0) {
+            return optionFieldOptions;
+        }
+        const columnOptions = Array.isArray(authoredChartDialogSelectedDatasetOption?.columnOptions)
+            ? authoredChartDialogSelectedDatasetOption.columnOptions
+            : [];
+        return columnOptions.map((option) => ({
+            key: normalizeString(option?.key),
+            label: normalizeString(option?.label || option?.key),
+            kind: normalizeString(option?.kind),
+            ...(normalizeString(option?.format) ? { format: normalizeString(option.format) } : {}),
+        })).filter((entry) => entry.key && entry.kind);
+    }, [authoredChartDialogSelectedDatasetOption]);
+    const authoredChartDialogDimensions = useMemo(
+        () => authoredChartDialogFieldOptions.filter((entry) => entry.kind === "dimension"),
+        [authoredChartDialogFieldOptions],
+    );
+    const authoredChartDialogMeasures = useMemo(
+        () => authoredChartDialogFieldOptions.filter((entry) => entry.kind === "measure"),
+        [authoredChartDialogFieldOptions],
+    );
+    const documentBlockDraftDatasetRef = useMemo(
+        () => normalizeString(documentBlockDraft?.datasetRef || "primary") || "primary",
+        [documentBlockDraft?.datasetRef],
+    );
+    const documentBlockDraftSelectedDatasetOption = useMemo(
+        () => authoredDatasetOptionIndex.get(documentBlockDraftDatasetRef) || authoredDatasetOptions[0] || null,
+        [authoredDatasetOptionIndex, authoredDatasetOptions, documentBlockDraftDatasetRef],
+    );
+    const documentBlockDraftTableColumnOptions = useMemo(
+        () => Array.isArray(documentBlockDraftSelectedDatasetOption?.columnOptions) && documentBlockDraftSelectedDatasetOption.columnOptions.length > 0
+            ? documentBlockDraftSelectedDatasetOption.columnOptions
+            : authoredTableColumnOptions,
+        [authoredTableColumnOptions, documentBlockDraftSelectedDatasetOption],
+    );
+    const documentBlockDraftValueFieldOptions = useMemo(
+        () => Array.isArray(documentBlockDraftSelectedDatasetOption?.valueFieldOptions) && documentBlockDraftSelectedDatasetOption.valueFieldOptions.length > 0
+            ? documentBlockDraftSelectedDatasetOption.valueFieldOptions
+            : authoredKpiValueFieldOptions,
+        [authoredKpiValueFieldOptions, documentBlockDraftSelectedDatasetOption],
+    );
+    const documentBlockDraftSecondaryFieldOptions = useMemo(
+        () => Array.isArray(documentBlockDraftSelectedDatasetOption?.secondaryFieldOptions) && documentBlockDraftSelectedDatasetOption.secondaryFieldOptions.length > 0
+            ? documentBlockDraftSelectedDatasetOption.secondaryFieldOptions
+            : authoredKpiSecondaryFieldOptions,
+        [authoredKpiSecondaryFieldOptions, documentBlockDraftSelectedDatasetOption],
+    );
+    const applyAuthoredChartBlockDatasetRef = React.useCallback((nextDatasetRef = "") => {
+        const normalizedDatasetRef = normalizeString(nextDatasetRef || "primary") || "primary";
+        const datasetOption = authoredDatasetOptionIndex.get(normalizedDatasetRef) || null;
+        const datasetFieldOptions = (() => {
+            const optionFieldOptions = Array.isArray(datasetOption?.chartFieldOptions)
+                ? datasetOption.chartFieldOptions
+                : [];
+            if (optionFieldOptions.length > 0) {
+                return optionFieldOptions;
+            }
+            const columnOptions = Array.isArray(datasetOption?.columnOptions)
+                ? datasetOption.columnOptions
+                : [];
+            return columnOptions.map((option) => ({
+                key: normalizeString(option?.key),
+                label: normalizeString(option?.label || option?.key),
+                kind: normalizeString(option?.kind),
+            })).filter((entry) => entry.key && entry.kind);
+        })();
+        const dimensionKeys = datasetFieldOptions.filter((entry) => entry.kind === "dimension").map((entry) => entry.key);
+        const measureKeys = datasetFieldOptions.filter((entry) => entry.kind === "measure").map((entry) => entry.key);
+        setAuthoredChartBlockDraft((current) => {
+            if (!current) {
+                return current;
+            }
+            const currentChartSpec = current?.chartSpec && typeof current.chartSpec === "object" && !Array.isArray(current.chartSpec)
+                ? current.chartSpec
+                : {};
+            const preferredXField = dimensionKeys.includes(normalizeString(currentChartSpec?.xField))
+                ? normalizeString(currentChartSpec?.xField)
+                : (dimensionKeys[0] || "");
+            const preferredYFields = (Array.isArray(currentChartSpec?.yFields) ? currentChartSpec.yFields : [])
+                .map((entry) => normalizeString(entry))
+                .filter((entry) => measureKeys.includes(entry));
+            const nextYFields = preferredYFields.length > 0
+                ? preferredYFields
+                : (measureKeys[0] ? [measureKeys[0]] : []);
+            const preferredSeriesField = dimensionKeys.includes(normalizeString(currentChartSpec?.seriesField))
+                && normalizeString(currentChartSpec?.seriesField) !== preferredXField
+                ? normalizeString(currentChartSpec?.seriesField)
+                : null;
+            return {
+                ...current,
+                datasetRef: normalizedDatasetRef,
+                chartSpec: sanitizeChartDraftPatch(currentChartSpec, {
+                    xField: preferredXField,
+                    yFields: nextYFields,
+                    seriesField: preferredSeriesField,
+                }),
+            };
+        });
+    }, [authoredDatasetOptionIndex]);
     const reportDocumentTemplates = useMemo(
         () => normalizeReportBuilderDocumentTemplates(displayConfig?.reportDocumentTemplates),
         [displayConfig?.reportDocumentTemplates],
@@ -2200,10 +3097,17 @@ export default function ReportBuilder({ container, context }) {
         [authoredDetailFieldOption, authoredDetailPresetTargets],
     );
     const authoredDetailTargetDraftText = String(authoredDetailTargetRefDraft || "").trim();
+    const authoredDetailHasPresetMatch = useMemo(
+        () => authoredDetailRouteSuggestions.some((entry) => entry.targetRef === authoredDetailTargetDraftText),
+        [authoredDetailRouteSuggestions, authoredDetailTargetDraftText],
+    );
     const authoredDetailSelectedRoutePreset = useMemo(
         () => authoredDetailRouteSuggestions.find((entry) => entry.targetRef === authoredDetailTargetDraftText)?.targetRef || "",
         [authoredDetailRouteSuggestions, authoredDetailTargetDraftText],
     );
+    const showAuthoredDetailTargetManualEditor = authoredDetailTargetManualMode
+        || authoredDetailRouteSuggestions.length === 0
+        || (!!authoredDetailTargetDraftText && !authoredDetailHasPresetMatch);
     const authoredDetailParameterSourceFieldOptions = useMemo(() => {
         const seen = new Set();
         return authoredTableColumnOptions
@@ -2276,13 +3180,70 @@ export default function ReportBuilder({ container, context }) {
             scopeParamOptions: authoredScopeParamOptions,
             chartConfig: authoredChartConfig,
             chartFieldOptions: authoredChartFieldOptions,
+            datasetOptions: authoredDatasetOptions,
         }),
-        [authoredChartConfig, authoredChartFieldOptions, authoredDocumentBlocks, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions],
+        [authoredChartConfig, authoredChartFieldOptions, authoredDatasetOptions, authoredDocumentBlocks, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions],
     );
     const authoredDocumentCompileValidation = useMemo(
         () => buildReportBuilderDocumentCompileValidation(authoredDocumentBlockDiagnostics),
         [authoredDocumentBlockDiagnostics],
     );
+    const authoredDocumentSummary = useMemo(
+        () => summarizeReportBuilderAuthoredBlocks(authoredDocumentBlocks, {
+            scopeParamOptions: authoredScopeParamOptions,
+        }),
+        [authoredDocumentBlocks, authoredScopeParamOptions],
+    );
+    const authoredRuntimeBlockSummary = useMemo(() => {
+        const runtimeBlocks = authoredDocumentBlocks.filter((block) => {
+            const kind = normalizeString(block?.kind);
+            return kind === "filterBarBlock" || kind === "refinementBarBlock" || kind === "geoMapBlock";
+        });
+        const labels = runtimeBlocks.map((block) => {
+            const kind = normalizeString(block?.kind);
+            if (kind === "filterBarBlock") return "Filter bar";
+            if (kind === "refinementBarBlock") return "Refinement bar";
+            if (kind === "geoMapBlock") return "Geo map";
+            return "";
+        }).filter(Boolean);
+        return {
+            count: runtimeBlocks.length,
+            summary: runtimeBlocks.length > 0
+                ? formatReportBuilderSummaryList(labels)
+                : "No runtime blocks yet",
+        };
+    }, [authoredDocumentBlocks]);
+    const authoredDocumentCompileDiagnosticsNotice = useMemo(() => buildReportBuilderCompileDiagnosticsNotice({
+        compileValidation: authoredDocumentCompileValidation,
+        title: "Authored Block Validation",
+    }), [authoredDocumentCompileValidation]);
+    const authoredDocumentBlockCount = Number(authoredDocumentSummary?.totalCount || 0) || 0;
+    const designWorkspaceOverviewState = useMemo(() => {
+        const hasDrillStructure = Number(authoredDrillSummary?.hierarchyCount || 0) > 0
+            || Number(authoredDrillSummary?.detailTargetCount || 0) > 0
+            || Number(authoredDrillSummary?.fieldActionCount || 0) > 0;
+        const hasAuthoredContent = authoredDocumentBlockCount > 0 || hasDrillStructure;
+        const designDiagnostics = authoredDocumentCompileValidation.valid ? "" : "Design diagnostics";
+        return {
+            hasAuthoredContent,
+            metaChips: [
+                authoredDocumentBlockCount > 0
+                    ? `${authoredDocumentBlockCount} ${authoredDocumentBlockCount === 1 ? "block" : "blocks"}`
+                    : "",
+                hasDrillStructure ? authoredDrillSummary.summary : "",
+                designDiagnostics || (hasAuthoredContent ? "Ready to view" : ""),
+            ].filter(Boolean),
+            authoredBlockSummaryText: authoredDocumentBlockCount > 0
+                ? String(authoredDocumentSummary?.summary || "").trim()
+                : "",
+            drillSummaryText: hasDrillStructure ? String(authoredDrillSummary?.summary || "").trim() : "",
+        };
+    }, [
+        authoredDocumentBlockCount,
+        authoredDocumentCompileValidation.valid,
+        authoredDocumentSummary,
+        authoredDrillSummary,
+    ]);
     const semanticMeasureIssuesById = semanticFieldValidation?.measureIssuesById || {};
     const semanticDimensionIssuesById = semanticFieldValidation?.dimensionIssuesById || {};
     const semanticParameterIssuesById = semanticFieldValidation?.parameterIssuesById || {};
@@ -2295,6 +3256,57 @@ export default function ReportBuilder({ container, context }) {
         state,
         binding: semanticBinding,
     }), [displayConfig, semanticBinding, state]);
+    const semanticImportedArtifactCount = useMemo(() => {
+        const importedResponses = Array.isArray(importedLocalGetReportDocumentResponses)
+            ? importedLocalGetReportDocumentResponses
+            : [];
+        const importedSavedRecords = Array.isArray(importedLocalSavedReportRecords)
+            ? importedLocalSavedReportRecords
+            : [];
+        return (
+            importedResponses.filter((response) => hasSemanticImportedArtifact(response)).length
+            + importedSavedRecords.filter((record) => hasSemanticImportedArtifact(record?.savedReportPayload || record)).length
+        );
+    }, [importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
+    const semanticWorkspacePanelState = useMemo(() => buildReportBuilderSemanticWorkspacePanelState({
+        semanticSummary: semanticRuntimeSummary,
+        binding: semanticBinding,
+        semanticStatus,
+        semanticDiagnosticsNotice,
+        semanticGovernanceNotice,
+        providerAvailable: !!semanticModelProvider,
+        modelLoading: !!semanticModelState.loading,
+        modelError: semanticModelState.error,
+        modelRef: semanticModelRef,
+        model: semanticModelState.model,
+    }), [
+        semanticRuntimeSummary,
+        semanticBinding,
+        semanticStatus,
+        semanticDiagnosticsNotice,
+        semanticGovernanceNotice,
+        semanticModelProvider,
+        semanticModelState.loading,
+        semanticModelState.error,
+        semanticModelRef,
+        semanticModelState.model,
+    ]);
+    const showSemanticWorkspaceControl = useMemo(
+        () => shouldShowReportBuilderSemanticWorkspace({
+            binding: semanticBinding,
+            providerAvailable: !!semanticModelProvider,
+            configuredSemanticModel: config?.semanticModel || null,
+            activationCount: semanticImportedArtifactCount,
+        }),
+        [config?.semanticModel, semanticBinding, semanticImportedArtifactCount, semanticModelProvider],
+    );
+    const semanticResultSurfaceState = useMemo(
+        () => buildReportBuilderSemanticResultSurfaceState({
+            designWorkspaceMode,
+            semanticWorkspacePanelState,
+        }),
+        [designWorkspaceMode, semanticWorkspacePanelState],
+    );
     const runtimePreviewSemanticDiagnostics = useMemo(() => buildReportBuilderSemanticRuntimeDiagnostics({
         binding: semanticBinding,
         semanticStatus,
@@ -2326,21 +3338,22 @@ export default function ReportBuilder({ container, context }) {
     const semanticProviderParameterDiagnosticsById = semanticDiagnosticTargets.parameterDiagnosticsById || {};
     const documentBlockDraftValidation = useMemo(
         () => validateReportBuilderDocumentBlockDraft(documentBlockDraft, {
-            valueFieldOptions: authoredKpiValueFieldOptions,
-            secondaryFieldOptions: authoredKpiSecondaryFieldOptions,
-            tableColumnOptions: authoredTableColumnOptions,
+            valueFieldOptions: documentBlockDraftValueFieldOptions,
+            secondaryFieldOptions: documentBlockDraftSecondaryFieldOptions,
+            tableColumnOptions: documentBlockDraftTableColumnOptions,
+            datasetOptions: authoredDatasetOptions,
             scopeParamOptions: authoredScopeParamOptions,
             chartConfig: authoredChartConfig,
             chartFieldOptions: authoredChartFieldOptions,
         }),
-        [authoredChartConfig, authoredChartFieldOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions, documentBlockDraft],
+        [authoredChartConfig, authoredChartFieldOptions, authoredDatasetOptions, authoredScopeParamOptions, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions],
     );
     const authoredChartBlockDraftValidation = useMemo(
         () => validateReportBuilderDocumentBlockDraft(authoredChartBlockDraft, {
             chartConfig: authoredChartConfig,
-            chartFieldOptions: authoredChartFieldOptions,
+            chartFieldOptions: authoredChartDialogFieldOptions,
         }),
-        [authoredChartBlockDraft, authoredChartConfig, authoredChartFieldOptions],
+        [authoredChartBlockDraft, authoredChartConfig, authoredChartDialogFieldOptions],
     );
     const quickTableCalculationOptions = useMemo(() => (
         tableCalculationMeasures
@@ -2370,8 +3383,8 @@ export default function ReportBuilder({ container, context }) {
     const semanticProviderGroupByDiagnostics = Array.isArray(semanticDiagnosticTargets.groupByDiagnostics)
         ? semanticDiagnosticTargets.groupByDiagnostics
         : [];
-    const staticFilters = Array.isArray(displayConfig.staticFilters) ? displayConfig.staticFilters : [];
-    const dynamicFilterGroups = Array.isArray(config.dynamicFilterGroups) ? config.dynamicFilterGroups : [];
+    const staticFilters = useMemo(() => resolveReportBuilderScopeParamFilters(displayConfig), [displayConfig]);
+    const dynamicFilterGroups = useMemo(() => resolveReportBuilderDynamicFilterGroups(config), [config]);
     const dynamicFilterFamilies = useMemo(() => resolveDynamicFilterFamilies(config), [config]);
     const familyMode = dynamicFilterFamilies.length > 0;
     const hiddenDynamicGroupIds = useMemo(
@@ -2384,15 +3397,15 @@ export default function ReportBuilder({ container, context }) {
     );
     const showFilterCategoryBar = config.showFilterCategoryBar !== false;
     const lookupExtension = useMemo(() => getLookupExtensionConfig(config), [config]);
-    const explicitChartMode = isExplicitReportBuilderChartMode(config);
-    const viewModes = Array.isArray(config?.result?.viewModes) && config.result.viewModes.length > 0
-        ? config.result.viewModes
+    const explicitChartMode = isExplicitReportBuilderChartMode(semanticDisplayConfig);
+    const viewModes = Array.isArray(semanticDisplayConfig?.result?.viewModes) && semanticDisplayConfig.result.viewModes.length > 0
+        ? semanticDisplayConfig.result.viewModes
         : ["chart", "table"];
-    const orderFields = Array.isArray(config?.result?.orderFields || config?.orderFields)
-        ? (config?.result?.orderFields || config?.orderFields)
+    const orderFields = Array.isArray(semanticDisplayConfig?.result?.orderFields || semanticDisplayConfig?.orderFields)
+        ? (semanticDisplayConfig?.result?.orderFields || semanticDisplayConfig?.orderFields)
         : [];
-    const pageSizeOptions = Array.isArray(config?.result?.pageSizeOptions) && config.result.pageSizeOptions.length > 0
-        ? config.result.pageSizeOptions
+    const pageSizeOptions = Array.isArray(semanticDisplayConfig?.result?.pageSizeOptions) && semanticDisplayConfig.result.pageSizeOptions.length > 0
+        ? semanticDisplayConfig.result.pageSizeOptions
         : [25, 50, 100];
 
     const selectedColumns = useMemo(() => buildReportBuilderColumns(displayConfig, state), [displayConfig, state]);
@@ -2412,6 +3425,388 @@ export default function ReportBuilder({ container, context }) {
     const activeTablePreset = state?.activeTablePreset && typeof state.activeTablePreset === "object" ? state.activeTablePreset : null;
     const lastTablePreset = state?.lastTablePreset && typeof state.lastTablePreset === "object" ? state.lastTablePreset : null;
     const modifiedTablePreset = !activeTablePreset && lastTablePreset ? lastTablePreset : null;
+    const currentProjectionColumnKeys = useMemo(() => [
+        ...selectedDimensionDefs.map((dimension) => normalizeString(dimension?.id || dimension?.key)),
+        ...selectedMeasureDefs.map((measure) => normalizeString(measure?.id || measure?.key)),
+    ].filter(Boolean), [selectedDimensionDefs, selectedMeasureDefs]);
+    const authoredProjectionOptions = useMemo(() => {
+        const currentProjection = {
+            value: "__current__",
+            label: modifiedTablePreset?.title || activeTablePreset?.title || "Current builder selection",
+            description: modifiedTablePreset?.description || activeTablePreset?.description || "Uses the fields currently active in this builder.",
+            columnKeys: currentProjectionColumnKeys,
+            dimensions: selectedDimensionDefs.map((dimension) => normalizeString(dimension?.id || dimension?.key)).filter(Boolean),
+            measures: selectedMeasureDefs.map((measure) => normalizeString(measure?.id || measure?.key)).filter(Boolean),
+            primaryMeasure: normalizeString(state?.primaryMeasure || selectedMeasureDefs[0]?.id || selectedMeasureDefs[0]?.key || ""),
+            groupBy: normalizeString(state?.groupBy),
+            orderField: normalizeString(state?.orderField),
+            orderDir: normalizeString(state?.orderDir || "desc"),
+            pageSize: Math.max(0, Number(state?.pageSize || 0) || 0) || null,
+        };
+        const namedProjections = defaultTablePresets.map((preset) => ({
+            value: normalizeString(preset?.id),
+            label: normalizeString(preset?.title || "Data view"),
+            description: normalizeString(preset?.description || "Reusable data view."),
+            columnKeys: buildReportBuilderProjectionColumnKeys(preset),
+            dimensions: normalizeReportBuilderStringArray(preset?.dimensions),
+            measures: normalizeReportBuilderStringArray(preset?.measures),
+            primaryMeasure: normalizeString(preset?.primaryMeasure),
+            groupBy: normalizeString(preset?.groupBy),
+            orderField: normalizeString(preset?.orderField),
+            orderDir: normalizeString(preset?.orderDir || "desc"),
+            pageSize: Math.max(0, Number(preset?.pageSize || 0) || 0) || null,
+        })).filter((option) => option.value && option.label && option.columnKeys.length > 0);
+        return [currentProjection, ...namedProjections];
+    }, [
+        activeTablePreset?.description,
+        activeTablePreset?.title,
+        currentProjectionColumnKeys,
+        defaultTablePresets,
+        modifiedTablePreset?.description,
+        modifiedTablePreset?.title,
+        selectedDimensionDefs,
+        selectedMeasureDefs,
+        state?.groupBy,
+        state?.orderDir,
+        state?.orderField,
+        state?.pageSize,
+        state?.primaryMeasure,
+    ]);
+    const namedAuthoredProjectionOptions = useMemo(
+        () => authoredProjectionOptions.filter((option) => option?.value && option.value !== "__current__"),
+        [authoredProjectionOptions],
+    );
+    const activeNamedProjectionOption = useMemo(() => (
+        namedAuthoredProjectionOptions.find((option) => reportBuilderProjectionOptionMatchesState(option, state)) || null
+    ), [namedAuthoredProjectionOptions, state]);
+    const activeDataViewLabel = useMemo(() => (
+        activeNamedProjectionOption?.label
+        || modifiedTablePreset?.title
+        || activeTablePreset?.title
+        || "Current data selection"
+    ), [activeNamedProjectionOption?.label, activeTablePreset?.title, modifiedTablePreset?.title]);
+    const activeDataViewDescription = useMemo(() => (
+        activeNamedProjectionOption?.description
+        || modifiedTablePreset?.description
+        || activeTablePreset?.description
+        || "Uses the measures and breakdowns currently active in this report."
+    ), [activeNamedProjectionOption?.description, activeTablePreset?.description, modifiedTablePreset?.description]);
+    const activeAuthoringProjectionLabel = useMemo(() => (
+        activeNamedProjectionOption?.label
+        || modifiedTablePreset?.title
+        || activeTablePreset?.title
+        || "Current builder selection"
+    ), [activeNamedProjectionOption?.label, activeTablePreset?.title, modifiedTablePreset?.title]);
+    const activeAuthoringProjectionDescription = useMemo(() => (
+        activeNamedProjectionOption?.description
+        || modifiedTablePreset?.description
+        || activeTablePreset?.description
+        || "Uses the fields currently active in this builder."
+    ), [activeNamedProjectionOption?.description, activeTablePreset?.description, modifiedTablePreset?.description]);
+    const primaryResultOutlineChildren = useMemo(() => {
+        const nextChildren = [];
+        const normalizedChartTitle = normalizeString(state?.chartSpec?.title);
+        const normalizedChartType = normalizeString(state?.chartSpec?.type);
+        const chartMeasureCount = Array.isArray(state?.chartSpec?.yFields)
+            ? state.chartSpec.yFields.filter((entry) => normalizeString(entry)).length
+            : 0;
+        nextChildren.push({
+            id: "primaryBuilder:chartView",
+            kind: "chartView",
+            title: normalizedChartTitle || "Chart view",
+            summary: normalizedChartType
+                ? `${chartTypeLabel(normalizedChartType)} • ${chartMeasureCount || 0} ${chartMeasureCount === 1 ? "measure" : "measures"}`
+                : "No chart configured yet.",
+            actionLabel: normalizedChartTitle || normalizedChartType ? "Edit chart" : "Add chart",
+            widthLabel: "Primary view",
+        });
+        nextChildren.push({
+            id: "primaryBuilder:tableView",
+            kind: "tableView",
+            title: activeDataViewLabel || "Table view",
+            summary: `${selectedDimensionDefs.length} ${selectedDimensionDefs.length === 1 ? "breakdown" : "breakdowns"} • ${selectedMeasureDefs.length} ${selectedMeasureDefs.length === 1 ? "measure" : "measures"}`,
+            actionLabel: documentDataViewOpen ? "Close data editor" : "Open data editor",
+            widthLabel: "Primary view",
+        });
+        return nextChildren;
+    }, [
+        activeDataViewLabel,
+        documentDataViewOpen,
+        selectedDimensionDefs.length,
+        selectedMeasureDefs.length,
+        state?.chartSpec?.title,
+        state?.chartSpec?.type,
+        state?.chartSpec?.yFields,
+    ]);
+    const reportDocumentOutlineEntries = useMemo(() => buildReportBuilderDocumentOutlineEntries({
+        activeDataViewLabel,
+        authoredDocumentBlocks,
+        authoredDocumentLayout,
+        authoredScopeParamOptions,
+        authoredDrillSummary,
+        currentBreakdownDrillHierarchy,
+        primaryResultChildren: primaryResultOutlineChildren,
+    }), [
+        activeDataViewLabel,
+        authoredDocumentBlocks,
+        authoredDocumentLayout,
+        authoredDrillSummary,
+        authoredScopeParamOptions,
+        currentBreakdownDrillHierarchy,
+        primaryResultOutlineChildren,
+    ]);
+    const designDocumentOutlineEntries = useMemo(() => {
+        return reportDocumentOutlineEntries.filter((entry) => normalizeString(entry?.kind) !== "primaryBuilder");
+    }, [reportDocumentOutlineEntries]);
+    const preferredDocumentOutlineEntries = useMemo(
+        () => (designWorkspaceMode
+            ? designDocumentOutlineEntries
+            : reportDocumentOutlineEntries),
+        [designDocumentOutlineEntries, designWorkspaceMode, reportDocumentOutlineEntries],
+    );
+    const effectiveSelectedDocumentOutlineEntryId = useMemo(() => (
+        preferredDocumentOutlineEntries.length === 0
+            ? ""
+            : resolveReportBuilderPreferredSelectedEntryId(
+                preferredDocumentOutlineEntries,
+                {
+                    currentSelectedEntryId: selectedDocumentOutlineEntryId,
+                    preferChartView: !designWorkspaceMode && !!selectedBuilderChartSelection,
+                    preferTableView: !designWorkspaceMode && !!selectedBuilderTableRow && !selectedBuilderChartSelection,
+                },
+            )
+    ), [
+        designWorkspaceMode,
+        preferredDocumentOutlineEntries,
+        selectedBuilderChartSelection,
+        selectedBuilderTableRow,
+        selectedDocumentOutlineEntryId,
+    ]);
+    const flattenedReportDocumentOutlineEntries = useMemo(
+        () => flattenReportBuilderDocumentOutlineEntries(reportDocumentOutlineEntries),
+        [reportDocumentOutlineEntries],
+    );
+    const selectedDocumentInsertionTarget = useMemo(
+        () => resolveReportBuilderDocumentInsertionTarget(reportDocumentOutlineEntries, effectiveSelectedDocumentOutlineEntryId),
+        [effectiveSelectedDocumentOutlineEntryId, reportDocumentOutlineEntries],
+    );
+    const selectedDocumentOutlineEntry = useMemo(
+        () => flattenedReportDocumentOutlineEntries.find((entry) => entry.id === selectedDocumentInsertionTarget.selectedEntryId)
+            || flattenedReportDocumentOutlineEntries[0]
+            || null,
+        [flattenedReportDocumentOutlineEntries, selectedDocumentInsertionTarget.selectedEntryId],
+    );
+    const selectedDocumentOutlineBlock = useMemo(
+        () => authoredDocumentBlocks.find((block) => normalizeString(block?.id) === normalizeString(selectedDocumentOutlineEntry?.id)) || null,
+        [authoredDocumentBlocks, selectedDocumentOutlineEntry?.id],
+    );
+    const selectedDocumentOutlineBlockIndex = useMemo(
+        () => authoredDocumentBlocks.findIndex((block) => normalizeString(block?.id) === normalizeString(selectedDocumentOutlineEntry?.id)),
+        [authoredDocumentBlocks, selectedDocumentOutlineEntry?.id],
+    );
+    const selectedDocumentOutlineWidthLabels = useMemo(() => {
+        const selectedId = normalizeString(selectedDocumentOutlineEntry?.id);
+        if (!selectedId || !selectedDocumentOutlineBlock) {
+            return resolveReportBuilderDocumentWidthLabels(null);
+        }
+        const layoutItem = authoredDocumentLayoutItemIndex.get(selectedId) || null;
+        return resolveReportBuilderDocumentWidthLabels(layoutItem);
+    }, [authoredDocumentLayoutItemIndex, selectedDocumentOutlineBlock, selectedDocumentOutlineEntry?.id]);
+    const selectedDocumentDrillState = useMemo(
+        () => resolveReportBuilderSelectedDrillBindings({
+            selectedEntryId: selectedDocumentOutlineEntry?.id || "",
+            hierarchies: authoredDrillMetadata.hierarchies,
+            detailBindings: authoredDetailActionBindings,
+        }),
+        [authoredDetailActionBindings, authoredDrillMetadata.hierarchies, selectedDocumentOutlineEntry?.id],
+    );
+    const selectedDocumentDrillMissingFieldOptions = useMemo(() => {
+        const labelsByFieldRef = new Map(
+            (Array.isArray(selectedDocumentDrillState?.hierarchy?.levels) ? selectedDocumentDrillState.hierarchy.levels : [])
+                .map((level) => [normalizeString(level?.field), normalizeString(level?.label || level?.field)])
+                .filter(([fieldRef, label]) => !!fieldRef && !!label),
+        );
+        return (Array.isArray(selectedDocumentDrillState?.missingFieldRefs) ? selectedDocumentDrillState.missingFieldRefs : [])
+            .map((fieldRef) => {
+                const normalizedFieldRef = normalizeString(fieldRef);
+                if (!normalizedFieldRef) {
+                    return null;
+                }
+                const option = authoredDetailFieldOptions.find((entry) => normalizeString(entry?.value) === normalizedFieldRef) || null;
+                return {
+                    fieldRef: normalizedFieldRef,
+                    label: option?.label || labelsByFieldRef.get(normalizedFieldRef) || normalizedFieldRef,
+                    available: !!option,
+                };
+            })
+            .filter(Boolean);
+    }, [authoredDetailFieldOptions, selectedDocumentDrillState?.hierarchy?.levels, selectedDocumentDrillState?.missingFieldRefs]);
+    useEffect(() => {
+        if (!effectiveSelectedDocumentOutlineEntryId) {
+            setSelectedDocumentOutlineEntryId("");
+            return;
+        }
+        setSelectedDocumentOutlineEntryId((current) => (
+            current === effectiveSelectedDocumentOutlineEntryId ? current : effectiveSelectedDocumentOutlineEntryId
+        ));
+    }, [effectiveSelectedDocumentOutlineEntryId]);
+    useEffect(() => {
+        setDraggingDocumentBlockId("");
+        setDocumentOutlinePointerDragState({
+            blockId: "",
+            active: false,
+        });
+        setDocumentOutlineDropTarget({
+            targetId: "",
+            placement: "",
+        });
+    }, [authoredDocumentBlocks, authoredDocumentLayout]);
+    useEffect(() => {
+        setPendingDocumentInsertionPlacement("after");
+    }, [selectedDocumentInsertionTarget.insertionAfterId]);
+    const reportDataSourceCards = useMemo(() => {
+        const currentSourceRef = normalizeString(
+            builderContext?.identity?.dataSourceRef
+            || container?.dataSourceRef
+            || displayConfig?.dataSourceRef
+            || config?.dataSourceRef
+            || "",
+        );
+        const normalizedConfiguredSources = (Array.isArray(displayConfig?.dataSources) ? displayConfig.dataSources : [])
+            .map((entry) => {
+                const dataSourceRef = normalizeString(entry?.dataSourceRef || entry?.value || entry?.id);
+                if (!dataSourceRef) {
+                    return null;
+                }
+                return {
+                    id: entry.id,
+                    dataSourceRef,
+                    label: normalizeString(entry?.label || formatReportBuilderSourceLabel(dataSourceRef)) || formatReportBuilderSourceLabel(dataSourceRef),
+                    description: normalizeString(entry?.description),
+                    kindLabel: normalizeString(entry?.kindLabel || entry?.kind),
+                };
+            })
+            .filter(Boolean);
+        const sourceMap = new Map();
+        normalizedConfiguredSources.forEach((entry) => {
+            if (!sourceMap.has(entry.dataSourceRef)) {
+                sourceMap.set(entry.dataSourceRef, entry);
+            }
+        });
+        if (currentSourceRef && !sourceMap.has(currentSourceRef)) {
+                sourceMap.set(currentSourceRef, {
+                    dataSourceRef: currentSourceRef,
+                    label: formatReportBuilderSourceLabel(currentSourceRef),
+                    description: "",
+                    kindLabel: "published",
+                });
+        }
+        authoredStaticDatasets.forEach((dataset) => {
+            if (!sourceMap.has(dataset.dataSourceRef)) {
+                sourceMap.set(dataset.dataSourceRef, {
+                    id: dataset.id,
+                    dataSourceRef: dataset.dataSourceRef,
+                    label: dataset.label,
+                    description: dataset.description,
+                    kindLabel: dataset.kindLabel,
+                });
+            }
+        });
+        return Array.from(sourceMap.values()).map((entry) => ({
+            ...entry,
+            active: entry.dataSourceRef === currentSourceRef,
+            inspected: normalizeString(entry.dataSourceRef) === normalizeString(inspectedDataSourceRef),
+        }));
+    }, [
+        authoredStaticDatasets,
+        builderContext?.identity?.dataSourceRef,
+        config?.dataSourceRef,
+        container?.dataSourceRef,
+        displayConfig?.dataSourceRef,
+        displayConfig?.dataSources,
+        inspectedDataSourceRef,
+    ]);
+    useEffect(() => {
+        const normalizedInspectedRef = normalizeString(inspectedDataSourceRef);
+        if (!normalizedInspectedRef) {
+            return;
+        }
+        if (reportDataSourceCards.some((card) => normalizeString(card?.dataSourceRef) === normalizedInspectedRef)) {
+            return;
+        }
+        setInspectedDataSourceRef("");
+    }, [inspectedDataSourceRef, reportDataSourceCards]);
+    const inspectedReportDataSourceCard = useMemo(
+        () => reportDataSourceCards.find((card) => normalizeString(card?.dataSourceRef) === normalizeString(inspectedDataSourceRef)) || null,
+        [inspectedDataSourceRef, reportDataSourceCards],
+    );
+    const activeReportDataSourceCard = useMemo(
+        () => reportDataSourceCards.find((card) => card.active) || null,
+        [reportDataSourceCards],
+    );
+    const inspectedReportDataSourceDetails = useMemo(() => {
+        if (!inspectedReportDataSourceCard) {
+            return null;
+        }
+        const inspectedDatasetOption = authoredDatasetOptions.find((entry) => (
+            normalizeString(entry?.value) === normalizeString(inspectedReportDataSourceCard.id || "")
+            || normalizeString(entry?.dataSourceRef) === normalizeString(inspectedReportDataSourceCard.dataSourceRef)
+        )) || null;
+        if (normalizeString(inspectedReportDataSourceCard.kindLabel).startsWith("static ")) {
+            const dataset = authoredStaticDatasets.find((entry) => normalizeString(entry?.dataSourceRef) === normalizeString(inspectedReportDataSourceCard.dataSourceRef))
+                || authoredStaticDatasets.find((entry) => normalizeString(entry?.id) === normalizeString(inspectedReportDataSourceCard.id))
+                || null;
+            const allColumns = Array.isArray(dataset?.columnOptions) ? dataset.columnOptions : [];
+            const previewColumns = Array.isArray(dataset?.columnOptions) ? dataset.columnOptions.slice(0, 6) : [];
+            const previewRows = Array.isArray(dataset?.rows) ? dataset.rows.slice(0, 5) : [];
+            return {
+                title: inspectedReportDataSourceCard.label,
+                description: inspectedReportDataSourceCard.description || "",
+                kindLabel: formatReportBuilderSourceKindLabel(inspectedReportDataSourceCard.kindLabel || "static csv"),
+                detailGroups: [
+                    buildReportBuilderSourceDetailGroup(
+                        "Fields",
+                        allColumns.map((entry) => normalizeString(entry?.label || entry?.key)).filter(Boolean),
+                    ),
+                ].filter(Boolean),
+                previewColumns,
+                previewRows,
+                rowCount: Math.max(0, Number(dataset?.rowCount || previewRows.length) || 0),
+                columnCount: Math.max(0, Number(dataset?.columnCount || previewColumns.length) || 0),
+                builderSource: false,
+            };
+        }
+        const activeDatasetOption = inspectedDatasetOption
+            || authoredDatasetOptions.find((entry) => normalizeString(entry?.value) === "primary")
+            || authoredDatasetOptions[0]
+            || null;
+        const measureItems = (Array.isArray(activeDatasetOption?.valueFieldOptions) ? activeDatasetOption.valueFieldOptions : [])
+            .map((entry) => normalizeString(entry?.label || entry?.value))
+            .filter(Boolean);
+        const dimensionItems = (Array.isArray(activeDatasetOption?.secondaryFieldOptions) ? activeDatasetOption.secondaryFieldOptions : [])
+            .map((entry) => normalizeString(entry?.label || entry?.value))
+            .filter(Boolean);
+        const inputItems = (Array.isArray(activeDatasetOption?.scopeParamOptions) ? activeDatasetOption.scopeParamOptions : authoredScopeParamOptions)
+            .map((entry) => normalizeString(entry?.label || entry?.value))
+            .filter(Boolean);
+        const previewColumns = Array.isArray(activeDatasetOption?.columnOptions) ? activeDatasetOption.columnOptions.slice(0, 6) : [];
+        const previewRows = inspectedReportDataSourceCard.active && Array.isArray(computedCollection) ? computedCollection.slice(0, 5) : [];
+        return {
+            title: inspectedReportDataSourceCard.label,
+            description: inspectedReportDataSourceCard.description || "",
+            kindLabel: formatReportBuilderSourceKindLabel(inspectedReportDataSourceCard.kindLabel || "published"),
+            detailGroups: [
+                buildReportBuilderSourceDetailGroup("Measures", measureItems),
+                buildReportBuilderSourceDetailGroup("Dimensions", dimensionItems),
+                buildReportBuilderSourceDetailGroup("Inputs", inputItems),
+            ].filter((group) => Array.isArray(group.items) && group.items.length > 0),
+            previewColumns,
+            previewRows,
+            rowCount: previewRows.length,
+            columnCount: previewColumns.length,
+            builderSource: inspectedReportDataSourceCard.active === true,
+        };
+    }, [authoredDatasetOptions, authoredScopeParamOptions, authoredStaticDatasets, computedCollection, inspectedReportDataSourceCard]);
     const chartSpecValidation = useMemo(
         () => validateReportBuilderChartSpec(displayConfig, state.chartSpec, chartFields),
         [displayConfig, state.chartSpec, chartFields],
@@ -2471,13 +3866,22 @@ export default function ReportBuilder({ container, context }) {
     const hasMore = collectionInfo?.hasMore ?? (Array.isArray(collection) && collection.length >= state.pageSize);
     const requiredStaticFilters = useMemo(() => staticFilters.filter((filter) => filter?.required), [staticFilters]);
     const optionalStaticFilters = useMemo(() => staticFilters.filter((filter) => !filter?.required), [staticFilters]);
+    const preferReportSideRequiredFilters = !compactMode && !designWorkspaceMode && (useFilterRail || useFilterDrawer);
     const inlineToolbarRequiredFilters = useMemo(
-        () => requiredStaticFilters.filter((filter) => String(filter?.presentation || "").trim() === "inlineToolbar"),
-        [requiredStaticFilters],
+        () => (
+            preferReportSideRequiredFilters
+                ? []
+                : requiredStaticFilters.filter((filter) => String(filter?.presentation || "").trim() === "inlineToolbar")
+        ),
+        [preferReportSideRequiredFilters, requiredStaticFilters],
     );
     const panelRequiredStaticFilters = useMemo(
-        () => requiredStaticFilters.filter((filter) => String(filter?.presentation || "").trim() !== "inlineToolbar"),
-        [requiredStaticFilters],
+        () => (
+            preferReportSideRequiredFilters
+                ? requiredStaticFilters
+                : requiredStaticFilters.filter((filter) => String(filter?.presentation || "").trim() !== "inlineToolbar")
+        ),
+        [preferReportSideRequiredFilters, requiredStaticFilters],
     );
     const compactRequiredStaticFilters = useMemo(() => {
         const seen = new Set();
@@ -2490,15 +3894,94 @@ export default function ReportBuilder({ container, context }) {
             return true;
         });
     }, [inlineToolbarRequiredFilters, panelRequiredStaticFilters]);
-    const [filterPanels, setFilterPanels] = useState({ common: true, advanced: false });
+    const [filterPanels, setFilterPanels] = useState(() => ({ common: !useFilterRail, advanced: false }));
     const [activeOptionalFilterKeys, setActiveOptionalFilterKeys] = useState([]);
     const [activeDynamicGroupIds, setActiveDynamicGroupIds] = useState([]);
     const [activeDynamicFamilyIds, setActiveDynamicFamilyIds] = useState([]);
     const [dimensionsCollapsed, setDimensionsCollapsed] = useState(false);
+    const designRailVisibility = useMemo(() => ({
+        measures: false,
+        breakdowns: false,
+        authoredBlocks: false,
+        filters: false,
+    }), []);
+    const designRailPanelCount = [
+        designRailVisibility.measures,
+        designRailVisibility.breakdowns,
+        designRailVisibility.authoredBlocks,
+    ].filter(Boolean).length;
+    const designRailOpenPanelCount = useMemo(() => (
+        [
+            designRailVisibility.measures && !measuresCollapsed,
+            designRailVisibility.breakdowns && !dimensionsCollapsed,
+            designRailVisibility.authoredBlocks && !authoredBlocksCollapsed,
+        ].filter(Boolean).length
+    ), [
+        authoredBlocksCollapsed,
+        designRailVisibility.authoredBlocks,
+        designRailVisibility.breakdowns,
+        designRailVisibility.measures,
+        dimensionsCollapsed,
+        measuresCollapsed,
+    ]);
+    const designRailPanelsCollapsed = designRailOpenPanelCount === 0;
+    const designRailHasVisiblePanels = designRailPanelCount > 0;
+    const designRailHasCollapsiblePanels = designRailPanelCount > 0;
+    const setDesignRailPanelsExpanded = React.useCallback((expanded = true) => {
+        const collapsed = !expanded;
+        setMeasuresCollapsed(collapsed);
+        setDimensionsCollapsed(collapsed);
+        setAuthoredBlocksCollapsed(collapsed);
+        if (collapsed) {
+            setDrillAuthoringExpanded(false);
+        }
+    }, []);
+    const toggleDesignRailPanels = React.useCallback(() => {
+        setDesignRailPanelsExpanded(designRailPanelsCollapsed);
+    }, [designRailPanelsCollapsed, setDesignRailPanelsExpanded]);
+    const toggleSettingsPanel = React.useCallback(() => {
+        setSettingsOpen((current) => {
+            const next = !current;
+            if (next) {
+                setReportMetadataPanelOpen(false);
+                setSemanticPanelOpen(false);
+            }
+            return next;
+        });
+    }, []);
+    const toggleReportMetadataPanel = React.useCallback(() => {
+        setReportMetadataPanelOpen((current) => {
+            const next = !current;
+            if (next) {
+                setSettingsOpen(false);
+                setSemanticPanelOpen(false);
+            }
+            return next;
+        });
+    }, []);
+    const toggleSemanticPanel = React.useCallback(() => {
+        setSemanticPanelOpen((current) => {
+            const next = !current;
+            if (next) {
+                setSettingsOpen(false);
+                setReportMetadataPanelOpen(false);
+            }
+            return next;
+        });
+    }, []);
+    const toggleStarterChooser = React.useCallback(() => {
+        setStarterChooserOpen((current) => !current);
+    }, []);
+    useEffect(() => {
+        if (showSemanticWorkspaceControl) {
+            return;
+        }
+        setSemanticPanelOpen(false);
+    }, [showSemanticWorkspaceControl]);
     const activeStaticFilterCount = useMemo(() => (
         staticFilters.reduce((count, filter) => {
-            const key = String(filter.id || filter.field || "").trim();
-            return key && hasConfiguredFilterValue(filter, state?.staticFilters?.[key]) ? count + 1 : count;
+            const key = resolveScopeParamId(filter);
+            return key && hasConfiguredFilterValue(filter, getScopeParamValue(state, key)) ? count + 1 : count;
         }, 0)
     ), [staticFilters, state]);
     const activeDynamicFilterCount = useMemo(() => (
@@ -2535,16 +4018,112 @@ export default function ReportBuilder({ container, context }) {
         || optionalStaticFilters.length > 0
         || dynamicFilterGroups.length > 0
         || dynamicFilterFamilies.length > 0;
+    const showUnifiedRuntimeFilterSurface = false;
+    const showRuntimeFilterRail = false;
+    const showLeftRail = !compactMode && designWorkspaceMode && designRailHasVisiblePanels;
     const totalActiveFilterCount = activeStaticFilterCount + activeDynamicFilterCount;
+    const designWorkspaceFlowState = useMemo(() => {
+        const measureLabels = selectedMeasureDefs.map((measure) => measure?.label || measure?.id);
+        const breakdownLabels = selectedDimensionDefs.map((dimension) => dimension?.label || dimension?.id);
+        const dateRangeFilter = staticFilters.find((filter) => String(filter?.type || "").trim() === "dateRange") || null;
+        const dateRangeKey = resolveScopeParamId(dateRangeFilter);
+        const dateRangeSummary = dateRangeKey
+            ? formatCompactDateRangeSummary(getScopeParamValue(state, dateRangeKey) || {})
+            : "";
+        const sourceQueryRef = normalizeString(
+            builderContext?.identity?.dataSourceRef
+            || container?.dataSourceRef
+            || config?.dataSourceRef
+            || ""
+        );
+        const reportTitle = resolveReportDocumentMetadataTitle(state, container, config);
+        const reportSubtitle = normalizeString(state?.reportDocumentSubtitle);
+        const currentDrillPath = Array.isArray(currentBreakdownDrillHierarchy?.levels) && currentBreakdownDrillHierarchy.levels.length > 0
+            ? currentBreakdownDrillHierarchy.levels.map((level) => level.label).join(" -> ")
+            : "";
+        return {
+            source: {
+                eyebrow: "1. Data Source",
+                title: "Published source",
+                description: "When a designer can switch sources, this step should list the published data sources available to the workspace.",
+                rows: [
+                    { label: "Source", value: sourceQueryRef || "Workspace-bound published source" },
+                    { label: "Status", value: "Bound to this builder" },
+                ],
+                actions: [],
+            },
+            projection: {
+                eyebrow: "2. Data",
+                title: "Shared measures, dimensions, and fixed filters",
+                description: "Use this when several data blocks should reuse the same result definition.",
+                metaChips: [
+                    `${selectedMeasureDefs.length} ${selectedMeasureDefs.length === 1 ? "measure" : "measures"}`,
+                    `${selectedDimensionDefs.length} ${selectedDimensionDefs.length === 1 ? "breakdown" : "breakdowns"}`,
+                    `${totalActiveFilterCount} ${totalActiveFilterCount === 1 ? "filter" : "filters"}`,
+                ],
+                rows: [
+                    { label: "Source", value: sourceQueryRef || "Workspace-bound published source" },
+                    { label: "Measures", value: formatReportBuilderSummaryList(measureLabels) || "Choose at least one measure" },
+                    { label: "Breakdowns", value: formatReportBuilderSummaryList(breakdownLabels) || "Choose at least one breakdown" },
+                    { label: "Fixed filters", value: dateRangeSummary || (totalActiveFilterCount > 0 ? `${totalActiveFilterCount} active filters` : "Add the required scope") },
+                ],
+                actions: [
+                    { id: "measures", label: "Measures" },
+                    { id: "breakdowns", label: "Breakdowns" },
+                ],
+            },
+            presentation: {
+                eyebrow: "3. Presentation",
+                title: "Document and authored blocks",
+                description: "Set document details, then compose the report with narrative, chart, table, geo, and KPI blocks.",
+                rows: [
+                    { label: "Title", value: reportTitle || "Report" },
+                    { label: "Subtitle", value: reportSubtitle || "Optional" },
+                    { label: "Blocks", value: designWorkspaceOverviewState.authoredBlockSummaryText || "Start with the first authored block" },
+                ],
+                actions: [
+                    { id: "metadata", label: "Metadata" },
+                    { id: "blocks", label: "Blocks" },
+                ],
+            },
+            drill: {
+                eyebrow: "4. Drill Downs",
+                title: "Navigation path",
+                description: "Capture the current breakdown order and bind detail targets when the report needs deeper navigation.",
+                rows: [
+                    { label: "Current path", value: currentDrillPath || "Select two or more breakdowns to define a path" },
+                    { label: "Configured", value: designWorkspaceOverviewState.drillSummaryText || "No saved drill configuration yet" },
+                ],
+                actions: [
+                    { id: "drill", label: "Drill setup" },
+                    ...(currentBreakdownDrillHierarchy ? [{ id: "capture", label: "Capture path" }] : []),
+                ],
+            },
+        };
+    }, [
+        builderContext?.identity?.dataSourceRef,
+        canRunReport,
+        config,
+        container,
+        currentBreakdownDrillHierarchy,
+        designWorkspaceOverviewState.authoredBlockSummaryText,
+        designWorkspaceOverviewState.drillSummaryText,
+        readiness.message,
+        selectedDimensionDefs,
+        selectedMeasureDefs,
+        state,
+        staticFilters,
+        totalActiveFilterCount,
+    ]);
     const renderFilterCategoryControls = () => (
         <>
             {showFilterCategoryBar && !familyMode && (optionalStaticFilters.length > 0 || dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).length > 0) ? (
                 <div className="forge-report-builder__filter-category-scroll">
                     <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
                         {optionalStaticFilters.map((filter) => {
-                            const filterKey = String(filter.id || filter.field || "").trim();
+                            const filterKey = resolveScopeParamId(filter);
                             const active = activeOptionalFilterKeys.includes(filterKey);
-                            const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                            const configuredCount = countConfiguredFilterValue(filter, getScopeParamValue(state, filterKey));
                             const categoryLabel = filter.label || filter.id;
                             const chipViewModel = buildFilterCategoryChipViewModel({
                                 label: categoryLabel,
@@ -2613,9 +4192,9 @@ export default function ReportBuilder({ container, context }) {
                 <div className="forge-report-builder__filter-category-scroll">
                     <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
                         {optionalStaticFilters.map((filter) => {
-                            const filterKey = String(filter.id || filter.field || "").trim();
+                            const filterKey = resolveScopeParamId(filter);
                             const active = activeOptionalFilterKeys.includes(filterKey);
-                            const configuredCount = countConfiguredFilterValue(filter, state?.staticFilters?.[filterKey]);
+                            const configuredCount = countConfiguredFilterValue(filter, getScopeParamValue(state, filterKey));
                             const categoryLabel = filter.label || filter.id;
                             const chipViewModel = buildFilterCategoryChipViewModel({
                                 label: categoryLabel,
@@ -2743,88 +4322,55 @@ export default function ReportBuilder({ container, context }) {
         </>
     );
 
-    const renderFilterRailControls = () => (
-        <aside
-            className={[
-                "forge-report-builder__bottom",
-                "forge-report-builder__bottom--rail",
-                railFilterState.showRailCategories ? "" : "forge-report-builder__bottom--rail-launcher",
-            ].filter(Boolean).join(" ")}
-            aria-label="Filters"
-        >
+    const renderFiltersPanel = ({ inlineReportMode = false } = {}) => (
+        <aside className={[
+            "forge-report-builder__bottom",
+            inlineReportMode ? "forge-report-builder__bottom--inline-report" : "",
+            useFilterDrawer ? "forge-report-builder__bottom--drawer" : "",
+        ].filter(Boolean).join(" ")} aria-label={useFilterDrawer ? "Filters drawer" : "Filters"}>
             <section
                 className={[
                     "forge-report-builder__bottom-group",
                     "forge-report-builder__bottom-group--static",
-                    railFilterState.showRailCategories ? "" : "forge-report-builder__bottom-group--launcher",
+                    inlineReportMode ? "forge-report-builder__bottom-group--inline-report" : "",
                 ].filter(Boolean).join(" ")}
-                aria-labelledby="report-builder-filters-rail-heading"
-            >
-                <div className="forge-report-builder__bottom-header">
-                    <h3 id="report-builder-filters-rail-heading" className="forge-report-builder__bottom-label forge-report-builder__bottom-label--featured">Filters</h3>
-                    <div className="forge-report-builder__bottom-header-actions">
-                        <button
-                            type="button"
-                            className="forge-report-builder__bottom-toggle"
-                            aria-expanded={railFilterState.panelOpen}
-                            onClick={() => toggleFilterPanel("common")}
-                        >
-                            <span>{totalActiveFilterCount} active</span>
-                            <span>{railFilterState.panelOpen ? "Hide Filters" : "Open Filters"}</span>
-                        </button>
-                    </div>
-                </div>
-                {railFilterState.showRailCategories ? (
-                    <div className="forge-report-builder__bottom-body forge-report-builder__bottom-body--launcher">
-                        {renderFilterCategoryControls()}
-                    </div>
-                ) : null}
-            </section>
-        </aside>
-    );
-
-    const renderFiltersPanel = ({ forceBody = false, showCloseAction = false, overlay = false, onClose = null } = {}) => (
-        <aside className={[
-            "forge-report-builder__bottom",
-            useFilterDrawer ? "forge-report-builder__bottom--drawer" : "",
-            overlay ? "forge-report-builder__bottom--overlay" : "",
-        ].filter(Boolean).join(" ")} aria-label={overlay ? "Filters panel" : (useFilterDrawer ? "Filters drawer" : "Filters")}>
-            <section
-                className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static"
-                aria-labelledby={overlay ? "report-builder-filters-overlay-heading" : "report-builder-filters-panel-heading"}
+                aria-labelledby="report-builder-filters-panel-heading"
             >
                 <div className="forge-report-builder__bottom-header">
                     <div>
                         <h3
-                            id={overlay ? "report-builder-filters-overlay-heading" : "report-builder-filters-panel-heading"}
+                            id="report-builder-filters-panel-heading"
                             className="forge-report-builder__bottom-label forge-report-builder__bottom-label--featured"
                         >
                             Filters
                         </h3>
                         <div className="forge-report-builder__bottom-description">
-                            Refine scope and targeting without covering the result table.
+                            Refine scope and targeting for this report.
                         </div>
                     </div>
                     <div className="forge-report-builder__bottom-header-actions">
                         <button
                             type="button"
                             className="forge-report-builder__bottom-toggle"
-                            aria-expanded={useFilterRail ? railFilterState.panelOpen : filterPanels.common}
+                            aria-expanded={filterPanels.common}
                             onClick={() => toggleFilterPanel("common")}
                         >
                             <span>{totalActiveFilterCount} active</span>
-                            <span>{useFilterRail ? (railFilterState.panelOpen ? "Hide Filters" : "Show Filters") : (filterPanels.common ? "Hide Body" : "Show Body")}</span>
+                            <span>{filterPanels.common ? "Hide Body" : "Show Body"}</span>
                         </button>
-                        {useFilterDrawer || showCloseAction ? (
-                            <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => (typeof onClose === "function" ? onClose() : setFiltersDrawerOpen(false))}>
+                        {useFilterDrawer ? (
+                            <button type="button" className="forge-report-builder__bottom-toggle" onClick={() => setFiltersDrawerOpen(false)}>
                                 <span>Close</span>
                             </button>
                         ) : null}
                     </div>
                 </div>
-                <div className="forge-report-builder__bottom-body">
+                <div className={[
+                    "forge-report-builder__bottom-body",
+                    inlineReportMode ? "forge-report-builder__bottom-body--inline-report" : "",
+                ].filter(Boolean).join(" ")}>
                     {renderFilterCategoryControls()}
-                    {filterPanels.common && (!useFilterRail || forceBody) ? renderFilterBody() : null}
+                    {filterPanels.common ? renderFilterBody() : null}
                 </div>
             </section>
         </aside>
@@ -2833,10 +4379,10 @@ export default function ReportBuilder({ container, context }) {
     useEffect(() => {
         const nextOptional = optionalStaticFilters
             .filter((filter) => {
-                const key = String(filter.id || filter.field || "").trim();
-                return key && hasConfiguredFilterValue(filter, state?.staticFilters?.[key]);
+                const key = resolveScopeParamId(filter);
+                return key && hasConfiguredFilterValue(filter, getScopeParamValue(state, key));
             })
-            .map((filter) => String(filter.id || filter.field || "").trim())
+            .map((filter) => resolveScopeParamId(filter))
             .filter(Boolean);
         setActiveOptionalFilterKeys((current) => {
             const currentSorted = [...current].sort();
@@ -2844,6 +4390,13 @@ export default function ReportBuilder({ container, context }) {
             return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextOptional;
         });
     }, [optionalStaticFilters, state]);
+
+    useEffect(() => {
+        if (designWorkspaceMode || !useFilterRail || !hasFilterDrawerContent) {
+            return;
+        }
+        setFilterPanels((current) => current.common ? current : { ...current, common: true });
+    }, [designWorkspaceMode, hasFilterDrawerContent, useFilterRail]);
 
     useEffect(() => {
         if (!familyMode) {
@@ -2874,8 +4427,8 @@ export default function ReportBuilder({ container, context }) {
         });
     }, [dynamicFilterGroups, hiddenDynamicGroupIds, pinnedDynamicGroupIds, state]);
     const renderStaticFilterSection = (filter) => {
-        const filterKey = String(filter.id || filter.field || "").trim();
-        const currentValue = state?.staticFilters?.[filterKey];
+        const filterKey = resolveScopeParamId(filter);
+        const currentValue = getScopeParamValue(state, filterKey);
         const issue = semanticParameterIssuesById[filterKey] || null;
         const providerDiagnostics = semanticProviderParameterDiagnosticsById[filterKey] || [];
         return (
@@ -2894,7 +4447,53 @@ export default function ReportBuilder({ container, context }) {
 
     const renderSettingsControls = () => (
         <>
-            {displayConfig.groupBy?.options?.length ? (
+            {designWorkspaceMode ? (
+                <>
+                    <div className="forge-report-builder__workspace-banner-headline" style={{ marginBottom: 8 }}>
+                        <div>
+                            <div className="forge-report-builder__workspace-banner-eyebrow">Design tools</div>
+                            <div className="forge-report-builder__workspace-banner-description">
+                                Adjust the existing measures and breakdown panels used by data-bearing authored blocks.
+                            </div>
+                        </div>
+                        <Button
+                            small
+                            minimal
+                            icon="cross"
+                            aria-label="Close design tools"
+                            onClick={() => setSettingsOpen(false)}
+                        />
+                    </div>
+                    <div className="forge-report-builder__control-cluster">
+                        <div className="forge-report-builder__workspace-banner-actions">
+                            <Button
+                                small
+                                minimal
+                                onClick={() => {
+                                    setSettingsOpen(false);
+                                    focusDesignArea("measures");
+                                }}
+                            >
+                                Edit measures
+                            </Button>
+                            <Button
+                                small
+                                minimal
+                                onClick={() => {
+                                    setSettingsOpen(false);
+                                    focusDesignArea("breakdowns");
+                                }}
+                            >
+                                Edit breakdowns
+                            </Button>
+                        </div>
+                        <div className="forge-report-builder__control-cluster-help">
+                            Open the measure and breakdown shelves to adjust the data view used by tables, charts, KPIs, and geo blocks.
+                        </div>
+                    </div>
+                </>
+            ) : null}
+            {!designWorkspaceMode && displayConfig.groupBy?.options?.length ? (
                 <div className={[
                     "forge-report-builder__control-cluster",
                     semanticProviderGroupByDiagnostics.length > 0 ? "is-semantic-provider-invalid" : "",
@@ -2930,7 +4529,7 @@ export default function ReportBuilder({ container, context }) {
                     ) : null}
                 </div>
             ) : null}
-            {orderFields.length > 0 ? (
+            {!designWorkspaceMode && orderFields.length > 0 ? (
                 <div className="forge-report-builder__control-cluster">
                     <label>Order by</label>
                     <select
@@ -2954,20 +4553,22 @@ export default function ReportBuilder({ container, context }) {
                     </select>
                 </div>
             ) : null}
-            <div className="forge-report-builder__control-cluster">
-                <label>Page size</label>
-                <select
-                    className="forge-report-builder-select"
-                    value={state.pageSize}
-                    onChange={(event) => setPageSize(event.target.value)}
-                >
-                    {pageSizeOptions.map((value) => (
-                        <option key={value} value={value}>
-                            {value}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            {!designWorkspaceMode ? (
+                <div className="forge-report-builder__control-cluster">
+                    <label>Page size</label>
+                    <select
+                        className="forge-report-builder-select"
+                        value={state.pageSize}
+                        onChange={(event) => setPageSize(event.target.value)}
+                    >
+                        {pageSizeOptions.map((value) => (
+                            <option key={value} value={value}>
+                                {value}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            ) : null}
         </>
     );
 
@@ -3080,7 +4681,7 @@ export default function ReportBuilder({ container, context }) {
     );
 
     const renderMeasuresPanel = () => (
-        <section className="forge-report-builder__panel" aria-labelledby="report-builder-measures-heading">
+        <section ref={measuresPanelRef} className="forge-report-builder__panel" aria-labelledby="report-builder-measures-heading">
             <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
                 <h3 id="report-builder-measures-heading" className="forge-report-builder__panel-title forge-report-builder__panel-title--featured">Measures</h3>
                 <div className="forge-report-builder__panel-header-actions">
@@ -3158,7 +4759,7 @@ export default function ReportBuilder({ container, context }) {
     const renderBreakdownPanel = ({ collapsible = true } = {}) => {
         const headingId = collapsible ? "report-builder-breakdowns-heading" : "report-builder-breakdowns-compact-heading";
         return (
-            <section className="forge-report-builder__panel" aria-labelledby={headingId}>
+            <section ref={breakdownPanelRef} className="forge-report-builder__panel" aria-labelledby={headingId}>
                 <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
                     <h3 id={headingId} className="forge-report-builder__panel-title forge-report-builder__panel-title--featured">Breakdowns</h3>
                     {collapsible ? (
@@ -3176,6 +4777,8 @@ export default function ReportBuilder({ container, context }) {
                     <div className="forge-report-builder__dimension-picker">
                         <select
                             className="forge-report-builder-select forge-report-builder-select--add"
+                            data-testid="report-builder-breakdown-selector"
+                            aria-label="Add breakdown"
                             value=""
                             onChange={(event) => {
                                 addDimension(event.target.value);
@@ -3237,9 +4840,18 @@ export default function ReportBuilder({ container, context }) {
                             || authoredDrillSummary.hierarchyCount > 0
                             || authoredDrillSummary.detailTargetCount > 0
                             || authoredDrillSummary.fieldActionCount > 0) ? (
-                            <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info" style={{ marginTop: 10 }}>
+                            <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info forge-report-builder__chart-inline-notice--drill" style={{ marginTop: 10 }}>
                                 <div className="forge-report-builder__chart-inline-notice-header">
-                                    <strong>Drill navigation</strong>
+                                    <div style={{ display: "grid", gap: 4, minWidth: 0 }}>
+                                        <strong>Drill paths</strong>
+                                        {!drillAuthoringExpanded ? (
+                                            <div className="forge-report-builder__chart-inline-notice-description">
+                                                {currentBreakdownDrillHierarchy
+                                                    ? `Path: ${currentBreakdownDrillHierarchy.levels.map((level) => level.label).join(" -> ")}`
+                                                    : "Open setup to capture the current breakdown path."}
+                                            </div>
+                                        ) : null}
+                                    </div>
                                     <div className="forge-report-builder__result-meta forge-report-builder__chart-inline-notice-meta">
                                         <span className="forge-report-builder__result-meta-chip">
                                             {authoredDrillSummary.hierarchyCount} {authoredDrillSummary.hierarchyCount === 1 ? "hierarchy" : "hierarchies"}
@@ -3249,36 +4861,47 @@ export default function ReportBuilder({ container, context }) {
                                                 {authoredDrillSummary.detailTargetCount} {authoredDrillSummary.detailTargetCount === 1 ? "detail target" : "detail targets"}
                                             </span>
                                         ) : null}
+                                        <Button
+                                            small
+                                            minimal
+                                            onClick={() => setDrillAuthoringExpanded((current) => !current)}
+                                        >
+                                            {drillAuthoringExpanded ? "Hide setup" : "Open setup"}
+                                        </Button>
                                     </div>
                                 </div>
-                                <div className="forge-report-builder__chart-inline-notice-description">
-                                    Capture the current breakdown order for drill paths, then bind breakdown fields to detail targets for runtime navigation in preview and saved report artifacts.
-                                </div>
-                                {currentBreakdownDrillHierarchy ? (
-                                    <div className="forge-report-builder__chart-inline-notice-current-path">
-                                        <strong>Current path:</strong> {currentBreakdownDrillHierarchy.levels.map((level) => level.label).join(" -> ")}
-                                    </div>
-                                ) : (
-                                    <div className="forge-report-builder__chart-inline-notice-description">
-                                        Select at least two breakdowns to capture a drill path.
-                                    </div>
-                                )}
-                                <div className="forge-report-builder__chart-inline-notice-actions">
-                                    <Button
-                                        small
-                                        minimal
-                                        onClick={captureCurrentDrillHierarchy}
-                                        disabled={!currentBreakdownDrillHierarchy}
-                                    >
-                                        {currentBreakdownDrillHierarchyCaptured ? "Update current path" : "Capture current path"}
-                                    </Button>
-                                </div>
-                                {authoredDetailFieldOptions.length > 0 ? (
-                                    <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-                                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                {drillAuthoringExpanded ? (
+                                    <>
+                                        <div className="forge-report-builder__chart-inline-notice-description">
+                                            Capture the current breakdown order, then connect breakdown fields to detail targets.
+                                        </div>
+                                        {currentBreakdownDrillHierarchy ? (
+                                            <div className="forge-report-builder__chart-inline-notice-current-path">
+                                                <strong>Current path:</strong> {currentBreakdownDrillHierarchy.levels.map((level) => level.label).join(" -> ")}
+                                            </div>
+                                        ) : (
+                                            <div className="forge-report-builder__chart-inline-notice-description">
+                                                Select at least two breakdowns to capture a drill path.
+                                            </div>
+                                        )}
+                                        <div className="forge-report-builder__chart-inline-notice-actions forge-report-builder__drill-action-row">
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={captureCurrentDrillHierarchy}
+                                                disabled={!currentBreakdownDrillHierarchy}
+                                            >
+                                                {currentBreakdownDrillHierarchyCaptured ? "Update current path" : "Capture current path"}
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : null}
+                                {drillAuthoringExpanded && authoredDetailFieldOptions.length > 0 ? (
+                                    <div className="forge-report-builder__drill-detail-stack">
+                                        <div className="forge-report-builder__drill-detail-heading">
                                             Detail actions
                                         </div>
-                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+                                        <div className="forge-report-builder__drill-detail-grid">
                                             <label className="forge-report-builder__chart-field">
                                                 <span>Breakdown field</span>
                                                 <select
@@ -3302,63 +4925,94 @@ export default function ReportBuilder({ container, context }) {
                                                     <option value="modal">Modal</option>
                                                 </select>
                                             </label>
-                                                    <label className="forge-report-builder__chart-field">
-                                                        <span>Route preset</span>
-                                                        <select
-                                                            className="forge-report-builder-select"
-                                                            value={authoredDetailSelectedRoutePreset || "__custom__"}
-                                                            onChange={(event) => {
-                                                                const nextValue = event.target.value;
-                                                                if (nextValue === "__custom__") {
-                                                                    return;
-                                                                }
-                                                                setAuthoredDetailTargetRefDraft(nextValue);
-                                                                const presetTarget = resolveReportBuilderDetailTargetRoutePreset(
-                                                                    authoredDetailPresetTargets,
-                                                                    nextValue,
-                                                                );
-                                                                const nextDraft = buildReportBuilderDetailTargetDraftFromTarget(presetTarget, {
-                                                                    fallbackIdPrefix: `detailParam_${String(authoredDetailFieldRef || "detail").trim() || "detail"}`,
-                                                                });
-                                                                if (!nextDraft) {
-                                                                    return;
-                                                                }
-                                                                setAuthoredDetailNavigationModeDraft(nextDraft.navigationMode);
-                                                                setAuthoredDetailTitleDraft(nextDraft.title);
-                                                                setAuthoredDetailDescriptionDraft(nextDraft.description);
-                                                                setAuthoredDetailParameterRowsDraft(nextDraft.parameterRows);
-                                                            }}
-                                                        >
-                                                    <option value="__custom__">Custom target reference</option>
+                                            <label className="forge-report-builder__chart-field">
+                                                <span>Published target</span>
+                                                <select
+                                                    className="forge-report-builder-select"
+                                                    value={showAuthoredDetailTargetManualEditor ? "__manual__" : (authoredDetailSelectedRoutePreset || "__manual__")}
+                                                    onChange={(event) => {
+                                                        const nextValue = event.target.value;
+                                                        if (nextValue === "__manual__") {
+                                                            setAuthoredDetailTargetManualMode(true);
+                                                            return;
+                                                        }
+                                                        setAuthoredDetailTargetManualMode(false);
+                                                        setAuthoredDetailTargetRefDraft(nextValue);
+                                                        const presetTarget = resolveReportBuilderDetailTargetRoutePreset(
+                                                            authoredDetailPresetTargets,
+                                                            nextValue,
+                                                        );
+                                                        const nextDraft = buildReportBuilderDetailTargetDraftFromTarget(presetTarget, {
+                                                            fallbackIdPrefix: `detailParam_${String(authoredDetailFieldRef || "detail").trim() || "detail"}`,
+                                                        });
+                                                        if (!nextDraft) {
+                                                            return;
+                                                        }
+                                                        setAuthoredDetailNavigationModeDraft(nextDraft.navigationMode);
+                                                        setAuthoredDetailTitleDraft(nextDraft.title);
+                                                        setAuthoredDetailDescriptionDraft(nextDraft.description);
+                                                        setAuthoredDetailParameterRowsDraft(nextDraft.parameterRows);
+                                                    }}
+                                                >
+                                                    <option value="__manual__">
+                                                        {authoredDetailRouteSuggestions.length > 0 ? "Select published target..." : "No published targets"}
+                                                    </option>
                                                     {authoredDetailRouteSuggestions.map((option) => (
                                                         <option key={option.targetRef} value={option.targetRef}>{option.label}</option>
                                                     ))}
                                                 </select>
-                                            </label>
-                                            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
-                                                <span>Target reference</span>
-                                                <input
-                                                    type="text"
-                                                    className="forge-report-builder-select"
-                                                    value={authoredDetailTargetRefDraft}
-                                                    onChange={(event) => setAuthoredDetailTargetRefDraft(event.target.value)}
-                                                    placeholder="target://example/channel-detail"
-                                                />
-                                                {authoredDetailSelectedRoutePreset ? (
-                                                    <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
-                                                        {authoredDetailRouteSuggestions.find((entry) => entry.targetRef === authoredDetailSelectedRoutePreset)?.description || ""}
+                                                {authoredDetailRouteSuggestions.length > 0 ? (
+                                                    <div className="forge-report-builder__drill-inline-note">
+                                                        Published targets are supplied by the framework. Use an advanced target reference only when a required target has not been registered yet.
                                                     </div>
                                                 ) : (
-                                                    <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
-                                                        Suggested presets reuse authored namespaces and provider-backed detail targets when available.
+                                                    <div className="forge-report-builder__drill-inline-note">
+                                                        No published targets are available for this breakdown field yet.
                                                     </div>
                                                 )}
-                                                {authoredDetailProviderPresetError ? (
-                                                    <div style={{ marginTop: 4, fontSize: 11, lineHeight: 1.45, color: "#ad4e00" }}>
-                                                        {authoredDetailProviderPresetError}
-                                                    </div>
-                                                ) : null}
                                             </label>
+                                            {showAuthoredDetailTargetManualEditor ? (
+                                                <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                                    <span>Advanced target reference</span>
+                                                    <input
+                                                        type="text"
+                                                        className="forge-report-builder-select"
+                                                        value={authoredDetailTargetRefDraft}
+                                                        onChange={(event) => {
+                                                            setAuthoredDetailTargetManualMode(true);
+                                                            setAuthoredDetailTargetRefDraft(event.target.value);
+                                                        }}
+                                                        placeholder="target://example/channel-detail"
+                                                    />
+                                                    <div className="forge-report-builder__drill-inline-note">
+                                                        Use this only when engineering has not yet published a selectable target.
+                                                    </div>
+                                                    {authoredDetailProviderPresetError ? (
+                                                        <div className="forge-report-builder__drill-inline-note forge-report-builder__drill-inline-note--warning">
+                                                            {authoredDetailProviderPresetError}
+                                                        </div>
+                                                    ) : null}
+                                                </label>
+                                            ) : authoredDetailSelectedRoutePreset ? (
+                                                <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                                    <span>Selected target</span>
+                                                    <div className="forge-report-builder-select" style={{ display: "flex", alignItems: "center" }}>
+                                                        {authoredDetailSelectedRoutePreset}
+                                                    </div>
+                                                    <div className="forge-report-builder__drill-inline-note">
+                                                        {authoredDetailRouteSuggestions.find((entry) => entry.targetRef === authoredDetailSelectedRoutePreset)?.description || ""}
+                                                    </div>
+                                                    <div className="forge-report-builder__workspace-banner-actions" style={{ paddingTop: 0 }}>
+                                                        <Button
+                                                            small
+                                                            minimal
+                                                            onClick={() => setAuthoredDetailTargetManualMode(true)}
+                                                        >
+                                                            Use advanced target reference
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ) : null}
                                             <label className="forge-report-builder__chart-field">
                                                 <span>Detail title</span>
                                                 <input
@@ -3380,9 +5034,9 @@ export default function ReportBuilder({ container, context }) {
                                                 />
                                             </label>
                                         </div>
-                                        <div style={{ display: "grid", gap: 8 }}>
-                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                        <div className="forge-report-builder__drill-parameter-stack">
+                                            <div className="forge-report-builder__drill-parameter-header">
+                                                <div className="forge-report-builder__drill-detail-heading">
                                                     Detail parameters
                                                 </div>
                                                 <Button small minimal onClick={addAuthoredDetailParameterRow}>
@@ -3392,12 +5046,7 @@ export default function ReportBuilder({ container, context }) {
                                             {normalizeReportBuilderDetailParameterDraftRows(authoredDetailParameterRowsDraft).map((row, index, rows) => (
                                                 <div
                                                     key={row.id}
-                                                    style={{
-                                                        display: "grid",
-                                                        gridTemplateColumns: "minmax(120px, 1fr) minmax(140px, 1fr) minmax(160px, 1fr) auto",
-                                                        gap: 8,
-                                                        alignItems: "end",
-                                                    }}
+                                                    className="forge-report-builder__drill-parameter-row"
                                                 >
                                                     <label className="forge-report-builder__chart-field">
                                                         <span>Parameter</span>
@@ -3470,7 +5119,7 @@ export default function ReportBuilder({ container, context }) {
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className="forge-report-builder__result-header-actions">
+                                        <div className="forge-report-builder__drill-action-row">
                                             <Button
                                                 small
                                                 minimal
@@ -3481,9 +5130,9 @@ export default function ReportBuilder({ container, context }) {
                                             </Button>
                                         </div>
                                         {detailTargetDraftValidation.errors.length > 0 ? (
-                                            <div style={{ display: "grid", gap: 4 }}>
+                                            <div className="forge-report-builder__drill-validation-list">
                                                 {detailTargetDraftValidation.errors.map((error, index) => (
-                                                    <div key={`${error.field}:${error.code}:${index}`} style={{ fontSize: 11, lineHeight: 1.45, color: "#b42318" }}>
+                                                    <div key={`${error.field}:${error.code}:${index}`} className="forge-report-builder__drill-validation-item">
                                                         {error.message}
                                                     </div>
                                                 ))}
@@ -3491,83 +5140,69 @@ export default function ReportBuilder({ container, context }) {
                                         ) : null}
                                     </div>
                                 ) : null}
-                                {authoredDrillSummary.hierarchies.length > 0 ? (
-                                    <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                                {drillAuthoringExpanded && authoredDrillSummary.hierarchies.length > 0 ? (
+                                    <div className="forge-report-builder__drill-card-list">
                                         {authoredDrillSummary.hierarchies.map((hierarchy) => (
                                             <div
                                                 key={hierarchy.id}
-                                                style={{
-                                                    border: "1px solid #d7e2ee",
-                                                    borderRadius: 10,
-                                                    background: "#fbfdff",
-                                                    padding: "10px 12px",
-                                                    display: "flex",
-                                                    alignItems: "flex-start",
-                                                    justifyContent: "space-between",
-                                                    gap: 12,
-                                                }}
+                                                className="forge-report-builder__drill-card"
                                             >
-                                                <div style={{ display: "grid", gap: 4 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{hierarchy.label}</div>
-                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>{hierarchy.summary}</div>
+                                                <div className="forge-report-builder__drill-card-copy">
+                                                    <div className="forge-report-builder__drill-card-title">{hierarchy.label}</div>
+                                                    <div className="forge-report-builder__drill-card-description">{hierarchy.summary}</div>
                                                 </div>
-                                                <Button
-                                                    small
-                                                    minimal
-                                                    intent="danger"
-                                                    onClick={() => removeDrillHierarchy(hierarchy.id)}
-                                                >
-                                                    Remove
-                                                </Button>
+                                                <div className="forge-report-builder__drill-card-actions">
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        intent="danger"
+                                                        onClick={() => removeDrillHierarchy(hierarchy.id)}
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 ) : null}
-                                {authoredDetailActionBindings.length > 0 ? (
-                                    <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                                {drillAuthoringExpanded && authoredDetailActionBindings.length > 0 ? (
+                                    <div className="forge-report-builder__drill-card-list">
                                         {authoredDetailActionBindings.map((binding) => (
                                             <div
                                                 key={binding.actionId}
-                                                style={{
-                                                    border: "1px solid #d7e2ee",
-                                                    borderRadius: 10,
-                                                    background: "#fbfdff",
-                                                    padding: "10px 12px",
-                                                    display: "flex",
-                                                    alignItems: "flex-start",
-                                                    justifyContent: "space-between",
-                                                    gap: 12,
-                                                }}
+                                                className="forge-report-builder__drill-card"
                                             >
-                                                <div style={{ display: "grid", gap: 4 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{binding.actionLabel}</div>
-                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#486579" }}>
+                                                <div className="forge-report-builder__drill-card-copy">
+                                                    <div className="forge-report-builder__drill-card-title">{binding.actionLabel}</div>
+                                                    <div className="forge-report-builder__drill-card-description">
                                                         {binding.fieldLabel} {"->"} {binding.target?.title || binding.targetRef}
                                                     </div>
-                                                    <div style={{ fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
+                                                    <div className="forge-report-builder__drill-card-meta">
                                                         {binding.target?.navigationMode || "hostRoute"} • {binding.targetRef}
                                                     </div>
                                                     {binding.parameterSummary ? (
-                                                        <div style={{ fontSize: 11, lineHeight: 1.45, color: "#738694" }}>
+                                                        <div className="forge-report-builder__drill-card-meta">
                                                             {binding.parameterSummary}
                                                         </div>
                                                     ) : null}
                                                 </div>
-                                                <Button
-                                                    small
-                                                    minimal
-                                                    onClick={() => editDetailTarget(binding)}
-                                                >
-                                                    Edit
-                                                </Button>
-                                                <Button
-                                                    small
-                                                    minimal
-                                                    intent="danger"
-                                                    onClick={() => removeDetailTarget(binding.targetRef)}
-                                                >
-                                                    Remove
-                                                </Button>
+                                                <div className="forge-report-builder__drill-card-actions">
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        onClick={() => editDetailTarget(binding)}
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        small
+                                                        minimal
+                                                        intent="danger"
+                                                        onClick={() => removeDetailTarget(binding.targetRef)}
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -3580,98 +5215,277 @@ export default function ReportBuilder({ container, context }) {
         );
     };
 
-    const renderReportDocumentPanel = () => (
-        <section className="forge-report-builder__panel" aria-labelledby="report-builder-document-heading">
-            <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
-                <h3 id="report-builder-document-heading" className="forge-report-builder__panel-title forge-report-builder__panel-title--featured">Report Document</h3>
-                <div className="forge-report-builder__panel-header-actions">
-                    <div className="forge-report-builder__panel-badge">
-                        Metadata
-                    </div>
-                    <button
-                        type="button"
-                        className="forge-report-builder__panel-toggle"
-                        onClick={() => setReportDocumentCollapsed((current) => !current)}
-                        aria-expanded={!reportDocumentCollapsed}
-                    >
-                        {reportDocumentCollapsed ? "Show" : "Hide"}
-                    </button>
-                </div>
-            </div>
-            {!reportDocumentCollapsed ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    <label className="forge-report-builder__chart-field">
-                        <span>Title</span>
-                        <input
-                            aria-label="Report document title"
-                            type="text"
-                            className="forge-report-builder-select"
-                            value={resolveReportDocumentMetadataTitle(state, container, config)}
-                            onChange={(event) => updateReportDocumentMetadata("reportDocumentTitle", event.target.value)}
-                            placeholder={container?.title || config?.title || "Report"}
-                        />
-                    </label>
-                    <label className="forge-report-builder__chart-field">
-                        <span>Subtitle</span>
-                        <input
-                            aria-label="Report document subtitle"
-                            type="text"
-                            className="forge-report-builder-select"
-                            value={String(state?.reportDocumentSubtitle || "")}
-                            onChange={(event) => updateReportDocumentMetadata("reportDocumentSubtitle", event.target.value)}
-                            placeholder="Optional subtitle"
-                        />
-                    </label>
-                    <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
-                        <span>Description</span>
-                        <textarea
-                            aria-label="Report document description"
-                            className="forge-report-builder__calculated-field-textarea"
-                            value={String(state?.reportDocumentDescription || "")}
-                            onChange={(event) => updateReportDocumentMetadata("reportDocumentDescription", event.target.value)}
-                            placeholder="Optional document description"
-                            rows={3}
-                        />
-                    </label>
-                    {state.reportDocumentTemplateLabel ? (
-                        <div style={{ fontSize: 11, lineHeight: 1.5, color: "#486579" }}>
-                            Seeded from template: {state.reportDocumentTemplateLabel}
-                        </div>
-                    ) : null}
+    const renderReportDocumentMetadataFields = () => (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <label className="forge-report-builder__chart-field">
+                <span>Title</span>
+                <input
+                    aria-label="Report document title"
+                    type="text"
+                    className="forge-report-builder-select"
+                    value={resolveReportDocumentMetadataTitle(state, container, config)}
+                    onChange={(event) => updateReportDocumentMetadata("reportDocumentTitle", event.target.value)}
+                    placeholder={container?.title || config?.title || "Report"}
+                />
+            </label>
+            <label className="forge-report-builder__chart-field">
+                <span>Subtitle</span>
+                <input
+                    aria-label="Report document subtitle"
+                    type="text"
+                    className="forge-report-builder-select"
+                    value={String(state?.reportDocumentSubtitle || "")}
+                    onChange={(event) => updateReportDocumentMetadata("reportDocumentSubtitle", event.target.value)}
+                    placeholder="Optional subtitle"
+                />
+            </label>
+            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                <span>Description</span>
+                <textarea
+                    aria-label="Report document description"
+                    className="forge-report-builder__calculated-field-textarea"
+                    value={String(state?.reportDocumentDescription || "")}
+                    onChange={(event) => updateReportDocumentMetadata("reportDocumentDescription", event.target.value)}
+                    placeholder="Optional document description"
+                    rows={3}
+                />
+            </label>
+            {state.reportDocumentTemplateLabel ? (
+                <div style={{ fontSize: 11, lineHeight: 1.5, color: "#486579" }}>
+                    Seeded from template: {state.reportDocumentTemplateLabel}
                 </div>
             ) : null}
-        </section>
+        </div>
     );
 
-    function openAuthoredAction(actionId = "") {
+    const renderReportDocumentMetadataPanel = () => {
+        if (!designWorkspaceMode || !reportMetadataPanelOpen) {
+            return null;
+        }
+        return (
+            <div
+                className="forge-report-builder__settings-popover forge-report-builder__settings-popover--metadata"
+                aria-labelledby="report-builder-document-heading"
+            >
+                <div className="forge-report-builder__design-stage-header">
+                    <div>
+                        <div className="forge-report-builder__design-stage-eyebrow">Report metadata</div>
+                        <div id="report-builder-document-heading" className="forge-report-builder__design-stage-title">Document details</div>
+                        <div className="forge-report-builder__design-stage-description">
+                            Set the saved title, subtitle, and description once, then keep shaping the report document.
+                        </div>
+                    </div>
+                    <Button
+                        small
+                        minimal
+                        icon="cross"
+                        aria-label="Close metadata"
+                        onClick={() => setReportMetadataPanelOpen(false)}
+                    >
+                    </Button>
+                </div>
+                {renderReportDocumentMetadataFields()}
+            </div>
+        );
+    };
+    const semanticPanelPrimaryAction = (() => {
+        if (!semanticWorkspacePanelState || String(readiness?.reason || "").trim() !== "semantic") {
+            return null;
+        }
+        const actionId = String(readiness?.action || "").trim();
+        const onAction = resolveReadinessActionHandler(actionId);
+        if (!onAction) {
+            return null;
+        }
+        if (actionId === "retrySemanticModelLoad") {
+            return {
+                label: "Retry model load",
+                onAction,
+            };
+        }
+        if (actionId === "retrySemanticValidation") {
+            return {
+                label: "Retry validation",
+                onAction,
+            };
+        }
+        return null;
+    })();
+    const renderSemanticWorkspacePanel = () => {
+        if (compactMode || !designWorkspaceMode || !semanticPanelOpen || !semanticWorkspacePanelState) {
+            return null;
+        }
+        return (
+            <div className="forge-report-builder__settings-popover forge-report-builder__settings-popover--semantic" aria-labelledby="report-builder-semantic-heading">
+                <div className="forge-report-builder__workspace-banner-headline">
+                    <div>
+                        <div className="forge-report-builder__workspace-banner-eyebrow">{semanticWorkspacePanelState.eyebrow}</div>
+                        <div id="report-builder-semantic-heading" className="forge-report-builder__workspace-banner-title">{semanticWorkspacePanelState.title}</div>
+                        <div className="forge-report-builder__workspace-banner-description">{semanticWorkspacePanelState.description}</div>
+                    </div>
+                    <Button
+                        small
+                        minimal
+                        onClick={() => setSemanticPanelOpen(false)}
+                    >
+                        Hide model
+                    </Button>
+                </div>
+                {semanticWorkspacePanelState.metaChips.length > 0 ? (
+                    <div className="forge-report-builder__result-meta" aria-label="Semantic model summary">
+                        {semanticWorkspacePanelState.metaChips.map((chip) => (
+                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                        ))}
+                    </div>
+                ) : null}
+                {semanticPanelPrimaryAction ? (
+                    <div className="forge-report-builder__workspace-banner-actions">
+                        <Button
+                            small
+                            minimal
+                            onClick={semanticPanelPrimaryAction.onAction}
+                        >
+                            {semanticPanelPrimaryAction.label}
+                        </Button>
+                    </div>
+                ) : null}
+                {semanticWorkspaceActivationState ? (
+                    <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            <div className="forge-report-builder__workspace-banner-eyebrow">{semanticWorkspaceActivationState.title}</div>
+                            <div className="forge-report-builder__workspace-banner-description">{semanticWorkspaceActivationState.description}</div>
+                        </div>
+                        <div className="forge-report-builder__workspace-banner-actions">
+                            <Button
+                                small
+                                outlined
+                                icon="upload"
+                                onClick={openImportReportFilePicker}
+                            >
+                                {savedArtifactViewState.loadFileLabel}
+                            </Button>
+                        </div>
+                        {semanticWorkspaceActivationState.entries.length > 0 ? (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                                {semanticWorkspaceActivationState.entries.map((entry) => {
+                                    const actions = [];
+                                    if (entry.kind === "reopenable") {
+                                        actions.push({
+                                            id: `${entry.id}:activate`,
+                                            label: entry.activateLabel || "Use",
+                                            onClick: () => activateImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                        });
+                                        actions.push({
+                                            id: `${entry.id}:remove`,
+                                            label: entry.removeLabel || "Remove",
+                                            onClick: () => removeImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                        });
+                                    } else if (entry.kind === "savedRecord") {
+                                        actions.push({
+                                            id: `${entry.id}:activate`,
+                                            label: entry.activateLabel || "Use",
+                                            onClick: () => activateImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                        });
+                                        actions.push({
+                                            id: `${entry.id}:remove`,
+                                            label: entry.removeLabel || "Remove",
+                                            onClick: () => removeImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                        });
+                                    }
+                                    return (
+                                        <ReportBuilderPreparedArtifactCard
+                                            key={entry.id}
+                                            artifact={entry}
+                                            actions={actions}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
+                {renderSemanticBindingChips(semanticWorkspacePanelState, { marginTop: 8 })}
+                {renderSemanticBindingFieldGroups(semanticWorkspacePanelState, { marginTop: 10 })}
+                {semanticWorkspacePanelState.governanceItems.length > 0 ? (
+                    <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                            {semanticWorkspacePanelState.governanceTitle}
+                        </div>
+                        <div className="forge-report-builder__semantic-diagnostics-list">
+                            {semanticWorkspacePanelState.governanceItems.map((item, index) => (
+                                <article
+                                    key={`${item}_${index}`}
+                                    className="forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--warning"
+                                >
+                                    <div className="forge-report-builder__semantic-diagnostic-message">{item}</div>
+                                </article>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+                {semanticWorkspacePanelState.diagnostics.length > 0 ? (
+                    <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${semanticWorkspacePanelState.tone}`} style={{ marginTop: 12 }}>
+                        <div className="forge-report-builder__semantic-diagnostics-header">
+                            {semanticWorkspacePanelState.diagnosticsTitle ? (
+                                <div className="forge-report-builder__semantic-diagnostics-title">{semanticWorkspacePanelState.diagnosticsTitle}</div>
+                            ) : null}
+                            {semanticWorkspacePanelState.diagnosticsDescription ? (
+                                <div className="forge-report-builder__semantic-diagnostics-description">{semanticWorkspacePanelState.diagnosticsDescription}</div>
+                            ) : null}
+                        </div>
+                        <div className="forge-report-builder__semantic-diagnostics-list">
+                            {semanticWorkspacePanelState.diagnostics.map((diagnostic) => (
+                                <article
+                                    key={diagnostic.id}
+                                    className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
+                                >
+                                    <div className="forge-report-builder__semantic-diagnostic-meta">
+                                        {diagnostic.code ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.code}</span> : null}
+                                        {diagnostic.path ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.path}</span> : null}
+                                    </div>
+                                    <div className="forge-report-builder__semantic-diagnostic-message">{diagnostic.message}</div>
+                                    {diagnostic.suggestedFix ? (
+                                        <div className="forge-report-builder__semantic-diagnostic-fix">{diagnostic.suggestedFix}</div>
+                                    ) : null}
+                                </article>
+                            ))}
+                        </div>
+                    </section>
+                ) : null}
+            </div>
+        );
+    };
+
+    function openAuthoredAction(actionId = "", options = {}) {
         const normalizedActionId = String(actionId || "").trim();
         if (!normalizedActionId) {
             return;
         }
         if (normalizedActionId === "chartBlock") {
-            openAuthoredChartBlockDialog();
+            openAuthoredChartBlockDialog(null, options);
             return;
         }
-        openDocumentBlockDialog(normalizedActionId);
+        openDocumentBlockDialog(normalizedActionId, options);
     }
 
-    const renderAuthoredBlockActionButtons = ({ className = "", actionIds = null } = {}) => authoredCapabilities.actions
+    const renderAuthoredBlockActionButtons = ({ className = "", actionIds = null, onAction = null, iconOnly = false } = {}) => authoredCapabilities.actions
         .filter((action) => !Array.isArray(actionIds) || actionIds.length === 0 || actionIds.includes(action.id))
         .map((action) => (
         <Button
             key={action.id}
             small
-            outlined
+            outlined={!iconOnly}
+            minimal={iconOnly}
             icon={action.icon || "add"}
             className={className || undefined}
             disabled={action.disabled}
-            title={action.disabled ? action.disabledReason : undefined}
+            title={action.disabled ? action.disabledReason : action.label}
             aria-label={action.disabled ? `${action.label}. ${action.disabledReason}` : action.label}
-            onClick={() => openAuthoredAction(action.id)}
+            onClick={() => (typeof onAction === "function" ? onAction(action.id, action) : openAuthoredAction(action.id))}
         >
-            {action.label}
+            {iconOnly ? null : action.label}
         </Button>
-        ));
+    ));
     const renderAuthoredActionGroupPopover = (group = null) => {
         if (!group || typeof group !== "object") {
             return null;
@@ -3723,8 +5537,12 @@ export default function ReportBuilder({ container, context }) {
             </Popover>
         );
     };
-    const renderAuthoredBlocksPanel = () => (
-        <section className="forge-report-builder__panel" aria-labelledby="report-builder-authored-blocks-heading">
+    const renderAuthoredBlocksPanel = ({
+        showCreationPalette = true,
+        showComposerToolbar = true,
+        emptyMessage = "",
+    } = {}) => (
+        <section ref={authoredBlocksPanelRef} className="forge-report-builder__panel" aria-labelledby="report-builder-authored-blocks-heading">
             <div className="forge-report-builder__panel-headerline forge-report-builder__panel-headerline--compact">
                 <h3 id="report-builder-authored-blocks-heading" className="forge-report-builder__panel-title forge-report-builder__panel-title--featured">Authored Blocks</h3>
                 <div className="forge-report-builder__panel-header-actions">
@@ -3775,77 +5593,98 @@ export default function ReportBuilder({ container, context }) {
             </div>
             <div className="forge-report-builder__document-block-list" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {authoredBlocksCollapsed ? null : authoredDocumentBlocks.length === 0 ? (
-                    <div className="forge-report-builder__authored-empty-state">
-                        <div className="forge-report-builder__authored-empty-state-groups">
-                            {authoredCapabilities.actionGroups.map((group) => {
-                                const headingId = `report-builder-authored-group-${group.id}`;
-                                return (
-                                <section key={group.id} className="forge-report-builder__authored-action-group" aria-labelledby={headingId}>
-                                    <div className="forge-report-builder__authored-action-group-header">
-                                        <div className="forge-report-builder__authored-action-group-heading">
-                                            <div className="forge-report-builder__authored-action-group-title-row">
-                                                <h4 id={headingId} className="forge-report-builder__authored-action-group-title">{group.title}</h4>
-                                                {group.description ? (
-                                                    <Tooltip content={group.description} placement="top">
-                                                        <button
-                                                            type="button"
-                                                            className="forge-report-builder__authored-action-group-info"
-                                                            aria-label={`${group.title} details`}
-                                                        >
-                                                            <Icon icon="info-sign" size={12} />
-                                                        </button>
-                                                    </Tooltip>
-                                                ) : null}
+                    showCreationPalette ? (
+                        <div className="forge-report-builder__authored-empty-state">
+                            <div className="forge-report-builder__authored-empty-state-groups">
+                                {authoredCapabilities.actionGroups.map((group) => {
+                                    const headingId = `report-builder-authored-group-${group.id}`;
+                                    return (
+                                    <section key={group.id} className="forge-report-builder__authored-action-group" aria-labelledby={headingId}>
+                                        <div className="forge-report-builder__authored-action-group-header">
+                                            <div className="forge-report-builder__authored-action-group-heading">
+                                                <div className="forge-report-builder__authored-action-group-title-row">
+                                                    <h4 id={headingId} className="forge-report-builder__authored-action-group-title">{group.title}</h4>
+                                                    {group.description ? (
+                                                        <Tooltip content={group.description} placement="top">
+                                                            <button
+                                                                type="button"
+                                                                className="forge-report-builder__authored-action-group-info"
+                                                                aria-label={`${group.title} details`}
+                                                            >
+                                                                <Icon icon="info-sign" size={12} />
+                                                            </button>
+                                                        </Tooltip>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                            <div className="forge-report-builder__authored-action-group-count">
+                                                {group.actionIds.length} options
                                             </div>
                                         </div>
-                                        <div className="forge-report-builder__authored-action-group-count">
-                                            {group.actionIds.length} options
+                                        <div className="forge-report-builder__authored-action-group-actions">
+                                            {renderAuthoredBlockActionButtons({
+                                                className: "forge-report-builder__authored-empty-state-action",
+                                                actionIds: group.actionIds,
+                                            })}
                                         </div>
-                                    </div>
-                                    <div className="forge-report-builder__authored-action-group-actions">
-                                        {renderAuthoredBlockActionButtons({
-                                            className: "forge-report-builder__authored-empty-state-action",
-                                            actionIds: group.actionIds,
-                                        })}
-                                    </div>
-                                </section>
-                                );
-                            })}
-                        </div>
-                        {authoredCapabilities.showDisabledHint ? (
-                            <div className="forge-report-builder__authored-empty-state-footnote">
-                                {authoredCapabilities.disabledHintText}
+                                    </section>
+                                    );
+                                })}
                             </div>
-                        ) : null}
-                    </div>
+                            {authoredCapabilities.showDisabledHint ? (
+                                <div className="forge-report-builder__authored-empty-state-footnote">
+                                    {authoredCapabilities.disabledHintText}
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : (
+                        <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                            <div className="forge-report-builder__chart-inline-notice-description">
+                                {emptyMessage || "No authored blocks yet."}
+                            </div>
+                        </div>
+                    )
                 ) : (
                     <>
-                        <div className="forge-report-builder__authored-toolbar">
-                            <div className="forge-report-builder__authored-toolbar-copy">
-                                <div className="forge-report-builder__authored-toolbar-title">Add to report</div>
-                                <div className="forge-report-builder__authored-toolbar-description">
-                                    Keep composing with grouped report blocks and runtime controls.
+                        {showComposerToolbar ? (
+                            <div className="forge-report-builder__authored-toolbar">
+                                <div className="forge-report-builder__authored-toolbar-copy">
+                                    <div className="forge-report-builder__authored-toolbar-title">Add to report</div>
+                                    <div className="forge-report-builder__authored-toolbar-description">
+                                        Keep composing with grouped report blocks and runtime controls.
+                                    </div>
+                                </div>
+                                <div className="forge-report-builder__authored-toolbar-actions">
+                                    {authoredCapabilities.actionGroups.map((group) => renderAuthoredActionGroupPopover(group))}
                                 </div>
                             </div>
-                            <div className="forge-report-builder__authored-toolbar-actions">
-                                {authoredCapabilities.actionGroups.map((group) => renderAuthoredActionGroupPopover(group))}
-                            </div>
-                        </div>
+                        ) : null}
                         {authoredDocumentBlocks.map((block, index) => {
                     const normalizedKind = String(block?.kind || "").trim();
                     const layoutItem = authoredDocumentLayoutItemIndex.get(String(block?.id || "").trim()) || null;
-                    const widthLabels = resolveReportBuilderDocumentWidthLabels(layoutItem?.size);
-                    const isHalfWidth = widthLabels.isHalfWidth;
+                    const widthLabels = resolveReportBuilderDocumentWidthLabels(layoutItem);
                     const summary = normalizedKind === "kpiBlock"
                         ? [
                             block?.valueLabel || block?.valueField || "Value",
                             block?.secondaryField ? `Secondary ${block.secondaryLabel || block.secondaryField}` : "",
                         ].filter(Boolean).join(" • ")
+                        : normalizedKind === "badgesBlock"
+                            ? (() => {
+                                const labels = (Array.isArray(block?.items) ? block.items : [])
+                                    .map((item) => item?.label || item?.value)
+                                    .filter(Boolean);
+                                if (labels.length === 0) {
+                                    return "No pills";
+                                }
+                                return labels.length <= 3
+                                    ? labels.join(" • ")
+                                    : `${labels.slice(0, 3).join(" • ")} +${labels.length - 3}`;
+                            })()
                         : normalizedKind === "filterBarBlock"
                             ? (() => {
                                 const scopeSummary = buildReportBuilderScopeParamSummary(block?.paramIds, authoredScopeParamOptions);
                                 if (!Array.isArray(scopeSummary?.items) || scopeSummary.items.length === 0) {
-                                    return "No shared scope parameters";
+                                    return "No report filters";
                                 }
                                 return (
                                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -3932,6 +5771,8 @@ export default function ReportBuilder({ container, context }) {
                                 ? "Chart"
                             : normalizedKind === "kpiBlock"
                                 ? "KPI"
+                            : normalizedKind === "badgesBlock"
+                                ? "Pills"
                                 : normalizedKind === "tableBlock"
                                     ? "Table"
                                     : "Narrative";
@@ -3988,8 +5829,8 @@ export default function ReportBuilder({ container, context }) {
                                     <Button
                                         small
                                         minimal
-                                        aria-label={isHalfWidth ? `Make ${block.title || block.id} full width` : `Make ${block.title || block.id} half width`}
-                                        onClick={() => resizeDocumentBlock(block.id, isHalfWidth ? "full" : "half")}
+                                        aria-label={`Resize ${block.title || block.id} to ${widthLabels.actionLabel.replace(/^Make\s+/, "")} width`}
+                                        onClick={() => resizeDocumentBlock(block.id, widthLabels.nextSpan)}
                                         title={widthLabels.actionTitle}
                                     >
                                         {widthLabels.actionLabel}
@@ -4041,6 +5882,29 @@ export default function ReportBuilder({ container, context }) {
         </section>
     );
 
+    const renderDesignModeControl = () => {
+        if (compactMode) {
+            return null;
+        }
+        const targetMode = designWorkspaceMode ? "report" : "design";
+        const targetLabel = resolveReportBuilderWorkspaceModeLabel(targetMode);
+        const targetDescription = resolveReportBuilderWorkspaceModeDescription(targetMode);
+        return (
+            <Button
+                small
+                minimal
+                icon={designWorkspaceMode ? "eye-open" : "style"}
+                className="forge-report-builder__design-mode-control"
+                aria-pressed={designWorkspaceMode}
+                aria-label={`${targetLabel} mode. ${targetDescription}`}
+                title={targetDescription}
+                onClick={() => setWorkspaceMode(targetMode)}
+            >
+                {designWorkspaceMode ? "Back to report" : "Design"}
+            </Button>
+        );
+    };
+
     const renderCompactHeader = () => (
         <div className="forge-report-builder__compact-summary">
             <div className="forge-report-builder__compact-summary-topline">
@@ -4071,7 +5935,37 @@ export default function ReportBuilder({ container, context }) {
                     ))}
                 </div>
             ) : null}
+            {compactSemanticSummaryItems.length > 0 ? (
+                <div className="forge-report-builder__compact-summary-chips" aria-label="Semantic model summary">
+                    {compactSemanticSummaryItems.map((item) => (
+                        <span key={item} className="forge-report-builder__compact-summary-chip forge-report-builder__compact-summary-chip--semantic">{item}</span>
+                    ))}
+                </div>
+            ) : null}
             <div className="forge-report-builder__compact-summary-actions">
+                {hasFilterDrawerContent ? (
+                    <Button
+                        small
+                        outlined
+                        icon="filter"
+                        onClick={() => {
+                            setCompactSheetTab("filters");
+                            setCompactSheetOpen(true);
+                        }}
+                    >
+                        Filters
+                    </Button>
+                ) : null}
+                {semanticWorkspacePanelState ? (
+                    <Button
+                        small
+                        outlined
+                        icon="database"
+                        onClick={() => setCompactSemanticSheetOpen(true)}
+                    >
+                        {compactSemanticActionLabel}
+                    </Button>
+                ) : null}
                 <Button
                     small
                     outlined
@@ -4081,6 +5975,11 @@ export default function ReportBuilder({ container, context }) {
                     {savedArtifactViewState.loadFileLabel}
                 </Button>
             </div>
+            {compactSemanticHintText ? (
+                <div className="forge-report-builder__compact-summary-hint">
+                    {compactSemanticHintText}
+                </div>
+            ) : null}
             {renderChartApplyFeedbackNotice({ compact: true })}
         </div>
     );
@@ -4175,6 +6074,140 @@ export default function ReportBuilder({ container, context }) {
                         >
                             {loading ? "Running" : "Run"}
                         </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+    const renderCompactSemanticSheet = () => {
+        if (!compactMode || !compactSemanticSheetOpen || !semanticWorkspacePanelState) {
+            return null;
+        }
+        return (
+            <div className="forge-report-builder__compact-sheet-backdrop" onClick={() => setCompactSemanticSheetOpen(false)}>
+                <div
+                    className="forge-report-builder__compact-sheet forge-report-builder__compact-sheet--chart"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Semantic model"
+                    onClick={(event) => event.stopPropagation()}
+                >
+                    <div className="forge-report-builder__compact-sheet-header">
+                        <div>
+                            <div className="forge-report-builder__shelf-label">{semanticWorkspacePanelState.eyebrow}</div>
+                            <div className="forge-report-builder__compact-sheet-title">{semanticWorkspacePanelState.title}</div>
+                        </div>
+                        <button type="button" className="forge-report-builder__panel-toggle" onClick={() => setCompactSemanticSheetOpen(false)}>
+                            Close
+                        </button>
+                    </div>
+                    <div className="forge-report-builder__compact-sheet-body forge-report-builder__compact-sheet-body--chart">
+                        <p className="forge-report-builder__runtime-preview-description" style={{ margin: 0 }}>
+                            {semanticWorkspacePanelState.description}
+                        </p>
+                        {semanticWorkspacePanelState.metaChips.length > 0 ? (
+                            <div className="forge-report-builder__result-meta">
+                                {semanticWorkspacePanelState.metaChips.map((chip) => (
+                                    <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                ))}
+                            </div>
+                        ) : null}
+                        {semanticWorkspaceActivationState ? (
+                            <div style={{ display: "grid", gap: 10 }}>
+                                <div style={{ display: "grid", gap: 4 }}>
+                                    <div className="forge-report-builder__runtime-preview-eyebrow">{semanticWorkspaceActivationState.title}</div>
+                                    <div className="forge-report-builder__runtime-preview-description">{semanticWorkspaceActivationState.description}</div>
+                                </div>
+                                <div className="forge-report-builder__compact-chart-actions">
+                                    <Button
+                                        small
+                                        outlined
+                                        icon="upload"
+                                        onClick={openImportReportFilePicker}
+                                    >
+                                        {savedArtifactViewState.loadFileLabel}
+                                    </Button>
+                                </div>
+                                {semanticWorkspaceActivationState.entries.length > 0 ? (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                                        {semanticWorkspaceActivationState.entries.map((entry) => {
+                                            const actions = [];
+                                            if (entry.kind === "reopenable") {
+                                                actions.push({
+                                                    id: `${entry.id}:activate`,
+                                                    label: entry.activateLabel || "Use",
+                                                    onClick: () => activateImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                                });
+                                                actions.push({
+                                                    id: `${entry.id}:remove`,
+                                                    label: entry.removeLabel || "Remove",
+                                                    onClick: () => removeImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                                });
+                                            } else if (entry.kind === "savedRecord") {
+                                                actions.push({
+                                                    id: `${entry.id}:activate`,
+                                                    label: entry.activateLabel || "Use",
+                                                    onClick: () => activateImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                                });
+                                                actions.push({
+                                                    id: `${entry.id}:remove`,
+                                                    label: entry.removeLabel || "Remove",
+                                                    onClick: () => removeImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                                });
+                                            }
+                                            return (
+                                                <ReportBuilderPreparedArtifactCard
+                                                    key={entry.id}
+                                                    artifact={entry}
+                                                    actions={actions}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
+                        {renderSemanticBindingChips(semanticWorkspacePanelState, { marginTop: 4 })}
+                        {renderSemanticBindingFieldGroups(semanticWorkspacePanelState, { marginTop: 8 })}
+                        {semanticWorkspacePanelState.governanceItems.length > 0 ? (
+                            <div style={{ display: "grid", gap: 8 }}>
+                                <div className="forge-report-builder__runtime-preview-eyebrow">{semanticWorkspacePanelState.governanceTitle}</div>
+                                {semanticWorkspacePanelState.governanceItems.map((item, index) => (
+                                    <div key={`${item}_${index}`} className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--warning">
+                                        <span>{item}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+                        {semanticWorkspacePanelState.diagnostics.length > 0 ? (
+                            <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${semanticWorkspacePanelState.tone}`}>
+                                <div className="forge-report-builder__semantic-diagnostics-header">
+                                    {semanticWorkspacePanelState.diagnosticsTitle ? (
+                                        <div className="forge-report-builder__semantic-diagnostics-title">{semanticWorkspacePanelState.diagnosticsTitle}</div>
+                                    ) : null}
+                                    {semanticWorkspacePanelState.diagnosticsDescription ? (
+                                        <div className="forge-report-builder__semantic-diagnostics-description">{semanticWorkspacePanelState.diagnosticsDescription}</div>
+                                    ) : null}
+                                </div>
+                                <div className="forge-report-builder__semantic-diagnostics-list">
+                                    {semanticWorkspacePanelState.diagnostics.map((diagnostic) => (
+                                        <article
+                                            key={diagnostic.id}
+                                            className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
+                                        >
+                                            <div className="forge-report-builder__semantic-diagnostic-meta">
+                                                {diagnostic.code ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.code}</span> : null}
+                                                {diagnostic.path ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.path}</span> : null}
+                                            </div>
+                                            <div className="forge-report-builder__semantic-diagnostic-message">{diagnostic.message}</div>
+                                            {diagnostic.suggestedFix ? (
+                                                <div className="forge-report-builder__semantic-diagnostic-fix">{diagnostic.suggestedFix}</div>
+                                            ) : null}
+                                        </article>
+                                    ))}
+                                </div>
+                            </section>
+                        ) : null}
                     </div>
                 </div>
             </div>
@@ -4295,9 +6328,36 @@ export default function ReportBuilder({ container, context }) {
                                     </Button>
                                 )) : null}
                                 {compactChartSheetState.exportEnabled ? (
-                                    <Button small outlined icon="download" disabled={!canShowResults} onClick={downloadCsv}>
-                                        Export
-                                    </Button>
+                                    <Popover
+                                        placement="bottom-start"
+                                        usePortal={false}
+                                        content={(
+                                            <Menu>
+                                                <MenuItem
+                                                    icon="document"
+                                                    text="PDF"
+                                                    disabled={draftExportActionState?.submitDisabled || !draftExportRequest}
+                                                    onClick={() => {
+                                                        closeCompactChartSheet();
+                                                        triggerDraftExport();
+                                                    }}
+                                                />
+                                                <MenuItem
+                                                    icon="th"
+                                                    text="XLSX"
+                                                    disabled={!draftXlsxExportRequest}
+                                                    onClick={() => {
+                                                        closeCompactChartSheet();
+                                                        triggerDraftXlsxExport();
+                                                    }}
+                                                />
+                                            </Menu>
+                                        )}
+                                    >
+                                        <Button small outlined icon="download" disabled={!canOpenDraftExportMenu}>
+                                            Export
+                                        </Button>
+                                    </Popover>
                                 ) : null}
                             </div>
                         ) : compactChartSheetState.emptyStateEnabled ? (
@@ -4368,12 +6428,20 @@ export default function ReportBuilder({ container, context }) {
     }, [builderContext, config.request?.autoFetch, resolveStateReadiness, semanticDisplayConfig]);
 
     const runReport = React.useCallback(() => {
+        const currentState = currentBuilderStateRef.current || state;
         setManualRunSequence((current) => current + 1);
         setChartApplyFeedback(null);
-        setFilterPanels(collapseReportBuilderFilterBodyState);
+        if (designWorkspaceMode || (!useFilterRail && !useFilterDrawer)) {
+            setFilterPanels(collapseReportBuilderFilterBodyState);
+        } else {
+            setFilterPanels((current) => ({ ...current, common: true }));
+        }
         setFiltersDrawerOpen(false);
-        dispatchReportRequest(state, { forceFetch: true, markManual: true });
-    }, [dispatchReportRequest, state]);
+        if (designWorkspaceMode) {
+            setWorkspaceMode("report");
+        }
+        dispatchReportRequest(currentState, { forceFetch: true, markManual: true });
+    }, [designWorkspaceMode, dispatchReportRequest, state, useFilterDrawer, useFilterRail]);
     const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
     const canShowResults = canRunReport && hasRows;
     const canShowResultsRef = useRef(canShowResults);
@@ -5076,6 +7144,18 @@ export default function ReportBuilder({ container, context }) {
         && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
     const hideSavedPayloadHandoffUpdateConflictSummary = savedPayloadApiHandoffActive
         && normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.updateReportDocumentConflictDiagnostic]) === PREPARED_API_ARTIFACT_HANDOFF_ORIGIN;
+    const activeImportedLocalGetResponseIdentity = buildImportedLocalGetReportDocumentResponseIdentity(getReportDocumentResponse);
+    const activeHydratedImportedSourceIdentity = buildHydratedReportDocumentImportedSourceIdentity(hydratedReportDocumentSession);
+    const importedGetResponseActive = normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.getReportDocumentResponse]) === PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+    const importedUpdatePayloadActive = normalizeString(preparedApiArtifactOrigins?.[PREPARED_API_ARTIFACT_KEYS.updateReportDocumentPayload]) === PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
+    const activeImportedSemanticSessionMatchesCurrentArtifact = !!hydratedReportDocumentSession
+        && Number(semanticImportedArtifactCount || 0) > 0
+        && !!activeImportedLocalGetResponseIdentity
+        && activeImportedLocalGetResponseIdentity === activeHydratedImportedSourceIdentity;
+    const hideImportedActivationGetResponseSummary = activeImportedSemanticSessionMatchesCurrentArtifact && importedGetResponseActive;
+    const hideImportedActivationReopenDiagnosticSummary = activeImportedSemanticSessionMatchesCurrentArtifact && importedGetResponseActive;
+    const hideImportedActivationArtifactSummaries = activeImportedSemanticSessionMatchesCurrentArtifact && importedGetResponseActive;
+    const hideImportedActivationUpdatePayloadSummary = activeImportedSemanticSessionMatchesCurrentArtifact && importedUpdatePayloadActive;
     const chartSelectionSummary = useMemo(
         () => (selectedBuilderChartSelection
             ? resolveReportRuntimeChartSelectionSummary({
@@ -5107,6 +7187,9 @@ export default function ReportBuilder({ container, context }) {
         : "";
 
     useEffect(() => {
+        if (!designWorkspaceMode && (useFilterRail || useFilterDrawer)) {
+            return;
+        }
         if (!shouldAutoCollapseReportBuilderFilters({
             canShowResults,
             hasCompletedCurrentRun,
@@ -5118,45 +7201,17 @@ export default function ReportBuilder({ container, context }) {
         lastAutoCollapsedRunSequenceRef.current = manualRunSequence;
         setFilterPanels(collapseReportBuilderFilterBodyState);
         setFiltersDrawerOpen(false);
-    }, [canShowResults, hasCompletedCurrentRun, manualRunSequence]);
+    }, [canShowResults, designWorkspaceMode, hasCompletedCurrentRun, manualRunSequence, useFilterDrawer, useFilterRail]);
 
     useEffect(() => {
-        if (!useFilterRail || !railFilterState.shouldAutoCollapseSeededPanel) {
+        if (!designWorkspaceMode || !useFilterRail || !railFilterState.shouldAutoCollapseSeededPanel) {
             return;
         }
         lastSeededRailFilterCollapseFingerprintRef.current = currentRequestFingerprint;
         setFilterPanels((current) => (
             current.common ? { ...current, common: false } : current
         ));
-    }, [currentRequestFingerprint, railFilterState.shouldAutoCollapseSeededPanel, useFilterRail]);
-
-    useEffect(() => {
-        if (typeof window === "undefined") {
-            filterOverlayWasOpenRef.current = railFilterState.showOverlayBody;
-            return;
-        }
-        if (compactMode || !useFilterRail) {
-            if (filterOverlayWasOpenRef.current) {
-                window.scrollTo({ top: Math.max(filterOverlayScrollRestoreRef.current || 0, 0), behavior: "auto" });
-            }
-            filterOverlayWasOpenRef.current = false;
-            return;
-        }
-        const isOpen = railFilterState.showOverlayBody;
-        const rootNode = builderRootRef.current;
-        if (!rootNode) {
-            filterOverlayWasOpenRef.current = isOpen;
-            return;
-        }
-        if (!filterOverlayWasOpenRef.current && isOpen) {
-            filterOverlayScrollRestoreRef.current = window.scrollY || 0;
-            const nextTop = Math.max(rootNode.getBoundingClientRect().top + window.scrollY - 12, 0);
-            window.scrollTo({ top: nextTop, behavior: "auto" });
-        } else if (filterOverlayWasOpenRef.current && !isOpen) {
-            window.scrollTo({ top: Math.max(filterOverlayScrollRestoreRef.current || 0, 0), behavior: "auto" });
-        }
-        filterOverlayWasOpenRef.current = isOpen;
-    }, [compactMode, railFilterState.showOverlayBody, useFilterRail]);
+    }, [currentRequestFingerprint, designWorkspaceMode, railFilterState.shouldAutoCollapseSeededPanel, useFilterRail]);
 
     useEffect(() => {
         if (!explicitChartMode || state.chartSpec || !autoChartCycleKey) {
@@ -5202,7 +7257,7 @@ export default function ReportBuilder({ container, context }) {
 
     const compactSummaryItems = useMemo(() => resolveCompactSummaryItems({
         requiredStaticFilters: compactRequiredStaticFilters,
-        staticFilters: state.staticFilters,
+        scopeParamValues: listScopeParamValues(state),
         selectedMeasures: state.selectedMeasures,
         selectedDimensions: state.selectedDimensions,
         totalActiveFilterCount,
@@ -5211,7 +7266,16 @@ export default function ReportBuilder({ container, context }) {
         viewMode: state.viewMode,
         activeTablePresetTitle: String(activeTablePreset?.title || "").trim(),
         modifiedTablePresetTitle: String(modifiedTablePreset?.title || "").trim(),
-    }), [activeTablePreset?.title, canShowResults, compactRequiredStaticFilters, hasValidChartSpec, modifiedTablePreset?.title, state.selectedDimensions, state.selectedMeasures, state.staticFilters, state.viewMode, totalActiveFilterCount]);
+    }), [activeTablePreset?.title, canShowResults, compactRequiredStaticFilters, hasValidChartSpec, modifiedTablePreset?.title, state.selectedDimensions, state.selectedMeasures, listScopeParamValues(state), state.viewMode, totalActiveFilterCount]);
+    const compactSemanticSummaryItems = useMemo(() => resolveCompactSemanticSummaryItems({
+        semanticBindingChips: semanticWorkspacePanelState?.semanticBindingChips,
+        semanticMetaChips: semanticWorkspacePanelState?.metaChips,
+        semanticTitle: semanticWorkspacePanelState?.title,
+    }), [
+        semanticWorkspacePanelState?.semanticBindingChips,
+        semanticWorkspacePanelState?.metaChips,
+        semanticWorkspacePanelState?.title,
+    ]);
 
     const retainVisibleResultsWhileLoading = hasCompletedCurrentRun && computedCollection.length > 0;
     const showingChartView = !error && canShowResults && (!loading || retainVisibleResultsWhileLoading) && (
@@ -5227,7 +7291,18 @@ export default function ReportBuilder({ container, context }) {
         }
     }, [selectedBuilderChartSelection, showingChartView]);
     useEffect(() => {
+        if (selectedBuilderTableRow == null) {
+            return;
+        }
+        if (showingChartView || !canShowResults) {
+            setSelectedBuilderTableRow(null);
+        }
+    }, [canShowResults, selectedBuilderTableRow, showingChartView]);
+    useEffect(() => {
         setSelectedBuilderChartSelection(null);
+    }, [currentRequestFingerprint]);
+    useEffect(() => {
+        setSelectedBuilderTableRow(null);
     }, [currentRequestFingerprint]);
 
     const compactChartSheetNotice = useMemo(() => {
@@ -5367,7 +7442,8 @@ export default function ReportBuilder({ container, context }) {
             state,
             refinements: runtimePreviewRefinements,
             drillTransitions: runtimePreviewDrillTransitions,
-            semanticSummary: resolvedSemanticSummary,
+            runtimeDatasetScopeParams: runtimePreviewInteraction.datasetScopeParams,
+            semanticSummary: semanticRuntimeSummary,
             binding: semanticBinding,
             semanticModel: semanticModelState.model,
             requestTransform: ({ request, state: runtimeState }) => applyReportBuilderRequestHook(
@@ -5382,8 +7458,9 @@ export default function ReportBuilder({ container, context }) {
         container,
         displayConfig,
         runtimePreviewDrillTransitions,
+        runtimePreviewInteraction.datasetScopeParams,
         runtimePreviewRefinements,
-        resolvedSemanticSummary,
+        semanticRuntimeSummary,
         semanticBinding,
         semanticModelState.model,
         state,
@@ -5396,9 +7473,107 @@ export default function ReportBuilder({ container, context }) {
         () => new Map((Array.isArray(authoredCapabilities.actions) ? authoredCapabilities.actions : []).map((action) => [action.id, action])),
         [authoredCapabilities.actions],
     );
+    const documentDesignActionGroup = useMemo(
+        () => authoredCapabilities.actionGroups.find((group) => group.id === "document") || null,
+        [authoredCapabilities.actionGroups],
+    );
+    const runtimeDesignActionGroup = useMemo(
+        () => authoredCapabilities.actionGroups.find((group) => group.id === "runtime") || null,
+        [authoredCapabilities.actionGroups],
+    );
+    const showAuthoredReportSurface = !designWorkspaceMode && authoredDocumentBlockCount > 0;
+    const authoredAudienceReportMode = reportWorkspaceMode && showAuthoredReportSurface;
+    const showInlineReportBaselineControls = !designWorkspaceMode
+        && showAuthoredReportSurface
+        && hasFilterDrawerContent
+        && (
+            activeDynamicFilterCount > 0
+            || (familyMode ? activeDynamicFamilyIds.length > 0 : visibleActiveDynamicGroupIds.length > 0)
+        );
+    const authoredPreviewAutoFetchKey = useMemo(
+        () => [
+            buildReportBuilderSurfaceAutoRunKey({
+                workspaceMode: reportWorkspaceMode ? "report" : "preview",
+                requestFingerprint: currentRequestFingerprint,
+            }),
+            normalizeString(state?.reportDocumentTemplateId),
+            String(authoredDocumentBlockCount),
+            JSON.stringify(
+                Array.isArray(state?.reportDocumentLayout?.items)
+                    ? state.reportDocumentLayout.items.map((item) => ({
+                        blockId: normalizeString(item?.blockId),
+                        size: normalizeString(item?.size),
+                        span: Number(item?.span || 0) || 0,
+                    }))
+                    : [],
+            ),
+        ].join("::"),
+        [
+            activeDynamicFamilyIds.length,
+            activeDynamicFilterCount,
+            authoredDocumentBlockCount,
+            currentRequestFingerprint,
+            familyMode,
+            hasFilterDrawerContent,
+            reportWorkspaceMode,
+            state?.reportDocumentLayout?.items,
+            state?.reportDocumentTemplateId,
+            visibleActiveDynamicGroupIds.length,
+        ],
+    );
+    const visibleSemanticInlineNotices = useMemo(() => (
+        resolveReportBuilderVisibleSemanticInlineNotices(semanticInlineNotices, {
+            reportWorkspaceMode,
+            showAuthoredReportSurface,
+        })
+    ), [reportWorkspaceMode, semanticInlineNotices, showAuthoredReportSurface]);
     const runtimePreviewModel = useMemo(
         () => (shouldCompileRuntimePreview ? compiledRuntimePreviewModel : null),
         [compiledRuntimePreviewModel, shouldCompileRuntimePreview],
+    );
+    const compiledAuthoredRuntimePreviewModel = useMemo(() => {
+        if (!shouldCompileRuntimePreview) {
+            return null;
+        }
+        if (!showAuthoredReportSurface) {
+            return compiledRuntimePreviewModel;
+        }
+        return buildReportBuilderRuntimePreviewModel({
+            container,
+            config: displayConfig,
+            state,
+            refinements: runtimePreviewRefinements,
+            drillTransitions: runtimePreviewDrillTransitions,
+            runtimeDatasetScopeParams: runtimePreviewInteraction.datasetScopeParams,
+            semanticSummary: semanticRuntimeSummary,
+            binding: semanticBinding,
+            semanticModel: semanticModelState.model,
+            includePrimaryBlocks: false,
+            requestTransform: ({ request, state: runtimeState }) => applyReportBuilderRequestHook(
+                builderContext,
+                displayConfig,
+                runtimeState,
+                request,
+            ),
+        });
+    }, [
+        builderContext,
+        compiledRuntimePreviewModel,
+        container,
+        displayConfig,
+        semanticRuntimeSummary,
+        runtimePreviewDrillTransitions,
+        runtimePreviewInteraction.datasetScopeParams,
+        runtimePreviewRefinements,
+        semanticBinding,
+        semanticModelState.model,
+        shouldCompileRuntimePreview,
+        showAuthoredReportSurface,
+        state,
+    ]);
+    const authoredRuntimePreviewModel = useMemo(
+        () => (shouldCompileRuntimePreview ? compiledAuthoredRuntimePreviewModel : null),
+        [compiledAuthoredRuntimePreviewModel, shouldCompileRuntimePreview],
     );
     const runtimePreviewPrimaryDataset = useMemo(
         () => (Array.isArray(runtimePreviewModel?.reportSpec?.datasets)
@@ -5418,20 +7593,82 @@ export default function ReportBuilder({ container, context }) {
         () => (runtimePreviewRequest ? JSON.stringify(runtimePreviewRequest) : ""),
         [runtimePreviewRequest],
     );
-    const runtimePreviewRequestKey = useMemo(
-        () => buildReportRuntimePreviewRequestKey(runtimePreviewFingerprint, manualRunSequence),
-        [manualRunSequence, runtimePreviewFingerprint],
+    const runtimePreviewRecoveryToken = useMemo(
+        () => `${Number(semanticModelRetrySequence || 0) || 0}:${Number(semanticValidationRetrySequence || 0) || 0}`,
+        [semanticModelRetrySequence, semanticValidationRetrySequence],
     );
+    const runtimePreviewExtractConfigFingerprint = useMemo(
+        () => buildReportRuntimePreviewExtractConfigFingerprint(builderContext?.dataSource || null),
+        [builderContext?.dataSource],
+    );
+    const runtimePreviewRequestKey = useMemo(
+        () => buildReportRuntimePreviewRequestKey(
+            runtimePreviewFingerprint,
+            manualRunSequence,
+            runtimePreviewRecoveryToken,
+            runtimePreviewExtractConfigFingerprint,
+        ),
+        [manualRunSequence, runtimePreviewExtractConfigFingerprint, runtimePreviewFingerprint, runtimePreviewRecoveryToken],
+    );
+    const hydrateRuntimePreviewRows = React.useCallback(async ({
+        rows,
+        request,
+    } = {}) => hydrateReportBuilderRuntimeRows({
+        builderContext,
+        config: displayConfig,
+        request,
+        rows,
+    }), [builderContext, displayConfig]);
     const runtimePreviewRowsState = useReportRuntimePreviewRows({
-        enabled: runtimePreviewEnabled,
+        enabled: runtimePreviewEnabled || authoredRuntimeSurfaceEnabled,
         canRun: canRunReport,
         hasModel: !!runtimePreviewModel,
         request: runtimePreviewRequest,
         fingerprint: runtimePreviewFingerprint,
         requestKey: runtimePreviewRequestKey,
         fetchRecords: builderContext?.handlers?.dataSource?.fetchRecords || null,
+        extractConfig: builderContext?.dataSource || null,
         requestKind: "runtimePreview",
         unavailableErrorMessage: "Runtime preview fetch is unavailable for this data source.",
+        hydrateRows: hydrateRuntimePreviewRows,
+    });
+    const runtimePreviewAdditionalPublishedDatasets = useMemo(() => {
+        const datasets = Array.isArray(authoredRuntimePreviewModel?.reportSpec?.datasets)
+            ? authoredRuntimePreviewModel.reportSpec.datasets
+            : [];
+        const staticDatasetIds = new Set(
+            authoredRuntimePreviewModel?.staticDatasetPayloads && typeof authoredRuntimePreviewModel.staticDatasetPayloads === "object" && !Array.isArray(authoredRuntimePreviewModel.staticDatasetPayloads)
+                ? Object.keys(authoredRuntimePreviewModel.staticDatasetPayloads).map((datasetId) => normalizeString(datasetId)).filter(Boolean)
+                : [],
+        );
+        return datasets
+            .filter((dataset) => {
+                const datasetId = normalizeString(dataset?.id);
+                return datasetId && datasetId !== "primary" && !staticDatasetIds.has(datasetId);
+            })
+            .map((dataset) => ({
+                id: normalizeString(dataset?.id),
+                dataSourceRef: normalizeString(dataset?.dataSourceRef),
+                request: dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
+                    ? cloneValue(dataset.request)
+                    : null,
+                label: normalizeString(
+                    authoredDatasetOptionIndex.get(normalizeString(dataset?.id))?.label
+                    || authoredDatasetOptionIndex.get(normalizeString(dataset?.dataSourceRef))?.label
+                    || dataset?.id
+                    || dataset?.dataSourceRef,
+                ),
+            }))
+            .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
+    }, [authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads]);
+    const runtimePreviewAdditionalDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
+        enabled: runtimePreviewEnabled || authoredRuntimeSurfaceEnabled,
+        builderContext,
+        datasets: runtimePreviewAdditionalPublishedDatasets,
+        requestKey: JSON.stringify({
+            previewRequestKey: runtimePreviewRequestKey,
+            datasets: runtimePreviewAdditionalPublishedDatasets,
+        }),
     });
     const runtimePreviewRowsSource = resolveReportBuilderRuntimePreviewRowsSource({
         currentRequestFingerprint,
@@ -5451,18 +7688,19 @@ export default function ReportBuilder({ container, context }) {
     const runtimePreviewSurface = useAuthoredRuntimePreviewSurface({
         interaction: runtimePreviewInteraction,
         semanticModelHandler: builderContext?.handlers?.semanticModel || null,
-        reportSpec: runtimePreviewModel?.reportSpec || {},
+        reportSpec: authoredRuntimePreviewModel?.reportSpec || runtimePreviewModel?.reportSpec || {},
     });
     const runtimePreviewHostIntent = runtimePreviewSurface.hostIntent;
     const runtimePreviewDetailDiagnostic = runtimePreviewSurface.detailDiagnostic;
     const runtimePreviewArtifact = useMemo(() => {
-        if (!runtimePreviewModel) {
+        if (!authoredRuntimePreviewModel) {
             return null;
         }
         return buildReportBuilderRuntimePreview({
-            model: runtimePreviewModel,
+            model: authoredRuntimePreviewModel,
             rows: runtimePreviewRowsSource.rows,
             hasMore: runtimePreviewRowsSource.hasMore,
+            datasetPayloads: runtimePreviewAdditionalDatasetPayloadState.payloads,
             error: runtimePreviewRowsSource.error,
             additionalDiagnostics: [
                 ...runtimePreviewArtifactDiagnostics,
@@ -5474,14 +7712,45 @@ export default function ReportBuilder({ container, context }) {
             runtimeSubtitle: String(runtimePreviewConfig?.subtitle || "").trim()
                 || String(state?.reportDocumentSubtitle || "").trim()
                 || String(state?.reportDocumentDescription || "").trim()
-                || "Compiled from the current builder state using the generic Forge runtime contract.",
+                || (reportWorkspaceMode ? "" : "Compiled from the current builder state using the generic Forge runtime contract."),
             hostIntent: runtimePreviewHostIntent,
         });
-    }, [authoredDocumentBlockDiagnostics, container, displayConfig, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewModel, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
-    const draftExportRequest = useMemo(
-        () => runtimePreviewArtifact?.exportRequest || null,
-        [runtimePreviewArtifact],
-    );
+    }, [authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewAdditionalDatasetPayloadState.payloads, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
+    const runtimeExportMetadata = useMemo(() => ({
+        conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
+        workspaceId: String(container?.windowKey || container?.id || "").trim(),
+        renderHints: {
+            source: "reportBuilder",
+            viewMode: String(state?.viewMode || "").trim() || "table",
+        },
+    }), [builderContext?.conversationId, builderContext?.windowState?.conversationId, container?.conversationId, container?.id, container?.windowKey, state?.viewMode]);
+    const draftExportRequest = useMemo(() => {
+        if (!runtimePreviewArtifact?.document || !runtimePreviewArtifact?.reportSpec || !runtimePreviewArtifact?.reportFill) {
+            return runtimePreviewArtifact?.exportRequest || null;
+        }
+        return buildDraftReportExportRequest({
+            reportDocument: runtimePreviewArtifact.document,
+            reportSpec: runtimePreviewArtifact.reportSpec,
+            reportFill: runtimePreviewArtifact.reportFill,
+            reportPrint: runtimePreviewArtifact.reportPrint || null,
+            format: "pdf",
+            metadata: runtimeExportMetadata,
+        }) || runtimePreviewArtifact?.exportRequest || null;
+    }, [runtimeExportMetadata, runtimePreviewArtifact]);
+    const draftXlsxExportRequest = useMemo(() => {
+        if (!runtimePreviewArtifact?.document || !runtimePreviewArtifact?.reportSpec || !runtimePreviewArtifact?.reportFill) {
+            return null;
+        }
+        return buildDraftReportExportRequest({
+            reportDocument: runtimePreviewArtifact.document,
+            reportSpec: runtimePreviewArtifact.reportSpec,
+            reportFill: runtimePreviewArtifact.reportFill,
+            reportPrint: runtimePreviewArtifact.reportPrint || null,
+            format: "xlsx",
+            metadata: runtimeExportMetadata,
+        });
+    }, [runtimeExportMetadata, runtimePreviewArtifact]);
+    const canOpenDraftExportMenu = !!draftExportRequest || !!draftXlsxExportRequest;
     const reopenedExportRequest = useMemo(() => {
         const reopenedExportSeed = reopenedSavedRecord?.savedReportPayload
             || (reopenedSavedRecord?.exportable === true ? reopenedSavedRecord : null);
@@ -5498,7 +7767,7 @@ export default function ReportBuilder({ container, context }) {
                 container,
                 config: semanticDisplayConfig,
                 state,
-                semanticSummary: resolvedSemanticSummary,
+                semanticSummary: semanticRuntimeSummary,
                 semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
             },
@@ -5509,22 +7778,25 @@ export default function ReportBuilder({ container, context }) {
         reopenedSavedRecord?.exportable,
         reopenedSavedRecord,
         reopenedSavedRecordExportRequest,
-        resolvedSemanticSummary,
+        semanticRuntimeSummary,
         runtimePreviewArtifact,
         runtimePreviewSemanticDiagnostics,
         semanticDisplayConfig,
         semanticModelState.model,
         state,
     ]);
+    const selectedListEntryMatchesHydratedSession = useMemo(
+        () => matchesReportBuilderSelectedEntryHydratedSession({
+            hydratedReportDocumentSession,
+            reopenedSavedRecord,
+            selectedListEntrySavedRecord,
+        }),
+        [hydratedReportDocumentSession, reopenedSavedRecord, selectedListEntrySavedRecord],
+    );
     const selectedListEntryExportRequest = useMemo(() => {
         const selectedListEntryExportSeed = selectedListEntrySavedRecord?.savedReportPayload
             || (selectedListEntrySavedRecord?.exportable === true ? selectedListEntrySavedRecord : null);
-        const selectedMatchesReopened = !!hydratedReportDocumentSession
-            && !!reopenedSavedRecord
-            && !!selectedListEntrySavedRecord
-            && normalizeString(selectedListEntrySavedRecord?.reportId) === normalizeString(hydratedReportDocumentSession?.reportId)
-            && matchesReportBuilderSavedReportRecordSource(selectedListEntrySavedRecord, reopenedSavedRecord);
-        if (!selectedMatchesReopened || !selectedListEntryExportSeed || !runtimePreviewArtifact) {
+        if (!selectedListEntryMatchesHydratedSession || !selectedListEntryExportSeed || !runtimePreviewArtifact) {
             return selectedListEntrySavedRecordExportRequest;
         }
         return buildReportBuilderSavedReportExportRequestFromBuilderState(
@@ -5537,7 +7809,7 @@ export default function ReportBuilder({ container, context }) {
                 container,
                 config: semanticDisplayConfig,
                 state,
-                semanticSummary: resolvedSemanticSummary,
+                semanticSummary: semanticRuntimeSummary,
                 semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
             },
@@ -5546,11 +7818,12 @@ export default function ReportBuilder({ container, context }) {
         container,
         hydratedReportDocumentSession,
         reopenedSavedRecord,
-        resolvedSemanticSummary,
+        semanticRuntimeSummary,
         runtimePreviewArtifact,
         runtimePreviewSemanticDiagnostics,
         semanticDisplayConfig,
         semanticModelState.model,
+        selectedListEntryMatchesHydratedSession,
         selectedListEntrySavedRecord,
         selectedListEntrySavedRecordExportRequest,
         state,
@@ -5610,13 +7883,25 @@ export default function ReportBuilder({ container, context }) {
         ],
     );
     const draftExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.draft);
+    const draftXlsxExportExecution = useReportBuilderExportExecution({
+        request: draftXlsxExportRequest,
+        sourceKind: "draft",
+        localSavedPayloads: configuredExportContextSavedPayloads,
+        reportExportHandler,
+        reportAuditHandler,
+        reportAuditActorRef,
+        reportAuditMetadata,
+        setFeedback: setChartApplyFeedback,
+        missingRequestMessage: "No draft XLSX export request is available.",
+        missingJobMessage: "No draft XLSX export job is available to refresh.",
+        missingArtifactMessage: "No completed draft XLSX export artifact is available yet.",
+    });
     const importedStandaloneExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.importedStandalone);
     const importedPipelineExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.importedPipeline);
     const savedReportPayloadExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.savedPayload);
     const reopenedExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.reopened);
     const selectedListEntryExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.selectedListEntry);
     const latestLifecycleSharedArtifactExportExecution = useReportBuilderExportExecution(latestLifecycleSharedArtifactExportExecutionConfig);
-    const runtimePreviewHandlers = runtimePreviewSurface.runtimeHandlers;
 
     useEffect(() => {
         if (!hydratedReportDocumentSession) {
@@ -5641,7 +7926,7 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         persistStateWithConfig(
-            applyReportBuilderHydratedDocumentSessionState(state, nextSession),
+            applyReportBuilderHydratedDocumentSessionState(currentBuilderStateRef.current || state, nextSession),
             config,
             { skipExplorationHistory: true },
         );
@@ -5653,6 +7938,31 @@ export default function ReportBuilder({ container, context }) {
         persistStateWithConfig,
         runtimePreviewInteractionSnapshot,
         runtimePreviewInteractionSnapshotFingerprint,
+        state,
+    ]);
+    useEffect(() => {
+        if (hydratedReportDocumentSession || !showAuthoredReportSurface) {
+            return;
+        }
+        if (runtimePreviewInteractionSnapshotFingerprint === persistedRuntimePreviewInteractionFingerprint) {
+            return;
+        }
+        persistStateWithConfig(
+            applyReportBuilderPersistedRuntimePreviewInteraction(
+                currentBuilderStateRef.current || state,
+                runtimePreviewInteractionSnapshot,
+            ),
+            config,
+            { skipExplorationHistory: true },
+        );
+    }, [
+        config,
+        hydratedReportDocumentSession,
+        persistStateWithConfig,
+        persistedRuntimePreviewInteractionFingerprint,
+        runtimePreviewInteractionSnapshot,
+        runtimePreviewInteractionSnapshotFingerprint,
+        showAuthoredReportSurface,
         state,
     ]);
 
@@ -5679,37 +7989,88 @@ export default function ReportBuilder({ container, context }) {
         canRunReport,
         canShowResults,
     }), [canRunReport, canShowResults, chartDataPolicy.mode, chartQueryState.error, chartQueryState.loading, chartRenderCollection.length, computedCollection.length, error, loading, retainVisibleResultsWhileLoading, showingChartView]);
+    const activeResultErrorDiagnostics = useMemo(
+        () => buildReportBuilderActiveResultErrorDiagnosticsState(activeResultError),
+        [activeResultError],
+    );
     const emptyResultState = useMemo(() => buildReportBuilderEmptyResultState({
         canRunReport,
         hasCompletedCurrentRun,
         readinessReason: readiness.reason,
         readinessMessage: readiness.message,
         readinessAction: readiness.action,
-    }), [canRunReport, hasCompletedCurrentRun, readiness.action, readiness.message, readiness.reason]);
+        readinessIssueKind: readiness.issueKind,
+    }), [canRunReport, hasCompletedCurrentRun, readiness.action, readiness.issueKind, readiness.message, readiness.reason]);
     const runtimePreviewBlockedState = useMemo(() => buildReportBuilderRuntimePreviewBlockedState({
         canRunReport,
         readinessReason: readiness.reason,
         readinessMessage: readiness.message,
         readinessAction: readiness.action,
+        readinessIssueKind: readiness.issueKind,
         semanticDiagnosticsNotice,
-    }), [canRunReport, readiness.action, readiness.message, readiness.reason, semanticDiagnosticsNotice]);
+    }), [canRunReport, readiness.action, readiness.issueKind, readiness.message, readiness.reason, semanticDiagnosticsNotice]);
     const authoredRuntimePreviewState = useMemo(() => buildReportBuilderAuthoredRuntimePreviewState({
-        runtimePreviewEnabled,
+        runtimePreviewEnabled: runtimePreviewEnabled || authoredRuntimeSurfaceEnabled,
         runtimePreviewArtifact,
         runtimePreviewRowsSource,
         canRunReport,
         readinessReason: readiness.reason,
+        readinessAction: readiness.action,
+        readinessIssueKind: readiness.issueKind,
         runtimePreviewArtifactDiagnostics,
         runtimePreviewBlockedState,
         runtimePreviewErrorDescription: renderReportBuilderError(runtimePreviewRowsSource.error),
+        presentationMode: reportWorkspaceMode ? "report" : "preview",
     }), [
         canRunReport,
+        readiness.action,
+        readiness.issueKind,
         readiness.reason,
+        reportWorkspaceMode,
         runtimePreviewArtifact,
         runtimePreviewArtifactDiagnostics,
         runtimePreviewBlockedState,
+        authoredRuntimeSurfaceEnabled,
         runtimePreviewEnabled,
         runtimePreviewRowsSource,
+    ]);
+    const hideAuthoredRuntimeSemanticErrorCard = useMemo(() => {
+        const errorState = authoredRuntimePreviewState?.errorState || null;
+        if (!semanticResultSurfaceState || !errorState) {
+            return false;
+        }
+        if (normalizeString(errorState?.actionLabel)) {
+            return false;
+        }
+        const semanticContextDescription = normalizeString(semanticResultSurfaceState?.description);
+        const runtimeErrorDescription = normalizeString(errorState?.description);
+        return !!semanticContextDescription
+            && !!runtimeErrorDescription
+            && semanticContextDescription === runtimeErrorDescription;
+    }, [
+        authoredRuntimePreviewState?.errorState?.actionLabel,
+        authoredRuntimePreviewState?.errorState?.description,
+        semanticResultSurfaceState?.description,
+        semanticResultSurfaceState,
+    ]);
+    const hideAuthoredRuntimeSemanticBlockedCard = useMemo(() => {
+        const blockedState = authoredRuntimePreviewState?.blockedState || null;
+        if (!semanticResultSurfaceState || !blockedState) {
+            return false;
+        }
+        if (normalizeString(blockedState?.actionLabel)) {
+            return false;
+        }
+        const semanticContextDescription = normalizeString(semanticResultSurfaceState?.description);
+        const runtimeBlockedDescription = normalizeString(blockedState?.description);
+        return !!semanticContextDescription
+            && !!runtimeBlockedDescription
+            && semanticContextDescription === runtimeBlockedDescription;
+    }, [
+        authoredRuntimePreviewState?.blockedState?.actionLabel,
+        authoredRuntimePreviewState?.blockedState?.description,
+        semanticResultSurfaceState?.description,
+        semanticResultSurfaceState,
     ]);
     const resultVisibility = useMemo(() => resolveReportBuilderResultVisibility({
         activeResultLoading,
@@ -6010,7 +8371,7 @@ export default function ReportBuilder({ container, context }) {
         }
         if (nextHydratedSession && nextHydratedSession !== hydratedReportDocumentSession) {
             persistStateWithConfig(
-                applyReportBuilderHydratedDocumentSessionState(state, nextHydratedSession),
+                applyReportBuilderHydratedDocumentSessionState(currentBuilderStateRef.current || state, nextHydratedSession),
                 config,
                 { skipExplorationHistory: true },
             );
@@ -6366,6 +8727,90 @@ export default function ReportBuilder({ container, context }) {
             : nextState;
         persistState(nextPersistedState, { skipExplorationHistory: true });
     }, [persistState]);
+    const toggleStaticFilter = (filter, optionValue) => {
+        const key = resolveScopeParamId(filter);
+        if (!key) return;
+        const normalizedDatasetRef = normalizeString(filter?.datasetRef || "primary") || "primary";
+        if (normalizedDatasetRef !== "primary") {
+            const currentScopedValues = runtimePreviewInteraction.datasetScopeParams?.[normalizedDatasetRef]
+                && typeof runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef] === "object"
+                && !Array.isArray(runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef])
+                    ? runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef]
+                    : {};
+            const current = Object.prototype.hasOwnProperty.call(currentScopedValues, key)
+                ? currentScopedValues[key]
+                : null;
+            let nextValue;
+            if (filter.multiple) {
+                const list = Array.isArray(current) ? current : [];
+                nextValue = list.includes(optionValue)
+                    ? list.filter((entry) => entry !== optionValue)
+                    : [...list, optionValue];
+            } else {
+                nextValue = current === optionValue ? "" : optionValue;
+            }
+            runtimePreviewInteraction.setDatasetScopeParamValue({
+                datasetRef: normalizedDatasetRef,
+                paramId: key,
+                value: nextValue,
+            });
+            return;
+        }
+        const currentState = currentBuilderStateRef.current || state;
+        const current = getScopeParamValue(currentState, key);
+        let nextValue;
+        if (filter.multiple) {
+            const list = Array.isArray(current) ? current : [];
+            nextValue = list.includes(optionValue)
+                ? list.filter((entry) => entry !== optionValue)
+                : [...list, optionValue];
+        } else {
+            nextValue = current === optionValue ? "" : optionValue;
+        }
+        persistExplorationMutation({
+            ...setScopeParamValue(currentState, key, nextValue),
+            page: 1,
+        });
+    };
+    const setDateRangeValue = (filter, edge, value) => {
+        const key = resolveScopeParamId(filter);
+        if (!key) return;
+        const normalizedDatasetRef = normalizeString(filter?.datasetRef || "primary") || "primary";
+        if (normalizedDatasetRef !== "primary") {
+            const currentScopedValues = runtimePreviewInteraction.datasetScopeParams?.[normalizedDatasetRef]
+                && typeof runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef] === "object"
+                && !Array.isArray(runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef])
+                    ? runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef]
+                    : {};
+            const current = currentScopedValues[key] && typeof currentScopedValues[key] === "object"
+                ? currentScopedValues[key]
+                : {};
+            runtimePreviewInteraction.setDatasetScopeParamValue({
+                datasetRef: normalizedDatasetRef,
+                paramId: key,
+                value: {
+                    ...current,
+                    [edge]: value || "",
+                },
+            });
+            return;
+        }
+        const currentState = currentBuilderStateRef.current || state;
+        const current = getScopeParamValue(currentState, key);
+        const previous = current && typeof current === "object" ? current : {};
+        persistExplorationMutation({
+            ...setScopeParamValue(currentState, key, {
+                ...previous,
+                [edge]: value || "",
+            }),
+            page: 1,
+        });
+    };
+    const runtimePreviewHandlers = useMemo(() => ({
+        ...(runtimePreviewSurface.runtimeHandlers || {}),
+        toggleScopeParamOption: (filter, optionValue) => toggleStaticFilter(filter, optionValue),
+        setScopeParamDate: (filter, edge, value) => setDateRangeValue(filter, edge, value),
+    }), [runtimePreviewSurface.runtimeHandlers, setDateRangeValue, toggleStaticFilter]);
     const startChartSelectionExploration = React.useCallback(() => {
         const currentState = currentBuilderStateRef.current || {};
         if (!selectedBuilderChartSelection || !canShowResultsRef.current || isReportBuilderExplorationActive(currentState)) {
@@ -6527,6 +8972,7 @@ export default function ReportBuilder({ container, context }) {
             chartSpec: normalized,
             viewMode: "chart",
         });
+        setSelectedBuilderChartSelection(null);
         setChartApplyFeedback(null);
         if (savePreset) {
             saveChartPreset(normalized);
@@ -6540,6 +8986,7 @@ export default function ReportBuilder({ container, context }) {
             chartSpec: null,
             viewMode: "table",
         });
+        setSelectedBuilderChartSelection(null);
         setChartApplyFeedback(null);
     }, [persistExplorationMutation, state]);
 
@@ -6619,6 +9066,7 @@ export default function ReportBuilder({ container, context }) {
         hasTableQuickPresets,
         quickChartOptions,
         overflowActionCount: desktopResultOverflowActions.length,
+        workspaceMode,
     }), [
         actionModel.desktop,
         canCreateChart,
@@ -6629,6 +9077,7 @@ export default function ReportBuilder({ container, context }) {
         quickChartOptions,
         resultViewModes,
         state.viewMode,
+        workspaceMode,
     ]);
 
     const openChartDialog = React.useCallback((seed = null) => {
@@ -6685,6 +9134,32 @@ export default function ReportBuilder({ container, context }) {
             requiresManualRun: prepared.requiresManualRun,
         }));
     }, [dispatchReportRequest, displayConfig, persistExplorationMutation, resolveStateReadiness, semanticDisplayConfig, state]);
+    const applyQuickChartToAuthoredDocument = React.useCallback((nextState = {}, normalizedChartSpec = null) => {
+        if (!showAuthoredReportSurface || !normalizedChartSpec) {
+            return nextState;
+        }
+        const existingChartBlock = authoredDocumentBlocks.find((block) => normalizeString(block?.kind) === "chartBlock") || null;
+        const chartDraft = buildReportBuilderDocumentBlockDraft("chartBlock", {
+            ...(existingChartBlock ? { id: existingChartBlock.id } : {}),
+            title: normalizeString(normalizedChartSpec?.title || existingChartBlock?.title || "Chart") || "Chart",
+            datasetRef: normalizeString(existingChartBlock?.datasetRef || "primary") || "primary",
+            chartSpec: normalizedChartSpec,
+        }, {
+            existingBlocks: authoredDocumentBlocks,
+            chartConfig: authoredChartConfig,
+            chartState: nextState,
+        });
+        const upserted = upsertReportBuilderDocumentBlockState(nextState, chartDraft, {
+            editingId: normalizeString(existingChartBlock?.id),
+            insertionAfterId: existingChartBlock ? "" : "primaryBuilder",
+            insertionPlacement: "after",
+            chartConfig: authoredChartConfig,
+            chartFieldOptions: authoredChartDialogFieldOptions,
+        });
+        return upserted?.valid && upserted?.nextState
+            ? upserted.nextState
+            : nextState;
+    }, [authoredChartConfig, authoredChartDialogFieldOptions, authoredDocumentBlocks, showAuthoredReportSurface]);
 
     const applyQuickChart = React.useCallback((quickOptionValue = "") => {
         const optionValue = String(quickOptionValue || selectedQuickChartOption || "").trim();
@@ -6766,38 +9241,39 @@ export default function ReportBuilder({ container, context }) {
             setSelectedQuickChartOption("");
             return;
         }
-        persistExplorationMutation(prepared.nextState, {
-            sourceKind: "reportBuilder.chartResult",
-            sourceContext: {
-                label: prepared.normalizedChartSpec?.title || next.label || "Chart",
-            },
-        });
-        const preparedReadiness = resolveStateReadiness(prepared.nextState);
-        const didFetchPreparedState = prepared.shouldFetch && preparedReadiness.canRun;
-        if (didFetchPreparedState) {
-            dispatchReportRequest(prepared.nextState, { forceFetch: true });
-        }
-        const changedParts = [];
-        if (prepared.measureSelectionChanged || prepared.primaryMeasureChanged) {
+        setSelectedBuilderChartSelection(null);
+            const nextPreparedState = applyQuickChartToAuthoredDocument(prepared.nextState, prepared.normalizedChartSpec);
+            persistExplorationMutation(nextPreparedState, {
+                sourceKind: "reportBuilder.chartResult",
+                sourceContext: {
+                    label: prepared.normalizedChartSpec?.title || next.label || "Chart",
+                },
+            });
+            const preparedReadiness = resolveStateReadiness(nextPreparedState);
+            const didFetchPreparedState = prepared.shouldFetch && preparedReadiness.canRun;
+            if (didFetchPreparedState) {
+                dispatchReportRequest(nextPreparedState, { forceFetch: true });
+            }
+            const changedParts = [];
+            if (prepared.measureSelectionChanged || prepared.primaryMeasureChanged) {
             changedParts.push("measures");
         }
         if (prepared.dimensionSelectionChanged) {
             changedParts.push("breakdowns");
         }
-        setChartApplyFeedback(buildReportBuilderPresetApplyFeedback({
-            kind: "chart",
-            changedParts,
-            selectionChanged: prepared.selectionChanged,
-            didFetchPreparedState,
+            setChartApplyFeedback(buildReportBuilderPresetApplyFeedback({
+                kind: "chart",
+                changedParts,
+                selectionChanged: prepared.selectionChanged,
+                didFetchPreparedState,
             preparedReadiness,
             requiresManualRun: prepared.requiresManualRun,
-        }));
-        saveChartPreset(prepared.normalizedChartSpec, {
-            settingsHash: buildReportBuilderSettingsHash(prepared.nextState),
-        });
-        setSelectedQuickChartOption("");
-    }, [applyChartSpec, dispatchReportRequest, displayConfig, persistExplorationMutation, quickChartOptions, quickPresetPolicy.autoFetchOnSelect, quickPresetPolicy.autoProvisionMissingDimensions, quickPresetPolicy.selectionPolicy, resolveStateReadiness, saveChartPreset, selectedQuickChartOption, state]);
-
+            }));
+            saveChartPreset(prepared.normalizedChartSpec, {
+                settingsHash: buildReportBuilderSettingsHash(nextPreparedState),
+            });
+            setSelectedQuickChartOption("");
+    }, [applyChartSpec, applyQuickChartToAuthoredDocument, dispatchReportRequest, displayConfig, persistExplorationMutation, quickChartOptions, quickPresetPolicy.autoFetchOnSelect, quickPresetPolicy.autoProvisionMissingDimensions, quickPresetPolicy.selectionPolicy, resolveStateReadiness, saveChartPreset, selectedQuickChartOption, state]);
     const runCompactPrimaryAction = React.useCallback(() => {
         closeCompactSheet();
         closeCompactChartSheet();
@@ -6827,24 +9303,27 @@ export default function ReportBuilder({ container, context }) {
         }),
         [displayConfig, editingTableCalculationId, tableCalculationDraft],
     );
-    const openDocumentBlockDialog = React.useCallback((kindOrSeed = "markdownBlock") => {
+    const openDocumentBlockDialog = React.useCallback((kindOrSeed = "markdownBlock", options = {}) => {
         const seed = kindOrSeed && typeof kindOrSeed === "object" && !Array.isArray(kindOrSeed)
             ? kindOrSeed
             : { kind: kindOrSeed };
         setChartApplyFeedback(null);
         setEditingDocumentBlockId(String(seed?.id || "").trim());
+        setPendingDocumentInsertionAfterId(String(seed?.id || "").trim() ? "" : normalizeString(options?.insertionAfterId || "primaryBuilder"));
+        setPendingDocumentInsertionPlacement(String(seed?.id || "").trim() ? "after" : (normalizeString(options?.insertionPlacement).toLowerCase() === "before" ? "before" : "after"));
         setDocumentBlockDraft(buildReportBuilderDocumentBlockDraft(seed?.kind || "markdownBlock", seed, {
             existingBlocks: authoredDocumentBlocks,
             valueFieldOptions: authoredKpiValueFieldOptions,
             secondaryFieldOptions: authoredKpiSecondaryFieldOptions,
             tableColumnOptions: authoredTableColumnOptions,
+            datasetOptions: authoredDatasetOptions,
             scopeParamOptions: authoredScopeParamOptions,
             chartConfig: authoredChartConfig,
             chartState: authoredChartState,
         }));
         setDocumentBlockDialogOpen(true);
-    }, [authoredChartConfig, authoredChartState, authoredDocumentBlocks, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
-    const openAuthoredChartBlockDialog = React.useCallback((seed = null) => {
+    }, [authoredChartConfig, authoredChartState, authoredDatasetOptions, authoredDocumentBlocks, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
+    const openAuthoredChartBlockDialog = React.useCallback((seed = null, options = {}) => {
         const nextDraft = buildReportBuilderDocumentBlockDraft("chartBlock", seed, {
             existingBlocks: authoredDocumentBlocks,
             chartConfig: authoredChartConfig,
@@ -6855,9 +9334,49 @@ export default function ReportBuilder({ container, context }) {
         }
         setChartApplyFeedback(null);
         setEditingAuthoredChartBlockId(String(seed?.id || "").trim());
+        setPendingDocumentInsertionAfterId(String(seed?.id || "").trim() ? "" : normalizeString(options?.insertionAfterId || "primaryBuilder"));
+        setPendingDocumentInsertionPlacement(String(seed?.id || "").trim() ? "after" : (normalizeString(options?.insertionPlacement).toLowerCase() === "before" ? "before" : "after"));
         setAuthoredChartBlockDraft(nextDraft);
         setAuthoredChartBlockDialogOpen(true);
     }, [authoredChartConfig, authoredChartState, authoredDocumentBlocks]);
+    const buildRepairableDocumentBlockDraft = React.useCallback((block = null) => (
+        buildRepairableReportBuilderDocumentBlockDraft(block, {
+            existingBlocks: authoredDocumentBlocks,
+            tableColumnOptions: authoredTableColumnOptions,
+        })
+    ), [authoredDocumentBlocks, authoredTableColumnOptions]);
+    const applyDocumentBlockCurrentSelection = React.useCallback((block = null) => {
+        const repairResult = repairReportBuilderDocumentBlockWithCurrentSelection({
+            state,
+            block,
+            existingBlocks: authoredDocumentBlocks,
+            valueFieldOptions: authoredKpiValueFieldOptions,
+            secondaryFieldOptions: authoredKpiSecondaryFieldOptions,
+            tableColumnOptions: authoredTableColumnOptions,
+            scopeParamOptions: authoredScopeParamOptions,
+            chartConfig: authoredChartConfig,
+            chartFieldOptions: authoredChartFieldOptions,
+            resolveStateReadiness,
+        });
+        if (!repairResult.applied || !repairResult.block) {
+            return false;
+        }
+        persistExplorationMutation(repairResult.nextState, {
+            sourceKind: "reportBuilder.result",
+            sourceContext: {
+                label: `${repairResult.block.title || repairResult.block.id || "Authored block"} current selection`,
+            },
+        });
+        if (repairResult.didRefreshResults) {
+            dispatchReportRequest(repairResult.nextState, { forceFetch: true });
+        }
+        setSelectedDocumentOutlineEntryId(repairResult.block.id);
+        setChartApplyFeedback({
+            level: "success",
+            message: repairResult.feedbackMessage,
+        });
+        return true;
+    }, [authoredChartConfig, authoredChartFieldOptions, authoredDocumentBlocks, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions, dispatchReportRequest, persistExplorationMutation, resolveStateReadiness, state]);
     const openDocumentBlockDialogForDiagnostic = React.useCallback((diagnostic = null) => {
         const targetBlockId = String(diagnostic?.blockId || "").trim();
         if (!targetBlockId) {
@@ -6867,20 +9386,48 @@ export default function ReportBuilder({ container, context }) {
         if (!block) {
             return;
         }
+        setSelectedDocumentOutlineEntryId(targetBlockId);
         if (String(block?.kind || "").trim() === "chartBlock") {
             openAuthoredChartBlockDialog(block);
             return;
         }
         openDocumentBlockDialog(block);
     }, [authoredDocumentBlocks, openAuthoredChartBlockDialog, openDocumentBlockDialog]);
+    const resolveDocumentBlockDiagnosticActionLabel = React.useCallback((diagnostic = null) => {
+        if (normalizeString(diagnostic?.code) !== "documentBlockTableEmpty") {
+            return "Edit block";
+        }
+        const targetBlockId = normalizeString(diagnostic?.blockId);
+        if (!targetBlockId) {
+            return "Edit block";
+        }
+        const block = authoredDocumentBlocks.find((entry) => normalizeString(entry?.id) === targetBlockId) || null;
+        return buildRepairableDocumentBlockDraft(block) ? "Apply current fields" : "Edit block";
+    }, [authoredDocumentBlocks, buildRepairableDocumentBlockDraft]);
+    const handleDocumentBlockDiagnosticAction = React.useCallback((diagnostic = null) => {
+        if (normalizeString(diagnostic?.code) === "documentBlockTableEmpty") {
+            const targetBlockId = normalizeString(diagnostic?.blockId);
+            if (targetBlockId) {
+                const block = authoredDocumentBlocks.find((entry) => normalizeString(entry?.id) === targetBlockId) || null;
+                if (block && applyDocumentBlockCurrentSelection(block)) {
+                    return;
+                }
+            }
+        }
+        openDocumentBlockDialogForDiagnostic(diagnostic);
+    }, [applyDocumentBlockCurrentSelection, authoredDocumentBlocks, openDocumentBlockDialogForDiagnostic]);
     const closeDocumentBlockDialog = React.useCallback(() => {
         setDocumentBlockDialogOpen(false);
         setEditingDocumentBlockId("");
+        setPendingDocumentInsertionAfterId("primaryBuilder");
+        setPendingDocumentInsertionPlacement("after");
         setDocumentBlockDraft(buildReportBuilderDocumentBlockDraft("markdownBlock"));
     }, []);
     const closeAuthoredChartBlockDialog = React.useCallback(() => {
         setAuthoredChartBlockDialogOpen(false);
         setEditingAuthoredChartBlockId("");
+        setPendingDocumentInsertionAfterId("primaryBuilder");
+        setPendingDocumentInsertionPlacement("after");
         setAuthoredChartBlockDraft(null);
     }, []);
     const openCalculatedFieldDialog = React.useCallback((seed = null) => {
@@ -7015,9 +9562,11 @@ export default function ReportBuilder({ container, context }) {
     const applyDocumentBlockDraft = React.useCallback(() => {
         const result = upsertReportBuilderDocumentBlockState(state, documentBlockDraft, {
             editingId: editingDocumentBlockId,
-            valueFieldOptions: authoredKpiValueFieldOptions,
-            secondaryFieldOptions: authoredKpiSecondaryFieldOptions,
-            tableColumnOptions: authoredTableColumnOptions,
+            insertionAfterId: pendingDocumentInsertionAfterId,
+            insertionPlacement: pendingDocumentInsertionPlacement,
+            valueFieldOptions: documentBlockDraftValueFieldOptions,
+            secondaryFieldOptions: documentBlockDraftSecondaryFieldOptions,
+            tableColumnOptions: documentBlockDraftTableColumnOptions,
             scopeParamOptions: authoredScopeParamOptions,
             chartConfig: authoredChartConfig,
             chartFieldOptions: authoredChartFieldOptions,
@@ -7031,22 +9580,44 @@ export default function ReportBuilder({ container, context }) {
                 label: result.block.title || result.block.id || "Authored block",
             },
         });
+        setSelectedDocumentOutlineEntryId(result.block.id);
         closeDocumentBlockDialog();
+        const insertionAnchorTitle = pendingDocumentInsertionAfterId === "primaryBuilder"
+            ? ""
+            : (authoredDocumentBlocks.find((block) => normalizeString(block?.id) === normalizeString(pendingDocumentInsertionAfterId))?.title
+                || normalizeString(pendingDocumentInsertionAfterId));
+        const insertionPlacementLabel = pendingDocumentInsertionPlacement === "before" ? "before" : "after";
         setChartApplyFeedback({
             level: "success",
             message: result.created
-                ? `${result.block.title || result.block.id || "Authored block"} added to the report document.`
+                ? `${result.block.title || result.block.id || "Authored block"} added${insertionAnchorTitle ? ` ${insertionPlacementLabel} ${insertionAnchorTitle}` : ""}.`
                 : `${result.block.title || result.block.id || "Authored block"} updated.`,
         });
         return true;
-    }, [authoredChartConfig, authoredChartFieldOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions, closeDocumentBlockDialog, documentBlockDraft, editingDocumentBlockId, persistExplorationMutation, state]);
+    }, [authoredChartConfig, authoredChartFieldOptions, authoredDocumentBlocks, authoredScopeParamOptions, closeDocumentBlockDialog, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions, editingDocumentBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, persistExplorationMutation, state]);
     const applyDocumentTemplate = React.useCallback((templateId = "") => {
         const normalizedTemplateId = String(templateId || "").trim();
         if (!normalizedTemplateId) {
             return false;
         }
+        if (normalizedTemplateId === "__blank__") {
+            const blankState = buildReportBuilderStarterAppliedState(buildBlankReportBuilderDocumentState(displayConfig, {
+                baseState: state,
+            }));
+            requestFingerprintRef.current = "";
+            persistStateWithConfig(blankState, config, {
+                preserveHydratedSession: false,
+                skipExplorationHistory: true,
+            });
+            runtimePreviewInteraction.clearInteractionState();
+            setChartApplyFeedback(null);
+            return true;
+        }
         const template = reportDocumentTemplates.find((entry) => String(entry?.id || "").trim() === normalizedTemplateId) || null;
-        const result = instantiateReportBuilderDocumentTemplate(displayConfig, template);
+        const result = instantiateReportBuilderDocumentTemplate(displayConfig, template, {
+            baseState: state,
+            preserveInputState: true,
+        });
         if (!result.valid || !result.nextState) {
             setChartApplyFeedback({
                 level: "danger",
@@ -7054,22 +9625,106 @@ export default function ReportBuilder({ container, context }) {
             });
             return false;
         }
-        persistExplorationMutation(result.nextState, {
-            sourceKind: "reportBuilder.result",
-            sourceContext: {
-                label: result.template?.label || "Report template",
-            },
+        requestFingerprintRef.current = "";
+        persistStateWithConfig(buildReportBuilderStarterAppliedState(result.nextState), config, {
+            preserveHydratedSession: false,
+            skipExplorationHistory: true,
         });
-        const templateReadiness = resolveStateReadiness(result.nextState);
-        if (templateReadiness.canRun) {
-            dispatchReportRequest(result.nextState, { forceFetch: true });
-        }
+        runtimePreviewInteraction.clearInteractionState();
         setChartApplyFeedback({
             level: "success",
             message: `${result.template?.label || "Report template"} applied.`,
         });
         return true;
-    }, [dispatchReportRequest, displayConfig, persistExplorationMutation, reportDocumentTemplates, resolveStateReadiness]);
+    }, [config, displayConfig, persistStateWithConfig, reportDocumentTemplates, runtimePreviewInteraction, state]);
+    const resetReportDocumentToBlank = React.useCallback(() => {
+        const resetApplied = applyDocumentTemplate("__blank__");
+        if (!resetApplied) {
+            return false;
+        }
+        setSelectedDocumentOutlineEntryId("");
+        setPendingDocumentInsertionAfterId("primaryBuilder");
+        setPendingDocumentInsertionPlacement("after");
+        setDocumentDataViewOpen(false);
+        setAuthoredDiagnosticsExpanded(false);
+        return true;
+    }, [applyDocumentTemplate]);
+    const requestedReportStarterId = useMemo(
+        () => resolveAutoAppliedReportStarterId({
+            requestedReportStarterId: normalizeString(container?.parameters?.reportStarterId),
+            prefillReportStarterId: normalizeString(displayConfig?.prefillReportStarterId),
+            hasPrefill: !!currentPrefillSignature,
+            currentTemplateId: normalizeString(state?.reportDocumentTemplateId),
+            authoredBlockCount: Array.isArray(state?.reportDocumentBlocks) ? state.reportDocumentBlocks.length : 0,
+            availableTemplateIds: reportDocumentTemplates.map((template) => normalizeString(template?.id)),
+        }),
+        [
+            container?.parameters?.reportStarterId,
+            currentPrefillSignature,
+            displayConfig?.prefillReportStarterId,
+            reportDocumentTemplates,
+            state?.reportDocumentBlocks,
+            state?.reportDocumentTemplateId,
+        ],
+    );
+    useEffect(() => {
+        if (!requestedReportStarterId) {
+            return;
+        }
+        if (shouldDeferReportBuilderRequestForPrefill({
+            currentPrefillSignature,
+            appliedPrefillSignature: appliedPrefillSignatureRef.current,
+        })) {
+            return;
+        }
+        if (appliedReportStarterIdRef.current === requestedReportStarterId) {
+            return;
+        }
+        if (requestedReportStarterId === "__blank__") {
+            const blankState = buildReportBuilderStarterAppliedState(buildBlankReportBuilderDocumentState(displayConfig, {
+                baseState: state,
+            }));
+            if (JSON.stringify(blankState) !== JSON.stringify(state)) {
+                persistStateWithConfig(blankState, config, {
+                    preserveHydratedSession: false,
+                    skipExplorationHistory: true,
+                });
+                runtimePreviewInteraction.clearInteractionState();
+            }
+            appliedReportStarterIdRef.current = requestedReportStarterId;
+            return;
+        }
+        if (normalizeString(state?.reportDocumentTemplateId)) {
+            appliedReportStarterIdRef.current = requestedReportStarterId;
+            return;
+        }
+        if (Array.isArray(state?.reportDocumentBlocks) && state.reportDocumentBlocks.length > 0) {
+            appliedReportStarterIdRef.current = requestedReportStarterId;
+            return;
+        }
+        if (!reportDocumentTemplates.some((template) => normalizeString(template?.id) === requestedReportStarterId)) {
+            if (reportDocumentTemplates.length > 0) {
+                appliedReportStarterIdRef.current = requestedReportStarterId;
+            }
+            return;
+        }
+        const applied = applyDocumentTemplate(requestedReportStarterId);
+        if (applied) {
+            appliedReportStarterIdRef.current = requestedReportStarterId;
+        }
+    }, [
+        applyDocumentTemplate,
+        currentPrefillSignature,
+        config,
+        displayConfig,
+        persistStateWithConfig,
+        reportDocumentTemplates,
+        requestedReportStarterId,
+        runtimePreviewInteraction,
+        state,
+        state?.reportDocumentBlocks,
+        state?.reportDocumentTemplateId,
+    ]);
     const updateReportDocumentMetadata = React.useCallback((field = "", value = "") => {
         const normalizedField = String(field || "").trim();
         if (!normalizedField) {
@@ -7193,14 +9848,48 @@ export default function ReportBuilder({ container, context }) {
         if (!nextDraft) {
             return;
         }
+        setDesignWorkspaceFocus("document");
+        setDocumentDataViewOpen(true);
+        setDimensionsCollapsed(false);
+        setDrillAuthoringExpanded(true);
         setEditingAuthoredDetailTargetRef(String(binding?.targetRef || "").trim());
         setAuthoredDetailFieldRefDraft(nextDraft.fieldRef);
         setAuthoredDetailTargetRefDraft(nextDraft.targetRef);
+        setAuthoredDetailTargetManualMode(false);
         setAuthoredDetailNavigationModeDraft(nextDraft.navigationMode);
         setAuthoredDetailTitleDraft(nextDraft.title);
         setAuthoredDetailDescriptionDraft(nextDraft.description);
         setAuthoredDetailParameterRowsDraft(nextDraft.parameterRows);
     }, []);
+    const beginAuthoredDetailTargetDraft = React.useCallback((fieldRef = "") => {
+        const normalizedFieldRef = String(fieldRef || "").trim();
+        const matchedFieldOption = authoredDetailFieldOptions.find((entry) => normalizeString(entry?.value) === normalizedFieldRef) || null;
+        if (normalizedFieldRef && !matchedFieldOption) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: `${normalizedFieldRef} is no longer available in the current drill authoring fields. Restore the hierarchy field in the builder before adding a detail action.`,
+            });
+            setDesignWorkspaceFocus("document");
+            setDocumentDataViewOpen(true);
+            setDrillAuthoringExpanded(true);
+            setDimensionsCollapsed(false);
+            requestAnimationFrame(() => scrollDesignPanelIntoView(breakdownPanelRef));
+            return;
+        }
+        setDrillAuthoringExpanded(true);
+        setDesignWorkspaceFocus("document");
+        setDocumentDataViewOpen(true);
+        setDimensionsCollapsed(false);
+        setEditingAuthoredDetailTargetRef("");
+        setAuthoredDetailFieldRefDraft(normalizedFieldRef);
+        setAuthoredDetailTargetRefDraft("");
+        setAuthoredDetailTargetManualMode(false);
+        setAuthoredDetailNavigationModeDraft("hostRoute");
+        setAuthoredDetailTitleDraft("");
+        setAuthoredDetailDescriptionDraft("");
+        setAuthoredDetailParameterRowsDraft(normalizeReportBuilderDetailParameterDraftRows());
+        requestAnimationFrame(() => scrollDesignPanelIntoView(breakdownPanelRef));
+    }, [authoredDetailFieldOptions, scrollDesignPanelIntoView]);
     const applyAuthoredDetailTarget = React.useCallback(() => {
         if (!authoredDetailFieldOption || !authoredDetailTargetDraftValue) {
             setChartApplyFeedback({
@@ -7241,6 +9930,7 @@ export default function ReportBuilder({ container, context }) {
         });
         setEditingAuthoredDetailTargetRef("");
         setAuthoredDetailTargetRefDraft("");
+        setAuthoredDetailTargetManualMode(false);
         setAuthoredDetailParameterRowsDraft(normalizeReportBuilderDetailParameterDraftRows());
         setAuthoredDetailTitleDraft("");
         setAuthoredDetailDescriptionDraft("");
@@ -7292,8 +9982,10 @@ export default function ReportBuilder({ container, context }) {
     const applyAuthoredChartBlockDraft = React.useCallback(() => {
         const result = upsertReportBuilderDocumentBlockState(state, authoredChartBlockDraft, {
             editingId: editingAuthoredChartBlockId,
+            insertionAfterId: pendingDocumentInsertionAfterId,
+            insertionPlacement: pendingDocumentInsertionPlacement,
             chartConfig: authoredChartConfig,
-            chartFieldOptions: authoredChartFieldOptions,
+            chartFieldOptions: authoredChartDialogFieldOptions,
         });
         if (!result.valid || !result.block) {
             return false;
@@ -7304,15 +9996,21 @@ export default function ReportBuilder({ container, context }) {
                 label: result.block.title || result.block.id || "Authored chart",
             },
         });
+        setSelectedDocumentOutlineEntryId(result.block.id);
         closeAuthoredChartBlockDialog();
+        const insertionAnchorTitle = pendingDocumentInsertionAfterId === "primaryBuilder"
+            ? ""
+            : (authoredDocumentBlocks.find((block) => normalizeString(block?.id) === normalizeString(pendingDocumentInsertionAfterId))?.title
+                || normalizeString(pendingDocumentInsertionAfterId));
+        const insertionPlacementLabel = pendingDocumentInsertionPlacement === "before" ? "before" : "after";
         setChartApplyFeedback({
             level: "success",
             message: result.created
-                ? `${result.block.title || result.block.id || "Authored chart"} added to the report document.`
+                ? `${result.block.title || result.block.id || "Authored chart"} added${insertionAnchorTitle ? ` ${insertionPlacementLabel} ${insertionAnchorTitle}` : ""}.`
                 : `${result.block.title || result.block.id || "Authored chart"} updated.`,
         });
         return true;
-    }, [authoredChartBlockDraft, authoredChartConfig, authoredChartFieldOptions, closeAuthoredChartBlockDialog, editingAuthoredChartBlockId, persistExplorationMutation, state]);
+    }, [authoredChartBlockDraft, authoredChartConfig, authoredChartDialogFieldOptions, authoredDocumentBlocks, closeAuthoredChartBlockDialog, editingAuthoredChartBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, persistExplorationMutation, state]);
     const removeDocumentBlock = React.useCallback((blockId = "") => {
         const normalizedBlockId = String(blockId || "").trim();
         if (!normalizedBlockId) {
@@ -7342,12 +10040,118 @@ export default function ReportBuilder({ container, context }) {
             },
         });
     }, [persistExplorationMutation, state]);
+    const moveDocumentBlockRelative = React.useCallback((blockId = "", targetBlockId = "", placement = "before") => {
+        const normalizedBlockId = String(blockId || "").trim();
+        const normalizedTargetBlockId = String(targetBlockId || "").trim();
+        const normalizedPlacement = normalizeString(placement).toLowerCase() === "after" ? "after" : "before";
+        if (!normalizedBlockId || !normalizedTargetBlockId || normalizedBlockId === normalizedTargetBlockId) {
+            return;
+        }
+        const currentBlock = authoredDocumentBlocks.find((block) => String(block?.id || "").trim() === normalizedBlockId) || null;
+        const targetBlock = authoredDocumentBlocks.find((block) => String(block?.id || "").trim() === normalizedTargetBlockId) || null;
+        if (!currentBlock || !targetBlock) {
+            return;
+        }
+        persistExplorationMutation(
+            moveReportBuilderDocumentBlockRelativeState(state, normalizedBlockId, normalizedTargetBlockId, normalizedPlacement),
+            {
+                sourceKind: "reportBuilder.result",
+                sourceContext: {
+                    label: currentBlock?.title || normalizedBlockId,
+                },
+            },
+        );
+        setChartApplyFeedback({
+            level: "info",
+            message: `${currentBlock?.title || normalizedBlockId} moved ${normalizedPlacement} ${targetBlock?.title || normalizedTargetBlockId}.`,
+        });
+    }, [authoredDocumentBlocks, persistExplorationMutation, state]);
+    const clearDocumentOutlineDragState = React.useCallback(() => {
+        setDraggingDocumentBlockId("");
+        setDocumentOutlinePointerDragState({
+            blockId: "",
+            active: false,
+        });
+        setDocumentOutlineDropTarget({
+            targetId: "",
+            placement: "",
+        });
+    }, []);
+    const updateDocumentOutlineDropTarget = React.useCallback((event, targetId = "") => {
+        const normalizedTargetId = String(targetId || "").trim();
+        if (!normalizedTargetId) {
+            return "";
+        }
+        event.preventDefault();
+        const bounds = event.currentTarget?.getBoundingClientRect?.();
+        const placement = bounds && Number.isFinite(bounds.top) && Number.isFinite(bounds.height)
+            ? ((event.clientY - bounds.top) > (bounds.height / 2) ? "after" : "before")
+            : "before";
+        setDocumentOutlineDropTarget({
+            targetId: normalizedTargetId,
+            placement,
+        });
+        return placement;
+    }, []);
+    useEffect(() => {
+        if (!documentOutlinePointerDragState.active || !documentOutlinePointerDragState.blockId) {
+            return undefined;
+        }
+        const handleMove = (event) => {
+            const hovered = document.elementFromPoint(event.clientX, event.clientY);
+            const targetNode = hovered?.closest?.('[data-testid="report-builder-outline-node"]');
+            const targetId = normalizeString(targetNode?.getAttribute?.("data-outline-entry-id"));
+            const targetDepth = Number(targetNode?.getAttribute?.("data-outline-depth") || 0);
+            if (!targetId || targetDepth !== 0 || targetId === documentOutlinePointerDragState.blockId) {
+                setDocumentOutlineDropTarget({
+                    targetId: "",
+                    placement: "",
+                });
+                return;
+            }
+            const rect = targetNode.getBoundingClientRect();
+            const placement = (event.clientY - rect.top) > (rect.height / 2) ? "after" : "before";
+            setDocumentOutlineDropTarget({
+                targetId,
+                placement,
+            });
+        };
+        const handleUp = (event) => {
+            const hovered = document.elementFromPoint(event.clientX, event.clientY);
+            const targetNode = hovered?.closest?.('[data-testid="report-builder-outline-node"]');
+            const targetId = normalizeString(targetNode?.getAttribute?.("data-outline-entry-id"));
+            const targetDepth = Number(targetNode?.getAttribute?.("data-outline-depth") || 0);
+            if (targetId && targetDepth === 0 && targetId !== documentOutlinePointerDragState.blockId) {
+                const rect = targetNode.getBoundingClientRect();
+                const placement = (event.clientY - rect.top) > (rect.height / 2) ? "after" : "before";
+                moveDocumentBlockRelative(documentOutlinePointerDragState.blockId, targetId, placement);
+            }
+            clearDocumentOutlineDragState();
+        };
+        const handleCancel = () => {
+            clearDocumentOutlineDragState();
+        };
+        window.addEventListener("pointermove", handleMove);
+        window.addEventListener("pointerup", handleUp);
+        window.addEventListener("pointercancel", handleCancel);
+        return () => {
+            window.removeEventListener("pointermove", handleMove);
+            window.removeEventListener("pointerup", handleUp);
+            window.removeEventListener("pointercancel", handleCancel);
+        };
+    }, [
+        clearDocumentOutlineDragState,
+        documentOutlinePointerDragState.active,
+        documentOutlinePointerDragState.blockId,
+        moveDocumentBlockRelative,
+    ]);
     const resizeDocumentBlock = React.useCallback((blockId = "", size = "full") => {
         const normalizedBlockId = String(blockId || "").trim();
         if (!normalizedBlockId) {
             return;
         }
         const currentBlock = authoredDocumentBlocks.find((block) => String(block?.id || "").trim() === normalizedBlockId) || null;
+        const nextWidthLabels = resolveReportBuilderDocumentWidthLabels({ span: size, size });
         persistExplorationMutation(resizeReportBuilderDocumentBlockState(state, normalizedBlockId, size), {
             sourceKind: "reportBuilder.result",
             sourceContext: {
@@ -7356,7 +10160,7 @@ export default function ReportBuilder({ container, context }) {
         });
         setChartApplyFeedback({
             level: "info",
-            message: `${currentBlock?.title || normalizedBlockId} resized to ${String(size || "full").trim() === "half" ? "half" : "full"} width in the authored report layout.`,
+            message: `${currentBlock?.title || normalizedBlockId} resized to ${nextWidthLabels.currentLabel.replace(/^Width:\s*/, "")} in the authored report layout.`,
         });
     }, [authoredDocumentBlocks, persistExplorationMutation, state]);
     const duplicateDocumentBlock = React.useCallback((blockId = "") => {
@@ -7374,6 +10178,7 @@ export default function ReportBuilder({ container, context }) {
                 label: result.block.title || result.block.id || normalizedBlockId,
             },
         });
+        setSelectedDocumentOutlineEntryId(result.block.id);
         setChartApplyFeedback({
             level: "success",
             message: `${result.block.title || result.block.id || normalizedBlockId} duplicated in the authored report document.`,
@@ -7401,12 +10206,12 @@ export default function ReportBuilder({ container, context }) {
             message: "Draft discarded.",
         });
     }, [persistState, state]);
-    const saveExploration = React.useCallback(() => {
+    const saveExploration = React.useCallback(async () => {
         const artifact = buildReportBuilderExplorationArtifact({
             container,
             config: semanticDisplayConfig,
             state,
-            semanticSummary: resolvedSemanticSummary,
+            semanticSummary: semanticRuntimeSummary,
             semanticModel: semanticModelState.model,
             semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
         });
@@ -7436,6 +10241,14 @@ export default function ReportBuilder({ container, context }) {
         const nextSavedReportPayloadRecord = buildReportBuilderSavedReportPayloadRecord(payload, {
             runtimeArtifact: runtimeArtifactValue,
         });
+        const saveReportRequest = buildReportBuilderSaveReportRequest(payload, {
+            runtimeArtifact: runtimeArtifactValue,
+            savedReportPayloadRecord: nextSavedReportPayloadRecord,
+            metadata: {
+                conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
+                workspaceId: String(container?.windowKey || container?.id || "").trim(),
+            },
+        });
         setSavedExplorationArtifact(artifact);
         setSavedExplorationRuntimeArtifact(runtimeArtifactValue);
         setSavedExplorationArtifactOpen(false);
@@ -7463,11 +10276,57 @@ export default function ReportBuilder({ container, context }) {
         setUpdateReportDocumentConflictDiagnostic(null);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
         resetPreparedApiArtifactOrigins();
+        let persistedStore = false;
+        let persistedStoreMode = "";
+        if (
+            saveReportRequest
+            && storedReportArtifact?.artifactId
+            && typeof reportStoreHandler?.updateReport === "function"
+        ) {
+            try {
+                const updatedReport = await reportStoreHandler.updateReport({
+                    artifactId: storedReportArtifact.artifactId,
+                    ...saveReportRequest,
+                });
+                if (updatedReport && typeof updatedReport === "object" && !Array.isArray(updatedReport)) {
+                    setStoredReportArtifact(updatedReport);
+                    setImportedLocalSavedReportRecords((current) => normalizeImportedLocalSavedReportRecords([
+                        ...current,
+                        updatedReport,
+                    ]));
+                    persistedStore = true;
+                    persistedStoreMode = "updated";
+                }
+            } catch (error) {
+                console.warn("reportBuilder.saveExploration store update failed", error);
+            }
+        } else if (saveReportRequest && typeof reportStoreHandler?.saveReport === "function") {
+            try {
+                const storedReport = await reportStoreHandler.saveReport(saveReportRequest);
+                if (storedReport && typeof storedReport === "object" && !Array.isArray(storedReport)) {
+                    setStoredReportArtifact(storedReport);
+                    setImportedLocalSavedReportRecords((current) => normalizeImportedLocalSavedReportRecords([
+                        ...current,
+                        storedReport,
+                    ]));
+                    persistedStore = true;
+                    persistedStoreMode = "saved";
+                }
+            } catch (error) {
+                console.warn("reportBuilder.saveExploration store persistence failed", error);
+            }
+        }
         setChartApplyFeedback({
-            level: "success",
-            message: `Saved report file ${payload?.title || artifact.title || "Report"}. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`,
+            level: persistedStore ? "success" : "success",
+            message: persistedStore
+                ? (
+                    persistedStoreMode === "updated"
+                        ? `Saved report file ${payload?.title || artifact.title || "Report"} and updated it in the report store. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`
+                        : `Saved report file ${payload?.title || artifact.title || "Report"} and persisted it to the report store. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`
+                )
+                : `Saved report file ${payload?.title || artifact.title || "Report"}. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`,
         });
-    }, [container, resetPreparedApiArtifactOrigins, resolvedSemanticSummary, runtimePreviewArtifact, runtimePreviewSemanticDiagnostics, semanticDisplayConfig, semanticModelState.model, state]);
+    }, [builderContext?.conversationId, builderContext?.windowState?.conversationId, container, reportStoreHandler, resetPreparedApiArtifactOrigins, runtimePreviewArtifact, runtimePreviewSemanticDiagnostics, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state, storedReportArtifact?.artifactId]);
     const resetImportedArtifactState = React.useCallback(({
         preserveStandaloneReportFill = false,
         preservePipelinePreview = false,
@@ -7553,21 +10412,39 @@ export default function ReportBuilder({ container, context }) {
         () => buildImportedLocalGetReportDocumentResponseIdentity(getReportDocumentResponse),
         [getReportDocumentResponse],
     );
+    useEffect(() => {
+        let cancelled = false;
+        if (typeof reportStoreHandler?.listReports !== "function") {
+            return undefined;
+        }
+        async function loadStoredReports() {
+            try {
+                const result = await reportStoreHandler.listReports({ limit: 50 });
+                if (cancelled) {
+                    return;
+                }
+                const reports = Array.isArray(result?.reports) ? result.reports : [];
+                setImportedLocalSavedReportRecords((current) => normalizeImportedLocalSavedReportRecords([
+                    ...current,
+                    ...reports,
+                ]));
+            } catch (error) {
+                console.warn("reportBuilder.listReports failed", error);
+            }
+        }
+        loadStoredReports();
+        return () => {
+            cancelled = true;
+        };
+    }, [reportStoreHandler]);
+    const hydratedImportedSourceIdentity = useMemo(
+        () => buildHydratedReportDocumentImportedSourceIdentity(hydratedReportDocumentSession),
+        [hydratedReportDocumentSession],
+    );
     const importedLocalReopenablePanelState = useMemo(() => buildImportedLocalReopenablePanelState({
-        importedLocalGetReportDocumentResponses: importedLocalGetReportDocumentResponses.map((response) => ({
-            id: buildImportedLocalGetReportDocumentResponseIdentity(response),
-            title: normalizeString(response?.document?.title || response?.reportRef?.reportId),
-            reportId: normalizeString(response?.reportRef?.reportId || response?.document?.id),
-            documentVersion: Number(response?.documentVersion || 0) || 0,
-            importedArtifactKind: normalizeString(response?.importedArtifactKind),
-            source: response?.source || null,
-            savedViewOverlay: response?.savedViewOverlay || null,
-            reportSpec: response?.reportSpec || null,
-            document: response?.document || null,
-            semanticSummary: response?.reportSpec?.semanticSummary || response?.document?.semanticSummary || null,
-            binding: response?.reportSpec?.binding || response?.document?.binding || null,
-            scopeParams: Array.isArray(response?.reportSpec?.scope?.params) ? response.reportSpec.scope.params : [],
-        })),
+        importedLocalGetReportDocumentResponses: importedLocalGetReportDocumentResponses
+            .map((response) => buildImportedLocalReopenablePanelSeedEntry(response))
+            .filter(Boolean),
         activeResponseIdentity: currentImportedLocalGetResponseIdentity,
         localSavedPayloads: importedLocalSavedReportRecords,
     }), [currentImportedLocalGetResponseIdentity, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
@@ -7575,18 +10452,158 @@ export default function ReportBuilder({ container, context }) {
         () => buildImportedLocalSavedReportRecordIdentity(savedReportPayloadRecord),
         [savedReportPayloadRecord],
     );
-    const reopenedSemanticBindingViewState = useMemo(
-        () => buildReportBuilderSemanticBindingViewState({
-            semanticSummary: hydratedReportDocumentSession?.reopenedSemanticSummary || null,
-            binding: hydratedReportDocumentSession?.reopenedConfig?.binding || null,
+    const selectedDocumentSemanticBindingState = useMemo(() => {
+        const selectedEntryKind = normalizeString(selectedDocumentOutlineEntry?.kind || "");
+        const shouldUseRenderedChartScope = selectedEntryKind === "chartView" && explicitChartMode && hasValidChartSpec;
+        const shouldUseDrillHierarchyScope = selectedEntryKind === "drillHierarchy" && selectedDocumentDrillState.hierarchy;
+        const shouldUseDrillPlaceholderScope = selectedEntryKind === "drillPlaceholder" && currentBreakdownDrillHierarchy;
+        const selectedSemanticBlock = shouldUseRenderedChartScope
+            ? { chartSpec: state.chartSpec }
+            : shouldUseDrillHierarchyScope
+                ? { levels: selectedDocumentDrillState.hierarchy.levels }
+                : shouldUseDrillPlaceholderScope
+                    ? { levels: currentBreakdownDrillHierarchy.levels }
+            : selectedDocumentOutlineBlock;
+        return buildReportBuilderSelectedSemanticBindingViewState({
+            entryKind: shouldUseRenderedChartScope
+                ? selectedEntryKind
+                : (
+                    selectedEntryKind === "chartView"
+                        ? "primaryBuilder"
+                        : selectedEntryKind
+                ),
+            block: selectedSemanticBlock,
+            semanticSummary: semanticRuntimeSummary || null,
+            binding: semanticBinding || null,
+            chartFieldOptions: authoredChartFieldOptions,
+            tableFieldOptions: authoredTableColumnOptions,
+        });
+    }, [authoredChartFieldOptions, authoredTableColumnOptions, currentBreakdownDrillHierarchy, explicitChartMode, hasValidChartSpec, semanticRuntimeSummary, selectedDocumentDrillState.hierarchy, semanticBinding, selectedDocumentOutlineBlock, selectedDocumentOutlineEntry?.kind, state.chartSpec]);
+    const showSelectedDocumentSemanticContext = useMemo(() => (
+        !!selectedDocumentSemanticBindingState
+        && !!selectedDocumentOutlineEntry
+        && normalizeString(selectedDocumentOutlineEntry?.kind) !== "primaryBuilder"
+        && !isReportBuilderScopeRuntimeOnlyOutlineKind(selectedDocumentOutlineEntry?.kind)
+    ), [selectedDocumentOutlineEntry, selectedDocumentSemanticBindingState]);
+    const primaryBuilderRuntimeTableBlock = useMemo(
+        () => (
+            Array.isArray(runtimePreviewModel?.reportSpec?.blocks)
+                ? (
+                    runtimePreviewModel.reportSpec.blocks.find((block) => normalizeString(block?.id) === "primaryTable")
+                    || runtimePreviewModel.reportSpec.blocks.find((block) => normalizeString(block?.kind) === "tableBlock")
+                    || null
+                )
+                : null
+        ),
+        [runtimePreviewModel?.reportSpec?.blocks],
+    );
+    const primaryBuilderRuntimeChartBlock = useMemo(
+        () => (
+            Array.isArray(runtimePreviewModel?.reportSpec?.blocks)
+                ? (
+                    runtimePreviewModel.reportSpec.blocks.find((block) => normalizeString(block?.id) === "primaryChart")
+                    || runtimePreviewModel.reportSpec.blocks.find((block) => normalizeString(block?.kind) === "chartBlock")
+                    || null
+                )
+                : null
+        ),
+        [runtimePreviewModel?.reportSpec?.blocks],
+    );
+    const [selectedBuilderLiveProviderActionsByField, setSelectedBuilderLiveProviderActionsByField] = useState(() => new Map());
+    useEffect(() => {
+        let cancelled = false;
+        const provider = runtimePreviewHandlers?.drillMetadataProvider;
+        const providerBlocks = [primaryBuilderRuntimeTableBlock, primaryBuilderRuntimeChartBlock].filter(Boolean);
+        if (
+            !provider
+            || typeof provider.listAvailableRefinements !== "function"
+            || providerBlocks.length === 0
+            || !runtimePreviewModel?.reportSpec
+        ) {
+            setSelectedBuilderLiveProviderActionsByField(new Map());
+            return undefined;
+        }
+        async function loadSelectedBuilderLiveProviderActions() {
+            const result = await resolveReportRuntimeProviderActions({
+                provider,
+                reportSpec: runtimePreviewModel.reportSpec,
+                blocks: providerBlocks,
+            });
+            if (cancelled) {
+                return;
+            }
+            setSelectedBuilderLiveProviderActionsByField(
+                result?.providerActionsByField instanceof Map
+                    ? result.providerActionsByField
+                    : new Map(),
+            );
+        }
+        loadSelectedBuilderLiveProviderActions();
+        return () => {
+            cancelled = true;
+        };
+    }, [primaryBuilderRuntimeChartBlock, primaryBuilderRuntimeTableBlock, runtimePreviewHandlers?.drillMetadataProvider, runtimePreviewModel?.reportSpec]);
+    const selectedBuilderTableInteractionState = useMemo(
+        () => buildReportBuilderSelectedTableInteractionState({
+            blockId: normalizeString(primaryBuilderRuntimeTableBlock?.id || "primaryTable") || "primaryTable",
+            row: selectedBuilderTableRow?.row || null,
+            columns: runtimeTableColumns,
+            drillMetadata: authoredDrillMetadata,
+            providerActionsByField: selectedBuilderLiveProviderActionsByField,
         }),
-        [hydratedReportDocumentSession?.reopenedConfig?.binding, hydratedReportDocumentSession?.reopenedSemanticSummary],
+        [authoredDrillMetadata, primaryBuilderRuntimeTableBlock?.id, runtimeTableColumns, selectedBuilderLiveProviderActionsByField, selectedBuilderTableRow?.row],
+    );
+    const selectedBuilderChartInteractionState = useMemo(() => {
+        if (!selectedBuilderChartSelection || !primaryBuilderRuntimeChartBlock || !runtimePreviewModel?.reportSpec) {
+            return null;
+        }
+        const chartFields = resolveReportRuntimeChartActionFields(
+            runtimePreviewModel.reportSpec,
+            primaryBuilderRuntimeChartBlock,
+        );
+        if (chartFields.length === 0) {
+            return null;
+        }
+        return buildReportRuntimeChartInteractionState({
+            blockId: normalizeString(primaryBuilderRuntimeChartBlock?.id || "primaryChart") || "primaryChart",
+            blockTitle: normalizeString(primaryBuilderRuntimeChartBlock?.chartSpec?.title || state?.chartSpec?.title || "Selected chart value") || "Selected chart value",
+            fields: chartFields,
+            selection: selectedBuilderChartSelection,
+            providerActionsByField: selectedBuilderLiveProviderActionsByField,
+            interactionSupport: resolveReportRuntimeChartInteractionSupport(primaryBuilderRuntimeChartBlock?.chartSpec || state?.chartSpec || {}),
+            canClearSelection: true,
+        });
+    }, [
+        primaryBuilderRuntimeChartBlock,
+        runtimePreviewModel?.reportSpec,
+        selectedBuilderChartSelection,
+        selectedBuilderLiveProviderActionsByField,
+        state?.chartSpec,
+    ]);
+    const selectedBuilderChartSelectionActions = useMemo(
+        () => (selectedBuilderChartInteractionState?.executions || [])
+            .filter((execution) => (
+                ((execution.kind === "keep" || execution.kind === "exclude") && typeof runtimePreviewHandlers?.applyRefinement === "function")
+                || (execution.kind === "drill" && typeof runtimePreviewHandlers?.applyDrillTransition === "function")
+                || (execution.kind === "detail" && typeof runtimePreviewHandlers?.openDetailTarget === "function")
+            ))
+            .map((execution) => ({
+                id: execution.id,
+                label: execution.label,
+                execution,
+            })),
+        [
+            runtimePreviewHandlers?.applyDrillTransition,
+            runtimePreviewHandlers?.applyRefinement,
+            runtimePreviewHandlers?.openDetailTarget,
+            selectedBuilderChartInteractionState?.executions,
+        ],
     );
     const reopenedScopeSummaryState = useMemo(() => {
         const summary = buildReportBuilderScopeSummaryFromParams(hydratedReportDocumentSession?.reopenedScopeParams);
         return Array.isArray(summary?.items) && summary.items.length > 0
             ? {
-                scopeSummaryTitle: "Report Scope",
+                scopeSummaryTitle: "Filters",
                 scopeSummaryText: summary.text,
                 scopeSummaryItems: summary.items,
             }
@@ -7604,31 +10621,98 @@ export default function ReportBuilder({ container, context }) {
         ],
     );
     const importedLocalSavedRecordPanelState = useMemo(() => buildImportedLocalSavedRecordPanelState({
-        importedLocalSavedReportRecords: importedLocalSavedReportRecords.map((record) => ({
-            id: buildImportedLocalSavedReportRecordIdentity(record),
-            title: normalizeString(record?.title || record?.reportId),
-            reportId: normalizeString(record?.reportId),
-            documentVersion: Number(record?.documentVersion || 0) || 0,
-            exportable: record?.exportable === true,
-            importedArtifactKind: normalizeString(record?.importedArtifactKind),
-            source: record?.source || null,
-            savedViewOverlay: record?.savedViewOverlay || null,
-            savedReportPayload: record?.savedReportPayload || null,
-            reportSpec: record?.reportSpec || null,
-            document: record?.document || null,
-            semanticSummary: record?.reportSpec?.semanticSummary || record?.document?.semanticSummary || record?.savedReportPayload?.reportSpec?.semanticSummary || record?.savedReportPayload?.reportDocument?.semanticSummary || null,
-            binding: record?.reportSpec?.binding || record?.document?.binding || record?.savedReportPayload?.reportSpec?.binding || null,
-            scopeParams: Array.isArray(record?.reportSpec?.scope?.params)
-                ? record.reportSpec.scope.params
-                : (Array.isArray(record?.document?.scope?.params)
-                    ? record.document.scope.params
-                    : (Array.isArray(record?.savedReportPayload?.reportSpec?.scope?.params)
-                        ? record.savedReportPayload.reportSpec.scope.params
-                        : [])),
-        })),
+        importedLocalSavedReportRecords: importedLocalSavedReportRecords
+            .map((record) => buildImportedLocalSavedRecordPanelSeedEntry(record))
+            .filter(Boolean),
         activeRecordIdentity: currentImportedLocalSavedRecordIdentity,
         localSavedPayloads: importedLocalSavedReportRecords,
     }), [currentImportedLocalSavedRecordIdentity, importedLocalSavedReportRecords]);
+    const semanticWorkspaceActivationState = useMemo(() => buildReportBuilderSemanticWorkspaceActivationState({
+        semanticWorkspacePanelState,
+        importedLocalReopenablePanelState,
+        importedLocalSavedRecordPanelState,
+    }), [
+        importedLocalReopenablePanelState,
+        importedLocalSavedRecordPanelState,
+        semanticWorkspacePanelState,
+    ]);
+    const compactSemanticActionLabel = useMemo(() => resolveCompactSemanticActionLabel({
+        semanticTitle: semanticWorkspacePanelState?.title,
+        tone: semanticWorkspacePanelState?.tone,
+        diagnosticsCount: semanticWorkspacePanelState?.diagnostics?.length || 0,
+        activationCount: semanticWorkspaceActivationState?.entries?.length || 0,
+    }), [
+        semanticWorkspacePanelState?.title,
+        semanticWorkspacePanelState?.tone,
+        semanticWorkspacePanelState?.diagnostics?.length,
+        semanticWorkspaceActivationState?.entries?.length,
+    ]);
+    const compactSemanticHintText = useMemo(() => resolveCompactSemanticHintText({
+        semanticTitle: semanticWorkspacePanelState?.title,
+        activationCount: semanticWorkspaceActivationState?.entries?.length || 0,
+    }), [
+        semanticWorkspacePanelState?.title,
+        semanticWorkspaceActivationState?.entries?.length,
+    ]);
+    const activateImportedResponseInBuilder = React.useCallback((response = null, {
+        successMessage = "",
+    } = {}) => {
+        const activation = buildReportBuilderImportedResponseActivation({
+            response,
+            container,
+            builderIdentity: {
+                containerId: container?.id,
+                stateKey,
+                dataSourceRef: builderContext?.identity?.dataSourceRef || container?.dataSourceRef,
+            },
+            localSavedPayloads: localSavedReportRecords,
+            priorSession: hydratedReportDocumentSession,
+            liveConfig: cloneReportBuilderValue(hydratedReportDocumentSession?.liveSnapshot?.config || config),
+            liveState: cloneReportBuilderValue(hydratedReportDocumentSession?.liveSnapshot?.state || state),
+        });
+        if (!activation.valid) {
+            setGetReportDocumentResponseOpen(false);
+            setSavedReportPayloadOpen(false);
+            setCreateReportDocumentPayloadOpen(false);
+            setListReportDocumentsResponseOpen(false);
+            setUpdateReportDocumentPayloadOpen(false);
+            setUpdateReportDocumentConflictDiagnosticOpen(false);
+            setReopenReportDocumentDiagnostic(activation.diagnostic || null);
+            setReopenReportDocumentDiagnosticOpen(!!activation.diagnostic);
+            setChartApplyFeedback({
+                level: "warning",
+                message: activation.message || "Could not activate the imported report in the builder.",
+            });
+            return false;
+        }
+        persistStateWithConfig(
+            activation.nextState,
+            activation.nextConfig,
+            { skipExplorationHistory: true },
+        );
+        setSavedReportPayloadOpen(false);
+        setCreateReportDocumentPayloadOpen(false);
+        setGetReportDocumentResponseOpen(false);
+        setReopenReportDocumentDiagnostic(null);
+        setReopenReportDocumentDiagnosticOpen(false);
+        setListReportDocumentsResponseOpen(false);
+        setUpdateReportDocumentPayloadOpen(false);
+        setUpdateReportDocumentConflictDiagnosticOpen(false);
+        setChartApplyFeedback({
+            level: "success",
+            message: successMessage || `Activated imported report ${activation.title}.`,
+        });
+        return true;
+    }, [
+        builderContext?.identity?.dataSourceRef,
+        config,
+        container,
+        hydratedReportDocumentSession,
+        localSavedReportRecords,
+        persistStateWithConfig,
+        state,
+        stateKey,
+    ]);
     const removeImportedLocalReopenable = React.useCallback((targetIdentity = "", title = "") => {
         const normalizedIdentity = normalizeString(targetIdentity);
         if (!normalizedIdentity) {
@@ -7693,20 +10777,10 @@ export default function ReportBuilder({ container, context }) {
         setSavedReportPayloadApiArtifactsOpen(false);
         const documentVersion = Number(response?.documentVersion || 0) || 0;
         setReportDocumentVersionDraft(documentVersion > 0 ? String(documentVersion) : "");
-        setChartApplyFeedback(
-            buildReportBuilderImportFeedback({
-                valid: true,
-                kind: "getReportDocumentResponse",
-                payload: response,
-                documentVersion,
-                message: `${normalizeString(title) || "Imported reopen artifact"} is now the active reopen artifact.`,
-            })
-            || {
-                level: "success",
-                message: `${normalizeString(title) || "Imported reopen artifact"} is now the active reopen artifact.`,
-            },
-        );
-    }, [applyPreparedApiArtifactOrigins, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
+        activateImportedResponseInBuilder(response, {
+            successMessage: `${normalizeString(title) || "Imported reopen artifact"} is now active in the builder.`,
+        });
+    }, [activateImportedResponseInBuilder, applyPreparedApiArtifactOrigins, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
     const clearImportedLocalReopenables = React.useCallback(() => {
         if (importedLocalGetReportDocumentResponses.length === 0) {
             return;
@@ -7753,6 +10827,7 @@ export default function ReportBuilder({ container, context }) {
         }
         setSavedReportPayloadRecord(record);
         setSavedReportPayload(record?.savedReportPayload || null);
+        setStoredReportArtifact(record || null);
         setSavedReportPayloadApiArtifactsOpen(false);
         const nextGetResponse = resolveImportedLocalSavedRecordActivationResponse({
             importedLocalGetReportDocumentResponses,
@@ -7777,6 +10852,12 @@ export default function ReportBuilder({ container, context }) {
             });
         }
         setReportDocumentVersionDraft(documentVersion > 0 ? String(documentVersion) : "");
+        if (nextGetResponse) {
+            activateImportedResponseInBuilder(nextGetResponse, {
+                successMessage: `${normalizeString(title) || "Imported report file"} is now active in the builder.`,
+            });
+            return;
+        }
         setChartApplyFeedback(
             buildReportBuilderImportFeedback({
                 valid: true,
@@ -7791,7 +10872,7 @@ export default function ReportBuilder({ container, context }) {
                 message: `${normalizeString(title) || "Imported report file"} is now the active report file.`,
             },
         );
-    }, [applyPreparedApiArtifactOrigins, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
+    }, [activateImportedResponseInBuilder, applyPreparedApiArtifactOrigins, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords]);
     const removeImportedLocalSavedRecord = React.useCallback((targetIdentity = "", title = "") => {
         const normalizedIdentity = normalizeString(targetIdentity);
         if (!normalizedIdentity) {
@@ -7804,6 +10885,9 @@ export default function ReportBuilder({ container, context }) {
             removedSavedRecord: removedRecord,
         });
         setImportedLocalSavedReportRecords((current) => resolveReportBuilderImportedLocalSavedReportRecordsAfterRemoval(current, normalizedIdentity));
+        if (buildImportedLocalSavedReportRecordIdentity(storedReportArtifact) === normalizedIdentity) {
+            setStoredReportArtifact(null);
+        }
         if (currentImportedLocalSavedRecordIdentity === normalizedIdentity) {
             setSavedReportPayloadRecord(null);
             setSavedReportPayload(null);
@@ -7851,6 +10935,7 @@ export default function ReportBuilder({ container, context }) {
         });
         const clearedCurrentSavedRecord = !!(currentImportedLocalSavedRecordIdentity && currentIdentities.has(currentImportedLocalSavedRecordIdentity));
         setImportedLocalSavedReportRecords([]);
+        setStoredReportArtifact(null);
         if (clearedCurrentSavedRecord) {
             setSavedReportPayloadRecord(null);
             setSavedReportPayload(null);
@@ -7883,6 +10968,17 @@ export default function ReportBuilder({ container, context }) {
     const openImportReportFilePicker = React.useCallback(() => {
         importReportFileInputRef.current?.click();
     }, []);
+    const revealSemanticImportSurface = React.useCallback(() => {
+        const nextSurfaceState = resolveReportBuilderSemanticWorkspaceImportRevealState({
+            compactMode,
+        });
+        setSettingsOpen(nextSurfaceState.settingsOpen);
+        setReportMetadataPanelOpen(nextSurfaceState.reportMetadataPanelOpen);
+        setSemanticPanelOpen(nextSurfaceState.semanticPanelOpen);
+        setCompactSheetOpen(nextSurfaceState.compactSheetOpen);
+        setCompactChartSheetOpen(nextSurfaceState.compactChartSheetOpen);
+        setCompactSemanticSheetOpen(nextSurfaceState.compactSemanticSheetOpen);
+    }, [compactMode]);
     const importLocalReportFile = React.useCallback(async (event) => {
         const input = event?.target || null;
         const file = input?.files?.[0] || null;
@@ -7905,10 +11001,18 @@ export default function ReportBuilder({ container, context }) {
             }
             const nextImportedArtifactState = resolveReportBuilderImportedArtifactStateAfterImport(importedArtifactState, imported);
             const preserveImportedState = resolveReportBuilderImportedArtifactImportPreservation(imported, importedArtifactState);
+            const nextImportedGetResponses = resolveReportBuilderImportedLocalGetResponsesAfterImport(
+                importedLocalGetReportDocumentResponses,
+                imported,
+            );
+            const nextImportedSavedRecords = resolveReportBuilderImportedLocalSavedReportRecordsAfterImport(
+                importedLocalSavedReportRecords,
+                imported,
+            );
             resetImportedArtifactState(preserveImportedState);
             const importedPreparedArtifactOrigins = {};
-            setImportedLocalGetReportDocumentResponses((current) => resolveReportBuilderImportedLocalGetResponsesAfterImport(current, imported));
-            setImportedLocalSavedReportRecords((current) => resolveReportBuilderImportedLocalSavedReportRecordsAfterImport(current, imported));
+            setImportedLocalGetReportDocumentResponses(nextImportedGetResponses);
+            setImportedLocalSavedReportRecords(nextImportedSavedRecords);
             setImportedStandaloneReportFill(nextImportedArtifactState.importedStandaloneReportFill);
             setImportedStandaloneReportFillOpen(nextImportedArtifactState.importedStandaloneReportFillOpen);
             setImportedPipelineCompanionFillAttached(nextImportedArtifactState.importedPipelineCompanionFillAttached);
@@ -7986,20 +11090,179 @@ export default function ReportBuilder({ container, context }) {
                 importedPreparedArtifactOrigins[PREPARED_API_ARTIFACT_KEYS.getReportDocumentRequestPayload] = PREPARED_API_ARTIFACT_IMPORTED_ORIGIN;
             }
             applyPreparedApiArtifactOrigins(importedPreparedArtifactOrigins);
-            setChartApplyFeedback(
+            const importFeedback = buildReportBuilderSemanticWorkspaceImportFeedback(
                 buildReportBuilderImportFeedback(imported)
                 || {
                     level: "success",
                     message: imported.message || `Imported ${imported.kind}.`,
                 },
+                {
+                    compactMode,
+                },
             );
+            const importedActivationResponse = imported.kind === "getReportDocumentResponse"
+                ? imported.payload
+                : (
+                    imported.getReportDocumentResponse
+                    || (imported.kind === "reportBuilder.savedReportRecord"
+                        ? resolveImportedLocalSavedRecordActivationResponse({
+                            importedLocalGetReportDocumentResponses: nextImportedGetResponses,
+                            savedRecord: imported.savedRecord || imported.payload,
+                        })
+                        : null)
+                );
+            const shouldAutoActivateImportedResponse = normalizeString(semanticWorkspacePanelState?.title).toLowerCase() === "semantic modeling inactive"
+                && hasSemanticWorkspaceImportActivation(importFeedback)
+                && importedActivationResponse;
+            if (shouldAutoActivateImportedResponse) {
+                const activated = activateImportedResponseInBuilder(importedActivationResponse, {
+                    successMessage: `${normalizeString(file?.name || imported.kind || "Imported report")} loaded and activated in the builder.`,
+                });
+                if (activated) {
+                    revealSemanticImportSurface();
+                    return;
+                }
+            }
+            if (hasSemanticWorkspaceImportActivation(importFeedback)) {
+                revealSemanticImportSurface();
+            }
+            setChartApplyFeedback(importFeedback);
         } catch (error) {
             setChartApplyFeedback({
                 level: "warning",
                 message: `Could not import ${String(file?.name || "the selected report file")}. ${renderReportBuilderError(error)}`,
             });
         }
-    }, [applyPreparedApiArtifactOrigins, importedArtifactState, resetImportedArtifactState]);
+    }, [activateImportedResponseInBuilder, applyPreparedApiArtifactOrigins, compactMode, importedArtifactState, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords, resetImportedArtifactState, revealSemanticImportSurface, semanticWorkspacePanelState?.title]);
+    const openStaticDatasetImport = React.useCallback((targetDatasetId = "") => {
+        setPendingStaticDatasetImportTargetId(normalizeString(targetDatasetId));
+        importStaticDatasetFileInputRef.current?.click();
+    }, []);
+    const importStaticDatasetFile = React.useCallback(async (event) => {
+        const file = event?.target?.files?.[0] || null;
+        if (!file) {
+            return;
+        }
+        const targetDatasetId = normalizeString(pendingStaticDatasetImportTargetId);
+        try {
+            const fileText = await file.text();
+            const normalizedFileName = normalizeString(file.name);
+            const isJsonFile = /\.json$/i.test(normalizedFileName) || normalizeString(file.type).toLowerCase().includes("json");
+            const importedDatasets = isJsonFile
+                ? buildReportBuilderStaticDatasetsFromJsonFile({
+                    fileName: file.name,
+                    json: fileText,
+                    id: targetDatasetId || "",
+                })
+                : [buildReportBuilderStaticDatasetFromCsvFile({
+                    fileName: file.name,
+                    csv: fileText,
+                    id: targetDatasetId || `static_${normalizeString(file.name).replace(/\.[^.]+$/, "") || "csv_source"}`,
+                })].filter(Boolean);
+            const importedStarter = isJsonFile
+                ? buildReportBuilderImportedStarterFromJsonFile({
+                    fileName: file.name,
+                    json: fileText,
+                })
+                : null;
+            const normalizedImportedDatasets = importedStarter?.datasetFieldHints
+                ? applyReportBuilderStaticDatasetFieldHints(importedDatasets, importedStarter.datasetFieldHints)
+                : importedDatasets;
+            if (importedDatasets.length === 0) {
+                throw new Error(`Could not create a static dataset from the selected ${isJsonFile ? "JSON" : "CSV"} file.`);
+            }
+            const existingDatasets = normalizeReportBuilderStaticDatasets(state?.reportStaticDatasets);
+            const existingDataset = targetDatasetId
+                ? (existingDatasets.find((entry) => entry.id === targetDatasetId) || null)
+                : null;
+            const importedIds = new Set(normalizedImportedDatasets.map((entry) => entry.id));
+            const nextStaticDatasets = [
+                ...existingDatasets.filter((entry) => !importedIds.has(entry.id)),
+                ...normalizedImportedDatasets,
+            ];
+            const canApplyImportedStarter = !!importedStarter
+                && !targetDatasetId
+                && (!Array.isArray(state?.reportDocumentBlocks) || state.reportDocumentBlocks.length === 0);
+            const nextState = (() => {
+                if (!canApplyImportedStarter) {
+                    return {
+                        ...(state || {}),
+                        reportStaticDatasets: nextStaticDatasets,
+                    };
+                }
+                const blankState = buildBlankReportBuilderDocumentState(displayConfig, {
+                    baseState: {
+                        ...(state || {}),
+                        reportStaticDatasets: nextStaticDatasets,
+                    },
+                });
+                return {
+                    ...blankState,
+                    reportStaticDatasets: nextStaticDatasets,
+                    reportDocumentTitle: importedStarter.title,
+                    ...(normalizeString(importedStarter.subtitle) ? { reportDocumentSubtitle: importedStarter.subtitle } : {}),
+                    ...(normalizeString(importedStarter.description) ? { reportDocumentDescription: importedStarter.description } : {}),
+                    reportDocumentBlocks: importedStarter.blocks,
+                    reportDocumentLayout: importedStarter.layout,
+                };
+            })();
+            persistExplorationMutation(nextState, {
+                sourceKind: "reportBuilder.result",
+                sourceContext: {
+                    label: importedStarter?.label || importedDatasets[0]?.label || "Static dataset",
+                },
+            });
+            if (canApplyImportedStarter) {
+                setSelectedDocumentOutlineEntryId(importedStarter.blocks[0]?.id || "");
+                setPendingDocumentInsertionAfterId("primaryBuilder");
+                setPendingDocumentInsertionPlacement("after");
+            }
+            setChartApplyFeedback({
+                level: "success",
+                message: targetDatasetId
+                    ? `${importedDatasets[0]?.label || existingDataset?.label || "Static dataset"} updated.`
+                    : canApplyImportedStarter
+                        ? `${importedDatasets.length} static datasets added from ${normalizedFileName || "the selected file"} and ${importedStarter?.label || "the imported starter"} applied.`
+                        : importedStarter
+                            ? `${importedDatasets.length} static datasets added from ${normalizedFileName || "the selected file"}. The imported report starter was detected but not auto-applied because the current report already contains authored blocks.`
+                            : importedDatasets.length === 1
+                                ? `${importedDatasets[0]?.label || "Static dataset"} added as a static dataset.`
+                                : `${importedDatasets.length} static datasets added from ${normalizedFileName || "the selected file"}.`,
+            });
+        } catch (error) {
+            setChartApplyFeedback({
+                level: "danger",
+                message: String(error?.message || "Could not import the selected static dataset file."),
+            });
+        } finally {
+            setPendingStaticDatasetImportTargetId("");
+            if (event?.target) {
+                event.target.value = "";
+            }
+        }
+    }, [displayConfig, pendingStaticDatasetImportTargetId, persistExplorationMutation, state]);
+    const removeStaticDataset = React.useCallback((datasetId = "") => {
+        const normalizedDatasetId = normalizeString(datasetId);
+        if (!normalizedDatasetId) {
+            return;
+        }
+        const currentDatasets = normalizeReportBuilderStaticDatasets(state?.reportStaticDatasets);
+        const removedDataset = currentDatasets.find((entry) => entry.id === normalizedDatasetId) || null;
+        const nextStaticDatasets = currentDatasets.filter((entry) => entry.id !== normalizedDatasetId);
+        persistExplorationMutation({
+            ...(state || {}),
+            reportStaticDatasets: nextStaticDatasets,
+        }, {
+            sourceKind: "reportBuilder.result",
+            sourceContext: {
+                label: removedDataset?.label || normalizedDatasetId,
+            },
+        });
+        setChartApplyFeedback({
+            level: "warning",
+            message: `${removedDataset?.label || "Static dataset"} removed. Rebind any authored blocks that used it.`,
+        });
+    }, [persistExplorationMutation, state]);
     const downloadExplorationArtifact = React.useCallback(() => {
         const descriptor = buildReportBuilderExplorationArtifactDownload(savedExplorationArtifact);
         if (!descriptor) {
@@ -8163,6 +11426,9 @@ export default function ReportBuilder({ container, context }) {
         downloadRequest: downloadDraftExportRequest,
     } = draftExportExecution;
     const {
+        submit: triggerDraftXlsxExport,
+    } = draftXlsxExportExecution;
+    const {
         requestOpen: importedStandaloneExportRequestOpen,
         setRequestOpen: setImportedStandaloneExportRequestOpen,
         requestSummary: importedStandaloneExportRequestExecutionSummary,
@@ -8267,8 +11533,15 @@ export default function ReportBuilder({ container, context }) {
         jobSummary: reopenedExportJobSummary,
         statusLoading: reopenedExportStatusLoading,
         artifactLoading: reopenedExportArtifactLoading,
+        historyAvailable: reopenedExportHistoryAvailable,
+        historyLoading: reopenedExportHistoryLoading,
+        historyJobs: reopenedExportHistoryJobs,
+        historyArtifacts: reopenedExportHistoryArtifacts,
         submit: triggerReopenedExport,
         refreshStatus: refreshReopenedExportStatus,
+        refreshHistory: refreshReopenedExportHistory,
+        selectHistoryEntry: selectReopenedExportHistoryEntry,
+        downloadHistoryArtifact: downloadReopenedExportHistoryArtifact,
         downloadArtifact: downloadReopenedExportArtifact,
         downloadRequest: downloadReopenedExportRequest,
     } = reopenedExportExecution;
@@ -8289,8 +11562,15 @@ export default function ReportBuilder({ container, context }) {
         jobSummary: selectedListEntryExportJobSummary,
         statusLoading: selectedListEntryExportStatusLoading,
         artifactLoading: selectedListEntryExportArtifactLoading,
+        historyAvailable: selectedListEntryExportHistoryAvailable,
+        historyLoading: selectedListEntryExportHistoryLoading,
+        historyJobs: selectedListEntryExportHistoryJobs,
+        historyArtifacts: selectedListEntryExportHistoryArtifacts,
         submit: triggerSelectedListEntryExport,
         refreshStatus: refreshSelectedListEntryExportStatus,
+        refreshHistory: refreshSelectedListEntryExportHistory,
+        selectHistoryEntry: selectSelectedListEntryExportHistoryEntry,
+        downloadHistoryArtifact: downloadSelectedListEntryExportHistoryArtifact,
         downloadArtifact: downloadSelectedListEntryExportArtifact,
         downloadRequest: downloadSelectedListEntryExportRequest,
     } = selectedListEntryExportExecution;
@@ -8554,7 +11834,7 @@ export default function ReportBuilder({ container, context }) {
         ],
     );
     const savedReportPayloadRecentExportEntries = useMemo(
-        () => buildReportBuilderSavedPayloadRecentExportEntries({
+        () => buildReportBuilderRecentExportEntries({
             jobs: savedReportPayloadExportHistoryJobs,
             artifacts: savedReportPayloadExportHistoryArtifacts,
             summary: savedReportPayloadSummary,
@@ -8571,8 +11851,53 @@ export default function ReportBuilder({ container, context }) {
             savedReportPayloadSummary,
         ],
     );
+    const reopenedRecentExportEntries = useMemo(
+        () => buildReportBuilderRecentExportEntries({
+            jobs: reopenedExportHistoryJobs,
+            artifacts: reopenedExportHistoryArtifacts,
+            summary: {
+                title: hydratedReportDocumentSession?.title || reopenedExportRequestSummary?.title || "Report",
+                templateLabel: reopenedSessionNoticeState?.templateLabel || "",
+                reopenSourceResolutionChips: Array.isArray(reopenedSessionNoticeState?.reopenSourceResolutionChips)
+                    ? reopenedSessionNoticeState.reopenSourceResolutionChips
+                    : [],
+            },
+            activeJobId: reopenedExportJob?.jobId,
+            activeArtifactId: reopenedExportJob?.artifactId,
+            nowMs: exportHistoryNowMs,
+        }),
+        [
+            exportHistoryNowMs,
+            hydratedReportDocumentSession?.title,
+            reopenedExportHistoryArtifacts,
+            reopenedExportHistoryJobs,
+            reopenedExportJob?.artifactId,
+            reopenedExportJob?.jobId,
+            reopenedExportRequestSummary?.title,
+            reopenedSessionNoticeState?.reopenSourceResolutionChips,
+            reopenedSessionNoticeState?.templateLabel,
+        ],
+    );
+    const selectedListEntryRecentExportEntries = useMemo(
+        () => buildReportBuilderRecentExportEntries({
+            jobs: selectedListEntryExportHistoryJobs,
+            artifacts: selectedListEntryExportHistoryArtifacts,
+            summary: selectedListReportDocumentsEntrySummary,
+            activeJobId: selectedListEntryExportJob?.jobId,
+            activeArtifactId: selectedListEntryExportJob?.artifactId,
+            nowMs: exportHistoryNowMs,
+        }),
+        [
+            exportHistoryNowMs,
+            selectedListEntryExportHistoryArtifacts,
+            selectedListEntryExportHistoryJobs,
+            selectedListEntryExportJob?.artifactId,
+            selectedListEntryExportJob?.jobId,
+            selectedListReportDocumentsEntrySummary,
+        ],
+    );
     useEffect(() => {
-        if (!savedReportPayloadExportHistoryAvailable) {
+        if (!savedReportPayloadExportHistoryAvailable && !reopenedExportHistoryAvailable && !selectedListEntryExportHistoryAvailable) {
             return undefined;
         }
         setExportHistoryNowMs(Date.now());
@@ -8580,7 +11905,7 @@ export default function ReportBuilder({ container, context }) {
             setExportHistoryNowMs(Date.now());
         }, 60 * 1000);
         return () => clearInterval(timer);
-    }, [savedReportPayloadExportHistoryAvailable]);
+    }, [reopenedExportHistoryAvailable, savedReportPayloadExportHistoryAvailable, selectedListEntryExportHistoryAvailable]);
     const selectedListEntryExportActionState = useMemo(
         () => buildReportBuilderSelectedListEntryExportActionState({
             requestSummary: selectedListEntryExportRequestSummary,
@@ -8753,45 +12078,103 @@ export default function ReportBuilder({ container, context }) {
         if (!notice || !Array.isArray(notice.diagnostics) || notice.diagnostics.length === 0) {
             return null;
         }
+        const diagnostics = notice.diagnostics.filter(Boolean);
+        const firstDiagnostic = diagnostics[0] || null;
+        const affectedBlockCount = new Set(
+            diagnostics
+                .map((diagnostic) => normalizeString(diagnostic?.blockId))
+                .filter(Boolean),
+        ).size;
+        const hiddenDiagnosticCount = Math.max(0, diagnostics.length - 1);
+        const showExpandedList = authoredDiagnosticsExpanded || diagnostics.length <= 1;
+        const summaryChips = [
+            `${diagnostics.length} ${diagnostics.length === 1 ? "issue" : "issues"}`,
+            affectedBlockCount > 0
+                ? `${affectedBlockCount} ${affectedBlockCount === 1 ? "block" : "blocks"}`
+                : "",
+            !showExpandedList && hiddenDiagnosticCount > 0
+                ? `+${hiddenDiagnosticCount} more ${hiddenDiagnosticCount === 1 ? "issue" : "issues"}`
+                : "",
+        ].filter(Boolean);
+        const resolveActionLabel = (diagnostic = null) => (
+            typeof actionLabel === "function"
+                ? (normalizeString(actionLabel(diagnostic)) || "Edit block")
+                : (normalizeString(actionLabel) || "Edit block")
+        );
         return (
             <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${notice.level || "warning"}`} style={{ marginTop: 12 }}>
                 <div className="forge-report-builder__semantic-diagnostics-header">
                     <div className="forge-report-builder__semantic-diagnostics-title">{notice.title}</div>
                     <div className="forge-report-builder__semantic-diagnostics-description">{notice.description}</div>
                 </div>
-                <div className="forge-report-builder__semantic-diagnostics-list">
-                    {notice.diagnostics.map((diagnostic) => (
-                        <article
-                            key={diagnostic.id}
-                            className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
-                        >
-                            <div className="forge-report-builder__semantic-diagnostic-meta">
-                                {diagnostic.code ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.code}</span> : null}
-                                {diagnostic.path ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.path}</span> : null}
-                                {diagnostic.blockId ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.blockId}</span> : null}
-                            </div>
-                            <div className="forge-report-builder__semantic-diagnostic-message">{diagnostic.message}</div>
-                            {diagnostic.suggestedFix ? (
-                                <div className="forge-report-builder__semantic-diagnostic-fix">{diagnostic.suggestedFix}</div>
-                            ) : null}
-                            {typeof actionForDiagnostic === "function" && diagnostic.blockId ? (
-                                <div style={{ marginTop: 8 }}>
-                                    <Button
-                                        small
-                                        minimal
-                                        onClick={() => actionForDiagnostic(diagnostic)}
-                                        aria-label={`${actionLabel} ${diagnostic.blockId}`}
-                                    >
-                                        {actionLabel}
-                                    </Button>
-                                </div>
-                            ) : null}
-                        </article>
-                    ))}
+                <div className="forge-report-builder__semantic-diagnostics-toolbar">
+                    <div className="forge-report-builder__result-meta" aria-label="Diagnostic summary">
+                        {summaryChips.map((chip) => (
+                            <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                        ))}
+                    </div>
+                    <div className="forge-report-builder__result-header-actions">
+                        {typeof actionForDiagnostic === "function" && firstDiagnostic?.blockId && !showExpandedList ? (
+                            <Button
+                                small
+                                minimal
+                                onClick={() => actionForDiagnostic(firstDiagnostic)}
+                                aria-label={`${resolveActionLabel(firstDiagnostic)} ${firstDiagnostic.blockId}`}
+                            >
+                                {resolveActionLabel(firstDiagnostic)}
+                            </Button>
+                        ) : null}
+                        {diagnostics.length > 1 ? (
+                            <Button
+                                small
+                                minimal
+                                onClick={() => setAuthoredDiagnosticsExpanded((current) => !current)}
+                            >
+                                {showExpandedList ? "Hide details" : "Show details"}
+                            </Button>
+                        ) : null}
+                    </div>
                 </div>
+                {!showExpandedList && firstDiagnostic ? (
+                    <div className="forge-report-builder__semantic-diagnostic-fix">
+                        {firstDiagnostic.message}
+                    </div>
+                ) : null}
+                {showExpandedList ? (
+                    <div className="forge-report-builder__semantic-diagnostics-list">
+                        {diagnostics.map((diagnostic) => (
+                            <article
+                                key={diagnostic.id}
+                                className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
+                            >
+                                <div className="forge-report-builder__semantic-diagnostic-meta">
+                                    {diagnostic.code ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.code}</span> : null}
+                                    {diagnostic.path ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.path}</span> : null}
+                                    {diagnostic.blockId ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.blockId}</span> : null}
+                                </div>
+                                <div className="forge-report-builder__semantic-diagnostic-message">{diagnostic.message}</div>
+                                {diagnostic.suggestedFix ? (
+                                    <div className="forge-report-builder__semantic-diagnostic-fix">{diagnostic.suggestedFix}</div>
+                                ) : null}
+                                {typeof actionForDiagnostic === "function" && diagnostic.blockId ? (
+                                    <div style={{ marginTop: 8 }}>
+                                        <Button
+                                            small
+                                            minimal
+                                            onClick={() => actionForDiagnostic(diagnostic)}
+                                            aria-label={`${resolveActionLabel(diagnostic)} ${diagnostic.blockId}`}
+                                        >
+                                            {resolveActionLabel(diagnostic)}
+                                        </Button>
+                                    </div>
+                                ) : null}
+                            </article>
+                        ))}
+                    </div>
+                ) : null}
             </section>
         );
-    }, []);
+    }, [authoredDiagnosticsExpanded]);
     const renderSemanticBindingFieldGroups = React.useCallback((bindingState = null, {
         marginTop = 0,
         marginBottom = 0,
@@ -8978,11 +12361,1495 @@ export default function ReportBuilder({ container, context }) {
             </div>
         );
     }, []);
+    const handleDesignWorkspaceStageAction = React.useCallback((actionId = "") => {
+        const normalizedActionId = normalizeString(actionId).toLowerCase();
+        if (!normalizedActionId) {
+            return;
+        }
+        if (normalizedActionId === "settings") {
+            setReportMetadataPanelOpen(false);
+            setSemanticPanelOpen(false);
+            setSettingsOpen(true);
+            return;
+        }
+        if (normalizedActionId === "preview") {
+            setWorkspaceMode("report");
+            return;
+        }
+        if (normalizedActionId === "capture") {
+            captureCurrentDrillHierarchy();
+            return;
+        }
+        focusDesignArea(normalizedActionId);
+    }, [captureCurrentDrillHierarchy, focusDesignArea]);
+    const renderDesignWorkspaceOverview = React.useCallback(() => {
+        if (!designWorkspaceMode) {
+            return null;
+        }
+        const activeFocus = designWorkspaceFocus === "runtime"
+            ? "runtime"
+            : "document";
+        const focusOptions = [
+            { id: "document", label: "Report Document" },
+            { id: "runtime", label: "Filters & Controls" },
+        ];
+        const renderStage = (stage = null, {
+            primary = false,
+            keySuffix = "",
+        } = {}) => {
+            if (!stage || typeof stage !== "object") {
+                return null;
+            }
+            const rows = Array.isArray(stage.rows) ? stage.rows.filter((row) => normalizeString(row?.value)) : [];
+            const actions = Array.isArray(stage.actions) ? stage.actions.filter((action) => normalizeString(action?.id) && normalizeString(action?.label)) : [];
+            const metaChips = Array.isArray(stage.metaChips) ? stage.metaChips.filter(Boolean) : [];
+            return (
+                <section
+                    key={`${stage.eyebrow || stage.title}${keySuffix}`}
+                    className={[
+                        "forge-report-builder__design-stage",
+                        primary ? "forge-report-builder__design-stage--primary" : "",
+                    ].filter(Boolean).join(" ")}
+                >
+                    <div className="forge-report-builder__design-stage-header">
+                        {stage.eyebrow ? (
+                            <div className="forge-report-builder__design-stage-eyebrow">{stage.eyebrow}</div>
+                        ) : null}
+                        <div className="forge-report-builder__design-stage-title">{stage.title}</div>
+                        {stage.description ? (
+                            <div className="forge-report-builder__design-stage-description">{stage.description}</div>
+                        ) : null}
+                    </div>
+                    {metaChips.length > 0 ? (
+                        <div className="forge-report-builder__result-meta" aria-label={`${stage.title} summary`}>
+                            {metaChips.map((chip) => (
+                                <span key={`${stage.title}:${chip}`} className="forge-report-builder__result-meta-chip">{chip}</span>
+                            ))}
+                        </div>
+                    ) : null}
+                    {rows.length > 0 ? (
+                        <div className="forge-report-builder__design-stage-rows">
+                            {rows.map((row) => (
+                                <div key={`${stage.title}:${row.label}`} className="forge-report-builder__design-stage-row">
+                                    <div className="forge-report-builder__design-stage-row-label">{row.label}</div>
+                                    <div className="forge-report-builder__design-stage-row-value">{row.value}</div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                    {actions.length > 0 ? (
+                        <div className="forge-report-builder__design-stage-actions">
+                            {actions.map((action) => (
+                                <Button
+                                    key={`${stage.title}:${action.id}`}
+                                    small
+                                    outlined={!primary}
+                                    intent={primary ? "primary" : "none"}
+                                    onClick={() => handleDesignWorkspaceStageAction(action.id)}
+                                >
+                                    {action.label}
+                                </Button>
+                            ))}
+                        </div>
+                    ) : null}
+                </section>
+            );
+        };
+        const renderActionGroupStage = (group = null, {
+            eyebrow = "",
+            title = "",
+            description = "",
+        } = {}) => {
+            if (!group || typeof group !== "object") {
+                return null;
+            }
+            return (
+                <section className="forge-report-builder__design-stage" key={`${group.id}:${title || group.title}`}>
+                    <div className="forge-report-builder__design-stage-header">
+                        {eyebrow ? (
+                            <div className="forge-report-builder__design-stage-eyebrow">{eyebrow}</div>
+                        ) : null}
+                        <div className="forge-report-builder__design-stage-title">{title || group.title}</div>
+                        <div className="forge-report-builder__design-stage-description">{description || group.description || ""}</div>
+                    </div>
+                    <section className="forge-report-builder__authored-action-group" aria-labelledby={`report-builder-design-group-${group.id}`}>
+                        <div className="forge-report-builder__authored-action-group-header">
+                            <div className="forge-report-builder__authored-action-group-heading">
+                                <div className="forge-report-builder__authored-action-group-title-row">
+                                    <h4 id={`report-builder-design-group-${group.id}`} className="forge-report-builder__authored-action-group-title">{group.title}</h4>
+                                    {group.description ? (
+                                        <Tooltip content={group.description} placement="top">
+                                            <button
+                                                type="button"
+                                                className="forge-report-builder__authored-action-group-info"
+                                                aria-label={`${group.title} details`}
+                                            >
+                                                <Icon icon="info-sign" size={12} />
+                                            </button>
+                                        </Tooltip>
+                                    ) : null}
+                                </div>
+                            </div>
+                            <div className="forge-report-builder__authored-action-group-count">
+                                {group.actionIds.length} options
+                            </div>
+                        </div>
+                        <div className="forge-report-builder__authored-action-group-actions">
+                            {renderAuthoredBlockActionButtons({
+                                className: "forge-report-builder__authored-empty-state-action",
+                                actionIds: group.actionIds,
+                            })}
+                        </div>
+                    </section>
+                    {authoredCapabilities.showDisabledHint ? (
+                        <div className="forge-report-builder__authored-empty-state-footnote">
+                            {authoredCapabilities.disabledHintText}
+                        </div>
+                    ) : null}
+                </section>
+            );
+        };
+        const renderTemplateChooser = ({
+            compact = false,
+        } = {}) => {
+            const blankStarterSelected = isBlankReportBuilderStarterId(state.reportDocumentTemplateId)
+                || !normalizeString(state.reportDocumentTemplateId);
+            const starterRows = [
+                {
+                    id: "__blank__",
+                    label: "New report",
+                    current: blankStarterSelected,
+                },
+                ...reportDocumentTemplates.map((template) => ({
+                    ...template,
+                    current: normalizeString(state.reportDocumentTemplateId) === normalizeString(template?.id),
+                })),
+            ];
+            return (
+                <section
+                    className={[
+                        "forge-report-builder__design-starter-chooser",
+                        compact ? "forge-report-builder__design-starter-chooser--compact" : "",
+                    ].filter(Boolean).join(" ")}
+                    aria-label="Report starters"
+                >
+                    <div className="forge-report-builder__design-starter-heading">{compact ? "Start from" : "Report starters"}</div>
+                    <div
+                        className={[
+                            "forge-report-builder__design-source-grid",
+                            "forge-report-builder__design-source-grid--starters",
+                        ].join(" ")}
+                        aria-label="Available report starters"
+                    >
+                        <div className="forge-report-builder__design-source-grid-header">
+                            <div>Starter</div>
+                            <div>Status</div>
+                            <div>Action</div>
+                        </div>
+                        {starterRows.map((template) => {
+                            const isActive = !!template.current;
+                            return (
+                                <div
+                                    key={template.id}
+                                    className={[
+                                        "forge-report-builder__design-source-grid-row",
+                                        isActive ? "is-active" : "",
+                                    ].filter(Boolean).join(" ")}
+                                >
+                                    <div className="forge-report-builder__design-source-grid-cell forge-report-builder__design-source-grid-cell--source">
+                                        <div className="forge-report-builder__design-projection-card-title">{template.label}</div>
+                                    </div>
+                                    <div className="forge-report-builder__design-source-grid-cell">
+                                        <span className="forge-report-builder__result-meta-chip">
+                                            {isActive ? "Current" : "Available"}
+                                        </span>
+                                    </div>
+                                    <div className="forge-report-builder__design-source-grid-cell forge-report-builder__design-source-grid-cell--actions">
+                                        {!isActive ? (
+                                            <Button
+                                                small
+                                                outlined
+                                                onClick={() => {
+                                                    applyDocumentTemplate(template.id);
+                                                    setStarterChooserOpen(false);
+                                                }}
+                                            >
+                                                Use
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+            );
+        };
+        const performOutlineEntryAction = (entry = null) => {
+            if (!entry || typeof entry !== "object") {
+                return;
+            }
+            const normalizedKind = normalizeString(entry?.kind);
+            if (normalizedKind === "primaryBuilder") {
+                setDesignWorkspaceFocus("document");
+                setDocumentDataViewOpen((current) => !current);
+                return;
+            }
+            if (normalizedKind === "tableView") {
+                setDesignWorkspaceFocus("document");
+                setDocumentDataViewOpen((current) => !current);
+                return;
+            }
+            if (normalizedKind === "chartView") {
+                openChartDialog(state.chartSpec);
+                return;
+            }
+            if (normalizedKind === "drillHierarchy" || normalizedKind === "drillPlaceholder") {
+                focusDesignArea("drill");
+                return;
+            }
+            const block = authoredDocumentBlocks.find((candidate) => normalizeString(candidate?.id) === normalizeString(entry?.id)) || null;
+            if (!block) {
+                return;
+            }
+            if (normalizedKind === "chartBlock") {
+                openAuthoredChartBlockDialog(block);
+                return;
+            }
+            openDocumentBlockDialog(block);
+        };
+        const renderOutlineNodes = (entries = [], depth = 0) => (
+            (Array.isArray(entries) ? entries : []).map((entry) => {
+                const normalizedKind = normalizeString(entry?.kind);
+                const isPrimaryBuilder = normalizedKind === "primaryBuilder";
+                const isPrimaryChartView = normalizedKind === "chartView";
+                const isPrimaryTableView = normalizedKind === "tableView";
+                const isDrillNode = normalizedKind === "drillHierarchy" || normalizedKind === "drillPlaceholder";
+                const isSelected = entry.id === effectiveSelectedDocumentOutlineEntryId;
+                const outlineBlock = authoredDocumentBlocks.find((candidate) => normalizeString(candidate?.id) === normalizeString(entry?.id)) || null;
+                const repairDraft = outlineBlock ? buildRepairableDocumentBlockDraft(outlineBlock) : null;
+                const canRepairOutlineBlock = !!repairDraft;
+                const outlineBlockIndex = authoredDocumentBlocks.findIndex((candidate) => normalizeString(candidate?.id) === normalizeString(entry?.id));
+                const canDragOutlineBlock = !!outlineBlock && depth === 0 && !isDrillNode && !isPrimaryBuilder && !isPrimaryChartView && !isPrimaryTableView;
+                const isOutlineDropTarget = canDragOutlineBlock
+                    && !!draggingDocumentBlockId
+                    && draggingDocumentBlockId !== entry.id
+                    && documentOutlineDropTarget.targetId === entry.id;
+                const selectedActionLabel = isPrimaryBuilder || isPrimaryTableView
+                    ? (documentDataViewOpen ? "Close data editor" : "Open data editor")
+                    : (isPrimaryChartView
+                        ? (normalizeString(state?.chartSpec?.title || state?.chartSpec?.type) ? "Edit chart" : "Add chart")
+                            : (normalizeString(entry?.actionLabel || (isDrillNode ? "Drill setup" : "Edit block"))
+                            || (isDrillNode ? "Drill setup" : "Edit block")));
+                const showInlineToolbar = !!outlineBlock && isSelected;
+                const actionLabel = showInlineToolbar
+                    ? ""
+                    : (isSelected ? selectedActionLabel : "Select");
+                const icon = isPrimaryBuilder
+                    ? "projects"
+                    : (isPrimaryChartView
+                        ? "timeline-line-chart"
+                        : (isPrimaryTableView
+                            ? "th"
+                            : (isDrillNode ? "git-branch" : reportBuilderDocumentBlockIcon(normalizedKind))));
+                return (
+                    <div key={entry.id} className="forge-report-builder__design-outline-branch">
+                        <div className="forge-report-builder__design-outline-node-shell">
+                            {canDragOutlineBlock ? (
+                                <div
+                                    className={[
+                                        "forge-report-builder__design-outline-drag-handle",
+                                        draggingDocumentBlockId === entry.id ? "is-dragging" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    data-testid="report-builder-outline-drag-handle"
+                                    data-outline-entry-id={entry.id}
+                                    draggable
+                                    aria-label={`Drag ${entry.title}`}
+                                    title={`Drag ${entry.title}`}
+                                    onPointerDown={(event) => {
+                                        if (event.button != null && event.button !== 0) {
+                                            return;
+                                        }
+                                        event.preventDefault();
+                                        event.stopPropagation();
+                                        setSelectedDocumentOutlineEntryId(entry.id);
+                                        setDraggingDocumentBlockId(outlineBlock.id);
+                                        setDocumentOutlinePointerDragState({
+                                            blockId: outlineBlock.id,
+                                            active: true,
+                                        });
+                                    }}
+                                    onDragStart={(event) => {
+                                        if (!outlineBlock?.id || !event?.dataTransfer) {
+                                            return;
+                                        }
+                                        setDocumentOutlinePointerDragState({
+                                            blockId: outlineBlock.id,
+                                            active: false,
+                                        });
+                                        const payload = JSON.stringify({
+                                            blockId: outlineBlock.id,
+                                            dragKind: "document-block",
+                                        });
+                                        event.dataTransfer.effectAllowed = "move";
+                                        event.dataTransfer.setData(REPORT_BUILDER_DOCUMENT_BLOCK_DND_MIME, payload);
+                                        event.dataTransfer.setData("text/plain", payload);
+                                        setSelectedDocumentOutlineEntryId(entry.id);
+                                        setDraggingDocumentBlockId(outlineBlock.id);
+                                    }}
+                                    onDragEnd={clearDocumentOutlineDragState}
+                                >
+                                    <Icon icon="drag-handle-vertical" size={12} />
+                                </div>
+                            ) : null}
+                            <button
+                                type="button"
+                                className={[
+                                    "forge-report-builder__design-outline-node",
+                                    draggingDocumentBlockId === entry.id ? "is-dragging" : "",
+                                    isOutlineDropTarget ? `is-drop-${documentOutlineDropTarget.placement || "before"}` : "",
+                                    isSelected ? "is-selected" : "",
+                                ].filter(Boolean).join(" ")}
+                                data-outline-depth={depth}
+                                data-testid="report-builder-outline-node"
+                                data-outline-entry-id={entry.id}
+                                aria-pressed={isSelected}
+                                aria-label={isSelected
+                                    ? `${entry.title}. Selected. ${selectedActionLabel}.`
+                                    : `${entry.title}. Select to view actions.`}
+                                onDragOver={(event) => {
+                                    // Drag payload data is not readable during dragover in real
+                                    // browsers, so gate on the advertised MIME type / local drag
+                                    // state instead and read the payload only on drop.
+                                    const transferTypes = Array.from(event?.dataTransfer?.types || []);
+                                    const carriesDocumentBlock = transferTypes.includes(REPORT_BUILDER_DOCUMENT_BLOCK_DND_MIME)
+                                        || !!draggingDocumentBlockId;
+                                    if (!canDragOutlineBlock || !carriesDocumentBlock || draggingDocumentBlockId === entry.id) {
+                                        return;
+                                    }
+                                    if (event?.dataTransfer) {
+                                        event.dataTransfer.dropEffect = "move";
+                                    }
+                                    updateDocumentOutlineDropTarget(event, entry.id);
+                                }}
+                                onDrop={(event) => {
+                                    const dragPayload = parseReportBuilderDocumentBlockDragPayload(event);
+                                    const dragBlockId = normalizeString(dragPayload?.blockId || draggingDocumentBlockId);
+                                    if (!canDragOutlineBlock || !dragBlockId || dragBlockId === entry.id) {
+                                        clearDocumentOutlineDragState();
+                                        return;
+                                    }
+                                    const placement = updateDocumentOutlineDropTarget(event, entry.id) || documentOutlineDropTarget.placement || "before";
+                                    event.preventDefault();
+                                    moveDocumentBlockRelative(dragBlockId, entry.id, placement);
+                                    clearDocumentOutlineDragState();
+                                }}
+                                onClick={() => {
+                                    setSelectedDocumentOutlineEntryId(entry.id);
+                                    if (!isSelected) {
+                                        return;
+                                    }
+                                    performOutlineEntryAction(entry);
+                                }}
+                            >
+                                <span className="forge-report-builder__design-outline-node-rail" aria-hidden="true" />
+                                <span className="forge-report-builder__design-outline-node-icon" aria-hidden="true">
+                                    <Icon icon={icon} size={12} />
+                                </span>
+                                <span className="forge-report-builder__design-outline-node-copy">
+                                    <span className="forge-report-builder__design-outline-node-title-row">
+                                        <strong>{entry.title}</strong>
+                                        {entry.widthLabel ? (
+                                            <span className="forge-report-builder__result-meta-chip">
+                                                {isPrimaryBuilder ? "Current data" : entry.widthLabel}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                    {entry.summary ? (
+                                        <span className="forge-report-builder__design-outline-node-summary">{entry.summary}</span>
+                                    ) : null}
+                                </span>
+                                {actionLabel ? (
+                                    <span className="forge-report-builder__design-outline-node-action">{actionLabel}</span>
+                                ) : null}
+                            </button>
+                            {showInlineToolbar ? (
+                                <div className="forge-report-builder__design-outline-toolbar" aria-label={`${entry.title} actions`}>
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button"
+                                        aria-label={`Edit ${entry.title}`}
+                                        title={`Edit ${entry.title}`}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setSelectedDocumentOutlineEntryId(entry.id);
+                                            if (normalizedKind === "chartBlock") {
+                                                openAuthoredChartBlockDialog(outlineBlock);
+                                                return;
+                                            }
+                                            openDocumentBlockDialog(outlineBlock);
+                                        }}
+                                    >
+                                        <Icon icon="edit" size={12} />
+                                    </button>
+                                    {canRepairOutlineBlock ? (
+                                        <button
+                                            type="button"
+                                            className="forge-report-builder__design-outline-toolbar-button"
+                                            aria-label={`Apply current fields for ${entry.title}`}
+                                            title={`Apply current fields for ${entry.title}`}
+                                            onClick={(event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                                setSelectedDocumentOutlineEntryId(entry.id);
+                                                applyDocumentBlockCurrentSelection(outlineBlock);
+                                            }}
+                                        >
+                                            <Icon icon="endorsed" size={12} />
+                                        </button>
+                                    ) : null}
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button"
+                                        aria-pressed={workspaceMode === "report"}
+                                        aria-label={`View ${entry.title} in the report`}
+                                        title={`View ${entry.title} in the report`}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setWorkspaceMode("report");
+                                        }}
+                                    >
+                                        <Icon icon="eye-open" size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button"
+                                        aria-label={`Duplicate ${entry.title}`}
+                                        title={`Duplicate ${entry.title}`}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setSelectedDocumentOutlineEntryId(entry.id);
+                                            duplicateDocumentBlock(outlineBlock.id);
+                                        }}
+                                    >
+                                        <Icon icon="duplicate" size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button"
+                                        aria-label={`Resize ${entry.title} to ${selectedDocumentOutlineWidthLabels.actionLabel.replace(/^Make\s+/, "")} width`}
+                                        title={selectedDocumentOutlineWidthLabels.actionTitle}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setSelectedDocumentOutlineEntryId(entry.id);
+                                            resizeDocumentBlock(outlineBlock.id, selectedDocumentOutlineWidthLabels.nextSpan);
+                                        }}
+                                    >
+                                        <Icon icon={selectedDocumentOutlineWidthLabels.actionIcon} size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={[
+                                            "forge-report-builder__design-outline-toolbar-button",
+                                            pendingDocumentInsertionPlacement === "before" ? "is-active" : "",
+                                        ].filter(Boolean).join(" ")}
+                                        aria-pressed={pendingDocumentInsertionPlacement === "before"}
+                                        aria-label={`Set next insert before ${entry.title}`}
+                                        title={`Set next insert before ${entry.title}`}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setSelectedDocumentOutlineEntryId(entry.id);
+                                            setPendingDocumentInsertionPlacement("before");
+                                        }}
+                                    >
+                                        <Icon icon="plus" size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className={[
+                                            "forge-report-builder__design-outline-toolbar-button",
+                                            pendingDocumentInsertionPlacement === "after" ? "is-active" : "",
+                                        ].filter(Boolean).join(" ")}
+                                        aria-pressed={pendingDocumentInsertionPlacement === "after"}
+                                        aria-label={`Set next insert after ${entry.title}`}
+                                        title={`Set next insert after ${entry.title}`}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setSelectedDocumentOutlineEntryId(entry.id);
+                                            setPendingDocumentInsertionPlacement("after");
+                                        }}
+                                    >
+                                        <Icon icon="plus" size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button"
+                                        aria-label={`Move ${entry.title} up`}
+                                        title={`Move ${entry.title} up`}
+                                        disabled={outlineBlockIndex <= 0}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setSelectedDocumentOutlineEntryId(entry.id);
+                                            moveDocumentBlock(outlineBlock.id, "up");
+                                        }}
+                                    >
+                                        <Icon icon="arrow-up" size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button"
+                                        aria-label={`Move ${entry.title} down`}
+                                        title={`Move ${entry.title} down`}
+                                        disabled={outlineBlockIndex === -1 || outlineBlockIndex >= authoredDocumentBlocks.length - 1}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setSelectedDocumentOutlineEntryId(entry.id);
+                                            moveDocumentBlock(outlineBlock.id, "down");
+                                        }}
+                                    >
+                                        <Icon icon="arrow-down" size={12} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button forge-report-builder__design-outline-toolbar-button--danger"
+                                        aria-label={`Remove ${entry.title}`}
+                                        title={`Remove ${entry.title}`}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            removeDocumentBlock(outlineBlock.id);
+                                        }}
+                                    >
+                                        <Icon icon="trash" size={12} />
+                                    </button>
+                                </div>
+                            ) : null}
+                        </div>
+                        {Array.isArray(entry.children) && entry.children.length > 0 ? (
+                            <div className="forge-report-builder__design-outline-children">
+                                {renderOutlineNodes(entry.children, depth + 1)}
+                            </div>
+                        ) : null}
+                    </div>
+                );
+            })
+        );
+        const renderSelectedOutlineInspector = () => {
+            if (!selectedDocumentOutlineEntry) {
+                return null;
+            }
+            const normalizedKind = normalizeString(selectedDocumentOutlineEntry.kind);
+            const isPrimaryBuilder = normalizedKind === "primaryBuilder";
+            const isPrimaryChartView = normalizedKind === "chartView";
+            const isPrimaryTableView = normalizedKind === "tableView";
+            const isDrillNode = normalizedKind === "drillHierarchy" || normalizedKind === "drillPlaceholder";
+            const block = selectedDocumentOutlineBlock;
+            const actions = [];
+            const selectedInsertionAnchorTitle = selectedDocumentInsertionTarget.insertionAnchorTitle || "";
+            const insertionAfterId = selectedDocumentInsertionTarget.insertionAfterId || "";
+            const insertionPlacement = pendingDocumentInsertionPlacement === "before" ? "before" : "after";
+            const insertionGroupIds = resolveReportBuilderSelectedInsertionGroupIds(normalizedKind);
+            const selectedTableRowActions = isPrimaryTableView && selectedBuilderTableInteractionState && selectedBuilderTableRow?.row
+                ? selectedBuilderTableInteractionState.actions
+                    .map((action) => {
+                        const execution = action.resolveExecution({
+                            ...selectedBuilderTableRow.row,
+                            selectionRows: [selectedBuilderTableRow.row],
+                        });
+                        if (!execution) {
+                            return null;
+                        }
+                        const supported = (
+                            ((execution.kind === "keep" || execution.kind === "exclude") && typeof runtimePreviewHandlers?.applyRefinement === "function")
+                            || (execution.kind === "drill" && typeof runtimePreviewHandlers?.applyDrillTransition === "function")
+                            || (execution.kind === "detail" && typeof runtimePreviewHandlers?.openDetailTarget === "function")
+                        );
+                        if (!supported) {
+                            return null;
+                        }
+                        return {
+                            id: action.id,
+                            label: action.label,
+                            execution,
+                        };
+                    })
+                    .filter(Boolean)
+                : [];
+            const selectedChartActions = isPrimaryChartView && selectedBuilderChartSelection
+                ? selectedBuilderChartSelectionActions
+                : [];
+            if (isPrimaryBuilder || isPrimaryTableView) {
+                actions.push(
+                    <Button
+                        key="edit-data"
+                        small
+                        outlined
+                        onClick={() => {
+                            setDesignWorkspaceFocus("document");
+                            setDocumentDataViewOpen((current) => !current);
+                        }}
+                    >
+                        {documentDataViewOpen ? "Hide data editor" : "Edit data editor"}
+                    </Button>,
+                );
+            }
+            if (isPrimaryBuilder || isPrimaryChartView) {
+                actions.push(
+                    <Button
+                        key="edit-chart"
+                        small
+                        outlined
+                        onClick={() => openChartDialog(state.chartSpec)}
+                    >
+                        {normalizeString(state?.chartSpec?.title || state?.chartSpec?.type) ? "Edit chart" : "Add chart"}
+                    </Button>,
+                );
+            }
+            if (isPrimaryChartView && selectedBuilderChartSelection) {
+                actions.push(
+                    <Button
+                        key="start-chart-draft"
+                        small
+                        outlined
+                        onClick={startChartSelectionExploration}
+                    >
+                        Start draft from chart selection
+                    </Button>,
+                );
+                actions.push(
+                    <Button
+                        key="clear-chart-selection"
+                        small
+                        minimal
+                        onClick={() => setSelectedBuilderChartSelection(null)}
+                    >
+                        Clear chart selection
+                    </Button>,
+                );
+            }
+            if (isPrimaryTableView && selectedBuilderTableRow) {
+                actions.push(
+                    <Button
+                        key="clear-table-selection"
+                        small
+                        minimal
+                        onClick={() => setSelectedBuilderTableRow(null)}
+                    >
+                        Clear row selection
+                    </Button>,
+                );
+            }
+            if (isPrimaryBuilder || isPrimaryChartView || isPrimaryTableView || isDrillNode || block) {
+                const shouldShowInspectorPreview = !block;
+                if (shouldShowInspectorPreview) {
+                    actions.push(
+                        <Button
+                            key="preview-report"
+                            small
+                            minimal
+                            onClick={() => setWorkspaceMode("report")}
+                        >
+                            View report
+                        </Button>,
+                    );
+                }
+            }
+            if (isDrillNode) {
+                actions.push(
+                    <Button
+                        key="open-drill"
+                        small
+                        outlined
+                        onClick={() => focusDesignArea("drill")}
+                    >
+                        Open drill setup
+                    </Button>,
+                );
+            }
+            if (normalizedKind === "drillPlaceholder" && currentBreakdownDrillHierarchy) {
+                actions.push(
+                    <Button
+                        key="capture-drill"
+                        small
+                        outlined
+                        onClick={captureCurrentDrillHierarchy}
+                    >
+                        {currentBreakdownDrillHierarchyCaptured ? "Update current path" : "Capture current path"}
+                    </Button>,
+                );
+            }
+            if (normalizedKind === "drillHierarchy" && selectedDocumentDrillState.hierarchy) {
+                actions.push(
+                    <Button
+                        key="remove-drill"
+                        small
+                        minimal
+                        intent="danger"
+                        onClick={() => removeDrillHierarchy(selectedDocumentDrillState.hierarchy.id)}
+                    >
+                        Remove drill branch
+                    </Button>,
+                );
+            }
+            const insertGroups = insertionAfterId
+                ? insertionGroupIds.map((groupId) => {
+                    if (groupId === "runtime") {
+                        return {
+                            key: "runtime",
+                            title: runtimeDesignActionGroup?.title || "Live Controls",
+                            description: selectedInsertionAnchorTitle
+                                ? `Add the next runtime control ${insertionPlacement} ${selectedInsertionAnchorTitle}.`
+                                : "Add the next runtime control.",
+                            actionIds: runtimeDesignActionGroup?.actionIds || [],
+                        };
+                    }
+                    return {
+                        key: "document",
+                        title: documentDesignActionGroup?.title || "Report Document",
+                        description: selectedInsertionAnchorTitle
+                            ? `Add the next narrative or presentation block ${insertionPlacement} ${selectedInsertionAnchorTitle}.`
+                            : "Add the next narrative or presentation block.",
+                        actionIds: documentDesignActionGroup?.actionIds || [],
+                    };
+                }).filter((group) => group.actionIds.length > 0)
+                : [];
+            const selectedItemEyebrow = isPrimaryBuilder || isPrimaryTableView
+                ? "Data editor"
+                : (isPrimaryChartView
+                    ? "Chart View"
+                    : (isDrillNode ? "Drill Path" : "Report Item"));
+            const selectedItemTitle = isPrimaryBuilder
+                ? "Current data selection"
+                : (isPrimaryTableView
+                    ? "Current table result"
+                    : (isPrimaryChartView
+                        ? "Chart result setup"
+                        : selectedDocumentOutlineEntry.title));
+            const selectedItemDescription = isPrimaryBuilder
+                ? "Adjust the current measures, breakdowns, chart behavior, and drill setup for the builder result."
+                : (isPrimaryTableView
+                    ? "Inspect the current table result, row actions, and local runtime interactions."
+                    : (isPrimaryChartView
+                        ? "Use the current chart leaf to adjust chart setup or start a local draft from the active chart selection."
+                        : (isDrillNode
+                            ? (selectedDocumentOutlineEntry.summary || "Configure drill capture and detail navigation for this branch.")
+                            : (selectedDocumentOutlineEntry.summary || "Review this report item and continue composition from the outline."))));
+            if (!block) {
+                return null;
+            }
+            return (
+                <section className="forge-report-builder__design-stage" aria-label={selectedItemTitle}>
+                    <div className="forge-report-builder__design-stage-header">
+                        <div className="forge-report-builder__design-stage-eyebrow">{selectedItemEyebrow}</div>
+                        <div className="forge-report-builder__design-stage-title">{selectedItemTitle}</div>
+                        <div className="forge-report-builder__design-stage-description">
+                            {selectedItemDescription}
+                        </div>
+                    </div>
+                    <div className="forge-report-builder__result-meta" aria-label={`${selectedItemTitle} summary`}>
+                        <span className="forge-report-builder__result-meta-chip">
+                            {isPrimaryBuilder
+                                ? "Current data"
+                                : (selectedDocumentOutlineEntry.widthLabel || selectedDocumentOutlineEntry.kind)}
+                        </span>
+                        {selectedDocumentInsertionTarget.insertionAnchorTitle ? (
+                            <span className="forge-report-builder__result-meta-chip">
+                                Next insert {insertionPlacement} {selectedDocumentInsertionTarget.insertionAnchorTitle}
+                            </span>
+                        ) : null}
+                    </div>
+                    {selectedDocumentSemanticBindingState ? (
+                        <>
+                            {renderSemanticBindingChips(selectedDocumentSemanticBindingState, { marginTop: 10 })}
+                            {renderSemanticBindingFieldGroups(selectedDocumentSemanticBindingState, { marginTop: 10 })}
+                        </>
+                    ) : null}
+                    {isPrimaryChartView && selectedBuilderChartSelection ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label="Chart selection"
+                            value={chartSelectionSummary || "Selected chart value"}
+                            description="Use the current chart selection as a local draft starting point from the selected chart leaf."
+                        />
+                    ) : null}
+                    {isPrimaryTableView && selectedBuilderTableInteractionState?.rowSummary ? (
+                        <ReportBuilderSummaryNotice
+                            level="info"
+                            label="Selected row"
+                            value={selectedBuilderTableInteractionState.rowSummary}
+                            description="Use the current row selection as a runtime starting point from the selected table leaf."
+                        />
+                    ) : null}
+                    {actions.length > 0 ? (
+                        <div className="forge-report-builder__result-header-actions">
+                            {actions}
+                        </div>
+                    ) : null}
+                    {selectedTableRowActions.length > 0 ? (
+                        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                Row actions
+                            </div>
+                            <ReportBuilderRuntimeActionStrip
+                                ariaLabel="Row actions"
+                                actions={selectedTableRowActions}
+                                onExecute={(action) => executeReportRuntimeAction(action.execution, runtimePreviewHandlers)}
+                            />
+                        </div>
+                    ) : null}
+                    {selectedChartActions.length > 0 ? (
+                        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                Chart actions
+                            </div>
+                            <ReportBuilderRuntimeActionStrip
+                                ariaLabel="Chart actions"
+                                actions={selectedChartActions}
+                                onExecute={(action) => executeReportRuntimeAction(action.execution, runtimePreviewHandlers)}
+                            />
+                        </div>
+                    ) : null}
+                    {insertionAfterId && !block ? (
+                        <div className="forge-report-builder__result-header-actions" style={{ marginTop: 8 }}>
+                            <Button
+                                small
+                                minimal
+                                aria-pressed={insertionPlacement === "before"}
+                                onClick={() => setPendingDocumentInsertionPlacement("before")}
+                            >
+                                Insert before
+                            </Button>
+                            <Button
+                                small
+                                minimal
+                                aria-pressed={insertionPlacement === "after"}
+                                onClick={() => setPendingDocumentInsertionPlacement("after")}
+                            >
+                                Insert after
+                            </Button>
+                        </div>
+                    ) : null}
+                    {selectedDocumentDrillState.bindings.length > 0 ? (
+                        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                Detail actions
+                            </div>
+                            <div className="forge-report-builder__drill-card-list">
+                                {selectedDocumentDrillState.bindings.map((binding) => (
+                                    <div
+                                        key={binding.actionId}
+                                        className="forge-report-builder__drill-card"
+                                    >
+                                        <div className="forge-report-builder__drill-card-copy">
+                                            <div className="forge-report-builder__drill-card-title">{binding.actionLabel}</div>
+                                            <div className="forge-report-builder__drill-card-description">
+                                                {binding.fieldLabel} {"->"} {binding.target?.title || binding.targetRef}
+                                            </div>
+                                            <div className="forge-report-builder__drill-card-meta">
+                                                {binding.target?.navigationMode || "hostRoute"} • {binding.targetRef}
+                                            </div>
+                                            {binding.parameterSummary ? (
+                                                <div className="forge-report-builder__drill-card-meta">
+                                                    {binding.parameterSummary}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                        <div className="forge-report-builder__drill-card-actions">
+                                            <Button
+                                                small
+                                                minimal
+                                                onClick={() => editDetailTarget(binding)}
+                                            >
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                small
+                                                minimal
+                                                intent="danger"
+                                                onClick={() => removeDetailTarget(binding.targetRef)}
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                    {selectedDocumentDrillMissingFieldOptions.length > 0 ? (
+                        <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+                                Add detail actions
+                            </div>
+                            <div className="forge-report-builder__result-header-actions">
+                                {selectedDocumentDrillMissingFieldOptions.map((option) => (
+                                    <Button
+                                        key={option.fieldRef}
+                                        small
+                                        outlined
+                                        disabled={!option.available}
+                                        title={!option.available ? `${option.label} is no longer available in the current drill authoring fields.` : undefined}
+                                        aria-label={!option.available ? `Add detail for ${option.label}. Unavailable because the hierarchy field is no longer present in the current breakdowns.` : `Add detail for ${option.label}`}
+                                        onClick={() => beginAuthoredDetailTargetDraft(option.fieldRef)}
+                                    >
+                                        {`Add detail for ${option.label}`}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                    {insertGroups.length > 0 ? (
+                        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+                            {insertGroups.map((group) => (
+                                <section key={group.key} className="forge-report-builder__authored-action-group" aria-label={group.title}>
+                                    <div className="forge-report-builder__authored-action-group-header">
+                                        <div className="forge-report-builder__authored-action-group-heading">
+                                            <div className="forge-report-builder__authored-action-group-title-row">
+                                                <h4 className="forge-report-builder__authored-action-group-title">{group.title}</h4>
+                                            </div>
+                                            <div className="forge-report-builder__design-stage-description">{group.description}</div>
+                                        </div>
+                                        <div className="forge-report-builder__authored-action-group-count">
+                                            {group.actionIds.length} options
+                                        </div>
+                                    </div>
+                                    <div className="forge-report-builder__authored-action-group-actions">
+                                        {renderAuthoredBlockActionButtons({
+                                            actionIds: group.actionIds,
+                                            onAction: (actionId) => openAuthoredAction(actionId, {
+                                                insertionAfterId,
+                                                insertionPlacement,
+                                            }),
+                                        })}
+                                    </div>
+                                </section>
+                            ))}
+                        </div>
+                    ) : null}
+                </section>
+            );
+        };
+        const renderDocumentDataViewPanel = () => (
+            <section className="forge-report-builder__design-stage" aria-label="Data editor">
+                <div className="forge-report-builder__design-stage-header">
+                    <div className="forge-report-builder__design-stage-eyebrow">Data editor</div>
+                    <div className="forge-report-builder__design-stage-title">Current data selection</div>
+                    <div className="forge-report-builder__design-stage-description">
+                        Adjust the current measures, breakdowns, and drill setup without leaving the report designer.
+                    </div>
+                </div>
+                <div className="forge-report-builder__result-meta" aria-label="Current data selection summary">
+                    {activeReportDataSourceCard?.label ? (
+                        <span className="forge-report-builder__result-meta-chip">{activeReportDataSourceCard.label}</span>
+                    ) : null}
+                    <span className="forge-report-builder__result-meta-chip">
+                        {`${selectedMeasureDefs.length} ${selectedMeasureDefs.length === 1 ? "measure" : "measures"}`}
+                    </span>
+                    <span className="forge-report-builder__result-meta-chip">
+                        {`${selectedDimensionDefs.length} ${selectedDimensionDefs.length === 1 ? "breakdown" : "breakdowns"}`}
+                    </span>
+                    {currentBreakdownDrillHierarchy ? (
+                        <span className="forge-report-builder__result-meta-chip">
+                            {`${currentBreakdownDrillHierarchy.levels.length} drill ${currentBreakdownDrillHierarchy.levels.length === 1 ? "level" : "levels"}`}
+                        </span>
+                    ) : null}
+                </div>
+                {currentSemanticBindingViewState ? renderSemanticBindingChips(currentSemanticBindingViewState, { marginTop: 10 }) : null}
+                <div className="forge-report-builder__design-stage-actions">
+                    <Button
+                        small
+                        minimal
+                        icon="cross"
+                        onClick={() => setDocumentDataViewOpen(false)}
+                    >
+                        Close data editor
+                    </Button>
+                </div>
+                <div style={{ display: "grid", gap: 14, marginTop: 6 }}>
+                    {renderMeasuresPanel()}
+                    {renderBreakdownPanel()}
+                </div>
+            </section>
+        );
+        const renderSharedDataSelectionCard = () => {
+            const hasMultipleSources = reportDataSourceCards.length > 1;
+            return (
+                <section className="forge-report-builder__design-stage" aria-label="Report data sources">
+                    <div className="forge-report-builder__design-stage-header">
+                        <div className="forge-report-builder__design-stage-title">Data Sources</div>
+                    </div>
+                    <div className="forge-report-builder__design-stage-actions">
+                        <Button
+                            small
+                            outlined
+                            icon="edit"
+                            onClick={() => {
+                                if (documentDataViewOpen) {
+                                    setDocumentDataViewOpen(false);
+                                    return;
+                                }
+                                focusDesignArea("projection");
+                            }}
+                        >
+                            {documentDataViewOpen ? "Hide data" : "Edit data"}
+                        </Button>
+                        <Tooltip content="Import source" placement="top">
+                            <Button
+                                small
+                                minimal
+                                icon="upload"
+                                className="forge-report-builder__design-source-action-icon"
+                                aria-label="Import source"
+                                title="Import source"
+                                onClick={() => openStaticDatasetImport("")}
+                            />
+                        </Tooltip>
+                    </div>
+                    {reportDataSourceCards.length > 0 ? (
+                        <div className="forge-report-builder__design-source-grid" aria-label="Available data sources" role="table">
+                            {hasMultipleSources ? (
+                                <div className="forge-report-builder__design-source-grid-header" role="row">
+                                    <div role="columnheader">Source</div>
+                                    <div role="columnheader">Type</div>
+                                    <div role="columnheader">Status</div>
+                                    <div role="columnheader">Actions</div>
+                                </div>
+                            ) : null}
+                            {reportDataSourceCards.map((card) => (
+                                <div
+                                    key={card.dataSourceRef}
+                                    className={[
+                                        "forge-report-builder__design-source-grid-row",
+                                        card.active ? "is-active" : "",
+                                        card.inspected ? "is-inspected" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    role="row"
+                                >
+                                    <div className="forge-report-builder__design-source-grid-cell forge-report-builder__design-source-grid-cell--source" role="cell">
+                                        <div className="forge-report-builder__design-projection-card-title">{card.label}</div>
+                                        {card.description ? (
+                                            <div className="forge-report-builder__design-projection-card-description">{card.description}</div>
+                                        ) : null}
+                                    </div>
+                                    <div className="forge-report-builder__design-source-grid-cell" role="cell">
+                                        <span className="forge-report-builder__result-meta-chip">
+                                            {formatReportBuilderSourceKindLabel(card.kindLabel || "published")}
+                                        </span>
+                                    </div>
+                                    <div className="forge-report-builder__design-source-grid-cell" role="cell">
+                                        <div className="forge-report-builder__result-meta">
+                                            <span className="forge-report-builder__result-meta-chip">
+                                                {card.active ? "Current source" : "Available"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                <div className="forge-report-builder__design-source-grid-cell forge-report-builder__design-source-grid-cell--actions" role="cell">
+                                    <Tooltip content={card.inspected ? "Hide source details" : "View source details"} placement="top">
+                                        <Button
+                                            small
+                                            minimal
+                                            icon={card.inspected ? "chevron-up" : "eye-open"}
+                                            className="forge-report-builder__design-source-action-icon"
+                                            aria-label={card.inspected ? "Hide source details" : "View source details"}
+                                            title={card.inspected ? "Hide source details" : "View source details"}
+                                            onClick={() => setInspectedDataSourceRef((current) => (
+                                                normalizeString(current) === normalizeString(card.dataSourceRef)
+                                                    ? ""
+                                                    : normalizeString(card.dataSourceRef)
+                                            ))}
+                                        />
+                                    </Tooltip>
+                                    {normalizeString(card.kindLabel).startsWith("static ") ? (
+                                        <>
+                                            <Tooltip content="Replace source file" placement="top">
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    icon="refresh"
+                                                    className="forge-report-builder__design-source-action-icon"
+                                                    aria-label="Replace source file"
+                                                    title="Replace source file"
+                                                    onClick={() => openStaticDatasetImport(card.id)}
+                                                />
+                                            </Tooltip>
+                                            <Tooltip content="Remove source" placement="top">
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    intent="danger"
+                                                    icon="trash"
+                                                    className="forge-report-builder__design-source-action-icon forge-report-builder__design-source-action-icon--danger"
+                                                    aria-label="Remove source"
+                                                    title="Remove source"
+                                                    onClick={() => removeStaticDataset(card.id)}
+                                                />
+                                            </Tooltip>
+                                        </>
+                                    ) : null}
+                                </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                    {inspectedReportDataSourceDetails ? (
+                        <section className="forge-report-builder__design-source-details" aria-label="Source details">
+                            <div className="forge-report-builder__design-stage-header">
+                                <div className="forge-report-builder__design-stage-eyebrow">Details</div>
+                                <div className="forge-report-builder__design-stage-title">{inspectedReportDataSourceDetails.title}</div>
+                                {inspectedReportDataSourceDetails.description ? (
+                                    <div className="forge-report-builder__design-stage-description">
+                                        {inspectedReportDataSourceDetails.description}
+                                    </div>
+                                ) : null}
+                            </div>
+                        <div className="forge-report-builder__result-meta" aria-label={`${inspectedReportDataSourceDetails.title} summary`}>
+                            <span className="forge-report-builder__result-meta-chip">{inspectedReportDataSourceDetails.kindLabel}</span>
+                            <span className="forge-report-builder__result-meta-chip">
+                                {inspectedReportDataSourceDetails.builderSource ? "Current source" : "Imported source"}
+                            </span>
+                            {!inspectedReportDataSourceDetails.builderSource ? (
+                                <span className="forge-report-builder__result-meta-chip">{`${inspectedReportDataSourceDetails.rowCount} rows`}</span>
+                            ) : null}
+                            <span className="forge-report-builder__result-meta-chip">{`${inspectedReportDataSourceDetails.columnCount} columns`}</span>
+                        </div>
+                            <div className="forge-report-builder__design-source-groups">
+                                {(Array.isArray(inspectedReportDataSourceDetails.detailGroups) ? inspectedReportDataSourceDetails.detailGroups : [])
+                                    .map((group) => {
+                                        const label = normalizeString(group?.label);
+                                        const items = (Array.isArray(group?.items) ? group.items : [])
+                                            .map((entry) => normalizeString(entry))
+                                            .filter(Boolean);
+                                        if (!label || items.length === 0) {
+                                            return null;
+                                        }
+                                        return (
+                                            <section key={`${inspectedReportDataSourceDetails.title}:${label}`} className="forge-report-builder__design-source-group">
+                                                <div className="forge-report-builder__design-stage-eyebrow">{label}</div>
+                                                <div className="forge-report-builder__result-meta" aria-label={`${label} fields`}>
+                                                    {items.map((item, index) => (
+                                                        <span key={`${label}:${item}:${index}`} className="forge-report-builder__result-meta-chip">{item}</span>
+                                                    ))}
+                                                    {Math.max(0, Number(group?.overflowCount || 0) || 0) > 0 ? (
+                                                        <span className="forge-report-builder__result-meta-chip">
+                                                            {`+${Math.max(0, Number(group?.overflowCount || 0) || 0)} more`}
+                                                        </span>
+                                                    ) : null}
+                                                </div>
+                                            </section>
+                                        );
+                                    })}
+                            </div>
+                            {Array.isArray(inspectedReportDataSourceDetails.previewColumns)
+                            && inspectedReportDataSourceDetails.previewColumns.length > 0
+                            && Array.isArray(inspectedReportDataSourceDetails.previewRows)
+                            && inspectedReportDataSourceDetails.previewRows.length > 0 ? (
+                                <div className="forge-report-builder__design-source-preview">
+                                    <div className="forge-report-builder__design-stage-eyebrow">Sample rows</div>
+                                    <table className="forge-report-builder__design-source-preview-table">
+                                        <thead>
+                                            <tr>
+                                                {inspectedReportDataSourceDetails.previewColumns.map((column) => (
+                                                    <th key={normalizeString(column?.key || column?.value)}>
+                                                        {normalizeString(column?.label || column?.key || column?.value)}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(inspectedReportDataSourceDetails.previewRows || []).slice(0, 5).map((row, rowIndex) => (
+                                                <tr key={`${inspectedReportDataSourceDetails.title}:${rowIndex}`}>
+                                                    {inspectedReportDataSourceDetails.previewColumns.map((column) => {
+                                                        const columnKey = normalizeString(column?.key || column?.value);
+                                                        const cellValue = resolveDashboardTableColumnValue(row, column, { preferDisplay: true });
+                                                        return (
+                                                            <td key={`${rowIndex}:${columnKey}`}>
+                                                                {cellValue == null ? "" : String(cellValue)}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : null}
+                    </section>
+                ) : null}
+                    {documentDataViewOpen ? renderDocumentDataViewPanel() : null}
+                </section>
+            );
+        };
+        let focusContent = null;
+        if (activeFocus === "document") {
+            const showTemplateChooser = shouldShowReportBuilderStarterChooser({
+                authoredBlockCount: authoredDocumentBlockCount,
+            });
+            focusContent = (
+                <div style={{ display: "grid", gap: 14 }}>
+                    <section className="forge-report-builder__design-stage forge-report-builder__design-stage--primary">
+                        <div className="forge-report-builder__design-stage-header">
+                            <div className="forge-report-builder__design-stage-eyebrow">Report Document</div>
+                            <div className="forge-report-builder__design-stage-title">
+                                {authoredDocumentBlockCount > 0 ? "Compose report" : "Report"}
+                            </div>
+                            {authoredDocumentBlockCount > 0 ? (
+                                <div className="forge-report-builder__design-stage-description">
+                                    Add the first block, then keep shaping the report in the same outline.
+                                </div>
+                            ) : null}
+                        </div>
+                        <div className="forge-report-builder__design-stage-actions">
+                            <div className="forge-report-builder__settings-anchor forge-report-builder__settings-anchor--metadata">
+                                <button
+                                    type="button"
+                                    className="forge-report-builder__toolbar-button forge-report-builder__toolbar-button--icon"
+                                    aria-label={reportMetadataPanelOpen ? "Close report metadata" : "Edit report metadata"}
+                                    title={reportMetadataPanelOpen ? "Close report metadata" : "Edit report metadata"}
+                                    aria-expanded={reportMetadataPanelOpen}
+                                    onClick={toggleReportMetadataPanel}
+                                >
+                                    <Icon icon={reportMetadataPanelOpen ? "cross" : "edit"} size={14} />
+                                </button>
+                                {renderReportDocumentMetadataPanel()}
+                            </div>
+                            {authoredDocumentBlockCount > 0 ? (
+                                <Button
+                                    small
+                                    minimal
+                                    icon="swap-horizontal"
+                                    aria-expanded={starterChooserOpen}
+                                    onClick={toggleStarterChooser}
+                                >
+                                    {starterChooserOpen ? "Close starter picker" : "Change report"}
+                                </Button>
+                            ) : null}
+                            {authoredDocumentBlockCount > 0 ? (
+                                <Button
+                                    small
+                                    minimal
+                                    icon="reset"
+                                    onClick={resetReportDocumentToBlank}
+                                >
+                                    Reset report
+                                </Button>
+                            ) : null}
+                        </div>
+                        {authoredDocumentBlockCount > 0 && starterChooserOpen ? (
+                            <section
+                                className="forge-report-builder__design-stage forge-report-builder__design-starter-chooser-reopen"
+                                aria-label="Change report starter"
+                            >
+                                <div className="forge-report-builder__design-stage-description">
+                                    Pick another starter or a new report. Your current content stays as-is until you choose one.
+                                </div>
+                                {renderTemplateChooser({ compact: true })}
+                            </section>
+                        ) : null}
+                        {renderSharedDataSelectionCard()}
+                        <section
+                            className="forge-report-builder__design-outline"
+                            aria-labelledby="report-builder-design-outline"
+                            data-testid="report-builder-outline"
+                        >
+                            <div className="forge-report-builder__design-outline-topbar">
+                                <div className="forge-report-builder__design-outline-topbar-copy">
+                                    <div id="report-builder-design-outline" className="forge-report-builder__design-stage-title">Report blocks</div>
+                                </div>
+                                {documentDesignActionGroup?.actionIds?.length > 0 ? (
+                                    <div className="forge-report-builder__design-outline-topbar-actions" aria-label="Add report block">
+                                        {renderAuthoredBlockActionButtons({
+                                            className: "forge-report-builder__authored-toolbar-icon",
+                                            actionIds: documentDesignActionGroup.actionIds,
+                                            iconOnly: true,
+                                            onAction: (actionId) => openAuthoredAction(actionId, {
+                                                insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId || "primaryBuilder",
+                                                insertionPlacement: pendingDocumentInsertionPlacement,
+                                            }),
+                                        })}
+                                    </div>
+                                ) : null}
+                            </div>
+                            {designDocumentOutlineEntries.length > 0 ? (
+                                <>
+                                    <div className="forge-report-builder__design-outline-root">
+                                        <span className="forge-report-builder__result-meta-chip">Report</span>
+                                        <strong>{designWorkspaceFlowState.presentation.rows[0]?.value || "Report"}</strong>
+                                    </div>
+                                    <div className="forge-report-builder__design-outline-tree">
+                                        {renderOutlineNodes(designDocumentOutlineEntries)}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="forge-report-builder__design-outline-empty">
+                                    {showTemplateChooser ? renderTemplateChooser({ compact: true }) : null}
+                                    <strong>No blocks yet.</strong>
+                                    {!showTemplateChooser ? (
+                                        <span>Use the block toolbar above to add the first block.</span>
+                                    ) : null}
+                                </div>
+                            )}
+                            {showSelectedDocumentSemanticContext ? (
+                                <section
+                                    className="forge-report-builder__design-stage"
+                                    aria-label={`${selectedDocumentOutlineEntry.title || "Selected item"} selected fields`}
+                                    data-testid="report-builder-selected-fields"
+                                >
+                                    <div className="forge-report-builder__design-stage-header">
+                                        <div className="forge-report-builder__design-stage-eyebrow">Selected Fields</div>
+                                        <div className="forge-report-builder__design-stage-title">
+                                            {selectedDocumentOutlineEntry.title || "Selected item"}
+                                        </div>
+                                        <div className="forge-report-builder__design-stage-description">
+                                            Dimensions, measures, and parameters currently bound to the selected item.
+                                        </div>
+                                    </div>
+                                    {renderSemanticBindingChips(selectedDocumentSemanticBindingState, { marginTop: 6 })}
+                                    {renderSemanticBindingFieldGroups(selectedDocumentSemanticBindingState, { marginTop: 10 })}
+                                </section>
+                            ) : null}
+                        </section>
+                    </section>
+                </div>
+            );
+        } else if (activeFocus === "runtime") {
+            focusContent = (
+                <div className="forge-report-builder__design-board-grid forge-report-builder__design-board-grid--detail">
+                    <section
+                        className="forge-report-builder__design-stage forge-report-builder__design-stage--primary forge-report-builder__design-stage--runtime-filters"
+                        aria-label="Report filter editor"
+                        data-testid="report-builder-runtime-filter-editor"
+                    >
+                        <div className="forge-report-builder__design-stage-header">
+                            <div className="forge-report-builder__design-stage-eyebrow">Live report</div>
+                            <div className="forge-report-builder__design-stage-title">Filters</div>
+                            <div className="forge-report-builder__design-stage-description">
+                                Edit the same report predicates used on the report surface.
+                            </div>
+                        </div>
+                        <div className="forge-report-builder__result-meta" aria-label="Runtime filter summary">
+                            <span className="forge-report-builder__result-meta-chip">
+                                {totalActiveFilterCount} {totalActiveFilterCount === 1 ? "active filter" : "active filters"}
+                            </span>
+                        </div>
+                        <div className="forge-report-builder__bottom-body forge-report-builder__bottom-body--design-stage">
+                            {renderFilterCategoryControls()}
+                            {renderFilterBody()}
+                        </div>
+                    </section>
+                    {authoredDocumentBlockCount > 0 ? renderActionGroupStage(runtimeDesignActionGroup, {
+                        eyebrow: "Live Controls",
+                        title: "Filter and runtime blocks",
+                        description: "Add filter, refinement, and geo blocks to the live report surface.",
+                    }) : (
+                        <section className="forge-report-builder__design-stage">
+                            <div className="forge-report-builder__design-stage-header">
+                                <div className="forge-report-builder__design-stage-eyebrow">Live Controls</div>
+                                <div className="forge-report-builder__design-stage-title">Live controls follow the document</div>
+                                <div className="forge-report-builder__design-stage-description">
+                                    Add the first authored block from Report Document, then return here to compose runtime controls in context.
+                                </div>
+                            </div>
+                        </section>
+                    )}
+                </div>
+            );
+        }
+        return (
+            <section className="forge-report-builder__design-board" aria-label="Designer flow">
+                <div className="forge-report-builder__design-focus-strip" role="tablist" aria-label="Designer focus">
+                    {focusOptions.map((option) => (
+                        <button
+                            key={option.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={activeFocus === option.id}
+                            className={activeFocus === option.id ? "is-active" : ""}
+                            onClick={() => setDesignWorkspaceFocus(option.id)}
+                        >
+                            {option.label}
+                        </button>
+                    ))}
+                </div>
+                {focusContent}
+            </section>
+        );
+    }, [
+        activeDataViewDescription,
+        activeDataViewLabel,
+        authoredCapabilities.disabledHintText,
+        authoredCapabilities.showDisabledHint,
+        applyDocumentTemplate,
+        compactMode,
+        currentSemanticBindingViewState,
+        designDocumentOutlineEntries,
+        designWorkspaceFlowState,
+        selectedDocumentOutlineBlock,
+        selectedDocumentOutlineBlockIndex,
+        selectedDocumentOutlineEntry,
+        selectedDocumentInsertionTarget,
+        pendingDocumentInsertionPlacement,
+        selectedDocumentOutlineWidthLabels,
+        effectiveSelectedDocumentOutlineEntryId,
+        designWorkspaceFocus,
+        designWorkspaceMode,
+        documentDataViewOpen,
+        authoredDocumentBlockCount,
+        documentDesignActionGroup,
+        authoredDocumentBlocks,
+        focusDesignArea,
+        handleDesignWorkspaceStageAction,
+        openAuthoredChartBlockDialog,
+        openAuthoredAction,
+        openChartDialog,
+        openDocumentBlockDialog,
+        openStaticDatasetImport,
+        pendingDocumentInsertionPlacement,
+        reportDocumentOutlineEntries,
+        reportDocumentTemplates,
+        reportDataSourceCards,
+        renderAuthoredBlockActionButtons,
+        renderFilterBody,
+        renderFilterCategoryControls,
+        renderReportDocumentMetadataPanel,
+        runtimeDesignActionGroup,
+        reportMetadataPanelOpen,
+        starterChooserOpen,
+        toggleStarterChooser,
+        state?.chartSpec,
+        state?.reportDocumentTemplateId,
+        state?.reportDocumentTemplateLabel,
+        setWorkspaceMode,
+        setDesignWorkspaceFocus,
+        draggingDocumentBlockId,
+        documentOutlineDropTarget,
+        selectedDimensionDefs.length,
+        selectedMeasureDefs.length,
+        totalActiveFilterCount,
+        toggleReportMetadataPanel,
+        clearDocumentOutlineDragState,
+        duplicateDocumentBlock,
+        moveDocumentBlock,
+        moveDocumentBlockRelative,
+        removeDocumentBlock,
+        resizeDocumentBlock,
+        updateDocumentOutlineDropTarget,
+    ]);
     const renderChartApplyFeedbackNotice = ({
         compact = false,
         onAction = undefined,
     } = {}) => {
         if (!chartApplyFeedback?.message) {
+            return null;
+        }
+        if (chartApplyFeedback?.hideWhenHydratedSessionActive && hydratedReportDocumentSession) {
             return null;
         }
         const metaChips = Array.isArray(chartApplyFeedback?.metaChips)
@@ -9140,7 +14007,7 @@ export default function ReportBuilder({ container, context }) {
                 container,
                 config: semanticDisplayConfig,
                 state,
-                semanticSummary: resolvedSemanticSummary,
+                semanticSummary: semanticRuntimeSummary,
                 semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
             })
@@ -9179,7 +14046,7 @@ export default function ReportBuilder({ container, context }) {
             level: "success",
             message: `Prepared create request ${payload.title || "Report"}. Review or download it when needed.`,
         });
-    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state]);
+    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state]);
     const downloadCreateReportDocumentPayload = React.useCallback(() => {
         const descriptor = buildReportBuilderCreateReportDocumentPayloadDownload(createReportDocumentPayload);
         if (!descriptor) {
@@ -9205,7 +14072,7 @@ export default function ReportBuilder({ container, context }) {
                 container,
                 config: semanticDisplayConfig,
                 state,
-                semanticSummary: resolvedSemanticSummary,
+                semanticSummary: semanticRuntimeSummary,
                 semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 documentVersion: reportDocumentVersionDraft,
@@ -9242,7 +14109,7 @@ export default function ReportBuilder({ container, context }) {
             level: "success",
             message: `Prepared reopen bundle for ${response.document?.title || response.reportRef?.reportId || "Report"}. Review or download it when needed.`,
         });
-    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state]);
+    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state]);
     const reopenGetReportDocumentResponse = React.useCallback(() => {
         const hydrated = buildHydratedReportBuilderDocument(getReportDocumentResponse, {
             container,
@@ -9292,6 +14159,7 @@ export default function ReportBuilder({ container, context }) {
             liveConfig: cloneReportBuilderValue(hydratedReportDocumentSession?.liveSnapshot?.config || config),
             liveState: cloneReportBuilderValue(hydratedReportDocumentSession?.liveSnapshot?.state || state),
             priorSession: hydratedReportDocumentSession,
+            runtimePreviewInteraction: hydrated.runtimePreviewInteraction || null,
         });
         if (!session) {
             setReopenReportDocumentDiagnostic(null);
@@ -9376,7 +14244,7 @@ export default function ReportBuilder({ container, context }) {
                 container,
                 config: semanticDisplayConfig,
                 state,
-                semanticSummary: resolvedSemanticSummary,
+                semanticSummary: semanticRuntimeSummary,
                 semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 documentVersion: reportDocumentVersionDraft,
@@ -9432,7 +14300,7 @@ export default function ReportBuilder({ container, context }) {
             level: "success",
             message: `Prepared catalog response with ${response.entries.length} entries. Review or download it when needed.`,
         });
-    }, [applyPreparedApiArtifactOrigins, config, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state]);
+    }, [applyPreparedApiArtifactOrigins, config, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentVersionDraft, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state]);
     const downloadListReportDocumentsResponse = React.useCallback(() => {
         const descriptor = buildReportBuilderReportDocumentReadResponseDownload(activeListReportDocumentsResponse, {
             fallbackName: "list-report-documents-response",
@@ -9556,7 +14424,7 @@ export default function ReportBuilder({ container, context }) {
                 },
             )
             : null;
-        const response = directSharedArtifactResponse || (hydratedReportDocumentSession
+        const response = directSharedArtifactResponse || (selectedListEntryMatchesHydratedSession
             ? (
                 buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState(
                     activeListReportDocumentsResponse,
@@ -9566,7 +14434,7 @@ export default function ReportBuilder({ container, context }) {
                         container,
                         config: semanticDisplayConfig,
                         state,
-                        semanticSummary: resolvedSemanticSummary,
+                        semanticSummary: semanticRuntimeSummary,
                         semanticModel: semanticModelState.model,
                         semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                     },
@@ -9619,7 +14487,7 @@ export default function ReportBuilder({ container, context }) {
                 message: `Prepared reopen bundle for ${response.reportRef?.reportId || response.document?.title || "Report"}. Review or download it when needed.`,
             },
         );
-    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, listReportDocumentsResponse, listReportDocumentsSelectedReportId, localSavedReportRecords, preparedApiArtifactOrigins, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, selectedBackendSharedArtifactRecord, semanticDisplayConfig, semanticModelState.model, state]);
+    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, listReportDocumentsResponse, listReportDocumentsSelectedReportId, localSavedReportRecords, preparedApiArtifactOrigins, runtimePreviewSemanticDiagnostics, savedReportPayload, selectedBackendSharedArtifactRecord, selectedListEntryMatchesHydratedSession, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state]);
     const prepareSelectedGetReportDocumentResponse = React.useCallback(() => {
         if (!getReportDocumentRequestPayload) {
             setGetReportDocumentRequestPayloadOpen(false);
@@ -9645,7 +14513,7 @@ export default function ReportBuilder({ container, context }) {
                 },
             )
             : null;
-        const response = directSharedArtifactResponse || (hydratedReportDocumentSession
+        const response = directSharedArtifactResponse || (selectedListEntryMatchesHydratedSession
             ? (
                 buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState(
                     activeListReportDocumentsResponse,
@@ -9655,7 +14523,7 @@ export default function ReportBuilder({ container, context }) {
                         container,
                         config: semanticDisplayConfig,
                         state,
-                        semanticSummary: resolvedSemanticSummary,
+                        semanticSummary: semanticRuntimeSummary,
                         semanticModel: semanticModelState.model,
                         semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                     },
@@ -9704,7 +14572,7 @@ export default function ReportBuilder({ container, context }) {
                 message: `Prepared reopen bundle for ${response.reportRef?.reportId || response.document?.title || "Report"}. Review or download it when needed.`,
             },
         );
-    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, container, getReportDocumentRequestPayload, getReportDocumentResponse, hydratedReportDocumentSession, listReportDocumentsResponse, localSavedReportRecords, preparedApiArtifactOrigins, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, selectedBackendSharedArtifactRecord, semanticDisplayConfig, semanticModelState.model, state]);
+    }, [activeListReportDocumentsResponse, applyPreparedApiArtifactOrigins, container, getReportDocumentRequestPayload, getReportDocumentResponse, listReportDocumentsResponse, localSavedReportRecords, preparedApiArtifactOrigins, runtimePreviewSemanticDiagnostics, savedReportPayload, selectedBackendSharedArtifactRecord, selectedListEntryMatchesHydratedSession, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state]);
     useEffect(() => {
         const registerBridge = builderContext?.handlers?.reportBuilderPreview?.registerPreparedArtifactBridge;
         if (typeof registerBridge !== "function") {
@@ -9802,7 +14670,7 @@ export default function ReportBuilder({ container, context }) {
                 container,
                 config: semanticDisplayConfig,
                 state,
-                semanticSummary: resolvedSemanticSummary,
+                semanticSummary: semanticRuntimeSummary,
                 semanticModel: semanticModelState.model,
                 semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 expectedVersion: updateReportDocumentExpectedVersionDraft,
@@ -9831,7 +14699,7 @@ export default function ReportBuilder({ container, context }) {
             level: "success",
             message: `Prepared update request ${payload.title || "Report"} at version ${payload.expectedVersion}. Review or download it when needed.`,
         });
-    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, resolvedSemanticSummary, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, state, updateReportDocumentExpectedVersionDraft]);
+    }, [applyPreparedApiArtifactOrigins, container, getReportDocumentResponse, hydratedReportDocumentSession, reportDocumentPayloadCompileValidation, runtimePreviewSemanticDiagnostics, savedReportPayload, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state, updateReportDocumentExpectedVersionDraft]);
     const downloadUpdateReportDocumentPayload = React.useCallback(() => {
         const descriptor = buildReportBuilderUpdateReportDocumentPayloadDownload(updateReportDocumentPayload);
         if (!descriptor) {
@@ -9931,24 +14799,27 @@ export default function ReportBuilder({ container, context }) {
     };
 
     const setGroupBy = (value) => {
+        const currentState = currentBuilderStateRef.current || state;
         persistExplorationMutation({
-            ...state,
+            ...currentState,
             groupBy: value,
             page: 1,
         });
     };
 
     const setOrderField = (value) => {
+        const currentState = currentBuilderStateRef.current || state;
         persistExplorationMutation({
-            ...state,
+            ...currentState,
             orderField: value,
             page: 1,
         });
     };
 
     const setOrderDir = (value) => {
+        const currentState = currentBuilderStateRef.current || state;
         persistExplorationMutation({
-            ...state,
+            ...currentState,
             orderDir: value,
             page: 1,
         });
@@ -9956,8 +14827,9 @@ export default function ReportBuilder({ container, context }) {
 
     const setPageSize = (value) => {
         const pageSize = Math.max(1, Number(value) || 1);
+        const currentState = currentBuilderStateRef.current || state;
         persistExplorationMutation({
-            ...state,
+            ...currentState,
             pageSize,
             page: 1,
         });
@@ -9968,48 +14840,6 @@ export default function ReportBuilder({ container, context }) {
         persistPassiveViewState({
             ...currentState,
             page: Math.max(1, Number(page) || 1),
-        });
-    };
-
-    const toggleStaticFilter = (filter, optionValue) => {
-        const key = String(filter.id || filter.field || "").trim();
-        if (!key) return;
-        const current = state?.staticFilters?.[key];
-        let nextValue;
-        if (filter.multiple) {
-            const list = Array.isArray(current) ? current : [];
-            nextValue = list.includes(optionValue)
-                ? list.filter((entry) => entry !== optionValue)
-                : [...list, optionValue];
-        } else {
-            nextValue = current === optionValue ? "" : optionValue;
-        }
-        persistExplorationMutation({
-            ...state,
-            staticFilters: {
-                ...(state.staticFilters || {}),
-                [key]: nextValue,
-            },
-            page: 1,
-        });
-    };
-
-    const setDateRangeValue = (filter, edge, value) => {
-        const key = String(filter.id || filter.field || "").trim();
-        if (!key) return;
-        const previous = state?.staticFilters?.[key] && typeof state.staticFilters[key] === "object"
-            ? state.staticFilters[key]
-            : {};
-        persistExplorationMutation({
-            ...state,
-            staticFilters: {
-                ...(state.staticFilters || {}),
-                [key]: {
-                    ...previous,
-                    [edge]: value || "",
-                },
-            },
-            page: 1,
         });
     };
 
@@ -10335,19 +15165,6 @@ export default function ReportBuilder({ container, context }) {
                 className="forge-report-builder__runtime-preview"
                 aria-label="Imported runtime preview"
             >
-                <div className="forge-report-builder__runtime-preview-header">
-                    <div className="forge-report-builder__runtime-preview-eyebrow">{importedPipelinePreviewPanelState.eyebrow}</div>
-                    <h4 className="forge-report-builder__runtime-preview-title">
-                        {importedPipelinePreviewPanelState.title}
-                    </h4>
-                    <p className="forge-report-builder__runtime-preview-description">
-                        {importedPipelinePreviewPanelState.description}
-                    </p>
-                    {renderSemanticBindingChips(importedPipelinePreviewPanelState, { marginTop: 8 })}
-                    {renderSemanticBindingFieldGroups(importedPipelinePreviewPanelState, { marginTop: 10 })}
-                    {renderScopeSummaryItems(importedPipelinePreviewPanelState, { marginTop: 10 })}
-                    {renderAuthoredDocumentProgress(importedPipelinePreviewPanelState, { marginTop: 10 })}
-                </div>
                 <ReportBuilderSummaryNotice
                     level={importedPipelinePreviewPanelState.summaryNotice?.tone || "info"}
                     label={importedPipelinePreviewPanelState.summaryLabel}
@@ -10455,6 +15272,8 @@ export default function ReportBuilder({ container, context }) {
                     subtitle={importedPipelineRuntimeArtifact?.runtimeBlock?.subtitle || ""}
                     locale={locale}
                     hostIntent={importedPipelineRuntimeConfig.hostIntent}
+                    presentationMode={reportWorkspaceMode ? "report" : "preview"}
+                    showContextSummary={false}
                 />
             </section>
         );
@@ -10466,9 +15285,8 @@ export default function ReportBuilder({ container, context }) {
         return (
             <section
                 className="forge-report-builder__runtime-preview"
-                aria-label="Authored runtime preview"
+                aria-label={reportWorkspaceMode ? "Authored report" : "Authored runtime preview"}
             >
-                <ReportBuilderAuthoredRuntimePreviewHeader state={authoredRuntimePreviewState} />
                 {authoredRuntimePreviewState.loadingState ? (
                     <ReportBuilderResultState
                         icon={authoredRuntimePreviewState.loadingState.icon}
@@ -10478,7 +15296,7 @@ export default function ReportBuilder({ container, context }) {
                         animated={authoredRuntimePreviewState.loadingState.animated}
                     />
                 ) : null}
-                {authoredRuntimePreviewState.blockedState ? (
+                {authoredRuntimePreviewState.blockedState && !hideAuthoredRuntimeSemanticBlockedCard ? (
                     <div>
                         <ReportBuilderResultState
                             tone={authoredRuntimePreviewState.blockedState?.tone || "neutral"}
@@ -10522,14 +15340,72 @@ export default function ReportBuilder({ container, context }) {
                         ) : null}
                     </div>
                 ) : null}
-                {authoredRuntimePreviewState.errorState ? (
-                    <ReportBuilderResultState
-                        tone={authoredRuntimePreviewState.errorState.tone}
-                        icon={authoredRuntimePreviewState.errorState.icon}
-                        eyebrow={authoredRuntimePreviewState.errorState.eyebrow}
-                        title={authoredRuntimePreviewState.errorState.title}
-                        description={authoredRuntimePreviewState.errorState.description}
-                    />
+                {authoredRuntimePreviewState.errorState && !hideAuthoredRuntimeSemanticErrorCard ? (
+                    <div>
+                        <ReportBuilderResultState
+                            tone={authoredRuntimePreviewState.errorState.tone}
+                            icon={authoredRuntimePreviewState.errorState.icon}
+                            eyebrow={authoredRuntimePreviewState.errorState.eyebrow}
+                            title={authoredRuntimePreviewState.errorState.title}
+                            description={authoredRuntimePreviewState.errorState.description}
+                            actionLabel={authoredRuntimePreviewState.errorState.actionLabel || ""}
+                            onAction={resolveReadinessActionHandler(authoredRuntimePreviewState.errorState.action)}
+                        />
+                        {Array.isArray(authoredRuntimePreviewState.errorState?.diagnostics) && authoredRuntimePreviewState.errorState.diagnostics.length > 0 ? (
+                            <section className="forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--danger" style={{ marginTop: 12 }}>
+                                {authoredRuntimePreviewState.errorState.diagnosticsTitle || authoredRuntimePreviewState.errorState.diagnosticsDescription ? (
+                                    <div className="forge-report-builder__semantic-diagnostics-header">
+                                        {authoredRuntimePreviewState.errorState.diagnosticsTitle ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-title">{authoredRuntimePreviewState.errorState.diagnosticsTitle}</div>
+                                        ) : null}
+                                        {authoredRuntimePreviewState.errorState.diagnosticsDescription ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-description">{authoredRuntimePreviewState.errorState.diagnosticsDescription}</div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                                <div className="forge-report-builder__semantic-diagnostics-list">
+                                    {authoredRuntimePreviewState.errorState.diagnostics.map((diagnostic) => (
+                                        <article
+                                            key={diagnostic.id}
+                                            className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
+                                        >
+                                            <div className="forge-report-builder__semantic-diagnostic-meta">
+                                                {diagnostic.code ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.code}</span> : null}
+                                                {diagnostic.path ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.path}</span> : null}
+                                            </div>
+                                            <div className="forge-report-builder__semantic-diagnostic-message">{diagnostic.message}</div>
+                                            {diagnostic.suggestedFix ? (
+                                                <div className="forge-report-builder__semantic-diagnostic-fix">{diagnostic.suggestedFix}</div>
+                                            ) : null}
+                                        </article>
+                                    ))}
+                                </div>
+                            </section>
+                        ) : null}
+                    </div>
+                ) : null}
+                {authoredRuntimePreviewState.canRenderRuntime && authoredRuntimePreviewState.updatingNotice ? (
+                    <ReportBuilderInlineNotice notice={authoredRuntimePreviewState.updatingNotice} />
+                ) : null}
+                {authoredRuntimePreviewState.canRenderRuntime && showInlineReportBaselineControls ? renderFiltersPanel({ inlineReportMode: true }) : null}
+                {authoredRuntimePreviewState.canRenderRuntime && desktopResultHeaderState.quickActions.enabled ? (
+                    <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 12 }}>
+                        <ReportBuilderChartQuickActions
+                            canCreate={desktopResultHeaderState.quickActions.canCreate}
+                            showCreateButton={desktopResultHeaderState.quickActions.showCreateButton}
+                            onCreate={() => openChartDialog(state.chartSpec)}
+                            quickOptions={desktopResultHeaderState.quickActions.quickOptions}
+                            buttonLabel={desktopResultHeaderState.quickActions.buttonLabel}
+                            buttonIcon={desktopResultHeaderState.quickActions.buttonIcon}
+                            onSelectQuickOption={(value) => {
+                                setSelectedQuickChartOption(value);
+                                setChartApplyFeedback(null);
+                                if (value) {
+                                    applyQuickChart(value);
+                                }
+                            }}
+                        />
+                    </div>
                 ) : null}
                 {authoredRuntimePreviewState.canRenderRuntime ? (
                     <ReportRuntime
@@ -10539,13 +15415,65 @@ export default function ReportBuilder({ container, context }) {
                         title={runtimePreviewArtifact?.runtimeBlock?.title || ""}
                         subtitle={runtimePreviewArtifact?.runtimeBlock?.subtitle || ""}
                         locale={locale}
-                        hostIntent={authoredRuntimePreviewState.runtimeConfig.hostIntent}
+                        hostIntent={runtimePreviewHostIntent}
                         runtimeHandlers={runtimePreviewHandlers}
+                        presentationMode={reportWorkspaceMode ? "report" : "preview"}
+                        showContextSummary={false}
+                        suppressFilterBarBlocks={showUnifiedRuntimeFilterSurface}
+                        suppressFilterBarBlockDatasetRefs={showInlineReportBaselineControls ? ["primary"] : []}
                     />
                 ) : null}
             </section>
         );
     };
+
+    useEffect(() => {
+        const autoRunAction = resolveReportBuilderSurfaceAutoRunAction({
+            workspaceMode: designWorkspaceMode ? "design" : (reportWorkspaceMode ? "report" : "preview"),
+            requestFingerprint: currentRequestFingerprint,
+            deferForPrefill: shouldDeferReportBuilderRequestForPrefill({
+                currentPrefillSignature,
+                appliedPrefillSignature: appliedPrefillSignatureRef.current,
+            }),
+            canRunReport: showAuthoredReportSurface && authoredDocumentCompileValidation.valid && canRunReport,
+            currentRequestShouldFetch,
+            loading,
+            error,
+            hasRows,
+            hasCompletedCurrentRun,
+            autoRunKey: authoredPreviewAutoFetchKey,
+            consumedAutoRunKey: authoredPreviewAutoFetchKeyRef.current,
+            currentRequestDispatchFingerprint,
+            requestDispatchFingerprint: requestFingerprintRef.current,
+        });
+        if (autoRunAction.type === "skip") {
+            return;
+        }
+        authoredPreviewAutoFetchKeyRef.current = autoRunAction.autoRunKey;
+        if (autoRunAction.type === "dispatch") {
+            dispatchReportRequest(currentBuilderStateRef.current || state, { forceFetch: true, markManual: true });
+            return;
+        }
+        lastManualRunFingerprintRef.current = currentRequestFingerprint;
+        setManualRunSequence((current) => current + 1);
+    }, [
+        authoredDocumentCompileValidation.valid,
+        authoredPreviewAutoFetchKey,
+        canRunReport,
+        currentPrefillSignature,
+        currentRequestFingerprint,
+        currentRequestDispatchFingerprint,
+        currentRequestShouldFetch,
+        designWorkspaceMode,
+        dispatchReportRequest,
+        error,
+        hasCompletedCurrentRun,
+        hasRows,
+        loading,
+        reportWorkspaceMode,
+        showAuthoredReportSurface,
+        state,
+    ]);
 
     return (
         <div className={[
@@ -10553,8 +15481,9 @@ export default function ReportBuilder({ container, context }) {
             compactMode ? "forge-report-builder--compact" : "",
             compactSheetOpen || compactChartSheetOpen ? "forge-report-builder--compact-overlay-open" : "",
             useFilterDrawer ? "forge-report-builder--filters-drawer" : "",
-            (!compactMode && useFilterRail && railFilterState.showOverlayBody) ? "forge-report-builder--filter-overlay-open" : "",
             resultPanePosition === "left" ? "forge-report-builder--result-left" : "",
+            (!compactMode && designWorkspaceMode && !designRailHasVisiblePanels) ? "forge-report-builder--designer-canvas" : "",
+            (workspaceMode === "report" && !showLeftRail) ? "forge-report-builder--workspace-report" : "",
         ].filter(Boolean).join(" ")}
         ref={builderRootRef}
         style={builderRootStyle}
@@ -10572,29 +15501,53 @@ export default function ReportBuilder({ container, context }) {
                 style={{ display: "none" }}
                 onChange={importLocalReportFile}
             />
+            <input
+                ref={importStaticDatasetFileInputRef}
+                type="file"
+                accept=".csv,text/csv,.json,application/json"
+                aria-label="Add static data source file"
+                style={{ display: "none" }}
+                onChange={importStaticDatasetFile}
+            />
             <div className="forge-report-builder__top">
                 {compactMode ? renderCompactHeader() : (
                     <div className="forge-report-builder__shelf">
                         <div className="forge-report-builder__topline">
                             <div className="forge-report-builder__toolbar forge-report-builder__toolbar--inline">
                                 <div className="forge-report-builder__toolbar-group forge-report-builder__toolbar-group--execute">
-                                    <div className="forge-report-builder__settings-anchor">
-                                        <button
-                                            type="button"
-                                            className="forge-report-builder__toolbar-button forge-report-builder__toolbar-button--icon"
-                                            aria-label="Performance metrics settings"
-                                            title="Report settings"
-                                            aria-expanded={settingsOpen}
-                                            onClick={() => setSettingsOpen((current) => !current)}
-                                        >
-                                            <Icon icon="cog" size={14} />
-                                        </button>
-                                        {settingsOpen ? (
-                                            <div className="forge-report-builder__settings-popover">
-                                                {renderSettingsControls()}
-                                            </div>
-                                        ) : null}
-                                    </div>
+                                    {designWorkspaceMode ? (
+                                        <div className="forge-report-builder__settings-anchor">
+                                            <button
+                                                type="button"
+                                                className="forge-report-builder__toolbar-button forge-report-builder__toolbar-button--icon"
+                                                aria-label={workspaceSettingsLabel}
+                                                title={workspaceSettingsLabel}
+                                                aria-expanded={settingsOpen}
+                                                onClick={toggleSettingsPanel}
+                                            >
+                                                <Icon icon="cog" size={14} />
+                                            </button>
+                                            {settingsOpen ? (
+                                                <div className="forge-report-builder__settings-popover">
+                                                    {renderSettingsControls()}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+                                    {designWorkspaceMode && showSemanticWorkspaceControl && semanticWorkspacePanelState ? (
+                                        <div className="forge-report-builder__settings-anchor forge-report-builder__settings-anchor--semantic">
+                                            <Button
+                                                small
+                                                outlined
+                                                icon="database"
+                                                aria-expanded={semanticPanelOpen}
+                                                onClick={toggleSemanticPanel}
+                                            >
+                                                {semanticPanelOpen ? "Hide model" : "Model"}
+                                            </Button>
+                                            {renderSemanticWorkspacePanel()}
+                                        </div>
+                                    ) : null}
                                     <Button
                                         small
                                         intent="primary"
@@ -10605,15 +15558,34 @@ export default function ReportBuilder({ container, context }) {
                                     >
                                         Run
                                     </Button>
-                                    <Button
-                                        small
-                                        outlined
-                                        icon="download"
-                                        disabled={!canShowResults}
-                                        onClick={downloadCsv}
+                                    <Popover
+                                        placement="bottom-start"
+                                        content={(
+                                            <Menu>
+                                                <MenuItem
+                                                    icon="document"
+                                                    text="PDF"
+                                                    disabled={draftExportActionState?.submitDisabled || !draftExportRequest}
+                                                    onClick={triggerDraftExport}
+                                                />
+                                                <MenuItem
+                                                    icon="th"
+                                                    text="XLSX"
+                                                    disabled={!draftXlsxExportRequest}
+                                                    onClick={triggerDraftXlsxExport}
+                                                />
+                                            </Menu>
+                                        )}
                                     >
-                                        Export
-                                    </Button>
+                                        <Button
+                                            small
+                                            outlined
+                                            icon="download"
+                                            disabled={!canOpenDraftExportMenu}
+                                        >
+                                            Export
+                                        </Button>
+                                    </Popover>
                                     <Button
                                         small
                                         outlined
@@ -10622,6 +15594,7 @@ export default function ReportBuilder({ container, context }) {
                                     >
                                         {savedArtifactViewState.loadFileLabel}
                                     </Button>
+                                    {renderDesignModeControl()}
                                 </div>
                                 {inlineToolbarRequiredFilters.length > 0 ? (
                                     <div className="forge-report-builder__toolbar-divider" aria-hidden="true" />
@@ -10629,8 +15602,8 @@ export default function ReportBuilder({ container, context }) {
                                 {inlineToolbarRequiredFilters.length > 0 ? (
                                     <div className="forge-report-builder__toolbar-group forge-report-builder__toolbar-group--scope">
                                         {inlineToolbarRequiredFilters.map((filter) => {
-                                            const filterKey = String(filter.id || filter.field || "").trim();
-                                            const currentValue = state?.staticFilters?.[filterKey];
+                                            const filterKey = resolveScopeParamId(filter);
+                                            const currentValue = getScopeParamValue(state, filterKey);
                                             const issue = semanticParameterIssuesById[filterKey] || null;
                                             const providerDiagnostics = semanticProviderParameterDiagnosticsById[filterKey] || [];
                                             return (
@@ -10647,7 +15620,7 @@ export default function ReportBuilder({ container, context }) {
                                         })}
                                     </div>
                                 ) : null}
-                                {hasFilterDrawerContent && useFilterDrawer ? (
+                                {designWorkspaceMode && hasFilterDrawerContent && useFilterDrawer ? (
                                     <Button
                                         small
                                         outlined
@@ -10663,7 +15636,7 @@ export default function ReportBuilder({ container, context }) {
                 )}
             </div>
 
-            {semanticInlineNotices.map((notice, index) => (
+            {visibleSemanticInlineNotices.map((notice, index) => (
                 <ReportBuilderInlineNotice
                     key={`${notice.level || "info"}_${notice.message}_${index}`}
                     notice={notice}
@@ -10694,103 +15667,146 @@ export default function ReportBuilder({ container, context }) {
                     ) : null}
                 </section>
             ) : null}
-            {authoredDocumentBlockDiagnostics.length > 0 ? (
-                <section className="forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--warning">
-                    <div className="forge-report-builder__semantic-diagnostics-header">
-                        <div className="forge-report-builder__semantic-diagnostics-title">Authored Block Validation</div>
-                        <div className="forge-report-builder__semantic-diagnostics-description">
-                            Some authored blocks reference measures, breakdowns, scope parameters, or geo fields that are no longer available in the current builder state.
-                        </div>
-                    </div>
-                    <div className="forge-report-builder__semantic-diagnostics-list">
-                        {authoredDocumentBlockDiagnostics.map((diagnostic) => (
-                            <article
-                                key={diagnostic.id}
-                                className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
-                            >
-                                <div className="forge-report-builder__semantic-diagnostic-meta">
-                                    {diagnostic.code ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.code}</span> : null}
-                                    {diagnostic.blockId ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.blockId}</span> : null}
-                                </div>
-                                <div className="forge-report-builder__semantic-diagnostic-message">{diagnostic.message}</div>
-                                {diagnostic.suggestedFix ? (
-                                    <div className="forge-report-builder__semantic-diagnostic-fix">{diagnostic.suggestedFix}</div>
-                                ) : null}
-                                {diagnostic.blockId ? (
-                                    <div style={{ marginTop: 8 }}>
-                                        <Button
-                                            small
-                                            minimal
-                                            onClick={() => openDocumentBlockDialogForDiagnostic(diagnostic)}
-                                            aria-label={`Edit authored block ${diagnostic.blockId}`}
-                                        >
-                                            Edit block
-                                        </Button>
-                                    </div>
-                                ) : null}
-                            </article>
-                        ))}
-                    </div>
-                </section>
-            ) : null}
-
+            {!designWorkspaceMode ? renderCompileDiagnosticsNotice(authoredDocumentCompileDiagnosticsNotice, {
+                actionForDiagnostic: handleDocumentBlockDiagnosticAction,
+                actionLabel: resolveDocumentBlockDiagnosticActionLabel,
+            }) : null}
             <div className="forge-report-builder__body">
-                {!compactMode ? (
-                    <aside className="forge-report-builder__left" ref={leftRailRef}>
-                        {renderReportDocumentPanel()}
-                        {renderMeasuresPanel()}
-                        {renderBreakdownPanel()}
-                        {renderAuthoredBlocksPanel()}
-                        {useFilterRail ? renderFilterRailControls() : null}
-                        {useFilterDrawer && filtersDrawerOpen ? renderFiltersPanel() : null}
-                        {leftRailCanScrollDown ? (
+                {showLeftRail ? (
+                    <aside className="forge-report-builder__left">
+                        <div className="forge-report-builder__left-scroll" ref={leftRailRef}>
+                        <div className="forge-report-builder__left-rail-header">
+                            <div className="forge-report-builder__left-rail-header-copy">
+                                <div className="forge-report-builder__left-rail-header-eyebrow">
+                                    {designWorkspaceMode ? "Design workspace" : "Live filters"}
+                                </div>
+                                <div className="forge-report-builder__left-rail-header-description">
+                                    {designWorkspaceMode
+                                        ? workspaceModeDescription
+                                        : "Edit the same report predicates used on the report surface."}
+                                </div>
+                            </div>
+                            {designWorkspaceMode && designRailHasCollapsiblePanels ? (
+                                <div className="forge-report-builder__left-rail-header-actions">
+                                    <span className="forge-report-builder__result-meta-chip">
+                                        {designRailOpenPanelCount} of {designRailPanelCount} open
+                                    </span>
+                                    <Button small minimal onClick={toggleDesignRailPanels}>
+                                        {designRailPanelsCollapsed ? "Expand panels" : "Collapse panels"}
+                                    </Button>
+                                </div>
+                            ) : null}
+                        </div>
+                        {designWorkspaceMode ? (
+                            <>
+                                {designRailVisibility.measures ? renderMeasuresPanel() : null}
+                                {designRailVisibility.breakdowns ? renderBreakdownPanel() : null}
+                                {designRailVisibility.authoredBlocks ? renderAuthoredBlocksPanel() : null}
+                                {useFilterDrawer && filtersDrawerOpen ? renderFiltersPanel() : null}
+                            </>
+                        ) : (
+                            renderFiltersPanel()
+                        )}
+                        </div>
+                        <div className="forge-report-builder__left-resizer-shell">
+                            {leftRailCanScrollDown ? (
+                                <button
+                                    type="button"
+                                    className="forge-report-builder__left-jump"
+                                    onClick={scrollLeftRailToBottom}
+                                    aria-label="Scroll setup panel to bottom"
+                                    title="Scroll to the last setup section"
+                                >
+                                    <Icon icon="double-chevron-down" size={12} />
+                                </button>
+                            ) : null}
                             <button
                                 type="button"
-                                className="forge-report-builder__left-jump"
-                                onClick={scrollLeftRailToBottom}
-                                aria-label="Scroll setup panel to bottom"
-                                title="Scroll to the last setup section"
+                                className="forge-report-builder__left-resizer-dock"
+                                onClick={toggleResultPanePosition}
+                                aria-label={resultPanePositionActionLabel}
+                                title={`${resultPanePositionLabel}. ${resultPanePositionActionLabel}.`}
+                                data-result-pane-position={resultPanePosition}
                             >
-                                <Icon icon="double-chevron-down" size={12} />
-                                Bottom
+                                <Icon icon={resultPanePosition === "left" ? "double-chevron-right" : "double-chevron-left"} size={10} />
                             </button>
-                        ) : null}
-                        <div
-                            className={leftRailResizing ? "forge-report-builder__left-resizer is-active" : "forge-report-builder__left-resizer"}
-                            role="separator"
-                            aria-orientation="vertical"
-                            aria-label="Resize setup panel"
-                            title="Drag to resize the setup panel. Double-click to reset."
-                            onMouseDown={startLeftRailResize}
-                            onDoubleClick={resetLeftRailWidth}
-                        >
-                            <span className="forge-report-builder__left-resizer-thumb" aria-hidden="true">
-                                <span />
-                                <span />
-                                <span />
-                            </span>
+                            <div
+                                className={leftRailResizing ? "forge-report-builder__left-resizer is-active" : "forge-report-builder__left-resizer"}
+                                role="separator"
+                                aria-orientation="vertical"
+                                aria-label="Resize setup panel"
+                                aria-valuemin={MIN_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT}
+                                aria-valuemax={MAX_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT}
+                                aria-valuenow={Math.round(resolvedLeftRailWidthPercent)}
+                                aria-valuetext={resolveReportBuilderLeftRailWidthAriaValueText(resolvedLeftRailWidthPercent)}
+                                tabIndex={0}
+                                title="Drag to resize the setup panel. Use arrow keys to adjust or double-click to reset."
+                                onPointerDown={startLeftRailResize}
+                                onKeyDown={handleLeftRailResizeKeyDown}
+                                onDoubleClick={resetLeftRailWidth}
+                                data-left-rail-width={Math.round(resolvedLeftRailWidthPercent)}
+                            >
+                                <span className="forge-report-builder__left-resizer-thumb">
+                                    <span className="forge-report-builder__left-resizer-controls">
+                                        <button
+                                            type="button"
+                                            className="forge-report-builder__left-resizer-step"
+                                            aria-label={moveDividerLeftLabel}
+                                            title={moveDividerLeftLabel}
+                                            disabled={!canMoveDividerLeft}
+                                            onPointerDown={stopLeftRailControlPointerDown}
+                                            onClick={() => nudgeLeftRailWidth("left")}
+                                        >
+                                            <Icon icon="chevron-left" size={10} />
+                                        </button>
+                                        <span className="forge-report-builder__left-resizer-grip" aria-hidden="true">
+                                            <span />
+                                            <span />
+                                            <span />
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="forge-report-builder__left-resizer-step"
+                                            aria-label={moveDividerRightLabel}
+                                            title={moveDividerRightLabel}
+                                            disabled={!canMoveDividerRight}
+                                            onPointerDown={stopLeftRailControlPointerDown}
+                                            onClick={() => nudgeLeftRailWidth("right")}
+                                        >
+                                            <Icon icon="chevron-right" size={10} />
+                                        </button>
+                                    </span>
+                                </span>
+                            </div>
                         </div>
                     </aside>
                 ) : null}
 
                 <main className="forge-report-builder__center">
-                    {!compactMode && useFilterRail && railFilterState.showOverlayBody ? (
-                        <div className="forge-report-builder__overlay-shell">
-                            <button
-                                type="button"
-                                className="forge-report-builder__overlay-backdrop"
-                                aria-label="Close filters drawer"
-                                onClick={() => setFilterPanels((current) => ({ ...current, common: false }))}
-                            />
-                            {renderFiltersPanel({
-                                forceBody: true,
-                                showCloseAction: true,
-                                overlay: true,
-                                onClose: () => setFilterPanels((current) => ({ ...current, common: false })),
-                            })}
-                        </div>
+                    {renderDesignWorkspaceOverview()}
+                    {semanticResultSurfaceState && designWorkspaceMode ? (
+                        <ReportBuilderSummaryNotice
+                            level={semanticResultSurfaceState.level}
+                            label={semanticResultSurfaceState.label}
+                            value={semanticResultSurfaceState.value}
+                            description={semanticResultSurfaceState.description}
+                            footer={semanticResultSurfaceState.metaChips.length > 0 ? (
+                                <div className="forge-report-builder__result-meta" aria-label="Semantic context summary">
+                                    {semanticResultSurfaceState.metaChips.map((chip) => (
+                                        <span key={chip} className="forge-report-builder__result-meta-chip">{chip}</span>
+                                    ))}
+                                </div>
+                            ) : null}
+                        >
+                            {renderSemanticBindingChips(semanticResultSurfaceState, { marginTop: 8 })}
+                            {renderSemanticBindingFieldGroups(semanticResultSurfaceState, { marginTop: 10 })}
+                        </ReportBuilderSummaryNotice>
                     ) : null}
-                    {!compactMode && config.showResultHeader !== false && config?.result?.showResultHeader !== false ? (
+                    {designWorkspaceMode ? renderCompileDiagnosticsNotice(authoredDocumentCompileDiagnosticsNotice, {
+                        actionForDiagnostic: handleDocumentBlockDiagnosticAction,
+                        actionLabel: resolveDocumentBlockDiagnosticActionLabel,
+                    }) : null}
+                    {!showAuthoredReportSurface && !designWorkspaceMode && !compactMode && config.showResultHeader !== false && config?.result?.showResultHeader !== false ? (
                         <div className="forge-report-builder__result-header">
                             <div className="forge-report-builder__result-header-copy">
                                 <div className="forge-report-builder__result-header-eyebrow">Results</div>
@@ -10859,7 +15875,7 @@ export default function ReportBuilder({ container, context }) {
                                         Edit Chart
                                     </Button>
                                 ) : null}
-                                {draftExportActionState ? (
+                                {!reportWorkspaceMode && draftExportActionState ? (
                                     <>
                                         <Button
                                             small
@@ -10899,7 +15915,7 @@ export default function ReportBuilder({ container, context }) {
                             </div>
                         </div>
                     ) : null}
-                    {showingChartView && selectedBuilderChartSelection && !explorationActive ? (
+                    {!showAuthoredReportSurface && !designWorkspaceMode && showingChartView && selectedBuilderChartSelection && !explorationActive ? (
                         <ReportBuilderSummaryNotice
                             level="info"
                             label="Chart selection"
@@ -10907,13 +15923,18 @@ export default function ReportBuilder({ container, context }) {
                             description="Use this selected value as an exploration starting point, or clear it if you only needed the chart context."
                             footer={(
                                 <div className="forge-report-builder__result-header-actions">
+                                    <ReportBuilderRuntimeActionStrip
+                                        ariaLabel="Chart selection actions"
+                                        actions={selectedBuilderChartSelectionActions}
+                                        onExecute={(action) => executeReportRuntimeAction(action.execution, runtimePreviewHandlers)}
+                                    />
                                     <Button small minimal onClick={startChartSelectionExploration}>Start draft</Button>
                                     <Button small minimal onClick={() => setSelectedBuilderChartSelection(null)}>Clear</Button>
                                 </div>
                             )}
                         />
                     ) : null}
-                    {explorationBannerState?.active ? (
+                    {!designWorkspaceMode && explorationBannerState?.active ? (
                         <ReportBuilderSummaryNotice
                             level="info"
                             label={explorationBannerState.title}
@@ -10936,6 +15957,21 @@ export default function ReportBuilder({ container, context }) {
                                         <Button small minimal onClick={undoExploration} disabled={!explorationBannerState.canUndo}>Undo</Button>
                                         <Button small minimal onClick={redoExploration} disabled={!explorationBannerState.canRedo}>Redo</Button>
                                         <Button small minimal onClick={keepExplorationChanges} disabled={!explorationBannerState.canKeep}>Keep changes</Button>
+                                        {draftExportActionState ? (
+                                            <>
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    onClick={triggerDraftExport}
+                                                    disabled={draftExportActionState.submitDisabled}
+                                                >
+                                                    {draftExportActionState.submitLabel}
+                                                </Button>
+                                                <Button small minimal onClick={() => setDraftExportRequestOpen((current) => !current)}>
+                                                    {draftExportActionState.inspectLabel}
+                                                </Button>
+                                            </>
+                                        ) : null}
                                         <Button small minimal onClick={saveExploration} disabled={!explorationBannerState.canSaveArtifact}>
                                             {savedArtifactViewState.saveLabel}
                                         </Button>
@@ -10997,8 +16033,8 @@ export default function ReportBuilder({ container, context }) {
                                 </div>
                             )}
                         >
-                            {renderSemanticBindingChips(reopenedSemanticBindingViewState, { marginTop: 8 })}
-                            {renderSemanticBindingFieldGroups(reopenedSemanticBindingViewState, { marginTop: 10 })}
+                            {!semanticResultSurfaceState ? renderSemanticBindingChips(reopenedSemanticBindingViewState, { marginTop: 8 }) : null}
+                            {!semanticResultSurfaceState ? renderSemanticBindingFieldGroups(reopenedSemanticBindingViewState, { marginTop: 10 }) : null}
                             {renderScopeSummaryItems(reopenedScopeSummaryState, { marginTop: 10 })}
                             {renderReopenSourceResolution(reopenedSessionNoticeState, { marginTop: 10 })}
                             {renderShareableArtifactState(reopenedSessionNoticeState, { marginTop: 10 })}
@@ -11017,6 +16053,100 @@ export default function ReportBuilder({ container, context }) {
                         downloadArtifact: downloadReopenedExportArtifact,
                         failureNotice: reopenedExportFailureNotice,
                     })}
+                    {reopenedExportHistoryAvailable ? (
+                        <div
+                            style={{
+                                display: "grid",
+                                gap: 10,
+                                marginTop: 10,
+                            }}
+                        >
+                            <div
+                                className="forge-report-builder__result-header-actions"
+                                style={{ alignItems: "center", flexWrap: "wrap" }}
+                            >
+                                <span className="forge-report-builder__result-meta-chip">Recent exports</span>
+                                {reopenedRecentExportEntries.length > 0 ? (
+                                    <span className="forge-report-builder__result-meta-chip">
+                                        {reopenedRecentExportEntries.length} recent
+                                    </span>
+                                ) : null}
+                                <Button
+                                    small
+                                    minimal
+                                    disabled={reopenedExportHistoryLoading}
+                                    onClick={() => refreshReopenedExportHistory()}
+                                >
+                                    {reopenedExportHistoryLoading ? "Refreshing history..." : "Refresh history"}
+                                </Button>
+                            </div>
+                            {reopenedRecentExportEntries.length > 0 ? (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 10,
+                                    }}
+                                >
+                                    {reopenedRecentExportEntries.map((entry) => {
+                                        const actions = [
+                                            {
+                                                id: `${entry.id}:review`,
+                                                label: entry.reviewLabel || "Use current",
+                                                onClick: () => selectReopenedExportHistoryEntry({
+                                                    job: entry.job,
+                                                    artifact: entry.artifact,
+                                                }),
+                                            },
+                                        ];
+                                        if (entry.hasArtifact) {
+                                            actions.push({
+                                                id: `${entry.id}:download`,
+                                                label: entry.downloadLabel || "Download artifact",
+                                                onClick: () => downloadReopenedExportHistoryArtifact({
+                                                    artifactId: entry.artifact?.artifactId || entry.job?.artifactId || "",
+                                                    title: hydratedReportDocumentSession?.title || entry.title || "Report",
+                                                    format: entry.artifact?.format || entry.job?.format || reopenedExportRequestSummary?.format || "pdf",
+                                                    artifact: entry.artifact || null,
+                                                }),
+                                            });
+                                        }
+                                        if (entry.canRefresh) {
+                                            actions.push({
+                                                id: `${entry.id}:refresh`,
+                                                label: "Refresh status",
+                                                onClick: async () => {
+                                                    selectReopenedExportHistoryEntry({
+                                                        job: entry.job,
+                                                        artifact: entry.artifact,
+                                                    });
+                                                    await refreshReopenedExportStatus({
+                                                        jobId: entry.job?.jobId || "",
+                                                    });
+                                                },
+                                            });
+                                        }
+                                        return (
+                                            <ReportBuilderPreparedArtifactCard
+                                                key={entry.id}
+                                                artifact={entry}
+                                                actions={actions}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <ReportBuilderInlineNotice
+                                    notice={{
+                                        level: "info",
+                                        message: reopenedExportHistoryLoading
+                                            ? "Loading recent exports."
+                                            : "No recent reopened exports yet.",
+                                    }}
+                                />
+                            )}
+                        </div>
+                    ) : null}
                     {hydratedReportDocumentSession && !reopenedReportDocumentCompileValidation.valid ? (
                         <ReportBuilderSummaryNotice
                             level="warning"
@@ -11771,6 +16901,100 @@ export default function ReportBuilder({ container, context }) {
                                             failureNotice: selectedListEntryExportFailureNotice,
                                         })
                                     ) : null}
+                                    {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && selectedListEntryExportHistoryAvailable ? (
+                                        <div
+                                            style={{
+                                                display: "grid",
+                                                gap: 10,
+                                                marginTop: 10,
+                                            }}
+                                        >
+                                            <div
+                                                className="forge-report-builder__result-header-actions"
+                                                style={{ alignItems: "center", flexWrap: "wrap" }}
+                                            >
+                                                <span className="forge-report-builder__result-meta-chip">Recent exports</span>
+                                                {selectedListEntryRecentExportEntries.length > 0 ? (
+                                                    <span className="forge-report-builder__result-meta-chip">
+                                                        {selectedListEntryRecentExportEntries.length} recent
+                                                    </span>
+                                                ) : null}
+                                                <Button
+                                                    small
+                                                    minimal
+                                                    disabled={selectedListEntryExportHistoryLoading}
+                                                    onClick={() => refreshSelectedListEntryExportHistory()}
+                                                >
+                                                    {selectedListEntryExportHistoryLoading ? "Refreshing history..." : "Refresh history"}
+                                                </Button>
+                                            </div>
+                                            {selectedListEntryRecentExportEntries.length > 0 ? (
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        flexWrap: "wrap",
+                                                        gap: 10,
+                                                    }}
+                                                >
+                                                    {selectedListEntryRecentExportEntries.map((entry) => {
+                                                        const actions = [
+                                                            {
+                                                                id: `${entry.id}:review`,
+                                                                label: entry.reviewLabel || "Use current",
+                                                                onClick: () => selectSelectedListEntryExportHistoryEntry({
+                                                                    job: entry.job,
+                                                                    artifact: entry.artifact,
+                                                                }),
+                                                            },
+                                                        ];
+                                                        if (entry.hasArtifact) {
+                                                            actions.push({
+                                                                id: `${entry.id}:download`,
+                                                                label: entry.downloadLabel || "Download artifact",
+                                                                onClick: () => downloadSelectedListEntryExportHistoryArtifact({
+                                                                    artifactId: entry.artifact?.artifactId || entry.job?.artifactId || "",
+                                                                    title: selectedListReportDocumentsEntrySummary?.title || entry.title || "Report",
+                                                                    format: entry.artifact?.format || entry.job?.format || selectedListEntryExportRequestSummary?.format || "pdf",
+                                                                    artifact: entry.artifact || null,
+                                                                }),
+                                                            });
+                                                        }
+                                                        if (entry.canRefresh) {
+                                                            actions.push({
+                                                                id: `${entry.id}:refresh`,
+                                                                label: "Refresh status",
+                                                                onClick: async () => {
+                                                                    selectSelectedListEntryExportHistoryEntry({
+                                                                        job: entry.job,
+                                                                        artifact: entry.artifact,
+                                                                    });
+                                                                    await refreshSelectedListEntryExportStatus({
+                                                                        jobId: entry.job?.jobId || "",
+                                                                    });
+                                                                },
+                                                            });
+                                                        }
+                                                        return (
+                                                            <ReportBuilderPreparedArtifactCard
+                                                                key={entry.id}
+                                                                artifact={entry}
+                                                                actions={actions}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <ReportBuilderInlineNotice
+                                                    notice={{
+                                                        level: "info",
+                                                        message: selectedListEntryExportHistoryLoading
+                                                            ? "Loading recent exports."
+                                                            : "No recent selected-entry exports yet.",
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
+                                    ) : null}
                                     {savedReportPayloadSummary && savedReportPayloadApiArtifactsOpen && hideSavedPayloadHandoffListResponseSummary && selectedListReportDocumentsEntry && !selectedListReportDocumentsEntryCompileValidation.valid ? (
                                         <ReportBuilderSummaryNotice
                                             level="warning"
@@ -12224,7 +17448,7 @@ export default function ReportBuilder({ container, context }) {
                             )}
                         </div>
                     ) : null}
-                    {getReportDocumentResponseSummary && !hideSavedPayloadHandoffGetResponseSummary ? (
+                    {getReportDocumentResponseSummary && !hideSavedPayloadHandoffGetResponseSummary && !hideImportedActivationGetResponseSummary ? (
                         <ReportBuilderSummaryNotice
                             level={getReportDocumentResponseSummary.templateConflict ? "warning" : "info"}
                             label={savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.label || "Reopen bundle"}
@@ -12290,7 +17514,7 @@ export default function ReportBuilder({ container, context }) {
                             {renderAuthoredDocumentProgress(getReportDocumentResponseSummary, { marginTop: 10 })}
                         </ReportBuilderSummaryNotice>
                     ) : null}
-                    {getReportDocumentResponseSummary && !getReportDocumentResponseCompileValidation.valid && !hideSavedPayloadHandoffGetResponseSummary ? (
+                    {getReportDocumentResponseSummary && !getReportDocumentResponseCompileValidation.valid && !hideSavedPayloadHandoffGetResponseSummary && !hideImportedActivationGetResponseSummary ? (
                         <ReportBuilderInlineNotice
                             notice={{
                                 level: "warning",
@@ -12298,7 +17522,7 @@ export default function ReportBuilder({ container, context }) {
                             }}
                         />
                     ) : null}
-                    {!hideSavedPayloadHandoffGetResponseSummary ? renderInspectorNoticePanel(getReportDocumentResponseInspector, {
+                    {!hideSavedPayloadHandoffGetResponseSummary && !hideImportedActivationGetResponseSummary ? renderInspectorNoticePanel(getReportDocumentResponseInspector, {
                         ariaLabel: `${savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.label || "Reopen bundle"} summary`,
                         hide: () => setGetReportDocumentResponseOpen(false),
                         hideLabel: savedReportPayloadApiArtifactEntriesById.getReportDocumentResponse?.inspectLabel || "Hide reopen bundle",
@@ -12316,7 +17540,7 @@ export default function ReportBuilder({ container, context }) {
                             getReportDocumentResponseInspector?.templateConflictLabel || "",
                         ].filter(Boolean),
                     }) : null}
-                    {reopenReportDocumentDiagnosticSummary && !hideSavedPayloadHandoffReopenDiagnosticSummary ? (
+                    {reopenReportDocumentDiagnosticSummary && !hideSavedPayloadHandoffReopenDiagnosticSummary && !hideImportedActivationReopenDiagnosticSummary ? (
                         <ReportBuilderSummaryNotice
                             level="warning"
                             label={savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.label || "Reopen diagnostic"}
@@ -12356,7 +17580,7 @@ export default function ReportBuilder({ container, context }) {
                             {renderReopenSourceResolution(reopenReportDocumentDiagnosticSummary, { marginTop: 10 })}
                         </ReportBuilderSummaryNotice>
                     ) : null}
-                    {reopenReportDocumentDiagnosticOpen && reopenReportDocumentDiagnosticInspector && !hideSavedPayloadHandoffReopenDiagnosticSummary ? renderInspectorNoticePanel(reopenReportDocumentDiagnosticInspector, {
+                    {reopenReportDocumentDiagnosticOpen && reopenReportDocumentDiagnosticInspector && !hideSavedPayloadHandoffReopenDiagnosticSummary && !hideImportedActivationReopenDiagnosticSummary ? renderInspectorNoticePanel(reopenReportDocumentDiagnosticInspector, {
                         level: "warning",
                         ariaLabel: `${savedReportPayloadApiArtifactEntriesById.reopenReportDocumentDiagnostic?.label || "Reopen diagnostic"} summary`,
                         hide: () => setReopenReportDocumentDiagnosticOpen(false),
@@ -12377,7 +17601,7 @@ export default function ReportBuilder({ container, context }) {
                             color: "#5f3411",
                         },
                     }) : null}
-                    {importedLocalReopenablePanelState ? (
+                    {importedLocalReopenablePanelState && !hideImportedActivationArtifactSummaries ? (
                         <ReportBuilderSummaryNotice
                             level="info"
                             label={importedLocalReopenablePanelState.title}
@@ -12402,7 +17626,7 @@ export default function ReportBuilder({ container, context }) {
                                                 renderScopeSummaryItems={renderScopeSummaryItems}
                                                 renderReopenSourceResolution={renderReopenSourceResolution}
                                                 renderAuthoredDocumentProgress={renderAuthoredDocumentProgress}
-                                                onActivate={entry.activateLabel ? () => activateImportedLocalReopenable(entry.id, entry.title) : null}
+                                                onActivate={entry.activateLabel ? () => activateImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title) : null}
                                                 onRemove={() => removeImportedLocalReopenable(entry.id, entry.title)}
                                             />
                                         ))}
@@ -12411,7 +17635,7 @@ export default function ReportBuilder({ container, context }) {
                             )}
                         />
                     ) : null}
-                    {importedLocalSavedRecordPanelState ? (
+                    {importedLocalSavedRecordPanelState && !hideImportedActivationArtifactSummaries ? (
                         <ReportBuilderSummaryNotice
                             level="info"
                             label={importedLocalSavedRecordPanelState.title}
@@ -12436,7 +17660,7 @@ export default function ReportBuilder({ container, context }) {
                                                 renderScopeSummaryItems={renderScopeSummaryItems}
                                                 renderReopenSourceResolution={renderReopenSourceResolution}
                                                 renderAuthoredDocumentProgress={renderAuthoredDocumentProgress}
-                                                onActivate={entry.activateLabel ? () => activateImportedLocalSavedRecord(entry.id, entry.title) : null}
+                                                onActivate={entry.activateLabel ? () => activateImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title) : null}
                                                 onRemove={() => removeImportedLocalSavedRecord(entry.id, entry.title)}
                                             />
                                         ))}
@@ -12626,6 +17850,100 @@ export default function ReportBuilder({ container, context }) {
                         downloadArtifact: downloadSelectedListEntryExportArtifact,
                         failureNotice: selectedListEntryExportFailureNotice,
                     }) : null}
+                    {!hideSavedPayloadHandoffListResponseSummary && selectedListEntryExportHistoryAvailable ? (
+                        <div
+                            style={{
+                                display: "grid",
+                                gap: 10,
+                                marginTop: 10,
+                            }}
+                        >
+                            <div
+                                className="forge-report-builder__result-header-actions"
+                                style={{ alignItems: "center", flexWrap: "wrap" }}
+                            >
+                                <span className="forge-report-builder__result-meta-chip">Recent exports</span>
+                                {selectedListEntryRecentExportEntries.length > 0 ? (
+                                    <span className="forge-report-builder__result-meta-chip">
+                                        {selectedListEntryRecentExportEntries.length} recent
+                                    </span>
+                                ) : null}
+                                <Button
+                                    small
+                                    minimal
+                                    disabled={selectedListEntryExportHistoryLoading}
+                                    onClick={() => refreshSelectedListEntryExportHistory()}
+                                >
+                                    {selectedListEntryExportHistoryLoading ? "Refreshing history..." : "Refresh history"}
+                                </Button>
+                            </div>
+                            {selectedListEntryRecentExportEntries.length > 0 ? (
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 10,
+                                    }}
+                                >
+                                    {selectedListEntryRecentExportEntries.map((entry) => {
+                                        const actions = [
+                                            {
+                                                id: `${entry.id}:review`,
+                                                label: entry.reviewLabel || "Use current",
+                                                onClick: () => selectSelectedListEntryExportHistoryEntry({
+                                                    job: entry.job,
+                                                    artifact: entry.artifact,
+                                                }),
+                                            },
+                                        ];
+                                        if (entry.hasArtifact) {
+                                            actions.push({
+                                                id: `${entry.id}:download`,
+                                                label: entry.downloadLabel || "Download artifact",
+                                                onClick: () => downloadSelectedListEntryExportHistoryArtifact({
+                                                    artifactId: entry.artifact?.artifactId || entry.job?.artifactId || "",
+                                                    title: selectedListReportDocumentsEntrySummary?.title || entry.title || "Report",
+                                                    format: entry.artifact?.format || entry.job?.format || selectedListEntryExportRequestSummary?.format || "pdf",
+                                                    artifact: entry.artifact || null,
+                                                }),
+                                            });
+                                        }
+                                        if (entry.canRefresh) {
+                                            actions.push({
+                                                id: `${entry.id}:refresh`,
+                                                label: "Refresh status",
+                                                onClick: async () => {
+                                                    selectSelectedListEntryExportHistoryEntry({
+                                                        job: entry.job,
+                                                        artifact: entry.artifact,
+                                                    });
+                                                    await refreshSelectedListEntryExportStatus({
+                                                        jobId: entry.job?.jobId || "",
+                                                    });
+                                                },
+                                            });
+                                        }
+                                        return (
+                                            <ReportBuilderPreparedArtifactCard
+                                                key={entry.id}
+                                                artifact={entry}
+                                                actions={actions}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <ReportBuilderInlineNotice
+                                    notice={{
+                                        level: "info",
+                                        message: selectedListEntryExportHistoryLoading
+                                            ? "Loading recent exports."
+                                            : "No recent selected-entry exports yet.",
+                                    }}
+                                />
+                            )}
+                        </div>
+                    ) : null}
                     {selectedListReportDocumentsEntry && !selectedListReportDocumentsEntryCompileValidation.valid && !hideSavedPayloadHandoffListResponseSummary ? (
                         <ReportBuilderSummaryNotice
                             level="warning"
@@ -12756,7 +18074,7 @@ export default function ReportBuilder({ container, context }) {
                             createReportDocumentPayloadInspector?.compileStatus || "",
                         ].filter(Boolean),
                     }) : null}
-                    {updateReportDocumentPayloadSummary && !hideSavedPayloadHandoffUpdatePayloadSummary ? (
+                    {updateReportDocumentPayloadSummary && !hideSavedPayloadHandoffUpdatePayloadSummary && !hideImportedActivationUpdatePayloadSummary ? (
                         <ReportBuilderSummaryNotice
                             level="info"
                             label={savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.label || "Update request"}
@@ -12814,7 +18132,7 @@ export default function ReportBuilder({ container, context }) {
                             {renderShareableArtifactState(updateReportDocumentPayloadSummary, { marginTop: 10 })}
                         </ReportBuilderSummaryNotice>
                     ) : null}
-                    {!hideSavedPayloadHandoffUpdatePayloadSummary ? renderInspectorNoticePanel(updateReportDocumentPayloadInspector, {
+                    {!hideSavedPayloadHandoffUpdatePayloadSummary && !hideImportedActivationUpdatePayloadSummary ? renderInspectorNoticePanel(updateReportDocumentPayloadInspector, {
                         ariaLabel: `${savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.label || "Update request"} summary`,
                         hide: () => setUpdateReportDocumentPayloadOpen(false),
                         hideLabel: savedReportPayloadApiArtifactEntriesById.updateReportDocumentPayload?.inspectLabel || "Hide update request",
@@ -12827,7 +18145,7 @@ export default function ReportBuilder({ container, context }) {
                             updateReportDocumentPayloadInspector?.expectedVersion ? `v${updateReportDocumentPayloadInspector.expectedVersion}` : "",
                         ].filter(Boolean),
                     }) : null}
-                    {updateReportDocumentPayloadSummary && !hideSavedPayloadHandoffUpdatePayloadSummary ? (
+                    {updateReportDocumentPayloadSummary && !hideSavedPayloadHandoffUpdatePayloadSummary && !hideImportedActivationUpdatePayloadSummary ? (
                         <ReportBuilderInlineNotice
                             notice={{
                                 level: "info",
@@ -12835,7 +18153,7 @@ export default function ReportBuilder({ container, context }) {
                             }}
                         />
                     ) : null}
-                    {updateReportDocumentConflictDiagnosticSummary && !hideSavedPayloadHandoffUpdateConflictSummary ? (
+                    {updateReportDocumentConflictDiagnosticSummary && !hideSavedPayloadHandoffUpdateConflictSummary && !hideImportedActivationUpdatePayloadSummary ? (
                         <ReportBuilderSummaryNotice
                             level="warning"
                             label={savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.label || "Conflict diagnostic"}
@@ -12862,7 +18180,7 @@ export default function ReportBuilder({ container, context }) {
                             {renderScopeSummaryItems(updateReportDocumentConflictDiagnosticSummary, { marginTop: 10 })}
                         </ReportBuilderSummaryNotice>
                     ) : null}
-                    {updateReportDocumentConflictDiagnosticOpen && updateReportDocumentConflictDiagnosticInspector && !hideSavedPayloadHandoffUpdateConflictSummary ? renderInspectorNoticePanel(updateReportDocumentConflictDiagnosticInspector, {
+                    {updateReportDocumentConflictDiagnosticOpen && updateReportDocumentConflictDiagnosticInspector && !hideSavedPayloadHandoffUpdateConflictSummary && !hideImportedActivationUpdatePayloadSummary ? renderInspectorNoticePanel(updateReportDocumentConflictDiagnosticInspector, {
                         level: "warning",
                         ariaLabel: `${savedReportPayloadApiArtifactEntriesById.updateReportDocumentConflictDiagnostic?.label || "Conflict diagnostic"} summary`,
                         hide: () => setUpdateReportDocumentConflictDiagnosticOpen(false),
@@ -12882,119 +18200,183 @@ export default function ReportBuilder({ container, context }) {
                         },
                     }) : null}
                     {renderChartApplyFeedbackNotice({ onAction: runReport })}
+                    {!designWorkspaceMode ? (
+                        <>
+                            {workspaceMode !== "report" ? renderCompactBottomBar() : null}
+                            {!showAuthoredReportSurface ? (
+                                <>
+                                    <div className="forge-report-builder__result-frame">
+                                        {activeResultLoading ? (
+                                            <ReportBuilderResultState
+                                                icon="refresh"
+                                                eyebrow="Loading"
+                                                title="Refreshing report data"
+                                                description="Preparing the latest result set for the current scope."
+                                                animated
+                                            />
+                                        ) : null}
+                                        {activeResultError ? (
+                                            <div>
+                                                <ReportBuilderResultState
+                                                    tone="error"
+                                                    icon="warning-sign"
+                                                    eyebrow="Result error"
+                                                    title="We couldn't render these results"
+                                                    description={renderReportBuilderError(activeResultError)}
+                                                    actionLabel={canRunReport ? "Run again" : ""}
+                                                    onAction={canRunReport ? runReport : undefined}
+                                                />
+                                                {Array.isArray(activeResultErrorDiagnostics?.diagnostics) && activeResultErrorDiagnostics.diagnostics.length > 0 ? (
+                                                    <section className="forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--danger" style={{ marginTop: 12 }}>
+                                                        {activeResultErrorDiagnostics.diagnosticsTitle || activeResultErrorDiagnostics.diagnosticsDescription ? (
+                                                            <div className="forge-report-builder__semantic-diagnostics-header">
+                                                                {activeResultErrorDiagnostics.diagnosticsTitle ? (
+                                                                    <div className="forge-report-builder__semantic-diagnostics-title">{activeResultErrorDiagnostics.diagnosticsTitle}</div>
+                                                                ) : null}
+                                                                {activeResultErrorDiagnostics.diagnosticsDescription ? (
+                                                                    <div className="forge-report-builder__semantic-diagnostics-description">{activeResultErrorDiagnostics.diagnosticsDescription}</div>
+                                                                ) : null}
+                                                            </div>
+                                                        ) : null}
+                                                        <div className="forge-report-builder__semantic-diagnostics-list">
+                                                            {activeResultErrorDiagnostics.diagnostics.map((diagnostic) => (
+                                                                <article
+                                                                    key={diagnostic.id}
+                                                                    className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
+                                                                >
+                                                                    <div className="forge-report-builder__semantic-diagnostic-meta">
+                                                                        {diagnostic.code ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.code}</span> : null}
+                                                                        {diagnostic.path ? <span className="forge-report-builder__semantic-diagnostic-chip">{diagnostic.path}</span> : null}
+                                                                    </div>
+                                                                    <div className="forge-report-builder__semantic-diagnostic-message">{diagnostic.message}</div>
+                                                                    {diagnostic.suggestedFix ? (
+                                                                        <div className="forge-report-builder__semantic-diagnostic-fix">{diagnostic.suggestedFix}</div>
+                                                                    ) : null}
+                                                                </article>
+                                                            ))}
+                                                        </div>
+                                                    </section>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
+                                        {!activeResultLoading && !activeResultError && !canShowResults ? (
+                                            <ReportBuilderResultState
+                                                icon={emptyResultState.icon}
+                                                eyebrow={emptyResultState.eyebrow}
+                                                title={emptyResultState.title}
+                                                description={emptyResultState.description}
+                                                actionLabel={emptyResultState.actionLabel}
+                                                onAction={
+                                                    resolveReadinessActionHandler(emptyResultState.action)
+                                                    || (canRunReport && !hasCompletedCurrentRun ? runReport : undefined)
+                                                }
+                                            />
+                                        ) : null}
+                                        {resultVisibility.showChartResult ? (
+                                            <div className="forge-report-builder__chart-wrap">
+                                                <Chart
+                                                    key={chartRenderKey}
+                                                    container={chartContainer}
+                                                    context={builderContext}
+                                                    embedded
+                                                    onDatumSelect={showingChartView ? setSelectedBuilderChartSelection : null}
+                                                    onLegendItemSelect={showingChartView ? setSelectedBuilderChartSelection : null}
+                                                />
+                                            </div>
+                                        ) : null}
+                                        {resultVisibility.showTableResult ? (
+                                            <div className="forge-report-builder__table-wrap">
+                                                <table className="forge-report-builder__table">
+                                                    <thead>
+                                                        <tr>
+                                                            {runtimeTableColumns.map((column) => (
+                                                                <th key={column.key} style={{ textAlign: column.align || "left" }}>
+                                                                    {column.label}
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(computedCollection || []).map((row, index) => (
+                                                            <tr
+                                                                key={index}
+                                                                data-selected={selectedBuilderTableRow?.rowIndex === index ? "true" : "false"}
+                                                                aria-selected={selectedBuilderTableRow?.rowIndex === index}
+                                                                tabIndex={0}
+                                                                onClick={() => setSelectedBuilderTableRow({
+                                                                    rowIndex: index,
+                                                                    row,
+                                                                })}
+                                                                onKeyDown={(event) => {
+                                                                    if (event.key !== "Enter" && event.key !== " ") {
+                                                                        return;
+                                                                    }
+                                                                    event.preventDefault();
+                                                                    setSelectedBuilderTableRow({
+                                                                        rowIndex: index,
+                                                                        row,
+                                                                    });
+                                                                }}
+                                                                style={{
+                                                                    background: selectedBuilderTableRow?.rowIndex === index ? "#eef5ff" : "",
+                                                                    cursor: "pointer",
+                                                                }}
+                                                            >
+                                                                {runtimeTableColumns.map((column) => {
+                                                                    const value = resolveReportBuilderCellValue(row, column);
+                                                                    return (
+                                                                        <td key={`${index}_${column.key}`} style={{ textAlign: column.align || "left" }}>
+                                                                            {renderDashboardTableCell(value, row, column, locale, builderContext)}
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        ) : null}
+                                        {resultVisibility.showChartPlaceholder ? (
+                                            <ReportBuilderResultState
+                                                tone={chartPlaceholderState.tone}
+                                                icon={chartPlaceholderState.icon}
+                                                eyebrow={chartPlaceholderState.eyebrow}
+                                                title={chartPlaceholderState.title}
+                                                description={chartPlaceholderState.description}
+                                                actionLabel={chartPlaceholderState.actionLabel}
+                                                onAction={!compactMode && canCreateChart
+                                                    ? () => openChartDialog(state.chartSpec)
+                                                    : undefined}
+                                            />
+                                        ) : null}
+                                    </div>
 
-                    <div className="forge-report-builder__result-frame">
-                        {activeResultLoading ? (
-                            <ReportBuilderResultState
-                                icon="refresh"
-                                eyebrow="Loading"
-                                title="Refreshing report data"
-                                description="Preparing the latest result set for the current scope."
-                                animated
-                            />
-                        ) : null}
-                        {activeResultError ? (
-                            <ReportBuilderResultState
-                                tone="error"
-                                icon="warning-sign"
-                                eyebrow="Result error"
-                                title="We couldn't render these results"
-                                description={renderReportBuilderError(activeResultError)}
-                                actionLabel={canRunReport ? "Run again" : ""}
-                                onAction={canRunReport ? runReport : undefined}
-                            />
-                        ) : null}
-                        {!activeResultLoading && !activeResultError && !canShowResults ? (
-                            <ReportBuilderResultState
-                                icon={emptyResultState.icon}
-                                eyebrow={emptyResultState.eyebrow}
-                                title={emptyResultState.title}
-                                description={emptyResultState.description}
-                                actionLabel={emptyResultState.actionLabel}
-                                onAction={
-                                    resolveReadinessActionHandler(emptyResultState.action)
-                                    || (canRunReport && !hasCompletedCurrentRun ? runReport : undefined)
-                                }
-                            />
-                        ) : null}
-                        {resultVisibility.showChartResult ? (
-                            <div className="forge-report-builder__chart-wrap">
-                                <Chart
-                                    key={chartRenderKey}
-                                    container={chartContainer}
-                                    context={builderContext}
-                                    embedded
-                                    onDatumSelect={showingChartView ? setSelectedBuilderChartSelection : null}
-                                    onLegendItemSelect={showingChartView ? setSelectedBuilderChartSelection : null}
-                                />
-                            </div>
-                        ) : null}
-                        {resultVisibility.showTableResult ? (
-                            <div className="forge-report-builder__table-wrap">
-                                <table className="forge-report-builder__table">
-                                    <thead>
-                                        <tr>
-                                            {runtimeTableColumns.map((column) => (
-                                                <th key={column.key} style={{ textAlign: column.align || "left" }}>
-                                                    {column.label}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(computedCollection || []).map((row, index) => (
-                                            <tr key={index}>
-                                                {runtimeTableColumns.map((column) => {
-                                                    const value = resolveReportBuilderCellValue(row, column);
-                                                    return (
-                                                        <td key={`${index}_${column.key}`} style={{ textAlign: column.align || "left" }}>
-                                                            {renderDashboardTableCell(value, row, column, locale, builderContext)}
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : null}
-                        {resultVisibility.showChartPlaceholder ? (
-                            <ReportBuilderResultState
-                                tone={chartPlaceholderState.tone}
-                                icon={chartPlaceholderState.icon}
-                                eyebrow={chartPlaceholderState.eyebrow}
-                                title={chartPlaceholderState.title}
-                                description={chartPlaceholderState.description}
-                                actionLabel={chartPlaceholderState.actionLabel}
-                                onAction={!compactMode && canCreateChart
-                                    ? () => openChartDialog(state.chartSpec)
-                                    : undefined}
-                            />
-                        ) : null}
-                    </div>
-
-                    {showPagination ? (
-                        <div className="forge-report-builder__pagination">
-                            <span>Page {state.page}</span>
-                            <div className="forge-report-builder__pagination-actions">
-                                <Button small outlined disabled={state.page <= 1} onClick={() => goToPage(state.page - 1)}>
-                                    Previous
-                                </Button>
-                                <Button small outlined disabled={!hasMore} onClick={() => goToPage(state.page + 1)}>
-                                    Next
-                                </Button>
-                            </div>
-                        </div>
+                                    {showPagination ? (
+                                        <div className="forge-report-builder__pagination">
+                                            <span>Page {state.page}</span>
+                                            <div className="forge-report-builder__pagination-actions">
+                                                <Button small outlined disabled={state.page <= 1} onClick={() => goToPage(state.page - 1)}>
+                                                    Previous
+                                                </Button>
+                                                <Button small outlined disabled={!hasMore} onClick={() => goToPage(state.page + 1)}>
+                                                    Next
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </>
+                            ) : null}
+                            {renderImportedRuntimePreview()}
+                            {showAuthoredReportSurface ? renderRuntimePreview() : null}
+                        </>
                     ) : null}
-                    {renderImportedRuntimePreview()}
-                    {renderRuntimePreview()}
-                    {renderCompactBottomBar()}
                 </main>
             </div>
 
-            {!compactMode && !useFilterDrawer && !useFilterRail ? renderFiltersPanel() : null}
+            {designWorkspaceMode && !compactMode && !useFilterDrawer && !useFilterRail ? renderFiltersPanel() : null}
             {renderCompactSetupSheet()}
             {renderCompactChartSheet()}
+            {renderCompactSemanticSheet()}
             <ReportBuilderCalculatedFieldDialog
                 isOpen={calculatedFieldDialogOpen}
                 onClose={closeCalculatedFieldDialog}
@@ -13022,16 +18404,32 @@ export default function ReportBuilder({ container, context }) {
                 onDraftChange={setDocumentBlockDraft}
                 onApply={applyDocumentBlockDraft}
                 validation={documentBlockDraftValidation}
-                valueFieldOptions={authoredKpiValueFieldOptions}
-                secondaryFieldOptions={authoredKpiSecondaryFieldOptions}
-                tableColumnOptions={authoredTableColumnOptions}
+                valueFieldOptions={documentBlockDraftValueFieldOptions}
+                secondaryFieldOptions={documentBlockDraftSecondaryFieldOptions}
+                tableColumnOptions={documentBlockDraftTableColumnOptions}
+                datasetOptions={authoredDatasetOptions}
+                projectionOptions={authoredProjectionOptions}
                 scopeParamOptions={authoredScopeParamOptions}
                 isEditing={!!editingDocumentBlockId}
+                dataViewLabel={activeAuthoringProjectionLabel}
+                dataViewDescription={activeAuthoringProjectionDescription}
+                semanticBindingState={currentSemanticBindingViewState}
+                onAdjustMeasures={() => {
+                    closeDocumentBlockDialog();
+                    focusDesignArea("measures");
+                }}
+                onAdjustBreakdowns={() => {
+                    closeDocumentBlockDialog();
+                    focusDesignArea("breakdowns");
+                }}
             />
             <ReportBuilderChartDialog
                 isOpen={authoredChartBlockDialogOpen}
                 onClose={closeAuthoredChartBlockDialog}
                 draft={authoredChartBlockDraft?.chartSpec || null}
+                datasetRef={authoredChartDialogDatasetRef}
+                datasetOptions={authoredDatasetOptions}
+                onDatasetRefChange={applyAuthoredChartBlockDatasetRef}
                 onDraftChange={(nextDraft) => {
                     const nextTitle = String(nextDraft?.title || authoredChartBlockDraft?.title || "Chart").trim() || "Chart";
                     setAuthoredChartBlockDraft((current) => current ? ({
@@ -13045,11 +18443,24 @@ export default function ReportBuilder({ container, context }) {
                 }}
                 onApply={applyAuthoredChartBlockDraft}
                 supportedTypes={supportedChartTypes}
-                dimensions={authoredChartDimensions}
-                measures={authoredChartMeasures}
+                dimensions={authoredChartDialogDimensions}
+                measures={authoredChartDialogMeasures}
                 validation={authoredChartBlockDraftValidation}
                 sanitizeDraftPatch={sanitizeChartDraftPatch}
                 renderChartError={chartErrorMessage}
+                dialogTitle={editingAuthoredChartBlockId ? "Edit Chart Block" : "Add Chart Block"}
+                dataSourceLabel={authoredChartDialogSelectedDatasetOption?.label || authoredDatasetOptions[0]?.label || ""}
+                dataViewLabel={authoredChartDialogDatasetRef === "primary" ? activeAuthoringProjectionLabel : ""}
+                dataViewDescription={authoredChartDialogDatasetRef === "primary" ? activeAuthoringProjectionDescription : authoredChartDialogSelectedDatasetOption?.description || ""}
+                semanticBindingState={authoredChartDialogDatasetRef === "primary" ? currentSemanticBindingViewState : null}
+                onAdjustMeasures={() => {
+                    closeAuthoredChartBlockDialog();
+                    focusDesignArea("measures");
+                }}
+                onAdjustBreakdowns={() => {
+                    closeAuthoredChartBlockDialog();
+                    focusDesignArea("breakdowns");
+                }}
             />
             <ReportBuilderChartDialog
                 isOpen={chartDialogOpen}

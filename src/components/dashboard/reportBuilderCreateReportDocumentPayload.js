@@ -4,7 +4,7 @@ import {
     buildReportBuilderScopeSummaryFromParams,
 } from "./reportBuilderDocumentBlocks.js";
 import { buildReportBuilderSavedReportPayloadFromBuilderState } from "./reportBuilderSavedReportPayload.js";
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import {
     normalizeReportBuilderSavedReportRecords,
@@ -237,9 +237,9 @@ export function buildReportBuilderCreateReportDocumentPayloadSummary(payload = n
         document: payload?.document || null,
         title: payload?.title || "",
     });
-    const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
-        semanticSummary: payloadContext?.semanticSummary || null,
-        binding: payloadContext?.binding || null,
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [payloadContext],
+        candidates: [payload?.semanticBindingViewState],
     });
     const scopeSummary = buildReportBuilderScopeSummaryFromParams(payloadContext?.scopeParams);
     const normalizedTitle = normalizeString(payload?.title)
@@ -288,7 +288,7 @@ export function buildReportBuilderCreateReportDocumentPayloadSummary(payload = n
                 : {}),
         } : {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),

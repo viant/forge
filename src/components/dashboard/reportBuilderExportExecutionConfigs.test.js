@@ -94,6 +94,7 @@ assert.deepEqual(configs, {
         missingRequestMessage: "No canonical export snapshot is available for the reopened ReportDocument.",
         missingJobMessage: "No reopened export job is available to refresh.",
         missingArtifactMessage: "No completed reopened export artifact is available yet.",
+        historyEnabled: true,
     },
     selectedListEntry: {
         request: { id: "selected-list-entry" },
@@ -107,6 +108,7 @@ assert.deepEqual(configs, {
         missingRequestMessage: "No canonical export snapshot is available for the selected catalog entry.",
         missingJobMessage: "No selected export job is available to refresh.",
         missingArtifactMessage: "No completed selected export artifact is available yet.",
+        historyEnabled: true,
     },
 });
 

@@ -34,10 +34,38 @@ function normalizeReportRuntimeDetailDiagnostic(detailDiagnostic = null) {
   };
 }
 
+function normalizeReportRuntimeScopedFilterState(state = null) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(state)
+      .map(([datasetRef, values]) => {
+        const normalizedDatasetRef = String(datasetRef || "").trim();
+        if (!normalizedDatasetRef || !values || typeof values !== "object" || Array.isArray(values)) {
+          return null;
+        }
+        const normalizedValues = Object.fromEntries(
+          Object.entries(values)
+            .map(([paramId, value]) => {
+              const normalizedParamId = String(paramId || "").trim();
+              return normalizedParamId ? [normalizedParamId, cloneValue(value)] : null;
+            })
+            .filter(Boolean),
+        );
+        return Object.keys(normalizedValues).length > 0
+          ? [normalizedDatasetRef, normalizedValues]
+          : null;
+      })
+      .filter(Boolean),
+  );
+}
+
 export function createReportRuntimeInteractionState() {
   return {
     refinements: [],
     drillTransitions: [],
+    datasetScopeParams: {},
     hostIntent: null,
     detailDiagnostic: null,
   };
@@ -50,14 +78,16 @@ export function normalizeReportRuntimeInteractionState(state = null, {
   const drillTransitions = (Array.isArray(state?.drillTransitions) ? state.drillTransitions : [])
     .map((entry) => normalizeReportRuntimeDrillTransition(entry))
     .filter(Boolean);
+  const datasetScopeParams = normalizeReportRuntimeScopedFilterState(state?.datasetScopeParams);
   const hostIntent = normalizeReportRuntimeHostIntent(state?.hostIntent);
   const detailDiagnostic = normalizeReportRuntimeDetailDiagnostic(state?.detailDiagnostic);
-  if (!allowEmpty && refinements.length === 0 && drillTransitions.length === 0 && !hostIntent && !detailDiagnostic) {
+  if (!allowEmpty && refinements.length === 0 && drillTransitions.length === 0 && Object.keys(datasetScopeParams).length === 0 && !hostIntent && !detailDiagnostic) {
     return null;
   }
   return {
     refinements,
     drillTransitions,
+    datasetScopeParams,
     hostIntent: hostIntent || null,
     detailDiagnostic: detailDiagnostic || null,
   };
@@ -119,6 +149,38 @@ export function clearReportRuntimeInteractionRefinements(state = {}) {
   };
 }
 
+export function setReportRuntimeInteractionDatasetScopeParamValue(state = {}, {
+  datasetRef = "",
+  paramId = "",
+  value = null,
+} = {}) {
+  const normalizedDatasetRef = String(datasetRef || "").trim();
+  const normalizedParamId = String(paramId || "").trim();
+  if (!normalizedDatasetRef || !normalizedParamId) {
+    return {
+      ...createReportRuntimeInteractionState(),
+      ...(state || {}),
+    };
+  }
+  const normalizedState = replaceReportRuntimeInteractionState(state);
+  const currentDatasetValues = normalizedState.datasetScopeParams?.[normalizedDatasetRef]
+    && typeof normalizedState.datasetScopeParams[normalizedDatasetRef] === "object"
+    && !Array.isArray(normalizedState.datasetScopeParams[normalizedDatasetRef])
+      ? normalizedState.datasetScopeParams[normalizedDatasetRef]
+      : {};
+  const nextDatasetValues = {
+    ...currentDatasetValues,
+    [normalizedParamId]: cloneValue(value),
+  };
+  return {
+    ...normalizedState,
+    datasetScopeParams: {
+      ...(normalizedState.datasetScopeParams || {}),
+      [normalizedDatasetRef]: nextDatasetValues,
+    },
+  };
+}
+
 export function clearReportRuntimeInteractionState() {
   return createReportRuntimeInteractionState();
 }
@@ -176,6 +238,8 @@ export function reduceReportRuntimeInteractionState(state = {}, action = {}) {
       return removeReportRuntimeInteractionRefinement(state, action.refinementId);
     case "clearRefinements":
       return clearReportRuntimeInteractionRefinements(state);
+    case "setDatasetScopeParamValue":
+      return setReportRuntimeInteractionDatasetScopeParamValue(state, action.payload);
     case "setHostIntent":
       return setReportRuntimeInteractionHostIntent(state, action.hostIntent);
     case "clearHostIntent":

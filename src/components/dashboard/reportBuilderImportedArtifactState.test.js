@@ -95,7 +95,7 @@ const importedDetailTargetSavedPayload = buildReportBuilderSavedReportPayloadFro
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -282,7 +282,7 @@ const normalizedEmbeddedBindingResponses = normalizeReportBuilderImportedLocalGe
                             selectedDimensions: ["event_date", "channel"],
                             selectedMeasures: ["available_impressions"],
                         },
-                        staticFilters: {
+                        scopeParams: {
                             dateRange: {
                                 start: "2026-05-01",
                                 end: "2026-05-04",
@@ -415,7 +415,7 @@ const normalizedEmbeddedBindingResponsesWithEmptySpec = normalizeReportBuilderIm
                             selectedDimensions: ["event_date", "channel"],
                             selectedMeasures: ["available_impressions"],
                         },
-                        staticFilters: {
+                        scopeParams: {
                             dateRange: {
                                 start: "2026-05-01",
                                 end: "2026-05-04",

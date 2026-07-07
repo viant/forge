@@ -1,5 +1,5 @@
 import { buildUpdateReportDocumentConflictDiagnostic } from "../../reporting/reportDocumentStore.js";
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 
@@ -64,9 +64,9 @@ export function buildReportBuilderUpdateReportDocumentConflictDiagnostic(updateP
         document: updatePayload?.document || null,
         title: updatePayload?.title || updatePayload?.reportRef?.reportId || "",
     });
-    const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
-        semanticSummary: payloadContext?.semanticSummary || null,
-        binding: payloadContext?.binding || null,
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [payloadContext],
+        candidates: [updatePayload?.semanticBindingViewState],
     });
     const scopeSummary = buildReportBuilderScopeSummaryFromParams(payloadContext?.scopeParams);
     return semanticBindingViewState
@@ -78,7 +78,7 @@ export function buildReportBuilderUpdateReportDocumentConflictDiagnostic(updateP
                 ? { semanticBindingFieldGroups: semanticBindingViewState.fieldGroups }
                 : {}),
             ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-                scopeSummaryTitle: "Report Scope",
+                scopeSummaryTitle: "Filters",
                 scopeSummaryText: scopeSummary.text,
                 scopeSummaryItems: scopeSummary.items,
             } : {}),
@@ -87,7 +87,7 @@ export function buildReportBuilderUpdateReportDocumentConflictDiagnostic(updateP
             Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0
                 ? {
                     ...diagnostic,
-                    scopeSummaryTitle: "Report Scope",
+                    scopeSummaryTitle: "Filters",
                     scopeSummaryText: scopeSummary.text,
                     scopeSummaryItems: scopeSummary.items,
                 }

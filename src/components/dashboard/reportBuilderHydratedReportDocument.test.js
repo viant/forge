@@ -129,7 +129,7 @@ const getResponse = {
                     primaryMeasure: "available_impressions",
                     selectedDimensions: ["event_date", "channel"],
                     viewMode: "table",
-                    staticFilters: {},
+                    scopeParams: {},
                     explorationSession: {
                         sessionId: "rbexplore_1",
                     },
@@ -197,7 +197,7 @@ const selectedGetSemanticState = {
     primaryMeasure: "avails",
     selectedDimensions: ["eventDate", "channelV2"],
     viewMode: "table",
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-04",
@@ -305,7 +305,7 @@ assert.deepEqual(hydrated, {
         chartSpec: null,
         orderField: "",
         orderDir: "desc",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -331,6 +331,51 @@ assert.deepEqual(hydrated, {
             modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
         },
+    },
+});
+
+// scope-native scopeParams.* binding targets hydrate the same builder slot as
+// the legacy staticFilters.* convention
+const hydratedWithScopeParamBindings = buildHydratedReportBuilderDocument({
+    ...getResponse,
+    document: {
+        ...getResponse.document,
+        scope: {
+            params: [
+                {
+                    id: "dateRange",
+                    value: {
+                        start: "2026-05-06",
+                        end: "2026-05-09",
+                    },
+                },
+            ],
+        },
+        blocks: [
+            {
+                ...getResponse.document.blocks[0],
+                scopeBindings: [
+                    {
+                        paramId: "dateRange",
+                        target: "scopeParams.dateRange",
+                    },
+                ],
+            },
+        ],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.equal(hydratedWithScopeParamBindings.valid, true);
+assert.deepEqual(hydratedWithScopeParamBindings.state.scopeParams, {
+    dateRange: {
+        start: "2026-05-06",
+        end: "2026-05-09",
     },
 });
 
@@ -397,6 +442,51 @@ assert.deepEqual(hydratedWithAuthoredBlocks.state.reportDocumentBlocks, [
     },
 ]);
 assert.equal(hydratedWithAuthoredBlocks.compileState, undefined);
+
+const hydratedLegacyTableKeys = buildHydratedReportBuilderDocument({
+    ...getResponse,
+    document: {
+        ...getResponse.document,
+        layout: {
+            type: "stack",
+            items: [
+                { blockId: "primaryBuilder" },
+                { blockId: "legacyTable" },
+            ],
+        },
+        blocks: [
+            ...getResponse.document.blocks,
+            {
+                id: "legacyTable",
+                kind: "tableBlock",
+                title: "Legacy Table",
+                datasetRef: "primary",
+                columnKeys: ["eventDate", "channelId", "avails"],
+            },
+        ],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.deepEqual(hydratedLegacyTableKeys.state.reportDocumentBlocks, [
+    {
+        id: "legacyTable",
+        kind: "tableBlock",
+        title: "Legacy Table",
+        datasetRef: "primary",
+        columns: [
+            { key: "eventDate" },
+            { key: "channelId" },
+            { key: "avails" },
+        ],
+    },
+]);
+assert.equal(hydratedLegacyTableKeys.compileState, undefined);
 
 const hydratedWithTemplateState = buildHydratedReportBuilderDocument({
     ...getResponse,
@@ -600,7 +690,7 @@ const hydratedSavedViewOverlay = buildHydratedReportBuilderDocument({
                 },
                 state: {
                     ...getResponse.document.blocks[0].state,
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -664,7 +754,7 @@ const hydratedSavedViewOverlay = buildHydratedReportBuilderDocument({
     },
     builderIdentity,
 });
-assert.deepEqual(hydratedSavedViewOverlay.state.staticFilters, {
+assert.deepEqual(hydratedSavedViewOverlay.state.scopeParams, {
     dateRange: {
         start: "2026-06-01",
         end: "2026-06-07",
@@ -830,7 +920,7 @@ const hydratedSnapshotBackedSavedViewOverlay = buildHydratedReportBuilderDocumen
                         },
                         state: {
                             ...getResponse.document.blocks[0].state,
-                            staticFilters: {
+                            scopeParams: {
                                 dateRange: {
                                     start: "2026-05-11",
                                     end: "2026-05-12",
@@ -874,7 +964,7 @@ const hydratedSnapshotBackedSavedViewOverlay = buildHydratedReportBuilderDocumen
         },
     ],
 });
-assert.deepEqual(hydratedSnapshotBackedSavedViewOverlay.state.staticFilters, {
+assert.deepEqual(hydratedSnapshotBackedSavedViewOverlay.state.scopeParams, {
     dateRange: {
         start: "2026-05-11",
         end: "2026-05-12",
@@ -1085,7 +1175,7 @@ assert.deepEqual(
         "savedViewOverlayPublishedSnapshotReportMismatch",
     ],
 );
-assert.deepEqual(hydratedMismatchedSavedViewOverlay.state.staticFilters, {
+assert.deepEqual(hydratedMismatchedSavedViewOverlay.state.scopeParams, {
     dateRange: {
         start: "2026-05-01",
         end: "2026-05-04",
@@ -1311,7 +1401,7 @@ assert.equal(buildHydratedReportBuilderDocument({
                 ...getResponse.document.blocks[0],
                 state: {
                     ...getResponse.document.blocks[0].state,
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-09",
                             end: "2026-05-10",
@@ -1328,7 +1418,7 @@ assert.equal(buildHydratedReportBuilderDocument({
         dataSourceRef: "demoReportSource",
     },
     builderIdentity,
-})?.state?.staticFilters?.dateRange?.start, "2026-05-09");
+})?.state?.scopeParams?.dateRange?.start, "2026-05-09");
 
 assert.deepEqual(buildHydratedReportBuilderDocument({
     ...getResponse,
@@ -1358,7 +1448,7 @@ assert.deepEqual(buildHydratedReportBuilderDocument({
                 ...getResponse.document.blocks[0],
                 state: {
                     ...getResponse.document.blocks[0].state,
-                    staticFilters: {},
+                    scopeParams: {},
                 },
             },
         ],
@@ -1370,7 +1460,7 @@ assert.deepEqual(buildHydratedReportBuilderDocument({
         dataSourceRef: "demoReportSource",
     },
     builderIdentity,
-})?.state?.staticFilters?.dateRange, {
+})?.state?.scopeParams?.dateRange, {
     start: "2026-06-01",
     end: "2026-06-07",
 });
@@ -1735,6 +1825,125 @@ assert.deepEqual(
     ),
     derivedSelectedGetSession,
 );
+
+const canonicalSummarySelectedGetListResponse = buildReportBuilderListReportDocumentsResponseFromBuilderState({
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_selected_get_runtime_canonical",
+    savedAt: 9412,
+    title: "Selected Get Runtime Canonical Demo",
+    sourceArtifactId: "selected_get_runtime_canonical_demo",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "selectedGetRuntimeCanonicalDemo",
+        title: "Selected Get Runtime Canonical Demo",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+}, {
+    container: selectedGetBuilderContainer,
+    config: selectedGetSemanticConfig,
+    state: selectedGetSemanticState,
+    semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        modelLabel: "Canonical Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Canonical Line Delivery",
+        selectedDimensions: [
+            { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", format: "date" },
+            { id: "channel", rawId: "channelV2", label: "Canonical Channel" },
+        ],
+        selectedMeasures: [
+            { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+        ],
+        selectedParameters: [
+            { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+        ],
+    },
+    semanticModel: null,
+    documentVersion: 14,
+    cursor: "next-page",
+    hasMore: true,
+});
+const canonicalSummarySelectedGetResponse = buildReportBuilderSelectedGetReportDocumentResponseFromBuilderState(
+    canonicalSummarySelectedGetListResponse,
+    {
+        version: 1,
+        kind: "getReportDocumentResponse",
+        reportRef: {
+            reportId: "selectedGetRuntimeCanonicalDemo",
+        },
+        documentVersion: 14,
+        savedAt: 9412,
+        document: {
+            version: 1,
+            kind: "reportDocument",
+            id: "selectedGetRuntimeCanonicalDemo",
+            title: "Selected Get Runtime Canonical Demo",
+        },
+        source: {
+            kind: "reportBuilder.savedReportPayload",
+            payloadId: "rbreport_selected_get_runtime_canonical",
+            sourceArtifactId: "selected_get_runtime_canonical_demo",
+        },
+    },
+    {
+        request: {
+            reportRef: {
+                reportId: "selectedGetRuntimeCanonicalDemo",
+            },
+        },
+        container: selectedGetBuilderContainer,
+        config: selectedGetSemanticConfig,
+        state: selectedGetSemanticState,
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", format: "date" },
+                { id: "channel", rawId: "channelV2", label: "Canonical Channel" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+            ],
+            selectedParameters: [
+                { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+            ],
+        },
+        semanticModel: null,
+    },
+);
+const canonicalSummarySelectedGetHydrated = buildHydratedReportBuilderDocument(canonicalSummarySelectedGetResponse, {
+    container: selectedGetBuilderContainer,
+    builderIdentity,
+});
+assert.equal(canonicalSummarySelectedGetHydrated.valid, true);
+const canonicalSummarySelectedGetSession = buildReportBuilderHydratedDocumentSession(canonicalSummarySelectedGetHydrated, {
+    liveConfig: {
+        result: {
+            defaultMode: "table",
+        },
+    },
+    liveState: {
+        selectedDimensions: ["eventDate"],
+        viewMode: "chart",
+    },
+});
+assert.equal(canonicalSummarySelectedGetSession?.reopenedSemanticSummary?.modelLabel, "Canonical Ad Delivery");
+assert.equal(canonicalSummarySelectedGetSession?.reopenedSemanticSummary?.entityLabel, "Canonical Line Delivery");
+assert.equal(canonicalSummarySelectedGetSession?.reopenedSemanticSummary?.selectedDimensions?.[0]?.label, "Canonical Delivery Date");
+assert.equal(canonicalSummarySelectedGetSession?.reopenedSemanticSummary?.selectedMeasures?.[0]?.label, "Canonical Available Impressions");
+assert.equal(canonicalSummarySelectedGetSession?.reopenedScopeParams?.[0]?.label, "Canonical Reporting Window");
+
 const invalidDerivedSelectedGetListResponse = buildReportBuilderListReportDocumentsResponseFromBuilderState({
     version: 1,
     kind: "reportBuilder.savedReportPayload",
@@ -2283,6 +2492,11 @@ const sessionWithRuntimePreviewInteraction = setReportBuilderHydratedDocumentSes
             sourceBlockId: "primaryChart",
         },
     ],
+    datasetScopeParams: {
+        forecast_cube: {
+            forecastRegion: ["US/NY"],
+        },
+    },
     hostIntent: {
         intentKind: "detailTarget",
         targetRef: "target://example/performance/channel-detail",
@@ -2316,6 +2530,11 @@ assert.deepEqual(sessionWithRuntimePreviewInteraction?.runtimePreviewInteraction
             sourceBlockId: "primaryChart",
         },
     ],
+    datasetScopeParams: {
+        forecast_cube: {
+            forecastRegion: ["US/NY"],
+        },
+    },
     hostIntent: {
         intentKind: "detailTarget",
         targetRef: "target://example/performance/channel-detail",
@@ -2360,6 +2579,11 @@ const templatedMixedRuntimePreviewInteraction = setReportBuilderHydratedDocument
             sourceBlockId: "reachRateTrend",
         },
     ],
+    datasetScopeParams: {
+        forecast_cube: {
+            forecastRegion: ["US/CA"],
+        },
+    },
     hostIntent: null,
     detailDiagnostic: null,
 });
@@ -2390,6 +2614,11 @@ assert.deepEqual(templatedMixedRuntimePreviewInteraction?.runtimePreviewInteract
             sourceBlockId: "reachRateTrend",
         },
     ],
+    datasetScopeParams: {
+        forecast_cube: {
+            forecastRegion: ["US/CA"],
+        },
+    },
     hostIntent: null,
     detailDiagnostic: null,
 });

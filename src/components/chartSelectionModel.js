@@ -1,3 +1,5 @@
+import { resolveKey } from "../utils/selector.js";
+
 function normalizeString(value = "") {
     return String(value || "").trim();
 }
@@ -52,12 +54,12 @@ export function collectChartSeriesDatumSelectionRows(rows = [], {
   if (!normalizedSeriesKey || !normalizedXAxisKey || xValue === undefined || xValue === null || xValue === "") {
     return [];
   }
-  const matchingRow = (Array.isArray(rows) ? rows : []).find((row) => {
-    if (!row || typeof row !== "object") {
-      return false;
-    }
-    return row?.[normalizedXAxisKey] === xValue;
-  });
+    const matchingRow = (Array.isArray(rows) ? rows : []).find((row) => {
+        if (!row || typeof row !== "object") {
+            return false;
+        }
+        return resolveKey(row, normalizedXAxisKey) === xValue;
+    });
   return resolveChartSelectionRows(matchingRow?.__chartSelectionRows, normalizedSeriesKey);
 }
 
@@ -71,7 +73,7 @@ export function normalizeChartDatumSelection({
         const payloadEntry = event.activePayload[0];
         const row = payloadEntry?.payload && typeof payloadEntry.payload === "object" ? cloneValue(payloadEntry.payload) : null;
         const seriesKey = normalizeString(payloadEntry?.dataKey || payloadEntry?.name);
-        const xValue = row && normalizedXAxisKey ? row?.[normalizedXAxisKey] : event?.activeLabel;
+        const xValue = row && normalizedXAxisKey ? resolveKey(row, normalizedXAxisKey) : event?.activeLabel;
         const selectionRows = resolveChartSelectionRows(row?.__chartSelectionRows, seriesKey);
         if (!row || (xValue === undefined || xValue === null || xValue === "")) {
             return null;
@@ -94,7 +96,7 @@ export function normalizeChartDatumSelection({
             row: cloneValue(piePayload),
             selectionRows: resolveChartSelectionRows(piePayload?.__chartSelectionRows),
             xDataKey: normalizedXAxisKey || "name",
-            xValue: piePayload?.[normalizedXAxisKey] ?? pieName,
+            xValue: resolveKey(piePayload, normalizedXAxisKey) ?? pieName,
             seriesKey: pieName,
         };
     }
@@ -116,7 +118,7 @@ export function normalizeChartSeriesDatumSelection({
     if (!candidateRow || !normalizedSeriesKey || !normalizedXAxisKey) {
         return null;
     }
-    const xValue = candidateRow?.[normalizedXAxisKey];
+    const xValue = resolveKey(candidateRow, normalizedXAxisKey);
     if (xValue === undefined || xValue === null || xValue === "") {
         return null;
     }

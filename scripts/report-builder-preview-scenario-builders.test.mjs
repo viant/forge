@@ -6,6 +6,8 @@ import {
   buildAudienceDefinitionRefWaitSteps,
   buildAudienceReopenVerificationSteps,
   buildAudienceSemanticBindingWaitStep,
+  buildAuthoredRuntimeSemanticSurfaceAbsentStep,
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildDiscardDraftAndRequirePreviewOnlyRuntimeSteps,
   buildDrillNavigationProviderRoutePresetSelectionSteps,
   buildDetailTargetBehaviorInjectionSteps,
@@ -27,8 +29,11 @@ import {
   buildQueuedSemanticValidationBehaviorsStep,
   buildPreviewFetchBehaviorReplacementStep,
   buildPreviewLifecycleBehaviorReplacementStep,
+  buildPreviewCaptureLeftRailWidthStep,
+  buildPreviewConfiguredLeftRailVisibilityWaitStep,
   buildPreviewPatchBuilderStateStep,
   buildPreviewPatchBuilderConfigStep,
+  buildPreviewPatchReopenedCompileStateStep,
   buildSeededSavedPayloadCompileStatePatchSteps,
   buildSeededSavedPayloadArtifactImportSteps,
   buildSectionButtonClickStep,
@@ -54,19 +59,12 @@ const steps = buildSavedPayloadPreparationSteps({
   draftTriggerText: "CTR",
 });
 
-assert.equal(steps.length, 12);
+assert.equal(steps.length, 11);
 
-assert.deepEqual(steps.slice(0, 5), [
+assert.deepEqual(steps.slice(0, 3), [
   {
-    type: "waitForEval",
-    expression: "(() => Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim() === \"CTR\")) )()",
-    timeoutMs: 60000,
-  },
-  {
-    type: "clickSelectorContains",
-    selector: ".forge-report-builder__measure-pill",
-    text: "CTR",
-    index: 0,
+    type: "eval",
+    expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.beginStandaloneDraft !== 'function') { throw new Error('beginStandaloneDraft API not available.'); } return !!preview.beginStandaloneDraft({ sourceLabel: \"CTR\", patch: { __scenarioDraft: true } }); })()",
   },
   {
     type: "waitForDomContains",
@@ -75,17 +73,16 @@ assert.deepEqual(steps.slice(0, 5), [
   },
   {
     type: "waitForEval",
-    expression: "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+    expression: "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => { const label = ((entry.innerText || entry.textContent || '').trim()); return label === 'Save report file' || label === 'Save artifact'; }); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
     timeoutMs: 60000,
-  },
-  {
-    type: "clickRole",
-    role: "button",
-    name: "Save artifact",
   },
 ]);
 
-assert.deepEqual(steps.slice(5), [
+assert.deepEqual(steps.slice(3), [
+  {
+    type: "eval",
+    expression: "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => { const label = ((entry.innerText || entry.textContent || '').trim()); return label === 'Save report file' || label === 'Save artifact'; }); if (!button) { throw new Error('Save report file button not found.'); } button.click(); return true; })()",
+  },
   {
     type: "waitForDomContains",
     text: "Saved exploration artifact: Report Builder Demo",
@@ -127,10 +124,11 @@ const trimmedSteps = buildSavedPayloadPreparationSteps({
   draftTriggerText: " CTR ",
 });
 
+assert.equal(trimmedSteps[0].type, "eval");
 assert.match(trimmedSteps[0].expression, /"CTR"/);
-assert.equal(trimmedSteps[1].text, "CTR");
+assert.doesNotMatch(trimmedSteps[0].expression, /"\s+CTR\s+"/);
 
-assert.deepEqual(steps[8], {
+assert.deepEqual(steps[7], {
   type: "fillSelector",
   selector: "input[aria-label=\"Document version\"]",
   value: "17",
@@ -374,6 +372,60 @@ assert.match(previewPatchBuilderConfigStep.expression, /patchBuilderConfig/);
 assert.match(previewPatchBuilderConfigStep.expression, /chartDataMode/);
 assert.match(previewPatchBuilderConfigStep.expression, /currentPage/);
 
+assert.throws(
+  () => buildPreviewCaptureLeftRailWidthStep({ beforeWidthVar: "" }),
+  /requires beforeWidthVar/i,
+);
+
+const previewCaptureLeftRailWidthStep = buildPreviewCaptureLeftRailWidthStep({
+  beforeWidthVar: "__REPORT_BUILDER_PROVIDER_UNAVAILABLE_RAIL_WIDTH_BEFORE__",
+});
+assert.equal(previewCaptureLeftRailWidthStep.type, "eval");
+assert.match(previewCaptureLeftRailWidthStep.expression, /forge-report-builder__left/);
+assert.match(previewCaptureLeftRailWidthStep.expression, /__REPORT_BUILDER_PROVIDER_UNAVAILABLE_RAIL_WIDTH_BEFORE__/);
+assert.match(previewCaptureLeftRailWidthStep.expression, /getBoundingClientRect/);
+
+assert.throws(
+  () => buildPreviewConfiguredLeftRailVisibilityWaitStep({ targetWidthPercent: 0 }),
+  /requires targetWidthPercent > 0/i,
+);
+assert.throws(
+  () => buildPreviewConfiguredLeftRailVisibilityWaitStep({ runtimeRequiredTexts: ["Show Channel details"] }),
+  /requires runtimeRootSelector/i,
+);
+
+const previewConfiguredLeftRailVisibilityWaitStep = buildPreviewConfiguredLeftRailVisibilityWaitStep({
+  beforeWidthVar: "__REPORT_BUILDER_PROVIDER_UNAVAILABLE_RAIL_WIDTH_BEFORE__",
+  requireSemanticBinding: false,
+  requireScopeSummary: false,
+  panelOneOfTexts: ["Current path:", "Select at least two breakdowns to capture a drill path."],
+  previewRequiredTexts: ["Compile the authored runtime preview"],
+  previewForbiddenTexts: ["Model Ad Delivery", "Entity Line Delivery"],
+  bodyRequiredTexts: ["Semantic model unavailable"],
+});
+assert.equal(previewConfiguredLeftRailVisibilityWaitStep.type, "waitForEval");
+assert.match(previewConfiguredLeftRailVisibilityWaitStep.expression, /ariaWidth === 20/);
+assert.match(previewConfiguredLeftRailVisibilityWaitStep.expression, /insideBounds/);
+assert.match(previewConfiguredLeftRailVisibilityWaitStep.expression, /!semanticBinding/);
+assert.match(previewConfiguredLeftRailVisibilityWaitStep.expression, /!scopeSummary/);
+assert.match(previewConfiguredLeftRailVisibilityWaitStep.expression, /Compile the authored runtime preview/);
+assert.match(previewConfiguredLeftRailVisibilityWaitStep.expression, /!previewText\.includes\("Model Ad Delivery"\)/);
+assert.match(previewConfiguredLeftRailVisibilityWaitStep.expression, /panelText\.includes\("Current path:"\) \|\| panelText\.includes\("Select at least two breakdowns to capture a drill path\."\)/);
+
+const previewConfiguredLeftRailVisibilityWithRuntimeWaitStep = buildPreviewConfiguredLeftRailVisibilityWaitStep({
+  beforeWidthVar: "__REPORT_BUILDER_REOPENED_DRILL_RAIL_WIDTH_BEFORE__",
+  requireSemanticBinding: true,
+  requireScopeSummary: true,
+  panelRequiredTexts: ["Current path:", "Show channel details"],
+  previewRequiredTexts: ["Semantic Binding", "Dimensions Delivery Date, Channel"],
+  runtimeRootSelector: ".forge-report-builder__runtime-preview .forge-report-runtime-table-panel",
+  runtimeRequiredTexts: ["Show Channel details"],
+});
+assert.equal(previewConfiguredLeftRailVisibilityWithRuntimeWaitStep.type, "waitForEval");
+assert.match(previewConfiguredLeftRailVisibilityWithRuntimeWaitStep.expression, /const runtimeRoot = document\.querySelector\("\.forge-report-builder__runtime-preview \.forge-report-runtime-table-panel"\)/);
+assert.match(previewConfiguredLeftRailVisibilityWithRuntimeWaitStep.expression, /const runtimeText = runtimeRoot\?\.innerText/);
+assert.match(previewConfiguredLeftRailVisibilityWithRuntimeWaitStep.expression, /runtimeText\.includes\("Show Channel details"\)/);
+
 const clearSemanticValidationBehaviorsStep = buildClearSemanticValidationBehaviorsStep();
 assert.equal(clearSemanticValidationBehaviorsStep.type, "eval");
 assert.match(clearSemanticValidationBehaviorsStep.expression, /clearSemanticValidationBehaviors/);
@@ -396,6 +448,23 @@ assert.deepEqual(reopenedCompileDiagnosticsWaitSteps[1], {
   timeoutMs: 60000,
 });
 assert.match(reopenedCompileDiagnosticsWaitSteps[3].expression, /reopenedCompileState\?\.status === "invalid"/);
+
+assert.throws(
+  () => buildPreviewPatchReopenedCompileStateStep(),
+  /requires compileState/i,
+);
+
+const patchReopenedCompileStateStep = buildPreviewPatchReopenedCompileStateStep({
+  compileState: {
+    status: "clean",
+    diagnostics: [],
+  },
+});
+assert.equal(patchReopenedCompileStateStep.type, "eval");
+assert.match(patchReopenedCompileStateStep.expression, /getHydratedReportDocumentSession/);
+assert.match(patchReopenedCompileStateStep.expression, /patchBuilderState/);
+assert.match(patchReopenedCompileStateStep.expression, /reopenedCompileState/);
+assert.match(patchReopenedCompileStateStep.expression, /"status":"clean"/);
 
 const discardDraftSteps = buildDiscardDraftAndRequirePreviewOnlyRuntimeSteps({
   runtimePanelSelector: ".forge-report-runtime-chart-panel",
@@ -1057,6 +1126,47 @@ assert.match(audienceSemanticWaitStep.expression, /Model Ad Delivery/);
 assert.match(audienceSemanticWaitStep.expression, /Entity Line Delivery/);
 assert.match(audienceSemanticWaitStep.expression, /Measures Audience Index/);
 assert.match(audienceSemanticWaitStep.expression, /export-ready/);
+
+assert.throws(
+  () => buildAuthoredRuntimeSemanticSurfaceWaitStep(),
+  /requires dimensionText and measureText/i,
+);
+
+const authoredRuntimeSemanticSurfaceWaitStep = buildAuthoredRuntimeSemanticSurfaceWaitStep({
+  dimensionText: "Dimensions Delivery Date",
+  measureText: "Measures Available Impressions",
+  extraTexts: ["Runtime Diagnostics"],
+});
+assert.equal(authoredRuntimeSemanticSurfaceWaitStep.type, "waitForEval");
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /\[aria-label=\\"Authored runtime preview\\"\]/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /data-report-builder-semantic-binding="true"/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /data-report-builder-scope-summary="true"/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /Semantic Binding/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /Model Ad Delivery/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /Entity Line Delivery/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /Dimensions Delivery Date/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /Measures Available Impressions/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /Filters/);
+assert.match(authoredRuntimeSemanticSurfaceWaitStep.expression, /Runtime Diagnostics/);
+
+assert.throws(
+  () => buildAuthoredRuntimeSemanticSurfaceAbsentStep(),
+  /requires requiredTexts, forbiddenTexts, or absentButtonText/i,
+);
+
+const authoredRuntimeSemanticSurfaceAbsentStep = buildAuthoredRuntimeSemanticSurfaceAbsentStep({
+  requiredTexts: ["Capacity Trend Q3", "Compile the authored runtime preview"],
+  forbiddenTexts: ["Model Ad Delivery", "Entity Line Delivery"],
+  absentButtonText: "Retry model load",
+});
+assert.equal(authoredRuntimeSemanticSurfaceAbsentStep.type, "waitForEval");
+assert.match(authoredRuntimeSemanticSurfaceAbsentStep.expression, /\[aria-label=\\"Authored runtime preview\\"\]/);
+assert.match(authoredRuntimeSemanticSurfaceAbsentStep.expression, /!semanticBinding/);
+assert.match(authoredRuntimeSemanticSurfaceAbsentStep.expression, /!scopeSummary/);
+assert.match(authoredRuntimeSemanticSurfaceAbsentStep.expression, /Capacity Trend Q3/);
+assert.match(authoredRuntimeSemanticSurfaceAbsentStep.expression, /Compile the authored runtime preview/);
+assert.match(authoredRuntimeSemanticSurfaceAbsentStep.expression, /!text\.includes\("Model Ad Delivery"\)/);
+assert.match(authoredRuntimeSemanticSurfaceAbsentStep.expression, /Retry model load/);
 
 const definitionRefWaitSteps = buildAudienceDefinitionRefWaitSteps({
   extraTexts: ['"kind": "getReportDocumentResponse"'],

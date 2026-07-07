@@ -7,6 +7,7 @@ import {
     buildReportBuilderExportRequestInspectorState,
     buildReportBuilderExportRequestSummary,
     resolveReportBuilderExportHandler,
+    resolveReportBuilderReportStoreHandler,
     resolveReportBuilderSavedPayloadExportRequest,
     resolveReportBuilderSavedPayloadExportRequestBySource,
     serializeReportBuilderExportRequest,
@@ -46,6 +47,18 @@ assert.equal(resolveReportBuilderExportHandler({
 assert.equal(resolveReportBuilderExportHandler({
     handlers: {
         reportExport: {},
+    },
+}), null);
+assert.equal(resolveReportBuilderReportStoreHandler({
+    handlers: {
+        reportStore: {
+            saveReport() {},
+        },
+    },
+})?.saveReport instanceof Function, true);
+assert.equal(resolveReportBuilderReportStoreHandler({
+    handlers: {
+        reportStore: {},
     },
 }), null);
 
@@ -120,7 +133,7 @@ assert.deepEqual(buildReportBuilderExportRequestSummary(exportRequest), {
     reportId: "capacityQ3",
     documentVersion: 4,
     hasReportPrint: true,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -171,7 +184,7 @@ assert.deepEqual(buildReportBuilderExportRequestInspectorState(exportRequest), {
     reportId: "capacityQ3",
     documentVersion: 4,
     hasReportPrint: true,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -331,7 +344,7 @@ assert.deepEqual(conflictingSavedPayloadExportSummary, {
     templateConflictMessage: "Saved report file template Market Brief does not match the source-session seed template Capacity Inventory Brief.",
     templateId: "market_brief",
     templateLabel: "Market Brief",
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -647,15 +660,25 @@ const carriedSemanticExportRequestSummary = buildReportBuilderExportRequestSumma
     },
 });
 assert.deepEqual(carriedSemanticExportRequestSummary.semanticBindingChips, [
-    "Model Carried Delivery",
-    "Measures Carried Spend",
+    "Model Ad Delivery",
+    "Entity Line Delivery",
+    "Dimensions Delivery Date, Channel",
+    "Measures Available Impressions",
 ]);
 assert.deepEqual(carriedSemanticExportRequestSummary.semanticBindingFieldGroups, [
+    {
+        id: "dimensions",
+        title: "Selected dimensions (2)",
+        fields: [
+            { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+            { id: "channel", rawId: "channelV2", label: "Channel" },
+        ],
+    },
     {
         id: "measures",
         title: "Selected measures (1)",
         fields: [
-            { id: "spend", label: "Carried Spend", format: "currency" },
+            { id: "available_impressions", rawId: "avails", label: "Available Impressions" },
         ],
     },
 ]);
@@ -726,15 +749,72 @@ const companionCarriedSemanticExportSummary = buildReportBuilderExportRequestSum
     ],
 });
 assert.deepEqual(companionCarriedSemanticExportSummary.semanticBindingChips, [
-    "Model Companion Delivery",
-    "Measures Companion Audience Index",
+    "Model Ad Delivery",
+    "Entity Line Delivery",
+    "Dimensions Market",
+    "Measures Audience Index",
+    "Parameters Date Range, Audience Segment",
+    "Categories Location, Audience +1",
+    "Lineage harmonizer://feature/location +2",
 ]);
 assert.deepEqual(companionCarriedSemanticExportSummary.semanticBindingFieldGroups, [
+    {
+        id: "dimensions",
+        title: "Selected dimensions (1)",
+        fields: [
+            {
+                id: "country_code",
+                label: "Market",
+                rawId: "country",
+                category: "Location",
+                definitionRef: "harmonizer://feature/location",
+                governance: {
+                    status: "approved",
+                    classification: "harmonizer.audience",
+                },
+            },
+        ],
+    },
     {
         id: "measures",
         title: "Selected measures (1)",
         fields: [
-            { id: "audience_index", label: "Companion Audience Index", format: "number" },
+            {
+                id: "audience_index",
+                label: "Audience Index",
+                rawId: "audienceIndex",
+                format: "number",
+                category: "Audience",
+                definitionRef: "harmonizer://feature/user.segment.index",
+                governance: {
+                    status: "approved",
+                    certification: "reviewed",
+                    classification: "harmonizer.audience",
+                },
+            },
+        ],
+    },
+    {
+        id: "parameters",
+        title: "Selected parameters (2)",
+        fields: [
+            {
+                id: "reporting_window",
+                label: "Date Range",
+                rawId: "dateRange",
+                category: "Scope",
+            },
+            {
+                id: "audience_segment",
+                label: "Audience Segment",
+                rawId: "audienceSegmentFilter",
+                category: "Audience",
+                definitionRef: "harmonizer://feature/user.segment",
+                governance: {
+                    status: "approved",
+                    classification: "harmonizer.audience",
+                },
+            },
         ],
     },
 ]);
@@ -768,7 +848,7 @@ assert.deepEqual(buildReportBuilderExportRequestSummary({
     reportId: "capacityQ3",
     documentVersion: 8,
     hasReportPrint: true,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -1359,7 +1439,7 @@ assert.deepEqual(buildReportBuilderExportRequestSummary({
     reportId: "capacityQ3",
     documentVersion: 9,
     hasReportPrint: true,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {

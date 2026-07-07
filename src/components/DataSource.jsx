@@ -2,7 +2,7 @@
 import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
-import { extractData } from "./dataSourceExtract.js";
+import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
 import { resolveFetchPage, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
 import {
     findSelectionSignal,
@@ -500,6 +500,15 @@ export default function DataSource({context}) {
             }
 
             let {records, info, stats} = extractData(selectors, paging, payload);
+            const deferredCacheHit = isDeferredCacheHitEnvelope(payload);
+            if (deferredCacheHit && records.length === 0) {
+                const previousRecords = Array.isArray(collection.peek()) ? collection.peek() : [];
+                if (previousRecords.length > 0) {
+                    records = previousRecords;
+                    info = collectionInfo.peek() || info;
+                    stats = metrics.peek() || stats;
+                }
+            }
             if (events.onFetch.isDefined() && records.length > 0) {
                 try {
                     log.debug('[doFetchRecords] onFetch:before', {

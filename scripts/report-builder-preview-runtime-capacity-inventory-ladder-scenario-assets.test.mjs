@@ -19,19 +19,15 @@ function findStepIndex(predicate) {
 }
 
 assert.equal(
-  scenario.steps.some((step) => step?.type === "clickSelectorContains" && step?.selector === "[role=\"menuitem\"]" && step?.text === "Inventory Ladder" && step?.index === 0),
+  scenario.steps.some((step) => step?.type === "eval" && String(step?.expression || "").includes("Capacity Inventory Brief starter button not found.")),
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("CAPACITY INVENTORY")),
+  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Capacity Inventory Brief applied.")),
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Publisher -> Site Type")),
-  true,
-);
-assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Semantic Binding")),
+  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("SEMANTIC BINDING")),
   true,
 );
 assert.equal(
@@ -59,6 +55,18 @@ assert.equal(
   true,
 );
 assert.equal(
+  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Show publisher details")),
+  true,
+);
+assert.equal(
+  scenario.steps.some((step) => step?.type === "clickSelectorContains" && step?.selector === ".forge-report-runtime-table-panel .forge-dashboard-row-action" && step?.text === "Show publisher details"),
+  true,
+);
+assert.equal(
+  expressions.some((expression) => expression.includes("target://example/publisher-detail") && expression.includes("Acme Media") && expression.includes("!text.includes('Detail target resolved with omitted parameters')")),
+  true,
+);
+assert.equal(
   scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Drill to Site Type = Acme Media")),
   true,
 );
@@ -71,15 +79,20 @@ assert.equal(
   true,
 );
 
-const selectPresetIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && step?.selector === "[role=\"menuitem\"]" && step?.text === "Inventory Ladder");
-const presetTitleIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("CAPACITY INVENTORY"));
-const semanticBindingIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Semantic Binding"));
+const selectPresetIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("Capacity Inventory Brief starter button not found."));
+const presetTitleIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Capacity Inventory Brief applied."));
+const semanticBindingIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("SEMANTIC BINDING"));
 const startingHeaderIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("labels.includes('Channel')") && String(step?.expression || "").includes("!labels.includes('Publisher')"));
 const actionsReadyIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes(".forge-report-runtime-table-panel .forge-dashboard-row-action"));
 const clickPublisherIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && step?.selector === ".forge-report-runtime-table-panel .forge-dashboard-row-action" && step?.text === "Drill to Publisher");
 const publisherChipIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Drill to Publisher = Display"));
 const publisherHeaderIndex = findStepIndex((step) => step?.type === "waitForEval"
   && String(step?.expression || "").includes("return labels.includes('Publisher') && !labels.includes('Channel')"));
+const publisherDetailLabelIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Show publisher details"));
+const clickPublisherDetailIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && step?.selector === ".forge-report-runtime-table-panel .forge-dashboard-row-action" && step?.text === "Show publisher details");
+const publisherDetailResolvedIndex = findStepIndex((step) => step?.type === "waitForEval"
+  && String(step?.expression || "").includes("target://example/publisher-detail")
+  && String(step?.expression || "").includes("Acme Media"));
 const clickSiteTypeIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && step?.selector === ".forge-report-runtime-table-panel .forge-dashboard-row-action" && step?.text === "Drill to Site Type");
 const siteTypeChipIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Drill to Site Type = Acme Media"));
 const siteTypeHeaderIndex = findStepIndex((step) => step?.type === "waitForEval"
@@ -93,6 +106,9 @@ assert.notEqual(actionsReadyIndex, -1);
 assert.notEqual(clickPublisherIndex, -1);
 assert.notEqual(publisherChipIndex, -1);
 assert.notEqual(publisherHeaderIndex, -1);
+assert.notEqual(publisherDetailLabelIndex, -1);
+assert.notEqual(clickPublisherDetailIndex, -1);
+assert.notEqual(publisherDetailResolvedIndex, -1);
 assert.notEqual(clickSiteTypeIndex, -1);
 assert.notEqual(siteTypeChipIndex, -1);
 assert.notEqual(siteTypeHeaderIndex, -1);
@@ -104,8 +120,11 @@ assert.equal(startingHeaderIndex < actionsReadyIndex, true);
 assert.equal(actionsReadyIndex < clickPublisherIndex, true);
 assert.equal(clickPublisherIndex < publisherChipIndex, true);
 assert.equal(publisherChipIndex < publisherHeaderIndex, true);
-assert.equal(publisherHeaderIndex < clickSiteTypeIndex, true);
+assert.equal(publisherHeaderIndex < publisherDetailLabelIndex, true);
+assert.equal(publisherDetailLabelIndex < clickPublisherDetailIndex, true);
+assert.equal(clickPublisherDetailIndex < publisherDetailResolvedIndex, true);
+assert.equal(publisherDetailResolvedIndex < clickSiteTypeIndex, true);
 assert.equal(clickSiteTypeIndex < siteTypeChipIndex, true);
 assert.equal(siteTypeChipIndex < siteTypeHeaderIndex, true);
 
-console.log("report-builder-preview-runtime-capacity-inventory-ladder-scenario-assets ✓ inventory ladder starts on channel and drills through publisher to site type");
+console.log("report-builder-preview-runtime-capacity-inventory-ladder-scenario-assets ✓ inventory ladder starts on channel, resolves publisher detail, and drills through site type");

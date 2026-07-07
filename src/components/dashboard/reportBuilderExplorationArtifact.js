@@ -10,6 +10,9 @@ import {
 import { buildReportBuilderSemanticRuntimeDiagnosticsFromState } from "./reportBuilderSemantic.js";
 import { normalizeReportBuilderExplorationSession } from "./reportBuilderExplorationSession.js";
 import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import {
+    resolvePreferredReportBuilderSemanticBindingViewState,
+} from "./reportBuilderSemanticBindingViewPreference.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import { resolveReportBuilderSemanticRuntimeState } from "./useReportBuilderSemanticRuntimeState.js";
 
@@ -19,47 +22,6 @@ function normalizeString(value = "") {
 
 function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
-}
-
-function normalizeSemanticBindingViewState(value = null) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return null;
-    }
-    const title = normalizeString(value?.title);
-    const chips = (Array.isArray(value?.chips) ? value.chips : [])
-        .map((entry) => normalizeString(entry))
-        .filter(Boolean);
-    const fieldGroups = (Array.isArray(value?.fieldGroups) ? value.fieldGroups : [])
-        .map((group) => {
-            const id = normalizeString(group?.id);
-            const groupTitle = normalizeString(group?.title);
-            const fields = (Array.isArray(group?.fields) ? group.fields : [])
-                .filter((field) => field && typeof field === "object" && !Array.isArray(field))
-                .filter((field) => (
-                    normalizeString(field?.id)
-                    || normalizeString(field?.rawId)
-                    || normalizeString(field?.label)
-                    || normalizeString(field?.definitionRef)
-                ))
-                .map((field) => cloneValue(field));
-            if (!id || !groupTitle || fields.length === 0) {
-                return null;
-            }
-            return {
-                id,
-                title: groupTitle,
-                fields,
-            };
-        })
-        .filter(Boolean);
-    if (chips.length === 0 && fieldGroups.length === 0) {
-        return null;
-    }
-    return {
-        ...(title ? { title } : { title: "Semantic Binding" }),
-        ...(chips.length > 0 ? { chips } : {}),
-        ...(fieldGroups.length > 0 ? { fieldGroups } : {}),
-    };
 }
 
 function sanitizeFilenameSegment(value = "") {
@@ -180,11 +142,10 @@ export function buildReportBuilderExplorationArtifactSummary(artifact = null) {
         document: artifact?.document || null,
         title: artifact?.title || "",
     });
-    const semanticBindingViewState = normalizeSemanticBindingViewState(artifact?.semanticBindingViewState)
-        || buildReportBuilderSemanticBindingViewState({
-            semanticSummary: artifactContext?.semanticSummary || null,
-            binding: artifactContext?.binding || null,
-        });
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [artifactContext],
+        candidates: [artifact?.semanticBindingViewState],
+    });
     const subtitle = normalizeString(artifactContext?.document?.subtitle || artifact?.document?.subtitle);
     const description = normalizeString(artifactContext?.document?.description || artifact?.document?.description);
     const blockCount = Array.isArray(artifact?.reportSpec?.blocks) ? artifact.reportSpec.blocks.length : 0;
@@ -208,7 +169,7 @@ export function buildReportBuilderExplorationArtifactSummary(artifact = null) {
                 : {}),
         } : {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),

@@ -158,6 +158,29 @@ assert.deepEqual(collectChartSeriesDatumSelectionRows([
     { campaign: "Family Reach", country: "US" },
 ]);
 
+assert.deepEqual(collectChartSeriesDatumSelectionRows([
+    {
+        channel: { channel: "CTV" },
+        totalSpend: 40400,
+        __chartSelectionRows: [
+            { campaign: "Prospect Sprint", country: "US" },
+        ],
+    },
+    {
+        channel: { channel: "Audio" },
+        totalSpend: 90000,
+        __chartSelectionRows: [
+            { campaign: "Launch Burst", country: "CA" },
+        ],
+    },
+], {
+    seriesKey: "totalSpend",
+    xAxisDataKey: "channel.channel",
+    xValue: "CTV",
+}), [
+    { campaign: "Prospect Sprint", country: "US" },
+]);
+
 assert.deepEqual(normalizeChartSeriesDatumSelection({
     seriesKey: "Display",
     xAxisDataKey: "eventDate",
@@ -286,6 +309,67 @@ assert.deepEqual(normalizeChartSeriesDatumSelection({
     xDataKey: "name",
     xValue: "May 1",
     seriesKey: "totalSpend",
+});
+
+assert.deepEqual(normalizeChartDatumSelection({
+    xAxisDataKey: "channel.channel",
+    event: {
+        activePayload: [
+            {
+                dataKey: "Display",
+                payload: {
+                    channel: { channel: "Display" },
+                    Display: 40400,
+                    __chartSelectionRows: {
+                        Display: [{ campaign: "Prospect Sprint" }],
+                    },
+                },
+            },
+        ],
+    },
+}), {
+    source: "cartesian",
+    row: {
+        channel: { channel: "Display" },
+        Display: 40400,
+        __chartSelectionRows: {
+            Display: [{ campaign: "Prospect Sprint" }],
+        },
+    },
+    selectionRows: [{ campaign: "Prospect Sprint" }],
+    xDataKey: "channel.channel",
+    xValue: "Display",
+    seriesKey: "Display",
+});
+
+assert.deepEqual(normalizeChartSeriesDatumSelection({
+    seriesKey: "Display",
+    xAxisDataKey: "channel.channel",
+    chartRows: [
+        {
+            channel: { channel: "Display" },
+            Display: 40400,
+            __chartSelectionRows: {
+                Display: [{ campaign: "Prospect Sprint" }],
+            },
+        },
+    ],
+    event: {
+        payload: {
+            channel: { channel: "Display" },
+            Display: 40400,
+        },
+    },
+}), {
+    source: "cartesian",
+    row: {
+        channel: { channel: "Display" },
+        Display: 40400,
+    },
+    selectionRows: [{ campaign: "Prospect Sprint" }],
+    xDataKey: "channel.channel",
+    xValue: "Display",
+    seriesKey: "Display",
 });
 
 console.log("chartSelectionModel ✓ normalizes chart click events into reusable datum selections");

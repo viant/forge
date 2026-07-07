@@ -76,7 +76,7 @@ const rawState = {
   pageSize: 25,
   orderField: "totalSpend",
   orderDir: "desc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
@@ -131,6 +131,75 @@ assert.equal(rawSpec.blocks[1].chartModel.type, "line");
 assert.equal(rawSpec.blocks[1].chartModel.series.nameKey, "channelId");
 assert.equal(rawSpec.blocks[1].chartModel.series.valueKey, "totalSpend");
 assert.equal(rawSpec.drillMetadata, undefined);
+
+const multiSourceConfig = {
+  ...rawConfig,
+  dataSources: [
+    {
+      id: "forecast_cube",
+      dataSourceRef: "forecastCubeSource",
+      request: {
+        measures: { forecastRevenue: true },
+        dimensions: { region: true },
+        filters: {},
+        limit: 25,
+        offset: 0,
+      },
+      columnOptions: [
+        { key: "region", label: "Region", kind: "dimension" },
+        { key: "forecastRevenue", label: "Forecast Revenue", kind: "measure", format: "currency" },
+      ],
+      scopeParamOptions: [
+        {
+          value: "forecastRegion",
+          label: "Forecast Region",
+          kind: "multiSelect",
+          paramPath: "filters.region",
+        },
+      ],
+    },
+  ],
+};
+const multiSourceState = {
+  ...rawState,
+  scopeParams: {
+    ...rawState.scopeParams,
+    forecastRegion: ["US/NY"],
+  },
+  reportDocumentBlocks: [
+    {
+      id: "forecastTable",
+      kind: "tableBlock",
+      title: "Forecast Regions",
+      datasetRef: "forecast_cube",
+      columns: [
+        { key: "region", label: "Region" },
+        { key: "forecastRevenue", label: "Forecast Revenue", format: "currency" },
+      ],
+    },
+  ],
+};
+const multiSourceSpec = buildReportBuilderReportSpec({
+  container: {
+    id: "multiSourceBuilder",
+    stateKey: "multiSourceBuilder",
+    title: "Multi Source Report",
+    dataSourceRef: "demoReportSource",
+  },
+  config: multiSourceConfig,
+  state: multiSourceState,
+});
+assert.equal(multiSourceSpec.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
+assert.deepEqual(
+  multiSourceSpec.datasets.find((dataset) => dataset.id === "forecast_cube")?.request,
+  {
+    measures: { forecastRevenue: true },
+    dimensions: { region: true },
+    filters: { region: ["US/NY"] },
+    limit: 25,
+    offset: 0,
+  },
+);
 
 const tableOnlySpec = buildReportBuilderReportSpec({
   container: {
@@ -219,7 +288,7 @@ const semanticState = {
   pageSize: 50,
   orderField: "eventDate",
   orderDir: "asc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
   binding: semanticConfig.binding,

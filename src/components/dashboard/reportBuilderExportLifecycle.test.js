@@ -266,7 +266,7 @@ assert.deepEqual(buildReportBuilderExportFailureNotice(failedWithDiagnostics, {
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -289,7 +289,7 @@ assert.deepEqual(buildReportBuilderExportFailureNotice(failedWithDiagnostics, {
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -333,7 +333,7 @@ assert.deepEqual(buildReportBuilderExportFailureNotice(failedWithDiagnostics, {
         "Lineage harmonizer://feature/location +2",
     ],
     semanticBindingFieldGroups: audienceExportInspector.semanticBindingFieldGroups,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {

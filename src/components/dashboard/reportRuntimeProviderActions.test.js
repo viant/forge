@@ -294,6 +294,69 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
   },
 ]);
 
+const genericDrillLabelProvider = {
+  async listAvailableRefinements(blockKind = "", fieldRef = "") {
+    if (blockKind === "tableBlock" && fieldRef === "channelV2") {
+      return [
+        {
+          id: "semantic_drill_channel",
+          label: "Drill Channel",
+          kind: "drill",
+          nextFieldRef: "country",
+        },
+      ];
+    }
+    return [];
+  },
+  async getDrillHierarchy(fieldRef = "") {
+    if (fieldRef !== "channelV2") {
+      return null;
+    }
+    return {
+      drillHierarchy: {
+        fieldRef: "channelV2",
+        levels: [
+          { id: "channelV2", field: "channelV2", label: "Channel" },
+          { id: "country", field: "country", label: "Market" },
+        ],
+      },
+    };
+  },
+};
+
+const genericDrillLabelResult = await resolveReportRuntimeProviderActions({
+  provider: genericDrillLabelProvider,
+  reportSpec,
+  blocks,
+});
+
+assert.deepEqual(genericDrillLabelResult.providerActionsByField.get("primaryTable:channelV2"), [
+  {
+    id: "semantic_drill_channel",
+    label: "Drill to Market",
+    kind: "drill",
+    nextFieldRef: "country",
+  },
+]);
+
+assert.deepEqual(buildReportRuntimeTableActionDescriptors({
+  blockId: "primaryTable",
+  field: {
+    valueKey: "channelV2",
+    label: "Channel",
+    runtimeFilterable: true,
+  },
+  providerActionsByField: genericDrillLabelResult.providerActionsByField,
+}), [
+  {
+    id: "semantic_drill_channel",
+    kind: "drill",
+    fieldValueKey: "channelV2",
+    label: "Drill to Market",
+    nextFieldRef: "country",
+  },
+]);
+
 const failingProvider = {
   async listAvailableRefinements(blockKind = "", fieldRef = "") {
     if (blockKind === "chartBlock" && fieldRef === "country") {

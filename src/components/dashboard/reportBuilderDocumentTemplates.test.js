@@ -5,6 +5,7 @@ import {
     lowerReportDocumentToReportSpec,
 } from "../../reporting/reportDocumentModel.js";
 import {
+    buildBlankReportBuilderDocumentState,
     instantiateReportBuilderDocumentTemplate,
     normalizeReportBuilderDocumentTemplate,
     normalizeReportBuilderDocumentTemplates,
@@ -30,7 +31,31 @@ const config = {
     ],
     staticFilters: [
         { id: "dateRange", label: "Date Range", type: "dateRange", required: true, default: { start: "2026-05-01", end: "2026-05-04" } },
-        { id: "channelsFilter", label: "Channels", multiple: true, options: [{ label: "Display", value: "Display" }] },
+        {
+            id: "channelsFilter",
+            label: "Channels",
+            multiple: true,
+            options: [
+                { label: "Display", value: "Display" },
+                { label: "CTV", value: "CTV" },
+            ],
+        },
+    ],
+    dynamicFilterGroups: [
+        {
+            id: "scope",
+            filters: [
+                {
+                    id: "advertiserIds",
+                    label: "Advertiser",
+                    multiple: true,
+                    emitArray: true,
+                    manualValueType: "int",
+                    valueSelector: "advertiserId",
+                    labelSelector: "advertiserName",
+                },
+            ],
+        },
     ],
     result: {
         chartCreationMode: "explicit",
@@ -56,7 +81,7 @@ const template = normalizeReportBuilderDocumentTemplate({
         viewMode: "table",
         orderField: "avails",
         orderDir: "desc",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-02",
@@ -128,7 +153,7 @@ assert.deepEqual(template, {
         viewMode: "table",
         orderField: "avails",
         orderDir: "desc",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-02",
@@ -208,7 +233,7 @@ assert.equal(instantiated.nextState.reportDocumentTemplateLabel, "Market Brief")
 assert.deepEqual(instantiated.nextState.selectedDimensions, ["country"]);
 assert.deepEqual(instantiated.nextState.selectedMeasures, ["avails"]);
 assert.equal(instantiated.nextState.localCalculatedFields[0].id, "reachRate");
-assert.deepEqual(instantiated.nextState.staticFilters, {
+assert.deepEqual(instantiated.nextState.scopeParams, {
     dateRange: {
         start: "2026-05-01",
         end: "2026-05-02",
@@ -223,6 +248,173 @@ assert.deepEqual(instantiated.nextState.reportDocumentLayout, {
         { blockId: "narrativeIntro", size: "half" },
         { blockId: "headlineKpi", size: "half" },
     ],
+});
+
+const instantiatedWithPrefillPreserved = instantiateReportBuilderDocumentTemplate(config, template, {
+    baseState: {
+        scopeParams: {
+            dateRange: {
+                start: "2026-07-01",
+                end: "2026-07-05",
+            },
+            channelsFilter: ["CTV"],
+        },
+        dynamicGroups: {
+            scope: [
+                {
+                    id: "prefill_advertiser",
+                    filterId: "advertiserIds",
+                    selections: [
+                        {
+                            value: 8123,
+                            label: "Acme Media",
+                            group: "",
+                            record: {
+                                advertiserId: 8123,
+                                advertiserName: "Acme Media",
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    preserveInputState: true,
+});
+assert.equal(instantiatedWithPrefillPreserved.valid, true);
+assert.deepEqual(instantiatedWithPrefillPreserved.nextState.scopeParams, {
+    dateRange: {
+        start: "2026-07-01",
+        end: "2026-07-05",
+    },
+    channelsFilter: ["CTV"],
+});
+assert.deepEqual(instantiatedWithPrefillPreserved.nextState.dynamicGroups.scope, [
+    {
+        id: "prefill_advertiser",
+        filterId: "advertiserIds",
+        enabled: true,
+        selections: [
+            {
+                value: 8123,
+                label: "Acme Media",
+                group: "",
+                record: {
+                    advertiserId: 8123,
+                    advertiserName: "Acme Media",
+                },
+            },
+        ],
+    },
+]);
+assert.deepEqual(instantiatedWithPrefillPreserved.nextState.selectedDimensions, ["country"]);
+assert.deepEqual(instantiatedWithPrefillPreserved.nextState.selectedMeasures, ["avails"]);
+assert.equal(instantiatedWithPrefillPreserved.nextState.reportDocumentTemplateId, "market_brief");
+
+const blankState = buildBlankReportBuilderDocumentState(config, {
+    baseState: {
+        selectedDimensions: ["country"],
+        selectedMeasures: ["avails"],
+        primaryMeasure: "avails",
+        scopeParams: {
+            dateRange: {
+                start: "2026-07-01",
+                end: "2026-07-05",
+            },
+            channelsFilter: ["CTV"],
+        },
+        dynamicGroups: {
+            scope: [
+                {
+                    id: "prefill_advertiser",
+                    filterId: "advertiserIds",
+                    selections: [
+                        {
+                            value: 8123,
+                            label: "Acme Media",
+                            group: "",
+                            record: {
+                                advertiserId: 8123,
+                                advertiserName: "Acme Media",
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+        reportDocumentTitle: "Existing Report",
+        reportDocumentSubtitle: "Existing Subtitle",
+        reportDocumentDescription: "Existing Description",
+        reportDocumentBlocks: [
+            {
+                id: "narrativeIntro",
+                kind: "markdownBlock",
+                title: "Narrative",
+                markdown: "## Narrative",
+            },
+        ],
+        reportDocumentLayout: {
+            type: "stack",
+            items: [{ blockId: "primaryBuilder" }, { blockId: "narrativeIntro" }],
+        },
+        reportDocumentTemplateId: "market_brief",
+        reportDocumentTemplateLabel: "Market Brief",
+    },
+});
+assert.equal(Object.prototype.hasOwnProperty.call(blankState, "reportDocumentTitle"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(blankState, "reportDocumentSubtitle"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(blankState, "reportDocumentDescription"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(blankState, "reportDocumentBlocks"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(blankState, "reportDocumentLayout"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(blankState, "reportDocumentTemplateId"), false);
+assert.equal(Object.prototype.hasOwnProperty.call(blankState, "reportDocumentTemplateLabel"), false);
+assert.deepEqual(blankState.scopeParams, {
+    dateRange: {
+        start: "2026-07-01",
+        end: "2026-07-05",
+    },
+    channelsFilter: ["CTV"],
+});
+assert.deepEqual(blankState.dynamicGroups.scope, [
+    {
+        id: "prefill_advertiser",
+        filterId: "advertiserIds",
+        enabled: true,
+        selections: [
+            {
+                value: 8123,
+                label: "Acme Media",
+                group: "",
+                record: {
+                    advertiserId: 8123,
+                    advertiserName: "Acme Media",
+                },
+            },
+        ],
+    },
+]);
+assert.deepEqual(blankState.selectedDimensions, ["country"]);
+assert.deepEqual(blankState.selectedMeasures, ["avails"]);
+
+const blankStateWithInvalidRequiredFilter = buildBlankReportBuilderDocumentState(config, {
+    baseState: {
+        selectedDimensions: ["country"],
+        selectedMeasures: ["avails"],
+        scopeParams: {
+            dateRange: {
+                start: "",
+                end: "2026-07-05",
+            },
+            channelsFilter: ["CTV"],
+        },
+    },
+});
+assert.deepEqual(blankStateWithInvalidRequiredFilter.scopeParams, {
+    dateRange: {
+        start: "2026-05-01",
+        end: "2026-05-04",
+    },
+    channelsFilter: ["CTV"],
 });
 
 const document = buildReportBuilderReportDocument({

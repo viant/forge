@@ -102,7 +102,7 @@ assert.deepEqual(summarizeReportBuilderAuthoredBlock({
 assert.deepEqual(summarizeReportBuilderAuthoredBlock({
     id: "sharedFilters",
     kind: "filterBarBlock",
-    title: "Report Scope",
+    title: "Filters",
     paramIds: ["dateRange", "channelsFilter", "audienceSegmentFilter"],
 }, {
     scopeParamOptions: [
@@ -113,11 +113,11 @@ assert.deepEqual(summarizeReportBuilderAuthoredBlock({
 }), {
     id: "sharedFilters",
     kind: "filterBarBlock",
-    title: "Report Scope",
+    title: "Filters",
     paramCount: 3,
     paramIds: ["dateRange", "channelsFilter", "audienceSegmentFilter"],
     paramLabels: ["Date Range", "Channels", "Audience Segment"],
-    summary: "3 shared scope parameters: Date Range, Channels, Audience Segment",
+    summary: "3 report filters: Date Range, Channels, Audience Segment",
 });
 
 assert.deepEqual(summarizeReportBuilderAuthoredBlock({
@@ -144,7 +144,7 @@ assert.deepEqual(summarizeReportBuilderAuthoredBlocks([
     {
         id: "sharedFilters",
         kind: "filterBarBlock",
-        title: "Report Scope",
+        title: "Filters",
         paramIds: ["dateRange"],
     },
     {
@@ -173,11 +173,11 @@ assert.deepEqual(summarizeReportBuilderAuthoredBlocks([
         {
             id: "sharedFilters",
             kind: "filterBarBlock",
-            title: "Report Scope",
+            title: "Filters",
             paramCount: 1,
             paramIds: ["dateRange"],
             paramLabels: ["dateRange"],
-            summary: "1 shared scope parameter: dateRange",
+            summary: "1 report filter: dateRange",
         },
         {
             id: "comparisonTable",

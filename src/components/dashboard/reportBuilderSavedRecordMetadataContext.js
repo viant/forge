@@ -20,8 +20,53 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function areClonedValuesEqual(left = null, right = null) {
+    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
 function hasOwnKeys(value = null) {
     return isPlainObject(value) && Object.keys(value).length > 0;
+}
+
+function hasHumanSemanticSummarySelectionMetadata(entries = []) {
+    return Array.isArray(entries) && entries.some((entry) => {
+        if (!isPlainObject(entry)) {
+            return false;
+        }
+        const id = normalizeString(entry?.id);
+        const rawId = normalizeString(entry?.rawId);
+        const label = normalizeString(entry?.label);
+        return !!(
+            (label && label !== id && label !== rawId)
+            || normalizeString(entry?.category)
+            || normalizeString(entry?.definitionRef)
+            || normalizeString(entry?.description)
+            || normalizeString(entry?.format)
+            || normalizeString(entry?.semanticDataType)
+            || normalizeString(entry?.governance?.status)
+            || normalizeString(entry?.governance?.certification)
+            || normalizeString(entry?.governance?.ownerRef)
+        );
+    });
+}
+
+function hasHumanSemanticSummaryMetadata(value = null) {
+    if (!hasSemanticSummaryContent(value)) {
+        return false;
+    }
+    const modelRef = normalizeString(value?.modelRef);
+    const modelLabel = normalizeString(value?.modelLabel);
+    const entity = normalizeString(value?.entity);
+    const entityLabel = normalizeString(value?.entityLabel);
+    return !!(
+        (modelLabel && modelLabel !== modelRef)
+        || normalizeString(value?.modelDescription)
+        || (entityLabel && entityLabel !== entity)
+        || normalizeString(value?.entityDescription)
+        || hasHumanSemanticSummarySelectionMetadata(value?.selectedDimensions)
+        || hasHumanSemanticSummarySelectionMetadata(value?.selectedMeasures)
+        || hasHumanSemanticSummarySelectionMetadata(value?.selectedParameters)
+    );
 }
 
 function resolvePreferredObject(primary = null, secondary = null, hasContent = () => false) {
@@ -32,6 +77,24 @@ function resolvePreferredObject(primary = null, secondary = null, hasContent = (
         return secondary;
     }
     return primary || secondary || null;
+}
+
+function resolvePreferredSemanticSummary(primary = null, secondary = null) {
+    const primaryHasContent = hasSemanticSummaryContent(primary);
+    const secondaryHasContent = hasSemanticSummaryContent(secondary);
+    if (!primaryHasContent) {
+        return secondaryHasContent ? secondary : (primary || secondary || null);
+    }
+    if (!secondaryHasContent) {
+        return primary;
+    }
+    if (hasHumanSemanticSummaryMetadata(primary)) {
+        return primary;
+    }
+    if (hasHumanSemanticSummaryMetadata(secondary)) {
+        return secondary;
+    }
+    return primary;
 }
 
 export function resolvePreferredScopeParams(...candidates) {
@@ -72,10 +135,9 @@ export function resolveNormalizedReportSpecDocumentContext({
             || normalizedReportSpec?.scope
             || null
         );
-    const semanticSummary = resolvePreferredObject(
+    const semanticSummary = resolvePreferredSemanticSummary(
         normalizedReportSpec?.semanticSummary,
         normalizedDocument?.semanticSummary,
-        hasSemanticSummaryContent,
     );
     const binding = resolvePreferredObject(
         normalizedReportSpec?.binding,
@@ -85,9 +147,11 @@ export function resolveNormalizedReportSpecDocumentContext({
     const enrichedReportSpec = isPlainObject(normalizedReportSpec)
         ? {
             ...cloneValue(normalizedReportSpec),
-            ...(!hasSemanticSummaryContent(normalizedReportSpec?.semanticSummary) && hasSemanticSummaryContent(semanticSummary)
+            ...(hasSemanticSummaryContent(semanticSummary)
+                && !areClonedValuesEqual(normalizedReportSpec?.semanticSummary, semanticSummary)
                 ? { semanticSummary: cloneValue(semanticSummary) }
-                : {}),
+                : {}
+            ),
             ...(!hasBindingContent(normalizedReportSpec?.binding) && hasBindingContent(binding)
                 ? { binding: cloneValue(binding) }
                 : {}),

@@ -85,6 +85,25 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
 
     const {ns} = metadata || [];
+    const ensureActionsInitialized = (context) => {
+        if (!context) {
+            return {};
+        }
+        const existingActions = context.actions;
+        if (existingActions && typeof existingActions === "object" && Object.keys(existingActions).length > 0) {
+            return existingActions;
+        }
+        const importer = metadata?.actions?.import;
+        if (typeof importer !== "function") {
+            context.actions = {};
+            return context.actions;
+        }
+        const importedActions = importer(context);
+        context.actions = importedActions && typeof importedActions === "object" && !Array.isArray(importedActions)
+            ? importedActions
+            : {};
+        return context.actions;
+    };
     return {
 
         identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, ...(actorRef ? { actorRef } : {})},
@@ -104,8 +123,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         view: metadata.view,
 
         init: function () {
-            const actions = this.metadata.actions.import(this)
-            this.actions = actions
+            ensureActionsInitialized(this);
         },
 
         dialogContext: function (dialog, dataSourceRef, options = {}) {
@@ -126,7 +144,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         },
 
         lookupHandler: function (name) {
-            return resolveActionHandler(this.actions, this.handlers, name)
+            return resolveActionHandler(ensureActionsInitialized(this), this.handlers, name)
         },
 
         Signals: function (dataSourceRef, hasSelection = false) {

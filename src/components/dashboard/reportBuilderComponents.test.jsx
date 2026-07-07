@@ -4,17 +4,22 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  applyReportBuilderBadgeItemFieldSelection,
   ReportBuilderArtifactEntryCard,
+  buildReportBuilderFieldMetadataSummary,
   buildFilterCategoryChipViewModel,
   InlineStaticFilterControl,
+  normalizeDialogDatasetOptions,
   ReportBuilderInspectorNotice,
   ReportBuilderInlineNotice,
   ReportBuilderScopeSummary,
   ReportBuilderSemanticBindingChips,
   ReportBuilderSemanticFieldGroups,
   ReportBuilderSummaryNotice,
+  resolveReportBuilderBadgeItemFieldLabel,
   StaticFilterSection,
 } from "./reportBuilderComponents.jsx";
+import { buildReportBuilderDocumentBlockDraft } from "./reportBuilderDocumentBlocks.js";
 
 const dateRangeHtml = renderToStaticMarkup(
   <StaticFilterSection
@@ -198,6 +203,267 @@ assert.deepEqual(buildFilterCategoryChipViewModel({
   stateLabel: "1",
   diagnosticSummary: "Date Range start date must be on or before the end date. Adjust the date range so the start date is not after the end date.",
 });
+
+assert.deepEqual(buildReportBuilderFieldMetadataSummary({
+  value: "country",
+  rawId: "country_code",
+  label: "Country",
+  description: "Approved market dimension.",
+  category: "Location",
+  definitionRef: "semantic://example/country",
+  semanticRef: "country_code",
+  format: "code",
+  governance: {
+    status: "approved",
+    certification: "certified",
+    ownerRef: "team://example/performance",
+  },
+}), {
+  label: "Country",
+  rawId: "country_code",
+  description: "Approved market dimension.",
+  definitionRef: "semantic://example/country",
+  semanticRef: "country_code",
+  chips: [
+    "Location",
+    "Format code",
+    "Approved",
+    "Certified",
+    "Owner team://example/performance",
+  ],
+});
+
+assert.deepEqual(
+  normalizeDialogDatasetOptions([
+    {
+      value: "segment_status_csv",
+      label: "Segment Status",
+      description: "CSV • 3 rows • 3 columns",
+      kindLabel: "static csv",
+      columnOptions: [
+        { key: "segment", label: "Segment", kind: "dimension" },
+        { key: "score", label: "Score", kind: "measure" },
+        { key: "status", label: "Status", kind: "dimension" },
+      ],
+      valueFieldOptions: [
+        { value: "segment", label: "Segment" },
+        { value: "score", label: "Score" },
+        { value: "status", label: "Status" },
+      ],
+      secondaryFieldOptions: [
+        { value: "segment", label: "Segment" },
+        { value: "status", label: "Status" },
+      ],
+      scopeParamOptions: [
+        { value: "region", label: "Region", kind: "multiSelect", required: false },
+      ],
+    },
+  ]),
+  [
+    {
+      value: "segment_status_csv",
+      label: "Segment Status",
+      description: "CSV • 3 rows • 3 columns",
+      kindLabel: "static csv",
+      columnOptions: [
+        { key: "segment", label: "Segment", kind: "dimension" },
+        { key: "score", label: "Score", kind: "measure" },
+        { key: "status", label: "Status", kind: "dimension" },
+      ],
+      valueFieldOptions: [
+        { value: "segment", label: "Segment" },
+        { value: "score", label: "Score" },
+        { value: "status", label: "Status" },
+      ],
+      secondaryFieldOptions: [
+        { value: "segment", label: "Segment" },
+        { value: "status", label: "Status" },
+      ],
+      scopeParamOptions: [
+        { value: "region", label: "Region", kind: "multiSelect", required: false },
+      ],
+      columnCount: 3,
+      measureCount: 1,
+      dimensionCount: 2,
+      missing: false,
+    },
+  ],
+);
+
+const normalizedPrimarySelectionDatasetOptions = normalizeDialogDatasetOptions([
+  {
+    value: "primary",
+    label: "Performance Cube",
+    kindLabel: "published",
+    columnOptions: [
+      {
+        key: "eventDate",
+        sourceKey: "eventDate",
+        displayKey: "eventDate",
+        label: "Date",
+        kind: "dimension",
+        selected: true,
+      },
+      {
+        key: "channelV2",
+        sourceKey: "channelV2",
+        displayKey: "channel.channel",
+        displayValueMap: { display: "Display" },
+        label: "Channel",
+        kind: "dimension",
+        selected: true,
+      },
+      {
+        key: "avails",
+        sourceKey: "avails",
+        displayKey: "avails",
+        label: "Avails",
+        kind: "measure",
+        format: "compactNumber",
+        selected: true,
+      },
+    ],
+  },
+]);
+
+assert.deepEqual(normalizedPrimarySelectionDatasetOptions[0].columnOptions, [
+  {
+    key: "eventDate",
+    sourceKey: "eventDate",
+    displayKey: "eventDate",
+    label: "Date",
+    kind: "dimension",
+    selected: true,
+  },
+  {
+    key: "channelV2",
+    sourceKey: "channelV2",
+    displayKey: "channel.channel",
+    displayValueMap: { display: "Display" },
+    label: "Channel",
+    kind: "dimension",
+    selected: true,
+  },
+  {
+    key: "avails",
+    sourceKey: "avails",
+    displayKey: "avails",
+    label: "Avails",
+    kind: "measure",
+    selected: true,
+    format: "compactNumber",
+  },
+]);
+
+assert.deepEqual(
+  buildReportBuilderDocumentBlockDraft("tableBlock", null, {
+    tableColumnOptions: normalizedPrimarySelectionDatasetOptions[0].columnOptions,
+  }).columnKeys,
+  ["eventDate", "channelV2", "avails"],
+);
+
+assert.deepEqual(
+  applyReportBuilderBadgeItemFieldSelection(
+    {
+      id: "pill1",
+      label: "",
+      labelMode: "field",
+      valueField: "",
+      format: "",
+    },
+    "country",
+    [
+      {
+        key: "country",
+        label: "Country",
+        format: "code",
+      },
+    ],
+  ),
+  {
+    id: "pill1",
+    label: "Country",
+    labelMode: "field",
+    valueField: "country",
+    format: "code",
+  },
+);
+
+assert.deepEqual(
+  applyReportBuilderBadgeItemFieldSelection(
+    {
+      id: "pill2",
+      label: "My custom label",
+      labelMode: "manual",
+      valueField: "country",
+      format: "code",
+    },
+    "channelId",
+    [
+      {
+        key: "channelId",
+        label: "Channel",
+      },
+    ],
+  ),
+  {
+    id: "pill2",
+    label: "My custom label",
+    labelMode: "manual",
+    valueField: "channelId",
+    format: "",
+  },
+);
+
+assert.deepEqual(
+  applyReportBuilderBadgeItemFieldSelection(
+    {
+      id: "pill2Legacy",
+      label: "Legacy custom label",
+      valueField: "country",
+      format: "code",
+    },
+    "channelId",
+    [
+      {
+        key: "channelId",
+        label: "Channel",
+      },
+    ],
+  ),
+  {
+    id: "pill2Legacy",
+    label: "Legacy custom label",
+    valueField: "channelId",
+    format: "",
+    labelMode: "manual",
+  },
+);
+
+assert.deepEqual(
+  resolveReportBuilderBadgeItemFieldLabel(
+    {
+      id: "pill3",
+      label: "Custom",
+      labelMode: "manual",
+      valueField: "channelId",
+      format: "",
+    },
+    [
+      {
+        key: "channelId",
+        label: "Channel",
+      },
+    ],
+  ),
+  {
+    id: "pill3",
+    label: "Channel",
+    labelMode: "field",
+    valueField: "channelId",
+    format: "",
+  },
+);
 
 const inlineNoticeHtml = renderToStaticMarkup(
   <ReportBuilderInlineNotice
@@ -403,7 +669,8 @@ assert.ok(semanticBindingFieldGroupsHtml.includes("public"));
 const scopeSummaryHtml = renderToStaticMarkup(
   <ReportBuilderScopeSummary
     summaryState={{
-      scopeSummaryTitle: "Report Scope",
+      scopeSummaryTitle: "Filters",
+      scopeSummaryText: "Reporting Window • Channel Group",
       scopeSummaryItems: [
         {
           id: "dateRange",
@@ -415,9 +682,12 @@ const scopeSummaryHtml = renderToStaticMarkup(
   />,
 );
 
-assert.ok(scopeSummaryHtml.includes("Report Scope"));
+assert.ok(scopeSummaryHtml.includes("Filters"));
+assert.ok(scopeSummaryHtml.includes("Reporting Window • Channel Group"));
 assert.ok(scopeSummaryHtml.includes("Reporting Window"));
 assert.ok(scopeSummaryHtml.includes("Approved reporting window for imported runtime previews."));
+assert.ok(scopeSummaryHtml.includes("data-report-builder-scope-summary=\"true\""));
+assert.ok(scopeSummaryHtml.includes("data-report-builder-scope-title=\"Filters\""));
 
 const artifactEntryCardHtml = renderToStaticMarkup(
   <ReportBuilderArtifactEntryCard

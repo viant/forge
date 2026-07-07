@@ -18,7 +18,7 @@ function normalizeScopeCapability(capability = null) {
         known: !!capability,
         supported: normalizeBoolean(capability?.supported),
         paramIds,
-        disabledReason: "Add filters becomes available once the current builder state compiles shared scope parameters.",
+        disabledReason: "Add filters becomes available once the current builder state compiles report filters.",
     };
 }
 
@@ -97,7 +97,7 @@ function buildAuthoredCapabilityNotes({
     if (scope?.known && !scope.supported) {
         notes.push({
             id: "scope",
-            message: "Filter bar blocks require at least one configured shared scope parameter in the current builder.",
+            message: "Filter bar blocks require at least one configured report filter in the current builder.",
         });
     }
     if (refinement?.known && !refinement.supported) {
@@ -140,6 +140,13 @@ function buildAuthoredCapabilityActions({
             id: "markdownBlock",
             label: "Add narrative",
             icon: "annotation",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "badgesBlock",
+            label: "Add pills",
+            icon: "properties",
             disabled: false,
             disabledReason: "",
         },
@@ -193,13 +200,13 @@ function buildAuthoredActionGroups() {
         {
             id: "document",
             title: "Report Document",
-            description: "Narrative, chart, table, and KPI building blocks for the report canvas.",
-            actionIds: ["markdownBlock", "chartBlock", "tableBlock", "kpiBlock"],
+            description: "Narrative, pill, chart, table, and KPI building blocks for the report canvas.",
+            actionIds: ["markdownBlock", "badgesBlock", "chartBlock", "tableBlock", "kpiBlock"],
         },
         {
             id: "runtime",
-            title: "Filters & Runtime",
-            description: "Filter, refinement, and geo controls that shape the live preview experience.",
+            title: "Live Controls",
+            description: "Filter, refinement, and geo blocks that shape the live report experience.",
             actionIds: ["filterBarBlock", "refinementBarBlock", "geoMapBlock"],
         },
     ];
@@ -249,7 +256,7 @@ export function buildReportBuilderAuthoredCapabilityViewModel({
         notes,
         showDisabledHint,
         disabledHintText: showDisabledHint
-            ? "Hover a disabled option to see which builder fields or shared scope parameters still need to be present."
+            ? "Hover a disabled option to see which builder fields or report filters still need to be present."
             : "",
     };
 }

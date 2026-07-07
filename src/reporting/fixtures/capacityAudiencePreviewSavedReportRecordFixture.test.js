@@ -26,7 +26,7 @@ assert.equal(primaryBuilderBlock.source.stateKey, "demoReportBuilder");
 assert.equal(primaryBuilderBlock.state?.viewMode, "table");
 assert.deepEqual(primaryBuilderBlock.state?.selectedMeasures, ["audienceIndex"]);
 assert.deepEqual(primaryBuilderBlock.state?.selectedDimensions, ["country"]);
-assert.deepEqual(primaryBuilderBlock.state?.staticFilters?.audienceSegmentFilter, ["Young Adults"]);
+assert.deepEqual(primaryBuilderBlock.state?.scopeParams?.audienceSegmentFilter, ["Young Adults"]);
 assert.equal(Array.isArray(reportFill?.datasets?.[0]?.rows), true);
 assert.equal(reportFill.datasets[0].rows.length, 8);
 assert.equal(reportFill.datasets[0].rows[0].country, "US");
@@ -81,7 +81,7 @@ assert.equal(hydrated.valid, true);
 assert.equal(hydrated.state.viewMode, "table");
 assert.deepEqual(hydrated.state.selectedMeasures, ["audienceIndex"]);
 assert.deepEqual(hydrated.state.selectedDimensions, ["country"]);
-assert.deepEqual(hydrated.state.staticFilters?.audienceSegmentFilter, ["Young Adults"]);
+assert.deepEqual(hydrated.state.scopeParams?.audienceSegmentFilter, ["Young Adults"]);
 
 const reopenedModel = buildReportBuilderRuntimePreviewModel({
   container: {

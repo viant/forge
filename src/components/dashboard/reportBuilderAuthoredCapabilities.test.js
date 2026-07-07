@@ -10,7 +10,7 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
         known: false,
         supported: false,
         paramIds: [],
-        disabledReason: "Add filters becomes available once the current builder state compiles shared scope parameters.",
+        disabledReason: "Add filters becomes available once the current builder state compiles report filters.",
     },
     refinement: {
         known: false,
@@ -47,7 +47,8 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
     },
     actions: [
         { id: "markdownBlock", label: "Add narrative", icon: "annotation", disabled: false, disabledReason: "" },
-        { id: "filterBarBlock", label: "Add filters", icon: "filter", disabled: true, disabledReason: "Add filters becomes available once the current builder state compiles shared scope parameters." },
+        { id: "badgesBlock", label: "Add pills", icon: "properties", disabled: false, disabledReason: "" },
+        { id: "filterBarBlock", label: "Add filters", icon: "filter", disabled: true, disabledReason: "Add filters becomes available once the current builder state compiles report filters." },
         { id: "refinementBarBlock", label: "Add refinements", icon: "changes", disabled: true, disabledReason: "Add refinements becomes available once the current builder state exposes runtime refinement-capable dimensions." },
         { id: "geoMapBlock", label: "Add geo", icon: "map", disabled: true, disabledReason: "Add geo becomes available once the current builder state compiles compatible geo keys and metrics." },
         { id: "chartBlock", label: "Add chart", icon: "timeline-line-chart", disabled: true, disabledReason: "Add chart becomes available once the current builder state compiles compatible chart fields." },
@@ -58,13 +59,13 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
         {
             id: "document",
             title: "Report Document",
-            description: "Narrative, chart, table, and KPI building blocks for the report canvas.",
-            actionIds: ["markdownBlock", "chartBlock", "tableBlock", "kpiBlock"],
+            description: "Narrative, pill, chart, table, and KPI building blocks for the report canvas.",
+            actionIds: ["markdownBlock", "badgesBlock", "chartBlock", "tableBlock", "kpiBlock"],
         },
         {
             id: "runtime",
-            title: "Filters & Runtime",
-            description: "Filter, refinement, and geo controls that shape the live preview experience.",
+            title: "Live Controls",
+            description: "Filter, refinement, and geo blocks that shape the live report experience.",
             actionIds: ["filterBarBlock", "refinementBarBlock", "geoMapBlock"],
         },
     ],
@@ -102,7 +103,7 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
         known: true,
         supported: true,
         paramIds: ["dateRange"],
-        disabledReason: "Add filters becomes available once the current builder state compiles shared scope parameters.",
+        disabledReason: "Add filters becomes available once the current builder state compiles report filters.",
     },
     refinement: {
         known: true,
@@ -139,7 +140,8 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
     },
     actions: [
         { id: "markdownBlock", label: "Add narrative", icon: "annotation", disabled: false, disabledReason: "" },
-        { id: "filterBarBlock", label: "Add filters", icon: "filter", disabled: false, disabledReason: "Add filters becomes available once the current builder state compiles shared scope parameters." },
+        { id: "badgesBlock", label: "Add pills", icon: "properties", disabled: false, disabledReason: "" },
+        { id: "filterBarBlock", label: "Add filters", icon: "filter", disabled: false, disabledReason: "Add filters becomes available once the current builder state compiles report filters." },
         { id: "refinementBarBlock", label: "Add refinements", icon: "changes", disabled: false, disabledReason: "Add refinements becomes available once the current builder state exposes runtime refinement-capable dimensions." },
         { id: "geoMapBlock", label: "Add geo", icon: "map", disabled: false, disabledReason: "Add geo becomes available once the current builder state compiles compatible geo keys and metrics." },
         { id: "chartBlock", label: "Add chart", icon: "timeline-line-chart", disabled: false, disabledReason: "Add chart becomes available once the current builder state compiles compatible chart fields." },
@@ -150,13 +152,13 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
         {
             id: "document",
             title: "Report Document",
-            description: "Narrative, chart, table, and KPI building blocks for the report canvas.",
-            actionIds: ["markdownBlock", "chartBlock", "tableBlock", "kpiBlock"],
+            description: "Narrative, pill, chart, table, and KPI building blocks for the report canvas.",
+            actionIds: ["markdownBlock", "badgesBlock", "chartBlock", "tableBlock", "kpiBlock"],
         },
         {
             id: "runtime",
-            title: "Filters & Runtime",
-            description: "Filter, refinement, and geo controls that shape the live preview experience.",
+            title: "Live Controls",
+            description: "Filter, refinement, and geo blocks that shape the live report experience.",
             actionIds: ["filterBarBlock", "refinementBarBlock", "geoMapBlock"],
         },
     ],
@@ -194,7 +196,7 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
         known: true,
         supported: true,
         paramIds: ["dateRange"],
-        disabledReason: "Add filters becomes available once the current builder state compiles shared scope parameters.",
+        disabledReason: "Add filters becomes available once the current builder state compiles report filters.",
     },
     refinement: {
         known: true,
@@ -231,7 +233,8 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
     },
     actions: [
         { id: "markdownBlock", label: "Add narrative", icon: "annotation", disabled: false, disabledReason: "" },
-        { id: "filterBarBlock", label: "Add filters", icon: "filter", disabled: false, disabledReason: "Add filters becomes available once the current builder state compiles shared scope parameters." },
+        { id: "badgesBlock", label: "Add pills", icon: "properties", disabled: false, disabledReason: "" },
+        { id: "filterBarBlock", label: "Add filters", icon: "filter", disabled: false, disabledReason: "Add filters becomes available once the current builder state compiles report filters." },
         { id: "refinementBarBlock", label: "Add refinements", icon: "changes", disabled: true, disabledReason: "Add refinements becomes available once the current builder state exposes runtime refinement-capable dimensions." },
         { id: "geoMapBlock", label: "Add geo", icon: "map", disabled: false, disabledReason: "Add geo becomes available once the current builder state compiles compatible geo keys and metrics." },
         { id: "chartBlock", label: "Add chart", icon: "timeline-line-chart", disabled: false, disabledReason: "Add chart becomes available once the current builder state compiles compatible chart fields." },
@@ -242,13 +245,13 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
         {
             id: "document",
             title: "Report Document",
-            description: "Narrative, chart, table, and KPI building blocks for the report canvas.",
-            actionIds: ["markdownBlock", "chartBlock", "tableBlock", "kpiBlock"],
+            description: "Narrative, pill, chart, table, and KPI building blocks for the report canvas.",
+            actionIds: ["markdownBlock", "badgesBlock", "chartBlock", "tableBlock", "kpiBlock"],
         },
         {
             id: "runtime",
-            title: "Filters & Runtime",
-            description: "Filter, refinement, and geo controls that shape the live preview experience.",
+            title: "Live Controls",
+            description: "Filter, refinement, and geo blocks that shape the live report experience.",
             actionIds: ["filterBarBlock", "refinementBarBlock", "geoMapBlock"],
         },
     ],
@@ -259,7 +262,7 @@ assert.deepEqual(buildReportBuilderAuthoredCapabilityViewModel({
         },
     ],
     showDisabledHint: true,
-    disabledHintText: "Hover a disabled option to see which builder fields or shared scope parameters still need to be present.",
+    disabledHintText: "Hover a disabled option to see which builder fields or report filters still need to be present.",
 });
 
 console.log("reportBuilderAuthoredCapabilities ✓ normalizes compiled authored block capability state");

@@ -67,7 +67,7 @@ assert.deepEqual(buildReportBuilderPresetApplyFeedback({
     requiresManualRun: false,
 }), {
     level: "info",
-    message: "Applied this preset's required measures and breakdowns. Validating the semantic selection against the provider.",
+    message: "Applied this preset's required measures and breakdowns to the active table and chart. Validating the semantic selection against the provider.",
     action: "",
 });
 
@@ -80,7 +80,7 @@ assert.deepEqual(buildReportBuilderPresetApplyFeedback({
     requiresManualRun: true,
 }), {
     level: "info",
-    message: "Applied this preset's required measures. Run to refresh results.",
+    message: "Applied this preset's required measures to the active table and chart. Run to refresh results.",
     action: "runReport",
 });
 
@@ -149,6 +149,33 @@ assert.deepEqual(buildReportBuilderSemanticValidationFeedback({
 }), {
     level: "danger",
     message: "Semantic validation: Semantic provider unavailable.",
+    actionLabel: "Retry validation",
+    action: "retrySemanticValidation",
+});
+
+assert.deepEqual(buildReportBuilderSemanticValidationFeedback({
+    readiness: {
+        reason: "semantic",
+        message: "Semantic model metadata failed. Retry loading the semantic model or choose a different semantic binding.",
+        action: "retrySemanticValidation",
+    },
+    semanticStatusLevel: "info",
+    semanticSelectedIssueCount: 0,
+    semanticSelectionValidationState: {
+        error: "",
+        valid: false,
+        diagnostics: [
+            {
+                code: "semanticModelError",
+                severity: "error",
+                path: "selection.modelRef",
+                message: "Semantic model metadata failed.",
+            },
+        ],
+    },
+}), {
+    level: "danger",
+    message: "Semantic validation: Semantic model metadata failed. Retry loading the semantic model or choose a different semantic binding.",
     actionLabel: "Retry validation",
     action: "retrySemanticValidation",
 });
@@ -280,6 +307,43 @@ assert.deepEqual(buildReportBuilderSemanticInlineNotices({
     },
 ]);
 
+assert.deepEqual(buildReportBuilderSemanticInlineNotices({
+    semanticStatus: {
+        level: "info",
+        title: "Semantic model",
+        message: "Loading semantic model metadata…",
+    },
+    readiness: {
+        reason: "semantic",
+        message: "Loading semantic model metadata…",
+        action: "",
+    },
+    semanticFieldValidationMessage: "",
+    semanticSelectedIssueCount: 0,
+    semanticSelectionValidationState: {
+        error: "",
+        valid: null,
+    },
+    semanticBindingViewState: {
+        title: "Semantic binding",
+        modelLabel: "Ad Delivery",
+        entityLabel: "Line Delivery",
+    },
+}), [
+    {
+        level: "info",
+        message: "Semantic binding: Ad Delivery • Entity: Line Delivery",
+        actionLabel: "",
+        action: "",
+    },
+    {
+        level: "info",
+        message: "Semantic validation: Loading semantic model metadata…",
+        actionLabel: "",
+        action: "",
+    },
+]);
+
 assert.deepEqual(buildReportBuilderImportFeedback({
     valid: true,
     kind: "reportSpec",
@@ -348,7 +412,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -453,7 +517,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -582,7 +646,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -795,7 +859,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Imported Reporting Window",
     scopeSummaryItems: [
         {
@@ -888,7 +952,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -999,7 +1063,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -1114,7 +1178,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -1215,7 +1279,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -1327,7 +1391,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -1433,7 +1497,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -1509,7 +1573,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
                         },
                         selectedDimensions: ["eventDate", "channelV2"],
                         selectedMeasures: ["avails"],
-                        staticFilters: {
+                        scopeParams: {
                             dateRange: {
                                 start: "2026-05-01",
                                 end: "2026-05-04",
@@ -1549,7 +1613,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -1642,7 +1706,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -1721,6 +1785,150 @@ assert.deepEqual(buildReportBuilderSelectedGetResponseFeedback({
     metaChips: ["v12", "Market Brief", "template mismatch"],
 });
 
+const staleCarriedImportFeedback = buildReportBuilderImportFeedback({
+    valid: true,
+    kind: "reportBuilder.savedReportPayload",
+    message: "Imported saved report file.",
+    payload: {
+        version: 1,
+        kind: "reportBuilder.savedReportPayload",
+        semanticBindingViewState: {
+            title: "Semantic Binding",
+            chips: [
+                "Model model://example/performance/delivery@v1",
+                "Measures available_impressions",
+            ],
+            fieldGroups: [
+                {
+                    id: "measures",
+                    title: "Selected measures (1)",
+                    fields: [
+                        {
+                            id: "available_impressions",
+                            rawId: "available_impressions",
+                            label: "available_impressions",
+                        },
+                    ],
+                },
+            ],
+        },
+        reportDocument: {
+            version: 1,
+            kind: "reportDocument",
+            id: "canonicalImportedDeliveryTrend",
+            title: "Canonical Imported Delivery Trend",
+            semanticSummary: {
+                kind: "semantic",
+                modelRef: "model://example/performance/delivery@v1",
+                modelLabel: "Canonical Ad Delivery",
+                entity: "line_delivery",
+                entityLabel: "Canonical Line Delivery",
+                selectedDimensions: [
+                    { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+                ],
+                selectedMeasures: [
+                    { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+                ],
+            },
+            binding: {
+                mode: "semantic",
+                modelRef: "model://example/performance/delivery@v1",
+                entity: "line_delivery",
+                selectedDimensions: ["event_date"],
+                selectedMeasures: ["available_impressions"],
+            },
+        },
+        reportSpec: {
+            version: 1,
+            kind: "reportSpec",
+            semanticSummary: {
+                kind: "semantic",
+                modelRef: "model://example/performance/delivery@v1",
+                entity: "line_delivery",
+                selectedDimensions: ["event_date"],
+                selectedMeasures: ["available_impressions"],
+            },
+        },
+    },
+});
+assert.deepEqual(staleCarriedImportFeedback.semanticBindingChips, [
+    "Model Canonical Ad Delivery",
+    "Entity Canonical Line Delivery",
+    "Dimensions Canonical Delivery Date",
+    "Measures Canonical Available Impressions",
+    "Categories Time",
+]);
+
+const staleCarriedSelectedGetFeedback = buildReportBuilderSelectedGetResponseFeedback({
+    response: {
+        version: 1,
+        kind: "getReportDocumentResponse",
+        reportRef: { reportId: "canonicalImportedDeliveryTrend" },
+        documentVersion: 12,
+        semanticBindingViewState: {
+            title: "Semantic Binding",
+            chips: [
+                "Model model://example/performance/delivery@v1",
+                "Measures available_impressions",
+            ],
+            fieldGroups: [
+                {
+                    id: "measures",
+                    title: "Selected measures (1)",
+                    fields: [
+                        {
+                            id: "available_impressions",
+                            rawId: "available_impressions",
+                            label: "available_impressions",
+                        },
+                    ],
+                },
+            ],
+        },
+        document: {
+            version: 1,
+            kind: "reportDocument",
+            id: "canonicalImportedDeliveryTrend",
+            title: "Canonical Imported Delivery Trend",
+            semanticSummary: {
+                kind: "semantic",
+                modelRef: "model://example/performance/delivery@v1",
+                modelLabel: "Canonical Ad Delivery",
+                entity: "line_delivery",
+                entityLabel: "Canonical Line Delivery",
+                selectedDimensions: [
+                    { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+                ],
+                selectedMeasures: [
+                    { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+                ],
+            },
+        },
+        reportSpec: {
+            version: 1,
+            kind: "reportSpec",
+            semanticSummary: {
+                kind: "semantic",
+                modelRef: "model://example/performance/delivery@v1",
+                entity: "line_delivery",
+                selectedDimensions: ["event_date"],
+                selectedMeasures: ["available_impressions"],
+            },
+        },
+        compileState: {
+            status: "clean",
+            diagnostics: [],
+        },
+    },
+});
+assert.deepEqual(staleCarriedSelectedGetFeedback.semanticBindingChips, [
+    "Model Canonical Ad Delivery",
+    "Entity Canonical Line Delivery",
+    "Dimensions Canonical Delivery Date",
+    "Measures Canonical Available Impressions",
+    "Categories Time",
+]);
+
 assert.deepEqual(buildReportBuilderListEntryCompatibilityFeedback({
     selectedEntry: {
         reportId: "capacityTrendImported",
@@ -1735,7 +1943,7 @@ assert.deepEqual(buildReportBuilderListEntryCompatibilityFeedback({
         semanticBindingTitle: "Semantic Binding",
         semanticBindingChips: ["Model Ad Delivery"],
         semanticBindingFieldGroups: [{ id: "dimensions", title: "Selected dimensions (1)", fields: [{ id: "event_date", label: "Delivery Date" }] }],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [{ id: "dateRange", label: "Reporting Window" }],
     },
@@ -1746,7 +1954,7 @@ assert.deepEqual(buildReportBuilderListEntryCompatibilityFeedback({
     semanticBindingTitle: "Semantic Binding",
     semanticBindingChips: ["Model Ad Delivery"],
     semanticBindingFieldGroups: [{ id: "dimensions", title: "Selected dimensions (1)", fields: [{ id: "event_date", label: "Delivery Date" }] }],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [{ id: "dateRange", label: "Reporting Window" }],
 });
@@ -1847,7 +2055,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -1947,7 +2155,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -2075,7 +2283,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range • Channels • Audience Segment",
     scopeSummaryItems: [
         {
@@ -2173,7 +2381,7 @@ assert.deepEqual(resolveCompactChartSheetNotice({
     modifiedTablePresetTitle: "Delivery Grid",
 }), {
     level: "warning",
-    message: "Modified from Delivery Grid. Use Quick view to restore the named table preset.",
+    message: "Modified from Delivery Grid. Use Presets to restore the named table preset.",
 });
 
 assert.equal(resolveCompactChartSheetNotice({

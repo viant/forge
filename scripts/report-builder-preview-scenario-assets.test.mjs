@@ -92,6 +92,58 @@ assert.equal(
   true,
 );
 
+// The scenario must seed the direct-series fixture and hand its list response straight to the
+// preview API rather than routing through the retired measure-pill/save-artifact draft-prep UI.
+assert.equal(
+  directSeriesExpressions.some((expression) => expression.includes("capacityDirectSeriesFixtureState.js") && expression.includes("buildCapacityDirectSeriesFixtureState")),
+  true,
+);
+assert.equal(
+  directSeriesExpressions.some((expression) => expression.includes("replacePreparedListReportDocumentsResponse") && expression.includes("capacityKpiBlendByDateQ3")),
+  true,
+);
+assert.equal(
+  directSeriesDraftExportScenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "") === "Selected entry: Capacity KPI Blend Q3"),
+  true,
+);
+assert.equal(
+  directSeriesDraftExportScenario.steps.some((step) => (
+    (step?.type === "clickSelectorContains" && String(step?.selector || "").includes("measure-pill"))
+    || (step?.type === "clickRole" && String(step?.name || "") === "Save artifact")
+    || (step?.type === "clickRole" && String(step?.name || "") === "Prepare report payload")
+  )),
+  false,
+);
+
+const directSeriesSeedFixtureIndex = directSeriesDraftExportScenario.steps.findIndex((step) => (
+  (step?.type === "eval" || step?.type === "waitForEval")
+  && String(step?.expression || "").includes("buildCapacityDirectSeriesFixtureState")
+  && String(step?.expression || "").includes("replaceSeededSavedReportPayloads")
+));
+const directSeriesReplaceListResponseIndex = directSeriesDraftExportScenario.steps.findIndex((step) => (
+  (step?.type === "eval" || step?.type === "waitForEval")
+  && String(step?.expression || "").includes("replacePreparedListReportDocumentsResponse")
+));
+const directSeriesSelectedEntryIndex = directSeriesDraftExportScenario.steps.findIndex((step) => (
+  step?.type === "waitForDomContains" && String(step.text || "") === "Selected entry: Capacity KPI Blend Q3"
+));
+const directSeriesPrepareGetRequestIndex = directSeriesDraftExportScenario.steps.findIndex((step) => (
+  step?.type === "clickRole" && step?.name === "Prepare get request"
+));
+const directSeriesReopenIndex = directSeriesDraftExportScenario.steps.findIndex((step) => (
+  step?.type === "clickRole" && step?.name === "Reopen in builder"
+));
+
+assert.notEqual(directSeriesSeedFixtureIndex, -1);
+assert.notEqual(directSeriesReplaceListResponseIndex, -1);
+assert.notEqual(directSeriesSelectedEntryIndex, -1);
+assert.notEqual(directSeriesPrepareGetRequestIndex, -1);
+assert.notEqual(directSeriesReopenIndex, -1);
+assert.equal(directSeriesSeedFixtureIndex < directSeriesReplaceListResponseIndex, true);
+assert.equal(directSeriesReplaceListResponseIndex < directSeriesSelectedEntryIndex, true);
+assert.equal(directSeriesSelectedEntryIndex < directSeriesPrepareGetRequestIndex, true);
+assert.equal(directSeriesPrepareGetRequestIndex < directSeriesReopenIndex, true);
+
 const importedSavedViewExpressions = importedSavedViewExportScenario.steps
   .filter((step) => step?.type === "eval" || step?.type === "waitForEval")
   .map((step) => String(step.expression || ""));

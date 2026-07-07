@@ -288,7 +288,7 @@ export function buildAuthoredDerivedCompactConfigState({
       chartSpec: null,
       orderField: normalizedOrderField,
       orderDir: normalizeString(orderDir) || "asc",
-      staticFilters: {
+      scopeParams: {
         dateRange: cloneValue(staticFilterDefault),
       },
       localCalculatedFields: [normalizedCalculatedField],

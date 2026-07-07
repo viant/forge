@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useSignalEffect } from "@preact/signals-react";
+import { Icon } from "@blueprintjs/core";
 
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { resolveKey } from "../../utils/selector.js";
@@ -7,6 +8,12 @@ import { resolveTableLink } from "../../utils/tableLink.js";
 import { getDashboardFilterSignal, getDashboardSelectionSignal } from "../../core/store/signals.js";
 import { matchingRules, mergeClassNames, mergeStyles, normalizeRuleList } from "../table/formattingRules.js";
 import { applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, publishDashboardSelection } from "./dashboardUtils.js";
+import {
+    resolveDashboardRowActionIdentity,
+    resolveDashboardRowActionKey,
+    resolveDashboardRowActionPresentation,
+    resolveDashboardRowActionVisibleLabel,
+} from "./dashboardRowActionPresentation.js";
 import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
 import { buildReportTableRuntimeColumns } from "./reportTableCellVisuals.js";
 import { renderDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
@@ -43,6 +50,7 @@ export default function DashboardTableContent({
     const quickFilterEnabled = container.dashboard?.table?.quickFilter === true || container.quickFilter === true;
     const density = container.dashboard?.table?.density || container.density || "comfortable";
     const rowActions = container.dashboard?.table?.rowActions || container.rowActions || [];
+    const rowActionDisplayMode = container.dashboard?.table?.rowActionDisplay || container.rowActionDisplay || "compact";
     const formattingRules = useMemo(
         () => normalizeRuleList(container.dashboard?.table?.formattingRules || container.dashboard?.table?.formatting || container.formattingRules || []),
         [container.dashboard?.table?.formattingRules, container.dashboard?.table?.formatting, container.formattingRules]
@@ -143,7 +151,7 @@ export default function DashboardTableContent({
         <>
             {loading ? <div style={subtitleStyle}>Loading…</div> : null}
             {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
-            {!loading && sortedRows.length === 0 ? <div style={subtitleStyle}>No data.</div> : null}
+            {!loading && !error && sortedRows.length === 0 ? <div style={subtitleStyle}>No data.</div> : null}
             {quickFilterEnabled ? (
                 <div className="forge-dashboard-table-tools">
                     <input
@@ -174,7 +182,16 @@ export default function DashboardTableContent({
                                     </th>
                                 );
                             })}
-                            {rowActions.length > 0 ? <th style={{textAlign: 'right'}}>Actions</th> : null}
+                            {rowActions.length > 0 ? (
+                                <th className="forge-dashboard-table__actions-head" style={{textAlign: 'right'}}>
+                                    <span className="forge-dashboard-table__actions-head-inner">
+                                        <span className="forge-dashboard-table__actions-head-icon" aria-hidden="true">
+                                            <Icon icon="widget-button" size={12} />
+                                        </span>
+                                        <span>Actions</span>
+                                    </span>
+                                </th>
+                            ) : null}
                         </tr>
                         </thead>
                         <tbody>
@@ -196,18 +213,56 @@ export default function DashboardTableContent({
                                         );
                                     })}
                                     {rowActions.length > 0 ? (
-                                        <td style={{textAlign: 'right'}}>
-                                            <div style={{display: 'inline-flex', gap: 6}}>
-                                                {rowActions.map((action) => (
+                                        <td className="forge-dashboard-table__actions-cell" style={{textAlign: 'right'}}>
+                                            <div
+                                                className={[
+                                                    "forge-dashboard-row-actions",
+                                                    rowActionDisplayMode === "compact" ? "forge-dashboard-row-actions--compact" : "",
+                                                ].filter(Boolean).join(" ")}
+                                            >
+                                                {rowActions.map((action, actionIndex) => {
+                                                    const presentation = resolveDashboardRowActionPresentation(action);
+                                                    const label = action?.label == null
+                                                        ? (action?.id == null ? 'Action' : String(action.id).trim() || 'Action')
+                                                        : (String(action.label).trim() || 'Action');
+                                                    const visibleLabel = resolveDashboardRowActionVisibleLabel(action, {
+                                                        displayMode: rowActionDisplayMode,
+                                                    });
+                                                    const iconOnly = !visibleLabel;
+                                                    return (
                                                     <button
-                                                        key={action.id || action.label}
+                                                        key={resolveDashboardRowActionKey(action, actionIndex)}
                                                         type="button"
-                                                        className="forge-dashboard-row-action"
+                                                        className={[
+                                                            'forge-dashboard-row-action',
+                                                            rowActionDisplayMode === 'compact' ? 'forge-dashboard-row-action--compact' : '',
+                                                            iconOnly ? 'forge-dashboard-row-action--icon-only' : '',
+                                                            presentation.className,
+                                                        ].filter(Boolean).join(' ')}
+                                                        data-testid="report-runtime-row-action"
+                                                        data-action-id={resolveDashboardRowActionIdentity(action)}
+                                                        data-action-kind={presentation.kind}
+                                                        data-action-display={rowActionDisplayMode}
+                                                        aria-label={label}
+                                                        title={label}
                                                         onClick={() => handleRowAction(action, row, index)}
                                                     >
-                                                        {action.label || action.id || 'Action'}
+                                                        <span className="forge-dashboard-row-action__icon" aria-hidden="true">
+                                                            <Icon icon={presentation.icon} size={12} />
+                                                        </span>
+                                                        {visibleLabel ? (
+                                                            <span
+                                                                className="forge-dashboard-row-action__label"
+                                                            >
+                                                                {visibleLabel}
+                                                            </span>
+                                                        ) : null}
+                                                        <span className="forge-dashboard-row-action__sr-label">
+                                                            {label}
+                                                        </span>
                                                     </button>
-                                                ))}
+                                                );
+                                                })}
                                             </div>
                                         </td>
                                     ) : null}

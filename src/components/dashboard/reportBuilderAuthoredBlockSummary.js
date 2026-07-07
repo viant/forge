@@ -179,7 +179,7 @@ function summarizeGeoMapBlock(block = {}) {
 }
 
 function summarizeFilterBarBlock(block = {}, options = {}) {
-    const title = resolveSummaryTitle(block, "Report Scope");
+    const title = resolveSummaryTitle(block, "Filters");
     const labelLookup = resolveParamLabelLookup(options?.scopeParamOptions);
     const paramIds = normalizeStringArray(block?.paramIds);
     const paramLabels = paramIds.map((paramId) => labelLookup.get(paramId) || paramId);
@@ -190,8 +190,8 @@ function summarizeFilterBarBlock(block = {}, options = {}) {
         paramIds,
         paramLabels,
         summary: paramIds.length > 0
-            ? `${pluralize(paramIds.length, "shared scope parameter")}: ${formatList(paramLabels)}`
-            : "No shared scope parameters",
+            ? `${pluralize(paramIds.length, "report filter")}: ${formatList(paramLabels)}`
+            : "No report filters",
     };
 }
 

@@ -1,4 +1,5 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildClearSemanticValidationBehaviorsStep,
   buildPreviewBootstrapSteps,
   buildReopenedHydratedSessionVerificationSteps,
@@ -96,6 +97,10 @@ export default {
       text: "Retry validation",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Channel",
+      measureText: "Measures Available Impressions, Household Uniques",
+    }),
     {
       type: "waitForEval",
       expression: "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.activeTablePreset?.title === 'Inventory Ladder' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions[0] === 'channelV2' && !window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession",
@@ -117,6 +122,10 @@ export default {
       expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return !text.includes('Semantic validation: Semantic provider unavailable.') && !text.includes('Retry validation') && text.includes('Showing Inventory Ladder.'); })()",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Channel",
+      measureText: "Measures Available Impressions, Household Uniques",
+    }),
     {
       type: "waitForEval",
       expression: "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.activeTablePreset?.title === 'Inventory Ladder' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.length === 1 && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions[0] === 'channelV2' && !window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession",

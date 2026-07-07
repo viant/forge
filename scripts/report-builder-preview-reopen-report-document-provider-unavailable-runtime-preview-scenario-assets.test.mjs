@@ -27,7 +27,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("[aria-label=\"Authored runtime preview\"]") && expression.includes("!text.includes('Model Ad Delivery')") && expression.includes("!text.includes('Entity Line Delivery')") && expression.includes("!retryButton")),
+  expressions.some((expression) => expression.includes('[aria-label=\\"Authored runtime preview\\"]') && expression.includes("!semanticBinding") && expression.includes("!scopeSummary") && expression.includes('!text.includes("Model Ad Delivery")') && expression.includes('!text.includes("Entity Line Delivery")') && expression.includes('!text.includes("Dimensions Delivery Date, Channel")') && expression.includes('!text.includes("Measures Available Impressions")') && expression.includes("Retry model load")),
   true,
 );
 assert.equal(
@@ -47,7 +47,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("[aria-label=\"Authored runtime preview\"]") && expression.includes("text.includes('Model Ad Delivery')") && expression.includes("text.includes('Entity Line Delivery')") && expression.includes("text.includes('Dimensions Delivery Date, Channel')") && expression.includes("text.includes('Measures Available Impressions')")),
+  expressions.some((expression) => expression.includes('[aria-label=\\"Authored runtime preview\\"]') && expression.includes('data-report-builder-semantic-binding="true"') && expression.includes('data-report-builder-scope-summary="true"') && expression.includes('text.includes("Dimensions Delivery Date, Channel")') && expression.includes('text.includes("Measures Available Impressions")') && expression.includes('text.includes("Filters")')),
   true,
 );
 assert.equal(
@@ -59,11 +59,16 @@ const selectedTrendIndex = findStepIndex((step) => step?.type === "waitForDomCon
 const reopenIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Reopen in builder");
 const providerUnavailableIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("setSemanticModelProviderAvailable(false)"));
 const unavailableVisibleIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Semantic model unavailable: Semantic binding is active, but no semantic model provider is available in the current runtime context."));
-const noFallbackMetadataIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("!text.includes('Model Ad Delivery')"));
+const noFallbackMetadataIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes('!text.includes("Model Ad Delivery")') && String(step?.expression || "").includes("!semanticBinding") && String(step?.expression || "").includes("!scopeSummary") && String(step?.expression || "").includes("Retry model load"));
 const providerRestoredIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("setSemanticModelProviderAvailable(true)"));
 const modelReloadedIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("__providerUnavailableBeforeRestore"));
 const recoveredBindingIndex = scenario.steps.findIndex((step, index) => index > modelReloadedIndex && step?.type === "waitForDomContains" && String(step?.text || "").includes("Semantic binding: Ad Delivery • Entity: Line Delivery"));
-const recoveredRuntimeMetadataIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("text.includes('Model Ad Delivery')") && String(step?.expression || "").includes("text.includes('Measures Available Impressions')"));
+const recoveredRuntimeMetadataIndex = findStepIndex((step) => step?.type === "waitForEval"
+  && String(step?.expression || "").includes('text.includes("Measures Available Impressions")')
+  && String(step?.expression || "").includes('text.includes("Dimensions Delivery Date, Channel")')
+  && String(step?.expression || "").includes('text.includes("Filters")')
+  && String(step?.expression || "").includes("!!semanticBinding")
+  && String(step?.expression || "").includes("!!scopeSummary"));
 
 assert.notEqual(selectedTrendIndex, -1);
 assert.notEqual(reopenIndex, -1);

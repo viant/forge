@@ -67,4 +67,16 @@ assert.equal(
   "ReportBuilder should surface detail-target draft validation errors inline.",
 );
 
+assert.equal(
+  source.includes("<span>Published target</span>"),
+  true,
+  "ReportBuilder should present published target selection ahead of raw target refs.",
+);
+
+assert.equal(
+  source.includes("<span>Advanced target reference</span>"),
+  true,
+  "ReportBuilder should keep manual target references as an advanced fallback only.",
+);
+
 console.log("reportBuilderDetailTargetCoverage ✓ ReportBuilder wires shared detail-target draft helpers and validation into the authoring UI");

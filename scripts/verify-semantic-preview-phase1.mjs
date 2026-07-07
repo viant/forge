@@ -59,11 +59,27 @@ const verificationSteps = [
     args: ["--no-warnings", "scripts/report-builder-preview-scenarios.test.mjs"],
   },
   {
+    label: "semantic runtime path structural suite",
+    command: process.execPath,
+    args: ["--no-warnings", "scripts/run-authored-runtime-unit-tests.mjs"],
+  },
+  {
     label: "self-hosted preview smoke",
     command: "npm",
     args: ["run", "smoke:report-builder-preview:ci"],
   },
 ];
+
+export function buildPhase1SemanticVerificationSteps({
+  skipBrowserSmoke = false,
+} = {}) {
+  return verificationSteps.filter((step) => {
+    if (skipBrowserSmoke !== true) {
+      return true;
+    }
+    return step.label !== "self-hosted preview smoke";
+  });
+}
 
 function runStep(step) {
   return new Promise((resolve, reject) => {
@@ -86,14 +102,21 @@ function runStep(step) {
 }
 
 async function main() {
+  const skipBrowserSmoke = process.argv.slice(2).includes("--skip-browser-smoke");
+  const activeSteps = buildPhase1SemanticVerificationSteps({
+    skipBrowserSmoke,
+  });
   console.log("Phase 1 semantic preview verification");
   console.log("");
-  for (const step of verificationSteps) {
+  if (skipBrowserSmoke) {
+    console.log("Browser smoke skipped for this run.");
+  }
+  for (const step of activeSteps) {
     console.log(`Running: ${step.label}`);
     await runStep(step);
   }
   console.log("");
-  console.log(`Phase 1 semantic preview verification complete: ${verificationSteps.length}/${verificationSteps.length} passed`);
+  console.log(`Phase 1 semantic preview verification complete: ${activeSteps.length}/${activeSteps.length} passed`);
 }
 
 main().catch((error) => {

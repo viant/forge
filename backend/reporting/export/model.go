@@ -35,6 +35,7 @@ type ReportExportRequest struct {
 	ReportSpec  json.RawMessage `json:"reportSpec"`
 	ReportFill  json.RawMessage `json:"reportFill"`
 	ReportPrint json.RawMessage `json:"reportPrint,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
 
 	reportSpecValue  *reportspec.ReportSpec
 	reportFillValue  *reportfill.ReportFill
@@ -64,6 +65,7 @@ type rawReportExportRequest struct {
 	ReportSpec  json.RawMessage `json:"reportSpec"`
 	ReportFill  json.RawMessage `json:"reportFill"`
 	ReportPrint json.RawMessage `json:"reportPrint,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
 func DecodeJSON(data []byte) (*ReportExportRequest, error) {
@@ -84,6 +86,7 @@ func DecodeJSON(data []byte) (*ReportExportRequest, error) {
 		ReportSpec:  raw.ReportSpec,
 		ReportFill:  raw.ReportFill,
 		ReportPrint: raw.ReportPrint,
+		Metadata:    raw.Metadata,
 	}
 	if err := request.Validate(); err != nil {
 		return nil, err

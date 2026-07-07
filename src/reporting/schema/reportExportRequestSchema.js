@@ -44,5 +44,6 @@ export const reportExportRequestSchema = {
     reportSpec: { type: "object" },
     reportFill: { type: "object" },
     reportPrint: { type: "object" },
+    metadata: { type: "object" },
   },
 };

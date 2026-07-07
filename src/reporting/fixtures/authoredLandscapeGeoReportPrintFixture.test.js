@@ -53,7 +53,7 @@ const state = {
   viewMode: "table",
   orderField: "stateCode",
   orderDir: "asc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
   reportDocumentLayout: {

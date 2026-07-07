@@ -43,15 +43,25 @@ export function buildPendingReportRuntimePreviewRowsState({
   fingerprint = "",
   requestKey = "",
   currentState = {},
+  seedRows = null,
+  seedHasMore = false,
 } = {}) {
+  // Retain the previously fetched rows across a fingerprint change (e.g. a drill)
+  // so the UI can render a stale-while-revalidate "updating" state instead of
+  // collapsing to empty while the new request is in flight. On the very first
+  // transition into fetch mode (e.g. the first drill out of a resolved-collection
+  // preview) there is no prior fetched state yet, so fall back to the caller-supplied
+  // seed rows (the previously visible resolved-collection rows) instead of losing them.
   const normalizedCurrentState = normalizeReportRuntimePreviewRowsState(currentState);
   const normalizedFingerprint = normalizeString(fingerprint);
   const normalizedRequestKey = normalizeString(requestKey);
+  const hasPriorFetchedState = !!normalizedCurrentState.fingerprint || normalizedCurrentState.rows.length > 0;
+  const normalizedSeedRows = Array.isArray(seedRows) ? seedRows.map((row) => cloneValue(row)) : [];
   return {
     fingerprint: normalizedFingerprint,
     requestKey: normalizedRequestKey,
-    rows: normalizedCurrentState.fingerprint === normalizedFingerprint ? normalizedCurrentState.rows : [],
-    hasMore: normalizedCurrentState.fingerprint === normalizedFingerprint ? normalizedCurrentState.hasMore : false,
+    rows: hasPriorFetchedState ? normalizedCurrentState.rows : normalizedSeedRows,
+    hasMore: hasPriorFetchedState ? normalizedCurrentState.hasMore : (seedHasMore === true),
     loading: true,
     error: null,
   };
@@ -117,6 +127,8 @@ export function resolveReportRuntimePreviewRowsStateTransition({
   fetchAvailable = false,
   currentState = {},
   unavailableError = null,
+  seedRows = null,
+  seedHasMore = false,
 } = {}) {
   const normalizedCurrentState = normalizeReportRuntimePreviewRowsState(currentState);
   const normalizedFingerprint = normalizeString(fingerprint);
@@ -177,6 +189,8 @@ export function resolveReportRuntimePreviewRowsStateTransition({
       fingerprint: normalizedFingerprint,
       requestKey: normalizedRequestKey,
       currentState: normalizedCurrentState,
+      seedRows,
+      seedHasMore,
     }),
   };
 }

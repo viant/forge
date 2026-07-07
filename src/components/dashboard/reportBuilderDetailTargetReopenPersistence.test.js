@@ -84,7 +84,7 @@ const savedPayload = buildReportBuilderSavedReportPayloadFromBuilderState({
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",

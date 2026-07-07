@@ -235,6 +235,38 @@ assert.deepEqual(await provider.listAvailableRefinements("tableBlock", "country"
     { id: "drill:country:metrocode", label: "Drill to Metro Area", kind: "drill", nextFieldRef: "metrocode" },
   ],
 });
+
+const duplicateDrillProvider = createReportBuilderDrillMetadataProvider({
+  drillMetadata: {
+    hierarchies: [
+      {
+        id: "performance_inventory",
+        levels: [
+          { field: "channelId", label: "Channel" },
+          { field: "publisherId", label: "Publisher" },
+        ],
+      },
+    ],
+    fieldActions: [
+      {
+        fieldRef: "channelId",
+        actions: [
+          { id: "drill_publisher", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisherId" },
+          { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://demo/channel-detail" },
+        ],
+      },
+    ],
+  },
+});
+
+assert.deepEqual(await duplicateDrillProvider.listAvailableRefinements("tableBlock", "channelId"), {
+  actions: [
+    { id: "keep:channelId", label: "Keep only", kind: "keep" },
+    { id: "exclude:channelId", label: "Exclude", kind: "exclude" },
+    { id: "drill_publisher", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisherId" },
+    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://demo/channel-detail" },
+  ],
+});
 assert.equal(await provider.getDrillHierarchy("missing"), null);
 
 console.log("reportBuilderDrillMetadata ✓ builds config-backed drill provider contracts from report builder metadata");

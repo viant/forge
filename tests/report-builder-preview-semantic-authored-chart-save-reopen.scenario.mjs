@@ -1,4 +1,5 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildPreviewBootstrapSteps,
   buildReopenedHydratedSessionVerificationSteps,
 } from "./report-builder-preview-scenario-builders.mjs";
@@ -126,6 +127,11 @@ export default {
       reportTitle: "Report Builder Demo",
       reportId: "demoReportBuilder",
       documentVersion: 11,
+    }),
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date, Channel",
+      measureText: "Measures Available Impressions",
+      extraTexts: ["Semantic binding: Ad Delivery • Entity: Line Delivery"],
     }),
     {
       type: "waitForEval",

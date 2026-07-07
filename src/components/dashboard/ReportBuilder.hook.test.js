@@ -81,6 +81,48 @@ assert.equal(
     directHandler,
 );
 
+const strippedHandlerCalls = [];
+const strippedHandler = () => "ok";
+const strippedContext = {
+    metadata: { namespace: "Performance Metrics" },
+    lookupHandler(name) {
+        strippedHandlerCalls.push(name);
+        if (name === "stewardReportBuilder.buildRequest") {
+            return strippedHandler;
+        }
+        throw new Error(`missing ${name}`);
+    },
+};
+assert.equal(
+    resolveReportBuilderHookHandler(strippedContext, "Performance Metrics.stewardReportBuilder.buildRequest"),
+    strippedHandler,
+);
+assert.deepEqual(strippedHandlerCalls, [
+    "Performance Metrics.stewardReportBuilder.buildRequest",
+    "stewardReportBuilder.buildRequest",
+]);
+
+const suffixFallbackCalls = [];
+const suffixFallbackHandler = () => "ok";
+const suffixFallbackContext = {
+    metadata: {},
+    lookupHandler(name) {
+        suffixFallbackCalls.push(name);
+        if (name === "stewardReportBuilder.buildRequest") {
+            return suffixFallbackHandler;
+        }
+        throw new Error(`missing ${name}`);
+    },
+};
+assert.equal(
+    resolveReportBuilderHookHandler(suffixFallbackContext, "Performance Metrics.stewardReportBuilder.buildRequest"),
+    suffixFallbackHandler,
+);
+assert.deepEqual(suffixFallbackCalls, [
+    "Performance Metrics.stewardReportBuilder.buildRequest",
+    "stewardReportBuilder.buildRequest",
+]);
+
 const stateHookContext = {
     metadata: { namespace: "Performance Metrics" },
     lookupHandler(name) {
@@ -222,7 +264,7 @@ assert.deepEqual(
     resolveReportBuilderLookupDescriptor(
         lookupContext,
         { hooks: { resolveLookup: "Capacity.capacityBuilder.resolveLookup" } },
-        { staticFilters: { channelIds: [1] } },
+        { scopeParams: { channelIds: [1] } },
         { id: "include" },
         {
             id: "includeUserPools",
@@ -345,6 +387,64 @@ assert.deepEqual(
             parameters: {
                 Field: "SITE_TYPE",
             },
+            resolveInput: "Body.treeLookupParam.filter.filter",
+            rowId: "row_1",
+            selectionIndex: 0,
+            value: "123",
+        },
+    ],
+);
+
+// raw canonical predicate config yields the same hydration jobs as the
+// equivalent lowered dynamicFilterGroups declaration
+assert.deepEqual(
+    buildLookupHydrationJobs(
+        inferredResolveInputContext,
+        {
+            predicates: [
+                {
+                    id: "siteType",
+                    label: "Site Type",
+                    dialogId: "targetingTreePicker",
+                    valueSelector: "value",
+                    labelSelector: "label",
+                    include: { filterId: "includeSiteType" },
+                },
+            ],
+        },
+        {
+            dynamicGroups: {
+                include: [
+                    {
+                        id: "row_1",
+                        filterId: "includeSiteType",
+                        selections: [
+                            { value: "123", label: "123" },
+                        ],
+                    },
+                ],
+            },
+        },
+        () => ({
+            dialogId: "targetingTreePicker",
+            parameters: {
+                Field: "SITE_TYPE",
+            },
+        }),
+    ).map((job) => ({
+        dataSourceRef: job.dataSourceRef,
+        filterId: job.filterDef?.id,
+        groupId: job.groupId,
+        resolveInput: job.resolveInput,
+        rowId: job.rowId,
+        selectionIndex: job.selectionIndex,
+        value: job.value,
+    })),
+    [
+        {
+            dataSourceRef: "targeting_tree_lookup",
+            filterId: "includeSiteType",
+            groupId: "include",
             resolveInput: "Body.treeLookupParam.filter.filter",
             rowId: "row_1",
             selectionIndex: 0,

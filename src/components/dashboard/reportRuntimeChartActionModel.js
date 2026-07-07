@@ -77,6 +77,22 @@ export function formatRefinementActionLabel(actionKind = "", fieldLabel = "") {
   return `${normalizedKind || "Action"} ${normalizedLabel}`.trim();
 }
 
+export function resolveRuntimeActionLabel(actionKind = "", providedLabel = "", fieldLabel = "") {
+  const normalizedKind = normalizeString(actionKind).toLowerCase();
+  const normalizedProvidedLabel = normalizeString(providedLabel);
+  if (normalizedKind === "keep") {
+    if (!normalizedProvidedLabel || /^(keep|keep only)$/i.test(normalizedProvidedLabel)) {
+      return formatRefinementActionLabel("keep", fieldLabel);
+    }
+  }
+  if (normalizedKind === "exclude") {
+    if (!normalizedProvidedLabel || /^exclude$/i.test(normalizedProvidedLabel)) {
+      return formatRefinementActionLabel("exclude", fieldLabel);
+    }
+  }
+  return normalizedProvidedLabel || formatRefinementActionLabel(actionKind, fieldLabel);
+}
+
 export function resolveReportRuntimeChartSelectionSummary({
   blockTitle = "",
   selection = null,
@@ -137,7 +153,7 @@ export function buildReportRuntimeChartActionDescriptors({
             : `${kindName}:${normalizeString(blockId)}:${normalizeString(field?.valueKey)}`,
           kind: kindName,
           fieldValueKey: normalizeString(field?.valueKey),
-          label: normalizeString(metadataAction?.label || formatRefinementActionLabel(kindName, field?.label)),
+          label: resolveRuntimeActionLabel(kindName, metadataAction?.label, field?.label),
           value,
           displayValue,
         });

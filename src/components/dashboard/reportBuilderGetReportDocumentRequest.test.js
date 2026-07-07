@@ -162,7 +162,7 @@ assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary(request, {
         title: "Capacity Q3",
         subtitle: "Inventory Ladder",
         description: "Selected request metadata.",
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -199,7 +199,7 @@ assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary(request, {
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -264,6 +264,140 @@ assert.deepEqual(buildReportBuilderGetReportDocumentRequestSummary(request, {
     ],
 });
 
+const staleCarriedRequestSummary = buildReportBuilderGetReportDocumentRequestSummary(request, {
+    metadata: {
+        title: "Capacity Q3",
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions" },
+            ],
+        },
+        semanticBindingTitle: "Semantic Binding",
+        semanticBindingChips: [
+            "Model model://example/performance/delivery@v1",
+            "Measures available_impressions",
+        ],
+        semanticBindingFieldGroups: [
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "available_impressions",
+                        label: "available_impressions",
+                    },
+                ],
+            },
+        ],
+    },
+});
+assert.deepEqual(staleCarriedRequestSummary.semanticBindingChips, [
+    "Model Canonical Ad Delivery",
+    "Entity Canonical Line Delivery",
+    "Dimensions Canonical Delivery Date",
+    "Measures Canonical Available Impressions",
+]);
+assert.deepEqual(staleCarriedRequestSummary.semanticBindingFieldGroups, [
+    {
+        id: "dimensions",
+        title: "Selected dimensions (1)",
+        fields: [
+            { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date" },
+        ],
+    },
+    {
+        id: "measures",
+        title: "Selected measures (1)",
+        fields: [
+            { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions" },
+        ],
+    },
+]);
+
+const richerCarriedRequestSummary = buildReportBuilderGetReportDocumentRequestSummary(request, {
+    metadata: {
+        title: "Capacity Q3",
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions" },
+            ],
+        },
+        semanticBindingTitle: "Semantic Binding",
+        modelLabel: "Carried Ad Delivery",
+        entityLabel: "Carried Line Delivery",
+        semanticBindingChips: [
+            "Model Carried Ad Delivery",
+            "Entity Carried Line Delivery",
+            "Dimensions Carried Delivery Date",
+            "Measures Carried Available Impressions",
+        ],
+        semanticBindingFieldGroups: [
+            {
+                id: "dimensions",
+                title: "Selected dimensions (1)",
+                fields: [
+                    {
+                        id: "event_date",
+                        rawId: "eventDate",
+                        label: "Carried Delivery Date",
+                        category: "Time",
+                        definitionRef: "semantic://example/event_date",
+                    },
+                ],
+            },
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "avails",
+                        label: "Carried Available Impressions",
+                        definitionRef: "semantic://example/available_impressions",
+                    },
+                ],
+            },
+            {
+                id: "parameters",
+                title: "Selected parameters (1)",
+                fields: [
+                    {
+                        id: "reporting_window",
+                        rawId: "dateRange",
+                        label: "Carried Reporting Window",
+                        category: "Scope",
+                        definitionRef: "semantic://example/reporting_window",
+                        description: "Carried reporting window",
+                    },
+                ],
+            },
+        ],
+    },
+});
+assert.deepEqual(richerCarriedRequestSummary.semanticBindingChips, [
+    "Model Carried Ad Delivery",
+    "Entity Carried Line Delivery",
+    "Dimensions Carried Delivery Date",
+    "Measures Carried Available Impressions",
+]);
+
 assert.match(
     serializeReportBuilderGetReportDocumentRequest(request),
     /"kind": "getReportDocumentRequest"/,
@@ -274,7 +408,7 @@ assert.deepEqual(buildReportBuilderGetReportDocumentRequestInspectorState(reques
         title: "Capacity Q3",
         subtitle: "Inventory Ladder",
         description: "Selected request metadata.",
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -311,7 +445,7 @@ assert.deepEqual(buildReportBuilderGetReportDocumentRequestInspectorState(reques
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -455,7 +589,7 @@ const embeddedMetadataContext = {
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",

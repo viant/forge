@@ -1,4 +1,5 @@
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
+import { buildReportLayoutItem } from "../../reporting/reportLayoutModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -20,22 +21,13 @@ function formatList(values = []) {
     .join(", ");
 }
 
-function normalizeLayoutItemSize(value = "") {
-  return normalizeString(value).toLowerCase() === "half" ? "half" : "";
-}
-
 function normalizeLayoutItem(item = null) {
   if (!item || typeof item !== "object" || Array.isArray(item)) {
     return null;
   }
-  const blockId = normalizeString(item?.blockId);
-  if (!blockId) {
-    return null;
-  }
-  const size = normalizeLayoutItemSize(item?.size);
-  return size
-    ? { blockId, size }
-    : { blockId };
+  return buildReportLayoutItem(item?.blockId, item, {
+    preserveLegacyHalf: true,
+  });
 }
 
 function isPlainObject(value = null) {
@@ -201,7 +193,7 @@ function resolveReportRuntimeFieldColumn(reportSpec = {}, datasetRef = "", field
   return null;
 }
 
-function resolveReportRuntimeFieldLabel(reportSpec = {}, datasetRef = "", fieldKey = "", fallbackLabel = "") {
+export function resolveReportRuntimeFieldLabel(reportSpec = {}, datasetRef = "", fieldKey = "", fallbackLabel = "") {
   const matchingColumn = resolveReportRuntimeFieldColumn(reportSpec, datasetRef, fieldKey);
   if (matchingColumn) {
     return normalizeString(matchingColumn?.label || fallbackLabel || fieldKey);
@@ -429,6 +421,47 @@ export function resolveReportRuntimeBindingSummaryChips(bindingSummary = null) {
   ].filter(Boolean);
 }
 
+export function resolveReportRuntimeCompactBindingSummaryChips(bindingSummary = null) {
+  if (!bindingSummary || typeof bindingSummary !== "object" || Array.isArray(bindingSummary)) {
+    return [];
+  }
+  const summarizeSelectedLabels = (title, fields = [], count = 0) => {
+    const labels = (Array.isArray(fields) ? fields : [])
+      .map((field) => normalizeString(field?.label))
+      .filter(Boolean);
+    if (labels.length === 0) {
+      const normalizedTitle = normalizeString(title).toLowerCase();
+      if (normalizedTitle === "dimensions") {
+        return `${Number(count || 0)} dimensions`;
+      }
+      if (normalizedTitle === "measures") {
+        return `${Number(count || 0)} measures`;
+      }
+      if (normalizedTitle === "parameters") {
+        return `${Number(count || 0)} parameters`;
+      }
+      return `${Number(count || 0)} ${normalizedTitle}`;
+    }
+    if (labels.length <= 2) {
+      return `${title} ${labels.join(", ")}`;
+    }
+    return `${title} ${labels.slice(0, 2).join(", ")} +${labels.length - 2}`;
+  };
+  return [
+    normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)
+      ? `Model ${normalizeString(bindingSummary.modelLabel || bindingSummary.modelRef)}`
+      : "",
+    normalizeString(bindingSummary.entityLabel || bindingSummary.entity)
+      ? `Entity ${normalizeString(bindingSummary.entityLabel || bindingSummary.entity)}`
+      : "",
+    summarizeSelectedLabels("Dimensions", bindingSummary.selectedDimensions, bindingSummary.dimensionCount),
+    summarizeSelectedLabels("Measures", bindingSummary.selectedMeasures, bindingSummary.measureCount),
+    Number(bindingSummary.parameterCount || 0) > 0
+      ? summarizeSelectedLabels("Parameters", bindingSummary.selectedParameters, bindingSummary.parameterCount)
+      : "",
+  ].filter(Boolean);
+}
+
 export function resolveReportRuntimeScopeSummary(reportSpecOrContext = {}, reportDocument = null) {
   const metadataContext = resolveReportRuntimeMetadataContext(reportSpecOrContext, reportDocument);
   const params = normalizeScopeParams(metadataContext?.scopeParams);
@@ -436,7 +469,7 @@ export function resolveReportRuntimeScopeSummary(reportSpecOrContext = {}, repor
     return null;
   }
   return {
-    title: "Report Scope",
+    title: "Filters",
     paramCount: params.length,
     params,
   };
@@ -466,6 +499,9 @@ export function resolveReportRuntimeRefinementFields(reportSpec = {}, block = {}
         displayValueKey,
         label: normalizeString(column?.label || valueKey),
         runtimeFilterable: column?.runtimeFilterable === true,
+        ...(column?.displayValueMap && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap)
+          ? { displayValueMap: cloneValue(column.displayValueMap) }
+          : {}),
       };
     })
     .filter(Boolean);
@@ -577,4 +613,23 @@ export function formatReportRuntimeRefinement(refinement = {}) {
   }[op] || op || "Refinement";
   const fieldText = normalizeString(refinement?.fieldLabel) || field || "field";
   return values ? `${opLabel}: ${fieldText} = ${values}` : `${opLabel}: ${fieldText}`;
+}
+
+export function resolveReportRuntimeActiveScopeSummary(refinements = []) {
+  const items = (Array.isArray(refinements) ? refinements : [])
+    .filter((refinement) => refinement && typeof refinement === "object" && !Array.isArray(refinement))
+    .map((refinement, index) => ({
+      id: normalizeString(refinement?.id) || `refinement:${index}`,
+      label: formatReportRuntimeRefinement(refinement),
+    }))
+    .filter((item) => !!item.label);
+  if (items.length === 0) {
+    return null;
+  }
+  return {
+    title: "Active Refinements",
+    description: "Keep, exclude, and drill actions applied on top of the baseline scope above, for this session only.",
+    count: items.length,
+    items,
+  };
 }

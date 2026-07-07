@@ -9,6 +9,13 @@ import {
     validateSemanticModel,
 } from "../../semantic/modelValidation.js";
 import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGovernanceView.js";
+import {
+    resolveReportBuilderScopeParamFilters,
+} from "./reportBuilderPredicates.js";
+import {
+    getScopeParamValue,
+    resolveScopeParamId,
+} from "../../reporting/scopeStateModel.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -50,12 +57,12 @@ function semanticSelectableMeasureFields(config = {}) {
 }
 
 function semanticSelectableParameterFields(config = {}) {
-    return (Array.isArray(config?.staticFilters) ? config.staticFilters : [])
+    return resolveReportBuilderScopeParamFilters(config)
         .filter((field) => !!semanticFieldId(field));
 }
 
 function semanticDiagnosableParameterFields(config = {}) {
-    return (Array.isArray(config?.staticFilters) ? config.staticFilters : [])
+    return resolveReportBuilderScopeParamFilters(config)
         .filter((field) => !!field && typeof field === "object" && !Array.isArray(field))
         .filter((field) => Object.prototype.hasOwnProperty.call(field, "semanticRef"));
 }
@@ -139,12 +146,12 @@ function cloneValue(value = null) {
 function buildSemanticSelectionParameters(config = {}, state = {}) {
     const next = {};
     semanticSelectableParameterFields(config).forEach((field) => {
-        const rawId = normalizeString(field?.id || field?.field);
+        const rawId = resolveScopeParamId(field);
         const semanticRef = semanticFieldId(field);
         if (!rawId || !semanticRef) {
             return;
         }
-        const value = state?.staticFilters?.[rawId];
+        const value = getScopeParamValue(state, rawId);
         if (!hasConfiguredSemanticParameterValue(field, value)) {
             return;
         }
@@ -156,13 +163,13 @@ function buildSemanticSelectionParameters(config = {}, state = {}) {
 function resolveSelectedSemanticParameterIds(config = {}, state = {}) {
     return semanticDiagnosableParameterFields(config)
         .filter((field) => {
-            const rawId = normalizeString(field?.id || field?.field);
+            const rawId = resolveScopeParamId(field);
             if (!rawId) {
                 return false;
             }
-            return hasConfiguredSemanticParameterValue(field, state?.staticFilters?.[rawId]);
+            return hasConfiguredSemanticParameterValue(field, getScopeParamValue(state, rawId));
         })
-        .map((field) => normalizeString(field?.id || field?.field))
+        .map((field) => resolveScopeParamId(field))
         .filter(Boolean);
 }
 
@@ -452,9 +459,18 @@ export function applyReportBuilderSemanticConfig(config = {}, binding = null, mo
     if (!normalizedBinding || normalizedBinding.mode !== "semantic") {
         return config;
     }
-    const entity = resolveReportBuilderSemanticEntity(model, normalizedBinding);
+    const validatedModel = validateSemanticModel(model);
+    const normalizedSemanticModel = validatedModel.valid && validatedModel.normalizedModel
+        ? validatedModel.normalizedModel
+        : null;
+    const entity = normalizedSemanticModel?.entities?.find((entry) => entry.id === normalizedBinding.entity) || null;
     if (!entity) {
-        return config;
+        return normalizedSemanticModel
+            ? {
+                ...config,
+                semanticModel: normalizedSemanticModel,
+            }
+            : config;
     }
     const measureIndex = buildSemanticFieldIndex(entity.measures || []);
     const dimensionIndex = buildSemanticFieldIndex(entity.dimensions || []);
@@ -479,9 +495,8 @@ export function applyReportBuilderSemanticConfig(config = {}, binding = null, mo
     const nextDimensions = Array.isArray(config.dimensions)
         ? config.dimensions.map((entry) => overlayField(entry, resolveSemanticField(dimensionIndex, entry)))
         : config.dimensions;
-    const nextStaticFilters = Array.isArray(config.staticFilters)
-        ? config.staticFilters.map((entry) => overlayField(entry, resolveSemanticField(parameterIndex, entry)))
-        : config.staticFilters;
+    const nextStaticFilters = resolveReportBuilderScopeParamFilters(config)
+        .map((entry) => overlayField(entry, resolveSemanticField(parameterIndex, entry)));
     const nextGroupBy = config?.groupBy && Array.isArray(config.groupBy.options)
         ? {
             ...config.groupBy,
@@ -494,6 +509,7 @@ export function applyReportBuilderSemanticConfig(config = {}, binding = null, mo
         : config.groupBy;
     return {
         ...config,
+        ...(normalizedSemanticModel ? { semanticModel: normalizedSemanticModel } : {}),
         measures: nextMeasures,
         calculatedFields: nextCalculatedFields,
         computedMeasures: nextComputed,
@@ -610,10 +626,10 @@ export function buildReportBuilderSemanticDiagnosticTargets({
     const selectedParametersBySemanticRef = new Map(
         semanticSelectableParameterFields(config)
             .filter((field) => {
-                const rawId = normalizeString(field?.id || field?.field);
-                return !!rawId && hasConfiguredSemanticParameterValue(field, state?.staticFilters?.[rawId]);
+                const rawId = resolveScopeParamId(field);
+                return !!rawId && hasConfiguredSemanticParameterValue(field, getScopeParamValue(state, rawId));
             })
-            .map((field) => [semanticFieldId(field), normalizeString(field?.id || field?.field)])
+            .map((field) => [semanticFieldId(field), resolveScopeParamId(field)])
             .filter(([semanticRef, rawId]) => !!semanticRef && !!rawId),
     );
     const groupByDimensionId = resolveGroupByDimensionId(config, state);
@@ -712,6 +728,16 @@ export function summarizeReportBuilderSemanticDiagnostics(diagnostics = []) {
         : first.message;
 }
 
+export function hasReportBuilderSemanticModelResolutionDiagnostics(diagnostics = []) {
+    return normalizeReportBuilderSemanticDiagnostics(diagnostics).some((entry) => {
+        const code = normalizeString(entry?.code);
+        return code === "semanticModelError"
+            || code === "semanticModelUnavailable"
+            || code === "semantic.providerUnavailable"
+            || code === "unknownModel";
+    });
+}
+
 export function buildReportBuilderSemanticDiagnosticsNotice({
     validationState = {},
 } = {}) {
@@ -723,12 +749,19 @@ export function buildReportBuilderSemanticDiagnosticsNotice({
     const level = error || diagnostics.some((entry) => entry.severity === "error")
         ? "danger"
         : (diagnostics.some((entry) => entry.severity === "warning") ? "warning" : "info");
+    const hasModelResolutionIssue = hasReportBuilderSemanticModelResolutionDiagnostics(diagnostics);
     return {
         level,
-        title: error ? "Semantic validation error" : "Semantic provider diagnostics",
-        description: error || (diagnostics.length === 1
-            ? "The semantic provider returned 1 diagnostic for the current selection."
-            : `The semantic provider returned ${diagnostics.length} diagnostics for the current selection.`),
+        title: error
+            ? "Semantic validation error"
+            : (hasModelResolutionIssue ? "Semantic model diagnostics" : "Semantic provider diagnostics"),
+        description: error || (
+            hasModelResolutionIssue
+                ? "The semantic model could not be resolved for the current selection."
+                : (diagnostics.length === 1
+                    ? "The semantic provider returned 1 diagnostic for the current selection."
+                    : `The semantic provider returned ${diagnostics.length} diagnostics for the current selection.`)
+        ),
         diagnostics: diagnostics.map((entry, index) => ({
             id: `${entry.code || "diagnostic"}_${index + 1}`,
             severity: entry.severity || "error",

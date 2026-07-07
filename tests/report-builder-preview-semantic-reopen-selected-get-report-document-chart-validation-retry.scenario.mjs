@@ -1,4 +1,5 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildClearSemanticValidationBehaviorsStep,
   buildPreviewBootstrapSteps,
   buildReopenedHydratedSessionVerificationSteps,
@@ -140,6 +141,10 @@ export default {
       text: "Retry validation",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date, Channel",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "waitForEval",
       expression: "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec?.title === 'Avails by Date and Channel' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'chart' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.includes('eventDate') && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.includes('channelV2') && !window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession",
@@ -161,6 +166,10 @@ export default {
       expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return !text.includes('Semantic validation: Semantic provider unavailable.') && !text.includes('Retry validation') && text.includes('Avails by Date and Channel'); })()",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date, Channel",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "waitForEval",
       expression: "window.__REPORT_BUILDER_PREVIEW__ && typeof window.__REPORT_BUILDER_PREVIEW__.getBuilderState === 'function' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.chartSpec?.title === 'Avails by Date and Channel' && window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.viewMode === 'chart' && Array.isArray(window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.selectedDimensions) && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.includes('eventDate') && window.__REPORT_BUILDER_PREVIEW__.getBuilderState().selectedDimensions.includes('channelV2') && !window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession",

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 
 import {
     formatCompactDateRangeSummary,
+    resolveCompactSemanticActionLabel,
+    resolveCompactSemanticHintText,
     resolveResultIdentityChip,
+    resolveCompactSemanticSummaryItems,
     resolveCompactStatusText,
     resolveCompactSummaryItems,
     resolveTablePresetTransitionText,
@@ -110,7 +113,7 @@ assert.equal(resolveCompactStatusText({}), "Set the required filters to continue
 assert.deepEqual(
     resolveCompactSummaryItems({
         requiredStaticFilters: [{ id: "dateRange", type: "dateRange" }],
-        staticFilters: { dateRange: { start: "2026-06-01", end: "2026-06-07" } },
+        scopeParamValues: { dateRange: { start: "2026-06-01", end: "2026-06-07" } },
         selectedMeasures: ["avails", "hhUniqs"],
         selectedDimensions: ["eventDate"],
         totalActiveFilterCount: 3,
@@ -152,6 +155,83 @@ assert.deepEqual(
         "1 measure",
         "1 breakdown",
     ],
+);
+
+assert.deepEqual(
+    resolveCompactSemanticSummaryItems({
+        semanticBindingChips: [
+            "Model Performance Model",
+            "Entity Line Delivery",
+            "Measures Spend",
+        ],
+    }),
+    [
+        "Model Performance Model",
+        "Entity Line Delivery",
+    ],
+);
+
+assert.deepEqual(
+    resolveCompactSemanticSummaryItems({
+        semanticMetaChips: [
+            "Raw mode",
+            "Provider unavailable",
+        ],
+    }),
+    [
+        "Raw mode",
+        "Provider unavailable",
+    ],
+);
+
+assert.equal(
+    resolveCompactSemanticActionLabel({
+        semanticTitle: "Semantic modeling inactive",
+        tone: "info",
+        activationCount: 0,
+    }),
+    "Semantic setup",
+);
+
+assert.equal(
+    resolveCompactSemanticActionLabel({
+        semanticTitle: "Semantic diagnostics",
+        tone: "warning",
+        diagnosticsCount: 2,
+    }),
+    "Model issues",
+);
+
+assert.equal(
+    resolveCompactSemanticActionLabel({
+        semanticTitle: "Semantic Binding",
+        tone: "info",
+    }),
+    "Model",
+);
+
+assert.equal(
+    resolveCompactSemanticActionLabel({
+        semanticTitle: "Semantic modeling inactive",
+        activationCount: 1,
+    }),
+    "Activate semantic",
+);
+
+assert.equal(
+    resolveCompactSemanticHintText({
+        semanticTitle: "Semantic modeling inactive",
+        activationCount: 0,
+    }),
+    "Load a semantic report file to switch this builder from raw mode to model-backed mappings.",
+);
+
+assert.equal(
+    resolveCompactSemanticHintText({
+        semanticTitle: "Semantic modeling inactive",
+        activationCount: 1,
+    }),
+    "A semantic report is ready to activate from this workspace.",
 );
 
 console.log("reportBuilderCompactState ✓");

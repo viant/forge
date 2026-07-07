@@ -31,11 +31,19 @@ assert.equal(
   true,
 );
 assert.equal(
+  expressions.some((expression) => expression.includes('[aria-label=\\"Authored runtime preview\\"]') && expression.includes('data-report-builder-semantic-binding="true"') && expression.includes('data-report-builder-scope-summary="true"') && expression.includes('text.includes("Dimensions Delivery Date")') && expression.includes('text.includes("Measures Available Impressions")') && expression.includes('text.includes("Filters")')),
+  true,
+);
+assert.equal(
   expressions.some((expression) => expression.includes("replaceRuntimeActionBehaviors") && expression.includes("detail_date") && expression.includes("Show date details")),
   true,
 );
 assert.equal(
   scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Retry action provider")),
+  true,
+);
+assert.equal(
+  scenario.steps.some((step) => step?.type === "assertDomNotContains" && String(step.text || "").includes("Runtime Diagnostics")),
   true,
 );
 assert.equal(
@@ -59,30 +67,39 @@ const patchStateIndex = findStepIndex((step) => step?.type === "eval" && String(
 const replaceFailureIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("Preview runtime action provider failed."));
 const firstRunIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Run");
 const diagnosticsIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Runtime Diagnostics"));
+const semanticVisibleWhileErroredIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('data-report-builder-semantic-binding="true"') && String(step?.expression || "").includes('text.includes("Dimensions Delivery Date")'));
 const retryVisibleIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Retry action provider"));
 const replaceSuccessIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("detail_date") && String(step?.expression || "").includes("Show date details"));
 const retryClickIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Retry action provider");
 const staleErrorClearedIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("!text.includes('Preview runtime action provider failed.')") && String(step?.expression || "").includes("!text.includes('Failed to load refinement actions for Delivery Date.')"));
+const diagnosticsHiddenIndex = findStepIndex((step) => step?.type === "assertDomNotContains" && String(step?.text || "").includes("Runtime Diagnostics"));
+const semanticVisibleAfterClearIndex = scenario.steps.findIndex((step, index) => index > diagnosticsHiddenIndex && step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('data-report-builder-semantic-binding="true"') && String(step?.expression || "").includes('text.includes("Dimensions Delivery Date")'));
 const selectedValueIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("Selected value: 2026-05-01"));
 
 assert.notEqual(patchStateIndex, -1);
 assert.notEqual(replaceFailureIndex, -1);
 assert.notEqual(firstRunIndex, -1);
 assert.notEqual(diagnosticsIndex, -1);
+assert.notEqual(semanticVisibleWhileErroredIndex, -1);
 assert.notEqual(retryVisibleIndex, -1);
 assert.notEqual(replaceSuccessIndex, -1);
 assert.notEqual(retryClickIndex, -1);
 assert.notEqual(staleErrorClearedIndex, -1);
+assert.notEqual(diagnosticsHiddenIndex, -1);
+assert.notEqual(semanticVisibleAfterClearIndex, -1);
 assert.notEqual(selectedValueIndex, -1);
 
 assert.equal(patchStateIndex < replaceFailureIndex, true);
 assert.equal(replaceFailureIndex < firstRunIndex, true);
 assert.equal(firstRunIndex < diagnosticsIndex, true);
-assert.equal(diagnosticsIndex < retryVisibleIndex, true);
+assert.equal(diagnosticsIndex < semanticVisibleWhileErroredIndex, true);
+assert.equal(semanticVisibleWhileErroredIndex < retryVisibleIndex, true);
 assert.equal(retryVisibleIndex < replaceSuccessIndex, true);
 assert.equal(replaceSuccessIndex < retryClickIndex, true);
 assert.equal(retryClickIndex < staleErrorClearedIndex, true);
-assert.equal(staleErrorClearedIndex < selectedValueIndex, true);
+assert.equal(staleErrorClearedIndex < diagnosticsHiddenIndex, true);
+assert.equal(diagnosticsHiddenIndex < semanticVisibleAfterClearIndex, true);
+assert.equal(semanticVisibleAfterClearIndex < selectedValueIndex, true);
 assert.equal(retryClickIndex < selectedValueIndex, true);
 
-console.log("report-builder-preview-runtime-action-provider-retry-scenario-assets ✓ runtime action provider failure recovers and restores date detail actions");
+console.log("report-builder-preview-runtime-action-provider-retry-scenario-assets ✓ active runtime diagnostics can clear while authored runtime semantic sections remain visible");

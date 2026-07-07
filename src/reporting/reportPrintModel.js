@@ -1,6 +1,10 @@
 import { buildReportSpecHash, buildReportFillHash } from "./reportFillModel.js";
 import { buildReportPrintChartSvg } from "./reportPrintChartSvg.js";
 import { buildReportPrintGeoSvg } from "./reportPrintGeoSvg.js";
+import {
+  REPORT_LAYOUT_GRID_COLUMNS,
+  resolveReportLayoutSpan,
+} from "./reportLayoutModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -521,10 +525,10 @@ function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}) {
   return ordered;
 }
 
-function buildLayoutSizeByBlockId(reportSpec = {}) {
+function buildLayoutSpanByBlockId(reportSpec = {}) {
   return new Map(
     (Array.isArray(reportSpec?.layoutIntent?.items) ? reportSpec.layoutIntent.items : [])
-      .map((item) => [normalizeString(item?.blockId), normalizeString(item?.size).toLowerCase()])
+      .map((item) => [normalizeString(item?.blockId), resolveReportLayoutSpan(item)])
       .filter(([blockId]) => !!blockId),
   );
 }
@@ -933,25 +937,36 @@ function syncReportPrintStateFromChildren(state = {}, children = []) {
   }
 }
 
-function renderReportPrintHalfWidthRow(state = {}, blocks = []) {
-  const rowBlocks = (Array.isArray(blocks) ? blocks : []).filter(Boolean).slice(0, 2);
-  if (rowBlocks.length === 0) {
+function renderReportPrintGridRow(state = {}, entries = []) {
+  const rowEntries = (Array.isArray(entries) ? entries : [])
+    .filter((entry) => !!entry?.block && Number.isFinite(entry?.span) && entry.span > 0)
+    .map((entry) => ({
+      block: entry.block,
+      span: Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS, Math.trunc(entry.span))),
+    }));
+  if (rowEntries.length === 0) {
     return;
   }
   ensureReportPrintPage(state);
   const startPosition = resolveReportPrintStatePosition(state);
-  const columnWidth = Math.max(
+  const unitWidth = Math.max(
     1,
-    (state.contentWidth - REPORT_PRINT_THEME.columnGap) / 2,
+    (state.contentWidth - (REPORT_PRINT_THEME.columnGap * (REPORT_LAYOUT_GRID_COLUMNS - 1))) / REPORT_LAYOUT_GRID_COLUMNS,
   );
-  const childStates = rowBlocks.map((block, index) => buildScopedReportPrintState(state, {
-    contentLeft: state.contentLeft + (index * (columnWidth + REPORT_PRINT_THEME.columnGap)),
-    contentWidth: columnWidth,
-    startPageIndex: startPosition.pageIndex,
-    startCursorY: startPosition.cursorY,
-  }));
+  let consumedColumns = 0;
+  const childStates = rowEntries.map((entry) => {
+    const span = Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS - consumedColumns, entry.span));
+    const childState = buildScopedReportPrintState(state, {
+      contentLeft: state.contentLeft + (consumedColumns * (unitWidth + REPORT_PRINT_THEME.columnGap)),
+      contentWidth: (unitWidth * span) + (REPORT_PRINT_THEME.columnGap * Math.max(0, span - 1)),
+      startPageIndex: startPosition.pageIndex,
+      startCursorY: startPosition.cursorY,
+    });
+    consumedColumns += span;
+    return childState;
+  });
   childStates.forEach((childState, index) => {
-    renderReportPrintBlock(childState, rowBlocks[index], {});
+    renderReportPrintBlock(childState, rowEntries[index].block, {});
   });
   syncReportPrintStateFromChildren(state, childStates);
 }
@@ -1479,25 +1494,37 @@ export function buildReportPrintFromReportFill({
   if (!state) {
     return null;
   }
-  const layoutSizeByBlockId = buildLayoutSizeByBlockId(reportSpec);
+  const layoutSpanByBlockId = buildLayoutSpanByBlockId(reportSpec);
   const orderedBlocks = buildOrderedReportFillBlocks(reportSpec, reportFill);
+  let pendingRow = [];
+  let pendingSpan = 0;
+  const flushPendingRow = () => {
+    if (pendingRow.length === 0) {
+      return;
+    }
+    renderReportPrintGridRow(state, pendingRow);
+    pendingRow = [];
+    pendingSpan = 0;
+  };
   for (let index = 0; index < orderedBlocks.length; index += 1) {
     const block = orderedBlocks[index];
     const blockId = normalizeString(block?.id);
-    const size = normalizeString(layoutSizeByBlockId.get(blockId)).toLowerCase();
-    if (size === "half") {
-      const nextBlock = orderedBlocks[index + 1] || null;
-      const nextSize = normalizeString(layoutSizeByBlockId.get(normalizeString(nextBlock?.id))).toLowerCase();
-      if (nextBlock && nextSize === "half") {
-        renderReportPrintHalfWidthRow(state, [block, nextBlock]);
-        index += 1;
-        continue;
-      }
-      renderReportPrintHalfWidthRow(state, [block]);
+    const span = resolveReportLayoutSpan(layoutSpanByBlockId.get(blockId));
+    if (span >= REPORT_LAYOUT_GRID_COLUMNS) {
+      flushPendingRow();
+      renderReportPrintBlock(state, block, {});
       continue;
     }
-    renderReportPrintBlock(state, block, {});
+    if (pendingRow.length > 0 && (pendingSpan + span) > REPORT_LAYOUT_GRID_COLUMNS) {
+      flushPendingRow();
+    }
+    pendingRow.push({ block, span });
+    pendingSpan += span;
+    if (pendingSpan >= REPORT_LAYOUT_GRID_COLUMNS) {
+      flushPendingRow();
+    }
   }
+  flushPendingRow();
   if (state.pages.length === 0) {
     startNextReportPrintPage(state);
     renderReportPrintTextLines(state, {

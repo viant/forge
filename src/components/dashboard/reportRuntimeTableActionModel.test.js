@@ -24,7 +24,7 @@ assert.deepEqual(buildReportRuntimeTableActionDescriptors({
     id: "keep:channelV2",
     kind: "keep",
     fieldValueKey: "channelV2",
-    label: "Keep only",
+    label: "Keep Channel",
   },
   {
     id: "drill_publisher",
@@ -87,13 +87,13 @@ assert.deepEqual(buildReportRuntimeTableActionDescriptors({
     id: "keep:channelV2",
     kind: "keep",
     fieldValueKey: "channelV2",
-    label: "Keep only",
+    label: "Keep Channel",
   },
   {
     id: "exclude:channelV2",
     kind: "exclude",
     fieldValueKey: "channelV2",
-    label: "Exclude",
+    label: "Exclude Channel",
   },
   {
     id: "drill_publisher",

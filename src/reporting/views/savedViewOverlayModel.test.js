@@ -200,7 +200,7 @@ assert.deepEqual(applySavedViewOverlayToBuilderState(savedViewArtifact, {
     selectedDimensions: ["eventDate", "channelV2"],
     selectedMeasures: ["avails"],
     primaryMeasure: "avails",
-    staticFilters: {},
+    scopeParams: {},
     orderField: "eventDate",
     orderDir: "asc",
     pageSize: 50,
@@ -215,7 +215,7 @@ assert.deepEqual(applySavedViewOverlayToBuilderState(savedViewArtifact, {
   selectedDimensions: ["eventDate", "channelV2"],
   selectedMeasures: ["avails"],
   primaryMeasure: "avails",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
   orderField: "avails",
@@ -418,6 +418,154 @@ assert.deepEqual(
     "savedViewOverlaySnapshotBaseReportMismatch",
     "savedViewOverlaySnapshotBaseVersionStale",
   ],
+);
+
+// --- predicate-backed base reports: scopeParams.* bindings and predicate filter ids ---
+
+const predicateSavedViewArtifact = {
+  version: 1,
+  kind: "reportBuilder.savedView",
+  id: "saved_view_forecast_overlay",
+  title: "Forecast Saved View Overlay",
+  reportId: "forecastQ3",
+  documentVersion: 3,
+  document: {
+    version: 1,
+    kind: "reportDocument",
+    id: "forecastQ3",
+    title: "Forecast Q3",
+    scope: {
+      params: [
+        { id: "dateRange", label: "Date Range" },
+        { id: "channelIds", label: "Channels" },
+      ],
+    },
+    blocks: [
+      {
+        id: "primaryBuilder",
+        kind: "reportBuilderBlock",
+        config: {
+          predicates: [
+            {
+              id: "dateRange",
+              label: "Date Range",
+              kind: "dateRange",
+              required: true,
+              startParamPath: "filters.from",
+              endParamPath: "filters.to",
+            },
+            {
+              id: "channelIds",
+              label: "Channels",
+              pinned: true,
+              multiple: true,
+              paramPath: "filters.channelIds",
+            },
+            {
+              id: "audienceIds",
+              label: "Audience",
+              bucket: "scope",
+              paramPath: "filters.audienceIds",
+            },
+          ],
+          dimensions: [
+            { id: "eventDate", key: "eventDate", label: "Event Date" },
+          ],
+          measures: [
+            { id: "reach", key: "reach", label: "Reach" },
+          ],
+        },
+        state: {
+          selectedDimensions: ["eventDate"],
+          selectedMeasures: ["reach"],
+          primaryMeasure: "reach",
+        },
+        scopeBindings: [
+          { paramId: "dateRange", target: "scopeParams.dateRange" },
+          { paramId: "channelIds", target: "scopeParams.channelIds" },
+        ],
+      },
+    ],
+  },
+  savedViewOverlay: {
+    baseReportRef: {
+      artifactRef: "report://forecastQ3",
+      reportId: "forecastQ3",
+      documentVersion: 3,
+    },
+    overlay: {
+      filters: {
+        dateRange: { start: "2026-06-01", end: "2026-06-07" },
+        channelIds: [2, 9],
+      },
+      parameters: {
+        channelIds: [2, 9],
+      },
+    },
+  },
+};
+
+const predicateOverlaySummary = buildSavedViewOverlaySummary(predicateSavedViewArtifact, {
+  document: predicateSavedViewArtifact.document,
+  reportSpec: {
+    version: 1,
+    kind: "reportSpec",
+    scope: {
+      params: [
+        { id: "dateRange", label: "Date Range" },
+        { id: "channelIds", label: "Channels" },
+      ],
+    },
+    datasets: [
+      {
+        id: "primary",
+        request: {
+          dimensions: { eventDate: true },
+          measures: { reach: true },
+        },
+      },
+    ],
+  },
+});
+// scopeParams.* bindings are supported targets and pinned predicate ids are
+// valid overlay filter ids, so no diagnostics surface.
+assert.equal(predicateOverlaySummary.diagnostics, undefined);
+
+assert.deepEqual(applySavedViewOverlayToBuilderState(predicateSavedViewArtifact, {
+  document: predicateSavedViewArtifact.document,
+  state: {
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["reach"],
+    primaryMeasure: "reach",
+    scopeParams: {},
+  },
+}), {
+  selectedDimensions: ["eventDate"],
+  selectedMeasures: ["reach"],
+  primaryMeasure: "reach",
+  scopeParams: {
+    dateRange: { start: "2026-06-01", end: "2026-06-07" },
+    channelIds: [2, 9],
+  },
+});
+
+// unknown filter ids still surface diagnostics against the predicate-derived id set
+const unknownPredicateFilterSummary = buildSavedViewOverlaySummary({
+  ...predicateSavedViewArtifact,
+  savedViewOverlay: {
+    ...predicateSavedViewArtifact.savedViewOverlay,
+    overlay: {
+      filters: {
+        unknownFilter: true,
+      },
+    },
+  },
+}, {
+  document: predicateSavedViewArtifact.document,
+});
+assert.deepEqual(
+  unknownPredicateFilterSummary.diagnostics.map((entry) => entry.code),
+  ["savedViewOverlayUnknownFilter"],
 );
 
 console.log("savedViewOverlayModel ✓ normalizes saved-view overlays and surfaces compatibility diagnostics");

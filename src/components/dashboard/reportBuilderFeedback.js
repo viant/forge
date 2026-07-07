@@ -1,5 +1,5 @@
 import { buildReportBuilderSemanticBindingViewStateFromReportSpec } from "./reportBuilderSemanticBindingViewState.js";
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import { resolveReportBuilderListReportDocumentsResponseEntry } from "./reportBuilderReportDocumentReadResponse.js";
 import {
@@ -336,9 +336,16 @@ export function buildReportBuilderImportFeedback(imported = null) {
     }
     const reportSpecContext = resolveImportedReportSpecContext(imported);
     const metadataContext = resolveImportedMetadataContext(imported);
-    const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
-        semanticSummary: metadataContext?.semanticSummary || null,
-        binding: metadataContext?.binding || null,
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [metadataContext, reportSpecContext ? {
+            semanticSummary: reportSpecContext?.semanticSummary || null,
+            binding: reportSpecContext?.binding || null,
+        } : null].filter(Boolean),
+        candidates: [
+            imported?.payload?.semanticBindingViewState,
+            imported?.savedReportPayload?.semanticBindingViewState,
+            imported?.getReportDocumentResponse?.semanticBindingViewState,
+        ],
     }) || buildReportBuilderSemanticBindingViewStateFromReportSpec(reportSpecContext);
     const scopeSummary = buildReportBuilderScopeSummaryFromParams(
         resolvePreferredScopeParams(
@@ -380,7 +387,7 @@ export function buildReportBuilderImportFeedback(imported = null) {
                 : {}),
         } : {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),
@@ -399,9 +406,9 @@ export function buildReportBuilderSelectedGetResponseFeedback({
         document: response?.document || null,
         title,
     });
-    const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
-        semanticSummary: context?.semanticSummary || null,
-        binding: context?.binding || null,
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [context],
+        candidates: [response?.semanticBindingViewState],
     });
     const scopeSummary = buildReportBuilderScopeSummaryFromParams(
         resolvePreferredScopeParams(context?.scopeParams, context?.scope?.params),
@@ -427,7 +434,7 @@ export function buildReportBuilderSelectedGetResponseFeedback({
                 : {}),
         } : {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),
@@ -502,6 +509,7 @@ function describePreparedReadiness(preparedReadiness = {}, successPrefix = "Appl
 export function buildReportBuilderSemanticStatusFeedback({
     semanticStatus = null,
     readiness = {},
+    semanticBindingViewState = null,
 } = {}) {
     const level = normalizeString(semanticStatus?.level || "info") || "info";
     const title = normalizeString(semanticStatus?.title);
@@ -509,10 +517,25 @@ export function buildReportBuilderSemanticStatusFeedback({
     if (!message) {
         return null;
     }
+    const bindingModelLabel = normalizeString(semanticBindingViewState?.modelLabel);
+    const bindingEntityLabel = normalizeString(semanticBindingViewState?.entityLabel);
+    const shouldPreferBindingIdentity = title.toLowerCase() === "semantic model"
+        && message === "Loading semantic model metadata…"
+        && !!(bindingModelLabel || bindingEntityLabel);
+    const displayTitle = shouldPreferBindingIdentity ? "Semantic binding" : title;
+    const displayMessage = shouldPreferBindingIdentity
+        ? [
+            bindingModelLabel,
+            bindingEntityLabel ? `Entity: ${bindingEntityLabel}` : "",
+        ].filter(Boolean).join(" • ")
+        : message;
+    if (!displayMessage) {
+        return null;
+    }
     const action = normalizeString(readiness?.action);
     return {
         level,
-        message: title ? `${title}: ${message}` : message,
+        message: displayTitle ? `${displayTitle}: ${displayMessage}` : displayMessage,
         actionLabel: action === "retrySemanticModelLoad" ? "Retry model load" : "",
         action: action === "retrySemanticModelLoad" ? action : "",
     };
@@ -568,11 +591,13 @@ export function buildReportBuilderSemanticInlineNotices({
     semanticFieldValidationMessage = "",
     semanticSelectedIssueCount = 0,
     semanticSelectionValidationState = {},
+    semanticBindingViewState = null,
 } = {}) {
     return [
         buildReportBuilderSemanticStatusFeedback({
             semanticStatus,
             readiness,
+            semanticBindingViewState,
         }),
         buildReportBuilderSemanticIssueFeedback({
             readiness,
@@ -676,7 +701,7 @@ export function buildReportBuilderPresetApplyFeedback({
     if (!selectionChanged) {
         return null;
     }
-    const successPrefix = `Applied this preset's required ${changedText || "chart settings"}.`;
+    const successPrefix = `Applied this preset's required ${changedText || "chart settings"} to the active table and chart.`;
     return {
         level: "info",
         message: didFetchPreparedState
@@ -736,7 +761,7 @@ export function resolveCompactChartSheetNotice({
         if (normalizeString(modifiedTablePresetTitle)) {
             return {
                 level: "warning",
-                message: `Modified from ${normalizeString(modifiedTablePresetTitle)}. Use Quick view to restore the named table preset.`,
+                message: `Modified from ${normalizeString(modifiedTablePresetTitle)}. Use Presets to restore the named table preset.`,
             };
         }
     }

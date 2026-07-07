@@ -489,7 +489,7 @@ export function buildReportBuilderSavedPayloadExportExecutionConfig({
     };
 }
 
-export function buildReportBuilderSavedPayloadRecentExportEntries({
+export function buildReportBuilderRecentExportEntries({
     jobs = [],
     artifacts = [],
     summary = null,
@@ -585,6 +585,10 @@ export function buildReportBuilderSavedPayloadRecentExportEntries({
         .filter(Boolean);
 }
 
+export function buildReportBuilderSavedPayloadRecentExportEntries(options = {}) {
+    return buildReportBuilderRecentExportEntries(options);
+}
+
 export function buildReportBuilderReopenedExportExecutionConfig({
     request = null,
     localSavedPayloads = [],
@@ -600,6 +604,7 @@ export function buildReportBuilderReopenedExportExecutionConfig({
         missingRequestMessage: "No canonical export snapshot is available for the reopened ReportDocument.",
         missingJobMessage: "No reopened export job is available to refresh.",
         missingArtifactMessage: "No completed reopened export artifact is available yet.",
+        historyEnabled: true,
     };
 }
 
@@ -618,6 +623,7 @@ export function buildReportBuilderSelectedListEntryExportExecutionConfig({
         missingRequestMessage: "No canonical export snapshot is available for the selected catalog entry.",
         missingJobMessage: "No selected export job is available to refresh.",
         missingArtifactMessage: "No completed selected export artifact is available yet.",
+        historyEnabled: true,
     };
 }
 

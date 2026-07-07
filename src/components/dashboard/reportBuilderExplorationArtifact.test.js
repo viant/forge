@@ -53,7 +53,7 @@ const baseState = {
     primaryMeasure: "totalSpend",
     selectedDimensions: ["eventDate", "channelId"],
     viewMode: "table",
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-04",
@@ -115,7 +115,7 @@ assert.deepEqual(buildReportBuilderExplorationArtifactSummary(artifact), {
     sourceLabel: "2026-05-01 • Display",
     blockCount: 1,
     datasetCount: 1,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range",
     scopeSummaryItems: [
         {
@@ -146,7 +146,7 @@ assert.deepEqual(buildReportBuilderExplorationArtifactInspectorState(artifact), 
     sourceLabel: "2026-05-01 • Display",
     blockCount: 1,
     datasetCount: 1,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range",
     scopeSummaryItems: [
         {
@@ -243,7 +243,7 @@ assert.deepEqual(buildReportBuilderExplorationArtifactSummary(semanticArtifact),
     sourceLabel: "2026-05-01 • Display",
     blockCount: 1,
     datasetCount: 1,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range",
     scopeSummaryItems: [
         {
@@ -285,7 +285,7 @@ assert.deepEqual(buildReportBuilderExplorationArtifactInspectorState(semanticArt
     sourceLabel: "2026-05-01 • Display",
     blockCount: 1,
     datasetCount: 1,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range",
     scopeSummaryItems: [
         {
@@ -528,7 +528,7 @@ const embeddedSemanticArtifactSummary = buildReportBuilderExplorationArtifactSum
                     },
                     selectedDimensions: ["eventDate", "channelId"],
                     selectedMeasures: ["totalSpend", "impressions"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -748,7 +748,7 @@ const embeddedSemanticArtifactSummaryWithEmptySpecScope = buildReportBuilderExpl
                     },
                     selectedDimensions: ["eventDate", "channelId"],
                     selectedMeasures: ["totalSpend", "impressions"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",

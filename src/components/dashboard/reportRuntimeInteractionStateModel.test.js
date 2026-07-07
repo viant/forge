@@ -13,6 +13,7 @@ import {
   replaceReportRuntimeInteractionState,
   reduceReportRuntimeInteractionState,
   removeReportRuntimeInteractionRefinement,
+  setReportRuntimeInteractionDatasetScopeParamValue,
   setReportRuntimeInteractionDetailDiagnostic,
   setReportRuntimeInteractionHostIntent,
 } from "./reportRuntimeInteractionStateModel.js";
@@ -21,6 +22,7 @@ const initial = createReportRuntimeInteractionState();
 assert.deepEqual(initial, {
   refinements: [],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -44,6 +46,7 @@ assert.deepEqual(keepState, {
     },
   ],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -79,6 +82,7 @@ assert.deepEqual(drilledState, {
       sourceBlockId: "primaryChart",
     },
   ],
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -86,6 +90,7 @@ assert.deepEqual(drilledState, {
 assert.deepEqual(removeReportRuntimeInteractionRefinement(drilledState, "drill:channelV2:primaryChart"), {
   refinements: [],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -101,6 +106,7 @@ const withHostIntent = setReportRuntimeInteractionHostIntent(initial, {
 assert.deepEqual(withHostIntent, {
   refinements: [],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: {
     intentKind: "detailTarget",
     targetRef: "target://example/performance/channel-detail",
@@ -115,6 +121,24 @@ assert.deepEqual(withHostIntent, {
 assert.deepEqual(clearReportRuntimeInteractionHostIntent(withHostIntent), {
   refinements: [],
   drillTransitions: [],
+  datasetScopeParams: {},
+  hostIntent: null,
+  detailDiagnostic: null,
+});
+
+const withScopedDatasetFilter = setReportRuntimeInteractionDatasetScopeParamValue(initial, {
+  datasetRef: "forecast_cube",
+  paramId: "forecastRegion",
+  value: ["US/NY"],
+});
+assert.deepEqual(withScopedDatasetFilter, {
+  refinements: [],
+  drillTransitions: [],
+  datasetScopeParams: {
+    forecast_cube: {
+      forecastRegion: ["US/NY"],
+    },
+  },
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -126,6 +150,7 @@ assert.deepEqual(setReportRuntimeInteractionDetailDiagnostic(initial, {
 }), {
   refinements: [],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: {
     code: "detailTargetPartial",
@@ -146,6 +171,7 @@ assert.deepEqual(clearReportRuntimeInteractionDetailDiagnostic({
 }), {
   refinements: keepState.refinements,
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: withHostIntent.hostIntent,
   detailDiagnostic: null,
 });
@@ -162,6 +188,7 @@ assert.deepEqual(clearReportRuntimeInteractionDetailState({
 }), {
   refinements: keepState.refinements,
   drillTransitions: drilledState.drillTransitions,
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -178,6 +205,7 @@ assert.deepEqual(clearReportRuntimeInteractionRefinements({
 }), {
   refinements: [],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: withHostIntent.hostIntent,
   detailDiagnostic: {
     code: "detailTargetPartial",
@@ -207,6 +235,7 @@ assert.deepEqual(reduceReportRuntimeInteractionState(initial, {
     },
   ],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -216,6 +245,7 @@ assert.deepEqual(clearReportRuntimeInteractionState(), initial);
 assert.deepEqual(reduceReportRuntimeInteractionState({
   refinements: keepState.refinements,
   drillTransitions: drilledState.drillTransitions,
+  datasetScopeParams: {},
   hostIntent: withHostIntent.hostIntent,
   detailDiagnostic: {
     code: "detailTargetPartial",
@@ -227,6 +257,7 @@ assert.deepEqual(reduceReportRuntimeInteractionState({
 }), {
   refinements: keepState.refinements,
   drillTransitions: drilledState.drillTransitions,
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -234,6 +265,7 @@ assert.deepEqual(reduceReportRuntimeInteractionState({
 assert.deepEqual(reduceReportRuntimeInteractionState({
   refinements: keepState.refinements,
   drillTransitions: drilledState.drillTransitions,
+  datasetScopeParams: {},
   hostIntent: withHostIntent.hostIntent,
   detailDiagnostic: {
     code: "detailTargetPartial",
@@ -245,6 +277,7 @@ assert.deepEqual(reduceReportRuntimeInteractionState({
 }), {
   refinements: [],
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: withHostIntent.hostIntent,
   detailDiagnostic: {
     code: "detailTargetPartial",
@@ -271,6 +304,7 @@ assert.deepEqual(normalizeReportRuntimeInteractionState({
       sourceBlockId: "primaryChart",
     },
   ],
+  datasetScopeParams: {},
   hostIntent: {
     intentKind: "detailTarget",
     targetRef: "target://example/performance/channel-detail",
@@ -303,6 +337,7 @@ assert.deepEqual(normalizeReportRuntimeInteractionState({
       sourceBlockId: "primaryChart",
     },
   ],
+  datasetScopeParams: {},
   hostIntent: {
     intentKind: "detailTarget",
     targetRef: "target://example/performance/channel-detail",

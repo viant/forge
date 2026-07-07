@@ -79,7 +79,7 @@ const state = {
   selectedDimensions: ["eventDate", "channelV2"],
   viewMode: "table",
   chartSpec: null,
-  staticFilters: {
+  scopeParams: {
     dateRange: {
       start: "2026-05-01",
       end: "2026-05-04",
@@ -199,6 +199,45 @@ assert.equal(exportRequest?.reportSpec?.semanticSummary?.entityLabel, "Line Deli
 assert.equal(exportRequest?.reportPrint?.title, "Report Builder Demo");
 assert.equal(JSON.stringify(exportRequest).includes("Inventory Note"), true);
 assert.equal(JSON.stringify(exportRequest).includes("Live note from reopened state."), true);
+
+const canonicalSemanticSummary = {
+  kind: "semantic",
+  modelRef: "model://example/performance/delivery@v1",
+  modelLabel: "Canonical Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Canonical Line Delivery",
+  selectedDimensions: [
+    { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date" },
+    { id: "channel", rawId: "channelV2", label: "Canonical Channel" },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+  ],
+  selectedParameters: [
+    { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+  ],
+};
+
+const canonicalExportRequest = buildReportBuilderSavedReportExportRequestFromBuilderState(
+  reopenedSavedRecordPayload,
+  {
+    runtimeArtifact,
+    documentVersion: 11,
+    savedAt: 9900,
+    format: "pdf",
+    container,
+    config,
+    state,
+    semanticSummary: canonicalSemanticSummary,
+    semanticModel: null,
+  },
+);
+
+assert.equal(canonicalExportRequest?.reportSpec?.semanticSummary?.modelLabel, "Canonical Ad Delivery");
+assert.equal(canonicalExportRequest?.reportSpec?.semanticSummary?.entityLabel, "Canonical Line Delivery");
+assert.equal(canonicalExportRequest?.reportSpec?.semanticSummary?.selectedDimensions?.[0]?.label, "Canonical Delivery Date");
+assert.equal(canonicalExportRequest?.reportSpec?.semanticSummary?.selectedMeasures?.[0]?.label, "Canonical Available Impressions");
+assert.equal(canonicalExportRequest?.reportSpec?.semanticSummary?.selectedParameters?.[0]?.label, "Canonical Reporting Window");
 
 const reopenedSavedViewRecord = {
   reportId: "capacityTrendQ3",

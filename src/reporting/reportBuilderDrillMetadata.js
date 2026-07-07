@@ -1,4 +1,4 @@
-import { normalizeDetailTarget, normalizeRefinementActions } from "./drillMetadataProvider.js";
+import { dedupeRefinementActions, normalizeDetailTarget, normalizeRefinementActions } from "./drillMetadataProvider.js";
 import {
   buildReportBuilderDrillActions,
   normalizeReportBuilderDrillHierarchies,
@@ -7,10 +7,6 @@ import {
 
 function normalizeString(value = "") {
   return String(value || "").trim();
-}
-
-function cloneValue(value) {
-  return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
 function resolveDrillMetadataSource(config = {}) {
@@ -41,20 +37,6 @@ function normalizeFieldActionEntries(fieldActions = []) {
       };
     })
     .filter(Boolean);
-}
-
-function dedupeActions(actions = []) {
-  const seen = new Set();
-  const next = [];
-  (Array.isArray(actions) ? actions : []).forEach((action) => {
-    const id = normalizeString(action?.id);
-    if (!id || seen.has(id)) {
-      return;
-    }
-    seen.add(id);
-    next.push(cloneValue(action));
-  });
-  return next;
 }
 
 export function normalizeReportBuilderDrillMetadata(config = {}) {
@@ -113,7 +95,7 @@ export function createReportBuilderDrillMetadataProvider(config = {}) {
         return { actions: [] };
       }
       return {
-        actions: dedupeActions([
+        actions: dedupeRefinementActions([
           { id: `keep:${normalizedFieldRef}`, label: "Keep only", kind: "keep" },
           { id: `exclude:${normalizedFieldRef}`, label: "Exclude", kind: "exclude" },
           ...buildReportBuilderDrillActions(normalized.hierarchies, normalizedFieldRef),

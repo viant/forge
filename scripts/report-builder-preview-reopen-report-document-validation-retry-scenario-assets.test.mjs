@@ -56,6 +56,10 @@ assert.equal(
   true,
 );
 assert.equal(
+  expressions.some((expression) => expression.includes('[aria-label=\\"Authored runtime preview\\"]') && expression.includes('data-report-builder-semantic-binding="true"') && expression.includes('data-report-builder-scope-summary="true"') && expression.includes('text.includes("Dimensions Channel")') && expression.includes('text.includes("Measures Available Impressions, Household Uniques")') && expression.includes('text.includes("Filters")')),
+  true,
+);
+assert.equal(
   expressions.some((expression) => expression.includes("Validating the semantic selection against the provider.") || expression.includes("Showing Inventory Ladder.")),
   true,
 );
@@ -69,28 +73,34 @@ const injectValidationIndex = findStepIndex((step) => step?.type === "eval" && S
 const prepareSelectedGetIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Prepare selected get response");
 const reopenIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Reopen in builder");
 const validationErrorIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Semantic validation: Semantic provider unavailable."));
+const runtimePreviewVisibleWhileErroredIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('data-report-builder-semantic-binding="true"') && String(step?.expression || "").includes('text.includes("Dimensions Channel")'));
 const clearValidationIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("clearSemanticValidationBehaviors"));
 const retryValidationIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Retry validation");
 const recoveredStateIndexes = findStepIndexes((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("activeTablePreset?.title === 'Inventory Ladder'") && String(step?.expression || "").includes("selectedDimensions[0] === 'channelV2'") && String(step?.expression || "").includes("!window.__REPORT_BUILDER_PREVIEW__.getBuilderState()?.explorationSession"));
 const recoveredIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("!text.includes('Semantic validation: Semantic provider unavailable.')"));
+const runtimePreviewVisibleAfterRecoveryIndex = findStepIndexes((step) => step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('data-report-builder-semantic-binding="true"') && String(step?.expression || "").includes('text.includes("Measures Available Impressions, Household Uniques")')).slice(-1)[0] ?? -1;
 
 assert.notEqual(selectedEntryIndex, -1);
 assert.notEqual(injectValidationIndex, -1);
 assert.notEqual(prepareSelectedGetIndex, -1);
 assert.notEqual(reopenIndex, -1);
 assert.notEqual(validationErrorIndex, -1);
+assert.notEqual(runtimePreviewVisibleWhileErroredIndex, -1);
 assert.notEqual(clearValidationIndex, -1);
 assert.notEqual(retryValidationIndex, -1);
 assert.equal(recoveredStateIndexes.length >= 2, true);
 assert.notEqual(recoveredIndex, -1);
+assert.notEqual(runtimePreviewVisibleAfterRecoveryIndex, -1);
 
 assert.equal(selectedEntryIndex < injectValidationIndex, true);
 assert.equal(injectValidationIndex < prepareSelectedGetIndex, true);
 assert.equal(prepareSelectedGetIndex < reopenIndex, true);
 assert.equal(reopenIndex < validationErrorIndex, true);
-assert.equal(validationErrorIndex < clearValidationIndex, true);
+assert.equal(validationErrorIndex < runtimePreviewVisibleWhileErroredIndex, true);
+assert.equal(runtimePreviewVisibleWhileErroredIndex < clearValidationIndex, true);
 assert.equal(clearValidationIndex < retryValidationIndex, true);
 assert.equal(retryValidationIndex < recoveredIndex, true);
-assert.equal(recoveredIndex < recoveredStateIndexes[recoveredStateIndexes.length - 1], true);
+assert.equal(recoveredIndex < runtimePreviewVisibleAfterRecoveryIndex, true);
+assert.equal(runtimePreviewVisibleAfterRecoveryIndex < recoveredStateIndexes[recoveredStateIndexes.length - 1], true);
 
-console.log("report-builder-preview-reopen-report-document-validation-retry-scenario-assets ✓ reopened table validation retry recovers after semantic provider validation retry");
+console.log("report-builder-preview-reopen-report-document-validation-retry-scenario-assets ✓ reopened table validation retry keeps authored runtime semantic sections visible through semantic provider validation retry");

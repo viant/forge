@@ -1,4 +1,7 @@
-import { buildPreviewBootstrapSteps } from "./report-builder-preview-scenario-builders.mjs";
+import {
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
+  buildPreviewBootstrapSteps,
+} from "./report-builder-preview-scenario-builders.mjs";
 
 export default {
   baseUrl: "http://127.0.0.1:5175",
@@ -32,6 +35,10 @@ export default {
       expression: "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview'); const text = panel?.innerText || panel?.textContent || ''; return text.includes('Failed to load refinement actions for Delivery Date.') && text.includes('Preview runtime action provider failed.'); })()",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "waitForDomContains",
       text: "Retry action provider",
@@ -57,6 +64,14 @@ export default {
       expression: "(() => { const panel = document.querySelector('.forge-report-builder__runtime-preview'); const text = panel?.innerText || panel?.textContent || ''; return !text.includes('Preview runtime action provider failed.') && !text.includes('Failed to load refinement actions for Delivery Date.'); })()",
       timeoutMs: 60000,
     },
+    {
+      type: "assertDomNotContains",
+      text: "Runtime Diagnostics",
+    },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "waitForEval",
       expression: "document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-chart-panel .recharts-bar-rectangle').length > 0",

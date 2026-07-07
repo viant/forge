@@ -51,7 +51,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("[aria-label=\"Authored runtime preview\"]") && expression.includes("!text.includes('Model Ad Delivery')") && expression.includes("!text.includes('Entity Line Delivery')") && expression.includes("!text.includes('Dimensions Delivery Date, Channel')") && expression.includes("!text.includes('Measures Available Impressions')")),
+  expressions.some((expression) => expression.includes('[aria-label=\\"Authored runtime preview\\"]') && expression.includes('!text.includes("Model Ad Delivery")') && expression.includes('!text.includes("Entity Line Delivery")') && expression.includes('!text.includes("Dimensions Delivery Date, Channel")') && expression.includes('!text.includes("Measures Available Impressions")') && expression.includes("!semanticBinding") && expression.includes("!scopeSummary")),
   true,
 );
 assert.equal(
@@ -59,19 +59,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Model Ad Delivery")),
-  true,
-);
-assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Entity Line Delivery")),
-  true,
-);
-assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Dimensions Delivery Date, Channel")),
-  true,
-);
-assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Measures Available Impressions")),
+  expressions.some((expression) => expression.includes('[aria-label=\\"Authored runtime preview\\"]') && expression.includes('data-report-builder-semantic-binding="true"') && expression.includes('data-report-builder-scope-summary="true"') && expression.includes('text.includes("Dimensions Delivery Date, Channel")') && expression.includes('text.includes("Measures Available Impressions")') && expression.includes('text.includes("Filters")')),
   true,
 );
 assert.equal(
@@ -86,11 +74,11 @@ const reopenIndex = findStepIndex((step) => step?.type === "clickRole" && step?.
 const injectModelErrorIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("replaceSemanticModelBehaviors"));
 const postErrorReloadIndex = scenario.steps.findIndex((step, index) => index > injectModelErrorIndex && step?.type === "reload");
 const modelErrorVisibleIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Semantic model error: Semantic model metadata failed."));
-const noFallbackMetadataWhileErroredIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("[aria-label=\"Authored runtime preview\"]") && String(step?.expression || "").includes("!text.includes('Model Ad Delivery')"));
+const noFallbackMetadataWhileErroredIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('!text.includes("Model Ad Delivery")') && String(step?.expression || "").includes("!semanticBinding") && String(step?.expression || "").includes("!scopeSummary"));
 const retryModelReadyIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("Retry model load") && String(step?.expression || "").includes("!button.disabled"));
 const retryModelButtonIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Retry model load");
 const modelRecoveredIndex = scenario.steps.findIndex((step, index) => index > retryModelButtonIndex && step?.type === "assertDomNotContains" && String(step?.text || "").includes("Semantic model error: Semantic model metadata failed."));
-const runtimePreviewVisibleIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Compiled Report Runtime Preview"));
+const runtimePreviewVisibleIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('data-report-builder-semantic-binding="true"') && String(step?.expression || "").includes('text.includes("Dimensions Delivery Date, Channel")'));
 
 assert.notEqual(selectedTrendIndex, -1);
 assert.notEqual(prepareGetRequestIndex, -1);

@@ -15,6 +15,7 @@ function buildHistoryTrackedInteractionState(state = null) {
   return {
     refinements: cloneValue(normalized.refinements || []),
     drillTransitions: cloneValue(normalized.drillTransitions || []),
+    datasetScopeParams: cloneValue(normalized.datasetScopeParams || {}),
   };
 }
 
@@ -25,6 +26,7 @@ function restoreHistoryTrackedInteractionState(currentState = null, trackedState
     ...normalizedCurrentState,
     refinements: normalizedTrackedState.refinements,
     drillTransitions: normalizedTrackedState.drillTransitions,
+    datasetScopeParams: normalizedTrackedState.datasetScopeParams,
     hostIntent: null,
     detailDiagnostic: null,
   };
@@ -261,6 +263,17 @@ export function useReportRuntimeInteractionState({
     });
   }, [applyHistoryTrackedAction]);
 
+  const setDatasetScopeParamValue = React.useCallback(({ datasetRef, paramId, value }) => {
+    return applyHistoryTrackedAction({
+      type: "setDatasetScopeParamValue",
+      payload: {
+        datasetRef,
+        paramId,
+        value,
+      },
+    });
+  }, [applyHistoryTrackedAction]);
+
   const clearInteractionState = React.useCallback(() => {
     return replaceInteractionStateInternal(createReportRuntimeInteractionState(), {
       resetHistory: true,
@@ -363,6 +376,7 @@ export function useReportRuntimeInteractionState({
   return {
     refinements: interactionState.refinements,
     drillTransitions: interactionState.drillTransitions,
+    datasetScopeParams: interactionState.datasetScopeParams,
     hostIntent: interactionState.hostIntent,
     detailDiagnostic: interactionState.detailDiagnostic,
     canUndoInteraction: historyCapabilities.canUndo,
@@ -371,6 +385,7 @@ export function useReportRuntimeInteractionState({
     setDetailDiagnostic,
     applyRefinement,
     applyDrillTransition,
+    setDatasetScopeParamValue,
     removeRefinementById,
     clearRefinements,
     undoInteractionState,
