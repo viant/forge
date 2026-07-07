@@ -129,7 +129,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
       ],
     },
   ],
-  scopeSummaryTitle: "Report Scope",
+  scopeSummaryTitle: "Filters",
   scopeSummaryText: "Date Range • Channels • Audience Segment",
   scopeSummaryItems: [
     {

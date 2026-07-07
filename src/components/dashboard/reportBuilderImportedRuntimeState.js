@@ -2,7 +2,8 @@ import { buildDraftReportExportRequest } from "../../reporting/reportExportReque
 import { buildReportFillHash, buildReportSpecHash } from "../../reporting/reportFillModel.js";
 import { buildReportPrintFromReportFill } from "../../reporting/reportPrintModel.js";
 import { buildDashboardReportRuntimeBlock } from "../../reporting/reportRuntimeBlock.js";
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
+import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -199,14 +200,24 @@ export function resolveImportedPipelineRuntimeState({
             ? cloneValue(importedStandaloneReportFill)
             : null;
         if (reportSpec && reportFill) {
+            const metadataContext = resolveNormalizedReportSpecDocumentContext({
+                reportSpec,
+                document: baseArtifact?.document || null,
+                title: baseArtifact?.document?.title || reportSpec?.title || pipelineSummary?.title || "",
+            });
+            const carriedSemanticBindingViewState = cloneValue(
+                baseArtifact?.runtimeBlock?.dashboard?.reportRuntime?.semanticBindingViewState
+                || baseArtifact?.semanticBindingViewState
+                || null,
+            );
             const reportPrint = buildReportPrintFromReportFill({
                 reportSpec,
                 reportFill: cloneValue(reportFill),
             });
-            const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
-                semanticSummary: reportSpec?.semanticSummary || null,
-                binding: reportSpec?.binding || null,
-            }) || cloneValue(baseArtifact?.runtimeBlock?.dashboard?.reportRuntime?.semanticBindingViewState || null);
+            const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+                metadataContexts: [metadataContext],
+                candidates: [carriedSemanticBindingViewState],
+            });
             const exportRequest = reportPrint
                 ? buildDraftReportExportRequest({
                     reportSpec,
@@ -231,6 +242,7 @@ export function resolveImportedPipelineRuntimeState({
                         reportPrint,
                         semanticBindingViewState,
                     }),
+                    ...(semanticBindingViewState ? { semanticBindingViewState: cloneValue(semanticBindingViewState) } : {}),
                 };
             } else {
                 attachFailureMessage = "Could not attach the imported ReportFill to the imported ReportSpec runtime preview. The preview/export stayed on the compiled preview fill.";

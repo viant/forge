@@ -1,4 +1,5 @@
 import {
+    matchesReportBuilderSavedReportRecordSource,
     normalizeReportBuilderSavedReportRecords,
     resolveReportBuilderSavedReportRecordByReportId,
     resolveReportBuilderSavedReportRecordBySource,
@@ -59,6 +60,26 @@ function buildSavedRecordFromGetReportDocumentResponse(response = null) {
         source,
         ...(normalizeString(response?.importedArtifactKind) ? { importedArtifactKind: normalizeString(response.importedArtifactKind) } : {}),
     };
+}
+
+export function matchesReportBuilderSelectedEntryHydratedSession({
+    hydratedReportDocumentSession = null,
+    reopenedSavedRecord = null,
+    selectedListEntrySavedRecord = null,
+} = {}) {
+    if (!hydratedReportDocumentSession || !reopenedSavedRecord || !selectedListEntrySavedRecord) {
+        return false;
+    }
+    if (
+        normalizeString(selectedListEntrySavedRecord?.reportId)
+        !== normalizeString(hydratedReportDocumentSession?.reportId)
+    ) {
+        return false;
+    }
+    return matchesReportBuilderSavedReportRecordSource(
+        selectedListEntrySavedRecord,
+        reopenedSavedRecord,
+    );
 }
 
 export function buildReportBuilderSavedReportState({

@@ -202,7 +202,7 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadSummary(payload), 
         "Dimensions Transaction Date, Category",
         "Measures Net Revenue",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -229,6 +229,102 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadSummary(payload), 
         },
     ],
 });
+
+const staleCarriedCreatePayloadSummary = buildReportBuilderCreateReportDocumentPayloadSummary({
+    ...payload,
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        chips: [
+            "Model model://example/performance/delivery@v1",
+            "Measures available_impressions",
+        ],
+        fieldGroups: [
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "available_impressions",
+                        label: "available_impressions",
+                    },
+                ],
+            },
+        ],
+    },
+    document: {
+        ...payload.document,
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date" },
+                { id: "channel", rawId: "channelV2", label: "Canonical Channel" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+            ],
+        },
+    },
+});
+assert.deepEqual(staleCarriedCreatePayloadSummary.semanticBindingChips, [
+    "Model Canonical Ad Delivery",
+    "Entity Canonical Line Delivery",
+    "Dimensions Canonical Delivery Date, Canonical Channel",
+    "Measures Canonical Available Impressions",
+]);
+
+const richerCarriedCreatePayloadSummary = buildReportBuilderCreateReportDocumentPayloadSummary({
+    ...payload,
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        modelLabel: "Carried Revenue Operations",
+        entityLabel: "Carried Store Performance",
+        chips: [
+            "Model Carried Revenue Operations",
+            "Entity Carried Store Performance",
+            "Dimensions Carried Transaction Date",
+            "Measures Carried Net Revenue",
+        ],
+        fieldGroups: [
+            {
+                id: "dimensions",
+                title: "Selected dimensions (1)",
+                fields: [
+                    {
+                        id: "event_date",
+                        rawId: "eventDate",
+                        label: "Carried Transaction Date",
+                        category: "Time",
+                        definitionRef: "semantic://example/event_date",
+                    },
+                ],
+            },
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "avails",
+                        label: "Carried Net Revenue",
+                        format: "compactNumber",
+                        definitionRef: "semantic://example/net_revenue",
+                    },
+                ],
+            },
+        ],
+    },
+});
+assert.deepEqual(richerCarriedCreatePayloadSummary.semanticBindingChips, [
+    "Model Carried Revenue Operations",
+    "Entity Carried Store Performance",
+    "Dimensions Carried Transaction Date",
+    "Measures Carried Net Revenue",
+]);
 
 assert.match(
     serializeReportBuilderCreateReportDocumentPayload(payload),
@@ -267,7 +363,7 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadInspectorState(pay
         "Dimensions Transaction Date, Category",
         "Measures Net Revenue",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -631,7 +727,7 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadSummary(thinCreate
         "Parameters Imported Reporting Window",
         "Categories Time, Metrics +1",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Imported Reporting Window",
     scopeSummaryItems: [
         {
@@ -687,7 +783,7 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadInspectorState(thi
         "Parameters Imported Reporting Window",
         "Categories Time, Metrics +1",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Imported Reporting Window",
     scopeSummaryItems: [
         {
@@ -775,7 +871,7 @@ const embeddedSemanticCreateSavedReportPayload = {
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -1133,7 +1229,7 @@ const derivedCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBu
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -1181,6 +1277,112 @@ assert.equal(derivedCreatePayload.document.blocks[0].config.measures[0].label, "
 assert.equal(derivedCreatePayload.document.blocks[0].config.dimensions[0].label, "Delivery Date");
 assert.equal(derivedCreatePayload.compileState.diagnostics[0].code, "semanticProviderDiagnostics");
 assert.equal(derivedCreatePayload.createdAt, 9420);
+
+const canonicalFallbackCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBuilderState({
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_semantic_runtime_fallback",
+    savedAt: 9421,
+    title: "Semantic Runtime Fallback Demo",
+    sourceArtifactId: "semantic_runtime_fallback_demo",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "semanticRuntimeFallbackDemo",
+        title: "Semantic Runtime Fallback Demo",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        title: "Report Builder Demo",
+        dataSourceRef: "demoReportSource",
+    },
+    config: {
+        measures: [
+            { id: "totalSpend", key: "totalSpend", semanticRef: "spend", label: "Spend", default: true, format: "currency" },
+            { id: "impressions", key: "impressions", semanticRef: "impressions", label: "Impressions", default: true, format: "compactNumber" },
+        ],
+        dimensions: [
+            { id: "eventDate", key: "eventDate", semanticRef: "event_date", label: "Date", default: true, chartAxis: true, format: "date" },
+            { id: "channelV2", key: "channelV2", semanticRef: "channel", label: "Channel", default: true },
+        ],
+        staticFilters: [
+            {
+                id: "dateRange",
+                type: "dateRange",
+                required: true,
+                startParamPath: "filters.From",
+                endParamPath: "filters.To",
+            },
+        ],
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["spend", "impressions"],
+        },
+    },
+    state: {
+        selectedMeasures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        selectedDimensions: ["eventDate", "channelV2"],
+        viewMode: "table",
+        scopeParams: {
+            dateRange: {
+                start: "2026-06-19",
+                end: "2026-06-25",
+            },
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["spend", "impressions"],
+        },
+    },
+    semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        modelLabel: "Canonical Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Canonical Line Delivery",
+        selectedDimensions: [
+            { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date" },
+            { id: "channel", rawId: "channelV2", label: "Canonical Channel" },
+        ],
+        selectedMeasures: [
+            { id: "spend", rawId: "totalSpend", label: "Canonical Spend", format: "currency" },
+            { id: "impressions", rawId: "impressions", label: "Canonical Impressions", format: "compactNumber" },
+        ],
+        selectedParameters: [
+            { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+        ],
+    },
+    semanticModel: null,
+    createdAt: 9422,
+});
+
+assert.equal(canonicalFallbackCreatePayload.document.semanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(canonicalFallbackCreatePayload.document.semanticSummary.entityLabel, "Canonical Line Delivery");
+assert.equal(canonicalFallbackCreatePayload.document.semanticSummary.selectedDimensions[0].label, "Canonical Delivery Date");
+assert.equal(canonicalFallbackCreatePayload.document.semanticSummary.selectedMeasures[0].label, "Canonical Spend");
+assert.equal(
+    buildReportBuilderCreateReportDocumentPayloadSummary(canonicalFallbackCreatePayload).semanticBindingChips.includes("Model Canonical Ad Delivery"),
+    true,
+);
+assert.equal(
+    buildReportBuilderCreateReportDocumentPayloadSummary(canonicalFallbackCreatePayload).semanticBindingChips.includes("Dimensions Canonical Delivery Date, Canonical Channel"),
+    true,
+);
 
 const dependentDerivedCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBuilderState({
     version: 1,
@@ -1252,7 +1454,7 @@ const dependentDerivedCreatePayload = buildReportBuilderCreateReportDocumentPayl
             xField: "eventDate",
             yFields: ["runningCtvAvails"],
         },
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",

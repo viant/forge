@@ -75,6 +75,9 @@ export function normalizeReportTableBlockColumn(column = {}) {
     key,
     ...(normalizeString(column.sourceKey) ? { sourceKey: normalizeString(column.sourceKey) } : {}),
     ...(normalizeString(column.displayKey) ? { displayKey: normalizeString(column.displayKey) } : {}),
+    ...(column?.displayValueMap && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap)
+      ? { displayValueMap: cloneValue(column.displayValueMap) }
+      : {}),
     ...(normalizeString(column.kind) ? { kind: normalizeString(column.kind) } : {}),
     ...(normalizeString(column.label) ? { label: normalizeString(column.label) } : {}),
     ...(normalizeString(column.format) ? { format: normalizeString(column.format) } : {}),
@@ -88,9 +91,12 @@ export function normalizeReportDocumentTableBlock(block = {}) {
   const id = normalizeString(block?.id || "tableBlock");
   const title = normalizeString(block?.title || "Table");
   const datasetRef = normalizeString(block?.datasetRef || "primary");
-  const columns = (Array.isArray(block?.columns) ? block.columns : [])
+  const explicitColumns = (Array.isArray(block?.columns) ? block.columns : [])
     .map((column) => normalizeReportTableBlockColumn(column))
     .filter(Boolean);
+  const columns = explicitColumns.length > 0
+    ? explicitColumns
+    : normalizeStringArray(block?.columnKeys).map((key) => ({ key }));
   return {
     id,
     kind: "tableBlock",

@@ -71,7 +71,7 @@ const state = {
   reportDocumentTitle: "Executive Snapshot",
   reportDocumentSubtitle: "Weekly Rollup",
   reportDocumentDescription: "Authored runtime metadata summary.",
-  staticFilters: {
+  scopeParams: {
     dateRange: {
       start: "2025-05-01",
       end: "2025-05-22",
@@ -90,7 +90,7 @@ const refinements = [{
   field: "channelV2",
   values: ["Display"],
   sourceBlockId: "primaryTable",
-  label: "Drill to Publisher = Display",
+  label: "Channel = Display",
 }];
 
 const drillTransitions = [{
@@ -158,7 +158,7 @@ assert.deepEqual(model.scopeCapability, {
 });
 assert.deepEqual(model.tableCapability, {
   supported: true,
-  columnKeys: ["channelV2", "publisherId", "siteType", "avails"],
+  columnKeys: ["channelV2", "avails"],
 });
 assert.deepEqual(model.chartCapability, {
   supported: true,
@@ -201,7 +201,7 @@ assert.deepEqual(resolveReportBuilderRuntimeTableCapability({
   state,
 }), {
   supported: true,
-  columnKeys: ["channelV2", "publisherId", "siteType", "avails"],
+  columnKeys: ["channelV2", "avails"],
 });
 assert.deepEqual(resolveReportBuilderRuntimeRefinementCapability({
   reportSpec: model.reportSpec,
@@ -352,7 +352,7 @@ assert.deepEqual(runtimeRefinementReadyModel.scopeCapability, {
 });
 assert.deepEqual(runtimeRefinementReadyModel.tableCapability, {
   supported: true,
-  columnKeys: ["channelV2", "publisherId", "siteType", "avails"],
+  columnKeys: ["channelV2", "avails"],
 });
 assert.deepEqual(runtimeRefinementReadyModel.chartCapability, {
   supported: true,
@@ -419,7 +419,7 @@ assert.deepEqual(nonRefinableModel.scopeCapability, {
 });
 assert.deepEqual(nonRefinableModel.tableCapability, {
   supported: true,
-  columnKeys: ["publisherId", "siteType", "avails"],
+  columnKeys: ["publisherId", "avails"],
 });
 assert.deepEqual(nonRefinableModel.chartCapability, {
   supported: true,
@@ -732,6 +732,137 @@ assert.equal(
   false,
 );
 
+const canonicalDocumentPreviewModel = {
+  ...model,
+  semanticBindingViewState: null,
+  document: {
+    ...model.document,
+    semanticSummary: {
+      kind: "semantic",
+      modelRef: "model://example/performance/delivery@v1",
+      modelLabel: "Canonical Ad Delivery",
+      entity: "line_delivery",
+      entityLabel: "Canonical Line Delivery",
+      selectedDimensions: [
+        { id: "channel", rawId: "channelV2", label: "Canonical Channel", category: "Delivery" },
+      ],
+      selectedMeasures: [
+        { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+      ],
+      selectedParameters: [
+        { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+      ],
+    },
+  },
+  reportSpec: {
+    ...model.reportSpec,
+    semanticSummary: {
+      kind: "semantic",
+      modelRef: "model://example/performance/delivery@v1",
+      entity: "line_delivery",
+      selectedDimensions: ["channel"],
+      selectedMeasures: ["available_impressions"],
+      selectedParameters: ["reporting_window"],
+    },
+  },
+};
+
+const canonicalDocumentPreviewArtifacts = buildReportBuilderRuntimePreviewArtifacts({
+  model: canonicalDocumentPreviewModel,
+  rows: [
+    { channelV2: "Display", publisherId: "Acme Media", avails: 1250000 },
+  ],
+  hasMore: false,
+});
+
+const canonicalDocumentPreview = buildReportBuilderRuntimePreview({
+  model: canonicalDocumentPreviewModel,
+  rows: [
+    { channelV2: "Display", publisherId: "Acme Media", avails: 1250000 },
+  ],
+  hasMore: false,
+});
+
+assert.equal(canonicalDocumentPreviewArtifacts.reportSpec.semanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(canonicalDocumentPreviewArtifacts.reportSpec.semanticSummary.entityLabel, "Canonical Line Delivery");
+assert.equal(canonicalDocumentPreviewArtifacts.reportSpec.semanticSummary.selectedDimensions[0].label, "Canonical Channel");
+assert.equal(canonicalDocumentPreviewArtifacts.reportSpec.semanticSummary.selectedMeasures[0].label, "Canonical Available Impressions");
+assert.equal(canonicalDocumentPreviewArtifacts.reportSpec.semanticSummary.selectedParameters[0].label, "Canonical Reporting Window");
+assert.equal(canonicalDocumentPreviewArtifacts.semanticBindingViewState.chips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(canonicalDocumentPreviewArtifacts.semanticBindingViewState.chips.includes("Entity Canonical Line Delivery"), true);
+assert.equal(canonicalDocumentPreviewArtifacts.semanticBindingViewState.chips.includes("Dimensions Canonical Channel"), true);
+assert.equal(canonicalDocumentPreviewArtifacts.semanticBindingViewState.chips.includes("Measures Canonical Available Impressions"), true);
+assert.equal(canonicalDocumentPreview.exportRequest.reportSpec.semanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(canonicalDocumentPreview.runtimeBlock.dashboard.reportRuntime.reportSpec.semanticSummary.selectedMeasures[0].label, "Canonical Available Impressions");
+
+const richerCarriedPreviewModel = {
+  ...canonicalDocumentPreviewModel,
+  semanticBindingViewState: {
+    title: "Semantic Binding",
+    modelLabel: "Carried Ad Delivery",
+    entityLabel: "Carried Line Delivery",
+    chips: [
+      "Model Carried Ad Delivery",
+      "Entity Carried Line Delivery",
+      "Dimensions Carried Delivery Date",
+      "Measures Carried Available Impressions",
+    ],
+    fieldGroups: [
+      {
+        id: "dimensions",
+        title: "Selected dimensions (1)",
+        fields: [
+          {
+            id: "event_date",
+            rawId: "eventDate",
+            label: "Carried Delivery Date",
+            category: "Time",
+            definitionRef: "semantic://example/event_date",
+          },
+        ],
+      },
+      {
+        id: "measures",
+        title: "Selected measures (1)",
+        fields: [
+          {
+            id: "available_impressions",
+            rawId: "avails",
+            label: "Carried Available Impressions",
+            format: "compactNumber",
+            definitionRef: "semantic://example/available_impressions",
+          },
+        ],
+      },
+    ],
+  },
+};
+
+const richerCarriedPreviewArtifacts = buildReportBuilderRuntimePreviewArtifacts({
+  model: richerCarriedPreviewModel,
+  rows: [
+    { channelV2: "Display", publisherId: "Acme Media", avails: 1250000 },
+  ],
+  hasMore: false,
+});
+
+const richerCarriedPreview = buildReportBuilderRuntimePreview({
+  model: richerCarriedPreviewModel,
+  rows: [
+    { channelV2: "Display", publisherId: "Acme Media", avails: 1250000 },
+  ],
+  hasMore: false,
+});
+
+assert.deepEqual(richerCarriedPreviewArtifacts.semanticBindingViewState.chips, [
+  "Model Carried Ad Delivery",
+  "Entity Carried Line Delivery",
+  "Dimensions Carried Delivery Date",
+  "Measures Carried Available Impressions",
+]);
+assert.equal(richerCarriedPreview.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.chips.includes("Model Carried Ad Delivery"), true);
+assert.equal(richerCarriedPreview.exportRequest.reportSpec.semanticSummary.modelLabel, "Canonical Ad Delivery");
+
 const semanticBinding = {
   mode: "semantic",
   modelRef: "model://example/performance/delivery@v1",
@@ -947,6 +1078,58 @@ const authoredBlocksPreview = buildReportBuilderRuntimePreview({
 });
 assert.equal(authoredBlocksPreview.reportFill.blocks.some((block) => block.kind === "markdownBlock" && block.id === "narrativeIntro"), true);
 assert.equal(authoredBlocksPreview.reportFill.blocks.some((block) => block.kind === "kpiBlock" && block.id === "headlineKpi" && block.content?.value === 1200000), true);
+
+const authoredOnlyBlocksModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config,
+  state: {
+    ...state,
+    reportDocumentBlocks: [
+      {
+        id: "narrativeIntro",
+        kind: "markdownBlock",
+        title: "Narrative",
+        markdown: "## Narrative\nAuthor-provided context.",
+      },
+      {
+        id: "headlineKpi",
+        kind: "kpiBlock",
+        title: "Headline KPI",
+        datasetRef: "primary",
+        valueField: "avails",
+        valueLabel: "Avails",
+      },
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "narrativeIntro" },
+        { blockId: "primaryBuilder" },
+        { blockId: "headlineKpi" },
+      ],
+    },
+  },
+  includePrimaryBlocks: false,
+});
+assert.deepEqual(
+  authoredOnlyBlocksModel.reportSpec.blocks.map((block) => block.id),
+  ["sharedFilters", "narrativeIntro", "headlineKpi"],
+);
+assert.equal(
+  authoredOnlyBlocksModel.reportSpec.blocks.some((block) => block.id === "primaryTable" || block.id === "primaryChart"),
+  false,
+);
+assert.equal(authoredOnlyBlocksModel.reportSpec.datasets[0].request.dimensions.channelV2, true);
+const authoredOnlyBlocksPreview = buildReportBuilderRuntimePreview({
+  model: authoredOnlyBlocksModel,
+  rows: [
+    { channelV2: "Display", avails: 1200000 },
+  ],
+  hasMore: false,
+});
+assert.equal(authoredOnlyBlocksPreview.reportFill.blocks.some((block) => block.id === "primaryTable" || block.id === "primaryChart"), false);
+assert.equal(authoredOnlyBlocksPreview.reportFill.blocks.some((block) => block.kind === "markdownBlock" && block.id === "narrativeIntro"), true);
+assert.equal(authoredOnlyBlocksPreview.reportFill.blocks.some((block) => block.kind === "kpiBlock" && block.id === "headlineKpi" && block.content?.value === 1200000), true);
 
 const authoredSizedBlocksModel = buildReportBuilderRuntimePreviewModel({
   container,
@@ -1251,6 +1434,47 @@ assert.deepEqual(dedupedSemanticDiagnosticsPreview.reportFill.diagnostics, [
   },
 ]);
 
+const semanticRequestError = new Error("Semantic model metadata failed. Retry loading the semantic model or choose a different semantic binding.");
+semanticRequestError.diagnostics = [
+  {
+    code: "semanticModelError",
+    severity: "error",
+    path: "selection.modelRef",
+    message: "Semantic model metadata failed.",
+    suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
+  },
+];
+const semanticRequestErrorPreview = buildReportBuilderRuntimePreview({
+  model,
+  rows: [],
+  hasMore: false,
+  error: semanticRequestError,
+});
+assert.deepEqual(semanticRequestErrorPreview.reportFill.diagnostics, [
+  {
+    code: "semanticModelError",
+    severity: "error",
+    path: "selection.modelRef",
+    message: "Semantic model metadata failed.",
+    suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
+  },
+]);
+
+const transportTimeoutError = new Error('GET error: 500 Internal Server Error: code: -32603, message: code: -32603, message: failed to send request: Post "http://steward.viantinc.com:5000/mcp": dial tcp 10.55.130.249:5000: i/o timeout, data: [123]');
+const transportTimeoutPreview = buildReportBuilderRuntimePreview({
+  model,
+  rows: [],
+  hasMore: false,
+  error: transportTimeoutError,
+});
+assert.deepEqual(transportTimeoutPreview.reportFill.diagnostics, [
+  {
+    code: "runtimePreviewError",
+    severity: "error",
+    message: "The reporting service at http://steward.viantinc.com:5000/mcp did not respond in time. Try again after the service is available.",
+  },
+]);
+
 const authoredBarsModel = buildReportBuilderRuntimePreviewModel({
   container,
   config,
@@ -1292,11 +1516,67 @@ const authoredBarsPreview = buildReportBuilderRuntimePreview({
   ],
   hasMore: false,
 });
-assert.equal(authoredBarsPreview.reportFill.blocks[0].kind, "filterBarBlock");
+const authoredBarsFilterBlock = authoredBarsPreview.reportFill.blocks.find((block) => block.id === "scopeFilters") || null;
+assert.equal(authoredBarsFilterBlock?.kind, "filterBarBlock");
 assert.equal(authoredBarsPreview.reportFill.blocks.some((block) => block.kind === "refinementBarBlock" && block.id === "trail"), true);
 assert.equal(authoredBarsPreview.reportFill.blocks.filter((block) => block.kind === "filterBarBlock").length, 1);
 assert.equal(authoredBarsPreview.reportFill.blocks.filter((block) => block.kind === "refinementBarBlock").length, 1);
 assert.equal(authoredBarsPreview.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.scopeFilters"), true);
+assert.equal(authoredBarsFilterBlock?.content?.params?.[0]?.type, "dateRange");
+
+const interactiveFilterModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config: {
+    ...config,
+    staticFilters: [
+      ...config.staticFilters,
+      {
+        id: "channelIds",
+        label: "Channels",
+        multiple: true,
+        presentation: "compactIconRow",
+        options: [
+          { value: "Display", label: "Display", icon: "media" },
+          { value: "CTV", label: "CTV", icon: "video" },
+        ],
+      },
+    ],
+  },
+  state: {
+    ...state,
+    scopeParams: {
+      ...state.scopeParams,
+      channelIds: ["Display"],
+    },
+    reportDocumentBlocks: [
+      {
+        id: "scopeFilters",
+        kind: "filterBarBlock",
+        title: "Filters",
+        paramIds: ["dateRange", "channelIds"],
+      },
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [{ blockId: "scopeFilters" }, { blockId: "primaryBuilder" }],
+    },
+  },
+});
+const interactiveFilterPreview = buildReportBuilderRuntimePreview({
+  model: interactiveFilterModel,
+  rows: [
+    { channelV2: "Display", avails: 1200000 },
+  ],
+  hasMore: false,
+});
+const interactiveScopeFilters = interactiveFilterPreview.reportFill.blocks.find((block) => block.id === "scopeFilters") || null;
+assert.equal(interactiveScopeFilters?.content?.params?.[1]?.label, "Channels");
+assert.equal(interactiveScopeFilters?.content?.params?.[1]?.multiple, true);
+assert.equal(interactiveScopeFilters?.content?.params?.[1]?.presentation, "compactIconRow");
+assert.deepEqual(interactiveScopeFilters?.content?.params?.[1]?.options, [
+  { value: "Display", label: "Display", icon: "media" },
+  { value: "CTV", label: "CTV", icon: "video" },
+]);
 
 const localCalculatedModel = buildReportBuilderRuntimePreviewModel({
   container,
@@ -1523,8 +1803,8 @@ assert.deepEqual(authoredReachRateTableInteraction.actions.map((action) => ({
   label: action.label,
   kind: action.kind,
 })), [
-  { id: "keep:channelV2", label: "Keep only", kind: "keep" },
-  { id: "exclude:channelV2", label: "Exclude", kind: "exclude" },
+  { id: "keep:channelV2", label: "Keep Channel", kind: "keep" },
+  { id: "exclude:channelV2", label: "Exclude Channel", kind: "exclude" },
   { id: "drill:channelV2:publisherId", label: "Drill to Publisher", kind: "drill" },
 ]);
 const authoredReachRateTableDrillExecution = authoredReachRateTableInteraction.actions.find((action) => action.kind === "drill")?.resolveExecution({
@@ -1545,7 +1825,7 @@ assert.deepEqual(authoredReachRateTableDrillExecution, {
     value: "Display",
     sourceBlockId: "reachRateTable",
     fieldLabel: "Channel",
-    label: "Drill to Publisher = Display",
+    label: "Channel = Display",
   },
 });
 let authoredReachRateTableInteractionState = createReportRuntimeInteractionState();
@@ -1572,6 +1852,11 @@ const authoredReachRateTableDrilledModel = buildReportBuilderRuntimePreviewModel
   container,
   config: {
     ...config,
+    dimensions: config.dimensions.map((dimension) => (
+      dimension?.id === "publisherId"
+        ? { ...dimension, displayKey: "publisherName" }
+        : dimension
+    )),
     measures: [
       ...config.measures,
       { id: "hhUniqs", key: "hhUniqs", label: "HH Uniques", format: "compactNumber" },
@@ -1623,5 +1908,92 @@ const authoredReachRateTableDrilledModel = buildReportBuilderRuntimePreviewModel
 assert.deepEqual(authoredReachRateTableDrilledModel.reportSpec.datasets[0].request.filters.includeChannelV2, ["Display"]);
 assert.equal(authoredReachRateTableDrilledModel.reportSpec.datasets[0].request.dimensions.publisherId, true);
 assert.equal(authoredReachRateTableDrilledModel.reportSpec.blocks.find((block) => block.id === "reachRateTable")?.columns?.some((column) => column.key === "reachRate"), true);
+assert.deepEqual(
+  authoredReachRateTableDrilledModel.reportSpec.blocks.find((block) => block.id === "reachRateTable")?.columns?.[0],
+  {
+    key: "publisherId",
+    sourceKey: "publisherId",
+    displayKey: "publisherName",
+    label: "Publisher",
+  },
+);
+const authoredReachRateTableDrilledPreview = buildReportBuilderRuntimePreview({
+  model: authoredReachRateTableDrilledModel,
+  rows: [
+    { eventDate: "2025-05-01", channelV2: "Display", publisherId: 506, publisherName: "Acme Media", avails: 12000, hhUniqs: 3000 },
+    { eventDate: "2025-05-02", channelV2: "Display", publisherId: 612, publisherName: "North Star Media", avails: 16000, hhUniqs: 6400 },
+  ],
+  hasMore: false,
+});
+const authoredReachRateTableDrilledBlock = authoredReachRateTableDrilledPreview.reportFill.blocks.find((block) => block.id === "reachRateTable");
+assert.equal(authoredReachRateTableDrilledBlock?.content?.columns?.[0]?.label, "Publisher");
+assert.equal(authoredReachRateTableDrilledBlock?.content?.resolvedRows?.[0]?.cells?.[0]?.value, 506);
+assert.equal(authoredReachRateTableDrilledBlock?.content?.resolvedRows?.[0]?.cells?.[0]?.displayValue, "Acme Media");
+
+// Regression: drilling into a dimension that has no dedicated runtime filter
+// binding (the common case — most drill hierarchy levels are not also wired
+// up as quick-filter chips) must still request the drill's source field so
+// the client-side "drill" refinement has something to match against. Before
+// the fix, only fields with a `runtimeFilter` binding (or the drill target
+// field itself) were added to request.dimensions, so the source field was
+// silently dropped from the request once its column was replaced by the
+// drill target column — producing "No data" instead of a filtered table.
+const unboundDrillRefinements = [{
+  id: "drill:publisherId:siteType",
+  op: "drill",
+  field: "publisherId",
+  values: ["Acme Media"],
+  sourceBlockId: "publisherTable",
+  label: "Publisher = Acme Media",
+}];
+const unboundDrillTransitions = [{
+  refinementId: "drill:publisherId:siteType",
+  sourceField: "publisherId",
+  nextFieldRef: "siteType",
+  sourceBlockId: "publisherTable",
+}];
+const unboundDrillModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config,
+  state: {
+    ...state,
+    selectedDimensions: ["publisherId"],
+    reportDocumentBlocks: [
+      {
+        id: "publisherTable",
+        kind: "tableBlock",
+        title: "Publisher Table",
+        datasetRef: "primary",
+        columns: [
+          { key: "publisherId", label: "Publisher" },
+          { key: "avails", label: "Avails" },
+        ],
+      },
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "primaryBuilder" },
+        { blockId: "publisherTable" },
+      ],
+    },
+  },
+  refinements: unboundDrillRefinements,
+  drillTransitions: unboundDrillTransitions,
+});
+assert.equal(unboundDrillModel.reportSpec.datasets[0].request.dimensions.publisherId, true);
+assert.equal(unboundDrillModel.reportSpec.datasets[0].request.dimensions.siteType, true);
+assert.equal(unboundDrillModel.reportSpec.datasets[0].request.filters?.includePublisherId, undefined);
+const unboundDrillPreview = buildReportBuilderRuntimePreview({
+  model: unboundDrillModel,
+  rows: [
+    { publisherId: "Acme Media", siteType: "App", avails: 12000 },
+    { publisherId: "North Star Media", siteType: "Web", avails: 16000 },
+  ],
+  hasMore: false,
+});
+const unboundDrillBlock = unboundDrillPreview.reportFill.blocks.find((block) => block.id === "publisherTable");
+assert.equal(unboundDrillBlock?.content?.resolvedRows?.length, 1);
+assert.equal(unboundDrillBlock?.content?.resolvedRows?.[0]?.cells?.[0]?.value, "App");
 
 console.log("reportBuilderRuntimePreview ✓ compiles builder state into authored runtime report contracts");

@@ -32,6 +32,8 @@ export function resolveReportBuilderRuntimePreviewRowsSource({
 } = {}) {
     const normalizedCurrentRequestFingerprint = normalizeString(currentRequestFingerprint);
     const normalizedRuntimePreviewFingerprint = normalizeString(runtimePreviewFingerprint);
+    const normalizedCollectionRows = normalizeRows(collection);
+    const normalizedFetchedRows = normalizeRows(fetchedRows);
     const requestMatches = normalizedCurrentRequestFingerprint
         && normalizedCurrentRequestFingerprint === normalizedRuntimePreviewFingerprint;
     const requestDispatched = matchesReportBuilderRuntimePreviewDispatch(
@@ -44,11 +46,20 @@ export function resolveReportBuilderRuntimePreviewRowsSource({
             currentRequestShouldFetch
                 ? !loading && !error
                 : hasCompletedCurrentRun
+        )
+        && (
+            normalizedCollectionRows.length > 0
+            || (
+                normalizedFetchedRows.length === 0
+                && fetchedHasMore !== true
+                && fetchedLoading !== true
+                && !fetchedError
+            )
         );
     if (canUseCollection) {
         return {
             source: "collection",
-            rows: normalizeRows(collection),
+            rows: normalizedCollectionRows,
             hasMore: collectionInfo?.hasMore === true,
             error: null,
             loading: false,
@@ -56,7 +67,7 @@ export function resolveReportBuilderRuntimePreviewRowsSource({
     }
     return {
         source: "runtimePreview",
-        rows: normalizeRows(fetchedRows),
+        rows: normalizedFetchedRows,
         hasMore: fetchedHasMore === true,
         error: fetchedError || null,
         loading: fetchedLoading === true,

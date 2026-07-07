@@ -42,6 +42,24 @@ assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
   error: null,
 });
 
+assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
+  fingerprint: "runtime::2",
+  requestKey: "runtime::2::0",
+  currentState: {
+    fingerprint: "runtime::1",
+    requestKey: "runtime::1::0",
+    rows: [{ channelV2: "Display" }],
+    hasMore: true,
+  },
+}), {
+  fingerprint: "runtime::2",
+  requestKey: "runtime::2::0",
+  rows: [{ channelV2: "Display" }],
+  hasMore: true,
+  loading: true,
+  error: null,
+});
+
 assert.deepEqual(buildResolvedReportRuntimePreviewRowsState({
   fingerprint: "runtime::1",
   requestKey: "runtime::1::0",
@@ -259,18 +277,14 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   },
 }), {
   type: "start",
-  nextState: buildPendingReportRuntimePreviewRowsState({
+  nextState: {
     fingerprint: "runtime::6",
     requestKey: "runtime::6::0",
-    currentState: {
-      fingerprint: "runtime::old",
-      requestKey: "runtime::old::0",
-      rows: [{ channelV2: "Display" }],
-      hasMore: true,
-      loading: false,
-      error: null,
-    },
-  }),
+    rows: [{ channelV2: "Display" }],
+    hasMore: true,
+    loading: true,
+    error: null,
+  },
 });
 
 assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
@@ -305,4 +319,87 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   }),
 });
 
+// First-drill transition: the hook was disabled (resolved-collection preview mode)
+// and has never fetched, so currentState is idle. The caller-supplied seed rows
+// (the previously visible resolved-collection rows) must be retained instead of
+// collapsing to empty while the first drill request is in flight.
+assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
+  fingerprint: "runtime::first-drill",
+  requestKey: "runtime::first-drill::0",
+  currentState: buildIdleReportRuntimePreviewRowsState(),
+  seedRows: [{ channelV2: "Display" }, { channelV2: "CTV" }],
+  seedHasMore: true,
+}), {
+  fingerprint: "runtime::first-drill",
+  requestKey: "runtime::first-drill::0",
+  rows: [{ channelV2: "Display" }, { channelV2: "CTV" }],
+  hasMore: true,
+  loading: true,
+  error: null,
+});
+
+// Once the hook has already fetched at least once, prior fetched rows win over the
+// seed even if a seed is still supplied (e.g. a second drill after the first).
+assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
+  fingerprint: "runtime::second-drill",
+  requestKey: "runtime::second-drill::0",
+  currentState: {
+    fingerprint: "runtime::first-drill",
+    requestKey: "runtime::first-drill::0",
+    rows: [{ channelV2: "Drilled Display" }],
+    hasMore: false,
+  },
+  seedRows: [{ channelV2: "Should Not Be Used" }],
+  seedHasMore: true,
+}), {
+  fingerprint: "runtime::second-drill",
+  requestKey: "runtime::second-drill::0",
+  rows: [{ channelV2: "Drilled Display" }],
+  hasMore: false,
+  loading: true,
+  error: null,
+});
+
+// With no seed supplied, the first-drill transition falls back to empty rows
+// (unchanged default behavior when no resolved-collection rows exist yet).
+assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
+  fingerprint: "runtime::first-drill-no-seed",
+  requestKey: "runtime::first-drill-no-seed::0",
+  currentState: buildIdleReportRuntimePreviewRowsState(),
+}), {
+  fingerprint: "runtime::first-drill-no-seed",
+  requestKey: "runtime::first-drill-no-seed::0",
+  rows: [],
+  hasMore: false,
+  loading: true,
+  error: null,
+});
+
+// End-to-end transition: disabling the hook (resolved-collection mode) resets to
+// idle, then the first drill flips enabled=true and must seed the pending state
+// from the previously visible resolved-collection rows.
+assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
+  enabled: true,
+  canRun: true,
+  hasModel: true,
+  hasRequest: true,
+  fingerprint: "runtime::first-drill",
+  requestKey: "runtime::first-drill::0",
+  fetchAvailable: true,
+  currentState: buildIdleReportRuntimePreviewRowsState(),
+  seedRows: [{ channelV2: "Display" }],
+  seedHasMore: false,
+}), {
+  type: "start",
+  nextState: {
+    fingerprint: "runtime::first-drill",
+    requestKey: "runtime::first-drill::0",
+    rows: [{ channelV2: "Display" }],
+    hasMore: false,
+    loading: true,
+    error: null,
+  },
+});
+
 console.log("reportRuntimePreviewRowsState ✓ models authored runtime preview fetch state transitions deterministically");
+console.log("reportRuntimePreviewRowsState ✓ seeds the first-drill pending state from resolved-collection rows instead of collapsing to empty");

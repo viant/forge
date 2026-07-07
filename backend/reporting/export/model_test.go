@@ -34,6 +34,28 @@ func TestDecodeJSON_CapacityDirectSeriesFixture(t *testing.T) {
 	require.Len(t, request.ReportPrintModel().Pages, 3)
 }
 
+func TestDecodeJSON_PreservesOptionalMetadata(t *testing.T) {
+	fixture := loadExportRequestFixtureMap(
+		t,
+		"capacity-direct-series-export-request-fixture.v1.json",
+	)
+	fixture["metadata"] = map[string]any{
+		"conversationId": "conv-123",
+		"workspaceId":    "steward",
+		"renderHints": map[string]any{
+			"theme": "print",
+		},
+	}
+	syncExportRequestFixtureHashes(fixture)
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	request, err := DecodeJSON(data)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"conversationId":"conv-123","workspaceId":"steward","renderHints":{"theme":"print"}}`, string(request.Metadata))
+}
+
 func TestDecodeJSON_AudienceFixturePreservesOptionalReportPrintContract(t *testing.T) {
 	fixture := loadExportRequestFixtureMap(
 		t,

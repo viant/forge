@@ -71,6 +71,24 @@ export function buildStaticPreviewScenarioRunnerArgs(args = [], {
   return forwarded;
 }
 
+export function formatStaticPreviewRunnerError(error = null) {
+  const message = String(error?.message || error || "").trim();
+  if (!message) {
+    return [
+      "Static preview scenario runner failed.",
+      "If the failure was a Playwright browser launch problem, rerun on a host that allows headless browser startup and has the required Playwright browser binaries installed.",
+    ].join("\n");
+  }
+  if (message.includes("static preview scenario runner exited with code")) {
+    return [
+      message,
+      "If the underlying failure was a Playwright browser launch error, rerun on a host that allows headless browser startup.",
+      "If browser binaries are missing, run `npx playwright install` from the workspace before retrying.",
+    ].join("\n");
+  }
+  return message;
+}
+
 function spawnChild(command, args, options = {}) {
   return spawn(command, args, {
     cwd: repoRoot,
@@ -120,7 +138,11 @@ async function main() {
     runnerScript,
     ...runnerArgs,
   ]);
-  await waitForExit(runnerChild, "static preview scenario runner");
+  try {
+    await waitForExit(runnerChild, "static preview scenario runner");
+  } catch (error) {
+    throw new Error(formatStaticPreviewRunnerError(error));
+  }
 }
 
 const invokedPath = normalizeArgValue(process.argv[1] || "");

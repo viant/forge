@@ -1,4 +1,4 @@
-import { formatRefinementActionLabel } from "./reportRuntimeChartActionModel.js";
+import { formatRefinementActionLabel, resolveRuntimeActionLabel } from "./reportRuntimeChartActionModel.js";
 import { resolveReportRuntimeFieldActionKey } from "./reportRuntimeModel.js";
 
 function normalizeString(value = "") {
@@ -42,7 +42,7 @@ export function buildReportRuntimeTableActionDescriptors({
           : `${kindName}:${normalizeString(field?.valueKey)}`,
         kind: kindName,
         fieldValueKey: normalizeString(field?.valueKey),
-        label: normalizeString(metadataAction?.label || formatRefinementActionLabel(kindName, field?.label)),
+        label: resolveRuntimeActionLabel(kindName, metadataAction?.label, field?.label),
       });
     });
   });

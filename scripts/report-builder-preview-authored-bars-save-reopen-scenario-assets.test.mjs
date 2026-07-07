@@ -51,7 +51,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("Inventory Scope") && expression.includes("Date Range") && expression.includes("!text.includes('Inventory Trail')") && expression.includes("!text.includes('Report Scope')")),
+  expressions.some((expression) => expression.includes("Inventory Scope") && expression.includes("Date Range") && expression.includes("!text.includes('Inventory Trail')") && expression.includes("!text.includes('Filters')")),
   true,
 );
 
@@ -107,7 +107,7 @@ const removeRefinementIndex = findStepIndex((step) => step?.type === "eval" && S
 const removedCardsIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("!titles.includes('Inventory Scope')") && String(step.expression || "").includes("!titles.includes('Inventory Trail')"));
 const reopenIndex = findStepIndex((step) => step?.type === "eval" && String(step.expression || "").includes("Reopen in builder button not found."));
 const reopenedCardsIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("titles.includes('Inventory Scope')") && String(step.expression || "").includes("titles.includes('Inventory Trail')") && scenario.steps.indexOf(step) > reopenIndex);
-const reopenedRuntimeIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("text.includes('Inventory Scope')") && String(step.expression || "").includes("!text.includes('Inventory Trail')") && String(step.expression || "").includes("!text.includes('Report Scope')"));
+const reopenedRuntimeIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("text.includes('Inventory Scope')") && String(step.expression || "").includes("!text.includes('Inventory Trail')") && String(step.expression || "").includes("!text.includes('Filters')"));
 
 assert.notEqual(addFilterIndex, -1);
 assert.notEqual(addRefinementIndex, -1);

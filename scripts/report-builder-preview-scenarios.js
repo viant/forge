@@ -90,11 +90,17 @@ export function isSemanticPreviewScenario(file = "") {
   return String(file || "").includes("-semantic-");
 }
 
+export function isSemanticLeftRailPreviewScenario(file = "") {
+  const normalized = String(file || "");
+  return isSemanticPreviewScenario(normalized) && normalized.includes("-left-rail-");
+}
+
 export function buildPreviewScenarioGroups(availableFiles = []) {
   const files = Array.isArray(availableFiles) ? availableFiles.slice().sort() : [];
   return {
     all: files,
     semantic: files.filter((file) => isSemanticPreviewScenario(file)),
+    "semantic-left-rail": files.filter((file) => isSemanticLeftRailPreviewScenario(file)),
     legacy: files.filter((file) => !isSemanticPreviewScenario(file)),
   };
 }

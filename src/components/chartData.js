@@ -8,6 +8,10 @@ function normalizeChartKey(key = "") {
 
 export { normalizeChartKey };
 
+function cloneValue(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
 export function resolveChartLoadingState({
     loading = false,
     collectionOverride = null,
@@ -54,6 +58,95 @@ export function seedChartBucket(key, value) {
         return { [normalizedKey]: value };
     }
     return setSelector({}, normalizedKey, value);
+}
+
+function resolveDisplayValueMapValue(value = undefined, displayValueMap = null) {
+    if (value === undefined || value === null || value === "") {
+        return undefined;
+    }
+    if (!displayValueMap || typeof displayValueMap !== "object" || Array.isArray(displayValueMap)) {
+        return undefined;
+    }
+    const key = String(value);
+    return Object.prototype.hasOwnProperty.call(displayValueMap, key)
+        ? displayValueMap[key]
+        : undefined;
+}
+
+function resolveChartDisplayValue(row = null, {
+    sourceKey = "",
+    displayKey = "",
+    displayValueMap = null,
+} = {}) {
+    const normalizedSourceKey = normalizeChartKey(sourceKey);
+    const normalizedDisplayKey = normalizeChartKey(displayKey);
+    if (!row || typeof row !== "object" || Array.isArray(row) || !normalizedSourceKey) {
+        return null;
+    }
+    const rawValue = resolveKey(row, normalizedSourceKey);
+    if (normalizedDisplayKey && normalizedDisplayKey !== normalizedSourceKey) {
+        const displayValue = resolveKey(row, normalizedDisplayKey);
+        if (displayValue !== undefined && displayValue !== null && displayValue !== "") {
+            return displayValue;
+        }
+    }
+    const mappedDisplayValue = resolveDisplayValueMapValue(rawValue, displayValueMap);
+    if (mappedDisplayValue !== undefined && mappedDisplayValue !== null && mappedDisplayValue !== "") {
+        return mappedDisplayValue;
+    }
+    return rawValue;
+}
+
+export function materializeChartDisplayRows(chart = {}, rows = []) {
+    const normalizedRows = Array.isArray(rows) ? rows : [];
+    if (normalizedRows.length === 0) {
+        return [];
+    }
+    const xAxisDisplayKey = normalizeChartKey(chart?.xAxis?.dataKey);
+    const xAxisSourceKey = normalizeChartKey(chart?.xAxis?.sourceDataKey);
+    const xAxisDisplayValueMap = chart?.xAxis?.displayValueMap;
+    const seriesDisplayKey = normalizeChartKey(chart?.series?.nameKey);
+    const seriesSourceKey = normalizeChartKey(chart?.series?.sourceNameKey);
+    const seriesDisplayValueMap = chart?.series?.displayValueMap;
+    const shouldMaterializeXAxis = xAxisDisplayKey && xAxisSourceKey
+        && (xAxisDisplayKey !== xAxisSourceKey || (xAxisDisplayValueMap && typeof xAxisDisplayValueMap === "object" && !Array.isArray(xAxisDisplayValueMap)));
+    const shouldMaterializeSeries = seriesDisplayKey && seriesSourceKey
+        && (seriesDisplayKey !== seriesSourceKey || (seriesDisplayValueMap && typeof seriesDisplayValueMap === "object" && !Array.isArray(seriesDisplayValueMap)));
+    if (!shouldMaterializeXAxis && !shouldMaterializeSeries) {
+        return normalizedRows.map((row) => row && typeof row === "object" ? attachChartSelectionRowsMetadata(cloneValue(row), row?.__chartSelectionRows) : row);
+    }
+    return normalizedRows.map((row) => {
+        const selectionRows = row?.__chartSelectionRows;
+        let nextRow = row && typeof row === "object" && !Array.isArray(row)
+            ? attachChartSelectionRowsMetadata(cloneValue(row), selectionRows)
+            : row;
+        if (!nextRow || typeof nextRow !== "object" || Array.isArray(nextRow)) {
+            return nextRow;
+        }
+        if (shouldMaterializeXAxis) {
+            const displayValue = resolveChartDisplayValue(nextRow, {
+                sourceKey: xAxisSourceKey,
+                displayKey: xAxisDisplayKey,
+                displayValueMap: xAxisDisplayValueMap,
+            });
+            if (displayValue !== undefined && displayValue !== null && displayValue !== "") {
+                nextRow = setSelector(nextRow, xAxisDisplayKey, displayValue);
+                nextRow = attachChartSelectionRowsMetadata(nextRow, selectionRows);
+            }
+        }
+        if (shouldMaterializeSeries) {
+            const displayValue = resolveChartDisplayValue(nextRow, {
+                sourceKey: seriesSourceKey,
+                displayKey: seriesDisplayKey,
+                displayValueMap: seriesDisplayValueMap,
+            });
+            if (displayValue !== undefined && displayValue !== null && displayValue !== "") {
+                nextRow = setSelector(nextRow, seriesDisplayKey, displayValue);
+                nextRow = attachChartSelectionRowsMetadata(nextRow, selectionRows);
+            }
+        }
+        return nextRow;
+    });
 }
 
 export function transformData(rawData, chart, valueKey) {
@@ -155,6 +248,11 @@ export function buildPieChartData(rawData = [], nameKey = "", valueKey = "") {
         grouped.set(category, existing);
     });
     return Array.from(grouped.values()).filter((row) => row.value > 0);
+}
+
+export function buildPieSliceCellKey(entry = {}, index = 0) {
+    const label = String(entry?.name || entry?.payload?.name || "unknown").trim() || "unknown";
+    return `${label}-${index}`;
 }
 
 export function formatTimestamp(timestamp, fmt = "MM/dd") {

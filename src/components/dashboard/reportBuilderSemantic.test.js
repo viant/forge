@@ -178,12 +178,50 @@ const overlaid = applyReportBuilderSemanticConfig({
 assert.equal(overlaid.measures[0].label, "Spend");
 assert.equal(overlaid.measures[0].format, "currency");
 assert.equal(overlaid.measures[0].semanticRef, "spend");
+assert.equal(overlaid.semanticModel.modelRef, "model://example/performance/delivery@v1");
 assert.equal(overlaid.dimensions[0].label, "Date");
 assert.equal(overlaid.staticFilters[0].label, "Reporting Window");
 assert.equal(overlaid.staticFilters[0].description, "Approved reporting window");
 assert.equal(overlaid.staticFilters[0].semanticDataType, "date");
 assert.equal(overlaid.staticFilters[0].semanticRef, "reporting_window");
 assert.equal(overlaid.groupBy.options[0].label, "Date");
+
+// predicate-native configs overlay semantics onto pinned scope params without
+// requiring the config to be lowered onto staticFilters first
+const predicateOverlaid = applyReportBuilderSemanticConfig({
+    measures: [
+        { id: "totalSpend", semanticRef: "spend", label: "Total Spend", paramPath: "measures.totalSpend" },
+    ],
+    dimensions: [
+        { id: "eventDate", semanticRef: "event_date", label: "Event Date", paramPath: "dimensions.eventDate" },
+    ],
+    predicates: [
+        {
+            id: "dateRange",
+            label: "Date Range",
+            kind: "dateRange",
+            required: true,
+            semanticRef: "reporting_window",
+            startParamPath: "filters.from",
+            endParamPath: "filters.to",
+        },
+    ],
+    staticFilters: [
+        { id: "legacyOnly", label: "Legacy Only" },
+    ],
+}, {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+}, model);
+assert.deepEqual(predicateOverlaid.staticFilters.map((entry) => entry.id), ["legacyOnly", "dateRange"]);
+assert.equal(predicateOverlaid.staticFilters[0].label, "Legacy Only");
+assert.equal(predicateOverlaid.staticFilters[1].label, "Reporting Window");
+assert.equal(predicateOverlaid.staticFilters[1].description, "Approved reporting window");
+assert.equal(predicateOverlaid.staticFilters[1].semanticDataType, "date");
+assert.equal(predicateOverlaid.staticFilters[1].semanticRef, "reporting_window");
+assert.equal(predicateOverlaid.staticFilters[1].type, "dateRange");
+assert.equal(predicateOverlaid.staticFilters[1].required, true);
 
 const flatFieldOverlaid = applyReportBuilderSemanticConfig({
     measures: [
@@ -204,6 +242,17 @@ assert.equal(flatFieldOverlaid.measures[0].category, "Audience");
 assert.equal(flatFieldOverlaid.measures[0].definitionRef, "harmonizer://feature/user.segment.index");
 assert.equal(flatFieldOverlaid.dimensions[0].category, "Inventory");
 assert.equal(flatFieldOverlaid.staticFilters[0].definitionRef, "harmonizer://feature/user.segment");
+assert.equal(flatFieldOverlaid.semanticModel.modelRef, "model://example/performance/delivery@v1");
+
+const embeddedModelOnly = applyReportBuilderSemanticConfig({
+    measures: [{ id: "spend", label: "Spend" }],
+}, {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "missing_entity",
+}, model);
+assert.equal(embeddedModelOnly.semanticModel.modelRef, "model://example/performance/delivery@v1");
+assert.equal(embeddedModelOnly.measures[0].label, "Spend");
 
 assert.deepEqual(resolveReportBuilderSemanticSelections({
     measures: [{ id: "totalSpend", semanticRef: "spend" }],
@@ -244,7 +293,7 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["totalSpend"],
     groupBy: "channel",
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-07",
@@ -255,6 +304,55 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     entity: "line_delivery",
     selection: {
         dimensions: ["event_date", "channel"],
+        measures: ["spend"],
+    },
+    refinements: [],
+    parameters: {
+        reporting_window: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
+});
+
+// semantic parameter selection resolves pinned predicate params natively,
+// without a lowered staticFilters shell on the config
+assert.deepEqual(buildReportBuilderSemanticSelection({
+    measures: [{ id: "totalSpend", semanticRef: "spend" }],
+    dimensions: [{ id: "eventDate", semanticRef: "event_date" }],
+    predicates: [
+        {
+            id: "dateRange",
+            kind: "dateRange",
+            semanticRef: "reporting_window",
+            startParamPath: "filters.from",
+            endParamPath: "filters.to",
+        },
+    ],
+    binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+    },
+}, {
+    binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+    },
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    scopeParams: {
+        dateRange: {
+            start: "2026-05-01",
+            end: "2026-05-07",
+        },
+    },
+}), {
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+    selection: {
+        dimensions: ["event_date"],
         measures: ["spend"],
     },
     refinements: [],
@@ -283,7 +381,7 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     },
     selectedDimensions: ["eventDate", "siteType"],
     selectedMeasures: ["totalSpend", "ctr"],
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-07",
@@ -329,7 +427,7 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
     },
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["totalSpend"],
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-07",
@@ -378,7 +476,7 @@ assert.deepEqual(buildReportBuilderSemanticValidationRequest({
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["totalSpend"],
     groupBy: "channel",
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-07",
@@ -432,7 +530,7 @@ assert.deepEqual(buildReportBuilderSemanticSummary({
     state: {
         selectedMeasures: ["ctr"],
         selectedDimensions: ["eventDate", "channelId"],
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-07",
@@ -833,7 +931,7 @@ assert.deepEqual(buildReportBuilderSemanticDiagnosticTargets({
         },
     },
     state: {
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-07",
@@ -1039,6 +1137,62 @@ assert.deepEqual(buildReportBuilderSemanticDiagnosticsNotice({
             path: "selection.dimensions[1]",
             message: "Dimension 'legacy_channel' is deprecated.",
             suggestedFix: "",
+        },
+    ],
+});
+
+assert.deepEqual(buildReportBuilderSemanticDiagnosticsNotice({
+    validationState: {
+        diagnostics: [
+            {
+                code: "semanticModelUnavailable",
+                severity: "error",
+                path: "selection.modelRef",
+                message: "Semantic model provider unavailable.",
+                suggestedFix: "Retry loading the semantic model or restore the semantic model provider.",
+            },
+        ],
+    },
+}), {
+    level: "danger",
+    title: "Semantic model diagnostics",
+    description: "The semantic model could not be resolved for the current selection.",
+    diagnostics: [
+        {
+            id: "semanticModelUnavailable_1",
+            severity: "error",
+            code: "semanticModelUnavailable",
+            path: "selection.modelRef",
+            message: "Semantic model provider unavailable.",
+            suggestedFix: "Retry loading the semantic model or restore the semantic model provider.",
+        },
+    ],
+});
+
+assert.deepEqual(buildReportBuilderSemanticDiagnosticsNotice({
+    validationState: {
+        diagnostics: [
+            {
+                code: "semanticModelError",
+                severity: "error",
+                path: "selection.modelRef",
+                message: "Semantic model metadata failed.",
+                suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
+            },
+        ],
+    },
+}), {
+    level: "danger",
+    title: "Semantic model diagnostics",
+    description: "The semantic model could not be resolved for the current selection.",
+    diagnostics: [
+        {
+            id: "semanticModelError_1",
+            severity: "error",
+            code: "semanticModelError",
+            path: "selection.modelRef",
+            message: "Semantic model metadata failed.",
+            suggestedFix: "Retry loading the semantic model or choose a different semantic binding.",
         },
     ],
 });
@@ -1313,7 +1467,7 @@ assert.deepEqual(buildReportBuilderSemanticFieldValidation({
     state: {
         selectedDimensions: ["eventDate"],
         selectedMeasures: ["totalSpend"],
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-07",
@@ -1478,7 +1632,7 @@ assert.deepEqual(buildReportBuilderSemanticSelection({
 });
 
 assert.match(semanticFieldTitle(overlaid.measures[0]), /Certified spend metric/);
-assert.match(semanticFieldTitle(overlaid.measures[0]), /approved/);
+assert.match(semanticFieldTitle(overlaid.measures[0]), /approved/i);
 assert.match(semanticFieldTitle(overlaid.measures[0]), /Owner team:\/\/example\/performance/);
 
 assert.deepEqual(buildReportBuilderSemanticStatus({

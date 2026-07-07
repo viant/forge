@@ -102,8 +102,8 @@ export function resolveReportBuilderResultDescription({
     if (canShowResults) {
         const presetDescription = normalizeString(activeTablePresetDescription);
         return presetDescription
-            ? `${presetTransitionText || "Table view."} ${presetDescription} Use chart actions to switch to a curated visual read of the same data.`
-            : "Table view for the active scope. Use chart actions to switch to a curated visual read of the same data.";
+            ? `${presetTransitionText || "Table view."} ${presetDescription} Use Presets to switch to a curated table and chart view for this scope.`
+            : "Table view for the active scope. Use Presets to switch to a curated table and chart view for this scope.";
     }
     if (presetTransitionText) {
         if (readinessReason === "semantic") {
@@ -136,15 +136,12 @@ export function resolveReportBuilderResultMetaItems({
     pageRowCount = 0,
 } = {}) {
     const items = [];
-    const identityChip = resolveResultIdentityChip({
+    const identityChip = !showingChartView ? resolveResultIdentityChip({
         showingChartView,
         canShowResults,
         activeTablePresetTitle,
         modifiedTablePresetTitle,
-    });
-    if (showingChartView && chartIdentityLabel) {
-        items.push(chartIdentityLabel);
-    }
+    }) : "";
     if (selectedMeasuresCount > 0) {
         items.push(`${selectedMeasuresCount} measure${selectedMeasuresCount === 1 ? "" : "s"}`);
     }
@@ -154,7 +151,7 @@ export function resolveReportBuilderResultMetaItems({
     if (totalActiveFilterCount > 0) {
         items.push(`${totalActiveFilterCount} filter${totalActiveFilterCount === 1 ? "" : "s"}`);
     }
-    if (canShowResults && pageRowCount > 0) {
+    if (!showingChartView && canShowResults && pageRowCount > 0) {
         items.push(`${pageRowCount} page row${pageRowCount === 1 ? "" : "s"}`);
     }
     if (identityChip) {

@@ -58,6 +58,32 @@ export function toggleSelectedDataKey(selectedDataKeys = [], dataKey = "") {
     return [...selected, normalizedKey];
 }
 
+export function resolveSelectedValueKey(currentValueKey = "", series = {}, seriesDefinitions = []) {
+    const current = String(currentValueKey ?? "").trim();
+    const explicit = String(series?.valueKey ?? "").trim();
+    const configured = normalizeKeys(
+        Array.isArray(series?.values)
+            ? series.values.map((entry) => entry?.value)
+            : [],
+    );
+    const derived = normalizeKeys(
+        Array.isArray(seriesDefinitions)
+            ? seriesDefinitions.map((entry) => entry?.value)
+            : [],
+    );
+    const available = normalizeKeys([explicit, ...configured, ...derived]);
+    if (available.length === 0) {
+        return "";
+    }
+    if (current && available.includes(current)) {
+        return current;
+    }
+    if (explicit && available.includes(explicit)) {
+        return explicit;
+    }
+    return available[0];
+}
+
 export function reconcileVisibleColumns(visibleColumns = [], allTableColumns = []) {
     const current = normalizeKeys(visibleColumns);
     const all = normalizeKeys(allTableColumns);

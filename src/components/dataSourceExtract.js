@@ -41,6 +41,17 @@ function extractEnvelopeInfo(data) {
     return resolveKey(data, "info") || resolveKey(data, "Info") || {};
 }
 
+export function isDeferredCacheHitEnvelope(data) {
+    if (data == null || typeof data !== "object" || Array.isArray(data)) {
+        return false;
+    }
+    return Object.prototype.hasOwnProperty.call(data, "rows")
+        && data.rows === null
+        && !!data.cache
+        && typeof data.cache === "object"
+        && data.cache.hit === true;
+}
+
 export function extractData(selectors = {}, paging, data) {
     let records = [];
     let info = {};

@@ -1,4 +1,5 @@
 import {
+    buildReportDocumentBadgesBlock,
     buildReportDocumentChartBlock,
     buildReportDocumentFilterBarBlock,
     buildReportDocumentGeoMapBlock,
@@ -8,13 +9,23 @@ import {
     buildReportDocumentTableBlock,
     normalizeReportBuilderDocumentBlocks,
 } from "../../reporting/reportDocumentModel.js";
+import {
+    buildReportLayoutItem,
+    resolveNextReportLayoutSpan,
+    resolveReportLayoutPreset,
+    resolveReportLayoutSpan,
+} from "../../reporting/reportLayoutModel.js";
 import { normalizeReportTableCellVisual } from "../../reporting/tableVisualSpec.js";
 import { buildReportBuilderCalculatedFieldConfig } from "./reportBuilderCalculatedFieldAuthoring.js";
+import { resolveReportBuilderScopeParamFilters } from "./reportBuilderPredicates.js";
+import { buildReportBuilderStaticDatasetOptions } from "./reportBuilderStaticDatasets.js";
 import {
     buildReportBuilderChartFields,
     buildDefaultReportBuilderChartSpec,
+    getComputedReportBuilderMeasures,
     getReportBuilderSupportedChartTypes,
     getSelectableReportBuilderMeasures,
+    getTableCalculationReportBuilderMeasures,
     getVisibleReportBuilderDimensions,
     normalizeReportBuilderChartSpec,
     validateReportBuilderChartSpec,
@@ -65,6 +76,21 @@ function normalizeScopeParamOptions(options = []) {
         .filter(Boolean);
 }
 
+function resolveDocumentBlockScopeParamOptions(datasetRef = "primary", datasetOptions = [], scopeParamOptions = []) {
+    const normalizedDatasetRef = normalizeString(datasetRef || "primary") || "primary";
+    const normalizedDatasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
+        .find((option) => normalizeString(option?.value ?? option?.id) === normalizedDatasetRef) || null;
+    if (normalizedDatasetOption) {
+        const datasetScopedOptions = normalizeScopeParamOptions(normalizedDatasetOption?.scopeParamOptions);
+        if (datasetScopedOptions.length > 0) {
+            return datasetScopedOptions;
+        }
+    }
+    return normalizedDatasetRef === "primary"
+        ? normalizeScopeParamOptions(scopeParamOptions)
+        : [];
+}
+
 function normalizeTableColumnOptions(options = []) {
     const seen = new Set();
     return (Array.isArray(options) ? options : [])
@@ -74,10 +100,19 @@ function normalizeTableColumnOptions(options = []) {
                 return null;
             }
             seen.add(key);
+            const sourceKey = normalizeString(option?.sourceKey || key) || key;
+            const displayKey = normalizeString(option?.displayKey || option?.displayPath || sourceKey) || sourceKey;
             return {
                 key,
+                sourceKey,
+                displayKey,
+                ...(option?.displayValueMap && typeof option.displayValueMap === "object" && !Array.isArray(option.displayValueMap)
+                    ? { displayValueMap: cloneValue(option.displayValueMap) }
+                    : {}),
                 label: normalizeString(option?.label || key),
                 kind: normalizeString(option?.kind),
+                ...(option?.calculated === true ? { calculated: true } : {}),
+                selected: option?.selected === true,
                 ...(normalizeString(option?.format) ? { format: normalizeString(option.format) } : {}),
             };
         })
@@ -224,10 +259,6 @@ function resolveDocumentPrimaryIndex(items = [], authoredIds = new Set()) {
     return 0;
 }
 
-function normalizeDocumentLayoutItemSize(value = "") {
-    return normalizeString(value).toLowerCase() === "half" ? "half" : "";
-}
-
 function stripMarkdownPreviewDecorators(value = "") {
     const source = String(value || "").trim();
     if (/^(`{3,}|-{3,}|_{3,})$/.test(source)) {
@@ -272,33 +303,32 @@ export function summarizeReportBuilderDocumentMarkdown(markdown = "") {
     return stripMarkdownPreviewDecorators(lines[0]) || "Narrative block";
 }
 
-export function resolveReportBuilderDocumentWidthLabels(size = "") {
-    const isHalfWidth = normalizeDocumentLayoutItemSize(size) === "half";
+export function resolveReportBuilderDocumentWidthLabels(layoutItem = null) {
+    const span = resolveReportLayoutSpan(layoutItem);
+    const currentPreset = resolveReportLayoutPreset(span);
+    const nextSpan = resolveNextReportLayoutSpan(span);
+    const nextPreset = resolveReportLayoutPreset(nextSpan);
     return {
-        isHalfWidth,
-        currentLabel: isHalfWidth ? "Width: Half" : "Width: Full",
-        actionLabel: isHalfWidth ? "Make Full" : "Make Half",
-        actionTitle: isHalfWidth ? "Resize block to full width" : "Resize block to half width",
+        span,
+        nextSpan,
+        isHalfWidth: span === 6,
+        currentLabel: `Width: ${currentPreset.label}`,
+        actionLabel: `Make ${nextPreset.label}`,
+        actionTitle: `Resize block to ${nextPreset.label} width`,
+        actionIcon: nextSpan < span ? "minimize" : "maximize",
     };
 }
 
-function buildDocumentLayoutItem(blockId = "", { size = "" } = {}) {
-    const normalizedBlockId = normalizeString(blockId);
-    if (!normalizedBlockId) {
-        return null;
-    }
-    const normalizedSize = normalizeDocumentLayoutItemSize(size);
-    return normalizedSize
-        ? { blockId: normalizedBlockId, size: normalizedSize }
-        : { blockId: normalizedBlockId };
+function buildDocumentLayoutItem(blockId = "", source = null) {
+    return buildReportLayoutItem(blockId, source, {
+        preserveLegacyHalf: true,
+    });
 }
 
 function buildDocumentLayoutItemIndex(items = []) {
     const index = new Map();
     (Array.isArray(items) ? items : []).forEach((item) => {
-        const normalizedItem = buildDocumentLayoutItem(item?.blockId || item, {
-            size: item?.size,
-        });
+        const normalizedItem = buildDocumentLayoutItem(item?.blockId || item, item);
         if (!normalizedItem) {
             return;
         }
@@ -365,6 +395,129 @@ function resolveUniqueDocumentBlockTitle(existingBlocks = [], baseTitle = "Autho
 function resolveOptionLabel(options = [], value = "") {
   const normalizedValue = normalizeString(value);
   return normalizeFieldOptions(options).find((option) => option.value === normalizedValue)?.label || normalizedValue;
+}
+
+function normalizeBadgeTone(value = "") {
+    const normalized = normalizeString(value).toLowerCase();
+    return ["neutral", "info", "success", "warning", "danger"].includes(normalized)
+        ? normalized
+        : "info";
+}
+
+function normalizeBadgeLabelMode(value = "", { hasExplicitLabel = false } = {}) {
+    const normalized = normalizeString(value).toLowerCase();
+    if (normalized === "manual" || normalized === "field") {
+        return normalized;
+    }
+    return hasExplicitLabel ? "manual" : "field";
+}
+
+function normalizeReportBuilderBadgeRules(rules = []) {
+    return (Array.isArray(rules) ? rules : [])
+        .map((rule) => {
+            if (!rule || typeof rule !== "object" || Array.isArray(rule) || !Object.prototype.hasOwnProperty.call(rule, "value")) {
+                return null;
+            }
+            return {
+                value: cloneValue(rule.value),
+                ...(normalizeString(rule?.label) ? { label: normalizeString(rule.label) } : {}),
+                ...(normalizeString(rule?.tone) ? { tone: normalizeBadgeTone(rule.tone) } : {}),
+            };
+        })
+        .filter(Boolean);
+}
+
+export function serializeReportBuilderBadgeRuleRows(rows = []) {
+    const normalizedRules = normalizeReportBuilderBadgeRules(rows);
+    return normalizedRules.length > 0 ? JSON.stringify(normalizedRules, null, 2) : "";
+}
+
+export function parseReportBuilderBadgeRuleRows(rulesText = "") {
+    const normalizedText = String(rulesText || "").trim();
+    if (!normalizedText) {
+        return {
+            valid: true,
+            rules: [],
+            error: "",
+        };
+    }
+    let parsed = null;
+    try {
+        parsed = JSON.parse(normalizedText);
+    } catch (_) {
+        return {
+            valid: false,
+            rules: [],
+            error: "Pill rules must be valid JSON.",
+        };
+    }
+    const rules = normalizeReportBuilderBadgeRules(parsed);
+    if (rules.length === 0) {
+        return {
+            valid: false,
+            rules: [],
+            error: "Pill rules must be a non-empty JSON array of objects with a value.",
+        };
+    }
+    return {
+        valid: true,
+        rules,
+        error: "",
+    };
+}
+
+export function resolveReportBuilderBadgeRuleRows(item = {}) {
+    const explicitRules = normalizeReportBuilderBadgeRules(item?.rules);
+    if (explicitRules.length > 0) {
+        return explicitRules;
+    }
+    const parsed = parseReportBuilderBadgeRuleRows(item?.rulesText || "");
+    return parsed.valid ? parsed.rules : [];
+}
+
+export function normalizeReportBuilderBadgeItems(items = []) {
+    return (Array.isArray(items) ? items : [])
+        .map((item, index) => {
+            if (!item || typeof item !== "object" || Array.isArray(item)) {
+                return null;
+            }
+            const label = normalizeString(item?.label);
+            const value = normalizeString(item?.value);
+            const valueField = normalizeString(item?.valueField);
+            const format = normalizeString(item?.format);
+            const labelMode = normalizeBadgeLabelMode(item?.labelMode, {
+                hasExplicitLabel: !!label,
+            });
+            const rulesText = String(item?.rulesText || "").trim();
+            const normalizedRules = normalizeReportBuilderBadgeRules(item?.rules);
+            const parsedRules = !normalizedRules.length && rulesText
+                ? parseReportBuilderBadgeRuleRows(rulesText)
+                : { valid: true, rules: [] };
+            if (!label && !value && !valueField) {
+                return null;
+            }
+            return {
+                id: normalizeString(item?.id || `badge_${index + 1}`) || `badge_${index + 1}`,
+                label,
+                value,
+                ...(valueField ? { valueField } : {}),
+                ...(format ? { format } : {}),
+                labelMode,
+                ...(normalizedRules.length > 0 ? { rules: normalizedRules } : {}),
+                ...(normalizedRules.length === 0 && parsedRules.valid && parsedRules.rules.length > 0 ? { rules: parsedRules.rules } : {}),
+                ...(rulesText ? { rulesText } : {}),
+                tone: normalizeBadgeTone(item?.tone || item?.severity),
+            };
+        })
+        .filter(Boolean);
+}
+
+function buildBadgeRulesText(item = {}) {
+    return serializeReportBuilderBadgeRuleRows(item?.rules);
+}
+
+function labelForBadgeItem(item = {}, index = 0) {
+    return normalizeString(item?.label || item?.valueField || item?.id || `Pill ${index + 1}`) || `Pill ${index + 1}`;
 }
 
 function formatDocumentBlockTitle(block = {}) {
@@ -467,7 +620,7 @@ export function buildReportBuilderScopeParamSummary(paramIds = [], scopeParamOpt
         items,
         text: items.length > 0
             ? items.map((item) => item.label).join(" • ")
-            : "No shared scope parameters",
+            : "No report filters",
     };
 }
 
@@ -507,9 +660,24 @@ function buildAvailableAuthoringDimensions(config = {}, state = {}) {
         getVisibleReportBuilderDimensions(config)
             .map((dimension) => ({
                 id: normalizeString(dimension?.id),
+                key: normalizeString(dimension?.id),
+                sourceKey: normalizeString(dimension?.key || dimension?.id),
+                displayKey: normalizeString(dimension?.displayKey || dimension?.displayPath || dimension?.key || dimension?.id),
+                ...(dimension?.displayValueMap && typeof dimension.displayValueMap === "object" && !Array.isArray(dimension.displayValueMap)
+                    ? { displayValueMap: cloneValue(dimension.displayValueMap) }
+                    : {}),
+                rawId: normalizeString(dimension?.rawId || (normalizeString(dimension?.semanticRef) ? (dimension?.key || dimension?.id) : "")),
                 label: normalizeString(dimension?.label || dimension?.id),
                 kind: "dimension",
+                selected: selectedDimensionIds.has(normalizeString(dimension?.id)),
                 ...(normalizeString(dimension?.format) ? { format: normalizeString(dimension.format) } : {}),
+                ...(normalizeString(dimension?.description) ? { description: normalizeString(dimension.description) } : {}),
+                ...(normalizeString(dimension?.category) ? { category: normalizeString(dimension.category) } : {}),
+                ...(normalizeString(dimension?.definitionRef) ? { definitionRef: normalizeString(dimension.definitionRef) } : {}),
+                ...(normalizeString(dimension?.semanticRef) ? { semanticRef: normalizeString(dimension.semanticRef) } : {}),
+                ...(dimension?.governance && typeof dimension.governance === "object" && !Array.isArray(dimension.governance)
+                    ? { governance: cloneValue(dimension.governance) }
+                    : {}),
             }))
             .filter((dimension) => dimension.id),
         selectedDimensionIds,
@@ -518,13 +686,37 @@ function buildAvailableAuthoringDimensions(config = {}, state = {}) {
 
 function buildAvailableAuthoringMeasures(config = {}, state = {}) {
     const selectedMeasureIds = new Set(normalizeStringArray(state?.selectedMeasures));
+    const calculatedMeasureIds = new Set(
+        [
+            ...getComputedReportBuilderMeasures(config),
+            ...getTableCalculationReportBuilderMeasures(config),
+        ]
+            .map((entry) => normalizeString(entry?.id))
+            .filter(Boolean),
+    );
     return orderAuthoringFieldsBySelection(
         getSelectableReportBuilderMeasures(config)
             .map((measure) => ({
                 id: normalizeString(measure?.id),
+                key: normalizeString(measure?.id),
+                sourceKey: normalizeString(measure?.key || measure?.id),
+                displayKey: normalizeString(measure?.displayKey || measure?.displayPath || measure?.key || measure?.id),
+                ...(measure?.displayValueMap && typeof measure.displayValueMap === "object" && !Array.isArray(measure.displayValueMap)
+                    ? { displayValueMap: cloneValue(measure.displayValueMap) }
+                    : {}),
+                rawId: normalizeString(measure?.rawId || (normalizeString(measure?.semanticRef) ? (measure?.key || measure?.id) : "")),
                 label: normalizeString(measure?.label || measure?.id),
                 kind: "measure",
+                ...(calculatedMeasureIds.has(normalizeString(measure?.id)) ? { calculated: true } : {}),
+                selected: selectedMeasureIds.has(normalizeString(measure?.id)),
                 ...(normalizeString(measure?.format) ? { format: normalizeString(measure.format) } : {}),
+                ...(normalizeString(measure?.description) ? { description: normalizeString(measure.description) } : {}),
+                ...(normalizeString(measure?.category) ? { category: normalizeString(measure.category) } : {}),
+                ...(normalizeString(measure?.definitionRef) ? { definitionRef: normalizeString(measure.definitionRef) } : {}),
+                ...(normalizeString(measure?.semanticRef) ? { semanticRef: normalizeString(measure.semanticRef) } : {}),
+                ...(measure?.governance && typeof measure.governance === "object" && !Array.isArray(measure.governance)
+                    ? { governance: cloneValue(measure.governance) }
+                    : {}),
             }))
             .filter((measure) => measure.id),
         selectedMeasureIds,
@@ -603,12 +795,24 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
     secondaryFieldOptions = [],
     tableColumnOptions = [],
     scopeParamOptions = [],
+    datasetOptions = [],
     chartConfig = null,
     chartState = null,
 } = {}) {
     const normalizedKind = normalizeString(seed?.kind || kind || "markdownBlock") || "markdownBlock";
+    const normalizedDatasetOptions = (Array.isArray(datasetOptions) ? datasetOptions : [])
+        .map((option) => ({
+            value: normalizeString(option?.value ?? option?.id),
+            scopeParamOptions: normalizeScopeParamOptions(option?.scopeParamOptions),
+        }))
+        .filter((option) => !!option.value);
     if (normalizedKind === "filterBarBlock") {
-        const normalizedScopeParamOptions = normalizeScopeParamOptions(scopeParamOptions);
+        const normalizedDatasetRef = normalizeString(seed?.datasetRef || "primary") || "primary";
+        const normalizedScopeParamOptions = resolveDocumentBlockScopeParamOptions(
+            normalizedDatasetRef,
+            normalizedDatasetOptions,
+            scopeParamOptions,
+        );
         const defaultParamIds = normalizedScopeParamOptions.map((option) => option.value);
         const paramIds = normalizeStringArray(
             Array.isArray(seed?.paramIds)
@@ -618,7 +822,8 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
         return {
             kind: "filterBarBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "filterBar")),
-            title: normalizeString(seed?.title || "Report Scope") || "Report Scope",
+            title: normalizeString(seed?.title || "Filters") || "Filters",
+            datasetRef: normalizedDatasetRef,
             paramIds: paramIds.length > 0 ? paramIds : defaultParamIds,
         };
     }
@@ -646,7 +851,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             kind: "chartBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "chartBlock")),
             title,
-            datasetRef: "primary",
+            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
             chartSpec: chartSpec
                 ? normalizeReportBuilderChartSpec({
                     ...chartSpec,
@@ -683,7 +888,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             kind: "geoMapBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "geoMapBlock")),
             title: normalizeString(seed?.title || "Geo Map") || "Geo Map",
-            datasetRef: "primary",
+            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
             geo: {
                 shape: normalizeString(geo?.shape || "us-states") || "us-states",
                 key,
@@ -706,7 +911,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             kind: "kpiBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "kpiBlock")),
             title: normalizeString(seed?.title || "Headline KPI") || "Headline KPI",
-            datasetRef: "primary",
+            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
             valueField,
             valueLabel: normalizeString(seed?.valueLabel || resolveOptionLabel(normalizedValueOptions, valueField) || "Value"),
             secondaryField,
@@ -719,9 +924,36 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             emptyLabel: normalizeString(seed?.emptyLabel || "No KPI value available."),
         };
     }
+    if (normalizedKind === "badgesBlock") {
+        const items = normalizeReportBuilderBadgeItems(seed?.items);
+        return {
+            kind: "badgesBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "badgesBlock")),
+            title: normalizeString(seed?.title || "Status Pills") || "Status Pills",
+            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
+            items: items.length > 0
+                ? items.map((item) => ({
+                    ...item,
+                    rulesText: normalizeString(item?.rulesText || buildBadgeRulesText(item)),
+                }))
+                : [{
+                    id: "badge_1",
+                    label: "",
+                    value: "",
+                    valueField: "",
+                    format: "",
+                    labelMode: "field",
+                    tone: "info",
+                    rulesText: "",
+                }],
+        };
+    }
     if (normalizedKind === "tableBlock") {
         const normalizedColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
-        const defaultColumnKeys = normalizedColumnOptions.map((option) => option.key);
+        const selectedColumnDefaults = normalizedColumnOptions.filter((option) => option.selected).map((option) => option.key);
+        const defaultColumnKeys = selectedColumnDefaults.length > 0
+            ? selectedColumnDefaults
+            : normalizedColumnOptions.map((option) => option.key);
         const columnKeys = normalizeStringArray(
             Array.isArray(seed?.columnKeys)
                 ? seed.columnKeys
@@ -740,7 +972,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             kind: "tableBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "tableBlock")),
             title: normalizeString(seed?.title || "Detail Table") || "Detail Table",
-            datasetRef: "primary",
+            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
             columnKeys: resolvedColumnKeys,
             columns: resolvedColumnKeys.map((columnKey) => {
                 const existing = existingColumns.get(columnKey);
@@ -754,13 +986,34 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
                         }
                     }
                 }
-                if (existing) {
-                    return existing;
-                }
                 const option = optionIndex.get(columnKey);
+                if (existing) {
+                    return {
+                        ...existing,
+                        key: columnKey,
+                        ...(normalizeString(existing?.sourceKey || option?.sourceKey)
+                            ? { sourceKey: normalizeString(existing?.sourceKey || option?.sourceKey) }
+                            : {}),
+                        ...(normalizeString(existing?.displayKey || option?.displayKey)
+                            ? { displayKey: normalizeString(existing?.displayKey || option?.displayKey) }
+                            : {}),
+                        ...(existing?.displayValueMap || option?.displayValueMap
+                            ? { displayValueMap: cloneValue(existing?.displayValueMap || option?.displayValueMap) }
+                            : {}),
+                        ...(normalizeString(existing?.label || option?.label || columnKey)
+                            ? { label: normalizeString(existing?.label || option?.label || columnKey) }
+                            : {}),
+                        ...(normalizeString(existing?.format || option?.format)
+                            ? { format: normalizeString(existing?.format || option?.format) }
+                            : {}),
+                    };
+                }
                 return option
                     ? {
                         key: option.key,
+                        sourceKey: option.sourceKey,
+                        displayKey: option.displayKey,
+                        ...(option.displayValueMap ? { displayValueMap: cloneValue(option.displayValueMap) } : {}),
                         label: option.label,
                         ...(option.format ? { format: option.format } : {}),
                     }
@@ -774,8 +1027,191 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
         kind: "markdownBlock",
         id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "markdownBlock")),
         title: normalizeString(seed?.title || "Narrative") || "Narrative",
-        markdown: String(seed?.markdown || "## Narrative\nAdd report context."),
+        markdown: String(seed?.markdown || ""),
     };
+}
+
+export function rebindReportBuilderDocumentBlockDraft(draft = null, {
+    datasetRef = "primary",
+    valueFieldOptions = [],
+    secondaryFieldOptions = [],
+    tableColumnOptions = [],
+    scopeParamOptions = [],
+} = {}) {
+    const normalizedDraft = draft && typeof draft === "object" && !Array.isArray(draft)
+        ? cloneValue(draft)
+        : null;
+    if (!normalizedDraft) {
+        return normalizedDraft;
+    }
+    const normalizedKind = normalizeString(normalizedDraft?.kind);
+    const nextDatasetRef = normalizeString(datasetRef || normalizedDraft?.datasetRef || "primary") || "primary";
+    normalizedDraft.datasetRef = nextDatasetRef;
+
+    const normalizedValueOptions = normalizeFieldOptions(valueFieldOptions);
+    const normalizedSecondaryOptions = normalizeFieldOptions(secondaryFieldOptions);
+    const normalizedColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
+    const normalizedScopeParamOptions = normalizeScopeParamOptions(scopeParamOptions);
+
+    if (normalizedKind === "filterBarBlock") {
+        const scopedParamOptions = resolveDocumentBlockScopeParamOptions(
+            nextDatasetRef,
+            [{ value: nextDatasetRef, scopeParamOptions: normalizedScopeParamOptions }],
+            [],
+        );
+        const allowedParamIds = new Set(scopedParamOptions.map((option) => option.value));
+        const defaultParamIds = scopedParamOptions.map((option) => option.value);
+        const selectedParamIds = normalizeStringArray(normalizedDraft?.paramIds).filter((paramId) => allowedParamIds.has(paramId));
+        normalizedDraft.paramIds = selectedParamIds.length > 0
+            ? selectedParamIds
+            : defaultParamIds;
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "tableBlock") {
+        const selectedColumnKeys = normalizeStringArray(normalizedDraft?.columnKeys);
+        const allowedColumnKeys = new Set(normalizedColumnOptions.map((option) => option.key));
+        const defaultColumnKeys = (() => {
+            const selectedDefaults = normalizedColumnOptions.filter((option) => option.selected).map((option) => option.key);
+            return selectedDefaults.length > 0
+                ? selectedDefaults
+                : normalizedColumnOptions.map((option) => option.key);
+        })();
+        const nextColumnKeys = selectedColumnKeys.filter((key) => allowedColumnKeys.has(key));
+        const resolvedColumnKeys = nextColumnKeys.length > 0 ? nextColumnKeys : defaultColumnKeys;
+        const optionIndex = new Map(normalizedColumnOptions.map((option) => [option.key, option]));
+        const existingColumns = new Map(
+            (Array.isArray(normalizedDraft?.columns) ? normalizedDraft.columns : [])
+                .filter((column) => column && typeof column === "object" && !Array.isArray(column))
+                .map((column) => [normalizeString(column?.key), cloneValue(column)]),
+        );
+        normalizedDraft.columnKeys = resolvedColumnKeys;
+        normalizedDraft.columns = resolvedColumnKeys.map((columnKey) => {
+            const option = optionIndex.get(columnKey);
+            const existing = existingColumns.get(columnKey);
+            return {
+                ...(existing || {}),
+                key: columnKey,
+                ...(normalizeString(existing?.sourceKey || option?.sourceKey)
+                    ? { sourceKey: normalizeString(existing?.sourceKey || option?.sourceKey) }
+                    : {}),
+                ...(normalizeString(existing?.displayKey || option?.displayKey)
+                    ? { displayKey: normalizeString(existing?.displayKey || option?.displayKey) }
+                    : {}),
+                ...(existing?.displayValueMap || option?.displayValueMap
+                    ? { displayValueMap: cloneValue(existing?.displayValueMap || option?.displayValueMap) }
+                    : {}),
+                label: normalizeString(existing?.label || option?.label || columnKey) || columnKey,
+                ...(normalizeString(existing?.format || option?.format) ? { format: normalizeString(existing?.format || option?.format) } : {}),
+            };
+        });
+        if (normalizedDraft.columnVisualKinds && typeof normalizedDraft.columnVisualKinds === "object" && !Array.isArray(normalizedDraft.columnVisualKinds)) {
+            normalizedDraft.columnVisualKinds = Object.fromEntries(
+                Object.entries(normalizedDraft.columnVisualKinds)
+                    .filter(([key]) => resolvedColumnKeys.includes(normalizeString(key))),
+            );
+        }
+        if (normalizedDraft.columnVisualRuleTexts && typeof normalizedDraft.columnVisualRuleTexts === "object" && !Array.isArray(normalizedDraft.columnVisualRuleTexts)) {
+            normalizedDraft.columnVisualRuleTexts = Object.fromEntries(
+                Object.entries(normalizedDraft.columnVisualRuleTexts)
+                    .filter(([key]) => resolvedColumnKeys.includes(normalizeString(key))),
+            );
+        }
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "kpiBlock") {
+        const currentValueField = normalizeString(normalizedDraft?.valueField);
+        const nextValueField = normalizedValueOptions.some((option) => option.value === currentValueField)
+            ? currentValueField
+            : normalizeString(normalizedValueOptions[0]?.value);
+        const currentSecondaryField = normalizeString(normalizedDraft?.secondaryField);
+        const nextSecondaryField = normalizedSecondaryOptions.some((option) => option.value === currentSecondaryField)
+            ? currentSecondaryField
+            : "";
+        normalizedDraft.valueField = nextValueField;
+        normalizedDraft.valueLabel = normalizeString(
+            normalizedValueOptions.find((option) => option.value === nextValueField)?.label
+            || normalizedDraft?.valueLabel
+            || nextValueField,
+        );
+        normalizedDraft.secondaryField = nextSecondaryField;
+        normalizedDraft.secondaryLabel = normalizeString(
+            nextSecondaryField
+                ? (normalizedSecondaryOptions.find((option) => option.value === nextSecondaryField)?.label || normalizedDraft?.secondaryLabel || nextSecondaryField)
+                : "",
+        );
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "badgesBlock") {
+        const allowedColumnKeys = new Set(normalizedColumnOptions.map((option) => option.key));
+        const optionIndex = new Map(normalizedColumnOptions.map((option) => [option.key, option]));
+        normalizedDraft.items = normalizeReportBuilderBadgeItems(normalizedDraft?.items).map((item) => {
+            const normalizedValueField = normalizeString(item?.valueField);
+            const matchedOption = optionIndex.get(normalizedValueField);
+            return {
+                ...item,
+                rulesText: normalizeString(item?.rulesText || buildBadgeRulesText(item)),
+                ...(normalizedValueField && allowedColumnKeys.has(normalizedValueField)
+                    ? {
+                        valueField: normalizedValueField,
+                        format: normalizeString(matchedOption?.format),
+                    }
+                    : { valueField: "", format: "" }),
+            };
+        });
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "geoMapBlock") {
+        const geo = normalizedDraft?.geo && typeof normalizedDraft.geo === "object" && !Array.isArray(normalizedDraft.geo)
+            ? cloneValue(normalizedDraft.geo)
+            : {};
+        const metric = geo?.metric && typeof geo.metric === "object" && !Array.isArray(geo.metric)
+            ? cloneValue(geo.metric)
+            : {};
+        const dimensionOptions = normalizedColumnOptions.filter((option) => normalizeString(option?.kind) === "dimension");
+        const measureOptions = normalizedColumnOptions.filter((option) => normalizeString(option?.kind) === "measure");
+        const currentKey = normalizeString(geo?.key);
+        const currentLabelKey = normalizeString(geo?.labelKey);
+        const currentMetricKey = normalizeString(metric?.key);
+        const nextKey = dimensionOptions.some((option) => option.key === currentKey)
+            ? currentKey
+            : normalizeString(dimensionOptions[0]?.key);
+        const nextLabelKey = dimensionOptions.some((option) => option.key === currentLabelKey)
+            ? currentLabelKey
+            : "";
+        const nextMetricKey = measureOptions.some((option) => option.key === currentMetricKey)
+            ? currentMetricKey
+            : normalizeString(measureOptions[0]?.key);
+        normalizedDraft.geo = {
+            ...geo,
+            key: nextKey,
+            ...(nextLabelKey ? { labelKey: nextLabelKey } : {}),
+            metric: {
+                ...metric,
+                key: nextMetricKey,
+                label: normalizeString(
+                    measureOptions.find((option) => option.key === nextMetricKey)?.label
+                    || metric?.label
+                    || nextMetricKey,
+                ),
+                ...(normalizeString(
+                    measureOptions.find((option) => option.key === nextMetricKey)?.format
+                    || metric?.format,
+                ) ? {
+                    format: normalizeGeoFormat(
+                        measureOptions.find((option) => option.key === nextMetricKey)?.format
+                        || metric?.format,
+                    ),
+                } : {}),
+            },
+        };
+        return normalizedDraft;
+    }
+
+    return normalizedDraft;
 }
 
 export function validateReportBuilderDocumentBlockDraft(draft = null, {
@@ -783,6 +1219,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
     secondaryFieldOptions = [],
     tableColumnOptions = [],
     scopeParamOptions = [],
+    datasetOptions = [],
     chartConfig = null,
     chartFieldOptions = [],
 } = {}) {
@@ -797,20 +1234,46 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
         });
     }
     if (normalizedKind === "filterBarBlock") {
-        const normalizedScopeParamOptions = normalizeScopeParamOptions(scopeParamOptions);
+        const datasetOptionsByValue = new Map(
+            (Array.isArray(datasetOptions) ? datasetOptions : [])
+                .map((option) => [
+                    normalizeString(option?.value ?? option?.id),
+                    normalizeScopeParamOptions(option?.scopeParamOptions),
+                ])
+                .filter(([value]) => !!value),
+        );
+        const normalizedDatasetRef = normalizeString(draft?.datasetRef || "primary") || "primary";
+        const datasetScopedOptions = datasetOptionsByValue.has(normalizedDatasetRef)
+            ? (datasetOptionsByValue.get(normalizedDatasetRef) || [])
+            : [];
+        const normalizedScopeParamOptions = datasetScopedOptions.length > 0
+            ? datasetScopedOptions
+            : (normalizedDatasetRef === "primary" ? normalizeScopeParamOptions(scopeParamOptions) : []);
         const allowedParamIds = new Set(normalizedScopeParamOptions.map((option) => option.value));
         const paramIds = normalizeStringArray(draft?.paramIds);
         if (paramIds.length === 0 && normalizedScopeParamOptions.length > 0) {
             errors.push({
                 field: "paramIds",
                 code: "required",
-                message: "Select at least one shared scope parameter for the filter bar block.",
+                message: "Select at least one report filter for the filter bar block.",
             });
-        } else if (normalizedScopeParamOptions.length > 0 && paramIds.some((paramId) => !allowedParamIds.has(paramId))) {
+        } else if ((normalizedScopeParamOptions.length === 0 && paramIds.length > 0) || paramIds.some((paramId) => !allowedParamIds.has(paramId))) {
             errors.push({
                 field: "paramIds",
                 code: "unknown",
-                message: "One or more filter bar parameters are not available in the current builder scope.",
+                message: "One or more filter bar filters are not available in the current builder.",
+            });
+        }
+        const datasetOptionIds = new Set(
+            (Array.isArray(datasetOptions) ? datasetOptions : [])
+                .map((option) => normalizeString(option?.value ?? option?.id))
+                .filter(Boolean),
+        );
+        if (datasetOptionIds.size > 0 && normalizedDatasetRef !== "primary" && !datasetOptionIds.has(normalizedDatasetRef)) {
+            errors.push({
+                field: "datasetRef",
+                code: "unknown",
+                message: "The filter bar data source is not available in the current builder.",
             });
         }
     } else if (normalizedKind === "refinementBarBlock") {
@@ -937,6 +1400,36 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
                 message: "The selected KPI secondary field is not available in the current builder.",
             });
         }
+    } else if (normalizedKind === "badgesBlock") {
+        const items = normalizeReportBuilderBadgeItems(draft?.items);
+        if (items.length === 0) {
+            errors.push({
+                field: "items",
+                code: "required",
+                message: "Add at least one pill to the authored badges block.",
+            });
+        }
+        const allowedColumnKeys = new Set(
+            normalizeTableColumnOptions(tableColumnOptions).map((option) => option.key),
+        );
+        items.forEach((item, index) => {
+            const valueField = normalizeString(item?.valueField);
+            if (valueField && tableColumnOptions.length > 0 && !allowedColumnKeys.has(valueField)) {
+                errors.push({
+                    field: `items.${index}.valueField`,
+                    code: "unknown",
+                    message: `The selected pill field '${valueField}' is not available in the current builder.`,
+                });
+            }
+            const parsedRules = parseReportBuilderBadgeRuleRows(item?.rulesText || "");
+            if (!parsedRules.valid) {
+                errors.push({
+                    field: `items.${index}.rulesText`,
+                    code: "invalidRules",
+                    message: `${labelForBadgeItem(item, index)}: ${parsedRules.error}`,
+                });
+            }
+        });
     } else if (normalizedKind === "tableBlock") {
         const normalizedColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
         const allowedColumnKeys = new Set(normalizedColumnOptions.map((option) => option.key));
@@ -945,13 +1438,13 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
             errors.push({
                 field: "columnKeys",
                 code: "required",
-                message: "Select at least one column for the table block.",
+                message: "Select at least one breakdown or measure for the table block.",
             });
         } else if (normalizedColumnOptions.length > 0 && columnKeys.some((columnKey) => !allowedColumnKeys.has(columnKey))) {
             errors.push({
                 field: "columnKeys",
                 code: "unknown",
-                message: "One or more table block columns are not available in the current builder.",
+                message: "One or more table block fields are not available in the current builder.",
             });
         }
         const columnVisualKinds = normalizeColumnVisualKinds(draft?.columnVisualKinds);
@@ -1022,7 +1515,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
         errors.push({
             field: "kind",
             code: "unsupported",
-            message: "Only narrative, filter bar, refinement bar, geo map, KPI, chart, and table authored blocks are supported in this builder slice.",
+            message: "Only narrative, pills, filter bar, refinement bar, geo map, KPI, chart, and table authored blocks are supported in this builder slice.",
         });
     }
     return {
@@ -1038,26 +1531,80 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
     scopeParamOptions = [],
     chartConfig = null,
     chartFieldOptions = [],
+    datasetOptions = [],
 } = {}) {
     const normalizedBlocks = normalizeReportBuilderDocumentBlocks(blocks);
     const normalizedValueOptions = normalizeFieldOptions(valueFieldOptions);
     const normalizedSecondaryOptions = normalizeFieldOptions(secondaryFieldOptions);
     const normalizedTableColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
     const normalizedScopeParamOptions = normalizeScopeParamOptions(scopeParamOptions);
+    const normalizedDatasetOptions = (Array.isArray(datasetOptions) ? datasetOptions : [])
+        .map((option) => {
+            const value = normalizeString(option?.value ?? option?.id);
+            if (!value) {
+                return null;
+            }
+            return {
+                value,
+                valueFieldOptions: normalizeFieldOptions(option?.valueFieldOptions),
+                secondaryFieldOptions: normalizeFieldOptions(option?.secondaryFieldOptions),
+                tableColumnOptions: normalizeTableColumnOptions(option?.columnOptions),
+                chartFieldOptions: normalizeChartFieldOptions(
+                    Array.isArray(option?.chartFieldOptions) && option.chartFieldOptions.length > 0
+                        ? option.chartFieldOptions
+                        : option?.columnOptions,
+                ),
+            };
+        })
+        .filter(Boolean);
+    const datasetOptionsByValue = new Map(normalizedDatasetOptions.map((option) => [option.value, option]));
     const valueOptionIds = new Set(normalizedValueOptions.map((option) => option.value));
     const secondaryOptionIds = new Set(normalizedSecondaryOptions.map((option) => option.value));
     const tableColumnOptionIds = new Set(normalizedTableColumnOptions.map((option) => option.key));
-    const scopeParamOptionIds = new Set(normalizedScopeParamOptions.map((option) => option.value));
+    const datasetOptionIds = new Set(normalizedDatasetOptions.map((option) => option.value));
     const diagnostics = [];
 
     normalizedBlocks.forEach((block, index) => {
         const blockId = normalizeString(block?.id || `documentBlock_${index + 1}`);
         const blockTitle = formatDocumentBlockTitle(block);
         const normalizedKind = normalizeString(block?.kind);
+        const normalizedDatasetRef = normalizeString(block?.datasetRef);
+        const datasetOption = datasetOptionsByValue.get(normalizedDatasetRef) || null;
+        const effectiveValueOptionIds = datasetOption
+            ? new Set((datasetOption.valueFieldOptions || []).map((option) => option.value))
+            : valueOptionIds;
+        const effectiveSecondaryOptionIds = datasetOption
+            ? new Set((datasetOption.secondaryFieldOptions || []).map((option) => option.value))
+            : secondaryOptionIds;
+        const effectiveTableColumnOptions = datasetOption?.tableColumnOptions?.length > 0
+            ? datasetOption.tableColumnOptions
+            : normalizedTableColumnOptions;
+        const effectiveTableColumnOptionIds = new Set(effectiveTableColumnOptions.map((option) => option.key));
+        const effectiveChartFieldOptions = datasetOption?.chartFieldOptions?.length > 0
+            ? datasetOption.chartFieldOptions
+            : normalizeChartFieldOptions(chartFieldOptions);
+        if (normalizedDatasetRef && normalizedDatasetRef !== "primary" && datasetOptionIds.size > 0 && !datasetOptionIds.has(normalizedDatasetRef)) {
+            diagnostics.push({
+                id: `documentBlockDatasetUnavailable:${blockId}:${normalizedDatasetRef}`,
+                code: "documentBlockDatasetUnavailable",
+                severity: "error",
+                blockId,
+                path: `reportDocument.blocks.${blockId}.datasetRef`,
+                message: `${blockTitle} references unavailable data source '${normalizedDatasetRef}'.`,
+                suggestedFix: "Edit the authored block to bind it to one of the current data sources or re-import the missing static dataset.",
+            });
+        }
         if (normalizedKind === "filterBarBlock") {
+            const datasetScopedOptions = datasetOption
+                ? normalizeScopeParamOptions(datasetOption.scopeParamOptions)
+                : [];
+            const effectiveScopeParamOptions = datasetScopedOptions.length > 0
+                ? datasetScopedOptions
+                : (normalizedDatasetRef === "primary" ? normalizedScopeParamOptions : []);
+            const effectiveScopeParamOptionIds = new Set(effectiveScopeParamOptions.map((option) => option.value));
             (Array.isArray(block?.paramIds) ? block.paramIds : []).forEach((paramId, paramIndex) => {
                 const normalizedParamId = normalizeString(paramId);
-                if (!normalizedParamId || scopeParamOptionIds.has(normalizedParamId)) {
+                if (!normalizedParamId || effectiveScopeParamOptionIds.has(normalizedParamId)) {
                     return;
                 }
                 diagnostics.push({
@@ -1066,8 +1613,8 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                     severity: "error",
                     blockId,
                     path: `reportDocument.blocks.${blockId}.paramIds[${paramIndex}]`,
-                    message: `${blockTitle} references unavailable scope parameter '${normalizedParamId}'.`,
-                    suggestedFix: "Edit the filter bar block to use one of the current shared scope parameters or remove the authored block.",
+                    message: `${blockTitle} references unavailable report filter '${normalizedParamId}'.`,
+                    suggestedFix: "Edit the filter bar block to use one of the current available report filters or remove the authored block.",
                 });
             });
             return;
@@ -1091,7 +1638,7 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                     ? chartConfig
                     : {},
                 normalizedChartSpec,
-                normalizeChartFieldOptions(chartFieldOptions),
+                effectiveChartFieldOptions,
             );
             chartValidation.errors.forEach((entry, errorIndex) => {
                 diagnostics.push({
@@ -1103,7 +1650,7 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                     message: `${blockTitle} is no longer compatible with the current builder. ${formatChartBlockValidationMessage({
                         ...entry,
                         chartSpec: normalizedChartSpec,
-                    }, chartFieldOptions)}`,
+                    }, effectiveChartFieldOptions)}`,
                     suggestedFix: "Edit the chart block to use one of the current builder fields or restore the missing chart fields in the builder.",
                 });
             });
@@ -1120,12 +1667,12 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
             const normalizedLabelKey = normalizeString(geo?.labelKey);
             const normalizedMetricKey = normalizeString(metric?.key);
             const dimensionOptionIds = new Set(
-                normalizedTableColumnOptions
+                effectiveTableColumnOptions
                     .filter((option) => normalizeString(option?.kind) === "dimension")
                     .map((option) => option.key),
             );
             const measureOptionIds = new Set(
-                normalizedTableColumnOptions
+                effectiveTableColumnOptions
                     .filter((option) => normalizeString(option?.kind) === "measure")
                     .map((option) => option.key),
             );
@@ -1167,7 +1714,7 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
         if (normalizedKind === "kpiBlock") {
             const valueField = normalizeString(block?.valueField);
             const secondaryField = normalizeString(block?.secondaryField);
-            if (valueField && !valueOptionIds.has(valueField)) {
+            if (valueField && !effectiveValueOptionIds.has(valueField)) {
                 diagnostics.push({
                     id: `documentBlockValueFieldUnavailable:${blockId}`,
                     code: "documentBlockValueFieldUnavailable",
@@ -1178,7 +1725,7 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                     suggestedFix: "Edit the KPI block to use one of the current available measures or restore the missing measure in the builder.",
                 });
             }
-            if (secondaryField && !secondaryOptionIds.has(secondaryField)) {
+            if (secondaryField && !effectiveSecondaryOptionIds.has(secondaryField)) {
                 diagnostics.push({
                     id: `documentBlockSecondaryFieldUnavailable:${blockId}`,
                     code: "documentBlockSecondaryFieldUnavailable",
@@ -1191,10 +1738,54 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
             }
             return;
         }
+        if (normalizedKind === "badgesBlock") {
+            const items = normalizeReportBuilderBadgeItems(block?.items);
+            if (items.length === 0) {
+                diagnostics.push({
+                    id: `documentBlockBadgesEmpty:${blockId}`,
+                    code: "documentBlockBadgesEmpty",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.items`,
+                    message: `${blockTitle} does not define any pills.`,
+                    suggestedFix: "Edit the pills block and add at least one visible pill.",
+                });
+            }
+            items.forEach((item, itemIndex) => {
+                const valueField = normalizeString(item?.valueField);
+                if (!valueField || effectiveTableColumnOptionIds.has(valueField)) {
+                    return;
+                }
+                diagnostics.push({
+                    id: `documentBlockBadgeValueFieldUnavailable:${blockId}:${valueField}`,
+                    code: "documentBlockBadgeValueFieldUnavailable",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.items[${itemIndex}].valueField`,
+                    message: `${blockTitle} references unavailable pill field '${valueField}'.`,
+                    suggestedFix: "Edit the pills block to use one of the current available fields or clear the field-backed value.",
+                });
+            });
+            return;
+        }
         if (normalizedKind === "tableBlock") {
-            (Array.isArray(block?.columns) ? block.columns : []).forEach((column, columnIndex) => {
+            const columns = (Array.isArray(block?.columns) ? block.columns : [])
+                .filter((column) => column && typeof column === "object" && !Array.isArray(column));
+            if (columns.length === 0) {
+                diagnostics.push({
+                    id: `documentBlockTableEmpty:${blockId}`,
+                    code: "documentBlockTableEmpty",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.columns`,
+                    message: `${blockTitle} does not define any table fields.`,
+                    suggestedFix: "Edit the table block and apply at least one current dimension or measure.",
+                });
+                return;
+            }
+            columns.forEach((column, columnIndex) => {
                 const columnKey = normalizeString(column?.key);
-                if (!columnKey || tableColumnOptionIds.has(columnKey)) {
+                if (!columnKey || effectiveTableColumnOptionIds.has(columnKey)) {
                     return;
                 }
                 diagnostics.push({
@@ -1277,7 +1868,7 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
             chartState: null,
         };
     }
-    const scopeParamOptions = (Array.isArray(preparedConfig?.staticFilters) ? preparedConfig.staticFilters : [])
+    const scopeParamOptions = resolveReportBuilderScopeParamFilters(preparedConfig)
         .map((filter) => {
             const value = normalizeString(filter?.id || filter?.field);
             if (!value) {
@@ -1297,15 +1888,36 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
     const tableColumnOptions = [
         ...availableDimensions.map((dimension) => ({
             key: dimension.id,
+            sourceKey: normalizeString(dimension.sourceKey || dimension.id) || dimension.id,
+            displayKey: normalizeString(dimension.displayKey || dimension.sourceKey || dimension.id) || dimension.id,
+            ...(dimension.displayValueMap ? { displayValueMap: cloneValue(dimension.displayValueMap) } : {}),
+            ...(dimension.rawId ? { rawId: dimension.rawId } : {}),
             label: dimension.label,
             kind: dimension.kind,
+            selected: dimension.selected === true,
             ...(dimension.format ? { format: dimension.format } : {}),
+            ...(dimension.description ? { description: dimension.description } : {}),
+            ...(dimension.category ? { category: dimension.category } : {}),
+            ...(dimension.definitionRef ? { definitionRef: dimension.definitionRef } : {}),
+            ...(dimension.semanticRef ? { semanticRef: dimension.semanticRef } : {}),
+            ...(dimension.governance ? { governance: cloneValue(dimension.governance) } : {}),
         })),
         ...availableMeasures.map((measure) => ({
             key: measure.id,
+            sourceKey: normalizeString(measure.sourceKey || measure.id) || measure.id,
+            displayKey: normalizeString(measure.displayKey || measure.sourceKey || measure.id) || measure.id,
+            ...(measure.displayValueMap ? { displayValueMap: cloneValue(measure.displayValueMap) } : {}),
+            ...(measure.rawId ? { rawId: measure.rawId } : {}),
             label: measure.label,
             kind: measure.kind,
+            ...(measure.calculated ? { calculated: true } : {}),
+            selected: measure.selected === true,
             ...(measure.format ? { format: measure.format } : {}),
+            ...(measure.description ? { description: measure.description } : {}),
+            ...(measure.category ? { category: measure.category } : {}),
+            ...(measure.definitionRef ? { definitionRef: measure.definitionRef } : {}),
+            ...(measure.semanticRef ? { semanticRef: measure.semanticRef } : {}),
+            ...(measure.governance ? { governance: cloneValue(measure.governance) } : {}),
         })),
     ].filter((option) => option.key);
     const chartState = buildAuthoringChartState(preparedConfig, normalizedState);
@@ -1313,13 +1925,27 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
         valueFieldOptions: availableMeasures
             .map((measure) => ({
                 value: measure.id,
+                ...(measure.rawId ? { rawId: measure.rawId } : {}),
                 label: measure.label,
+                ...(measure.format ? { format: measure.format } : {}),
+                ...(measure.description ? { description: measure.description } : {}),
+                ...(measure.category ? { category: measure.category } : {}),
+                ...(measure.definitionRef ? { definitionRef: measure.definitionRef } : {}),
+                ...(measure.semanticRef ? { semanticRef: measure.semanticRef } : {}),
+                ...(measure.governance ? { governance: cloneValue(measure.governance) } : {}),
             }))
             .filter((option) => option.value),
         secondaryFieldOptions: availableDimensions
             .map((dimension) => ({
                 value: dimension.id,
+                ...(dimension.rawId ? { rawId: dimension.rawId } : {}),
                 label: dimension.label,
+                ...(dimension.format ? { format: dimension.format } : {}),
+                ...(dimension.description ? { description: dimension.description } : {}),
+                ...(dimension.category ? { category: dimension.category } : {}),
+                ...(dimension.definitionRef ? { definitionRef: dimension.definitionRef } : {}),
+                ...(dimension.semanticRef ? { semanticRef: dimension.semanticRef } : {}),
+                ...(dimension.governance ? { governance: cloneValue(dimension.governance) } : {}),
             }))
             .filter((option) => option.value),
         tableColumnOptions,
@@ -1350,7 +1976,22 @@ export function buildReportBuilderDocumentCompileDiagnostics({
         config,
         state,
     });
-    return buildReportBuilderDocumentBlockDiagnostics(blocks, fieldOptions);
+    const reportBuilderBlock = document && typeof document === "object" && !Array.isArray(document)
+        ? (Array.isArray(document?.blocks) ? document.blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null : null)
+        : null;
+    const embeddedState = reportBuilderBlock?.state && typeof reportBuilderBlock.state === "object" && !Array.isArray(reportBuilderBlock.state)
+        ? reportBuilderBlock.state
+        : null;
+    const stateDatasetOptions = buildReportBuilderStaticDatasetOptions(state?.reportStaticDatasets);
+    const embeddedDatasetOptions = buildReportBuilderStaticDatasetOptions(embeddedState?.reportStaticDatasets);
+    return buildReportBuilderDocumentBlockDiagnostics(blocks, {
+        ...fieldOptions,
+        datasetOptions: [
+            ...(Array.isArray(fieldOptions?.datasetOptions) ? fieldOptions.datasetOptions : []),
+            ...stateDatasetOptions,
+            ...embeddedDatasetOptions,
+        ],
+    });
 }
 
 export function buildReportBuilderDocumentCompileValidation(diagnostics = []) {
@@ -1384,6 +2025,8 @@ function buildNextDocumentState(baseState = {}, blocks = [], layout = null) {
 
 export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, {
     editingId = "",
+    insertionAfterId = "",
+    insertionPlacement = "after",
     valueFieldOptions = [],
     secondaryFieldOptions = [],
     tableColumnOptions = [],
@@ -1407,8 +2050,21 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
             block: null,
         };
     }
-    const currentBlocks = normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks);
+    const currentBlocks = resolveReportBuilderDocumentBlockList(state);
+    const normalizedCurrentLayout = normalizeReportBuilderDocumentLayoutState(
+        state?.reportDocumentLayout,
+        normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks),
+    );
+    const layoutItemIndex = buildDocumentLayoutItemIndex(normalizedCurrentLayout?.items);
+    const currentPrimaryIndex = resolveDocumentPrimaryIndex(
+        normalizedCurrentLayout?.items,
+        new Set(currentBlocks.map((block) => normalizeString(block?.id)).filter(Boolean)),
+    );
     const normalizedEditingId = normalizeString(editingId);
+    const normalizedInsertionAfterId = normalizeString(insertionAfterId);
+    const normalizedInsertionPlacement = normalizeString(insertionPlacement).toLowerCase() === "before"
+        ? "before"
+        : "after";
     const normalizedKind = normalizeString(draft?.kind);
     let normalizedBlock = null;
     if (normalizedKind === "filterBarBlock") {
@@ -1421,6 +2077,17 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
         normalizedBlock = buildReportDocumentGeoMapBlock(draft);
     } else if (normalizedKind === "kpiBlock") {
         normalizedBlock = buildReportDocumentKpiBlock(draft);
+    } else if (normalizedKind === "badgesBlock") {
+        normalizedBlock = buildReportDocumentBadgesBlock({
+            ...draft,
+            items: normalizeReportBuilderBadgeItems(draft?.items).map((item) => {
+                const parsedRules = parseReportBuilderBadgeRuleRows(item?.rulesText || "");
+                return {
+                    ...item,
+                    ...(parsedRules.valid && parsedRules.rules.length > 0 ? { rules: parsedRules.rules } : {}),
+                };
+            }),
+        });
     } else if (normalizedKind === "tableBlock") {
         const normalizedColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
         const optionIndex = new Map(normalizedColumnOptions.map((option) => [option.key, option]));
@@ -1442,6 +2109,9 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
                         : option
                             ? {
                                 key: option.key,
+                                ...(option.sourceKey ? { sourceKey: option.sourceKey } : {}),
+                                ...(option.displayKey ? { displayKey: option.displayKey } : {}),
+                                ...(option.displayValueMap ? { displayValueMap: cloneValue(option.displayValueMap) } : {}),
                                 label: option.label,
                                 ...(option.format ? { format: option.format } : {}),
                             }
@@ -1508,15 +2178,45 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
     const targetId = normalizeString(normalizedEditingId || normalizedBlock?.id);
     const existingIndex = currentBlocks.findIndex((block) => normalizeString(block?.id) === targetId);
     const nextBlocks = [...currentBlocks];
+    let nextPrimaryIndex = currentPrimaryIndex;
     if (existingIndex >= 0) {
         nextBlocks[existingIndex] = normalizedBlock;
+    } else if (normalizedInsertionAfterId) {
+        const insertionAfterPrimary = normalizedInsertionAfterId === "primaryBuilder";
+        if (insertionAfterPrimary) {
+            nextBlocks.splice(currentPrimaryIndex, 0, normalizedBlock);
+            if (normalizedInsertionPlacement === "before") {
+                nextPrimaryIndex = currentPrimaryIndex + 1;
+            }
+        } else {
+            const afterIndex = currentBlocks.findIndex((block) => normalizeString(block?.id) === normalizedInsertionAfterId);
+            if (afterIndex === -1) {
+                nextBlocks.push(normalizedBlock);
+            } else {
+                const nextIndex = normalizedInsertionPlacement === "before"
+                    ? afterIndex
+                    : afterIndex + 1;
+                nextBlocks.splice(nextIndex, 0, normalizedBlock);
+                const insertionBeforePrimary = afterIndex < currentPrimaryIndex;
+                if (insertionBeforePrimary) {
+                    nextPrimaryIndex += 1;
+                }
+            }
+        }
     } else {
         nextBlocks.push(normalizedBlock);
     }
     const nextState = buildNextDocumentState(
         state,
         nextBlocks,
-        state?.reportDocumentLayout,
+        {
+            type: normalizedCurrentLayout?.type || "stack",
+            items: buildLayoutItemsFromAuthoredOrder(
+                nextBlocks.map((block) => normalizeString(block?.id)).filter(Boolean),
+                nextPrimaryIndex,
+                layoutItemIndex,
+            ),
+        },
     );
     return {
         valid: true,
@@ -1557,7 +2257,7 @@ export function duplicateReportBuilderDocumentBlockState(state = {}, blockId = "
     }
     const sourceBlock = currentBlocks[currentIndex];
     const normalizedKind = normalizeString(sourceBlock?.kind);
-    if (!["filterBarBlock", "refinementBarBlock", "chartBlock", "geoMapBlock", "kpiBlock", "markdownBlock", "tableBlock"].includes(normalizedKind)) {
+    if (!["filterBarBlock", "refinementBarBlock", "chartBlock", "geoMapBlock", "kpiBlock", "badgesBlock", "markdownBlock", "tableBlock"].includes(normalizedKind)) {
         return {
             valid: false,
             nextState: cloneValue(state),
@@ -1583,6 +2283,8 @@ export function duplicateReportBuilderDocumentBlockState(state = {}, blockId = "
                     ? buildReportDocumentGeoMapBlock(duplicatedSeed)
             : normalizedKind === "kpiBlock"
                 ? buildReportDocumentKpiBlock(duplicatedSeed)
+                : normalizedKind === "badgesBlock"
+                    ? buildReportDocumentBadgesBlock(duplicatedSeed)
                 : normalizedKind === "tableBlock"
                     ? buildReportDocumentTableBlock(duplicatedSeed)
                     : buildReportDocumentMarkdownBlock(duplicatedSeed);
@@ -1639,11 +2341,11 @@ export function resizeReportBuilderDocumentBlockState(state = {}, blockId = "", 
         normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks),
     );
     const layoutItemIndex = buildDocumentLayoutItemIndex(normalizedCurrentLayout?.items);
-    const normalizedSize = normalizeDocumentLayoutItemSize(size);
-    if (normalizedSize) {
+    const normalizedSpan = resolveReportLayoutSpan(size);
+    if (normalizedSpan < 12) {
         layoutItemIndex.set(normalizedBlockId, {
             blockId: normalizedBlockId,
-            size: normalizedSize,
+            span: normalizedSpan,
         });
     } else {
         layoutItemIndex.delete(normalizedBlockId);
@@ -1684,6 +2386,55 @@ export function moveReportBuilderDocumentBlockState(state = {}, blockId = "", di
     const reorderedBlocks = [...currentBlocks];
     const [movedBlock] = reorderedBlocks.splice(currentIndex, 1);
     reorderedBlocks.splice(nextIndex, 0, movedBlock);
+    const normalizedCurrentLayout = normalizeReportBuilderDocumentLayoutState(
+        state?.reportDocumentLayout,
+        normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks),
+    );
+    const layoutItemIndex = buildDocumentLayoutItemIndex(normalizedCurrentLayout?.items);
+    const primaryIndex = resolveDocumentPrimaryIndex(
+        normalizedCurrentLayout?.items,
+        new Set(reorderedBlocks.map((block) => normalizeString(block?.id)).filter(Boolean)),
+    );
+    return buildNextDocumentState(
+        state,
+        reorderedBlocks,
+        {
+            type: normalizedCurrentLayout?.type || "stack",
+            items: buildLayoutItemsFromAuthoredOrder(
+                reorderedBlocks.map((block) => normalizeString(block?.id)).filter(Boolean),
+                primaryIndex,
+                layoutItemIndex,
+            ),
+        },
+    );
+}
+
+export function moveReportBuilderDocumentBlockRelativeState(state = {}, blockId = "", targetBlockId = "", placement = "before") {
+    const normalizedBlockId = normalizeString(blockId);
+    const normalizedTargetBlockId = normalizeString(targetBlockId);
+    const normalizedPlacement = normalizeString(placement).toLowerCase() === "after"
+        ? "after"
+        : "before";
+    if (!normalizedBlockId || !normalizedTargetBlockId || normalizedBlockId === normalizedTargetBlockId) {
+        return cloneValue(state);
+    }
+    const currentBlocks = resolveReportBuilderDocumentBlockList(state);
+    const currentIndex = currentBlocks.findIndex((block) => normalizeString(block?.id) === normalizedBlockId);
+    const targetIndex = currentBlocks.findIndex((block) => normalizeString(block?.id) === normalizedTargetBlockId);
+    if (currentIndex === -1 || targetIndex === -1) {
+        return cloneValue(state);
+    }
+    const reorderedBlocks = [...currentBlocks];
+    const [movedBlock] = reorderedBlocks.splice(currentIndex, 1);
+    const reducedTargetIndex = reorderedBlocks.findIndex((block) => normalizeString(block?.id) === normalizedTargetBlockId);
+    if (!movedBlock || reducedTargetIndex === -1) {
+        return cloneValue(state);
+    }
+    reorderedBlocks.splice(
+        normalizedPlacement === "after" ? reducedTargetIndex + 1 : reducedTargetIndex,
+        0,
+        movedBlock,
+    );
     const normalizedCurrentLayout = normalizeReportBuilderDocumentLayoutState(
         state?.reportDocumentLayout,
         normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks),

@@ -89,6 +89,10 @@ assert.equal(matchesReportBuilderSavedPayloadSourceIdentity(
 const normalizedPlainRecord = normalizeReportBuilderSavedReportRecord(savedReportPayload, {
     documentVersion: 4,
 });
+assert.equal(
+    normalizedPlainRecord.id,
+    "reportBuilder.savedReportPayload::rbreport_capacity_q3::capacity_q3_inventory_ladder::capacityQ3",
+);
 assert.equal(normalizedPlainRecord.reportId, "capacityQ3");
 assert.equal(normalizedPlainRecord.templateId, "capacity_inventory_brief");
 assert.equal(normalizedPlainRecord.exportable, false);
@@ -116,6 +120,49 @@ const normalizedRichRecord = normalizeReportBuilderSavedReportRecord({
 assert.equal(normalizedRichRecord.exportable, true);
 assert.equal(normalizedRichRecord.exportRequest.source.payloadId, "rbreport_capacity_q3");
 assert.equal(normalizedRichRecord.importedArtifactKind, "reportBuilder.savedReportRecord");
+
+const normalizedStoredArtifactRecord = normalizeReportBuilderSavedReportRecord({
+    artifactId: "report-1",
+    artifactRef: "reportBuilder.savedReportPayload://report_capacityQ3",
+    kind: "reportBuilder.savedReportPayload",
+    reportId: "capacityQ3",
+    title: "Capacity Q3",
+    sourceArtifactId: "report_capacityQ3",
+    documentVersion: 6,
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "capacityQ3",
+        title: "Capacity Q3",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+    compileState: {
+        status: "clean",
+        diagnostics: [],
+    },
+    metadata: {
+        payloadId: "rbreport_capacity_q3",
+        sourceArtifactId: "capacity_q3_inventory_ladder",
+        sourceSession: {
+            sourceRef: {
+                templateId: "capacity_inventory_brief",
+                templateLabel: "Capacity Inventory Brief",
+            },
+        },
+    },
+}, {
+    documentVersion: 6,
+});
+assert.equal(normalizedStoredArtifactRecord.reportId, "capacityQ3");
+assert.equal(normalizedStoredArtifactRecord.templateId, "capacity_inventory_brief");
+assert.equal(normalizedStoredArtifactRecord.savedReportPayload.payloadId, "rbreport_capacity_q3");
+assert.equal(normalizedStoredArtifactRecord.savedReportPayload.sourceArtifactId, "report_capacityQ3");
+assert.equal(normalizedStoredArtifactRecord.exportable, false);
 
 const normalizedRecords = normalizeReportBuilderSavedReportRecords([
     savedReportPayload,
@@ -184,7 +231,7 @@ const embeddedSavedReportPayload = {
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",

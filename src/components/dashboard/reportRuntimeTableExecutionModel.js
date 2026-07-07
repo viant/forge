@@ -13,14 +13,43 @@ function formatExecutionValue(value) {
   return normalized || String(value ?? "");
 }
 
+function formatDrillExecutionLabel(field = {}, descriptor = {}, displayValue = undefined) {
+  const sourceLabel = normalizeString(field?.label || descriptor?.fieldValueKey || "Selection");
+  const valueLabel = formatExecutionValue(displayValue);
+  return `${sourceLabel} = ${valueLabel}`;
+}
+
+function resolveDisplayValueMapValue(field = {}, value = undefined) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  const displayValueMap = field?.displayValueMap && typeof field.displayValueMap === "object" && !Array.isArray(field.displayValueMap)
+    ? field.displayValueMap
+    : null;
+  if (!displayValueMap) {
+    return undefined;
+  }
+  const key = String(value);
+  return Object.prototype.hasOwnProperty.call(displayValueMap, key)
+    ? displayValueMap[key]
+    : undefined;
+}
+
 function resolveTableExecutionValues(field = {}, item = {}) {
   const value = resolveKey(item, field?.valueKey);
-  const displayValue = resolveKey(item, field?.displayValueKey || field?.valueKey);
+  const displayValueKey = normalizeString(field?.displayValueKey || field?.valueKey);
+  const valueKey = normalizeString(field?.valueKey);
+  const displayValue = displayValueKey && displayValueKey !== valueKey
+    ? resolveKey(item, displayValueKey)
+    : undefined;
+  const mappedDisplayValue = resolveDisplayValueMapValue(field, value);
   return {
     value,
     displayValue: displayValue !== undefined && displayValue !== null && displayValue !== ""
       ? displayValue
-      : value,
+      : (mappedDisplayValue !== undefined && mappedDisplayValue !== null && mappedDisplayValue !== ""
+          ? mappedDisplayValue
+          : value),
   };
 }
 
@@ -67,7 +96,7 @@ export function buildReportRuntimeTableActionExecutions({
           value,
           sourceBlockId: normalizedBlockId,
           fieldLabel: field?.label,
-          label: `${descriptor.label} = ${formatExecutionValue(displayValue)}`,
+          label: formatDrillExecutionLabel(field, descriptor, displayValue),
         },
       }];
     }

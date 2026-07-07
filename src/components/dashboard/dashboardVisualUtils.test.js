@@ -42,4 +42,28 @@ assert.equal(resolveDashboardTableColumnValue(row, {
   sourceKey: "missing",
 }, { preferDisplay: true }), undefined);
 
+assert.equal(resolveDashboardTableColumnValue({
+  channelId: 1,
+}, {
+  key: "channelId",
+  sourceKey: "channelId",
+  displayKey: "channelName",
+  displayValueMap: {
+    "1": "Display",
+    "2": "CTV",
+  },
+}, { preferDisplay: true }), "Display");
+
+assert.equal(resolveDashboardTableColumnValue({
+  channelId: 1,
+}, {
+  key: "channelId",
+  sourceKey: "channelId",
+  displayKey: "channelId",
+  displayValueMap: {
+    "1": "Display",
+    "2": "CTV",
+  },
+}, { preferDisplay: true }), "Display");
+
 console.log("dashboardVisualUtils ✓ resolves table display values from displayKey before raw source fields");

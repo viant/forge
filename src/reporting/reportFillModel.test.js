@@ -7,6 +7,7 @@ import {
 } from "./reportFillModel.js";
 import {
   buildReportBuilderReportDocument,
+  buildReportDocumentBadgesBlock,
   buildReportDocumentChartBlock,
   buildReportDocumentFilterBarBlock,
   buildReportDocumentGeoMapBlock,
@@ -18,6 +19,10 @@ import {
 } from "./reportDocumentModel.js";
 import { buildReportBuilderReportSpec } from "./reportSpecModel.js";
 import { applyReportBuilderSemanticConfig } from "../components/dashboard/reportBuilderSemantic.js";
+import {
+  buildReportBuilderDocumentBlockDraft,
+  buildReportBuilderDocumentBlockFieldOptions,
+} from "../components/dashboard/reportBuilderDocumentBlocks.js";
 
 const rawConfig = {
   title: "Performance Report",
@@ -84,7 +89,7 @@ const rawState = {
   pageSize: 25,
   orderField: "totalSpend",
   orderDir: "desc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
@@ -220,7 +225,7 @@ const semanticState = {
   pageSize: 50,
   orderField: "eventDate",
   orderDir: "asc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
   binding: semanticConfig.binding,
@@ -309,6 +314,23 @@ const documentWithNarrative = buildReportBuilderReportDocument({
       description: "Summarizes the first authored runtime row.",
       emptyLabel: "No headline KPI value available.",
     }),
+    buildReportDocumentBadgesBlock({
+      id: "statusPills",
+      title: "Status Pills",
+      datasetRef: "primary",
+      items: [
+        {
+          id: "channel",
+          label: "Channel",
+          valueField: "channelId",
+          tone: "info",
+          rules: [
+            { value: "Display", label: "Display media", tone: "success" },
+          ],
+        },
+        { id: "spend", label: "Spend", valueField: "totalSpend", format: "currency", tone: "success" },
+      ],
+    }),
     buildReportDocumentTableBlock({
       id: "comparisonTable",
       title: "Comparison Table",
@@ -376,6 +398,9 @@ assert.deepEqual(documentFill.blocks[2].content, {
   params: [
     {
       id: "dateRange",
+      label: "dateRange",
+      type: "dateRange",
+      required: true,
       description: "Approved reporting window for shared runtime scope.",
       value: {
         start: "2026-05-01",
@@ -383,6 +408,64 @@ assert.deepEqual(documentFill.blocks[2].content, {
       },
     },
   ],
+});
+
+const interactiveFilterConfig = {
+  ...rawConfig,
+  staticFilters: [
+    ...rawConfig.staticFilters,
+    {
+      id: "channelIds",
+      label: "Channels",
+      multiple: true,
+      presentation: "compactIconRow",
+      options: [
+        { value: "Display", label: "Display", icon: "media" },
+        { value: "CTV", label: "CTV", icon: "video" },
+      ],
+    },
+  ],
+};
+const interactiveFilterState = {
+  ...rawState,
+  scopeParams: {
+    ...rawState.scopeParams,
+    channelIds: ["Display"],
+  },
+};
+const interactiveFilterDocument = buildReportBuilderReportDocument({
+  container: rawContainer,
+  config: interactiveFilterConfig,
+  state: interactiveFilterState,
+  additionalBlocks: [
+    buildReportDocumentFilterBarBlock({
+      id: "sharedFilters",
+      title: "Filters",
+      paramIds: ["dateRange", "channelIds"],
+    }),
+  ],
+});
+const interactiveFilterSpec = lowerReportDocumentToReportSpec(interactiveFilterDocument);
+const interactiveFilterFill = buildReportFillFromReportSpec(
+  interactiveFilterSpec,
+  {
+    primary: {
+      rows: rawRows,
+    },
+  },
+);
+const interactiveFilterBlock = interactiveFilterFill.blocks.find((block) => block.id === "sharedFilters");
+assert.deepEqual(interactiveFilterBlock.content.params[1], {
+  id: "channelIds",
+  label: "Channels",
+  type: "multiSelect",
+  multiple: true,
+  presentation: "compactIconRow",
+  options: [
+    { value: "Display", label: "Display", icon: "media" },
+    { value: "CTV", label: "CTV", icon: "video" },
+  ],
+  value: ["Display"],
 });
 assert.deepEqual(documentFill.blocks[3].content, {
   title: "Applied Refinements",
@@ -411,13 +494,21 @@ assert.deepEqual(documentFill.blocks[4].content, {
   secondaryValue: "Display",
   emptyLabel: "No headline KPI value available.",
 });
-assert.deepEqual(documentFill.blocks[5].content.columns[0].cellVisual, {
+assert.deepEqual(documentFill.blocks[5].content, {
+  title: "Status Pills",
+  rowCount: 2,
+  items: [
+    { id: "channel", label: "Channel", value: "Display", displayValue: "Display media", valueField: "channelId", tone: "success" },
+    { id: "spend", label: "Spend", value: 40400, valueField: "totalSpend", format: "currency", displayValue: "$40,400", tone: "success" },
+  ],
+});
+assert.deepEqual(documentFill.blocks[6].content.columns[0].cellVisual, {
   kind: "dataBar",
   valueField: "totalSpend",
   range: { mode: "columnMax" },
   palette: ["#dbeafe", "#2563eb"],
 });
-assert.deepEqual(documentFill.blocks[5].content.columns[1].cellVisual, {
+assert.deepEqual(documentFill.blocks[6].content.columns[1].cellVisual, {
   kind: "badge",
   rules: [
     {
@@ -426,8 +517,8 @@ assert.deepEqual(documentFill.blocks[5].content.columns[1].cellVisual, {
     },
   ],
 });
-assert.equal(documentFill.blocks[5].content.rowCount, 2);
-assert.deepEqual(documentFill.blocks[5].content.resolvedRows[0].cells[0], {
+assert.equal(documentFill.blocks[6].content.rowCount, 2);
+assert.deepEqual(documentFill.blocks[6].content.resolvedRows[0].cells[0], {
   key: "totalSpend",
   sourceKey: "totalSpend",
   displayKey: "totalSpend",
@@ -440,7 +531,7 @@ assert.deepEqual(documentFill.blocks[5].content.resolvedRows[0].cells[0], {
     palette: ["#dbeafe", "#2563eb"],
   },
 });
-assert.deepEqual(documentFill.blocks[5].content.resolvedRows[0].cells[1], {
+assert.deepEqual(documentFill.blocks[6].content.resolvedRows[0].cells[1], {
   key: "status",
   sourceKey: "status",
   displayKey: "status",
@@ -448,7 +539,7 @@ assert.deepEqual(documentFill.blocks[5].content.resolvedRows[0].cells[1], {
   displayValue: null,
   visualState: null,
 });
-assert.deepEqual(documentFill.blocks[6].content, {
+assert.deepEqual(documentFill.blocks[7].content, {
   title: "Executive Summary",
   markdown: "## Executive Summary\nThe report opens with a short narrative block.",
 });
@@ -1194,6 +1285,221 @@ assert.deepEqual(styledRankPresetFill.blocks[0].content.resolvedRows[0].cells[3]
   },
 });
 
+const mappedDisplayFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "mappedDisplayRuntime",
+    stateKey: "mappedDisplayRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "demoReportSource",
+      request: {},
+    },
+  ],
+  blocks: [
+    {
+      id: "mappedTable",
+      kind: "tableBlock",
+      title: "Mapped Table",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "channelId",
+          sourceKey: "channelId",
+          displayKey: "channelId",
+          displayValueMap: {
+            "1": "Display",
+            "2": "CTV",
+          },
+          label: "Channel",
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [
+      { channelId: 1 },
+    ],
+  },
+});
+assert.deepEqual(mappedDisplayFill.blocks[0].content.resolvedRows[0].cells[0], {
+  key: "channelId",
+  sourceKey: "channelId",
+  displayKey: "channelId",
+  value: 1,
+  displayValue: "Display",
+  visualState: null,
+});
+
+const mappedKpiFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "mappedKpiRuntime",
+    stateKey: "mappedKpiRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "demoReportSource",
+      request: {},
+    },
+  ],
+  blocks: [
+    {
+      id: "mappedKpi",
+      kind: "kpiBlock",
+      title: "Mapped KPI",
+      datasetRef: "primary",
+      valueField: "totalSpend",
+      valueLabel: "Spend",
+      secondaryField: "channelId",
+      secondaryLabel: "Channel",
+      secondaryDisplayKey: "channelName",
+      secondaryDisplayValueMap: {
+        "1": "Display",
+        "2": "CTV",
+      },
+    },
+  ],
+}, {
+  primary: {
+    rows: [
+      { totalSpend: 12, channelId: 1 },
+    ],
+  },
+});
+assert.equal(mappedKpiFill.blocks[0].content.value, 12);
+assert.equal(mappedKpiFill.blocks[0].content.secondaryValue, "Display");
+
+const mappedBadgesFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "mappedBadgesRuntime",
+    stateKey: "mappedBadgesRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "demoReportSource",
+      request: {},
+    },
+  ],
+  blocks: [
+    {
+      id: "mappedBadges",
+      kind: "badgesBlock",
+      title: "Status Pills",
+      datasetRef: "primary",
+      items: [
+        {
+          id: "channel",
+          label: "Channel",
+          valueField: "channelId",
+          displayKey: "channelName",
+          displayValueMap: {
+            "1": "Display",
+            "2": "CTV",
+          },
+          tone: "info",
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [
+      { channelId: 1 },
+    ],
+  },
+});
+assert.equal(mappedBadgesFill.blocks[0].content.items[0].value, 1);
+assert.equal(mappedBadgesFill.blocks[0].content.items[0].displayValue, "Display");
+
+const mappedChartFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "mappedChartRuntime",
+    stateKey: "mappedChartRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "demoReportSource",
+      request: {},
+    },
+  ],
+  blocks: [
+    {
+      id: "mappedChart",
+      kind: "chartBlock",
+      title: "Mapped Chart",
+      datasetRef: "primary",
+      chartSpec: {
+        title: "Mapped Chart",
+        type: "line",
+        xField: "eventDate",
+        yFields: ["totalSpend"],
+        seriesField: "channelId",
+      },
+      chartModel: {
+        type: "line",
+        xAxis: {
+          dataKey: "eventDate",
+        },
+        yAxis: {
+          format: "currency",
+        },
+        series: {
+          nameKey: "channelName",
+          sourceNameKey: "channelId",
+          displayValueMap: {
+            "1": "Display",
+            "2": "CTV",
+          },
+          valueKey: "totalSpend",
+          values: [{
+            value: "totalSpend",
+            label: "Spend",
+            color: "#1f77b4",
+            format: "currency",
+            type: "line",
+          }],
+          palette: ["#1f77b4", "#ff7f0e"],
+        },
+      },
+    },
+  ],
+}, {
+  primary: {
+    rows: [
+      { eventDate: "2026-05-01", channelId: 1, totalSpend: 100 },
+      { eventDate: "2026-05-01", channelId: 2, totalSpend: 80 },
+    ],
+  },
+});
+assert.deepEqual(mappedChartFill.blocks[0].content.resolvedChart, {
+  kind: "groupedSeries",
+  type: "line",
+  xAxisKey: "eventDate",
+  nameKey: "channelName",
+  valueKey: "totalSpend",
+  rows: [
+    {
+      eventDate: "2026-05-01",
+      Display: 100,
+      CTV: 80,
+    },
+  ],
+  seriesKeys: ["Display", "CTV"],
+});
+
 const authoredDerivedDocument = buildReportBuilderReportDocument({
   container: rawContainer,
   config: {
@@ -1273,6 +1579,198 @@ assert.equal(authoredDerivedFill.datasets[0].rows[0].reachRate, 40.82);
 assert.equal(authoredDerivedFill.datasets[0].rows[1].reachRate, 42.82);
 assert.equal(authoredDerivedFill.blocks.find((block) => block.id === "reachRateTable")?.content?.columns?.some((column) => column.key === "reachRate"), true);
 assert.equal(authoredDerivedFill.blocks.find((block) => block.id === "reachRateTable")?.content?.resolvedRows?.[0]?.cells?.some((cell) => cell.key === "reachRate" && cell.value === 40.82), true);
+
+const currentSelectionConfig = {
+  ...rawConfig,
+  dimensions: [
+    {
+      id: "eventDate",
+      key: "eventDate",
+      label: "Date",
+      paramPath: "dimensions.eventDate",
+      default: true,
+      chartAxis: true,
+      format: "date",
+      displayKey: "eventDate",
+    },
+    {
+      id: "channelId",
+      key: "channelId",
+      label: "Channel",
+      paramPath: "dimensions.channelId",
+      default: true,
+      runtimeFilter: {
+        includeParamPath: "filters.includeChannelId",
+        excludeParamPath: "filters.excludeChannelId",
+      },
+      displayKey: "channel.channel",
+      displayValueMap: {
+        display: "Display",
+        ctv: "CTV",
+      },
+    },
+  ],
+  measures: [
+    {
+      id: "totalSpend",
+      key: "totalSpend",
+      label: "Spend",
+      paramPath: "measures.totalSpend",
+      default: true,
+      format: "currency",
+      displayKey: "totalSpend",
+    },
+    {
+      id: "impressions",
+      key: "impressions",
+      label: "Impressions",
+      paramPath: "measures.impressions",
+      format: "compactNumber",
+      displayKey: "impressions",
+    },
+  ],
+};
+
+const currentSelectionFieldOptions = buildReportBuilderDocumentBlockFieldOptions({
+  config: currentSelectionConfig,
+  state: {
+    ...rawState,
+    selectedDimensions: ["eventDate", "channelId"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+  },
+});
+
+const currentSelectionDraft = buildReportBuilderDocumentBlockDraft("tableBlock", {
+  id: "currentSelectionTable",
+  title: "Current Selection Table",
+}, {
+  tableColumnOptions: currentSelectionFieldOptions.tableColumnOptions,
+});
+
+assert.deepEqual(currentSelectionDraft.columns, [
+  {
+    key: "eventDate",
+    sourceKey: "eventDate",
+    displayKey: "eventDate",
+    label: "Date",
+    format: "date",
+  },
+  {
+    key: "channelId",
+    sourceKey: "channelId",
+    displayKey: "channel.channel",
+    displayValueMap: {
+      display: "Display",
+      ctv: "CTV",
+    },
+    label: "Channel",
+  },
+  {
+    key: "totalSpend",
+    sourceKey: "totalSpend",
+    displayKey: "totalSpend",
+    label: "Spend",
+    format: "currency",
+  },
+]);
+
+const currentSelectionDocument = buildReportBuilderReportDocument({
+  container: rawContainer,
+  config: currentSelectionConfig,
+  state: {
+    ...rawState,
+    selectedDimensions: ["eventDate", "channelId"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    reportDocumentBlocks: [currentSelectionDraft],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "primaryBuilder" },
+        { blockId: "currentSelectionTable" },
+      ],
+    },
+  },
+});
+
+const currentSelectionSpec = lowerReportDocumentToReportSpec(currentSelectionDocument);
+assert.deepEqual(currentSelectionSpec.blocks.find((block) => block.id === "currentSelectionTable"), {
+  id: "currentSelectionTable",
+  kind: "tableBlock",
+  title: "Current Selection Table",
+  datasetRef: "primary",
+  columns: [
+    {
+      key: "eventDate",
+      sourceKey: "eventDate",
+      displayKey: "eventDate",
+      label: "Date",
+      format: "date",
+    },
+    {
+      key: "channelId",
+      sourceKey: "channelId",
+      displayKey: "channel.channel",
+      displayValueMap: {
+        display: "Display",
+        ctv: "CTV",
+      },
+      label: "Channel",
+      runtimeFilterable: true,
+    },
+    {
+      key: "totalSpend",
+      sourceKey: "totalSpend",
+      displayKey: "totalSpend",
+      label: "Spend",
+      format: "currency",
+    },
+  ],
+});
+
+const currentSelectionFill = buildReportFillFromReportSpec(currentSelectionSpec, {
+  primary: {
+    rows: [
+      {
+        eventDate: "2026-05-01",
+        channelId: "display",
+        channel: { channel: "Display" },
+        totalSpend: 120000,
+      },
+    ],
+  },
+});
+
+assert.deepEqual(
+  currentSelectionFill.blocks.find((block) => block.id === "currentSelectionTable")?.content?.resolvedRows?.[0]?.cells,
+  [
+    {
+      key: "eventDate",
+      sourceKey: "eventDate",
+      displayKey: "eventDate",
+      value: "2026-05-01",
+      displayValue: "2026-05-01",
+      visualState: null,
+    },
+    {
+      key: "channelId",
+      sourceKey: "channelId",
+      displayKey: "channel.channel",
+      value: "display",
+      displayValue: "Display",
+      visualState: null,
+    },
+    {
+      key: "totalSpend",
+      sourceKey: "totalSpend",
+      displayKey: "totalSpend",
+      value: 120000,
+      displayValue: 120000,
+      visualState: null,
+    },
+  ],
+);
 
 const geoDocument = buildReportBuilderReportDocument({
   container: rawContainer,

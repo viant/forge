@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   buildReportBuilderReportDocument,
+  buildReportDocumentBadgesBlock,
   buildReportBuilderBlockScopeBindings,
   buildReportDocumentChartBlock,
   extractReportDocumentTemplateIdentity,
@@ -15,6 +16,7 @@ import {
   lowerReportDocumentToReportSpec,
 } from "./reportDocumentModel.js";
 import { buildReportBuilderReportSpec } from "./reportSpecModel.js";
+import { lowerReportBuilderPredicates } from "../components/dashboard/reportBuilderPredicates.js";
 
 const config = {
   title: "Performance Report",
@@ -72,7 +74,7 @@ const state = {
   pageSize: 25,
   orderField: "totalSpend",
   orderDir: "desc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
@@ -92,6 +94,17 @@ const markdownBlock = buildReportDocumentMarkdownBlock({
 const filterBarBlock = buildReportDocumentFilterBarBlock({
   id: "sharedFilters",
   title: "Shared Filters",
+  paramIds: ["dateRange"],
+});
+assert.deepEqual(buildReportDocumentFilterBarBlock({
+  id: "legacyScopeFilters",
+  title: "Scope",
+  paramIds: ["dateRange"],
+}), {
+  id: "legacyScopeFilters",
+  kind: "filterBarBlock",
+  title: "Filters",
+  datasetRef: "primary",
   paramIds: ["dateRange"],
 });
 const refinementBarBlock = buildReportDocumentRefinementBarBlock({
@@ -129,6 +142,23 @@ const headlineKpiBlock = buildReportDocumentKpiBlock({
   description: "Summarizes the first authored runtime row.",
   emptyLabel: "No headline KPI value available.",
 });
+const statusPillsBlock = buildReportDocumentBadgesBlock({
+  id: "statusPills",
+  title: "Status Pills",
+  datasetRef: "primary",
+  items: [
+    {
+      id: "setup",
+      label: "Setup",
+      valueField: "channelId",
+      tone: "info",
+      rules: [
+        { value: "Display", label: "Display media", tone: "success" },
+      ],
+    },
+    { id: "pace", label: "Pacing", value: "Behind", tone: "warning" },
+  ],
+});
 assert.deepEqual(buildReportDocumentKpiBlock(), {
   id: "kpiBlock",
   kind: "kpiBlock",
@@ -136,6 +166,13 @@ assert.deepEqual(buildReportDocumentKpiBlock(), {
   datasetRef: "primary",
   valueField: "value",
   valueLabel: "value",
+});
+assert.deepEqual(buildReportDocumentBadgesBlock(), {
+  id: "badgesBlock",
+  kind: "badgesBlock",
+  title: "Status Pills",
+  datasetRef: "primary",
+  items: [],
 });
 const authoredChartBlock = buildReportDocumentChartBlock({
   id: "channelTrend",
@@ -215,7 +252,7 @@ const document = buildReportBuilderReportDocument({
   container,
   config,
   state,
-  additionalBlocks: [filterBarBlock, refinementBarBlock, headlineKpiBlock, authoredChartBlock, comparisonTableBlock, geoMapBlock, markdownBlock],
+  additionalBlocks: [filterBarBlock, refinementBarBlock, headlineKpiBlock, statusPillsBlock, authoredChartBlock, comparisonTableBlock, geoMapBlock, markdownBlock],
   semanticSummary: {
     kind: "semantic",
     modelRef: "model://example/performance/delivery@v1",
@@ -287,6 +324,9 @@ assert.deepEqual(document.layout, {
       blockId: "headlineKpi",
     },
     {
+      blockId: "statusPills",
+    },
+    {
       blockId: "channelTrend",
     },
     {
@@ -300,7 +340,7 @@ assert.deepEqual(document.layout, {
     },
   ],
 });
-assert.equal(document.blocks.length, 8);
+assert.equal(document.blocks.length, 9);
 assert.deepEqual(document.blocks[0].source, {
   kind: "dashboard.reportBuilder",
   containerId: "performanceBuilder",
@@ -318,13 +358,52 @@ assert.deepEqual(document.blocks[0].scopeBindings, [
 assert.deepEqual(document.blocks[1], filterBarBlock);
 assert.deepEqual(document.blocks[2], refinementBarBlock);
 assert.deepEqual(document.blocks[3], headlineKpiBlock);
-assert.deepEqual(document.blocks[4], authoredChartBlock);
-assert.deepEqual(document.blocks[5], comparisonTableBlock);
-assert.deepEqual(document.blocks[6], geoMapBlock);
-assert.deepEqual(document.blocks[7], markdownBlock);
+assert.deepEqual(document.blocks[4], statusPillsBlock);
+assert.deepEqual(document.blocks[5], authoredChartBlock);
+assert.deepEqual(document.blocks[6], comparisonTableBlock);
+assert.deepEqual(document.blocks[7], geoMapBlock);
+assert.deepEqual(document.blocks[8], markdownBlock);
 
 assert.deepEqual(buildReportDocumentScopeParams(config, state), document.scope.params);
 assert.deepEqual(buildReportBuilderBlockScopeBindings(config), document.blocks[0].scopeBindings);
+
+const sourceScopedConfig = {
+  ...config,
+  dataSources: [
+    {
+      id: "forecast_cube",
+      dataSourceRef: "forecastCubeSource",
+      scopeParamOptions: [
+        {
+          value: "forecastRegion",
+          label: "Forecast Region",
+          kind: "multiSelect",
+          description: "Region filter for forecast source.",
+        },
+      ],
+    },
+  ],
+};
+const sourceScopedState = {
+  ...state,
+  scopeParams: {
+    ...state.scopeParams,
+    forecastRegion: ["US/NY"],
+  },
+};
+assert.deepEqual(buildReportDocumentScopeParams(sourceScopedConfig, sourceScopedState).find((param) => param.id === "forecastRegion"), {
+  id: "forecastRegion",
+  kind: "multiSelect",
+  label: "Forecast Region",
+  description: "Region filter for forecast source.",
+  required: false,
+  datasetRef: "forecast_cube",
+  value: ["US/NY"],
+});
+assert.equal(
+  buildReportBuilderBlockScopeBindings(sourceScopedConfig).some((binding) => binding.paramId === "forecastRegion" && binding.target === "scopeParams.forecastRegion"),
+  true,
+);
 
 const lowered = lowerReportDocumentToReportSpec(document);
 const baseSpec = buildReportBuilderReportSpec({
@@ -349,6 +428,7 @@ assert.deepEqual(lowered.blocks[2], {
   id: "sharedFilters",
   kind: "filterBarBlock",
   title: "Shared Filters",
+  datasetRef: "primary",
   paramIds: ["dateRange"],
 });
 assert.deepEqual(lowered.blocks[3], {
@@ -359,7 +439,8 @@ assert.deepEqual(lowered.blocks[3], {
   emptyLabel: "No drill path selected",
 });
 assert.deepEqual(lowered.blocks[4], headlineKpiBlock);
-assert.deepEqual(lowered.blocks[5], {
+assert.deepEqual(lowered.blocks[5], statusPillsBlock);
+assert.deepEqual(lowered.blocks[6], {
   id: "channelTrend",
   kind: "chartBlock",
   datasetRef: "primary",
@@ -392,9 +473,9 @@ assert.deepEqual(lowered.blocks[5], {
     },
   },
 });
-assert.deepEqual(lowered.blocks[6], comparisonTableBlock);
-assert.deepEqual(lowered.blocks[7], geoMapBlock);
-assert.deepEqual(lowered.blocks[8], {
+assert.deepEqual(lowered.blocks[7], comparisonTableBlock);
+assert.deepEqual(lowered.blocks[8], geoMapBlock);
+assert.deepEqual(lowered.blocks[9], {
   id: "narrativeIntro",
   kind: "markdownBlock",
   title: "Executive Summary",
@@ -406,11 +487,77 @@ assert.deepEqual(lowered.layoutIntent.blockOrder, [
   "sharedFilters",
   "activeRefinements",
   "headlineKpi",
+  "statusPills",
   "channelTrend",
   "comparisonTable",
   "stateGeo",
   "narrativeIntro",
 ]);
+
+const badgeDependencyDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    dimensions: [
+      ...config.dimensions,
+      { id: "region", key: "region", label: "Region", paramPath: "dimensions.region" },
+    ],
+  },
+  state: {
+    ...state,
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+  },
+  additionalBlocks: [
+    buildReportDocumentBadgesBlock({
+      id: "regionFlags",
+      title: "Region Flags",
+      datasetRef: "primary",
+      items: [
+        { id: "regionBadge", label: "Region", valueField: "region", tone: "info" },
+      ],
+    }),
+  ],
+});
+const loweredBadgeDependencyDocument = lowerReportDocumentToReportSpec(badgeDependencyDocument);
+assert.equal(loweredBadgeDependencyDocument.datasets[0].request.dimensions.region, true);
+
+const staticBadgeDocument = buildReportBuilderReportDocument({
+  container,
+  config,
+  state: {
+    ...state,
+    selectedDimensions: ["eventDate"],
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    reportStaticDatasets: [
+      {
+        id: "regional_csv",
+        label: "Regional CSV",
+        rows: [{ region: "West", revenue: 10 }],
+        columns: [
+          { key: "region", label: "Region", kind: "dimension" },
+          { key: "revenue", label: "Revenue", kind: "measure", format: "currency" },
+        ],
+      },
+    ],
+  },
+  additionalBlocks: [
+    buildReportDocumentBadgesBlock({
+      id: "staticRegionPill",
+      title: "Static Region Pill",
+      datasetRef: "regional_csv",
+      items: [
+        { id: "regionBadge", label: "Region", valueField: "region", tone: "info" },
+      ],
+    }),
+  ],
+});
+const loweredStaticBadgeDocument = lowerReportDocumentToReportSpec(staticBadgeDocument, {
+  includePrimaryBlocks: false,
+});
+assert.equal(Object.prototype.hasOwnProperty.call(loweredStaticBadgeDocument.datasets[0].request.dimensions || {}, "region"), false);
 
 const loweredMinimalRefinementBar = lowerReportDocumentToReportSpec({
   ...document,
@@ -451,6 +598,7 @@ assert.deepEqual(loweredWithCustomLayout.layoutIntent.blockOrder, [
   "comparisonTable",
   "stateGeo",
   "narrativeIntro",
+  "statusPills",
   "channelTrend",
 ]);
 assert.deepEqual(loweredWithCustomLayout.layoutIntent.items, [
@@ -462,6 +610,7 @@ assert.deepEqual(loweredWithCustomLayout.layoutIntent.items, [
   { blockId: "comparisonTable" },
   { blockId: "stateGeo" },
   { blockId: "narrativeIntro" },
+  { blockId: "statusPills" },
   { blockId: "channelTrend" },
 ]);
 
@@ -488,8 +637,41 @@ assert.deepEqual(loweredWithSizedLayout.layoutIntent.items, [
   { blockId: "stateGeo" },
   { blockId: "narrativeIntro" },
   { blockId: "activeRefinements" },
+  { blockId: "statusPills" },
   { blockId: "channelTrend" },
 ]);
+
+const loweredWithoutPrimaryPresentation = lowerReportDocumentToReportSpec({
+  ...document,
+  layout: {
+    ...document.layout,
+    items: [
+      { blockId: "sharedFilters" },
+      { blockId: "activeRefinements" },
+      { blockId: "primaryBuilder" },
+      { blockId: "headlineKpi" },
+      { blockId: "comparisonTable" },
+      { blockId: "stateGeo" },
+      { blockId: "narrativeIntro" },
+    ],
+  },
+}, {
+  includePrimaryBlocks: false,
+});
+assert.deepEqual(loweredWithoutPrimaryPresentation.layoutIntent.blockOrder, [
+  "sharedFilters",
+  "activeRefinements",
+  "headlineKpi",
+  "comparisonTable",
+  "stateGeo",
+  "narrativeIntro",
+  "statusPills",
+  "channelTrend",
+]);
+assert.equal(
+  loweredWithoutPrimaryPresentation.blocks.some((block) => block.id === "primaryTable" || block.id === "primaryChart"),
+  false,
+);
 
 const stateBackedDocument = buildReportBuilderReportDocument({
   container,
@@ -650,7 +832,7 @@ const authoredDependencyState = {
   pageSize: 25,
   orderField: "eventDate",
   orderDir: "asc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
@@ -732,6 +914,196 @@ assert.equal(dependencyRequest.dimensions.channelId, true);
 assert.equal(dependencyRequest.dimensions.stateCode, true);
 assert.equal(dependencyRequest.dimensions.stateName, true);
 assert.equal(dependencyRequest.dimensions.status, true);
+
+const displayMappedDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    dimensions: [
+      config.dimensions[0],
+      {
+        ...config.dimensions[1],
+        displayKey: "channelName",
+        displayValueMap: {
+          "1": "Display",
+          "2": "CTV",
+        },
+      },
+    ],
+  },
+  state: authoredDependencyState,
+  additionalBlocks: [
+    buildReportDocumentTableBlock({
+      id: "mappedTable",
+      title: "Mapped Table",
+      datasetRef: "primary",
+      columns: [
+        { key: "channelId", label: "Channel" },
+        { key: "totalSpend", label: "Spend" },
+      ],
+    }),
+  ],
+});
+const mappedTableSpec = lowerReportDocumentToReportSpec(displayMappedDocument);
+const mappedTableBlock = mappedTableSpec.blocks.find((block) => block?.id === "mappedTable");
+assert.deepEqual(mappedTableBlock?.columns?.[0], {
+  key: "channelId",
+  sourceKey: "channelId",
+  displayKey: "channelName",
+  displayValueMap: {
+    "1": "Display",
+    "2": "CTV",
+  },
+  label: "Channel",
+});
+
+const displayMappedKpiDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    dimensions: [
+      config.dimensions[0],
+      {
+        ...config.dimensions[1],
+        displayKey: "channelName",
+        displayValueMap: {
+          "1": "Display",
+          "2": "CTV",
+        },
+      },
+    ],
+  },
+  state: authoredDependencyState,
+  additionalBlocks: [
+    buildReportDocumentKpiBlock({
+      id: "mappedKpi",
+      title: "Mapped KPI",
+      datasetRef: "primary",
+      valueField: "totalSpend",
+      valueLabel: "Spend",
+      secondaryField: "channelId",
+      secondaryLabel: "Channel",
+    }),
+  ],
+});
+const displayMappedKpiSpec = lowerReportDocumentToReportSpec(displayMappedKpiDocument);
+const mappedKpiBlock = displayMappedKpiSpec.blocks.find((block) => block?.id === "mappedKpi");
+assert.deepEqual(
+  {
+    secondaryField: mappedKpiBlock?.secondaryField,
+    secondaryLabel: mappedKpiBlock?.secondaryLabel,
+    secondaryDisplayKey: mappedKpiBlock?.secondaryDisplayKey,
+    secondaryDisplayValueMap: mappedKpiBlock?.secondaryDisplayValueMap,
+  },
+  {
+    secondaryField: "channelId",
+    secondaryLabel: "Channel",
+    secondaryDisplayKey: "channelName",
+    secondaryDisplayValueMap: {
+      "1": "Display",
+      "2": "CTV",
+    },
+  },
+);
+
+const displayMappedBadgesDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    dimensions: [
+      config.dimensions[0],
+      {
+        ...config.dimensions[1],
+        displayKey: "channelName",
+        displayValueMap: {
+          "1": "Display",
+          "2": "CTV",
+        },
+      },
+    ],
+  },
+  state: authoredDependencyState,
+  additionalBlocks: [
+    buildReportDocumentBadgesBlock({
+      id: "statusPills",
+      title: "Status Pills",
+      datasetRef: "primary",
+      items: [
+        {
+          id: "channel",
+          label: "Channel",
+          valueField: "channelId",
+          tone: "info",
+        },
+      ],
+    }),
+  ],
+});
+const displayMappedBadgesSpec = lowerReportDocumentToReportSpec(displayMappedBadgesDocument);
+const mappedBadgesBlock = displayMappedBadgesSpec.blocks.find((block) => block?.id === "statusPills");
+assert.deepEqual(mappedBadgesBlock?.items?.[0], {
+  id: "channel",
+  label: "Channel",
+  valueField: "channelId",
+  displayKey: "channelName",
+  displayValueMap: {
+    "1": "Display",
+    "2": "CTV",
+  },
+  tone: "info",
+});
+
+const displayMappedChartDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    dimensions: [
+      config.dimensions[0],
+      {
+        ...config.dimensions[1],
+        displayKey: "channelName",
+        displayValueMap: {
+          "1": "Display",
+          "2": "CTV",
+        },
+      },
+    ],
+  },
+  state: authoredDependencyState,
+  additionalBlocks: [
+    buildReportDocumentChartBlock({
+      id: "mappedChart",
+      title: "Mapped Chart",
+      datasetRef: "primary",
+      chartSpec: {
+        title: "Mapped Chart",
+        type: "line",
+        xField: "eventDate",
+        yFields: ["impressions"],
+        seriesField: "channelId",
+      },
+    }),
+  ],
+});
+const displayMappedChartSpec = lowerReportDocumentToReportSpec(displayMappedChartDocument);
+const mappedChartBlock = displayMappedChartSpec.blocks.find((block) => block?.id === "mappedChart");
+assert.deepEqual(mappedChartBlock?.chartModel?.series, {
+  nameKey: "channelName",
+  sourceNameKey: "channelId",
+  displayValueMap: {
+    "1": "Display",
+    "2": "CTV",
+  },
+  valueKey: "impressions",
+  values: [{
+    value: "impressions",
+    label: "Impressions",
+    color: "#1f77b4",
+    format: "compactNumber",
+    type: "line",
+  }],
+  palette: ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"],
+});
 
 const authoredComputedChartDocument = buildReportBuilderReportDocument({
   container,
@@ -932,5 +1304,115 @@ assert.throws(
   () => lowerReportDocumentToReportSpec({ blocks: [] }),
   /reportBuilderBlock/,
 );
+
+// --- predicate-backed configs bind scope through scopeParams.<id> -----------------
+
+const predicateConfig = lowerReportBuilderPredicates({
+  title: "Forecast Report",
+  dataSourceRef: "forecastSource",
+  measures: [
+    { id: "reach", key: "reach", label: "Reach", paramPath: "measures.reach", default: true },
+  ],
+  dimensions: [
+    { id: "eventDate", key: "eventDate", label: "Date", paramPath: "dimensions.eventDate", default: true },
+  ],
+  staticFilters: [
+    { id: "region", label: "Region", paramPath: "filters.region" },
+  ],
+  predicates: [
+    {
+      id: "dateRange",
+      label: "Date Range",
+      kind: "dateRange",
+      required: true,
+      description: "Forecast window.",
+      startParamPath: "filters.from",
+      endParamPath: "filters.to",
+    },
+    {
+      id: "channelIds",
+      label: "Channels",
+      pinned: true,
+      multiple: true,
+      paramPath: "filters.channelIds",
+    },
+    {
+      id: "audienceIds",
+      label: "Audience",
+      bucket: "scope",
+      paramPath: "filters.audienceIds",
+    },
+  ],
+});
+
+const predicateState = {
+  selectedMeasures: ["reach"],
+  selectedDimensions: ["eventDate"],
+  primaryMeasure: "reach",
+  scopeParams: {
+    dateRange: { start: "2026-06-01", end: "2026-06-07" },
+    channelIds: [1, 2],
+    region: "EMEA",
+  },
+};
+
+assert.deepEqual(buildReportDocumentScopeParams(predicateConfig, predicateState), [
+  {
+    id: "dateRange",
+    kind: "dateRange",
+    label: "Date Range",
+    description: "Forecast window.",
+    required: true,
+    value: { start: "2026-06-01", end: "2026-06-07" },
+  },
+  {
+    id: "channelIds",
+    kind: "multiSelect",
+    label: "Channels",
+    required: false,
+    multiple: true,
+    value: [1, 2],
+  },
+  {
+    id: "region",
+    kind: "value",
+    label: "Region",
+    required: false,
+    value: "EMEA",
+  },
+]);
+assert.deepEqual(buildReportBuilderBlockScopeBindings(predicateConfig), [
+  { paramId: "dateRange", target: "scopeParams.dateRange" },
+  { paramId: "channelIds", target: "scopeParams.channelIds" },
+  { paramId: "region", target: "staticFilters.region" },
+]);
+
+const predicateDocument = buildReportBuilderReportDocument({
+  container: {
+    id: "forecastBuilder",
+    stateKey: "forecastBuilder",
+    title: "Forecast Report",
+    dataSourceRef: "forecastSource",
+  },
+  config: predicateConfig,
+  state: predicateState,
+});
+assert.deepEqual(predicateDocument.scope.params, buildReportDocumentScopeParams(predicateConfig, predicateState));
+assert.deepEqual(predicateDocument.blocks[0].scopeBindings, buildReportBuilderBlockScopeBindings(predicateConfig));
+
+// shared filter edits flow through scopeParams.* bindings when the document lowers
+const editedPredicateDocument = JSON.parse(JSON.stringify(predicateDocument));
+editedPredicateDocument.scope.params.find((param) => param.id === "dateRange").value = {
+  start: "2026-07-01",
+  end: "2026-07-05",
+};
+editedPredicateDocument.scope.params.find((param) => param.id === "channelIds").value = [9];
+editedPredicateDocument.scope.params.find((param) => param.id === "region").value = "APAC";
+const loweredPredicateSpec = lowerReportDocumentToReportSpec(editedPredicateDocument);
+const predicateRequest = loweredPredicateSpec.datasets.find((dataset) => dataset.id === "primary").request;
+assert.equal(predicateRequest.filters.from, "2026-07-01");
+assert.equal(predicateRequest.filters.to, "2026-07-05");
+assert.deepEqual(predicateRequest.filters.channelIds, [9]);
+assert.equal(predicateRequest.filters.region, "APAC");
 
 console.log("reportDocumentModel ✓ wraps current report builder state as ReportDocument and lowers to ReportSpec");

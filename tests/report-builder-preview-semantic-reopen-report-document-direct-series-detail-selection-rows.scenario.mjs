@@ -1,7 +1,5 @@
 import {
   buildPreviewBootstrapSteps,
-  buildSavedPayloadPreparationSteps,
-  buildSelectedReportDocumentPreparationSteps,
 } from "./report-builder-preview-scenario-builders.mjs";
 
 export default {
@@ -16,16 +14,45 @@ export default {
       type: "eval",
       expression: "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.getSeededSavedReportPayloads !== 'function' || typeof api.replaceSeededSavedReportPayloads !== 'function') { throw new Error('Preview seeded saved payload API not available.'); } return import('/src/reporting/fixtures/capacityDirectSeriesFixtureState.js').then(({ buildCapacityDirectSeriesFixtureState }) => { const record = buildCapacityDirectSeriesFixtureState().record; const existing = api.getSeededSavedReportPayloads(); const next = [...existing.filter((entry) => { const target = entry?.savedReportPayload || entry; const reportId = target?.reportDocument?.id || target?.reportRef?.reportId || target?.reportId || ''; return reportId !== 'capacityKpiBlendByDateQ3'; }), record]; const replaced = api.replaceSeededSavedReportPayloads(next); return Array.isArray(replaced) && replaced.some((entry) => { const target = entry?.savedReportPayload || entry; return (target?.reportDocument?.id || '') === 'capacityKpiBlendByDateQ3'; }); }); })()",
     },
-    ...buildSavedPayloadPreparationSteps({ documentVersion: "11", draftTriggerText: "Reach Rate" }),
+    {
+      type: "eval",
+      expression: "(() => { const api = window.__REPORT_BUILDER_PREVIEW__; if (!api || typeof api.replacePreparedListReportDocumentsResponse !== 'function') { throw new Error('replacePreparedListReportDocumentsResponse API not available.'); } return import('/src/reporting/fixtures/capacityDirectSeriesFixtureState.js').then(({ buildCapacityDirectSeriesFixtureState }) => { const fixture = buildCapacityDirectSeriesFixtureState(); const result = api.replacePreparedListReportDocumentsResponse(fixture.listReportDocumentsResponse, { selectedReportId: 'capacityKpiBlendByDateQ3' }); return !!result && result.selectedEntryKey.includes('capacityKpiBlendByDateQ3'); }); })()",
+    },
     {
       type: "waitForDomContains",
-      text: "List ReportDocuments response: 8 entries",
+      text: "Selected entry: Capacity KPI Blend Q3",
       timeoutMs: 60000,
     },
-    ...buildSelectedReportDocumentPreparationSteps({
-      reportId: "capacityKpiBlendByDateQ3",
-      responseTitle: "Get ReportDocument response: Capacity KPI Blend Q3",
-    }),
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Prepare get request",
+    },
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Review get request",
+    },
+    {
+      type: "waitForDomContains",
+      text: "\"reportId\": \"capacityKpiBlendByDateQ3\"",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Prepare selected get response",
+    },
+    {
+      type: "waitForDomContains",
+      text: "Reopen bundle: Capacity KPI Blend Q3",
+      timeoutMs: 60000,
+    },
+    {
+      type: "clickRole",
+      role: "button",
+      name: "Review reopen bundle",
+    },
     {
       type: "waitForDomContains",
       text: "\"documentVersion\": 9",

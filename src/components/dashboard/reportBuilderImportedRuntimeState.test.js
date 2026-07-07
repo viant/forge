@@ -205,6 +205,144 @@ assert.equal(attachedRuntimeState.runtimeArtifact.runtimeBlock.dashboard.reportR
 assert.equal(attachedRuntimeState.runtimeConfig.semanticBindingViewState.title, "Semantic Binding");
 assert.equal(attachedRuntimeState.runtimeArtifact.runtimeBlock.subtitle, "Local runtime preview compiled from the imported ReportSpec and attached ReportFill artifacts.");
 
+const canonicalCarriedSemanticBindingViewState = {
+    title: "Semantic Binding",
+    modelLabel: "Canonical Ad Delivery",
+    entityLabel: "Canonical Line Delivery",
+    chips: [
+        "Model Canonical Ad Delivery",
+        "Entity Canonical Line Delivery",
+        "Dimensions Canonical Delivery Date",
+        "Measures Canonical Available Impressions",
+        "Parameters Canonical Reporting Window",
+    ],
+    fieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (1)",
+            fields: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time", definitionRef: "semantic://example/event_date" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber", definitionRef: "semantic://example/available_impressions" },
+            ],
+        },
+        {
+            id: "parameters",
+            title: "Selected parameters (1)",
+            fields: [
+                { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window", category: "Scope", definitionRef: "semantic://example/reporting_window", description: "Canonical reporting window" },
+            ],
+        },
+    ],
+};
+
+const canonicalCarriedBaseRuntimeArtifact = buildReportBuilderRuntimePreview({
+    model: {
+        reportSpec,
+    },
+    rows: [],
+    hasMore: false,
+    runtimeTitle: reportSpec.title,
+    runtimeSubtitle: "Local runtime preview compiled directly from the imported ReportSpec file.",
+});
+
+const canonicalCarriedPipelinePreview = {
+    ...importedPipelinePreview,
+    runtimeArtifact: {
+        ...canonicalCarriedBaseRuntimeArtifact,
+        semanticBindingViewState: canonicalCarriedSemanticBindingViewState,
+        runtimeBlock: {
+            ...canonicalCarriedBaseRuntimeArtifact.runtimeBlock,
+            dashboard: {
+                ...canonicalCarriedBaseRuntimeArtifact.runtimeBlock.dashboard,
+                reportRuntime: {
+                    ...canonicalCarriedBaseRuntimeArtifact.runtimeBlock.dashboard.reportRuntime,
+                    semanticBindingViewState: canonicalCarriedSemanticBindingViewState,
+                },
+            },
+        },
+    },
+};
+
+const canonicalCarriedAttachedRuntimeState = resolveImportedPipelineRuntimeState({
+    importedPipelinePreview: canonicalCarriedPipelinePreview,
+    importedStandaloneReportFill,
+    attachedRequested: true,
+});
+
+assert.equal(canonicalCarriedAttachedRuntimeState.attachedApplied, true);
+assert.equal(canonicalCarriedAttachedRuntimeState.runtimeArtifact.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.chips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(canonicalCarriedAttachedRuntimeState.runtimeConfig.semanticBindingViewState.chips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(canonicalCarriedAttachedRuntimeState.runtimeArtifact.reportFill.datasets[0].rows.length, 8);
+assert.equal(canonicalCarriedAttachedRuntimeState.runtimeArtifact.exportRequest.reportFill.datasets[0].rows.length, 8);
+assert.equal(canonicalCarriedAttachedRuntimeState.runtimeArtifact.reportSpec.semanticSummary.modelLabel, "Ad Delivery");
+assert.equal(canonicalCarriedAttachedRuntimeState.runtimeArtifact.reportSpec.semanticSummary.entityLabel, "Line Delivery");
+
+const staleCarriedPipelinePreview = {
+    ...importedPipelinePreview,
+    runtimeArtifact: buildReportBuilderRuntimePreview({
+        model: {
+            reportSpec,
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: reportSpec.title,
+                title: reportSpec.title,
+                semanticSummary: {
+                    kind: "semantic",
+                    modelRef: "model://example/performance/delivery@v1",
+                    modelLabel: "Canonical Ad Delivery",
+                    entity: "line_delivery",
+                    entityLabel: "Canonical Line Delivery",
+                    selectedDimensions: [
+                        { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+                    ],
+                    selectedMeasures: [
+                        { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+                    ],
+                },
+            },
+            semanticBindingViewState: {
+                title: "Semantic Binding",
+                chips: [
+                    "Model model://example/performance/delivery@v1",
+                    "Measures available_impressions",
+                ],
+                fieldGroups: [
+                    {
+                        id: "measures",
+                        title: "Selected measures (1)",
+                        fields: [
+                            { id: "available_impressions", rawId: "available_impressions", label: "available_impressions" },
+                        ],
+                    },
+                ],
+            },
+        },
+        rows: [],
+        hasMore: false,
+        runtimeTitle: reportSpec.title,
+        runtimeSubtitle: "Local runtime preview compiled directly from the imported ReportSpec file.",
+    }),
+};
+
+const staleCarriedAttachedRuntimeState = resolveImportedPipelineRuntimeState({
+    importedPipelinePreview: staleCarriedPipelinePreview,
+    importedStandaloneReportFill,
+    attachedRequested: true,
+});
+
+assert.equal(staleCarriedAttachedRuntimeState.attachedApplied, true);
+assert.deepEqual(
+    staleCarriedAttachedRuntimeState.runtimeArtifact.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.chips,
+    staleCarriedPipelinePreview.runtimeArtifact.runtimeBlock.dashboard.reportRuntime.semanticBindingViewState.chips,
+);
+
 const detachedRuntimeState = resolveImportedPipelineRuntimeState({
     importedPipelinePreview,
     importedStandaloneReportFill,

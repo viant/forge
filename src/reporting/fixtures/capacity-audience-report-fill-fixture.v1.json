@@ -152,14 +152,14 @@
     {
       "id": "sharedFilters",
       "kind": "filterBarBlock",
-      "title": "Report Scope",
+      "title": "Filters",
       "paramIds": [
         "dateRange",
         "channelsFilter",
         "audienceSegmentFilter"
       ],
       "content": {
-        "title": "Report Scope",
+        "title": "Filters",
         "params": [
           {
             "id": "dateRange",

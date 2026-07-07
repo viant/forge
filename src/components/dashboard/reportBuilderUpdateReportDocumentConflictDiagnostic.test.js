@@ -124,7 +124,7 @@ assert.deepEqual(diagnostic, {
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -174,7 +174,7 @@ assert.deepEqual(buildReportBuilderUpdateReportDocumentConflictDiagnosticSummary
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -231,7 +231,7 @@ assert.deepEqual(buildReportBuilderUpdateReportDocumentConflictDiagnosticInspect
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -259,6 +259,107 @@ assert.deepEqual(buildReportBuilderUpdateReportDocumentConflictDiagnosticInspect
     ],
     content: serializeReportBuilderUpdateReportDocumentConflictDiagnostic(diagnostic),
 });
+
+const staleCarriedConflictDiagnostic = buildReportBuilderUpdateReportDocumentConflictDiagnostic({
+    ...updatePayload,
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        chips: [
+            "Model model://example/performance/delivery@v1",
+            "Measures available_impressions",
+        ],
+        fieldGroups: [
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "available_impressions",
+                        label: "available_impressions",
+                    },
+                ],
+            },
+        ],
+    },
+    document: {
+        ...updatePayload.document,
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions" },
+            ],
+        },
+    },
+}, {
+    currentVersion: "9",
+    detectedAt: 9101,
+});
+assert.deepEqual(staleCarriedConflictDiagnostic.semanticBindingChips, [
+    "Model Canonical Ad Delivery",
+    "Entity Canonical Line Delivery",
+    "Dimensions Canonical Delivery Date",
+    "Measures Canonical Available Impressions",
+    "Categories Time",
+]);
+
+const richerCarriedConflictDiagnostic = buildReportBuilderUpdateReportDocumentConflictDiagnostic({
+    ...updatePayload,
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        modelLabel: "Carried Ad Delivery",
+        entityLabel: "Carried Line Delivery",
+        chips: [
+            "Model Carried Ad Delivery",
+            "Entity Carried Line Delivery",
+            "Dimensions Carried Delivery Date",
+            "Measures Carried Available Impressions",
+        ],
+        fieldGroups: [
+            {
+                id: "dimensions",
+                title: "Selected dimensions (1)",
+                fields: [
+                    {
+                        id: "event_date",
+                        rawId: "eventDate",
+                        label: "Carried Delivery Date",
+                        category: "Time",
+                        definitionRef: "semantic://example/event_date",
+                    },
+                ],
+            },
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "avails",
+                        label: "Carried Available Impressions",
+                        definitionRef: "semantic://example/available_impressions",
+                    },
+                ],
+            },
+        ],
+    },
+}, {
+    currentVersion: "9",
+    detectedAt: 9102,
+});
+assert.deepEqual(richerCarriedConflictDiagnostic.semanticBindingChips, [
+    "Model Carried Ad Delivery",
+    "Entity Carried Line Delivery",
+    "Dimensions Carried Delivery Date",
+    "Measures Carried Available Impressions",
+]);
 
 assert.deepEqual(buildReportBuilderUpdateReportDocumentConflictDiagnosticDownload(diagnostic), {
     filename: "Exploration Demo-update-conflict-v7-current-v9.json",
@@ -343,7 +444,7 @@ const embeddedConflictDiagnostic = buildReportBuilderUpdateReportDocumentConflic
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -430,7 +531,7 @@ const embeddedConflictDiagnosticWithEmptySpecScope = buildReportBuilderUpdateRep
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",

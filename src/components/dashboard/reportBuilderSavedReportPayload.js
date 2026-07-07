@@ -8,6 +8,8 @@ import {
     buildSavedReportExportRequest,
     buildSavedViewReportExportRequest,
 } from "../../reporting/reportExportRequestModel.js";
+import { buildReportFillFromReportSpec } from "../../reporting/reportFillModel.js";
+import { buildReportPrintFromReportFill } from "../../reporting/reportPrintModel.js";
 import { buildReportDocumentCompileState } from "../../reporting/reportDocumentStore.js";
 import {
     buildReportBuilderDocumentCompileDiagnostics,
@@ -16,6 +18,10 @@ import {
 import { buildReportBuilderSemanticRuntimeDiagnosticsFromState } from "./reportBuilderSemantic.js";
 import { resolveReportBuilderSemanticRuntimeState } from "./useReportBuilderSemanticRuntimeState.js";
 import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import {
+    normalizeReportBuilderSemanticBindingViewState,
+    resolvePreferredReportBuilderSemanticBindingViewState,
+} from "./reportBuilderSemanticBindingViewPreference.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
 import {
     summarizeReportBuilderAuthoredBlocks,
@@ -31,6 +37,7 @@ import {
     extractSavedViewOverlayArtifactState,
 } from "../../reporting/views/savedViewOverlayModel.js";
 import { resolveReportBuilderSavedViewOverlayReopenSourceResolution } from "./reportBuilderReopenSourceResolution.js";
+import { resolveReportBuilderPersistedRuntimePreviewInteraction } from "./reportBuilderRuntimePreviewInteractionPersistence.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -42,47 +49,6 @@ function cloneValue(value) {
 
 function sanitizeFilenameSegment(value = "") {
     return normalizeString(value).replace(/[\\/:*?"<>|]+/g, "-");
-}
-
-function normalizeSemanticBindingViewState(value = null) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return null;
-    }
-    const title = normalizeString(value?.title);
-    const chips = (Array.isArray(value?.chips) ? value.chips : [])
-        .map((entry) => normalizeString(entry))
-        .filter(Boolean);
-    const fieldGroups = (Array.isArray(value?.fieldGroups) ? value.fieldGroups : [])
-        .map((group) => {
-            const id = normalizeString(group?.id);
-            const groupTitle = normalizeString(group?.title);
-            const fields = (Array.isArray(group?.fields) ? group.fields : [])
-                .filter((field) => field && typeof field === "object" && !Array.isArray(field))
-                .filter((field) => (
-                    normalizeString(field?.id)
-                    || normalizeString(field?.rawId)
-                    || normalizeString(field?.label)
-                    || normalizeString(field?.definitionRef)
-                ))
-                .map((field) => cloneValue(field));
-            if (!id || !groupTitle || fields.length === 0) {
-                return null;
-            }
-            return {
-                id,
-                title: groupTitle,
-                fields,
-            };
-        })
-        .filter(Boolean);
-    if (chips.length === 0 && fieldGroups.length === 0) {
-        return null;
-    }
-    return {
-        ...(title ? { title } : { title: "Semantic Binding" }),
-        ...(chips.length > 0 ? { chips } : {}),
-        ...(fieldGroups.length > 0 ? { fieldGroups } : {}),
-    };
 }
 
 const REPORT_DOCUMENT_REOPEN_SESSION_KEY = "reportDocumentReopenSession";
@@ -272,6 +238,43 @@ function buildSavedReportPayloadDrillSummary(payloadContext = null) {
         : null;
 }
 
+function buildExportRuntimeDatasetPayloads(reportFill = null) {
+    const datasets = Array.isArray(reportFill?.datasets) ? reportFill.datasets : [];
+    return datasets.reduce((acc, dataset) => {
+        const datasetId = normalizeString(dataset?.id);
+        if (!datasetId) {
+            return acc;
+        }
+        acc[datasetId] = {
+            rows: Array.isArray(dataset?.rows) ? cloneValue(dataset.rows) : [],
+            hasMore: dataset?.provenance?.hasMore === true || dataset?.provenance?.truncated === true,
+            diagnostics: Array.isArray(dataset?.provenance?.diagnostics) ? cloneValue(dataset.provenance.diagnostics) : [],
+        };
+        return acc;
+    }, {});
+}
+
+function applyCanonicalSemanticSummaryToExportRequest(request = null, reportSpec = null) {
+    if (!request || typeof request !== "object" || Array.isArray(request)) {
+        return request;
+    }
+    const semanticSummary = reportSpec?.semanticSummary && typeof reportSpec.semanticSummary === "object" && !Array.isArray(reportSpec.semanticSummary)
+        ? cloneValue(reportSpec.semanticSummary)
+        : null;
+    if (!semanticSummary) {
+        return request;
+    }
+    return {
+        ...request,
+        reportSpec: {
+            ...(request.reportSpec && typeof request.reportSpec === "object" && !Array.isArray(request.reportSpec)
+                ? cloneValue(request.reportSpec)
+                : {}),
+            semanticSummary,
+        },
+    };
+}
+
 export function buildReportBuilderSavedReportPayload(explorationArtifact = null, {
     savedAt = Date.now(),
 } = {}) {
@@ -288,7 +291,7 @@ export function buildReportBuilderSavedReportPayload(explorationArtifact = null,
     const compileState = explorationArtifact?.compileState && typeof explorationArtifact.compileState === "object" && !Array.isArray(explorationArtifact.compileState)
         ? cloneValue(explorationArtifact.compileState)
         : null;
-    const semanticBindingViewState = normalizeSemanticBindingViewState(explorationArtifact?.semanticBindingViewState);
+    const semanticBindingViewState = normalizeReportBuilderSemanticBindingViewState(explorationArtifact?.semanticBindingViewState);
     if (!artifactId || !reportDocument || !reportSpec) {
         return null;
     }
@@ -353,6 +356,58 @@ export function buildReportBuilderSavedReportPayloadRecord(savedReportPayload = 
     };
 }
 
+export function buildReportBuilderSaveReportRequest(savedReportPayload = null, {
+    runtimeArtifact = null,
+    savedReportPayloadRecord = null,
+    metadata = null,
+} = {}) {
+    const payload = savedReportPayload && typeof savedReportPayload === "object" && !Array.isArray(savedReportPayload)
+        ? cloneValue(savedReportPayload)
+        : null;
+    if (!payload) {
+        return null;
+    }
+    const runtimeDocument = runtimeArtifact?.document && typeof runtimeArtifact.document === "object" && !Array.isArray(runtimeArtifact.document)
+        ? cloneValue(runtimeArtifact.document)
+        : null;
+    const runtimeSpec = runtimeArtifact?.reportSpec && typeof runtimeArtifact.reportSpec === "object" && !Array.isArray(runtimeArtifact.reportSpec)
+        ? cloneValue(runtimeArtifact.reportSpec)
+        : null;
+    const runtimeFill = runtimeArtifact?.reportFill && typeof runtimeArtifact.reportFill === "object" && !Array.isArray(runtimeArtifact.reportFill)
+        ? cloneValue(runtimeArtifact.reportFill)
+        : null;
+    const runtimePrint = runtimeArtifact?.reportPrint && typeof runtimeArtifact.reportPrint === "object" && !Array.isArray(runtimeArtifact.reportPrint)
+        ? cloneValue(runtimeArtifact.reportPrint)
+        : null;
+    const exportRequest = savedReportPayloadRecord?.exportRequest && typeof savedReportPayloadRecord.exportRequest === "object" && !Array.isArray(savedReportPayloadRecord.exportRequest)
+        ? savedReportPayloadRecord.exportRequest
+        : null;
+    const requestMetadata = {
+        payloadId: normalizeString(payload?.payloadId),
+        sourceArtifactId: normalizeString(payload?.sourceArtifactId),
+        savedAt: Number(payload?.savedAt || 0) || 0,
+        ...(payload?.sourceSession && typeof payload.sourceSession === "object" && !Array.isArray(payload.sourceSession)
+            ? { sourceSession: cloneValue(payload.sourceSession) }
+            : {}),
+        ...(metadata && typeof metadata === "object" && !Array.isArray(metadata)
+            ? cloneValue(metadata)
+            : {}),
+    };
+    return {
+        artifactRef: normalizeString(exportRequest?.source?.artifactRef || ""),
+        reportId: normalizeString(payload?.reportDocument?.id || payload?.reportSpec?.title || ""),
+        title: normalizeString(payload?.title || payload?.reportDocument?.title || "Report") || "Report",
+        version: Number(savedReportPayloadRecord?.documentVersion || 0) || 1,
+        documentVersion: Number(savedReportPayloadRecord?.documentVersion || 0) || 0,
+        reportDocument: runtimeDocument || cloneValue(payload?.reportDocument || null),
+        reportSpec: runtimeSpec || cloneValue(payload?.reportSpec || null),
+        compileState: cloneValue(payload?.compileState || null),
+        reportFill: runtimeFill,
+        reportPrint: runtimePrint,
+        metadata: requestMetadata,
+    };
+}
+
 export function buildReportBuilderSavedReportExportRequestFromBuilderState(savedReportPayload = null, {
     runtimeArtifact = null,
     documentVersion = 0,
@@ -393,6 +448,9 @@ export function buildReportBuilderSavedReportExportRequestFromBuilderState(saved
     const runtimeReportSpec = runtimeArtifact?.reportSpec && typeof runtimeArtifact.reportSpec === "object" && !Array.isArray(runtimeArtifact.reportSpec)
         ? cloneValue(runtimeArtifact.reportSpec)
         : null;
+    let runtimeReportFill = runtimeArtifact?.reportFill && typeof runtimeArtifact.reportFill === "object" && !Array.isArray(runtimeArtifact.reportFill)
+        ? cloneValue(runtimeArtifact.reportFill)
+        : null;
     const runtimeReportPrint = runtimeArtifact?.reportPrint && typeof runtimeArtifact.reportPrint === "object" && !Array.isArray(runtimeArtifact.reportPrint)
         ? cloneValue(runtimeArtifact.reportPrint)
         : null;
@@ -402,21 +460,58 @@ export function buildReportBuilderSavedReportExportRequestFromBuilderState(saved
             title: normalizeString(runtimeReportDocument?.title || rebuiltSavedReportPayload?.reportDocument?.title),
         })
         : null;
+    const mergedRuntimeIdentity = normalizedRuntimeIdentity
+        ? {
+            reportDocument: {
+                ...normalizedRuntimeIdentity.reportDocument,
+                ...(rebuiltSavedReportPayload?.reportDocument?.semanticSummary
+                    ? { semanticSummary: cloneValue(rebuiltSavedReportPayload.reportDocument.semanticSummary) }
+                    : {}),
+            },
+            reportSpec: {
+                ...normalizedRuntimeIdentity.reportSpec,
+                ...(rebuiltSavedReportPayload?.reportSpec?.semanticSummary
+                    ? { semanticSummary: cloneValue(rebuiltSavedReportPayload.reportSpec.semanticSummary) }
+                    : {}),
+            },
+        }
+        : null;
     if (runtimeReportPrint && normalizedRuntimeIdentity?.reportDocument?.title) {
         runtimeReportPrint.title = normalizeString(normalizedRuntimeIdentity.reportDocument.title);
     }
     const exportPayload = {
         ...rebuiltSavedReportPayload,
-        ...(normalizedRuntimeIdentity?.reportDocument ? { reportDocument: normalizedRuntimeIdentity.reportDocument } : {}),
-        ...(normalizedRuntimeIdentity?.reportSpec ? { reportSpec: normalizedRuntimeIdentity.reportSpec } : {}),
+        ...(mergedRuntimeIdentity?.reportDocument ? { reportDocument: mergedRuntimeIdentity.reportDocument } : {}),
+        ...(mergedRuntimeIdentity?.reportSpec ? { reportSpec: mergedRuntimeIdentity.reportSpec } : {}),
     };
+    const canonicalSemanticSummary = exportPayload?.reportSpec?.semanticSummary && typeof exportPayload.reportSpec.semanticSummary === "object" && !Array.isArray(exportPayload.reportSpec.semanticSummary)
+        ? cloneValue(exportPayload.reportSpec.semanticSummary)
+        : null;
+    const runtimeSemanticSummary = runtimeReportSpec?.semanticSummary && typeof runtimeReportSpec.semanticSummary === "object" && !Array.isArray(runtimeReportSpec.semanticSummary)
+        ? cloneValue(runtimeReportSpec.semanticSummary)
+        : null;
+    const semanticSummaryChanged = JSON.stringify(canonicalSemanticSummary || null) !== JSON.stringify(runtimeSemanticSummary || null);
+    let nextRuntimeReportPrint = runtimeReportPrint;
+    if (semanticSummaryChanged && exportPayload?.reportSpec && runtimeReportFill) {
+        runtimeReportFill = buildReportFillFromReportSpec(
+            exportPayload.reportSpec,
+            buildExportRuntimeDatasetPayloads(runtimeArtifact?.reportFill || runtimeReportFill),
+        );
+        if (runtimeReportFill && runtimeArtifact?.reportPrint) {
+            nextRuntimeReportPrint = buildReportPrintFromReportFill({
+                reportSpec: exportPayload.reportSpec,
+                reportFill: runtimeReportFill,
+                pageGeometry: runtimeArtifact.reportPrint?.pageGeometry,
+            });
+        }
+    }
     const sourceKind = normalizeString(
         savedReportPayload?.source?.kind
         || savedReportPayload?.savedReportPayload?.source?.kind
         || savedReportPayload?.kind,
     );
     if (sourceKind === "reportBuilder.savedView") {
-        return buildSavedViewReportExportRequest({
+        return applyCanonicalSemanticSummaryToExportRequest(buildSavedViewReportExportRequest({
             savedView: {
                 kind: sourceKind,
                 id: normalizeString(exportPayload?.sourceArtifactId),
@@ -424,14 +519,14 @@ export function buildReportBuilderSavedReportExportRequestFromBuilderState(saved
                 title: normalizeString(exportPayload?.title || exportPayload?.reportDocument?.title),
             },
             reportSpec: exportPayload.reportSpec,
-            reportFill: runtimeArtifact?.reportFill || null,
-            reportPrint: runtimeReportPrint,
+            reportFill: runtimeReportFill || null,
+            reportPrint: nextRuntimeReportPrint,
             documentVersion,
             format,
-        });
+        }), exportPayload.reportSpec);
     }
     if (sourceKind === "reportBuilder.publishedSnapshot") {
-        return buildPublishedSnapshotReportExportRequest({
+        return applyCanonicalSemanticSummaryToExportRequest(buildPublishedSnapshotReportExportRequest({
             publishedSnapshot: {
                 kind: sourceKind,
                 id: normalizeString(exportPayload?.sourceArtifactId),
@@ -439,19 +534,19 @@ export function buildReportBuilderSavedReportExportRequestFromBuilderState(saved
                 title: normalizeString(exportPayload?.title || exportPayload?.reportDocument?.title),
             },
             reportSpec: exportPayload.reportSpec,
-            reportFill: runtimeArtifact?.reportFill || null,
-            reportPrint: runtimeReportPrint,
+            reportFill: runtimeReportFill || null,
+            reportPrint: nextRuntimeReportPrint,
             documentVersion,
             format,
-        });
+        }), exportPayload.reportSpec);
     }
-    return buildSavedReportExportRequest({
+    return applyCanonicalSemanticSummaryToExportRequest(buildSavedReportExportRequest({
         savedReportPayload: exportPayload,
-        reportFill: runtimeArtifact?.reportFill || null,
-        reportPrint: runtimeReportPrint,
+        reportFill: runtimeReportFill || null,
+        reportPrint: nextRuntimeReportPrint,
         documentVersion,
         format,
-    });
+    }), exportPayload.reportSpec);
 }
 
 export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReportPayload = null, {
@@ -473,6 +568,7 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
         return null;
     }
     const authoredState = stripBuilderOnlyState(state);
+    const runtimePreviewInteraction = resolveReportBuilderPersistedRuntimePreviewInteraction(state);
     const semanticRuntimeState = resolveReportBuilderSemanticRuntimeState({
         config,
         state: authoredState,
@@ -500,8 +596,11 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
         config: semanticRuntimeState.semanticDisplayConfig,
         state: authoredState,
         semanticSummary: semanticSummary || semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
+        runtimeDatasetScopeParams: runtimePreviewInteraction?.datasetScopeParams || null,
     });
-    const nextSpec = lowerReportDocumentToReportSpec(nextDocument);
+    const nextSpec = lowerReportDocumentToReportSpec(nextDocument, {
+        runtimeDatasetScopeParams: runtimePreviewInteraction?.datasetScopeParams || null,
+    });
     const withIdentity = applyReportDocumentIdentity(nextDocument, nextSpec, {
         reportId: seed.reportId || normalizeString(nextDocument?.id),
         title: resolveReportBuilderSavedPayloadIdentityTitle(authoredState, seed, nextDocument),
@@ -530,7 +629,12 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
         savedAt: Number(savedAt || Date.now()) || Date.now(),
         title: persistedTitle,
         sourceArtifactId,
-        sourceSession: seed.sourceSession,
+        sourceSession: seed.sourceSession
+            ? {
+                ...cloneValue(seed.sourceSession),
+                ...(runtimePreviewInteraction ? { runtimePreviewInteraction } : {}),
+            }
+            : (runtimePreviewInteraction ? { runtimePreviewInteraction } : null),
         reportDocument: withIdentity.reportDocument,
         reportSpec: withIdentity.reportSpec,
         ...(semanticBindingViewState ? { semanticBindingViewState } : {}),
@@ -553,11 +657,10 @@ export function buildReportBuilderSavedReportPayloadSummary(payload = null, {
         document: payload?.reportDocument || null,
         title: payload?.title || "",
     });
-    const semanticBindingViewState = normalizeSemanticBindingViewState(payload?.semanticBindingViewState)
-        || buildReportBuilderSemanticBindingViewState({
-            semanticSummary: payloadContext?.semanticSummary || null,
-            binding: payloadContext?.binding || null,
-        });
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [payloadContext],
+        candidates: [payload?.semanticBindingViewState],
+    });
     const scopeSummary = buildSavedReportPayloadScopeSummary(payload);
     const authoredSummary = buildSavedReportPayloadAuthoredSummary(payloadContext);
     const drillSummary = buildSavedReportPayloadDrillSummary(payloadContext);
@@ -597,7 +700,7 @@ export function buildReportBuilderSavedReportPayloadSummary(payload = null, {
                 : {}),
         } : {}),
         ...(scopeSummary ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),

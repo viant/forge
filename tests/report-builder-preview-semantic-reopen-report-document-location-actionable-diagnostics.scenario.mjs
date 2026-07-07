@@ -1,5 +1,7 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildPreviewBootstrapSteps,
+  buildPreviewPatchReopenedCompileStateStep,
   buildReopenedCompileDiagnosticsWaitSteps,
   buildReopenedHydratedSessionVerificationSteps,
   buildSavedPayloadPreparationSteps,
@@ -107,6 +109,33 @@ export default {
       expression: "(() => { const state = window.__REPORT_BUILDER_PREVIEW__?.getBuilderState?.(); return state?.reportDocumentReopenSession?.reopenedCompileState?.status === 'invalid'; })()",
       timeoutMs: 60000,
     },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Market",
+      measureText: "Measures Available Impressions",
+    }),
+    buildPreviewPatchReopenedCompileStateStep({
+      compileState: {
+        status: "clean",
+        diagnostics: [],
+      },
+    }),
+    {
+      type: "waitForEval",
+      expression: "(() => { const state = window.__REPORT_BUILDER_PREVIEW__?.getBuilderState?.(); return state?.reportDocumentReopenSession?.reopenedCompileState?.status === 'clean'; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Reopened compile diagnostics",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Runtime Diagnostics",
+    },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Market",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "screenshot",
       file: "report-builder-preview-semantic-reopen-report-document-location-actionable-diagnostics.png",

@@ -5,7 +5,10 @@ import {
     resolveReportBuilderSavedReportRecordBySource,
     normalizeReportBuilderSavedReportRecord,
 } from "./reportBuilderSavedReportRecords.js";
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import {
+    normalizeReportBuilderSemanticBindingViewState,
+    resolvePreferredReportBuilderSemanticBindingViewState,
+} from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import {
     resolvePreferredScopeParams,
@@ -28,41 +31,6 @@ function normalizeString(value = "") {
 
 function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
-}
-
-function normalizeSemanticBindingViewState(value = null) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return null;
-    }
-    const title = normalizeString(value?.title);
-    const chips = (Array.isArray(value?.chips) ? value.chips : [])
-        .map((entry) => normalizeString(entry))
-        .filter(Boolean);
-    const fieldGroups = (Array.isArray(value?.fieldGroups) ? value.fieldGroups : [])
-        .map((group) => {
-            const id = normalizeString(group?.id);
-            const groupTitle = normalizeString(group?.title);
-            const fields = (Array.isArray(group?.fields) ? group.fields : [])
-                .filter((field) => field && typeof field === "object" && !Array.isArray(field))
-                .map((field) => cloneValue(field));
-            if (!id || !groupTitle || fields.length === 0) {
-                return null;
-            }
-            return {
-                id,
-                title: groupTitle,
-                fields,
-            };
-        })
-        .filter(Boolean);
-    if (chips.length === 0 && fieldGroups.length === 0) {
-        return null;
-    }
-    return {
-        ...(title ? { title } : { title: "Semantic Binding" }),
-        ...(chips.length > 0 ? { chips } : {}),
-        ...(fieldGroups.length > 0 ? { fieldGroups } : {}),
-    };
 }
 
 function sanitizeFilenameSegment(value = "") {
@@ -231,14 +199,15 @@ function resolveExportRequestSemanticContext(request = null, {
             : (companionContext?.document || null),
         title: normalizeString(request?.source?.title || requestReportSpec?.title || companionContext?.title || "Report"),
     });
-    const semanticBindingViewState = normalizeSemanticBindingViewState(request?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(companionRecord?.savedReportPayload?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(companionSavedReportPayload?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(companionImportedArtifact?.semanticBindingViewState)
-        || buildReportBuilderSemanticBindingViewState({
-            semanticSummary: metadataContext?.semanticSummary || companionContext?.semanticSummary || null,
-            binding: metadataContext?.binding || companionContext?.binding || null,
-        });
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [metadataContext, companionContext],
+        candidates: [
+            request?.semanticBindingViewState,
+            companionRecord?.savedReportPayload?.semanticBindingViewState,
+            companionSavedReportPayload?.semanticBindingViewState,
+            companionImportedArtifact?.semanticBindingViewState,
+        ],
+    });
     const scopeSummary = buildReportBuilderScopeSummaryFromParams(
         resolvePreferredScopeParams(
             metadataContext?.scopeParams,
@@ -316,6 +285,19 @@ export function resolveReportBuilderExportHandler(builderContext = {}) {
         "getArtifact",
         "listJobs",
         "listArtifacts",
+    ];
+    return supportedMethods.some((method) => typeof candidate?.[method] === "function")
+        ? candidate
+        : null;
+}
+
+export function resolveReportBuilderReportStoreHandler(builderContext = {}) {
+    const candidate = builderContext?.handlers?.reportStore || null;
+    const supportedMethods = [
+        "saveReport",
+        "getReport",
+        "listReports",
+        "updateReport",
     ];
     return supportedMethods.some((method) => typeof candidate?.[method] === "function")
         ? candidate
@@ -431,7 +413,7 @@ export function buildReportBuilderExportRequestSummary(request = null, {
                 : {}),
         } : {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),

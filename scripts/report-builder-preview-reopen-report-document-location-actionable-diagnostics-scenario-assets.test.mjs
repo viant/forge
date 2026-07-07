@@ -30,6 +30,10 @@ assert.equal(
   true,
 );
 assert.equal(
+  expressions.some((expression) => expression.includes("getHydratedReportDocumentSession") && expression.includes("patchBuilderState") && expression.includes("reopenedCompileState") && expression.includes("\"status\":\"clean\"")),
+  true,
+);
+assert.equal(
   expressions.some((expression) => expression.includes("getHydratedReportDocumentSession") && expression.includes("capacityLocationQ3") && expression.includes("documentVersion === 11")),
   true,
 );
@@ -46,6 +50,18 @@ assert.equal(
   true,
 );
 assert.equal(
+  expressions.some((expression) => expression.includes('[aria-label=\\"Authored runtime preview\\"]') && expression.includes('data-report-builder-semantic-binding="true"') && expression.includes('data-report-builder-scope-summary="true"') && expression.includes('text.includes("Dimensions Market")') && expression.includes('text.includes("Measures Available Impressions")') && expression.includes('text.includes("Filters")')),
+  true,
+);
+assert.equal(
+  scenario.steps.some((step) => step?.type === "assertDomNotContains" && String(step.text || "").includes("Reopened compile diagnostics")),
+  true,
+);
+assert.equal(
+  scenario.steps.some((step) => step?.type === "assertDomNotContains" && String(step.text || "").includes("Runtime Diagnostics")),
+  true,
+);
+assert.equal(
   scenario.steps.some((step) => step?.type === "screenshot" && String(step.file || "").includes("location-actionable-diagnostics")),
   true,
 );
@@ -56,6 +72,12 @@ const reopenIndex = findStepIndex((step) => step?.type === "clickRole" && step?.
 const reopenedDiagnosticsIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Reopened compile diagnostics"));
 const reloadIndex = findLastStepIndex((step) => step?.type === "reload");
 const reloadedInvalidIndex = findStepIndex((step) => step?.type === "waitForEval" && (String(step?.expression || "").includes("reopenedCompileState?.status === 'invalid'") || String(step?.expression || "").includes('reopenedCompileState?.status === "invalid"')) && scenario.steps.indexOf(step) > reloadIndex);
+const runtimeSemanticVisibleWhileInvalidIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('data-report-builder-semantic-binding="true"') && String(step?.expression || "").includes('text.includes("Dimensions Market")'));
+const patchCleanCompileStateIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("reopenedCompileState") && String(step?.expression || "").includes("\"status\":\"clean\""));
+const cleanCompileStateIndex = findStepIndex((step) => step?.type === "waitForEval" && (String(step?.expression || "").includes("reopenedCompileState?.status === 'clean'") || String(step?.expression || "").includes('reopenedCompileState?.status === "clean"')));
+const diagnosticsHiddenIndex = scenario.steps.findIndex((step, index) => index > cleanCompileStateIndex && step?.type === "assertDomNotContains" && String(step?.text || "").includes("Reopened compile diagnostics"));
+const runtimeDiagnosticsHiddenIndex = scenario.steps.findIndex((step, index) => index > cleanCompileStateIndex && step?.type === "assertDomNotContains" && String(step?.text || "").includes("Runtime Diagnostics"));
+const runtimeSemanticVisibleAfterCleanIndex = scenario.steps.findIndex((step, index) => index > cleanCompileStateIndex && step?.type === "waitForEval" && String(step?.expression || "").includes('[aria-label=\\"Authored runtime preview\\"]') && String(step?.expression || "").includes('data-report-builder-semantic-binding="true"') && String(step?.expression || "").includes('text.includes("Dimensions Market")'));
 
 assert.notEqual(patchCompileStateIndex, -1);
 assert.notEqual(prepareSelectedGetIndex, -1);
@@ -63,11 +85,23 @@ assert.notEqual(reopenIndex, -1);
 assert.notEqual(reopenedDiagnosticsIndex, -1);
 assert.notEqual(reloadIndex, -1);
 assert.notEqual(reloadedInvalidIndex, -1);
+assert.notEqual(runtimeSemanticVisibleWhileInvalidIndex, -1);
+assert.notEqual(patchCleanCompileStateIndex, -1);
+assert.notEqual(cleanCompileStateIndex, -1);
+assert.notEqual(diagnosticsHiddenIndex, -1);
+assert.notEqual(runtimeDiagnosticsHiddenIndex, -1);
+assert.notEqual(runtimeSemanticVisibleAfterCleanIndex, -1);
 
 assert.equal(patchCompileStateIndex < prepareSelectedGetIndex, true);
 assert.equal(prepareSelectedGetIndex < reopenIndex, true);
 assert.equal(reopenIndex < reopenedDiagnosticsIndex, true);
 assert.equal(reopenedDiagnosticsIndex < reloadIndex, true);
 assert.equal(reloadIndex < reloadedInvalidIndex, true);
+assert.equal(reloadedInvalidIndex < runtimeSemanticVisibleWhileInvalidIndex, true);
+assert.equal(runtimeSemanticVisibleWhileInvalidIndex < patchCleanCompileStateIndex, true);
+assert.equal(patchCleanCompileStateIndex < cleanCompileStateIndex, true);
+assert.equal(cleanCompileStateIndex < diagnosticsHiddenIndex, true);
+assert.equal(diagnosticsHiddenIndex < runtimeDiagnosticsHiddenIndex, true);
+assert.equal(runtimeDiagnosticsHiddenIndex < runtimeSemanticVisibleAfterCleanIndex, true);
 
-console.log("report-builder-preview-reopen-report-document-location-actionable-diagnostics-scenario-assets ✓ reopened location table diagnostics persist across reload");
+console.log("report-builder-preview-reopen-report-document-location-actionable-diagnostics-scenario-assets ✓ reopened location runtime diagnostics can clear while authored runtime semantic sections remain visible");

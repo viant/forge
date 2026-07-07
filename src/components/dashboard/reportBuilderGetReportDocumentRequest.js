@@ -1,6 +1,6 @@
 import { buildGetReportDocumentRequest } from "../../reporting/reportDocumentStore.js";
 
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import {
     buildReportBuilderListReportDocumentsEntrySelectionKey,
@@ -63,10 +63,6 @@ function normalizeMetadataContext(context = null) {
     const title = normalizeString(context?.title || normalizedContext?.title);
     const subtitle = normalizeString(context?.subtitle || normalizedContext?.document?.subtitle || context?.document?.subtitle);
     const description = normalizeString(context?.description || normalizedContext?.document?.description || context?.document?.description);
-    const derivedSemanticBindingViewState = buildReportBuilderSemanticBindingViewState({
-        semanticSummary: context?.semanticSummary || normalizedContext?.semanticSummary || null,
-        binding: context?.binding || normalizedContext?.binding || null,
-    });
     const carriedSemanticBindingChips = Array.isArray(context?.semanticBindingChips)
         ? context.semanticBindingChips.map((chip) => normalizeString(chip)).filter(Boolean)
         : [];
@@ -79,18 +75,26 @@ function normalizeMetadataContext(context = null) {
                 .filter((field) => field && typeof field === "object" && !Array.isArray(field)),
         }))
         .filter((group) => group.id && group.title && group.fields.length > 0);
-    const semanticBindingViewState = derivedSemanticBindingViewState || (
-        carriedSemanticBindingChips.length > 0 || carriedSemanticBindingFieldGroups.length > 0
-            ? {
-                title: normalizeString(context?.semanticBindingTitle || "Semantic Binding") || "Semantic Binding",
-                ...(carriedSemanticBindingChips.length > 0 ? { chips: carriedSemanticBindingChips } : {}),
-                ...(carriedSemanticBindingFieldGroups.length > 0 ? { fieldGroups: carriedSemanticBindingFieldGroups } : {}),
-            }
-            : null
-    );
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [
+            {
+                semanticSummary: context?.semanticSummary || normalizedContext?.semanticSummary || null,
+                binding: context?.binding || normalizedContext?.binding || null,
+            },
+        ],
+        candidates: [
+            carriedSemanticBindingChips.length > 0 || carriedSemanticBindingFieldGroups.length > 0
+                ? {
+                    title: normalizeString(context?.semanticBindingTitle || "Semantic Binding") || "Semantic Binding",
+                    ...(carriedSemanticBindingChips.length > 0 ? { chips: carriedSemanticBindingChips } : {}),
+                    ...(carriedSemanticBindingFieldGroups.length > 0 ? { fieldGroups: carriedSemanticBindingFieldGroups } : {}),
+                }
+                : null,
+        ],
+    });
     const scopeSummary = Array.isArray(context?.scopeSummaryItems) && context.scopeSummaryItems.length > 0
         ? {
-            title: normalizeString(context?.scopeSummaryTitle || "Report Scope"),
+            title: normalizeString(context?.scopeSummaryTitle || "Filters"),
             text: normalizeString(context?.scopeSummaryText),
             items: context.scopeSummaryItems.map((item) => ({
                 id: normalizeString(item?.id),
@@ -127,7 +131,7 @@ function normalizeMetadataContext(context = null) {
                 : {}),
         } : {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: normalizeString(scopeSummary?.title || "Report Scope") || "Report Scope",
+            scopeSummaryTitle: normalizeString(scopeSummary?.title || "Filters") || "Filters",
             scopeSummaryText: normalizeString(scopeSummary?.text),
             scopeSummaryItems: scopeSummary.items,
         } : {}),

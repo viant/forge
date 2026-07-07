@@ -56,7 +56,7 @@ assert.equal(
         activeTablePresetTitle: "Delivery Grid",
         activeTablePresetDescription: "Table-first delivery preset.",
     }),
-    "Showing Delivery Grid. Table-first delivery preset. Use chart actions to switch to a curated visual read of the same data.",
+    "Showing Delivery Grid. Table-first delivery preset. Use Presets to switch to a curated table and chart view for this scope.",
 );
 
 assert.equal(
@@ -98,8 +98,6 @@ assert.deepEqual(
         selectedDimensionsCount: 1,
     }),
     [
-        "Chart view",
-        "Line chart",
         "1 measure",
         "1 breakdown",
     ],
@@ -121,7 +119,7 @@ assert.deepEqual(
     }),
     {
         title: "Delivery Grid",
-        description: "Showing Delivery Grid. Table-first delivery preset. Use chart actions to switch to a curated visual read of the same data.",
+        description: "Showing Delivery Grid. Table-first delivery preset. Use Presets to switch to a curated table and chart view for this scope.",
         presetIdentity: {
             eyebrow: "Metrics Panel",
             title: "Delivery Grid",

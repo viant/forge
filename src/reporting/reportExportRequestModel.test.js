@@ -55,7 +55,7 @@ const state = {
   pageSize: 25,
   orderField: "eventDate",
   orderDir: "asc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
@@ -97,6 +97,13 @@ const draftExportRequest = buildDraftReportExportRequest({
   reportFill,
   reportPrint,
   format: "pdf",
+  metadata: {
+    conversationId: "conv-123",
+    workspaceId: "steward",
+    renderHints: {
+      theme: "print",
+    },
+  },
 });
 
 assert.equal(draftExportRequest.kind, "reportExportRequest");
@@ -106,6 +113,13 @@ assert.equal(draftExportRequest.source.artifactKind, "dashboard.reportBuilder");
 assert.equal(draftExportRequest.source.artifactRef, "dashboard.reportBuilder://performanceBuilder");
 assert.equal(draftExportRequest.source.reportId, "performanceReport");
 assert.equal(draftExportRequest.source.title, "Performance Report");
+assert.deepEqual(draftExportRequest.metadata, {
+  conversationId: "conv-123",
+  workspaceId: "steward",
+  renderHints: {
+    theme: "print",
+  },
+});
 assert.equal(validateReportExportRequest(draftExportRequest).valid, true);
 
 const staleDraftExportRequest = JSON.parse(JSON.stringify(draftExportRequest));

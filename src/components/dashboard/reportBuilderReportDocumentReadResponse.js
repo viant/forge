@@ -5,7 +5,10 @@ import {
 } from "../../reporting/reportDocumentStore.js";
 import { buildReportBuilderExportArtifactKindLabel } from "./reportBuilderExportRequest.js";
 import { buildReportBuilderImportedArtifactSourceLabel } from "./reportBuilderImportedArtifactLabels.js";
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import {
+    normalizeReportBuilderSemanticBindingViewState,
+    resolvePreferredReportBuilderSemanticBindingViewState,
+} from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import { buildReportBuilderSavedReportPayloadFromBuilderState } from "./reportBuilderSavedReportPayload.js";
 import {
@@ -53,52 +56,6 @@ function cloneValue(value) {
 
 function sanitizeFilenameSegment(value = "") {
     return normalizeString(value).replace(/[\\/:*?"<>|]+/g, "-");
-}
-
-function normalizeSemanticBindingViewState(value = null) {
-    if (!isPlainObject(value)) {
-        return null;
-    }
-    const title = normalizeString(value?.title);
-    const chips = Array.isArray(value?.chips)
-        ? value.chips.map((chip) => normalizeString(chip)).filter(Boolean)
-        : [];
-    const fieldGroups = Array.isArray(value?.fieldGroups)
-        ? value.fieldGroups
-            .filter((group) => isPlainObject(group))
-            .map((group) => {
-                const id = normalizeString(group?.id);
-                const groupTitle = normalizeString(group?.title);
-                const fields = Array.isArray(group?.fields)
-                    ? group.fields
-                        .filter((field) => isPlainObject(field)
-                            && (
-                                normalizeString(field?.id)
-                                || normalizeString(field?.rawId)
-                                || normalizeString(field?.label)
-                                || normalizeString(field?.definitionRef)
-                            ))
-                        .map((field) => cloneValue(field))
-                    : [];
-                if (!id || !groupTitle || fields.length === 0) {
-                    return null;
-                }
-                return {
-                    id,
-                    title: groupTitle,
-                    fields,
-                };
-            })
-            .filter(Boolean)
-        : [];
-    if (chips.length === 0 && fieldGroups.length === 0) {
-        return null;
-    }
-    return {
-        ...(title ? { title } : { title: "Semantic Binding" }),
-        ...(chips.length > 0 ? { chips } : {}),
-        ...(fieldGroups.length > 0 ? { fieldGroups } : {}),
-    };
 }
 
 function cloneSharedArtifactProvenance(value = null) {
@@ -229,7 +186,15 @@ function applyListEntrySemanticBindingViewState(response = null, sourceEntries =
     const shareableArtifactStateByIdentity = new Map();
     const artifactIdByIdentity = new Map();
     (Array.isArray(sourceEntries) ? sourceEntries : []).forEach((entry) => {
-        const semanticBindingViewState = normalizeSemanticBindingViewState(entry?.semanticBindingViewState);
+        const entryContext = resolveNormalizedReportSpecDocumentContext({
+            reportSpec: entry?.reportSpec || null,
+            document: entry?.document || null,
+            title: entry?.title || entry?.reportRef?.reportId || "",
+        });
+        const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+            metadataContexts: [entryContext],
+            candidates: [entry?.semanticBindingViewState],
+        });
         const shareableArtifactState = extractShareableArtifactState(entry);
         const artifactId = normalizeString(entry?.artifactId || entry?.id);
         if (!semanticBindingViewState) {
@@ -363,8 +328,13 @@ export function buildListEntryFromSavedReportPayloadRecord(record = null) {
     const semanticSummary = recordContext?.semanticSummary || null;
     const binding = recordContext?.binding || null;
     const scope = recordContext?.scope || null;
-    const semanticBindingViewState = normalizeSemanticBindingViewState(record?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(record?.savedReportPayload?.semanticBindingViewState);
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [recordContext],
+        candidates: [
+            record?.semanticBindingViewState,
+            record?.savedReportPayload?.semanticBindingViewState,
+        ],
+    });
     const shareableArtifactState = extractShareableArtifactState(record?.savedReportPayload || record);
     const savedViewOverlay = extractSavedViewOverlayArtifactState(record);
     return {
@@ -480,11 +450,11 @@ function resolveListReportDocumentsEntrySemanticContext(entry = null, {
     });
     const effectiveDocument = directEntryContext?.document || sourceMatchedLocalRecordContext?.document || localSavedRecordContext?.document || localSavedRecord?.document || null;
     const effectiveReportSpec = directEntryContext?.reportSpec || sourceMatchedLocalRecordContext?.reportSpec || localSavedRecordContext?.reportSpec || localSavedRecord?.reportSpec || null;
-    const carriedSemanticBindingViewState = normalizeSemanticBindingViewState(entry?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(localSavedRecord?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(sourceMatchedLocalSavedRecord?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(localSavedRecord?.savedReportPayload?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(sourceMatchedLocalSavedRecord?.savedReportPayload?.semanticBindingViewState);
+    const carriedSemanticBindingViewState = normalizeReportBuilderSemanticBindingViewState(entry?.semanticBindingViewState)
+        || normalizeReportBuilderSemanticBindingViewState(localSavedRecord?.semanticBindingViewState)
+        || normalizeReportBuilderSemanticBindingViewState(sourceMatchedLocalSavedRecord?.semanticBindingViewState)
+        || normalizeReportBuilderSemanticBindingViewState(localSavedRecord?.savedReportPayload?.semanticBindingViewState)
+        || normalizeReportBuilderSemanticBindingViewState(sourceMatchedLocalSavedRecord?.savedReportPayload?.semanticBindingViewState);
     const savedViewOverlay = entry?.savedViewOverlay
         || sourceMatchedLocalSavedRecord?.savedViewOverlay
         || localSavedRecord?.savedViewOverlay
@@ -501,19 +471,16 @@ function resolveListReportDocumentsEntrySemanticContext(entry = null, {
     const reopenSourceResolutionState = savedViewOverlay
         ? resolveReportBuilderSavedViewOverlayReopenSourceResolution(savedViewOverlay, localSavedPayloads)?.state
         : null;
-    const effectiveSemanticBindingViewState = carriedSemanticBindingViewState
-        || buildReportBuilderSemanticBindingViewState({
-            semanticSummary: directEntryContext?.semanticSummary || null,
-            binding: directEntryContext?.binding || null,
-        })
-        || buildReportBuilderSemanticBindingViewState({
-            semanticSummary: sourceMatchedLocalRecordContext?.semanticSummary || null,
-            binding: sourceMatchedLocalRecordContext?.binding || null,
-        })
-        || buildReportBuilderSemanticBindingViewState({
-            semanticSummary: localSavedRecordContext?.semanticSummary || null,
-            binding: localSavedRecordContext?.binding || null,
-        });
+    const effectiveSemanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [
+            directEntryContext,
+            sourceMatchedLocalRecordContext,
+            localSavedRecordContext,
+        ],
+        candidates: [
+            carriedSemanticBindingViewState,
+        ],
+    });
     const scopeSummary = buildReportDocumentResponseScopeSummary(directEntryContext)
         || buildReportDocumentResponseScopeSummary(sourceMatchedLocalRecordContext)
         || buildReportDocumentResponseScopeSummary(localSavedRecordContext);
@@ -575,10 +542,22 @@ export function buildReportBuilderGetReportDocumentResponse(savedReportPayload =
     if (!response) {
         return null;
     }
-    const withSemanticBindingViewState = normalizeSemanticBindingViewState(base?.savedReportPayload?.semanticBindingViewState)
+    const responseContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: base?.reportSpec || null,
+        document: response?.document || null,
+        title: response?.document?.title || response?.reportRef?.reportId || "",
+    });
+    const preferredSemanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [responseContext],
+        candidates: [
+            base?.semanticBindingViewState,
+            base?.savedReportPayload?.semanticBindingViewState,
+        ],
+    });
+    const withSemanticBindingViewState = preferredSemanticBindingViewState
         ? {
             ...response,
-            semanticBindingViewState: normalizeSemanticBindingViewState(base.savedReportPayload.semanticBindingViewState),
+            semanticBindingViewState: preferredSemanticBindingViewState,
         }
         : response;
     const withShareableArtifactState = extractShareableArtifactState(base?.savedReportPayload)
@@ -678,14 +657,23 @@ export function buildReportBuilderSelectedGetReportDocumentResponse(listResponse
         return null;
     }
     const alignedResponse = alignSelectedGetResponseTemplateIdentity(response, entry);
-    const withSemanticBindingViewState = normalizeSemanticBindingViewState(entry?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(base?.semanticBindingViewState)
-        || normalizeSemanticBindingViewState(base?.savedReportPayload?.semanticBindingViewState)
+    const alignedResponseContext = resolveNormalizedReportSpecDocumentContext({
+        reportSpec: base?.reportSpec || null,
+        document: alignedResponse?.document || null,
+        title: alignedResponse?.document?.title || alignedResponse?.reportRef?.reportId || "",
+    });
+    const preferredSemanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [alignedResponseContext],
+        candidates: [
+            entry?.semanticBindingViewState,
+            base?.semanticBindingViewState,
+            base?.savedReportPayload?.semanticBindingViewState,
+        ],
+    });
+    const withSemanticBindingViewState = preferredSemanticBindingViewState
         ? {
             ...alignedResponse,
-            semanticBindingViewState: normalizeSemanticBindingViewState(entry?.semanticBindingViewState)
-                || normalizeSemanticBindingViewState(base?.semanticBindingViewState)
-                || normalizeSemanticBindingViewState(base?.savedReportPayload?.semanticBindingViewState),
+            semanticBindingViewState: preferredSemanticBindingViewState,
         }
         : alignedResponse;
     const withShareableArtifactState = extractShareableArtifactState(entry)
@@ -1106,11 +1094,10 @@ export function buildReportBuilderGetReportDocumentResponseSummary(response = nu
         title: response?.document?.title || response?.reportRef?.reportId || "",
     });
     const templateIdentity = extractReportDocumentTemplateIdentity(responseContext?.document || null);
-    const effectiveSemanticBindingViewState = normalizeSemanticBindingViewState(response?.semanticBindingViewState)
-        || buildReportBuilderSemanticBindingViewState({
-            semanticSummary: responseContext?.semanticSummary || null,
-            binding: responseContext?.binding || null,
-        });
+    const effectiveSemanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [responseContext],
+        candidates: [response?.semanticBindingViewState],
+    });
     const scopeSummary = buildReportDocumentResponseScopeSummary(
         responseContext?.scope ? { scope: responseContext.scope } : null,
     );
@@ -1152,7 +1139,7 @@ export function buildReportBuilderGetReportDocumentResponseSummary(response = nu
                 : {}),
         } : {}),
         ...(scopeSummary ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),
@@ -1252,7 +1239,7 @@ export function buildReportBuilderListReportDocumentsEntrySummary(entry = null, 
                 : {}),
         } : {}),
         ...(scopeSummary ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),

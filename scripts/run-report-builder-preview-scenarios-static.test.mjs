@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   buildStaticPreviewScenarioRunnerArgs,
+  formatStaticPreviewRunnerError,
   resolveStaticPreviewBaseUrl,
   resolveStaticPreviewOutputDir,
 } from "./run-report-builder-preview-scenarios-static.mjs";
@@ -63,5 +64,30 @@ assert.deepEqual(buildStaticPreviewScenarioRunnerArgs(["--list"], {
   "--output-root",
   path.join(repoRoot, "output", "playwright", "report-builder-preview-static"),
 ]);
+
+assert.deepEqual(buildStaticPreviewScenarioRunnerArgs(["semantic-left-rail"], {
+  outputRoot: path.join(repoRoot, "output", "playwright", "report-builder-preview-static"),
+  baseUrl: "file:///tmp/report-builder-preview-static",
+}), [
+  "--base-url",
+  "file:///tmp/report-builder-preview-static",
+  "--output-root",
+  path.join(repoRoot, "output", "playwright", "report-builder-preview-static"),
+  "semantic-left-rail",
+]);
+
+assert.equal(
+  formatStaticPreviewRunnerError(new Error("static preview scenario runner exited with code 1")),
+  [
+    "static preview scenario runner exited with code 1",
+    "If the underlying failure was a Playwright browser launch error, rerun on a host that allows headless browser startup.",
+    "If browser binaries are missing, run `npx playwright install` from the workspace before retrying.",
+  ].join("\n"),
+);
+
+assert.equal(
+  formatStaticPreviewRunnerError(new Error("custom failure")),
+  "custom failure",
+);
 
 console.log("run-report-builder-preview-scenarios-static ✓ resolves static preview paths and injects file-based runner arguments");

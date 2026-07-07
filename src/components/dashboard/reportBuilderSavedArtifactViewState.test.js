@@ -16,6 +16,7 @@ import {
     buildReportBuilderReopenedExportJobPanelState,
     buildReportBuilderReopenedExportNoticeState,
     buildReportBuilderReopenedSessionNoticeState,
+    buildReportBuilderRecentExportEntries,
     buildReportBuilderReopenedExportMetaChips,
     buildReportBuilderReopenedExportRequestPanelState,
     buildReportBuilderSavedPayloadExportExecutionConfig,
@@ -388,6 +389,7 @@ assert.deepEqual(buildReportBuilderReopenedExportExecutionConfig({
     missingRequestMessage: "No canonical export snapshot is available for the reopened ReportDocument.",
     missingJobMessage: "No reopened export job is available to refresh.",
     missingArtifactMessage: "No completed reopened export artifact is available yet.",
+    historyEnabled: true,
 });
 
 assert.deepEqual(buildReportBuilderSelectedListEntryExportExecutionConfig({
@@ -404,6 +406,7 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportExecutionConfig({
     missingRequestMessage: "No canonical export snapshot is available for the selected catalog entry.",
     missingJobMessage: "No selected export job is available to refresh.",
     missingArtifactMessage: "No completed selected export artifact is available yet.",
+    historyEnabled: true,
 });
 
 assert.deepEqual(buildReportBuilderActiveSavedArtifactNoticeState({
@@ -1180,7 +1183,7 @@ assert.deepEqual(buildReportBuilderSavedPayloadExportJobPanelState({
     requestSummary: {
         semanticBindingTitle: "Semantic Binding",
         semanticBindingChips: ["Model Ad Delivery"],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Date Range",
         scopeSummaryItems: [{ id: "dateRange", label: "Date Range" }],
     },
@@ -1192,7 +1195,7 @@ assert.deepEqual(buildReportBuilderSavedPayloadExportJobPanelState({
     metaChips: ["job-1", "queued", "Market Brief", "template mismatch"],
     semanticBindingTitle: "Semantic Binding",
     semanticBindingChips: ["Model Ad Delivery"],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Date Range",
     scopeSummaryItems: [{ id: "dateRange", label: "Date Range" }],
     refreshLabel: "Refresh status",
@@ -1294,6 +1297,82 @@ assert.deepEqual(buildReportBuilderSavedPayloadRecentExportEntries({
             contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             artifactRef: "report://doc_123",
             format: "xlsx",
+            createdAt: "2026-06-13T11:00:00Z",
+            retentionTtlMs: 7200000,
+        },
+    },
+]);
+
+assert.deepEqual(buildReportBuilderRecentExportEntries({
+    jobs: [
+        {
+            jobId: "job-reopened",
+            status: "succeeded",
+            artifactId: "artifact-reopened",
+            artifactRef: "reportBuilder.savedView://saved_view_capacityTrendQ3",
+            format: "pdf",
+            submittedAt: "2026-06-13T11:00:00Z",
+            completedAt: "2026-06-13T11:05:00Z",
+        },
+    ],
+    artifacts: [
+        {
+            artifactId: "artifact-reopened",
+            artifactRef: "reportBuilder.savedView://saved_view_capacityTrendQ3",
+            contentType: "application/pdf",
+            format: "pdf",
+            createdAt: "2026-06-13T11:00:00Z",
+            retentionTtlMs: 7200000,
+        },
+    ],
+    summary: {
+        title: "Capacity Trend Q3 Saved View",
+        templateLabel: "Capacity Brief",
+        reopenSourceResolutionChips: [
+            "Base report file capacity_q3_inventory_ladder • capacityTrendQ3",
+        ],
+    },
+    activeArtifactId: "artifact-reopened",
+    nowMs: Date.parse("2026-06-13T12:00:00Z"),
+}), [
+    {
+        id: "recentExport:job-reopened",
+        label: "Completed export",
+        title: "Capacity Trend Q3 Saved View",
+        subtitle: "PDF • succeeded",
+        description: "Artifact artifact-reopened is available for download.",
+        metaChips: [
+            "job-reopened",
+            "artifact-reopened",
+            "pdf",
+            "submitted 1h ago",
+            "expires in 1h",
+            "Capacity Brief",
+            "Base report file capacity_q3_inventory_ladder • capacityTrendQ3",
+        ],
+        notice: {
+            level: "info",
+            message: "Current export selection",
+        },
+        reviewLabel: "Use current",
+        downloadLabel: "Download artifact",
+        hasArtifact: true,
+        canRefresh: false,
+        active: true,
+        job: {
+            jobId: "job-reopened",
+            status: "succeeded",
+            artifactId: "artifact-reopened",
+            artifactRef: "reportBuilder.savedView://saved_view_capacityTrendQ3",
+            format: "pdf",
+            submittedAt: "2026-06-13T11:00:00Z",
+            completedAt: "2026-06-13T11:05:00Z",
+        },
+        artifact: {
+            artifactId: "artifact-reopened",
+            contentType: "application/pdf",
+            artifactRef: "reportBuilder.savedView://saved_view_capacityTrendQ3",
+            format: "pdf",
             createdAt: "2026-06-13T11:00:00Z",
             retentionTtlMs: 7200000,
         },
@@ -1447,7 +1526,7 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportRequestPanelState({
         localBackingLabel: "ambiguous local backing",
         semanticBindingTitle: "Semantic Binding",
         semanticBindingChips: ["Model Ad Delivery"],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [{ id: "dateRange", label: "Reporting Window" }],
     },
@@ -1458,7 +1537,7 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportRequestPanelState({
     hideLabel: "Hide export blocker",
     semanticBindingTitle: "Semantic Binding",
     semanticBindingChips: ["Model Ad Delivery"],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [{ id: "dateRange", label: "Reporting Window" }],
     headerSubtitle: "Capacity Shared",

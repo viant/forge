@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { buildReportBuilderSavedReportState } from "./reportBuilderSavedReportState.js";
+import {
+    buildReportBuilderSavedReportState,
+    matchesReportBuilderSelectedEntryHydratedSession,
+} from "./reportBuilderSavedReportState.js";
 
 const audienceArtifactFixture = JSON.parse(
     readFileSync(
@@ -79,6 +82,18 @@ assert.equal(state.selectedListEntrySavedRecord?.exportable, true);
 assert.equal(state.savedReportPayloadExportRequest?.source?.payloadId, "rbreport_capacity_q3");
 assert.equal(state.reopenedExportRequest?.source?.payloadId, "rbreport_capacity_q3");
 assert.equal(state.selectedListEntryExportRequest?.source?.payloadId, "rbreport_capacity_q3");
+assert.equal(matchesReportBuilderSelectedEntryHydratedSession({
+    hydratedReportDocumentSession: {
+        reportId: "capacityQ3",
+        source: {
+            kind: "reportBuilder.savedReportPayload",
+            payloadId: "rbreport_capacity_q3",
+            sourceArtifactId: "capacity_q3_inventory_ladder",
+        },
+    },
+    reopenedSavedRecord: state.reopenedSavedRecord,
+    selectedListEntrySavedRecord: state.selectedListEntrySavedRecord,
+}), true);
 state.reopenedExportRequest.source.payloadId = "mutated";
 assert.equal(richSavedRecord.exportRequest.source.payloadId, "rbreport_capacity_q3");
 
@@ -176,6 +191,18 @@ const sourceLessImportedGetResponseBackedState = buildReportBuilderSavedReportSt
 assert.equal(sourceLessImportedGetResponseBackedState.selectedListEntrySavedRecord?.reportId, "capacityTrendImported");
 assert.equal(sourceLessImportedGetResponseBackedState.selectedListEntrySavedRecord?.documentVersion, 0);
 assert.equal(sourceLessImportedGetResponseBackedState.selectedListEntryExportRequest, null);
+assert.equal(matchesReportBuilderSelectedEntryHydratedSession({
+    hydratedReportDocumentSession: {
+        reportId: "capacityTrendImported",
+        source: {
+            kind: "reportBuilder.savedReportPayload",
+            payloadId: "rbreport_capacity_q3",
+            sourceArtifactId: "capacity_q3_inventory_ladder",
+        },
+    },
+    reopenedSavedRecord: state.reopenedSavedRecord,
+    selectedListEntrySavedRecord: sourceLessImportedGetResponseBackedState.selectedListEntrySavedRecord,
+}), false);
 
 const backendSharedArtifactState = buildReportBuilderSavedReportState({
     savedReportPayload: null,
@@ -242,6 +269,25 @@ assert.equal(
     backendSharedArtifactState.selectedListEntryExportRequest?.source?.sourceArtifactId,
     "saved_view_capacity_shared",
 );
+assert.equal(matchesReportBuilderSelectedEntryHydratedSession({
+    hydratedReportDocumentSession: {
+        reportId: "capacitySharedSavedView",
+        source: {
+            kind: "reportBuilder.publishedSnapshot",
+            reportId: "capacitySharedSavedView",
+            sourceArtifactId: "published_snapshot_capacity_shared",
+        },
+    },
+    reopenedSavedRecord: {
+        reportId: "capacitySharedSavedView",
+        source: {
+            kind: "reportBuilder.publishedSnapshot",
+            reportId: "capacitySharedSavedView",
+            sourceArtifactId: "published_snapshot_capacity_shared",
+        },
+    },
+    selectedListEntrySavedRecord: backendSharedArtifactState.selectedListEntrySavedRecord,
+}), false);
 
 const ambiguousSourceLessSelectedEntryState = buildReportBuilderSavedReportState({
     savedReportPayload: null,
@@ -388,7 +434,7 @@ const embeddedGetResponseBackedState = buildReportBuilderSavedReportState({
                             },
                             selectedDimensions: ["eventDate", "channelV2"],
                             selectedMeasures: ["avails"],
-                            staticFilters: {
+                            scopeParams: {
                                 dateRange: {
                                     start: "2026-05-01",
                                     end: "2026-05-04",
@@ -420,6 +466,77 @@ assert.equal(embeddedGetResponseBackedState.selectedListEntrySavedRecord?.docume
 assert.equal(embeddedGetResponseBackedState.selectedListEntrySavedRecord?.document?.scope?.params?.[0]?.label, "Reporting Window");
 assert.equal(embeddedGetResponseBackedState.selectedListEntrySavedRecord?.reportSpec?.kind, "reportSpec");
 assert.equal(embeddedGetResponseBackedState.selectedListEntrySavedRecord?.compileState?.reportSpecVersion, 1);
+
+const embeddedRawSpecGetResponseBackedState = buildReportBuilderSavedReportState({
+    savedReportPayload: null,
+    configuredGetResponses: [
+        {
+            version: 1,
+            kind: "getReportDocumentResponse",
+            reportRef: {
+                reportId: "embeddedBindingTrendQ3",
+            },
+            savedAt: 9211,
+            reportSpec: {
+                version: 1,
+                kind: "reportSpec",
+                semanticSummary: {
+                    kind: "semantic",
+                    modelRef: "model://example/performance/delivery@v1",
+                    entity: "line_delivery",
+                    selectedDimensions: ["event_date", "channel"],
+                    selectedMeasures: ["available_impressions"],
+                },
+            },
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "embeddedBindingTrendQ3",
+                title: "Embedded Binding Trend Q3",
+                semanticSummary: {
+                    kind: "semantic",
+                    modelRef: "model://example/performance/delivery@v1",
+                    modelLabel: "Canonical Ad Delivery",
+                    entity: "line_delivery",
+                    entityLabel: "Canonical Line Delivery",
+                    selectedDimensions: [
+                        { id: "event_date", rawId: "eventDate", label: "Delivery Date", category: "Time" },
+                        { id: "channel", rawId: "channelV2", label: "Channel", category: "Delivery" },
+                    ],
+                    selectedMeasures: [
+                        { id: "available_impressions", rawId: "avails", label: "Available Impressions", category: "Metrics" },
+                    ],
+                },
+                blocks: [
+                    {
+                        id: "primaryBuilder",
+                        kind: "reportBuilderBlock",
+                        source: {
+                            kind: "dashboard.reportBuilder",
+                            dataSourceRef: "demoReportSource",
+                        },
+                    },
+                ],
+            },
+            source: {
+                kind: "reportBuilder.savedReportPayload",
+                payloadId: "rbreport_embedded_binding_trend",
+                sourceArtifactId: "embedded_binding_trend",
+            },
+        },
+    ],
+    selectedListEntry: {
+        reportRef: { reportId: "embeddedBindingTrendQ3" },
+        source: {
+            kind: "reportBuilder.savedReportPayload",
+            payloadId: "rbreport_embedded_binding_trend",
+            sourceArtifactId: "embedded_binding_trend",
+        },
+    },
+});
+assert.equal(embeddedRawSpecGetResponseBackedState.selectedListEntrySavedRecord?.reportSpec?.semanticSummary?.modelLabel, "Canonical Ad Delivery");
+assert.equal(embeddedRawSpecGetResponseBackedState.selectedListEntrySavedRecord?.reportSpec?.semanticSummary?.entityLabel, "Canonical Line Delivery");
+assert.equal(embeddedRawSpecGetResponseBackedState.selectedListEntrySavedRecord?.reportSpec?.semanticSummary?.selectedMeasures?.[0]?.label, "Available Impressions");
 
 const embeddedEmptySpecGetResponseBackedState = buildReportBuilderSavedReportState({
     savedReportPayload: null,
@@ -480,7 +597,7 @@ const embeddedEmptySpecGetResponseBackedState = buildReportBuilderSavedReportSta
                             },
                             selectedDimensions: ["eventDate", "channelV2"],
                             selectedMeasures: ["avails"],
-                            staticFilters: {
+                            scopeParams: {
                                 dateRange: {
                                     start: "2026-05-01",
                                     end: "2026-05-04",

@@ -1,5 +1,5 @@
 import { resolveReportBuilderSavedReportRecordByReportId } from "./reportBuilderSavedReportRecords.js";
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import {
     buildReportBuilderListReportDocumentsEntrySummary,
@@ -101,21 +101,11 @@ function buildSuggestedAction(code = "") {
     }
 }
 
-function resolveDiagnosticSemanticBindingViewState({
-    semanticSummary = null,
-    binding = null,
-} = {}) {
-    return buildReportBuilderSemanticBindingViewState({
-        semanticSummary,
-        binding,
-    });
-}
-
 function resolveDiagnosticScopeSummary(scopeParams = []) {
     const summary = buildReportBuilderScopeSummaryFromParams(scopeParams);
     return Array.isArray(summary?.items) && summary.items.length > 0
         ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: summary.text,
             scopeSummaryItems: summary.items,
         }
@@ -183,9 +173,9 @@ export function buildReportBuilderHydratedReportDocumentDiagnostic(getResponse =
         document: getResponse?.document || null,
         title: getResponse?.document?.title || getResponse?.reportRef?.reportId || "",
     });
-    const semanticBindingViewState = resolveDiagnosticSemanticBindingViewState({
-        semanticSummary: responseContext?.semanticSummary || null,
-        binding: responseContext?.binding || null,
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [responseContext],
+        candidates: [getResponse?.semanticBindingViewState],
     });
     const scopeSummary = resolveDiagnosticScopeSummary(
         resolvePreferredScopeParams(responseContext?.scopeParams),
@@ -291,9 +281,9 @@ export function buildReportBuilderListReportDocumentsEntryDiagnostic(listRespons
         resolvedReportId,
         localSavedPayloads,
     );
-    const semanticBindingViewState = resolveDiagnosticSemanticBindingViewState({
-        semanticSummary: companionContext?.semanticSummary || null,
-        binding: companionContext?.binding || null,
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [companionContext],
+        candidates: [entry?.semanticBindingViewState],
     });
     const scopeSummary = resolveDiagnosticScopeSummary(
         resolvePreferredScopeParams(

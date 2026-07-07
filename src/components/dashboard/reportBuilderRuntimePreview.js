@@ -20,6 +20,8 @@ import {
   normalizeReportBuilderSemanticSummary,
 } from "./reportBuilderSemantic.js";
 import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolveReportBuilderScopeParamFilters } from "./reportBuilderPredicates.js";
+import { resolveScopeParamId } from "../../reporting/scopeStateModel.js";
 import { buildReportBuilderCalculatedFieldConfig } from "./reportBuilderCalculatedFieldAuthoring.js";
 import { applyReportRuntimeDrillTransitions } from "./reportRuntimeDrillState.js";
 import {
@@ -28,10 +30,19 @@ import {
   validateReportBuilderDocumentBlockDraft,
 } from "./reportBuilderDocumentBlocks.js";
 import {
+  resolveReportBuilderDimensionByField,
+} from "./reportBuilderUtils.js";
+import {
+  buildReportBuilderStaticDatasetPayloadMap,
+  normalizeReportBuilderStaticDatasets,
+} from "./reportBuilderStaticDatasets.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
+import {
   resolveReportRuntimeChartActionFields,
   resolveReportRuntimeRefinementFields,
 } from "./reportRuntimeModel.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
+import { normalizeReportBuilderErrorText } from "./reportBuilderErrorText.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -43,14 +54,26 @@ function cloneValue(value) {
 
 function normalizeRuntimePreviewDiagnostics(error = null, additionalDiagnostics = []) {
   const diagnostics = [];
-  if (error) {
-    const message = typeof error?.message === "string" && error.message.trim()
-      ? error.message.trim()
-      : String(error);
+  const errorDiagnostics = Array.isArray(error?.diagnostics)
+    ? error.diagnostics
+    : [];
+  if (error && errorDiagnostics.length === 0) {
+    const message = normalizeReportBuilderErrorText(error)
+      || (typeof error?.message === "string" && error.message.trim()
+        ? error.message.trim()
+        : String(error));
     diagnostics.push({
       code: "runtimePreviewError",
       severity: "error",
       message,
+    });
+  }
+  if (errorDiagnostics.length > 0) {
+    errorDiagnostics.forEach((diagnostic) => {
+      if (!diagnostic || typeof diagnostic !== "object" || Array.isArray(diagnostic)) {
+        return;
+      }
+      diagnostics.push(cloneValue(diagnostic));
     });
   }
   if (Array.isArray(additionalDiagnostics)) {
@@ -111,6 +134,7 @@ function buildOrderedRuntimePreviewDocument({
   semanticSummary = null,
   binding = null,
   semanticModel = null,
+  runtimeDatasetScopeParams = null,
 } = {}) {
   const resolvedSemanticSummary = resolveRuntimePreviewSemanticSummary({
     config,
@@ -126,6 +150,7 @@ function buildOrderedRuntimePreviewDocument({
     additionalBlocks: [...leadingBlocks, ...trailingBlocks],
     refinements,
     semanticSummary: resolvedSemanticSummary,
+    runtimeDatasetScopeParams,
   });
   const availableBlockIds = new Set(
     (Array.isArray(document?.blocks) ? document.blocks : [])
@@ -160,6 +185,85 @@ function buildOrderedRuntimePreviewDocument({
   };
 }
 
+function resolveRuntimePreviewDrilledFieldKey(fieldKey = "", drillTransitions = []) {
+  const normalizedFieldKey = normalizeString(fieldKey);
+  if (!normalizedFieldKey) {
+    return "";
+  }
+  const drilledState = applyReportRuntimeDrillTransitions({
+    selectedDimensions: [normalizedFieldKey],
+  }, drillTransitions);
+  const drilledFieldKey = Array.isArray(drilledState?.selectedDimensions)
+    ? drilledState.selectedDimensions.map((entry) => normalizeString(entry)).filter(Boolean)[0]
+    : "";
+  return drilledFieldKey || normalizedFieldKey;
+}
+
+function applyRuntimePreviewDrillColumnsToBlock(block = {}, config = {}, drillTransitions = []) {
+  const normalizedBlock = block && typeof block === "object" && !Array.isArray(block)
+    ? cloneValue(block)
+    : null;
+  if (!normalizedBlock || normalizeString(normalizedBlock?.kind) !== "tableBlock") {
+    return normalizedBlock;
+  }
+  const columns = Array.isArray(normalizedBlock?.columns) ? normalizedBlock.columns : [];
+  normalizedBlock.columns = columns.map((column) => {
+    const normalizedColumn = column && typeof column === "object" && !Array.isArray(column)
+      ? cloneValue(column)
+      : null;
+    if (!normalizedColumn) {
+      return column;
+    }
+    const originalFieldKey = normalizeString(normalizedColumn?.key || normalizedColumn?.sourceKey || normalizedColumn?.displayKey);
+    if (!originalFieldKey) {
+      return normalizedColumn;
+    }
+    const currentDimension = resolveReportBuilderDimensionByField(config, originalFieldKey);
+    if (!currentDimension) {
+      return normalizedColumn;
+    }
+    const drilledFieldKey = resolveRuntimePreviewDrilledFieldKey(originalFieldKey, drillTransitions);
+    const drilledDimension = resolveReportBuilderDimensionByField(config, drilledFieldKey);
+    const drilledDimensionId = normalizeString(drilledDimension?.id || drilledDimension?.key || drilledFieldKey);
+    const currentDimensionId = normalizeString(currentDimension?.id || currentDimension?.key || originalFieldKey);
+    if (!drilledDimension || !drilledDimensionId || drilledDimensionId === currentDimensionId) {
+      return normalizedColumn;
+    }
+    const nextColumn = {
+      ...normalizedColumn,
+      key: drilledDimensionId,
+      sourceKey: normalizeString(drilledDimension?.key || drilledDimensionId) || drilledDimensionId,
+      displayKey: normalizeString(drilledDimension?.displayKey || drilledDimension?.key || drilledDimensionId) || drilledDimensionId,
+      label: normalizeString(drilledDimension?.label || drilledDimensionId) || drilledDimensionId,
+      runtimeFilterable: !!drilledDimension?.runtimeFilter,
+    };
+    const nextFormat = normalizeString(drilledDimension?.format || "");
+    if (nextFormat) {
+      nextColumn.format = nextFormat;
+    } else {
+      delete nextColumn.format;
+    }
+    if (drilledDimension?.displayValueMap && typeof drilledDimension.displayValueMap === "object" && !Array.isArray(drilledDimension.displayValueMap)) {
+      nextColumn.displayValueMap = cloneValue(drilledDimension.displayValueMap);
+    } else {
+      delete nextColumn.displayValueMap;
+    }
+    return nextColumn;
+  });
+  return normalizedBlock;
+}
+
+function buildRuntimePreviewDocumentState(state = {}, config = {}, drillTransitions = []) {
+  const normalizedBlocks = normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks);
+  if (normalizedBlocks.length === 0 || !Array.isArray(drillTransitions) || drillTransitions.length === 0) {
+    return state;
+  }
+  return {
+    ...(state && typeof state === "object" && !Array.isArray(state) ? cloneValue(state) : {}),
+    reportDocumentBlocks: normalizedBlocks.map((block) => applyRuntimePreviewDrillColumnsToBlock(block, config, drillTransitions)),
+  };
+}
+
 function augmentRuntimePreviewPrimaryRequest(reportSpec = {}, config = {}, state = {}, drillTransitions = [], requestTransform = null) {
   const nextSpec = cloneValue(reportSpec || {});
   const refinements = Array.isArray(nextSpec?.refinements) ? nextSpec.refinements : [];
@@ -177,17 +281,17 @@ function augmentRuntimePreviewPrimaryRequest(reportSpec = {}, config = {}, state
     .map((refinement) => normalizeString(refinement?.field))
     .filter((field) => hasRuntimeRequestRefinementFilter(config, field))
     .filter(Boolean);
-  const drillTargetFields = (Array.isArray(drillTransitions) ? drillTransitions : [])
-    .map((transition) => normalizeString(transition?.nextFieldRef))
+  const drillFields = (Array.isArray(drillTransitions) ? drillTransitions : [])
+    .flatMap((transition) => [normalizeString(transition?.sourceField), normalizeString(transition?.nextFieldRef)])
     .filter(Boolean);
-  if (hiddenRefinementFields.length > 0 || drillTargetFields.length > 0) {
+  if (hiddenRefinementFields.length > 0 || drillFields.length > 0) {
     const nextDimensions = {
       ...(request.dimensions && typeof request.dimensions === "object" ? request.dimensions : {}),
     };
     hiddenRefinementFields.forEach((field) => {
       nextDimensions[field] = true;
     });
-    drillTargetFields.forEach((field) => {
+    drillFields.forEach((field) => {
       nextDimensions[field] = true;
     });
     request.dimensions = nextDimensions;
@@ -336,22 +440,29 @@ function buildRuntimePreviewDocumentAndSpec({
   semanticSummary = null,
   binding = null,
   semanticModel = null,
+  includePrimaryBlocks = true,
+  runtimeDatasetScopeParams = null,
 } = {}) {
+  const runtimeDocumentState = buildRuntimePreviewDocumentState(state, config, drillTransitions);
   const document = buildOrderedRuntimePreviewDocument({
     container,
     config,
-    state,
+    state: runtimeDocumentState,
     refinements,
     leadingBlocks,
     trailingBlocks,
     semanticSummary,
     binding,
     semanticModel,
+    runtimeDatasetScopeParams,
   });
   return {
     document,
     reportSpec: augmentRuntimePreviewPrimaryRequest(
-      lowerReportDocumentToReportSpec(document),
+      lowerReportDocumentToReportSpec(document, {
+        includePrimaryBlocks,
+        runtimeDatasetScopeParams,
+      }),
       config,
       state,
       drillTransitions,
@@ -404,6 +515,7 @@ export function buildReportBuilderRuntimePreviewModel({
   state = null,
   refinements = [],
   drillTransitions = [],
+  runtimeDatasetScopeParams = null,
   includeScopeBlock = true,
   includeRefinementBlock = true,
   trailingBlocks = [],
@@ -411,6 +523,7 @@ export function buildReportBuilderRuntimePreviewModel({
   semanticSummary = null,
   binding = null,
   semanticModel = null,
+  includePrimaryBlocks = true,
 } = {}) {
   if (!state || typeof state !== "object" || Array.isArray(state)) {
     return null;
@@ -432,14 +545,15 @@ export function buildReportBuilderRuntimePreviewModel({
       .map((block) => normalizeString(block?.kind))
       .filter(Boolean),
   );
-  const paramIds = (Array.isArray(effectiveConfig?.staticFilters) ? effectiveConfig.staticFilters : [])
-    .map((filter) => normalizeString(filter?.id || filter?.field))
+  const staticDatasets = normalizeReportBuilderStaticDatasets(drilledState?.reportStaticDatasets || state?.reportStaticDatasets);
+  const paramIds = resolveReportBuilderScopeParamFilters(effectiveConfig)
+    .map((filter) => resolveScopeParamId(filter))
     .filter(Boolean);
   const leadingBlocks = [
     ...(includeScopeBlock && !authoredBlockKinds.has("filterBarBlock") && paramIds.length > 0 ? [
       buildReportDocumentFilterBarBlock({
         id: "sharedFilters",
-        title: "Report Scope",
+        title: "Filters",
         paramIds,
       }),
     ] : []),
@@ -456,6 +570,8 @@ export function buildReportBuilderRuntimePreviewModel({
     semanticSummary,
     binding,
     semanticModel,
+    includePrimaryBlocks,
+    runtimeDatasetScopeParams,
   }), {
     config: effectiveConfig,
     state: drilledState,
@@ -490,6 +606,8 @@ export function buildReportBuilderRuntimePreviewModel({
       semanticSummary,
       binding,
       semanticModel,
+      includePrimaryBlocks,
+      runtimeDatasetScopeParams,
     }), {
       config: effectiveConfig,
       state: drilledState,
@@ -499,13 +617,21 @@ export function buildReportBuilderRuntimePreviewModel({
       drillTransitions,
     })
     : initialPreviewModel;
+  const previewContext = resolveNormalizedReportSpecDocumentContext({
+    reportSpec: previewModelSource?.reportSpec || null,
+    document: previewModelSource?.document || null,
+    title: previewModelSource?.document?.title || previewModelSource?.reportSpec?.title || "",
+  });
   const semanticBindingViewState = buildReportBuilderSemanticBindingViewState({
-    semanticSummary: previewModelSource?.reportSpec?.semanticSummary || null,
-    binding: previewModelSource?.reportSpec?.binding || normalizedBinding,
+    semanticSummary: previewContext?.semanticSummary || null,
+    binding: previewContext?.binding || normalizedBinding,
   });
   return {
     ...previewModelSource,
+    ...(previewContext?.document ? { document: cloneValue(previewContext.document) } : {}),
+    ...(previewContext?.reportSpec ? { reportSpec: cloneValue(previewContext.reportSpec) } : {}),
     ...(semanticBindingViewState ? { semanticBindingViewState: cloneValue(semanticBindingViewState) } : {}),
+    ...(staticDatasets.length > 0 ? { staticDatasetPayloads: buildReportBuilderStaticDatasetPayloadMap(staticDatasets) } : {}),
   };
 }
 
@@ -513,6 +639,7 @@ export function buildReportBuilderRuntimePreview({
   model = null,
   rows = [],
   hasMore = false,
+  datasetPayloads = {},
   error = null,
   additionalDiagnostics = [],
   runtimeBlockId = "authoredRuntimePreview",
@@ -525,6 +652,7 @@ export function buildReportBuilderRuntimePreview({
     model,
     rows,
     hasMore,
+    datasetPayloads,
     error,
     additionalDiagnostics,
     pageGeometry,
@@ -536,12 +664,12 @@ export function buildReportBuilderRuntimePreview({
     ...artifacts,
     runtimeBlock: buildDashboardReportRuntimeBlock({
       id: runtimeBlockId,
-      title: normalizeString(runtimeTitle || model?.document?.title || model?.reportSpec?.title || "Authored Runtime Preview"),
+      title: normalizeString(runtimeTitle || model?.document?.title || model?.reportSpec?.title || "Report Preview"),
       subtitle: normalizeString(
         runtimeSubtitle
         || model?.document?.subtitle
         || model?.document?.description
-        || "Live builder state compiled through ReportDocument, ReportSpec, and ReportFill.",
+        || "Live report compiled from the current builder state.",
       ),
       reportSpec: artifacts.reportSpec,
       reportFill: artifacts.reportFill,
@@ -556,6 +684,7 @@ export function buildReportBuilderRuntimePreviewArtifacts({
   model = null,
   rows = [],
   hasMore = false,
+  datasetPayloads = {},
   error = null,
   additionalDiagnostics = [],
   pageGeometry = null,
@@ -563,11 +692,28 @@ export function buildReportBuilderRuntimePreviewArtifacts({
   if (!model?.reportSpec) {
     return null;
   }
-  const primaryRequest = Array.isArray(model?.reportSpec?.datasets)
-    ? (model.reportSpec.datasets.find((dataset) => normalizeString(dataset?.id) === "primary")?.request || model.reportSpec.datasets[0]?.request || {})
+  const metadataContext = resolveNormalizedReportSpecDocumentContext({
+    reportSpec: model?.reportSpec || null,
+    document: model?.document || null,
+    title: model?.document?.title || model?.reportSpec?.title || "",
+  });
+  const normalizedReportSpec = metadataContext?.reportSpec || model.reportSpec;
+  const normalizedDocument = metadataContext?.document || model.document;
+  const normalizedSemanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+    metadataContexts: [metadataContext],
+    candidates: [model?.semanticBindingViewState],
+  });
+  const primaryRequest = Array.isArray(normalizedReportSpec?.datasets)
+    ? (normalizedReportSpec.datasets.find((dataset) => normalizeString(dataset?.id) === "primary")?.request || normalizedReportSpec.datasets[0]?.request || {})
     : {};
   const refinedRows = applyReportRuntimeRequestRefinements(Array.isArray(rows) ? rows : [], primaryRequest);
-  const reportFill = buildReportFillFromReportSpec(model.reportSpec, {
+  const reportFill = buildReportFillFromReportSpec(normalizedReportSpec, {
+    ...(datasetPayloads && typeof datasetPayloads === "object" && !Array.isArray(datasetPayloads)
+      ? cloneValue(datasetPayloads)
+      : {}),
+    ...(model?.staticDatasetPayloads && typeof model.staticDatasetPayloads === "object" && !Array.isArray(model.staticDatasetPayloads)
+      ? cloneValue(model.staticDatasetPayloads)
+      : {}),
     primary: {
       rows: refinedRows,
       hasMore: hasMore === true,
@@ -576,7 +722,7 @@ export function buildReportBuilderRuntimePreviewArtifacts({
   });
   const previewReportFill = cloneValue(reportFill);
   const reportPrint = buildReportPrintFromReportFill({
-    reportSpec: model.reportSpec,
+    reportSpec: normalizedReportSpec,
     reportFill: cloneValue(reportFill),
     ...(pageGeometry && typeof pageGeometry === "object" && !Array.isArray(pageGeometry)
       ? { pageGeometry }
@@ -584,18 +730,18 @@ export function buildReportBuilderRuntimePreviewArtifacts({
   });
   const previewReportPrint = cloneValue(reportPrint);
   const exportRequest = buildDraftReportExportRequest({
-    reportDocument: model.document,
-    reportSpec: model.reportSpec,
+    reportDocument: normalizedDocument,
+    reportSpec: normalizedReportSpec,
     reportFill: previewReportFill,
     reportPrint: previewReportPrint,
     format: "pdf",
   });
   return {
-    document: cloneValue(model.document),
-    reportSpec: cloneValue(model.reportSpec),
+    document: cloneValue(normalizedDocument),
+    reportSpec: cloneValue(normalizedReportSpec),
     reportFill: previewReportFill,
     reportPrint: previewReportPrint,
-    ...(model?.semanticBindingViewState ? { semanticBindingViewState: cloneValue(model.semanticBindingViewState) } : {}),
+    ...(normalizedSemanticBindingViewState ? { semanticBindingViewState: cloneValue(normalizedSemanticBindingViewState) } : {}),
     exportRequest,
   };
 }

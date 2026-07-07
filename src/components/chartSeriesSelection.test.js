@@ -4,6 +4,7 @@ import {
   createKeyListSignature,
   reconcileVisibleColumns,
   reconcileSelectedDataKeys,
+  resolveSelectedValueKey,
   toggleSelectedDataKey,
 } from './chartSeriesSelection.js';
 
@@ -49,6 +50,39 @@ assert.deepEqual(
 
 assert.deepEqual(toggleSelectedDataKey(['spend', 'clicks'], 'clicks'), ['spend']);
 assert.deepEqual(toggleSelectedDataKey(['spend'], 'clicks'), ['spend', 'clicks']);
+
+assert.equal(
+  resolveSelectedValueKey('clicks', {
+    valueKey: 'spend',
+    values: [{ value: 'spend' }, { value: 'clicks' }],
+  }, []),
+  'clicks',
+);
+
+assert.equal(
+  resolveSelectedValueKey('legacy', {
+    valueKey: 'spend',
+    values: [{ value: 'spend' }, { value: 'clicks' }],
+  }, []),
+  'spend',
+);
+
+assert.equal(
+  resolveSelectedValueKey('', {
+    values: [{ value: 'spend' }, { value: 'clicks' }],
+  }, []),
+  'spend',
+);
+
+assert.equal(
+  resolveSelectedValueKey('', {}, [{ value: 'reachRate' }]),
+  'reachRate',
+);
+
+assert.equal(
+  resolveSelectedValueKey('legacy', {}, []),
+  '',
+);
 
 assert.equal(createKeyListSignature([' spend ', 'clicks', 'spend']), 'spend\u0001clicks');
 

@@ -68,7 +68,7 @@ assert.deepEqual(executions, [
       value: 1,
       sourceBlockId: "comparisonTable",
       fieldLabel: "Channel",
-      label: "Drill to Market = Display",
+      label: "Channel = Display",
     },
   },
   {
@@ -95,6 +95,125 @@ assert.deepEqual(executions, [
         selectionSource: "seriesKey",
       },
       sourceBlockId: "comparisonTable",
+    },
+  },
+]);
+
+assert.deepEqual(buildReportRuntimeTableActionExecutions({
+  blockId: "comparisonTable",
+  descriptors: [
+    {
+      id: "keep:channelId",
+      kind: "keep",
+      fieldValueKey: "channelId",
+      label: "Keep only",
+    },
+  ],
+  field: {
+    valueKey: "channelId",
+    displayValueKey: "channelName",
+    displayValueMap: {
+      "1": "Display",
+      "2": "CTV",
+    },
+    label: "Channel",
+  },
+  item: {
+    channelId: 1,
+  },
+}), [
+  {
+    id: "keep:channelId",
+    label: "Keep only",
+    kind: "keep",
+    refinement: {
+      op: "keep",
+      field: "channelId",
+      value: 1,
+      sourceBlockId: "comparisonTable",
+      fieldLabel: "Channel",
+      label: "Keep only = Display",
+    },
+  },
+]);
+
+assert.deepEqual(buildReportRuntimeTableActionExecutions({
+  blockId: "comparisonTable",
+  descriptors: [
+    {
+      id: "drill_channel",
+      kind: "drill",
+      fieldValueKey: "channelId",
+      label: "Drill Channel",
+      nextFieldRef: "publisherId",
+    },
+  ],
+  field: {
+    valueKey: "channelId",
+    displayValueKey: "channelName",
+    displayValueMap: {
+      "1": "Display",
+    },
+    label: "Channel",
+  },
+  item: {
+    channelId: 1,
+  },
+}), [
+  {
+    id: "drill_channel",
+    label: "Drill Channel",
+    kind: "drill",
+    transition: {
+      sourceField: "channelId",
+      nextFieldRef: "publisherId",
+      sourceBlockId: "comparisonTable",
+    },
+    refinement: {
+      op: "drill",
+      field: "channelId",
+      value: 1,
+      sourceBlockId: "comparisonTable",
+      fieldLabel: "Channel",
+      label: "Channel = Display",
+    },
+  },
+]);
+
+assert.deepEqual(buildReportRuntimeTableActionExecutions({
+  blockId: "comparisonTable",
+  descriptors: [
+    {
+      id: "keep:channelId",
+      kind: "keep",
+      fieldValueKey: "channelId",
+      label: "Keep only",
+    },
+  ],
+  field: {
+    valueKey: "channelId",
+    displayValueKey: "channelId",
+    displayValueMap: {
+      "1": "Display",
+      "2": "CTV",
+    },
+    label: "Channel",
+  },
+  item: {
+    channelId: 1,
+  },
+}), [
+  {
+    id: "keep:channelId",
+    label: "Keep only",
+    kind: "keep",
+    refinement: {
+      op: "keep",
+      field: "channelId",
+      value: 1,
+      sourceBlockId: "comparisonTable",
+      fieldLabel: "Channel",
+      label: "Keep only = Display",
     },
   },
 ]);

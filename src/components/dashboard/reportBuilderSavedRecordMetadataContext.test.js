@@ -91,6 +91,57 @@ assert.equal(thinSpecDocumentBackedContext.reportSpec.semanticSummary.modelLabel
 assert.equal(thinSpecDocumentBackedContext.reportSpec.semanticSummary.selectedMeasures[0].label, "Audience Index");
 assert.equal(thinSpecDocumentBackedContext.reportSpec.scope.params[0].id, "dateRange");
 
+const rawSpecDocumentBackedContext = resolveNormalizedReportSpecDocumentContext({
+    reportSpec: {
+        title: "Raw Semantic Spec",
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["available_impressions"],
+        },
+    },
+    document: {
+        title: "Canonical Semantic Document",
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                {
+                    id: "event_date",
+                    rawId: "eventDate",
+                    label: "Delivery Date",
+                    category: "Time",
+                },
+                {
+                    id: "channel",
+                    rawId: "channelV2",
+                    label: "Channel",
+                    category: "Delivery",
+                },
+            ],
+            selectedMeasures: [
+                {
+                    id: "available_impressions",
+                    rawId: "avails",
+                    label: "Available Impressions",
+                    category: "Metrics",
+                    definitionRef: "semantic://example/available_impressions",
+                },
+            ],
+        },
+    },
+});
+assert.equal(rawSpecDocumentBackedContext.semanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(rawSpecDocumentBackedContext.semanticSummary.entityLabel, "Canonical Line Delivery");
+assert.equal(rawSpecDocumentBackedContext.semanticSummary.selectedMeasures[0].definitionRef, "semantic://example/available_impressions");
+assert.equal(rawSpecDocumentBackedContext.reportSpec.semanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(rawSpecDocumentBackedContext.reportSpec.semanticSummary.selectedDimensions[1].label, "Channel");
+
 const normalizedContext = resolveNormalizedSavedReportRecordContext({
     documentVersion: 13,
     savedAt: 9375,

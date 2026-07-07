@@ -33,6 +33,18 @@ assert.equal(
   "Chart selection notices should expose an explicit Start draft action.",
 );
 
+assert.equal(
+  reportBuilderSource.includes("!designWorkspaceMode && explorationBannerState?.active ? ("),
+  true,
+  "ReportBuilder should keep the local draft banner visible on authored preview/report surfaces instead of hiding save/reopen controls behind the raw results-only path.",
+);
+
+assert.equal(
+  reportBuilderSource.includes("draftExportActionState ? (") && reportBuilderSource.includes("triggerDraftExport"),
+  true,
+  "The local draft banner should surface the draft PDF export action alongside keep/save controls.",
+);
+
 const steps = Array.isArray(chartSelectionScenario?.steps) ? chartSelectionScenario.steps : [];
 const tableRowSteps = Array.isArray(tableRowScenario?.steps) ? tableRowScenario.steps : [];
 

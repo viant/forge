@@ -24,7 +24,7 @@ export function buildReportBuilderDesktopResultHeaderState({
             canCreate: canCreateChart,
             showCreateButton: !hasValidChartSpec,
             quickOptions: Array.isArray(quickChartOptions) ? quickChartOptions : [],
-            buttonLabel: hasTableQuickPresets ? "Quick view" : "Quick chart",
+            buttonLabel: "Presets",
             buttonIcon: hasTableQuickPresets ? "panel-table" : "timeline-line-chart",
         },
         editChartEnabled: desktopActionModel.showEditChart === true,

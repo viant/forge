@@ -1,6 +1,7 @@
-import { buildReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewState.js";
+import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
+import { hasReportBuilderSemanticModelResolutionDiagnostics } from "./reportBuilderSemantic.js";
 
 export function resolveReportBuilderActiveResultState({
     loading = false,
@@ -36,12 +37,23 @@ export function resolveReportBuilderActiveResultState({
     };
 }
 
+export function buildReportBuilderActiveResultErrorDiagnosticsState(error = null) {
+    return buildReportBuilderErrorDiagnosticsState({
+        error,
+        title: "Result diagnostics",
+        singularDescription: "This result returned 1 diagnostic.",
+        pluralDescriptionPrefix: "This result returned",
+        semanticModelDescription: "The semantic model could not be resolved for the current result.",
+    });
+}
+
 export function buildReportBuilderEmptyResultState({
     canRunReport = false,
     hasCompletedCurrentRun = false,
     readinessReason = "",
     readinessMessage = "",
     readinessAction = "",
+    readinessIssueKind = "",
 } = {}) {
     if (canRunReport) {
         return {
@@ -64,6 +76,19 @@ export function buildReportBuilderEmptyResultState({
                 description: readinessMessage || "The semantic model could not be loaded for this report.",
                 actionLabel: "Retry model load",
                 action: "retrySemanticModelLoad",
+            };
+        }
+        if (
+            String(readinessAction || "").trim() === "retrySemanticValidation"
+            && String(readinessIssueKind || "").trim() === "semanticModelResolution"
+        ) {
+            return {
+                icon: "database",
+                eyebrow: "Semantic model",
+                title: "Retry semantic validation",
+                description: readinessMessage || "The semantic model could not be resolved for this report.",
+                actionLabel: "Retry validation",
+                action: "retrySemanticValidation",
             };
         }
         return {
@@ -109,6 +134,45 @@ function normalizeRuntimePreviewDiagnostics(diagnostics = []) {
         .filter((diagnostic) => !!diagnostic.message);
 }
 
+export function buildReportBuilderErrorDiagnosticsState({
+    error = null,
+    title = "Result diagnostics",
+    singularDescription = "This result returned 1 diagnostic.",
+    pluralDescriptionPrefix = "This result returned",
+    semanticModelDescription = "The semantic model could not be resolved for the current result.",
+} = {}) {
+    const normalizedDiagnostics = normalizeRuntimePreviewDiagnostics(
+        Array.isArray(error?.diagnostics) ? error.diagnostics : [],
+    );
+    if (normalizedDiagnostics.length === 0) {
+        return null;
+    }
+    if (hasReportBuilderSemanticModelResolutionDiagnostics(normalizedDiagnostics)) {
+        return {
+            diagnosticsTitle: "Semantic model diagnostics",
+            diagnosticsDescription: String(semanticModelDescription || "").trim() || "The semantic model could not be resolved for the current result.",
+            diagnostics: normalizedDiagnostics,
+        };
+    }
+    return {
+        diagnosticsTitle: String(title || "").trim() || "Result diagnostics",
+        diagnosticsDescription: normalizedDiagnostics.length === 1
+            ? (String(singularDescription || "").trim() || "This result returned 1 diagnostic.")
+            : `${String(pluralDescriptionPrefix || "").trim() || "This result returned"} ${normalizedDiagnostics.length} diagnostics.`,
+        diagnostics: normalizedDiagnostics,
+    };
+}
+
+function buildRuntimePreviewErrorDiagnosticsState(diagnostics = []) {
+    return buildReportBuilderErrorDiagnosticsState({
+        error: { diagnostics },
+        title: "Runtime preview diagnostics",
+        singularDescription: "This runtime preview returned 1 diagnostic.",
+        pluralDescriptionPrefix: "This runtime preview returned",
+        semanticModelDescription: "The semantic model could not be resolved for this runtime preview.",
+    });
+}
+
 function normalizeCompileDiagnosticsNoticeEntries(diagnostics = []) {
     return (Array.isArray(diagnostics) ? diagnostics : [])
         .filter((diagnostic) => diagnostic && typeof diagnostic === "object" && !Array.isArray(diagnostic))
@@ -140,6 +204,7 @@ export function buildReportBuilderRuntimePreviewBlockedState({
     readinessReason = "",
     readinessMessage = "",
     readinessAction = "",
+    readinessIssueKind = "",
     semanticDiagnosticsNotice = null,
 } = {}) {
     if (canRunReport) {
@@ -150,10 +215,26 @@ export function buildReportBuilderRuntimePreviewBlockedState({
         readinessReason,
         readinessMessage,
         readinessAction,
+        readinessIssueKind,
     });
     const diagnostics = normalizeRuntimePreviewDiagnostics(semanticDiagnosticsNotice?.diagnostics);
     return {
-        ...emptyState,
+        ...(
+            String(readinessAction || "").trim() === "retrySemanticValidation"
+            && (
+                String(readinessIssueKind || "").trim() === "semanticModelResolution"
+                || hasReportBuilderSemanticModelResolutionDiagnostics(diagnostics)
+            )
+                ? {
+                    icon: "database",
+                    eyebrow: "Semantic model",
+                    title: "Retry semantic validation",
+                    description: readinessMessage || "The semantic model could not be resolved for this report.",
+                    actionLabel: "Retry validation",
+                    action: "retrySemanticValidation",
+                }
+                : emptyState
+        ),
         tone: String(readinessReason || "").trim() === "semantic"
             ? (
                 String(readinessAction || "").trim() === "retrySemanticModelLoad"
@@ -167,56 +248,38 @@ export function buildReportBuilderRuntimePreviewBlockedState({
     };
 }
 
-function resolvePrimaryRuntimeDataset(runtimeConfig = null) {
+function resolveRuntimeDatasets(runtimeConfig = null) {
     const datasets = Array.isArray(runtimeConfig?.reportFill?.datasets)
         ? runtimeConfig.reportFill.datasets
         : [];
-    return datasets.find((dataset) => String(dataset?.id || "").trim() === "primary")
-        || datasets[0]
-        || null;
+    return datasets;
 }
 
-export function buildReportBuilderAuthoredRuntimePreviewState({
-    runtimePreviewEnabled = false,
+function resolveRuntimeHasRows(runtimeConfig = null) {
+    return resolveRuntimeDatasets(runtimeConfig).some((dataset) => (
+        Array.isArray(dataset?.rows) && dataset.rows.length > 0
+    ));
+}
+
+function buildReportBuilderAuthoredRuntimePreviewSemanticSections({
+    runtimeConfig = null,
     runtimePreviewArtifact = null,
-    runtimePreviewRowsSource = {},
-    canRunReport = false,
-    readinessReason = "",
-    runtimePreviewArtifactDiagnostics = [],
-    runtimePreviewBlockedState = null,
-    runtimePreviewErrorDescription = "",
 } = {}) {
-    if (!runtimePreviewEnabled) {
-        return null;
-    }
-    const runtimeConfig = runtimePreviewArtifact?.runtimeBlock?.dashboard?.reportRuntime || null;
-    const runtimePrimaryDataset = resolvePrimaryRuntimeDataset(runtimeConfig);
-    const hasRuntimeRows = Array.isArray(runtimePrimaryDataset?.rows)
-        && runtimePrimaryDataset.rows.length > 0;
-    const loading = !!runtimePreviewRowsSource?.loading;
-    const error = runtimePreviewRowsSource?.error || null;
-    const diagnostics = Array.isArray(runtimePreviewArtifactDiagnostics)
-        ? runtimePreviewArtifactDiagnostics
-        : [];
     const runtimePreviewContext = resolveNormalizedReportSpecDocumentContext({
         reportSpec: runtimeConfig?.reportSpec || runtimePreviewArtifact?.reportSpec || null,
         document: runtimePreviewArtifact?.document || null,
         title: runtimePreviewArtifact?.document?.title || "",
     });
     const scopeSummary = buildReportBuilderScopeSummaryFromParams(runtimePreviewContext?.scopeParams);
-    const semanticBindingViewState = runtimeConfig?.semanticBindingViewState && typeof runtimeConfig.semanticBindingViewState === "object" && !Array.isArray(runtimeConfig.semanticBindingViewState)
-        ? runtimeConfig.semanticBindingViewState
-        : buildReportBuilderSemanticBindingViewState({
-            semanticSummary: runtimePreviewContext?.semanticSummary || null,
-            binding: runtimePreviewContext?.binding || null,
-        });
+    const semanticBindingViewState = resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [runtimePreviewContext],
+        candidates: [
+            runtimeConfig?.semanticBindingViewState,
+            runtimePreviewArtifact?.semanticBindingViewState,
+        ],
+    });
     return {
-        eyebrow: "Authored Runtime",
-        title: runtimePreviewArtifact?.document?.title || runtimePreviewContext?.title || "Compiled Runtime Preview",
-        subtitle: String(runtimePreviewContext?.document?.subtitle || runtimePreviewArtifact?.document?.subtitle || "").trim(),
-        description: runtimePreviewContext?.document?.description
-            || runtimePreviewArtifact?.document?.description
-            || "Refine the current builder result through the compiled ReportDocument, ReportSpec, and ReportFill flow.",
+        runtimePreviewContext,
         ...(semanticBindingViewState ? {
             semanticBindingTitle: semanticBindingViewState.title,
             semanticBindingChips: semanticBindingViewState.chips,
@@ -225,33 +288,123 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
                 : {}),
         } : {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),
+    };
+}
+
+export function buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled = false,
+    runtimePreviewArtifact = null,
+    runtimePreviewRowsSource = {},
+    canRunReport = false,
+    readinessReason = "",
+    readinessAction = "",
+    readinessIssueKind = "",
+    runtimePreviewArtifactDiagnostics = [],
+    runtimePreviewBlockedState = null,
+    runtimePreviewErrorDescription = "",
+    presentationMode = "preview",
+} = {}) {
+    if (!runtimePreviewEnabled) {
+        return null;
+    }
+    const normalizedPresentationMode = String(presentationMode || "").trim().toLowerCase() === "report"
+        ? "report"
+        : "preview";
+    const reportPresentation = normalizedPresentationMode === "report";
+    const runtimeConfig = runtimePreviewArtifact?.runtimeBlock?.dashboard?.reportRuntime || null;
+    const hasRuntimeRows = resolveRuntimeHasRows(runtimeConfig);
+    const loading = !!runtimePreviewRowsSource?.loading;
+    const error = runtimePreviewRowsSource?.error || null;
+    const diagnostics = Array.isArray(runtimePreviewArtifactDiagnostics)
+        ? runtimePreviewArtifactDiagnostics
+        : [];
+    const runtimePreviewErrorDiagnostics = buildRuntimePreviewErrorDiagnosticsState(diagnostics);
+    const authoredRuntimeSemanticSections = buildReportBuilderAuthoredRuntimePreviewSemanticSections({
+        runtimeConfig,
+        runtimePreviewArtifact,
+    });
+    const runtimePreviewContext = authoredRuntimeSemanticSections.runtimePreviewContext || null;
+    const isLoadingWithoutRuntimeRows = loading && !hasRuntimeRows;
+    const isLoadingWithRetainedRuntimeRows = loading && hasRuntimeRows;
+    return {
+        eyebrow: reportPresentation ? "Report" : "Preview",
+        title: runtimePreviewArtifact?.document?.title
+            || runtimePreviewContext?.title
+            || (reportPresentation ? "Report" : "Preview"),
+        subtitle: String(runtimePreviewContext?.document?.subtitle || runtimePreviewArtifact?.document?.subtitle || "").trim(),
+        description: runtimePreviewContext?.document?.description
+            || runtimePreviewArtifact?.document?.description
+            || (
+                reportPresentation
+                    ? "Review the live report built from the current report definition."
+                    : "Review the live preview built from the current report definition."
+            ),
+        ...Object.fromEntries(
+            Object.entries(authoredRuntimeSemanticSections)
+                .filter(([key]) => key !== "runtimePreviewContext"),
+        ),
         runtimeConfig,
         hasRuntimeRows,
-        loadingState: loading && !hasRuntimeRows
+        loadingState: isLoadingWithoutRuntimeRows
             ? {
                 icon: "refresh",
-                eyebrow: "Runtime preview",
-                title: "Refreshing authored runtime",
-                description: "Executing the compiled runtime request for the current builder state.",
+                eyebrow: reportPresentation ? "Report" : "Runtime preview",
+                title: reportPresentation ? "Preparing report" : "Refreshing preview",
+                description: reportPresentation
+                    ? "Running the current report definition."
+                    : "Running the current preview definition.",
                 animated: true,
             }
             : null,
-        blockedState: !canRunReport && !loading ? runtimePreviewBlockedState : null,
+        updatingNotice: isLoadingWithRetainedRuntimeRows
+            ? {
+                level: "info",
+                message: reportPresentation
+                    ? "Updating this report with the latest results…"
+                    : "Updating results…",
+            }
+            : null,
+        blockedState: !hasRuntimeRows && !canRunReport && !loading ? runtimePreviewBlockedState : null,
         errorState: !loading && error && !hasRuntimeRows
             ? {
                 tone: "error",
                 icon: "warning-sign",
-                eyebrow: "Runtime preview",
-                title: "We couldn't compile these runtime results",
+                eyebrow: reportPresentation ? "Report" : "Runtime preview",
+                title: reportPresentation ? "We couldn't prepare this report" : "We couldn't compile these runtime results",
                 description: String(runtimePreviewErrorDescription || "").trim(),
+                ...(
+                    String(readinessAction || "").trim() === "retrySemanticModelLoad"
+                        ? {
+                            actionLabel: "Retry model load",
+                            action: "retrySemanticModelLoad",
+                        }
+                        : (
+                            String(readinessAction || "").trim() === "retrySemanticValidation"
+                            && (
+                                String(readinessIssueKind || "").trim() === "semanticModelResolution"
+                                || hasReportBuilderSemanticModelResolutionDiagnostics(diagnostics)
+                            )
+                        )
+                            ? {
+                                actionLabel: "Retry validation",
+                                action: "retrySemanticValidation",
+                            }
+                            : {}
+                ),
+                ...(runtimePreviewErrorDiagnostics || {}),
             }
             : null,
         canRenderRuntime: !!runtimeConfig
-            && (canRunReport || (String(readinessReason || "").trim() === "semantic" && diagnostics.length > 0)),
+            && !isLoadingWithoutRuntimeRows
+            && (
+                hasRuntimeRows
+                || canRunReport
+                || (String(readinessReason || "").trim() === "semantic" && diagnostics.length > 0)
+            ),
     };
 }
 

@@ -1,8 +1,14 @@
 const DEFAULT_STORAGE_KEYS = [
   "reportBuilder.state.demoReportBuilder.demoReportBuilderWindow",
   "reportBuilder.state.demoReportBuilder",
+  "reportBuilder.workspaceMode.desktop.demoReportBuilder.demoReportBuilderWindow",
+  "reportBuilder.workspaceMode.desktop.demoReportBuilder",
   "reportBuilder.chartPresets.demoReportBuilder.demoReportBuilderWindow",
   "reportBuilder.chartPresets.demoReportBuilder",
+  "reportBuilder.leftRailWidth.demoReportBuilder.demoReportBuilderWindow",
+  "reportBuilder.leftRailWidth.demoReportBuilder",
+  "reportBuilder.resultPanePosition.demoReportBuilder.demoReportBuilderWindow",
+  "reportBuilder.resultPanePosition.demoReportBuilder",
 ];
 
 function normalizeString(value = "") {
@@ -54,15 +60,8 @@ export function buildSavedPayloadPreparationSteps({
   }
   return [
     {
-      type: "waitForEval",
-      expression: `(() => Array.from(document.querySelectorAll('.forge-report-builder__measure-pill')).some((entry) => ((entry.innerText || entry.textContent || '').trim() === ${JSON.stringify(normalizedDraftTriggerText)})) )()`,
-      timeoutMs: 60000,
-    },
-    {
-      type: "clickSelectorContains",
-      selector: ".forge-report-builder__measure-pill",
-      text: normalizedDraftTriggerText,
-      index: 0,
+      type: "eval",
+      expression: `(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.beginStandaloneDraft !== 'function') { throw new Error('beginStandaloneDraft API not available.'); } return !!preview.beginStandaloneDraft({ sourceLabel: ${JSON.stringify(normalizedDraftTriggerText)}, patch: { __scenarioDraft: true } }); })()`,
     },
     {
       type: "waitForDomContains",
@@ -71,13 +70,12 @@ export function buildSavedPayloadPreparationSteps({
     },
     {
       type: "waitForEval",
-      expression: "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Save artifact')); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
+      expression: "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => { const label = ((entry.innerText || entry.textContent || '').trim()); return label === 'Save report file' || label === 'Save artifact'; }); return !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'; })()",
       timeoutMs: 60000,
     },
     {
-      type: "clickRole",
-      role: "button",
-      name: "Save artifact",
+      type: "eval",
+      expression: "(() => { const button = Array.from(document.querySelectorAll('button')).find((entry) => { const label = ((entry.innerText || entry.textContent || '').trim()); return label === 'Save report file' || label === 'Save artifact'; }); if (!button) { throw new Error('Save report file button not found.'); } button.click(); return true; })()",
     },
     {
       type: "waitForDomContains",
@@ -299,6 +297,122 @@ export function buildPreviewPatchBuilderConfigStep({
   };
 }
 
+export function buildPreviewCaptureLeftRailWidthStep({
+  beforeWidthVar = "__REPORT_BUILDER_LEFT_RAIL_WIDTH_BEFORE__",
+  railSelector = ".forge-report-builder__left",
+  missingRailMessage = "Left rail not found before config width patch.",
+} = {}) {
+  const normalizedBeforeWidthVar = normalizeString(beforeWidthVar);
+  const normalizedRailSelector = normalizeString(railSelector) || ".forge-report-builder__left";
+  const normalizedMissingRailMessage = normalizeString(missingRailMessage) || "Left rail not found before config width patch.";
+  if (!normalizedBeforeWidthVar) {
+    throw new Error("buildPreviewCaptureLeftRailWidthStep requires beforeWidthVar.");
+  }
+  return {
+    type: "eval",
+    expression: `(() => { const rail = document.querySelector(${JSON.stringify(normalizedRailSelector)}); if (!rail) { throw new Error(${JSON.stringify(normalizedMissingRailMessage)}); } window[${JSON.stringify(normalizedBeforeWidthVar)}] = Math.round(rail.getBoundingClientRect().width); return true; })()`,
+  };
+}
+
+export function buildPreviewConfiguredLeftRailVisibilityWaitStep({
+  beforeWidthVar = "__REPORT_BUILDER_LEFT_RAIL_WIDTH_BEFORE__",
+  railSelector = ".forge-report-builder__left",
+  drillPanelSelector = ".forge-report-builder__chart-inline-notice",
+  drillPanelText = "Drill navigation",
+  runtimePreviewSelector = '[aria-label="Authored runtime preview"]',
+  runtimeRootSelector = "",
+  resizerSelector = ".forge-report-builder__left-resizer",
+  targetWidthPercent = 20,
+  minimumShrinkPx = 24,
+  requireSemanticBinding = null,
+  requireScopeSummary = null,
+  panelRequiredTexts = [],
+  panelOneOfTexts = [],
+  previewRequiredTexts = [],
+  previewForbiddenTexts = [],
+  runtimeRequiredTexts = [],
+  runtimeForbiddenTexts = [],
+  bodyRequiredTexts = [],
+  bodyForbiddenTexts = [],
+} = {}) {
+  const normalizedBeforeWidthVar = normalizeString(beforeWidthVar);
+  const normalizedRailSelector = normalizeString(railSelector) || ".forge-report-builder__left";
+  const normalizedDrillPanelSelector = normalizeString(drillPanelSelector) || ".forge-report-builder__chart-inline-notice";
+  const normalizedDrillPanelText = normalizeString(drillPanelText) || "Drill navigation";
+  const normalizedRuntimePreviewSelector = normalizeString(runtimePreviewSelector) || '[aria-label="Authored runtime preview"]';
+  const normalizedRuntimeRootSelector = normalizeString(runtimeRootSelector);
+  const normalizedResizerSelector = normalizeString(resizerSelector) || ".forge-report-builder__left-resizer";
+  const normalizedTargetWidthPercent = Number(targetWidthPercent);
+  const normalizedMinimumShrinkPx = Number(minimumShrinkPx);
+  const normalizedPanelRequiredTexts = (Array.isArray(panelRequiredTexts) ? panelRequiredTexts : [panelRequiredTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedPanelOneOfTexts = (Array.isArray(panelOneOfTexts) ? panelOneOfTexts : [panelOneOfTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedPreviewRequiredTexts = (Array.isArray(previewRequiredTexts) ? previewRequiredTexts : [previewRequiredTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedPreviewForbiddenTexts = (Array.isArray(previewForbiddenTexts) ? previewForbiddenTexts : [previewForbiddenTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedRuntimeRequiredTexts = (Array.isArray(runtimeRequiredTexts) ? runtimeRequiredTexts : [runtimeRequiredTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedRuntimeForbiddenTexts = (Array.isArray(runtimeForbiddenTexts) ? runtimeForbiddenTexts : [runtimeForbiddenTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedBodyRequiredTexts = (Array.isArray(bodyRequiredTexts) ? bodyRequiredTexts : [bodyRequiredTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedBodyForbiddenTexts = (Array.isArray(bodyForbiddenTexts) ? bodyForbiddenTexts : [bodyForbiddenTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  if (!normalizedBeforeWidthVar) {
+    throw new Error("buildPreviewConfiguredLeftRailVisibilityWaitStep requires beforeWidthVar.");
+  }
+  if (!Number.isFinite(normalizedTargetWidthPercent) || normalizedTargetWidthPercent <= 0) {
+    throw new Error("buildPreviewConfiguredLeftRailVisibilityWaitStep requires targetWidthPercent > 0.");
+  }
+  if (!Number.isFinite(normalizedMinimumShrinkPx) || normalizedMinimumShrinkPx < 0) {
+    throw new Error("buildPreviewConfiguredLeftRailVisibilityWaitStep requires minimumShrinkPx >= 0.");
+  }
+  if (
+    !normalizedRuntimeRootSelector
+    && (normalizedRuntimeRequiredTexts.length > 0 || normalizedRuntimeForbiddenTexts.length > 0)
+  ) {
+    throw new Error("buildPreviewConfiguredLeftRailVisibilityWaitStep requires runtimeRootSelector when runtime text checks are provided.");
+  }
+  const buildIncludesChecks = (sourceVar, values = [], negate = false) => values.length > 0
+    ? ` && ${values.map((entry) => `${negate ? "!" : ""}${sourceVar}.includes(${JSON.stringify(entry)})`).join(" && ")}`
+    : "";
+  const panelOneOfCheck = normalizedPanelOneOfTexts.length > 0
+    ? ` && (${normalizedPanelOneOfTexts.map((entry) => `panelText.includes(${JSON.stringify(entry)})`).join(" || ")})`
+    : "";
+  const runtimeRootInit = normalizedRuntimeRootSelector
+    ? `const runtimeRoot = document.querySelector(${JSON.stringify(normalizedRuntimeRootSelector)});`
+    : "const runtimeRoot = null;";
+  const runtimeRootReadyCheck = normalizedRuntimeRootSelector ? " || !runtimeRoot" : "";
+  const runtimeTextInit = normalizedRuntimeRootSelector
+    ? "const runtimeText = runtimeRoot?.innerText || runtimeRoot?.textContent || '';"
+    : "const runtimeText = '';";
+  const semanticBindingCheck = requireSemanticBinding === true
+    ? " && !!semanticBinding"
+    : requireSemanticBinding === false
+      ? " && !semanticBinding"
+      : "";
+  const scopeSummaryCheck = requireScopeSummary === true
+    ? " && !!scopeSummary"
+    : requireScopeSummary === false
+      ? " && !scopeSummary"
+      : "";
+  return {
+    type: "waitForEval",
+    expression: `(() => { const rail = document.querySelector(${JSON.stringify(normalizedRailSelector)}); const drillPanel = Array.from(document.querySelectorAll(${JSON.stringify(normalizedDrillPanelSelector)})).find((entry) => ((entry.innerText || entry.textContent || '')).includes(${JSON.stringify(normalizedDrillPanelText)})); const runtimePreview = document.querySelector(${JSON.stringify(normalizedRuntimePreviewSelector)}); ${runtimeRootInit} const resizer = document.querySelector(${JSON.stringify(normalizedResizerSelector)}); const bodyText = document.body?.innerText || document.body?.textContent || ''; if (!rail || !drillPanel || !runtimePreview || !resizer${runtimeRootReadyCheck}) { return false; } const before = Number(window[${JSON.stringify(normalizedBeforeWidthVar)}] || 0); const railWidth = Math.round(rail.getBoundingClientRect().width); const panelRect = drillPanel.getBoundingClientRect(); const interactive = Array.from(drillPanel.querySelectorAll('button, input, select')).filter((entry) => entry.offsetParent !== null); const insideBounds = interactive.every((entry) => { const rect = entry.getBoundingClientRect(); return rect.left >= panelRect.left - 1 && rect.right <= panelRect.right + 1; }); const previewText = runtimePreview.innerText || runtimePreview.textContent || ''; ${runtimeTextInit} const panelText = drillPanel.innerText || drillPanel.textContent || ''; const semanticBinding = runtimePreview.querySelector('[data-report-builder-semantic-binding="true"]'); const scopeSummary = runtimePreview.querySelector('[data-report-builder-scope-summary="true"]'); const ariaWidth = Number(resizer.getAttribute('aria-valuenow') || 0); return before > 0 && railWidth <= before - ${normalizedMinimumShrinkPx} && ariaWidth === ${normalizedTargetWidthPercent} && rail.scrollWidth <= rail.clientWidth + 1 && drillPanel.scrollWidth <= drillPanel.clientWidth + 1 && insideBounds && panelText.includes(${JSON.stringify(normalizedDrillPanelText)})${buildIncludesChecks("panelText", normalizedPanelRequiredTexts)}${panelOneOfCheck}${semanticBindingCheck}${scopeSummaryCheck}${buildIncludesChecks("previewText", normalizedPreviewRequiredTexts)}${buildIncludesChecks("previewText", normalizedPreviewForbiddenTexts, true)}${buildIncludesChecks("runtimeText", normalizedRuntimeRequiredTexts)}${buildIncludesChecks("runtimeText", normalizedRuntimeForbiddenTexts, true)}${buildIncludesChecks("bodyText", normalizedBodyRequiredTexts)}${buildIncludesChecks("bodyText", normalizedBodyForbiddenTexts, true)}; })()`,
+    timeoutMs: 60000,
+  };
+}
+
 export function buildClearSemanticValidationBehaviorsStep({
   missingApiMessage = "clearSemanticValidationBehaviors API not available.",
 } = {}) {
@@ -335,6 +449,23 @@ export function buildReopenedCompileDiagnosticsWaitSteps({
       timeoutMs: 60000,
     },
   ];
+}
+
+export function buildPreviewPatchReopenedCompileStateStep({
+  compileState = null,
+  missingApiMessage = "reopened compileState patch APIs not available.",
+} = {}) {
+  const normalizedCompileState = compileState && typeof compileState === "object" && !Array.isArray(compileState)
+    ? JSON.parse(JSON.stringify(compileState))
+    : null;
+  if (!normalizedCompileState) {
+    throw new Error("buildPreviewPatchReopenedCompileStateStep requires compileState.");
+  }
+  const normalizedMissingApiMessage = normalizeString(missingApiMessage) || "reopened compileState patch APIs not available.";
+  return {
+    type: "eval",
+    expression: `(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; if (!preview || typeof preview.getHydratedReportDocumentSession !== 'function' || typeof preview.patchBuilderState !== 'function') { throw new Error(${JSON.stringify(normalizedMissingApiMessage)}); } const session = preview.getHydratedReportDocumentSession(); if (!session || typeof session !== 'object') { throw new Error('Hydrated reopen session is unavailable.'); } return !!preview.patchBuilderState({ reportDocumentReopenSession: { ...session, reopenedCompileState: ${JSON.stringify(normalizedCompileState)} } }); })()`,
+  };
 }
 
 export function buildDiscardDraftAndRequirePreviewOnlyRuntimeSteps({
@@ -1372,6 +1503,67 @@ export function buildAudienceSemanticBindingWaitStep({
   return {
     type: "waitForEval",
     expression: `(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Semantic Binding') && text.includes('Model Ad Delivery') && text.includes('Entity Line Delivery') && text.includes('Measures Audience Index') && text.includes('Parameters Date Range, Audience Segment') && text.includes('Date Range • Channels • Audience Segment')${extraCheck}; })()`,
+    timeoutMs: 60000,
+  };
+}
+
+export function buildAuthoredRuntimeSemanticSurfaceWaitStep({
+  runtimeScopeSelector = '[aria-label="Authored runtime preview"]',
+  bindingTitle = "Semantic Binding",
+  modelText = "Model Ad Delivery",
+  entityText = "Entity Line Delivery",
+  dimensionText = "",
+  measureText = "",
+  scopeTitle = "Filters",
+  extraTexts = [],
+} = {}) {
+  const normalizedRuntimeScopeSelector = normalizeString(runtimeScopeSelector) || '[aria-label="Authored runtime preview"]';
+  const normalizedBindingTitle = normalizeString(bindingTitle) || "Semantic Binding";
+  const normalizedModelText = normalizeString(modelText) || "Model Ad Delivery";
+  const normalizedEntityText = normalizeString(entityText) || "Entity Line Delivery";
+  const normalizedDimensionText = normalizeString(dimensionText);
+  const normalizedMeasureText = normalizeString(measureText);
+  const normalizedScopeTitle = normalizeString(scopeTitle) || "Filters";
+  const normalizedExtraTexts = (Array.isArray(extraTexts) ? extraTexts : [extraTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  if (!normalizedDimensionText || !normalizedMeasureText) {
+    throw new Error("buildAuthoredRuntimeSemanticSurfaceWaitStep requires dimensionText and measureText.");
+  }
+  return {
+    type: "waitForEval",
+    expression: `(() => { const preview = document.querySelector(${JSON.stringify(normalizedRuntimeScopeSelector)}); const text = preview?.innerText || preview?.textContent || ''; const semanticBinding = preview?.querySelector('[data-report-builder-semantic-binding="true"]'); const scopeSummary = preview?.querySelector('[data-report-builder-scope-summary="true"]'); return !!preview && !!semanticBinding && !!scopeSummary && text.includes(${JSON.stringify(normalizedBindingTitle)}) && text.includes(${JSON.stringify(normalizedModelText)}) && text.includes(${JSON.stringify(normalizedEntityText)}) && text.includes(${JSON.stringify(normalizedDimensionText)}) && text.includes(${JSON.stringify(normalizedMeasureText)}) && text.includes(${JSON.stringify(normalizedScopeTitle)})${normalizedExtraTexts.length > 0 ? ` && ${normalizedExtraTexts.map((entry) => `text.includes(${JSON.stringify(entry)})`).join(" && ")}` : ""}; })()`,
+    timeoutMs: 60000,
+  };
+}
+
+export function buildAuthoredRuntimeSemanticSurfaceAbsentStep({
+  runtimeScopeSelector = '[aria-label="Authored runtime preview"]',
+  requiredTexts = [],
+  forbiddenTexts = [],
+  absentButtonText = "",
+} = {}) {
+  const normalizedRuntimeScopeSelector = normalizeString(runtimeScopeSelector) || '[aria-label="Authored runtime preview"]';
+  const normalizedRequiredTexts = (Array.isArray(requiredTexts) ? requiredTexts : [requiredTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedForbiddenTexts = (Array.isArray(forbiddenTexts) ? forbiddenTexts : [forbiddenTexts])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+  const normalizedAbsentButtonText = normalizeString(absentButtonText);
+  if (
+    normalizedRequiredTexts.length === 0
+    && normalizedForbiddenTexts.length === 0
+    && !normalizedAbsentButtonText
+  ) {
+    throw new Error("buildAuthoredRuntimeSemanticSurfaceAbsentStep requires requiredTexts, forbiddenTexts, or absentButtonText.");
+  }
+  const buttonExpression = normalizedAbsentButtonText
+    ? ` && !Array.from(document.querySelectorAll('button')).some((entry) => ((entry.innerText || entry.textContent || '').trim() === ${JSON.stringify(normalizedAbsentButtonText)}))`
+    : "";
+  return {
+    type: "waitForEval",
+    expression: `(() => { const preview = document.querySelector(${JSON.stringify(normalizedRuntimeScopeSelector)}); const text = preview?.innerText || preview?.textContent || ''; const semanticBinding = preview?.querySelector('[data-report-builder-semantic-binding="true"]'); const scopeSummary = preview?.querySelector('[data-report-builder-scope-summary="true"]'); return !!preview${normalizedRequiredTexts.length > 0 ? ` && ${normalizedRequiredTexts.map((entry) => `text.includes(${JSON.stringify(entry)})`).join(" && ")}` : ""}${normalizedForbiddenTexts.length > 0 ? ` && ${normalizedForbiddenTexts.map((entry) => `!text.includes(${JSON.stringify(entry)})`).join(" && ")}` : ""} && !semanticBinding && !scopeSummary${buttonExpression}; })()`,
     timeoutMs: 60000,
   };
 }

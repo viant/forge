@@ -108,6 +108,7 @@ function buildImportedLocalNormalizedGetReportDocumentResponse({
     source = null,
     title = "",
     savedViewOverlay = null,
+    sourceSession = null,
 } = {}) {
     const context = resolveNormalizedReportSpecDocumentContext({
         reportSpec,
@@ -139,6 +140,9 @@ function buildImportedLocalNormalizedGetReportDocumentResponse({
     return normalizedResponse
         ? {
             ...normalizedResponse,
+            ...(sourceSession && typeof sourceSession === "object" && !Array.isArray(sourceSession)
+                ? { sourceSession: cloneValue(sourceSession) }
+                : {}),
             ...(normalizeString(importedArtifactKind) ? { importedArtifactKind: normalizeString(importedArtifactKind) } : {}),
         }
         : null;
@@ -158,7 +162,9 @@ function buildImportedLocalGetReportDocumentResponse(payload = null) {
     let source = null;
 
     if (kind === "reportBuilder.savedReportPayload") {
-        document = isPlainObject(payload?.reportDocument) ? cloneValue(payload.reportDocument) : null;
+        document = isPlainObject(payload?.reportDocument)
+            ? cloneValue(payload.reportDocument)
+            : (isPlainObject(payload?.document) ? cloneValue(payload.document) : null);
         reportSpec = isPlainObject(payload?.reportSpec) ? cloneValue(payload.reportSpec) : null;
         reportRef = normalizeString(document?.id) ? { reportId: normalizeString(document.id) } : null;
         documentVersion = normalizePositiveInteger(document?.version, 0);
@@ -197,6 +203,7 @@ function buildImportedLocalGetReportDocumentResponse(payload = null) {
         compileState,
         source,
         title: document?.title || reportRef?.reportId || "",
+        sourceSession: isPlainObject(payload?.sourceSession) ? cloneValue(payload.sourceSession) : null,
     });
 }
 

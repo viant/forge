@@ -157,6 +157,106 @@ const carriedSemanticSavedReportPayload = {
     },
 };
 
+const staleCarriedSemanticBindingViewState = {
+    title: "Semantic Binding",
+    chips: [
+        "Model model://example/performance/delivery@v1",
+        "Entity line_delivery",
+        "Dimensions event_date",
+        "Measures available_impressions",
+    ],
+    fieldGroups: [
+        {
+            id: "dimensions",
+            title: "Selected dimensions (1)",
+            fields: [
+                { id: "event_date", rawId: "event_date", label: "event_date" },
+            ],
+        },
+        {
+            id: "measures",
+            title: "Selected measures (1)",
+            fields: [
+                { id: "available_impressions", rawId: "available_impressions", label: "available_impressions" },
+            ],
+        },
+    ],
+};
+
+const staleCarriedSemanticSavedReportPayload = {
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_stale_carried_semantic",
+    sourceArtifactId: "stale_carried_semantic",
+    semanticBindingViewState: staleCarriedSemanticBindingViewState,
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "staleCarriedSemantic",
+        title: "Stale Carried Semantic",
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+            ],
+            selectedParameters: [
+                { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+            ],
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date"],
+            selectedMeasures: ["available_impressions"],
+        },
+        scope: {
+            params: [
+                {
+                    id: "dateRange",
+                    label: "Canonical Reporting Window",
+                },
+            ],
+        },
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date"],
+            selectedMeasures: ["available_impressions"],
+            selectedParameters: ["reporting_window"],
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date"],
+            selectedMeasures: ["available_impressions"],
+        },
+        scope: {
+            params: [
+                {
+                    id: "dateRange",
+                    label: "Canonical Reporting Window",
+                },
+            ],
+        },
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+};
+
 const invalidSavedReportPayload = {
     version: 1,
     kind: "reportBuilder.savedReportPayload",
@@ -500,6 +600,34 @@ assert.deepEqual(getResponse, {
         payloadId: "rbreport_rbexploration_rbexplore_1000_5000",
         sourceArtifactId: "rbexploration_rbexplore_1000_5000",
     },
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        chips: [
+            "Model Ad Delivery",
+            "Entity Line Delivery",
+            "Dimensions Delivery Date, Channel",
+            "Measures Available Impressions",
+        ],
+        modelLabel: "Ad Delivery",
+        entityLabel: "Line Delivery",
+        fieldGroups: [
+            {
+                id: "dimensions",
+                title: "Selected dimensions (2)",
+                fields: [
+                    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                    { id: "channel", rawId: "channelV2", label: "Channel" },
+                ],
+            },
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
+                ],
+            },
+        ],
+    },
 });
 
 const semanticSpecSavedReportPayload = {
@@ -574,7 +702,7 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary(semanticSpecL
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -721,7 +849,7 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary(semanticSpecL
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -797,7 +925,7 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary(directSemanti
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -872,7 +1000,7 @@ const derivedListResponse = buildReportBuilderListReportDocumentsResponseFromBui
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -994,7 +1122,7 @@ const derivedSelectedGetResponse = buildReportBuilderSelectedGetReportDocumentRe
             primaryMeasure: "avails",
             selectedDimensions: ["eventDate", "channelV2"],
             viewMode: "table",
-            staticFilters: {
+            scopeParams: {
                 dateRange: {
                     start: "2026-05-01",
                     end: "2026-05-04",
@@ -1332,7 +1460,7 @@ const embeddedDocumentOnlyGetResponse = {
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -1514,7 +1642,7 @@ const seededGetResponseList = buildReportBuilderListReportDocumentsResponseFromB
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -1727,7 +1855,7 @@ const derivedGetResponse = buildReportBuilderGetReportDocumentResponseFromBuilde
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -1774,6 +1902,230 @@ assert.equal(derivedGetResponse.document.semanticSummary.modelLabel, "Ad Deliver
 assert.equal(derivedGetResponse.reportSpec.semanticSummary.entityLabel, "Line Delivery");
 assert.equal(derivedGetResponse.reportSpec.semanticSummary.selectedMeasures[0].label, "Available Impressions");
 assert.equal(derivedGetResponse.compileState.diagnostics[0].code, "semanticProviderDiagnostics");
+
+const canonicalDerivedListResponse = buildReportBuilderListReportDocumentsResponseFromBuilderState({
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_semantic_runtime_canonical",
+    savedAt: 9411,
+    title: "Semantic Runtime Canonical Demo",
+    sourceArtifactId: "semantic_runtime_canonical_demo",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "semanticRuntimeCanonicalDemo",
+        title: "Semantic Runtime Canonical Demo",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        title: "Report Builder Demo",
+        dataSourceRef: "demoReportSource",
+    },
+    config: {
+        measures: [
+            { id: "totalSpend", key: "totalSpend", semanticRef: "spend", label: "Spend", default: true, format: "currency" },
+            { id: "impressions", key: "impressions", semanticRef: "impressions", label: "Impressions", default: true, format: "compactNumber" },
+        ],
+        dimensions: [
+            { id: "eventDate", key: "eventDate", semanticRef: "event_date", label: "Event Date", default: true, chartAxis: true, format: "date" },
+            { id: "channelV2", key: "channelV2", semanticRef: "channel", label: "Channel", default: true },
+        ],
+        staticFilters: [
+            {
+                id: "dateRange",
+                type: "dateRange",
+                required: true,
+                startParamPath: "filters.From",
+                endParamPath: "filters.To",
+            },
+        ],
+        result: {
+            chartCreationMode: "explicit",
+            defaultMode: "table",
+            pageSize: 50,
+            orderFields: [
+                { value: "eventDate", field: "eventDate", default: true, defaultDirection: "asc" },
+            ],
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["spend", "impressions"],
+        },
+    },
+    state: {
+        selectedMeasures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        selectedDimensions: ["eventDate", "channelV2"],
+        viewMode: "table",
+        scopeParams: {
+            dateRange: {
+                start: "2026-06-19",
+                end: "2026-06-25",
+            },
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["spend", "impressions"],
+        },
+    },
+    semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        modelLabel: "Canonical Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Canonical Line Delivery",
+        selectedDimensions: [
+            { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", format: "date" },
+            { id: "channel", rawId: "channelV2", label: "Canonical Channel" },
+        ],
+        selectedMeasures: [
+            { id: "spend", rawId: "totalSpend", label: "Canonical Spend", format: "currency" },
+            { id: "impressions", rawId: "impressions", label: "Canonical Impressions", format: "compactNumber" },
+        ],
+        selectedParameters: [
+            { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+        ],
+    },
+    semanticModel: null,
+    documentVersion: 12,
+    cursor: "next-page",
+    hasMore: true,
+});
+
+assert.equal(
+    buildReportBuilderListReportDocumentsEntrySummary(canonicalDerivedListResponse.entries[0]).semanticBindingChips.includes("Model Canonical Ad Delivery"),
+    true,
+);
+assert.equal(
+    buildReportBuilderListReportDocumentsEntrySummary(canonicalDerivedListResponse.entries[0]).semanticBindingChips.includes("Parameters Canonical Reporting Window"),
+    true,
+);
+
+const canonicalDerivedGetResponse = buildReportBuilderGetReportDocumentResponseFromBuilderState({
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_semantic_runtime_canonical",
+    savedAt: 9411,
+    title: "Semantic Runtime Canonical Demo",
+    sourceArtifactId: "semantic_runtime_canonical_demo",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "semanticRuntimeCanonicalDemo",
+        title: "Semantic Runtime Canonical Demo",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        title: "Report Builder Demo",
+        dataSourceRef: "demoReportSource",
+    },
+    config: {
+        measures: [
+            { id: "totalSpend", key: "totalSpend", semanticRef: "spend", label: "Spend", default: true, format: "currency" },
+            { id: "impressions", key: "impressions", semanticRef: "impressions", label: "Impressions", default: true, format: "compactNumber" },
+        ],
+        dimensions: [
+            { id: "eventDate", key: "eventDate", semanticRef: "event_date", label: "Event Date", default: true, chartAxis: true, format: "date" },
+            { id: "channelV2", key: "channelV2", semanticRef: "channel", label: "Channel", default: true },
+        ],
+        staticFilters: [
+            {
+                id: "dateRange",
+                type: "dateRange",
+                required: true,
+                startParamPath: "filters.From",
+                endParamPath: "filters.To",
+            },
+        ],
+        result: {
+            chartCreationMode: "explicit",
+            defaultMode: "table",
+            pageSize: 50,
+            orderFields: [
+                { value: "eventDate", field: "eventDate", default: true, defaultDirection: "asc" },
+            ],
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["spend", "impressions"],
+        },
+    },
+    state: {
+        selectedMeasures: ["totalSpend", "impressions"],
+        primaryMeasure: "totalSpend",
+        selectedDimensions: ["eventDate", "channelV2"],
+        viewMode: "table",
+        scopeParams: {
+            dateRange: {
+                start: "2026-06-19",
+                end: "2026-06-25",
+            },
+        },
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+            selectedDimensions: ["event_date", "channel"],
+            selectedMeasures: ["spend", "impressions"],
+        },
+    },
+    semanticSummary: {
+        kind: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        modelLabel: "Canonical Ad Delivery",
+        entity: "line_delivery",
+        entityLabel: "Canonical Line Delivery",
+        selectedDimensions: [
+            { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", format: "date" },
+            { id: "channel", rawId: "channelV2", label: "Canonical Channel" },
+        ],
+        selectedMeasures: [
+            { id: "spend", rawId: "totalSpend", label: "Canonical Spend", format: "currency" },
+            { id: "impressions", rawId: "impressions", label: "Canonical Impressions", format: "compactNumber" },
+        ],
+        selectedParameters: [
+            { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+        ],
+    },
+    semanticModel: null,
+    documentVersion: 12,
+});
+
+assert.equal(canonicalDerivedGetResponse.document.semanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(canonicalDerivedGetResponse.reportSpec.semanticSummary.entityLabel, "Canonical Line Delivery");
+assert.equal(
+    buildReportBuilderGetReportDocumentResponseSummary(canonicalDerivedGetResponse).semanticBindingChips.includes("Model Canonical Ad Delivery"),
+    true,
+);
+assert.equal(
+    buildReportBuilderGetReportDocumentResponseSummary(canonicalDerivedGetResponse).semanticBindingChips.includes("Parameters Canonical Reporting Window"),
+    true,
+);
 
 const carriedSemanticGetResponse = buildReportBuilderGetReportDocumentResponse(
     carriedSemanticSavedReportPayload,
@@ -1832,7 +2184,7 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(getResponse)
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -1928,7 +2280,7 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(derivedGetRe
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "dateRange",
     scopeSummaryItems: [
         {
@@ -1995,7 +2347,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(getR
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -2036,7 +2388,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(deri
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "dateRange",
     scopeSummaryItems: [
         {
@@ -2174,6 +2526,57 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(carriedSeman
     "Can Export",
     "1 grant",
 ]);
+
+const staleCarriedGetResponse = buildReportBuilderGetReportDocumentResponse(
+    staleCarriedSemanticSavedReportPayload,
+    {
+        documentVersion: 5,
+        savedAt: 6400,
+    },
+);
+assert.equal(staleCarriedGetResponse.semanticBindingViewState.modelLabel, "Canonical Ad Delivery");
+assert.equal(staleCarriedGetResponse.semanticBindingViewState.entityLabel, "Canonical Line Delivery");
+const staleCarriedGetResponseSummary = buildReportBuilderGetReportDocumentResponseSummary(staleCarriedGetResponse);
+assert.equal(staleCarriedGetResponseSummary.semanticBindingChips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(staleCarriedGetResponseSummary.semanticBindingChips.includes("Entity Canonical Line Delivery"), true);
+assert.equal(staleCarriedGetResponseSummary.semanticBindingChips.includes("Dimensions Canonical Delivery Date"), true);
+assert.equal(staleCarriedGetResponseSummary.semanticBindingChips.includes("Measures Canonical Available Impressions"), true);
+assert.equal(staleCarriedGetResponseSummary.semanticBindingChips.includes("Parameters Canonical Reporting Window"), true);
+assert.equal(staleCarriedGetResponseSummary.semanticBindingFieldGroups[0].fields[0].label, "Canonical Delivery Date");
+assert.equal(staleCarriedGetResponseSummary.semanticBindingFieldGroups[1].fields[0].label, "Canonical Available Impressions");
+
+const staleCarriedListResponse = buildReportBuilderListReportDocumentsResponse(
+    staleCarriedSemanticSavedReportPayload,
+    {
+        documentVersion: 5,
+        savedAt: 6400,
+    },
+);
+assert.equal(staleCarriedListResponse.entries[0].semanticBindingViewState.modelLabel, "Canonical Ad Delivery");
+assert.equal(staleCarriedListResponse.entries[0].semanticBindingViewState.entityLabel, "Canonical Line Delivery");
+const staleCarriedListEntrySummary = buildReportBuilderListReportDocumentsEntrySummary(
+    staleCarriedListResponse.entries[0],
+);
+assert.equal(staleCarriedListEntrySummary.semanticBindingChips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(staleCarriedListEntrySummary.semanticBindingChips.includes("Parameters Canonical Reporting Window"), true);
+assert.equal(staleCarriedListEntrySummary.semanticBindingFieldGroups[0].fields[0].label, "Canonical Delivery Date");
+
+const staleCarriedSelectedGetResponse = buildReportBuilderSelectedGetReportDocumentResponse(
+    staleCarriedListResponse,
+    staleCarriedSemanticSavedReportPayload,
+    {
+        request: {
+            reportRef: { reportId: "staleCarriedSemantic" },
+        },
+        savedAt: 6400,
+    },
+);
+assert.equal(staleCarriedSelectedGetResponse.semanticBindingViewState.modelLabel, "Canonical Ad Delivery");
+assert.equal(staleCarriedSelectedGetResponse.semanticBindingViewState.entityLabel, "Canonical Line Delivery");
+const staleCarriedSelectedGetResponseSummary = buildReportBuilderGetReportDocumentResponseSummary(staleCarriedSelectedGetResponse);
+assert.equal(staleCarriedSelectedGetResponseSummary.semanticBindingChips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(staleCarriedSelectedGetResponseSummary.semanticBindingChips.includes("Parameters Canonical Reporting Window"), true);
+assert.equal(staleCarriedSelectedGetResponseSummary.semanticBindingFieldGroups[1].fields[0].label, "Canonical Available Impressions");
 [
     {
         label: "empty",
@@ -2213,9 +2616,10 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(carriedSeman
     );
     assert.equal(
         Object.prototype.hasOwnProperty.call(malformedCarriedGetResponse, "semanticBindingViewState"),
-        false,
-        `${label} carried state should not be persisted on get response`,
+        true,
+        `${label} carried state should be replaced with metadata-derived semantic binding on get response`,
     );
+    assert.equal(malformedCarriedGetResponse.semanticBindingViewState?.modelLabel, "Ad Delivery");
     assert.equal(
         buildReportBuilderGetReportDocumentResponseSummary(malformedCarriedGetResponse).semanticBindingChips.includes("Model Ad Delivery"),
         true,
@@ -2231,9 +2635,10 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(carriedSeman
     );
     assert.equal(
         Object.prototype.hasOwnProperty.call(malformedCarriedListResponse.entries[0], "semanticBindingViewState"),
-        false,
-        `${label} carried state should not be persisted on list entry`,
+        true,
+        `${label} carried state should be replaced with metadata-derived semantic binding on list entry`,
     );
+    assert.equal(malformedCarriedListResponse.entries[0].semanticBindingViewState?.modelLabel, "Ad Delivery");
     assert.equal(
         buildReportBuilderListReportDocumentsEntrySummary(malformedCarriedListResponse.entries[0]).semanticBindingChips.includes("Model Ad Delivery"),
         true,
@@ -2252,9 +2657,10 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(carriedSeman
     );
     assert.equal(
         Object.prototype.hasOwnProperty.call(malformedCarriedSelectedGetResponse, "semanticBindingViewState"),
-        false,
-        `${label} carried state should not be persisted on selected get response`,
+        true,
+        `${label} carried state should be replaced with metadata-derived semantic binding on selected get response`,
     );
+    assert.equal(malformedCarriedSelectedGetResponse.semanticBindingViewState?.modelLabel, "Ad Delivery");
     assert.equal(
         buildReportBuilderGetReportDocumentResponseSummary(malformedCarriedSelectedGetResponse).semanticBindingChips.includes("Model Ad Delivery"),
         true,
@@ -2917,6 +3323,34 @@ assert.deepEqual(listResponse, {
                     { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
                 ],
             },
+            semanticBindingViewState: {
+                title: "Semantic Binding",
+                chips: [
+                    "Model Ad Delivery",
+                    "Entity Line Delivery",
+                    "Dimensions Delivery Date, Channel",
+                    "Measures Available Impressions",
+                ],
+                modelLabel: "Ad Delivery",
+                entityLabel: "Line Delivery",
+                fieldGroups: [
+                    {
+                        id: "dimensions",
+                        title: "Selected dimensions (2)",
+                        fields: [
+                            { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                            { id: "channel", rawId: "channelV2", label: "Channel" },
+                        ],
+                    },
+                    {
+                        id: "measures",
+                        title: "Selected measures (1)",
+                        fields: [
+                            { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
+                        ],
+                    },
+                ],
+            },
             scope: {
                 dataSourceRef: "demoReportSource",
                 params: [
@@ -3074,7 +3508,7 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary(listResponse.
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -3402,7 +3836,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(list
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -3438,7 +3872,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(list
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -3519,7 +3953,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -3554,7 +3988,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -3612,7 +4046,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -3647,7 +4081,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -3731,7 +4165,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(dire
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -3802,7 +4236,7 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(dire
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -3875,6 +4309,34 @@ assert.deepEqual(buildReportBuilderSelectedGetReportDocumentResponse(listRespons
         kind: "reportBuilder.savedReportPayload",
         payloadId: "rbreport_rbexploration_rbexplore_1000_5000",
         sourceArtifactId: "rbexploration_rbexplore_1000_5000",
+    },
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        chips: [
+            "Model Ad Delivery",
+            "Entity Line Delivery",
+            "Dimensions Delivery Date, Channel",
+            "Measures Available Impressions",
+        ],
+        modelLabel: "Ad Delivery",
+        entityLabel: "Line Delivery",
+        fieldGroups: [
+            {
+                id: "dimensions",
+                title: "Selected dimensions (2)",
+                fields: [
+                    { id: "event_date", rawId: "eventDate", label: "Delivery Date" },
+                    { id: "channel", rawId: "channelV2", label: "Channel" },
+                ],
+            },
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    { id: "available_impressions", rawId: "avails", label: "Available Impressions", format: "compactNumber" },
+                ],
+            },
+        ],
     },
 });
 assert.deepEqual(buildReportBuilderSelectedGetReportDocumentResponse(listResponse, [
@@ -4418,7 +4880,7 @@ const invalidDerivedListResponse = buildReportBuilderListReportDocumentsResponse
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -4542,7 +5004,7 @@ const invalidDerivedSelectedGetResponse = buildReportBuilderSelectedGetReportDoc
             primaryMeasure: "avails",
             selectedDimensions: ["eventDate", "channelV2"],
             viewMode: "table",
-            staticFilters: {
+            scopeParams: {
                 dateRange: {
                     start: "2026-05-01",
                     end: "2026-05-04",
@@ -4881,7 +5343,7 @@ const detailTargetSelectedSavedPayload = buildReportBuilderSavedReportPayloadFro
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -4966,7 +5428,7 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(detailTarget
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "dateRange",
     scopeSummaryItems: [
         {

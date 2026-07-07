@@ -1,8 +1,10 @@
 import {
   createDrillMetadataProvider,
+  dedupeRefinementActions,
   normalizeDetailTarget,
   normalizeDrillHierarchy,
   normalizeRefinementActions,
+  resolveRefinementActionIdentityKey,
 } from "../../reporting/drillMetadataProvider.js";
 import { normalizeReportRuntimeHostIntent } from "../../reporting/reportRuntimeHostIntent.js";
 import { resolveReportRuntimeDetailTarget } from "../../reporting/reportRuntimeDetailTarget.js";
@@ -26,18 +28,6 @@ function hasAnyDetailProviderMethods(provider = null) {
 
 function normalizeString(value = "") {
   return String(value || "").trim();
-}
-
-function dedupeRefinementActions(actions = []) {
-  const seen = new Set();
-  return (Array.isArray(actions) ? actions : []).filter((action) => {
-    const id = normalizeString(action?.id);
-    if (!id || seen.has(id)) {
-      return false;
-    }
-    seen.add(id);
-    return true;
-  });
 }
 
 function normalizeDetailProviderHierarchyResult(payload = null) {
@@ -108,9 +98,18 @@ function mergeDetailProviders(primaryProvider = null, fallbackProvider = null) {
         : null;
       const primaryActions = Array.isArray(primary) ? primary : [];
       const fallbackActions = Array.isArray(fallback) ? fallback : [];
+      const fallbackKeys = new Set(
+        fallbackActions
+          .map((action) => resolveRefinementActionIdentityKey(action))
+          .filter(Boolean),
+      );
+      const primaryUniqueActions = primaryActions.filter((action) => {
+        const identityKey = resolveRefinementActionIdentityKey(action);
+        return identityKey && !fallbackKeys.has(identityKey);
+      });
       return {
         actions: dedupeRefinementActions([
-          ...primaryActions,
+          ...primaryUniqueActions,
           ...fallbackActions,
         ]),
       };

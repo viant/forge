@@ -21,7 +21,7 @@ assert.deepEqual(buildReportBuilderDesktopResultHeaderState({
         canCreate: true,
         showCreateButton: false,
         quickOptions: [{ value: "table:0" }],
-        buttonLabel: "Quick view",
+        buttonLabel: "Presets",
         buttonIcon: "panel-table",
     },
     editChartEnabled: true,
@@ -51,7 +51,7 @@ assert.deepEqual(buildReportBuilderDesktopResultHeaderState({
         canCreate: false,
         showCreateButton: true,
         quickOptions: [],
-        buttonLabel: "Quick chart",
+        buttonLabel: "Presets",
         buttonIcon: "timeline-line-chart",
     },
     editChartEnabled: false,
@@ -63,3 +63,34 @@ assert.deepEqual(buildReportBuilderDesktopResultHeaderState({
 });
 
 console.log("reportBuilderResultHeader ✓ desktop result-header action state");
+
+assert.deepEqual(buildReportBuilderDesktopResultHeaderState({
+    desktopActionModel: {
+        showQuickChartActions: true,
+        showEditChart: true,
+    },
+    resultViewModes: ["table", "chart"],
+    currentViewMode: "chart",
+    explicitChartMode: true,
+    hasValidChartSpec: true,
+    canCreateChart: true,
+    hasTableQuickPresets: true,
+    quickChartOptions: [{ value: "table:0" }],
+    overflowActionCount: 1,
+    workspaceMode: "report",
+}), {
+    quickActions: {
+        enabled: true,
+        canCreate: true,
+        showCreateButton: false,
+        quickOptions: [{ value: "table:0" }],
+        buttonLabel: "Presets",
+        buttonIcon: "panel-table",
+    },
+    editChartEnabled: true,
+    viewToggleModes: [
+        { mode: "table", icon: "th", active: false, disabled: false },
+        { mode: "chart", icon: "timeline-line-chart", active: true, disabled: false },
+    ],
+    overflowEnabled: true,
+});

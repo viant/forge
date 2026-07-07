@@ -21,6 +21,13 @@ import {
     resolveReportBuilderDrillMetadata,
 } from "../../reporting/reportBuilderDrillMetadata.js";
 import {
+    getScopeParamValue,
+    listScopeParamValues,
+    mergeScopeParamValues,
+    resolveScopeParamId,
+    scopeParamStateSlice,
+} from "../../reporting/scopeStateModel.js";
+import {
     ALL_SUPPORTED_CHART_TYPES,
     chartFamilyAllowsSeriesOptions,
     chartFamilyForType,
@@ -29,6 +36,28 @@ import {
     SINGLE_MEASURE_CATEGORY_TYPES,
     supportsStackIdForSeries,
 } from "./reportBuilderChartRules.js";
+import {
+    REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY,
+    resolveReportBuilderPersistedRuntimePreviewInteraction,
+} from "./reportBuilderRuntimePreviewInteractionPersistence.js";
+import {
+    normalizeDynamicGroupRows,
+    normalizeDynamicRow,
+    projectLookupSelection,
+    projectLookupSelections,
+    projectManualSelection,
+} from "./reportBuilderDynamicRows.js";
+import {
+    resolveReportBuilderDynamicFilterGroups,
+    resolveReportBuilderScopeParamFilters,
+} from "./reportBuilderPredicates.js";
+
+export {
+    normalizeDynamicGroupRows,
+    projectLookupSelection,
+    projectLookupSelections,
+    projectManualSelection,
+};
 
 function clone(value) {
     if (Array.isArray(value)) {
@@ -251,161 +280,6 @@ function defaultStaticFilterValue(filter = {}) {
         return defaults;
     }
     return defaults[0] ?? "";
-}
-
-function normalizeDynamicRow(row = {}, group = {}, index = 0) {
-    const filters = normalizeArray(group.filters);
-    const firstFilterId = String(filters[0]?.id || "").trim();
-    const rowId = String(row.id || `row_${index + 1}`).trim();
-    return {
-        id: rowId || `row_${index + 1}`,
-        filterId: String(row.filterId || firstFilterId).trim(),
-        enabled: row?.enabled !== false,
-        selections: normalizeArray(row.selections).map((entry) => clone(entry)),
-    };
-}
-
-function filterDefinitionForRow(group = {}, row = {}) {
-    const filterId = String(row?.filterId || "").trim();
-    return normalizeArray(group?.filters).find((entry) => String(entry?.id || "").trim() === filterId) || null;
-}
-
-function normalizeSelectionForFilter(filterDef = {}, entry = null) {
-    const isObjectEntry = entry && typeof entry === "object" && !Array.isArray(entry);
-    const valueSelector = String(filterDef?.valueSelector || "value").trim() || "value";
-    const labelSelector = String(filterDef?.labelSelector || "label").trim() || "label";
-    const record = isObjectEntry && entry?.record && typeof entry.record === "object"
-        ? entry.record
-        : (isObjectEntry ? entry : {});
-    const rawValue = isObjectEntry
-        ? (
-            entry?.value
-            ?? selectFirstDefined(entry, lookupValueFallbackSelectors(valueSelector))
-            ?? selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector))
-        )
-        : entry;
-    const coerced = coerceManualSelectionValue(filterDef, rawValue);
-    if (!coerced.ok) {
-        return null;
-    }
-    const recordLabel = String(selectFirstDefined(record, lookupLabelFallbackSelectors(labelSelector, valueSelector)) ?? "").trim();
-    const entryLabel = String(isObjectEntry ? (entry?.label ?? "") : "").trim();
-    const label = recordLabel || entryLabel || String(coerced.label || "").trim();
-    return {
-        value: coerced.value,
-        label,
-        group: isObjectEntry ? (entry?.group || "") : "",
-        record: {
-            ...record,
-            [valueSelector]: coerced.value,
-            [labelSelector]: label,
-        },
-    };
-}
-
-function rowHasSelections(row = {}) {
-    return Array.isArray(row?.selections) && row.selections.length > 0;
-}
-
-export function normalizeDynamicGroupRows(rows = [], group = {}) {
-    return normalizeArray(rows).map((row, index) => {
-        const normalizedRow = normalizeDynamicRow(row, group, index);
-        const filterDef = filterDefinitionForRow(group, normalizedRow);
-        if (!filterDef) {
-            return normalizedRow;
-        }
-        const originalSelections = normalizeArray(normalizedRow.selections);
-        const normalizedSelections = originalSelections
-            .map((entry) => normalizeSelectionForFilter(filterDef, entry))
-            .filter(Boolean);
-        if (originalSelections.length > 0 && normalizedSelections.length === 0) {
-            return null;
-        }
-        return {
-            ...normalizedRow,
-            selections: normalizedSelections,
-        };
-    }).filter(Boolean);
-}
-
-function firstResolvedValue(record = null, selectors = []) {
-    for (const selector of selectors) {
-        const key = String(selector || "").trim();
-        if (!key) continue;
-        const value = resolveKey(record, key);
-        if (value !== undefined && value !== null && value !== "") {
-            return value;
-        }
-    }
-    return undefined;
-}
-
-function compactLookupRecord(filterDef = {}, record = {}) {
-    if (!record || typeof record !== "object") {
-        return null;
-    }
-    const selectors = [
-        filterDef.valueSelector,
-        filterDef.labelSelector,
-        filterDef.groupSelector,
-        ...(Array.isArray(filterDef.recordSelectors) ? filterDef.recordSelectors : []),
-    ].map((entry) => String(entry || "").trim()).filter(Boolean);
-    const compact = {};
-    selectors.forEach((selector) => {
-        const value = resolveKey(record, selector);
-        if (value === undefined || value === null || value === "") {
-            return;
-        }
-        compact[selector] = value;
-    });
-    return Object.keys(compact).length > 0 ? compact : null;
-}
-
-function selectFirstDefined(record = {}, selectors = []) {
-    for (const selector of selectors) {
-        const key = String(selector || "").trim();
-        if (!key) continue;
-        const value = resolveKey(record, key);
-        if (value !== undefined && value !== null && value !== "") {
-            return value;
-        }
-    }
-    return undefined;
-}
-
-function selectorLeaf(selector = "") {
-    const normalized = String(selector || "").trim();
-    if (!normalized) return "";
-    const parts = normalized.split(".").map((entry) => entry.trim()).filter(Boolean);
-    return parts[parts.length - 1] || normalized;
-}
-
-function lookupValueFallbackSelectors(selector = "") {
-    const leaf = selectorLeaf(selector);
-    const lower = leaf.toLowerCase();
-    const selectors = [selector, leaf];
-    if (lower === "id" || lower.endsWith("id")) {
-        selectors.push("id", "value");
-    }
-    return Array.from(new Set(selectors.filter(Boolean)));
-}
-
-function lookupLabelFallbackSelectors(selector = "", valueSelector = "") {
-    const leaf = selectorLeaf(selector);
-    const lower = leaf.toLowerCase();
-    const selectors = [selector, leaf];
-    if (lower === "label" || lower.endsWith("label")) {
-        selectors.push("label", "name", "displayName", "displayPath");
-    } else if (lower === "name" || lower.endsWith("name")) {
-        selectors.push("name", "label", "displayName", "displayPath");
-    } else {
-        selectors.push("label", "name", "displayName", "displayPath");
-    }
-    const valueLeaf = selectorLeaf(valueSelector);
-    if (valueLeaf && valueLeaf !== leaf) {
-        selectors.push(valueLeaf);
-    }
-    return Array.from(new Set(selectors.filter(Boolean)));
 }
 
 function camelToSnake(value = "") {
@@ -1425,7 +1299,7 @@ export function buildReportBuilderQuickViewOptions({
             metaItems: buildTableQuickOptionMeta(entry),
             description: dependencyHint
                 ? `${String(entry?.description || "Table preset").trim() || "Table preset"} ${dependencyHint.trim()}`
-                : (String(entry?.description || "").trim() || "Table-first preset with curated columns, sort order, and export-ready grid semantics."),
+                : (String(entry?.description || "").trim() || "Table-first preset that reselects the current query, columns, and sort for an export-ready grid."),
             prepared,
         };
     });
@@ -1465,6 +1339,8 @@ export function buildReportBuilderQuickViewOptions({
                     : ` requires ${prepared.missingDimensionLabels.join(", ")}`
             )
             : "";
+        const authoredDescription = String(entry?.description || "").trim();
+        const baseDescription = authoredDescription || `Preset (${entry.type}) that reselects the current table and chart for a curated visual read.`;
         return {
             value: `default:${index}`,
             label: String(entry?.title || "").trim(),
@@ -1476,8 +1352,8 @@ export function buildReportBuilderQuickViewOptions({
             accentTone: String(entry?.accentTone || "").trim(),
             metaItems: normalizeStringArray(entry?.highlights),
             description: dependencyHint
-                ? `Chart preset (${entry.type}) — ${dependencyHint.trim()}`
-                : `Chart preset (${entry.type}) for a curated visual read of the current table.`,
+                ? `${baseDescription} — ${dependencyHint.trim()}`
+                : baseDescription,
             prepared,
         };
     });
@@ -1488,7 +1364,7 @@ export function buildReportBuilderQuickViewOptions({
         kind: "previous",
         group: "Previous",
         spec: entry.chartSpec,
-        description: "Previous chart preset for this field set.",
+        description: "Previous preset for this field set.",
     }));
 
     return [...modifiedTable, ...tables, ...defaults, ...previous];
@@ -1952,8 +1828,8 @@ export function applyReportBuilderComputedMeasures(rows = [], config = {}) {
 export function buildReportBuilderDefaultState(config = {}) {
     const measures = getSelectableReportBuilderMeasures(config);
     const dimensions = getVisibleReportBuilderDimensions(config);
-    const staticFilters = normalizeArray(config.staticFilters);
-    const dynamicFilterGroups = normalizeArray(config.dynamicFilterGroups);
+    const staticFilters = resolveReportBuilderScopeParamFilters(config);
+    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
 
     const semanticSelections = resolveReportBuilderSemanticSelections(config, config?.binding);
     const selectedMeasures = semanticSelections?.hasExplicitMeasures
@@ -1980,11 +1856,11 @@ export function buildReportBuilderDefaultState(config = {}) {
         config?.result?.pageSize || config?.request?.limit || 50,
     ) || 50;
 
-    const defaultStaticFilters = {};
+    const defaultScopeParamValues = {};
     staticFilters.forEach((filter) => {
-        const key = String(filter.id || filter.field || "").trim();
+        const key = resolveScopeParamId(filter);
         if (!key) return;
-        defaultStaticFilters[key] = defaultStaticFilterValue(filter);
+        defaultScopeParamValues[key] = defaultStaticFilterValue(filter);
     });
 
     const defaultDynamicGroups = {};
@@ -2010,7 +1886,7 @@ export function buildReportBuilderDefaultState(config = {}) {
         pageSize: defaultPageSize,
         orderField: String(defaultOrder?.value || defaultOrder?.field || "").trim(),
         orderDir: String(defaultOrder?.defaultDirection || "desc").trim().toLowerCase() || "desc",
-        staticFilters: defaultStaticFilters,
+        ...scopeParamStateSlice(defaultScopeParamValues),
         dynamicGroups: defaultDynamicGroups,
     };
     const normalizedOrder = normalizeReportBuilderOrderState(config, baseState, baseState);
@@ -2023,14 +1899,15 @@ export function buildReportBuilderDefaultState(config = {}) {
 
 export function mergeReportBuilderState(config = {}, persisted = {}) {
     const defaults = buildReportBuilderDefaultState(config);
-    const dynamicFilterGroups = normalizeArray(config.dynamicFilterGroups);
+    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
     const next = {
-        ...defaults,
-        ...clone(persisted || {}),
-        staticFilters: {
-            ...defaults.staticFilters,
-            ...(persisted?.staticFilters || {}),
-        },
+        ...mergeScopeParamValues({
+            ...defaults,
+            ...clone(persisted || {}),
+        }, {
+            ...listScopeParamValues(defaults),
+            ...listScopeParamValues(persisted),
+        }),
         dynamicGroups: {
             ...defaults.dynamicGroups,
         },
@@ -2083,7 +1960,7 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
 export function sanitizeReportBuilderState(config = {}, state = {}) {
     const next = clone(state || {});
     const dynamicGroups = Array.isArray(next.dynamicGroups) ? {} : { ...(next.dynamicGroups || {}) };
-    normalizeArray(config?.dynamicFilterGroups).forEach((group) => {
+    resolveReportBuilderDynamicFilterGroups(config).forEach((group) => {
         const groupId = String(group?.id || "").trim();
         if (!groupId) return;
         dynamicGroups[groupId] = normalizeDynamicGroupRows(next?.dynamicGroups?.[groupId], group);
@@ -2103,6 +1980,12 @@ export function sanitizeReportBuilderState(config = {}, state = {}) {
     next.binding = resolveMergedSemanticBinding(config?.binding, next.binding);
     if (!next.drillMetadata) {
         delete next.drillMetadata;
+    }
+    const normalizedRuntimePreviewInteraction = resolveReportBuilderPersistedRuntimePreviewInteraction(next);
+    if (normalizedRuntimePreviewInteraction) {
+        next[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY] = normalizedRuntimePreviewInteraction;
+    } else {
+        delete next[REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY];
     }
     next.chartSpec = sanitizeChartSpecAgainstConfig(effectiveConfig, next.chartSpec);
     next.primaryMeasure = String(next.primaryMeasure || next.selectedMeasures?.[0] || "").trim();
@@ -2124,8 +2007,8 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     const measures = normalizeArray(effectiveConfig.measures);
     const calculatedFields = getNormalizedReportBuilderCalculatedFields(effectiveConfig);
     const dimensions = normalizeArray(effectiveConfig.dimensions);
-    const staticFilters = normalizeArray(effectiveConfig.staticFilters);
-    const dynamicFilterGroups = normalizeArray(effectiveConfig.dynamicFilterGroups);
+    const staticFilters = resolveReportBuilderScopeParamFilters(effectiveConfig);
+    const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(effectiveConfig);
     const groupByOptions = normalizeArray(effectiveConfig?.groupBy?.options);
     const orderFields = normalizeArray(resultConfig.orderFields || effectiveConfig.orderFields);
     const resolveBaseMeasureByField = (fieldKey = "") => {
@@ -2233,9 +2116,9 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     });
 
     staticFilters.forEach((filter) => {
-        const filterId = String(filter.id || filter.field || "").trim();
+        const filterId = resolveScopeParamId(filter);
         if (!filterId) return;
-        const value = state?.staticFilters?.[filterId];
+        const value = getScopeParamValue(state, filterId);
         if (filter.type === "dateRange") {
             if (value?.start && (filter.startParamPath || filter.paramPaths?.start)) {
                 setNestedValue(request, filter.startParamPath || filter.paramPaths.start, value.start);
@@ -2336,12 +2219,12 @@ export function resolveReportBuilderReadiness(config = {}, state = {}) {
         return { canRun: false, reason: "measure" };
     }
 
-    const staticFilters = normalizeArray(config?.staticFilters);
+    const staticFilters = resolveReportBuilderScopeParamFilters(config);
     for (const filter of staticFilters) {
         if (!filter?.required) continue;
-        const filterId = String(filter.id || filter.field || "").trim();
+        const filterId = resolveScopeParamId(filter);
         if (!filterId) continue;
-        const value = state?.staticFilters?.[filterId];
+        const value = getScopeParamValue(state, filterId);
         if (filter.type === "dateRange") {
             if (!value?.start || !value?.end) {
                 return { canRun: false, reason: "requiredFilter" };
@@ -2364,67 +2247,6 @@ export function resolveReportBuilderReadiness(config = {}, state = {}) {
 
 export function canAutoFetchReportBuilder(config = {}, state = {}) {
     return resolveReportBuilderReadiness(config, state).canRun;
-}
-
-export function projectLookupSelection(filterDef = {}, record = {}) {
-    const valueSelector = String(filterDef.valueSelector || filterDef.valueField || filterDef.field || "id").trim();
-    const labelSelector = String(filterDef.labelSelector || filterDef.previewSelector || filterDef.labelField || valueSelector).trim();
-    const groupSelector = String(filterDef.groupSelector || "").trim();
-    const value = selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector));
-    const label = selectFirstDefined(record, lookupLabelFallbackSelectors(labelSelector, valueSelector));
-    const group = groupSelector ? resolveKey(record, groupSelector) : "";
-    return {
-        value,
-        label: label == null || label === "" ? String(value ?? "") : String(label),
-        group: group == null ? "" : String(group),
-        record: compactLookupRecord(filterDef, record),
-    };
-}
-
-export function projectLookupSelections(filterDef = {}, payload = null) {
-    const records = Array.isArray(payload)
-        ? payload
-        : (payload == null ? [] : [payload]);
-    return records
-        .filter((record) => record && typeof record === "object")
-        .map((record) => projectLookupSelection(filterDef, record));
-}
-
-function coerceManualSelectionValue(filterDef = {}, rawValue = "") {
-    const normalized = String(rawValue ?? "").trim();
-    if (!normalized) {
-        return { ok: false };
-    }
-    const valueType = String(filterDef?.manualValueType || "string").trim().toLowerCase();
-    switch (valueType) {
-        case "int":
-        case "integer":
-            if (!/^-?\d+$/.test(normalized)) {
-                return { ok: false };
-            }
-            return { ok: true, value: Number(normalized), label: normalized };
-        case "string":
-        default:
-            return { ok: true, value: normalized, label: normalized };
-    }
-}
-
-export function projectManualSelection(filterDef = {}, rawValue = "") {
-    const coerced = coerceManualSelectionValue(filterDef, rawValue);
-    if (!coerced.ok) {
-        return null;
-    }
-    const valueSelector = String(filterDef?.valueSelector || "value").trim() || "value";
-    const labelSelector = String(filterDef?.labelSelector || "label").trim() || "label";
-    return {
-        value: coerced.value,
-        label: coerced.label,
-        group: "",
-        record: {
-            [valueSelector]: coerced.value,
-            [labelSelector]: coerced.label,
-        },
-    };
 }
 
 export function buildReportBuilderColumns(config = {}, state = {}) {
@@ -2459,6 +2281,9 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
             label: entry.label || entry.id,
             kind: "dimension",
             format: entry.format,
+            ...(entry?.displayValueMap && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap)
+                ? { displayValueMap: clone(entry.displayValueMap) }
+                : {}),
             ...(entry?.runtimeFilter && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter)
                 ? { runtimeFilterable: true }
                 : {}),
@@ -2472,6 +2297,9 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
             label: entry.label || entry.id,
             kind: "measure",
             format: entry.format,
+            ...(entry?.displayValueMap && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap)
+                ? { displayValueMap: clone(entry.displayValueMap) }
+                : {}),
             align: entry.align || "right",
         }));
 
@@ -2501,6 +2329,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
 
     if (seriesType === "pie" || seriesType === "donut") {
         const yMeasure = yMeasures[0];
+        const xSourceKey = reportBuilderDimensionValueKey(xField) || normalized.xField || "name";
+        const hasXDisplayValueMap = xField?.displayValueMap && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
         return {
             ...container,
             dataSourceRef: container.dataSourceRef,
@@ -2509,6 +2339,10 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
                 type: seriesType,
                 series: {
                     nameKey: xDisplayKey || normalized.xField,
+                    ...(xSourceKey && ((xDisplayKey && xDisplayKey !== xSourceKey) || hasXDisplayValueMap) ? { sourceNameKey: xSourceKey } : {}),
+                    ...(hasXDisplayValueMap
+                        ? { displayValueMap: clone(xField.displayValueMap) }
+                        : {}),
                     valueKey: String(yMeasure?.key || yMeasure?.id || "").trim(),
                     palette,
                 },
@@ -2516,10 +2350,16 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         };
     }
 
+    const xSourceKey = reportBuilderDimensionValueKey(xField) || normalized.xField || "name";
+    const hasXDisplayValueMap = xField?.displayValueMap && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
     const baseChart = {
         type: seriesType,
         xAxis: {
-            dataKey: xDisplayKey || reportBuilderDimensionValueKey(xField) || normalized.xField || "name",
+            dataKey: xDisplayKey || xSourceKey,
+            ...(xSourceKey && ((xDisplayKey && xDisplayKey !== xSourceKey) || hasXDisplayValueMap) ? { sourceDataKey: xSourceKey } : {}),
+            ...(hasXDisplayValueMap
+                ? { displayValueMap: clone(xField.displayValueMap) }
+                : {}),
             tickFormat: xField?.tickFormat,
         },
         yAxis: {
@@ -2530,6 +2370,9 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     if (family === "cartesian" && normalized.seriesField && yMeasures.length === 1) {
         const yMeasure = yMeasures[0];
         const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
+        const seriesDisplayKey = resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField;
+        const seriesSourceKey = reportBuilderDimensionValueKey(seriesDimension) || normalized.seriesField;
+        const hasSeriesDisplayValueMap = seriesDimension?.displayValueMap && typeof seriesDimension.displayValueMap === "object" && !Array.isArray(seriesDimension.displayValueMap);
         return {
             ...container,
             dataSourceRef: container.dataSourceRef,
@@ -2537,7 +2380,11 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             chart: {
                 ...baseChart,
                 series: {
-                    nameKey: resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField,
+                    nameKey: seriesDisplayKey,
+                    ...(seriesSourceKey && ((seriesDisplayKey && seriesDisplayKey !== seriesSourceKey) || hasSeriesDisplayValueMap) ? { sourceNameKey: seriesSourceKey } : {}),
+                    ...(hasSeriesDisplayValueMap
+                        ? { displayValueMap: clone(seriesDimension.displayValueMap) }
+                        : {}),
                     valueKey: String(yMeasure?.key || yMeasure?.id || "").trim(),
                     values: [{
                         value: String(yMeasure?.key || yMeasure?.id || "").trim(),

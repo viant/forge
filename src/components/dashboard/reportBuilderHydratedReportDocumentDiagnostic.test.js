@@ -119,7 +119,7 @@ assert.deepEqual(diagnostic, {
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -169,7 +169,7 @@ assert.deepEqual(buildReportBuilderHydratedReportDocumentDiagnosticSummary(diagn
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -234,7 +234,7 @@ assert.deepEqual(buildReportBuilderHydratedReportDocumentDiagnosticSummary(overl
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -336,7 +336,7 @@ assert.deepEqual(buildReportBuilderHydratedReportDocumentDiagnosticInspectorStat
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -364,6 +364,115 @@ assert.deepEqual(buildReportBuilderHydratedReportDocumentDiagnosticInspectorStat
     ],
     content: serializeReportBuilderHydratedReportDocumentDiagnostic(diagnostic),
 });
+
+const staleCarriedReopenDiagnostic = buildReportBuilderHydratedReportDocumentDiagnostic({
+    ...getResponse,
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        chips: [
+            "Model model://example/performance/delivery@v1",
+            "Measures available_impressions",
+        ],
+        fieldGroups: [
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "available_impressions",
+                        label: "available_impressions",
+                    },
+                ],
+            },
+        ],
+    },
+    document: {
+        ...getResponse.document,
+        semanticSummary: {
+            kind: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            modelLabel: "Canonical Ad Delivery",
+            entity: "line_delivery",
+            entityLabel: "Canonical Line Delivery",
+            selectedDimensions: [
+                { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+            ],
+            selectedMeasures: [
+                { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions" },
+            ],
+        },
+    },
+}, hydrateResult, {
+    detectedAt: 9101,
+    builderIdentity: {
+        containerId: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "otherSource",
+    },
+});
+assert.deepEqual(staleCarriedReopenDiagnostic.semanticBindingChips, [
+    "Model Canonical Ad Delivery",
+    "Entity Canonical Line Delivery",
+    "Dimensions Canonical Delivery Date",
+    "Measures Canonical Available Impressions",
+    "Categories Time",
+]);
+
+const richerCarriedReopenDiagnostic = buildReportBuilderHydratedReportDocumentDiagnostic({
+    ...getResponse,
+    semanticBindingViewState: {
+        title: "Semantic Binding",
+        modelLabel: "Carried Ad Delivery",
+        entityLabel: "Carried Line Delivery",
+        chips: [
+            "Model Carried Ad Delivery",
+            "Entity Carried Line Delivery",
+            "Dimensions Carried Delivery Date",
+            "Measures Carried Available Impressions",
+        ],
+        fieldGroups: [
+            {
+                id: "dimensions",
+                title: "Selected dimensions (1)",
+                fields: [
+                    {
+                        id: "event_date",
+                        rawId: "eventDate",
+                        label: "Carried Delivery Date",
+                        category: "Time",
+                        definitionRef: "semantic://example/event_date",
+                    },
+                ],
+            },
+            {
+                id: "measures",
+                title: "Selected measures (1)",
+                fields: [
+                    {
+                        id: "available_impressions",
+                        rawId: "avails",
+                        label: "Carried Available Impressions",
+                        definitionRef: "semantic://example/available_impressions",
+                    },
+                ],
+            },
+        ],
+    },
+}, hydrateResult, {
+    detectedAt: 9102,
+    builderIdentity: {
+        containerId: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "otherSource",
+    },
+});
+assert.deepEqual(richerCarriedReopenDiagnostic.semanticBindingChips, [
+    "Model Carried Ad Delivery",
+    "Entity Carried Line Delivery",
+    "Dimensions Carried Delivery Date",
+    "Measures Carried Available Impressions",
+]);
 
 assert.deepEqual(buildReportBuilderHydratedReportDocumentDiagnosticDownload(diagnostic), {
     filename: "Exploration Demo-reopen-diagnostic.json",
@@ -454,7 +563,7 @@ const embeddedDocumentOnlyDiagnostic = buildReportBuilderHydratedReportDocumentD
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -532,7 +641,7 @@ const embeddedDocumentEmptySpecDiagnostic = buildReportBuilderHydratedReportDocu
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -707,7 +816,7 @@ const embeddedListDiagnostic = buildReportBuilderListReportDocumentsEntryDiagnos
                                 },
                                 selectedDimensions: ["eventDate", "channelV2"],
                                 selectedMeasures: ["avails"],
-                                staticFilters: {
+                                scopeParams: {
                                     dateRange: {
                                         start: "2026-05-01",
                                         end: "2026-05-04",
@@ -793,7 +902,7 @@ assert.deepEqual(listDiagnostic, {
         "Dimensions Delivery Date, Channel",
         "Measures Available Impressions",
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {

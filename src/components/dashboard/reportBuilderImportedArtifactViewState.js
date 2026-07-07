@@ -7,8 +7,8 @@ import {
 import { buildReportBuilderExportFailureNotice as buildLifecycleExportFailureNotice } from "./reportBuilderExportLifecycle.js";
 import { buildReportBuilderImportedArtifactSourceLabel } from "./reportBuilderImportedArtifactLabels.js";
 import {
-    buildReportBuilderSemanticBindingViewState,
-} from "./reportBuilderSemanticBindingViewState.js";
+    resolvePreferredReportBuilderSemanticBindingViewState,
+} from "./reportBuilderSemanticBindingViewPreference.js";
 import { buildReportBuilderScopeSummaryFromParams } from "./reportBuilderDocumentBlocks.js";
 import {
     resolveNormalizedReportSpecDocumentContext,
@@ -72,73 +72,14 @@ function buildRawImportedEntryMetadataContext(entry = null) {
     };
 }
 
-function buildSemanticBindingViewStateFromMetadataContext(metadataContext = null) {
-    if (!hasSemanticSummaryContent(metadataContext?.semanticSummary) && !hasBindingContent(metadataContext?.binding)) {
-        return null;
-    }
-    return buildReportBuilderSemanticBindingViewState({
-        semanticSummary: metadataContext?.semanticSummary || null,
-        binding: metadataContext?.binding || null,
-    });
-}
-
-function normalizeSemanticBindingViewState(value = null) {
-    if (!isPlainObject(value)) {
-        return null;
-    }
-    const title = normalizeString(value?.title);
-    const chips = Array.isArray(value?.chips)
-        ? value.chips.map((chip) => normalizeString(chip)).filter(Boolean)
-        : [];
-    const fieldGroups = Array.isArray(value?.fieldGroups)
-        ? value.fieldGroups
-            .filter((group) => isPlainObject(group))
-            .map((group) => {
-                const id = normalizeString(group?.id);
-                const groupTitle = normalizeString(group?.title);
-                const fields = Array.isArray(group?.fields)
-                    ? group.fields
-                        .filter((field) => isPlainObject(field)
-                            && (
-                                normalizeString(field?.id)
-                                || normalizeString(field?.rawId)
-                                || normalizeString(field?.label)
-                                || normalizeString(field?.definitionRef)
-                            ))
-                        .map((field) => cloneValue(field))
-                    : [];
-                if (!id || !groupTitle || fields.length === 0) {
-                    return null;
-                }
-                return {
-                    id,
-                    title: groupTitle,
-                    fields,
-                };
-            })
-            .filter(Boolean)
-        : [];
-    if (chips.length === 0 && fieldGroups.length === 0) {
-        return null;
-    }
-    return {
-        ...(title ? { title } : { title: "Semantic Binding" }),
-        ...(chips.length > 0 ? { chips } : {}),
-        ...(fieldGroups.length > 0 ? { fieldGroups } : {}),
-    };
-}
-
 function resolveImportedSemanticBindingViewState({
     metadataContext = null,
     candidates = [],
 } = {}) {
-    for (const candidate of (Array.isArray(candidates) ? candidates : [candidates])) {
-        const normalized = normalizeSemanticBindingViewState(candidate);
-        if (normalized) {
-            return normalized;
-        }
-    }
-    return buildSemanticBindingViewStateFromMetadataContext(metadataContext);
+    return resolvePreferredReportBuilderSemanticBindingViewState({
+        metadataContexts: [metadataContext],
+        candidates,
+    });
 }
 
 function buildSemanticBindingViewSection(semanticBindingViewState = null) {
@@ -179,7 +120,7 @@ function buildImportedScopeSummary(scopeParams = []) {
     const summary = buildReportBuilderScopeSummaryFromParams(scopeParams);
     return Array.isArray(summary?.items) && summary.items.length > 0
         ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: summary.text,
             scopeSummaryItems: summary.items,
         }
@@ -725,7 +666,7 @@ export function buildImportedPipelinePreviewPanelState({
         compatibilityMessage: normalizeString(compatibility?.message),
         ...(buildSemanticBindingViewSection(semanticBindingViewState) || {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),
@@ -814,7 +755,7 @@ export function buildImportedPipelineInspectorState({
         ...(companionViewState ? companionViewState : {}),
         ...(buildSemanticBindingViewSection(semanticBindingViewState) || {}),
         ...(Array.isArray(scopeSummary?.items) && scopeSummary.items.length > 0 ? {
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: scopeSummary.text,
             scopeSummaryItems: scopeSummary.items,
         } : {}),

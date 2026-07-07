@@ -16,6 +16,21 @@ function normalizeSemanticValidationState(state = {}) {
     };
 }
 
+export function hasRetryableSemanticValidationDiagnostics(diagnostics = []) {
+    return (Array.isArray(diagnostics) ? diagnostics : []).some((diagnostic) => {
+        const code = String(diagnostic?.code || "").trim();
+        return code === "semanticModelError"
+            || code === "semanticModelUnavailable"
+            || code === "unknownModel";
+    });
+}
+
+export function resolveSemanticValidationIssueKind(diagnostics = []) {
+    return hasRetryableSemanticValidationDiagnostics(diagnostics)
+        ? "semanticModelResolution"
+        : "";
+}
+
 export function resolveReportBuilderStateReadiness({
     config = {},
     state = {},
@@ -111,10 +126,14 @@ export function resolveReportBuilderStateReadiness({
             };
         }
         if (normalizedValidationState.valid === false) {
+            const retryValidation = semanticRetryAvailable
+                && hasRetryableSemanticValidationDiagnostics(normalizedValidationState.diagnostics);
             return {
                 canRun: false,
                 reason: "semantic",
                 message: summarizeReportBuilderSemanticDiagnostics(normalizedValidationState.diagnostics) || "The semantic provider rejected the current selection.",
+                ...(retryValidation ? { issueKind: resolveSemanticValidationIssueKind(normalizedValidationState.diagnostics) } : {}),
+                ...(retryValidation ? { action: "retrySemanticValidation" } : {}),
             };
         }
         if (normalizedValidationState.valid !== true) {

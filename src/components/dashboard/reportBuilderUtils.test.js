@@ -158,7 +158,7 @@ const defaults = buildReportBuilderDefaultState(config);
 assert.deepEqual(defaults.selectedMeasures, ["totalSpend"]);
 assert.deepEqual(defaults.selectedDimensions.sort(), ["eventDate", "siteType"].sort());
 assert.equal(defaults.groupBy, "channelId");
-assert.deepEqual(defaults.staticFilters.channelIds, [1]);
+assert.deepEqual(defaults.scopeParams.channelIds, [1]);
 
 assert.equal(shouldAutoCollapseReportBuilderFilters({
     canShowResults: true,
@@ -257,7 +257,7 @@ assert.equal(
     }).shouldAutoCollapseSeededPanel,
     false,
 );
-assert.deepEqual(defaults.staticFilters.dateRange, { start: "2026-04-01", end: "2026-04-30" });
+assert.deepEqual(defaults.scopeParams.dateRange, { start: "2026-04-01", end: "2026-04-30" });
 assert.equal(defaults.page, 1);
 assert.equal(defaults.pageSize, 50);
 assert.equal(defaults.orderField, "eventDate");
@@ -316,8 +316,8 @@ const relativeDefaults = buildReportBuilderDefaultState({
         },
     ],
 });
-assert.match(relativeDefaults.staticFilters.dateRange.start, /^\d{4}-\d{2}-\d{2}$/);
-assert.match(relativeDefaults.staticFilters.dateRange.end, /^\d{4}-\d{2}-\d{2}$/);
+assert.match(relativeDefaults.scopeParams.dateRange.start, /^\d{4}-\d{2}-\d{2}$/);
+assert.match(relativeDefaults.scopeParams.dateRange.end, /^\d{4}-\d{2}-\d{2}$/);
 
 const relativeDefaultsLast3 = buildReportBuilderDefaultState({
     staticFilters: [
@@ -328,10 +328,10 @@ const relativeDefaultsLast3 = buildReportBuilderDefaultState({
         },
     ],
 });
-assert.match(relativeDefaultsLast3.staticFilters.dateRange.start, /^\d{4}-\d{2}-\d{2}$/);
-assert.match(relativeDefaultsLast3.staticFilters.dateRange.end, /^\d{4}-\d{2}-\d{2}$/);
-const startLast3 = new Date(relativeDefaultsLast3.staticFilters.dateRange.start);
-const endLast3 = new Date(relativeDefaultsLast3.staticFilters.dateRange.end);
+assert.match(relativeDefaultsLast3.scopeParams.dateRange.start, /^\d{4}-\d{2}-\d{2}$/);
+assert.match(relativeDefaultsLast3.scopeParams.dateRange.end, /^\d{4}-\d{2}-\d{2}$/);
+const startLast3 = new Date(relativeDefaultsLast3.scopeParams.dateRange.start);
+const endLast3 = new Date(relativeDefaultsLast3.scopeParams.dateRange.end);
 assert.equal(Math.round((endLast3 - startLast3) / 86400000), 2);
 
 const semanticDefaultState = buildReportBuilderDefaultState(semanticMappedConfig);
@@ -939,7 +939,7 @@ assert.deepEqual(
             groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
             eyebrow: "Metrics Panel",
             metaItems: ["Selected Dates", "Market Context", "Export Ready"],
-            description: "Table-first preset with curated columns, sort order, and export-ready grid semantics.",
+            description: "Table-first preset that reselects the current query, columns, and sort for an export-ready grid.",
         },
         {
             label: "Reach Grid",
@@ -947,7 +947,7 @@ assert.deepEqual(
             groupDescription: "Table-first grids for export-ready delivery and reach reporting.",
             eyebrow: "Household Metrics",
             metaItems: ["Reach Priority", "Market Rollup", "Export Ready"],
-            description: "Table-first preset with curated columns, sort order, and export-ready grid semantics.",
+            description: "Table-first preset that reselects the current query, columns, and sort for an export-ready grid.",
         },
         {
             label: "Spend by Date",
@@ -955,7 +955,7 @@ assert.deepEqual(
             groupDescription: "Narrative story charts for split trends and channel movement.",
             eyebrow: "Visual Story",
             metaItems: ["Split by Site Type", "Trend View", "Full Query"],
-            description: "Chart preset (line) — adds siteType",
+            description: "Preset (line) that reselects the current table and chart for a curated visual read. — adds siteType",
         },
         {
             label: "Spend + Impressions by Date",
@@ -963,7 +963,7 @@ assert.deepEqual(
             groupDescription: "Blended KPI charts for volume and reach comparisons.",
             eyebrow: "KPI Blend",
             metaItems: ["Dual Axis", "Reach + Volume", "Full Query"],
-            description: "Chart preset (bar) for a curated visual read of the current table.",
+            description: "Preset (bar) that reselects the current table and chart for a curated visual read.",
         },
         {
             label: "Saved Trend",
@@ -971,7 +971,7 @@ assert.deepEqual(
             groupDescription: "",
             eyebrow: "",
             metaItems: [],
-            description: "Previous chart preset for this field set.",
+            description: "Previous preset for this field set.",
         },
     ],
 );
@@ -984,7 +984,7 @@ const merged = mergeReportBuilderState(config, {
     pageSize: 25,
     orderField: "totalSpend",
     orderDir: "desc",
-    staticFilters: {
+    scopeParams: {
         channelIds: [1, 2],
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -1019,7 +1019,7 @@ assert.deepEqual(resolveReportBuilderReadiness(config, merged), { canRun: true, 
 const semanticRequestState = mergeReportBuilderState(semanticMappedConfig, {
     selectedMeasures: ["totalSpend", "impressions"],
     selectedDimensions: ["eventDate"],
-    staticFilters: {
+    scopeParams: {
         channelIds: [1, 2],
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -1140,7 +1140,7 @@ const mergedSemanticPersistedPreviewState = mergeReportBuilderState(semanticPers
     selectedDimensions: ["eventDate", "channelId"],
     groupBy: "agegroupId",
     binding: semanticPersistedPreviewConfig.binding,
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-04",
@@ -1177,7 +1177,7 @@ assert.equal(
 
 const disabledDynamicRowState = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend"],
-    staticFilters: {
+    scopeParams: {
         channelIds: [1],
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -1198,7 +1198,7 @@ assert.equal(disabledDynamicRowState.dynamicGroups.scope[0].enabled, false);
 
 const computedOnlyState = mergeReportBuilderState(config, {
     selectedMeasures: ["ctr"],
-    staticFilters: {
+    scopeParams: {
         channelIds: [1],
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -1598,7 +1598,7 @@ assert.match(invalidPreparedTableCalculation.message, /missingBreakdown/);
 
 const missingDate = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend"],
-    staticFilters: {
+    scopeParams: {
         channelIds: [1],
         dateRange: { start: "", end: "" },
     },
@@ -1608,7 +1608,7 @@ assert.deepEqual(resolveReportBuilderReadiness(config, missingDate), { canRun: f
 
 const missingScope = mergeReportBuilderState(config, {
     selectedMeasures: ["totalSpend"],
-    staticFilters: {
+    scopeParams: {
         channelIds: [1],
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -1942,7 +1942,14 @@ assert.equal(explicitContainer.chart.series.valueKey, "totalSpend");
 const displayConfig = {
     ...config,
     dimensions: [
-        { id: "channelId", key: "channelId", displayKey: "channel.channel", paramPath: "dimensions.channelId", default: true },
+        {
+            id: "channelId",
+            key: "channelId",
+            displayKey: "channel.channel",
+            displayValueMap: { "1": "Display", "6": "CTV" },
+            paramPath: "dimensions.channelId",
+            default: true,
+        },
         { id: "eventDate", key: "eventDate", paramPath: "dimensions.eventDate", chartAxis: true },
     ],
 };
@@ -1988,6 +1995,7 @@ assert.deepEqual(
             label: "Channel",
             kind: "dimension",
             format: undefined,
+            displayValueMap: { "1": "Display", "6": "CTV" },
             cellVisual: {
                 kind: "badge",
                 rules: [
@@ -2079,7 +2087,7 @@ const autoProvisionedQuickApply = prepareReportBuilderChartApplication(displayCo
     selectedMeasures: ["totalSpend"],
     primaryMeasure: "totalSpend",
     page: 3,
-    staticFilters: {
+    scopeParams: {
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
 }, {
@@ -2105,7 +2113,7 @@ const manualRunQuickApply = prepareReportBuilderChartApplication({
     selectedDimensions: ["eventDate"],
     selectedMeasures: ["totalSpend"],
     primaryMeasure: "totalSpend",
-    staticFilters: {
+    scopeParams: {
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
 }, {
@@ -2129,7 +2137,7 @@ const replaceSelectionQuickApply = prepareReportBuilderChartApplication({
     selectedMeasures: ["totalSpend", "impressions"],
     primaryMeasure: "impressions",
     groupBy: "channelId",
-    staticFilters: {
+    scopeParams: {
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
 }, {
@@ -2163,7 +2171,7 @@ const autoFetchOnSelectQuickApply = prepareReportBuilderChartApplication({
     selectedDimensions: ["eventDate", "channelId"],
     selectedMeasures: ["totalSpend", "impressions"],
     primaryMeasure: "impressions",
-    staticFilters: {
+    scopeParams: {
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
 }, {
@@ -2183,7 +2191,7 @@ const groupedQuickApply = prepareReportBuilderChartApplication(config, {
     selectedMeasures: ["totalSpend"],
     primaryMeasure: "totalSpend",
     groupBy: "channelId",
-    staticFilters: {
+    scopeParams: {
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
 }, {
@@ -2242,7 +2250,7 @@ const sanitizedInvalidOrderState = sanitizeReportBuilderState(displayConfig, {
     primaryMeasure: "totalSpend",
     orderField: "eventDate",
     orderDir: "asc",
-    staticFilters: {
+    scopeParams: {
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
 });
@@ -2301,7 +2309,7 @@ const singleSelectArrayConfig = {
 };
 const singleSelectArrayState = mergeReportBuilderState(singleSelectArrayConfig, {
     selectedMeasures: ["totalSpend"],
-    staticFilters: {
+    scopeParams: {
         channelIds: [1],
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -2353,7 +2361,7 @@ const hookOwnedTargetingConfig = {
 };
 const hookOwnedTargetingState = mergeReportBuilderState(hookOwnedTargetingConfig, {
     selectedMeasures: ["totalSpend"],
-    staticFilters: {
+    scopeParams: {
         channelIds: [1],
         dateRange: { start: "2026-05-01", end: "2026-05-31" },
     },
@@ -2550,7 +2558,7 @@ const metricAliasConfig = {
     ],
 };
 const metricAliasState = {
-    staticFilters: {
+    scopeParams: {
         dateRange: { start: "2026-05-20", end: "2026-05-26" },
     },
     dynamicGroups: {

@@ -178,6 +178,114 @@ reportBuilder:
       scope: {}
 ```
 
+## Unified predicates
+
+`predicates` (with optional `predicateGroups`) is the unified way to declare
+scope/filtering intent once, instead of hand-writing the legacy split of
+`staticFilters`, `dynamicFilterGroups` and `dynamicFilterFamilies`. Predicates
+are lowered onto those runtime structures automatically (implemented in
+`src/components/dashboard/reportBuilderPredicates.js`), so request shaping,
+lookup hydration, persistence and the filter UI stay unchanged. Explicit legacy
+declarations with the same ids win over generated ones, which supports
+incremental migration.
+
+```yaml
+reportBuilder:
+  predicateGroups:
+    - id: inventory
+      label: Inventory
+      icon: box
+
+  predicates:
+    # pinned/static scope predicate
+    - id: channels
+      label: Channels
+      pinned: true
+      multiple: true
+      paramPath: filters.includeChannelV2
+      options:
+        - value: 1
+          label: Display
+          default: true
+      prefill:
+        path: includeChannelV2         # resolved against windowForm.prefill
+
+    # pinned date range (dateRange implies pinned)
+    - id: dateRange
+      label: Date Range
+      kind: dateRange
+      required: true
+      startParamPath: filters.from
+      endParamPath: filters.to
+      prefill:
+        start: from
+        end: to
+
+    # include/exclude capable targeting predicate, lookup-backed
+    - id: publisher
+      label: Publisher
+      group: inventory                 # grouped into a predicate family
+      dialogId: publisherPicker
+      manualEntry: true
+      manualValueType: int
+      valueSelector: publisherId
+      labelSelector: publisherName
+      include:
+        filterId: includePublisherId
+        paramPath: filters.includePublisherId
+      exclude:
+        filterId: excludePublisherId
+        paramPath: filters.excludePublisherId
+      prefill:
+        include: includePublisherId
+        exclude: excludePublisherId
+
+    # targeting predicate resolved through a lookup hook (targetingFeatureKey)
+    - id: siteType
+      label: Site Type
+      group: inventory
+      targetingFeatureKey: ad.site.type
+      include: true                    # defaults: filterId includeSiteType, paramPath filters.includeSiteType
+      exclude: true
+
+    # neutral (non-directional) predicate; lands in the `scope` bucket by default
+    - id: audienceIds
+      label: Audience
+      dialogId: audiencePicker
+      valueSelector: audienceId
+      labelSelector: audienceName
+      paramPath: filters.audienceIds
+      prefill:                         # ordered fallback paths; first non-empty wins
+        - scope.audienceIds
+        - audienceIds
+```
+
+Lowering rules:
+
+- `pinned: true` (or `kind: dateRange`) lowers to a `staticFilters` entry
+- `include:` / `exclude:` lower to filters in the `include` / `exclude`
+  dynamic groups; direction filter ids default to `include<PredicateId>` /
+  `exclude<PredicateId>` and param paths to `filters.<filterId>`
+- predicates with neither direction lower into the dynamic group named by
+  `bucket` (default `scope`)
+- `group:` membership plus `predicateGroups` produce `dynamicFilterFamilies`
+- `lookup`, `dialogId`, `targetingFeatureKey`, selectors and manual-entry
+  fields pass through to the lowered filters, so declarative lookups and
+  `hooks.resolveLookup` both keep working
+- row predicates default to `multiple: true` + `emitArray: true`
+
+Prefill: each predicate can declare where its initial value comes from in the
+`windowForm.prefill` payload (dotted paths supported). A string is shorthand
+for `{ path: ... }`, and every prefill key (`path`, `start`, `end`, `include`,
+`exclude`) accepts either a single path or an ordered list of fallback paths —
+the first path resolving a non-empty value wins (empty arrays fall through), so
+one declaration can serve payload variants such as nested `scope.audienceIds`
+vs top-level `audienceIds`. Declarative prefill is applied before the optional
+`hooks.initializeState` handler, which receives the prefilled state and can
+refine it. Prefill values may be scalars, arrays, or record objects (projected
+through `valueSelector` / `labelSelector`), and replace any previous rows for
+the same lowered filter.
+
 ## Behavior
 
 - measure pills are configurable and backward-compatible with current chart

@@ -393,6 +393,10 @@ export const reportFillSchema = {
         key: { type: "string" },
         sourceKey: { type: "string" },
         displayKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         label: { type: "string" },
         kind: { type: "string" },
         format: { type: "string" },
@@ -811,6 +815,11 @@ export const reportFillSchema = {
       required: ["dataKey"],
       properties: {
         dataKey: { type: "string" },
+        sourceDataKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         tickFormat: { type: "string" },
       },
     },
@@ -841,6 +850,11 @@ export const reportFillSchema = {
       required: ["nameKey", "valueKey", "values", "palette"],
       properties: {
         nameKey: { type: "string" },
+        sourceNameKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         valueKey: { type: "string" },
         values: {
           type: "array",
@@ -875,6 +889,11 @@ export const reportFillSchema = {
       required: ["nameKey", "valueKey", "palette"],
       properties: {
         nameKey: { type: "string" },
+        sourceNameKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         valueKey: { type: "string" },
         palette: {
           type: "array",
@@ -934,6 +953,11 @@ export const reportFillSchema = {
         valueLabel: { type: "string" },
         secondaryField: { type: "string" },
         secondaryLabel: { type: "string" },
+        secondaryDisplayKey: { type: "string" },
+        secondaryDisplayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         description: { type: "string" },
         emptyLabel: { type: "string" },
         content: {
@@ -949,6 +973,11 @@ export const reportFillSchema = {
             rowCount: { type: "integer", minimum: 0 },
             secondaryField: { type: "string" },
             secondaryLabel: { type: "string" },
+            secondaryDisplayKey: { type: "string" },
+            secondaryDisplayValueMap: {
+              type: "object",
+              additionalProperties: { $ref: "#/$defs/jsonValue" },
+            },
             secondaryValue: { $ref: "#/$defs/jsonValue" },
             emptyLabel: { type: "string" },
           },
@@ -963,6 +992,7 @@ export const reportFillSchema = {
         id: { type: "string" },
         kind: { const: "filterBarBlock" },
         title: { type: "string" },
+        datasetRef: { type: "string" },
         paramIds: {
           type: "array",
           items: { type: "string" },
@@ -982,7 +1012,25 @@ export const reportFillSchema = {
                 properties: {
                   id: { type: "string" },
                   label: { type: "string" },
+                  type: { type: "string" },
                   description: { type: "string" },
+                  datasetRef: { type: "string" },
+                  required: { type: "boolean" },
+                  multiple: { type: "boolean" },
+                  presentation: { type: "string" },
+                  options: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["value", "label"],
+                      properties: {
+                        value: { $ref: "#/$defs/jsonValue" },
+                        label: { type: "string" },
+                        icon: { type: "string" },
+                      },
+                    },
+                  },
                   value: {},
                 },
               },

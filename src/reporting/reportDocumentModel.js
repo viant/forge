@@ -1,4 +1,10 @@
-import { buildReportBuilderReportSpec, buildReportSpecChartBlock } from "./reportSpecModel.js";
+import {
+  buildReportBuilderPublishedDatasetConfig,
+  buildReportBuilderPublishedDatasetDeclarations,
+  buildReportBuilderReportSpec,
+  buildReportSpecChartBlock,
+  normalizeReportBuilderPublishedDataSources,
+} from "./reportSpecModel.js";
 import { normalizeReportCalculatedFields } from "./calculatedFieldModel.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
 import {
@@ -7,10 +13,35 @@ import {
 } from "./refinementBarModel.js";
 import { normalizeReportDocumentTableBlock } from "./tableVisualSpec.js";
 import { buildReportBuilderCalculatedFieldConfig } from "../components/dashboard/reportBuilderCalculatedFieldAuthoring.js";
+import { normalizeReportBuilderStaticDatasets } from "../components/dashboard/reportBuilderStaticDatasets.js";
 import { normalizeReportBuilderChartSpec } from "../components/dashboard/reportBuilderUtils.js";
+import {
+  listReportBuilderPinnedPredicates,
+  resolveReportBuilderScopeParamFilters,
+} from "../components/dashboard/reportBuilderPredicates.js";
+import {
+  SCOPE_PARAMS_BINDING_PREFIX,
+  STATIC_FILTERS_BINDING_PREFIX,
+  resolveScopeBindingFilterId,
+} from "./scopeBindingModel.js";
+import {
+  getScopeParamValue,
+  mergeScopeParamValues,
+  resolveScopeParamId,
+} from "./scopeStateModel.js";
+import { buildReportLayoutItem } from "./reportLayoutModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
+}
+
+function normalizeFilterBarTitle(value = "") {
+  const normalized = normalizeString(value);
+  const lowered = normalized.toLowerCase();
+  if (!normalized || lowered === "scope" || lowered === "report scope") {
+    return "Filters";
+  }
+  return normalized;
 }
 
 function cloneValue(value) {
@@ -29,10 +60,6 @@ function normalizeGeoFormat(value = "") {
     return "compact";
   }
   return normalized;
-}
-
-function normalizeLayoutItemSize(value = "") {
-  return normalizeString(value).toLowerCase() === "half" ? "half" : "";
 }
 
 export function extractReportDocumentTemplateIdentity(document = null) {
@@ -57,15 +84,10 @@ export function extractReportDocumentTemplateIdentity(document = null) {
   };
 }
 
-function buildLayoutItem(blockId = "", { size = "" } = {}) {
-  const normalizedBlockId = normalizeString(blockId);
-  if (!normalizedBlockId) {
-    return null;
-  }
-  const normalizedSize = normalizeLayoutItemSize(size);
-  return normalizedSize
-    ? { blockId: normalizedBlockId, size: normalizedSize }
-    : { blockId: normalizedBlockId };
+function buildLayoutItem(blockId = "", source = null) {
+  return buildReportLayoutItem(blockId, source, {
+    preserveLegacyHalf: true,
+  });
 }
 
 function isPlainObject(value) {
@@ -201,6 +223,9 @@ function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
       ...normalizedColumn,
       sourceKey,
       displayKey,
+      ...(normalizedColumn?.displayValueMap || catalogEntry?.entry?.displayValueMap
+        ? { displayValueMap: cloneValue(normalizedColumn?.displayValueMap || catalogEntry?.entry?.displayValueMap) }
+        : {}),
       ...(normalizeString(normalizedColumn?.label || catalogEntry?.entry?.label || fieldId)
         ? { label: normalizeString(normalizedColumn?.label || catalogEntry?.entry?.label || fieldId) }
         : {}),
@@ -213,6 +238,138 @@ function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
     };
   });
   return normalizedBlock;
+}
+
+function buildAuthoredKpiBlock(block = {}, fieldCatalog = {}) {
+  const normalizedBlock = buildReportDocumentKpiBlock(block);
+  if (!normalizedBlock) {
+    return normalizedBlock;
+  }
+  const valueFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedBlock?.valueField);
+  const secondaryFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedBlock?.secondaryField);
+  const nextBlock = {
+    ...normalizedBlock,
+  };
+  if (!normalizeString(nextBlock?.valueLabel)) {
+    const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry?.entry);
+    const valueLabel = normalizeString(valueFieldEntry?.entry?.label || valueFieldId);
+    if (valueLabel) {
+      nextBlock.valueLabel = valueLabel;
+    }
+  }
+  if (normalizeString(nextBlock?.secondaryField) && secondaryFieldEntry?.entry) {
+    const secondaryFieldId = resolveReportBuilderFieldId(secondaryFieldEntry.entry);
+    const secondaryDisplayKey = normalizeString(
+      nextBlock?.secondaryDisplayKey
+      || secondaryFieldEntry?.entry?.displayKey
+      || secondaryFieldEntry?.entry?.displayPath
+      || secondaryFieldEntry?.entry?.key
+      || secondaryFieldId,
+    );
+    const secondaryDisplayValueMap = (
+      !nextBlock?.secondaryDisplayValueMap
+      && secondaryFieldEntry?.entry?.displayValueMap
+      && typeof secondaryFieldEntry.entry.displayValueMap === "object"
+      && !Array.isArray(secondaryFieldEntry.entry.displayValueMap)
+    )
+      ? cloneValue(secondaryFieldEntry.entry.displayValueMap)
+      : null;
+    if (secondaryDisplayKey && (secondaryDisplayKey !== normalizeString(nextBlock?.secondaryField) || secondaryDisplayValueMap)) {
+      nextBlock.secondaryDisplayKey = secondaryDisplayKey;
+    }
+    if (secondaryDisplayValueMap) {
+      nextBlock.secondaryDisplayValueMap = secondaryDisplayValueMap;
+    }
+    if (!normalizeString(nextBlock?.secondaryLabel)) {
+      const secondaryLabel = normalizeString(secondaryFieldEntry?.entry?.label || secondaryFieldId);
+      if (secondaryLabel) {
+        nextBlock.secondaryLabel = secondaryLabel;
+      }
+    }
+  }
+  return nextBlock;
+}
+
+function buildAuthoredBadgesBlock(block = {}, fieldCatalog = {}) {
+  const normalizedBlock = buildReportDocumentBadgesBlock(block);
+  if (!normalizedBlock) {
+    return normalizedBlock;
+  }
+  normalizedBlock.items = (Array.isArray(normalizedBlock?.items) ? normalizedBlock.items : []).map((item) => {
+    const normalizedItem = item && typeof item === "object" && !Array.isArray(item)
+      ? cloneValue(item)
+      : null;
+    if (!normalizedItem) {
+      return item;
+    }
+    const valueFieldEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedItem?.valueField);
+    const valueFieldId = resolveReportBuilderFieldId(valueFieldEntry?.entry);
+    if (!normalizeString(normalizedItem?.valueField) || !valueFieldEntry?.entry || !valueFieldId) {
+      return normalizedItem;
+    }
+    const displayKey = normalizeString(
+      normalizedItem?.displayKey
+      || valueFieldEntry?.entry?.displayKey
+      || valueFieldEntry?.entry?.displayPath
+      || valueFieldEntry?.entry?.key
+      || valueFieldId,
+    );
+    if (displayKey && displayKey !== normalizeString(normalizedItem?.valueField)) {
+      normalizedItem.displayKey = displayKey;
+    }
+    if (
+      !normalizedItem?.displayValueMap
+      && valueFieldEntry?.entry?.displayValueMap
+      && typeof valueFieldEntry.entry.displayValueMap === "object"
+      && !Array.isArray(valueFieldEntry.entry.displayValueMap)
+    ) {
+      normalizedItem.displayValueMap = cloneValue(valueFieldEntry.entry.displayValueMap);
+    }
+    if (!normalizeString(normalizedItem?.label)) {
+      const label = normalizeString(valueFieldEntry?.entry?.label || valueFieldId);
+      if (label) {
+        normalizedItem.label = label;
+      }
+    }
+    return normalizedItem;
+  });
+  return normalizedBlock;
+}
+
+function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset = null) {
+  const normalizedDataset = dataset && typeof dataset === "object" && !Array.isArray(dataset)
+    ? dataset
+    : null;
+  if (!normalizedDataset) {
+    return baseConfig;
+  }
+  const columnOptions = Array.isArray(normalizedDataset?.columnOptions)
+    ? normalizedDataset.columnOptions
+    : [];
+  const dimensions = columnOptions
+    .filter((column) => normalizeString(column?.kind) === "dimension")
+    .map((column) => ({
+      id: normalizeString(column?.key),
+      key: normalizeString(column?.key),
+      label: normalizeString(column?.label || column?.key),
+      ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
+    }))
+    .filter((entry) => entry.id && entry.key && entry.label);
+  const measures = columnOptions
+    .filter((column) => normalizeString(column?.kind) === "measure")
+    .map((column) => ({
+      id: normalizeString(column?.key),
+      key: normalizeString(column?.key),
+      label: normalizeString(column?.label || column?.key),
+      ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
+    }))
+    .filter((entry) => entry.id && entry.key && entry.label);
+  return {
+    ...(isPlainObject(baseConfig) ? cloneValue(baseConfig) : {}),
+    dataSourceRef: normalizeString(normalizedDataset?.dataSourceRef || baseConfig?.dataSourceRef),
+    dimensions,
+    measures,
+  };
 }
 
 function augmentReportRequestField(request = {}, fieldLookup = new Map(), fieldKey = "", defaultPathPrefix = "") {
@@ -291,6 +448,10 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
     if (!normalizedBlock) {
       return;
     }
+    const normalizedDatasetRef = normalizeString(normalizedBlock?.datasetRef || "primary") || "primary";
+    if (normalizedDatasetRef !== "primary") {
+      return;
+    }
     switch (normalizeString(normalizedBlock?.kind)) {
       case "chartBlock":
         enableField(normalizedBlock?.chartSpec?.xField);
@@ -301,6 +462,11 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
       case "kpiBlock":
         enableField(normalizedBlock?.valueField);
         enableField(normalizedBlock?.secondaryField);
+        break;
+      case "badgesBlock":
+        (Array.isArray(normalizedBlock?.items) ? normalizedBlock.items : []).forEach((item) => {
+          enableField(item?.valueField);
+        });
         break;
       case "tableBlock":
         (Array.isArray(normalizedBlock?.columns) ? normalizedBlock.columns : []).forEach((column) => {
@@ -357,12 +523,24 @@ function stripReportBuilderDocumentAuthoringState(state = {}) {
   return next;
 }
 
-function resolveScopeParamValue(filter = {}, state = {}) {
-  const filterId = normalizeString(filter?.id || filter?.field);
+function resolveScopeParamValue(filter = {}, state = {}, runtimeDatasetScopeParams = null, datasetRef = "") {
+  const filterId = resolveScopeParamId(filter);
   if (!filterId) {
     return null;
   }
-  const rawValue = state?.staticFilters?.[filterId];
+  const normalizedDatasetRef = normalizeString(datasetRef);
+  const datasetScopedValues = normalizedDatasetRef
+    && runtimeDatasetScopeParams
+    && typeof runtimeDatasetScopeParams === "object"
+    && !Array.isArray(runtimeDatasetScopeParams)
+    && runtimeDatasetScopeParams[normalizedDatasetRef]
+    && typeof runtimeDatasetScopeParams[normalizedDatasetRef] === "object"
+    && !Array.isArray(runtimeDatasetScopeParams[normalizedDatasetRef])
+      ? runtimeDatasetScopeParams[normalizedDatasetRef]
+      : null;
+  const rawValue = datasetScopedValues && Object.prototype.hasOwnProperty.call(datasetScopedValues, filterId)
+    ? datasetScopedValues[filterId]
+    : getScopeParamValue(state, filterId);
   if (filter?.type === "dateRange") {
     const start = normalizeString(rawValue?.start);
     const end = normalizeString(rawValue?.end);
@@ -374,11 +552,33 @@ function resolveScopeParamValue(filter = {}, state = {}) {
   return rawValue ?? null;
 }
 
-export function buildReportDocumentScopeParams(config = {}, state = {}) {
-  return (Array.isArray(config?.staticFilters) ? config.staticFilters : [])
+function collectPinnedPredicateScopeParams(config = {}, state = {}) {
+  return listReportBuilderPinnedPredicates(config).map((predicate) => {
+    const value = resolveScopeParamValue(
+      { id: predicate.id, ...(predicate.kind === "dateRange" ? { type: "dateRange" } : {}) },
+      state,
+    );
+    return {
+      id: predicate.id,
+      kind: predicate.kind === "dateRange"
+        ? "dateRange"
+        : (predicate.multiple === true ? "multiSelect" : "value"),
+      label: normalizeString(predicate.label || predicate.id),
+      ...(predicate.description ? { description: predicate.description } : {}),
+      required: predicate.required === true,
+      ...(predicate.multiple === true ? { multiple: true } : {}),
+      ...(predicate.presentation ? { presentation: normalizeString(predicate.presentation) } : {}),
+      ...(Array.isArray(predicate.options) ? { options: cloneValue(predicate.options) } : {}),
+      value,
+    };
+  });
+}
+
+function collectLegacyStaticFilterScopeParams(config = {}, state = {}, excludedIds = new Set()) {
+  return resolveReportBuilderScopeParamFilters(config)
     .map((filter) => {
       const id = normalizeString(filter?.id || filter?.field);
-      if (!id) {
+      if (!id || excludedIds.has(id)) {
         return null;
       }
       const value = resolveScopeParamValue(filter, state);
@@ -389,25 +589,103 @@ export function buildReportDocumentScopeParams(config = {}, state = {}) {
         label: normalizeString(filter?.label || id),
         ...(description ? { description } : {}),
         required: filter?.required === true,
+        ...(filter?.multiple === true ? { multiple: true } : {}),
+        ...(normalizeString(filter?.presentation) ? { presentation: normalizeString(filter.presentation) } : {}),
+        ...(Array.isArray(filter?.options) ? { options: cloneValue(filter.options) } : {}),
         value,
       };
     })
     .filter(Boolean);
 }
 
+function collectConfiguredDataSourceScopeParams(config = {}, state = {}, excludedIds = new Set(), runtimeDatasetScopeParams = null) {
+  const seen = new Set(excludedIds instanceof Set ? [...excludedIds] : []);
+  const params = [];
+  (Array.isArray(config?.dataSources) ? config.dataSources : []).forEach((source) => {
+    const datasetRef = normalizeString(source?.id || source?.dataSourceRef || source?.value);
+    if (!datasetRef) {
+      return;
+    }
+    (Array.isArray(source?.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
+      const id = normalizeString(option?.id || option?.value);
+      if (!id || seen.has(id)) {
+        return;
+      }
+      seen.add(id);
+      const kind = normalizeString(option?.kind || "value") || "value";
+      const value = resolveScopeParamValue({
+        id,
+        ...(kind === "dateRange" ? { type: "dateRange" } : {}),
+        ...(option?.multiple === true ? { multiple: true } : {}),
+      }, state, runtimeDatasetScopeParams, datasetRef);
+      params.push({
+        id,
+        kind,
+        label: normalizeString(option?.label || id),
+        ...(normalizeString(option?.description) ? { description: normalizeString(option.description) } : {}),
+        required: option?.required === true,
+        ...(option?.multiple === true ? { multiple: true } : {}),
+        ...(normalizeString(option?.presentation) ? { presentation: normalizeString(option.presentation) } : {}),
+        ...(Array.isArray(option?.options) ? { options: cloneValue(option.options) } : {}),
+        datasetRef,
+        value,
+      });
+    });
+  });
+  return params;
+}
+
+export function buildReportDocumentScopeParams(config = {}, state = {}, runtimeDatasetScopeParams = null) {
+  const predicateParams = collectPinnedPredicateScopeParams(config, state);
+  const predicateParamIds = new Set(predicateParams.map((param) => param.id));
+  const legacyParams = collectLegacyStaticFilterScopeParams(config, state, predicateParamIds);
+  const configuredSourceParams = collectConfiguredDataSourceScopeParams(
+    config,
+    state,
+    new Set([...predicateParamIds, ...legacyParams.map((param) => param.id)]),
+    runtimeDatasetScopeParams,
+  );
+  return [
+    ...predicateParams,
+    ...legacyParams,
+    ...configuredSourceParams,
+  ];
+}
+
 export function buildReportBuilderBlockScopeBindings(config = {}) {
-  return (Array.isArray(config?.staticFilters) ? config.staticFilters : [])
+  const predicateBindings = listReportBuilderPinnedPredicates(config).map((predicate) => ({
+    paramId: predicate.id,
+    target: `${SCOPE_PARAMS_BINDING_PREFIX}${predicate.id}`,
+  }));
+  const predicateParamIds = new Set(predicateBindings.map((binding) => binding.paramId));
+  const legacyBindings = resolveReportBuilderScopeParamFilters(config)
     .map((filter) => {
       const paramId = normalizeString(filter?.id || filter?.field);
-      if (!paramId) {
+      if (!paramId || predicateParamIds.has(paramId)) {
         return null;
       }
       return {
         paramId,
-        target: `staticFilters.${paramId}`,
+        target: `${STATIC_FILTERS_BINDING_PREFIX}${paramId}`,
       };
     })
     .filter(Boolean);
+  const seen = new Set([...predicateBindings, ...legacyBindings].map((binding) => binding.paramId));
+  const configuredSourceBindings = (Array.isArray(config?.dataSources) ? config.dataSources : [])
+    .flatMap((source) => (Array.isArray(source?.scopeParamOptions) ? source.scopeParamOptions : []))
+    .map((option) => {
+      const paramId = normalizeString(option?.id || option?.value);
+      if (!paramId || seen.has(paramId)) {
+        return null;
+      }
+      seen.add(paramId);
+      return {
+        paramId,
+        target: `${SCOPE_PARAMS_BINDING_PREFIX}${paramId}`,
+      };
+    })
+    .filter(Boolean);
+  return [...predicateBindings, ...legacyBindings, ...configuredSourceBindings];
 }
 
 export function buildReportDocumentMarkdownBlock({
@@ -427,11 +705,13 @@ export function buildReportDocumentFilterBarBlock({
   id = "filterBar",
   title = "Filters",
   paramIds = [],
+  datasetRef = "primary",
 } = {}) {
   return {
     id: normalizeString(id || "filterBar"),
     kind: "filterBarBlock",
-    title: normalizeString(title || "Filters"),
+    title: normalizeFilterBarTitle(title || "Filters"),
+    datasetRef: normalizeString(datasetRef || "primary") || "primary",
     paramIds: (Array.isArray(paramIds) ? paramIds : [])
       .map((entry) => normalizeString(entry))
       .filter(Boolean),
@@ -469,14 +749,79 @@ export function buildReportDocumentKpiBlock(block = {}) {
       ? {
         secondaryField,
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
+        ...(normalizeString(block?.secondaryDisplayKey)
+          ? { secondaryDisplayKey: normalizeString(block.secondaryDisplayKey) }
+          : {}),
+        ...(block?.secondaryDisplayValueMap && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap)
+          ? { secondaryDisplayValueMap: cloneValue(block.secondaryDisplayValueMap) }
+          : {}),
       }
       : {}),
     ...(normalizeString(block?.description)
       ? { description: normalizeString(block.description) }
       : {}),
+    ...(normalizeString(block?.tone) ? { tone: normalizeString(block.tone) } : {}),
     ...(normalizeString(block?.emptyLabel)
       ? { emptyLabel: normalizeString(block.emptyLabel) }
       : {}),
+  };
+}
+
+function normalizeReportDocumentBadgeItems(items = []) {
+  return (Array.isArray(items) ? items : [])
+    .map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        return null;
+      }
+      const label = normalizeString(item?.label);
+      const value = normalizeString(item?.value);
+      const valueField = normalizeString(item?.valueField);
+      const format = normalizeString(item?.format);
+      const displayKey = normalizeString(item?.displayKey);
+      const labelMode = normalizeString(item?.labelMode).toLowerCase();
+      const rules = (Array.isArray(item?.rules) ? item.rules : [])
+        .map((rule) => {
+          if (!rule || typeof rule !== "object" || Array.isArray(rule)) {
+            return null;
+          }
+          const next = {
+            ...("value" in rule ? { value: cloneValue(rule.value) } : {}),
+            ...(normalizeString(rule?.label) ? { label: normalizeString(rule.label) } : {}),
+            ...(normalizeString(rule?.tone) ? { tone: normalizeString(rule.tone) } : {}),
+          };
+          return Object.keys(next).length > 0 ? next : null;
+        })
+        .filter(Boolean);
+      const tone = normalizeString(item?.tone || item?.severity);
+      if (!label && !value && !valueField) {
+        return null;
+      }
+      return {
+        id: normalizeString(item?.id || `badge_${index + 1}`) || `badge_${index + 1}`,
+        ...(label ? { label } : {}),
+        ...(value ? { value } : {}),
+        ...(valueField ? { valueField } : {}),
+        ...(format ? { format } : {}),
+        ...(displayKey ? { displayKey } : {}),
+        ...(item?.displayValueMap && typeof item.displayValueMap === "object" && !Array.isArray(item.displayValueMap)
+          ? { displayValueMap: cloneValue(item.displayValueMap) }
+          : {}),
+        ...(["field", "manual"].includes(labelMode) ? { labelMode } : {}),
+        ...(rules.length > 0 ? { rules } : {}),
+        ...(tone ? { tone } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
+export function buildReportDocumentBadgesBlock(block = {}) {
+  const items = normalizeReportDocumentBadgeItems(block?.items);
+  return {
+    id: normalizeString(block?.id || "badgesBlock"),
+    kind: "badgesBlock",
+    title: normalizeString(block?.title || "Status Pills") || "Status Pills",
+    datasetRef: normalizeString(block?.datasetRef || "primary") || "primary",
+    items,
   };
 }
 
@@ -554,6 +899,9 @@ function normalizeReportBuilderDocumentBlock(block = {}) {
   if (normalizedKind === "kpiBlock") {
     return buildReportDocumentKpiBlock(block);
   }
+  if (normalizedKind === "badgesBlock") {
+    return buildReportDocumentBadgesBlock(block);
+  }
   if (normalizedKind === "chartBlock") {
     return buildReportDocumentChartBlock(block);
   }
@@ -606,9 +954,7 @@ function normalizeReportBuilderDocumentLayoutItems(layout = null, blockIds = [])
   const seen = new Set();
   const normalized = [];
   items.forEach((item) => {
-    const normalizedItem = buildLayoutItem(item?.blockId || item, {
-      size: item?.size,
-    });
+    const normalizedItem = buildLayoutItem(item?.blockId || item, item);
     const blockId = normalizeString(normalizedItem?.blockId);
     if (!blockId || seen.has(blockId) || !knownIds.has(blockId) || !normalizedItem) {
       return;
@@ -640,10 +986,11 @@ export function buildReportBuilderReportDocument({
   additionalBlocks = [],
   refinements = [],
   semanticSummary = null,
+  runtimeDatasetScopeParams = null,
 } = {}) {
   const documentId = resolveDocumentId(container);
   const blockId = "primaryBuilder";
-  const scopeParams = buildReportDocumentScopeParams(config, state);
+  const scopeParams = buildReportDocumentScopeParams(config, state, runtimeDatasetScopeParams);
   const documentBlocks = mergeReportBuilderDocumentBlocks(
     normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks),
     additionalBlocks,
@@ -699,30 +1046,22 @@ function applyReportBuilderBlockScope(document = {}, block = {}) {
       .map((param) => [normalizeString(param?.id), param])
       .filter(([id]) => !!id),
   );
-  const nextState = cloneValue(block?.state || {});
-  const nextStaticFilters = {
-    ...(nextState.staticFilters || {}),
-  };
+  const boundScopeValues = {};
   (Array.isArray(block?.scopeBindings) ? block.scopeBindings : []).forEach((binding) => {
     const paramId = normalizeString(binding?.paramId);
-    const target = normalizeString(binding?.target);
-    if (!paramId || !target.startsWith("staticFilters.")) {
+    const filterId = resolveScopeBindingFilterId(binding?.target);
+    if (!paramId || !filterId) {
       return;
     }
     const param = scopeParams.get(paramId);
     if (!param) {
       return;
     }
-    const filterId = normalizeString(target.slice("staticFilters.".length));
-    if (!filterId) {
-      return;
-    }
-    nextStaticFilters[filterId] = cloneValue(param.value);
+    boundScopeValues[filterId] = cloneValue(param.value);
   });
-  nextState.staticFilters = nextStaticFilters;
   return {
     ...block,
-    state: nextState,
+    state: mergeScopeParamValues(cloneValue(block?.state || {}), boundScopeValues),
   };
 }
 
@@ -746,9 +1085,7 @@ function orderLoweredBlocksByDocumentLayout(document = {}, baseSpec = {}, allBlo
     }
     seen.add(normalizedBlockId);
     ordered.push(block);
-    layoutItems.push(buildLayoutItem(normalizedBlockId, {
-      size: layoutItem?.size,
-    }) || { blockId: normalizedBlockId });
+    layoutItems.push(buildLayoutItem(normalizedBlockId, layoutItem) || { blockId: normalizedBlockId });
   };
   (Array.isArray(document?.layout?.items) ? document.layout.items : []).forEach((item) => {
     const blockId = normalizeString(item?.blockId);
@@ -777,7 +1114,10 @@ function orderLoweredBlocksByDocumentLayout(document = {}, baseSpec = {}, allBlo
   };
 }
 
-export function lowerReportDocumentToReportSpec(document = {}) {
+export function lowerReportDocumentToReportSpec(document = {}, {
+  includePrimaryBlocks = true,
+  runtimeDatasetScopeParams = null,
+} = {}) {
   const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
   const reportBuilderBlock = blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock");
   if (!reportBuilderBlock) {
@@ -789,6 +1129,22 @@ export function lowerReportDocumentToReportSpec(document = {}) {
   const scopedState = scopedReportBuilderBlock?.state || {};
   const effectiveConfig = buildReportBuilderCalculatedFieldConfig(scopedConfig, scopedState);
   const effectiveFieldCatalog = buildReportBuilderFieldCatalog(effectiveConfig);
+  const staticDatasets = normalizeReportBuilderStaticDatasets(scopedState?.reportStaticDatasets);
+  const staticDatasetIndex = new Map(
+    staticDatasets
+      .map((dataset) => [normalizeString(dataset?.id), dataset])
+      .filter(([datasetId]) => !!datasetId),
+  );
+  const publishedDatasetSources = normalizeReportBuilderPublishedDataSources(scopedConfig);
+  const publishedDatasetIndex = new Map();
+  publishedDatasetSources.forEach((source) => {
+    if (normalizeString(source?.id)) {
+      publishedDatasetIndex.set(normalizeString(source.id), source);
+    }
+    if (normalizeString(source?.dataSourceRef)) {
+      publishedDatasetIndex.set(normalizeString(source.dataSourceRef), source);
+    }
+  });
   const loweredContainer = {
     id: normalizeString(source.containerId || document?.id),
     stateKey: normalizeString(source.stateKey || source.containerId || document?.id),
@@ -801,16 +1157,64 @@ export function lowerReportDocumentToReportSpec(document = {}) {
     state: scopedState,
     refinements: normalizeReportRefinements(document?.refinements),
     semanticSummary: document?.semanticSummary || null,
+    includePrimaryBlocks,
   });
+  const resolveDatasetSpecificRuntimeContext = (datasetRef = "") => {
+    const normalizedDatasetRef = normalizeString(datasetRef || "primary") || "primary";
+    if (!normalizedDatasetRef || normalizedDatasetRef === "primary") {
+      return {
+        config: effectiveConfig,
+        fieldCatalog: effectiveFieldCatalog,
+        container: loweredContainer,
+      };
+    }
+    const staticDataset = staticDatasetIndex.get(normalizedDatasetRef) || null;
+    if (staticDataset) {
+      const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);
+      return {
+        config: datasetConfig,
+        fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
+        container: {
+          ...loweredContainer,
+          dataSourceRef: normalizeString(staticDataset?.dataSourceRef || loweredContainer?.dataSourceRef),
+        },
+      };
+    }
+    const publishedDataset = publishedDatasetIndex.get(normalizedDatasetRef) || null;
+    if (publishedDataset) {
+      const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset);
+      return {
+        config: datasetConfig,
+        fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
+        container: {
+          ...loweredContainer,
+          dataSourceRef: normalizeString(publishedDataset?.dataSourceRef || loweredContainer?.dataSourceRef),
+        },
+      };
+    }
+    return {
+      config: effectiveConfig,
+      fieldCatalog: effectiveFieldCatalog,
+      container: loweredContainer,
+    };
+  };
   const additionalBlocks = blocks
     .filter((block) => normalizeString(block?.kind) !== "reportBuilderBlock")
     .map((block) => {
       const normalizedBlock = normalizeReportBuilderDocumentBlock(block);
+      const datasetContext = resolveDatasetSpecificRuntimeContext(normalizedBlock?.datasetRef);
       if (normalizeString(normalizedBlock?.kind) === "chartBlock") {
+        const chartState = buildAuthoredChartBlockState({
+          ...cloneValue(scopedState),
+          selectedDimensions: [],
+          selectedMeasures: [],
+          primaryMeasure: "",
+          groupBy: "",
+        }, normalizedBlock?.chartSpec || {}, datasetContext.fieldCatalog);
         return buildReportSpecChartBlock({
-          container: loweredContainer,
-          config: effectiveConfig,
-          state: buildAuthoredChartBlockState(scopedState, normalizedBlock?.chartSpec || {}, effectiveFieldCatalog),
+          container: datasetContext.container,
+          config: datasetContext.config,
+          state: chartState,
           chartSpec: normalizedBlock?.chartSpec || null,
           blockId: normalizedBlock?.id,
           datasetRef: normalizedBlock?.datasetRef,
@@ -818,7 +1222,13 @@ export function lowerReportDocumentToReportSpec(document = {}) {
         });
       }
       if (normalizeString(normalizedBlock?.kind) === "tableBlock") {
-        return buildAuthoredTableBlock(normalizedBlock, effectiveFieldCatalog);
+        return buildAuthoredTableBlock(normalizedBlock, datasetContext.fieldCatalog);
+      }
+      if (normalizeString(normalizedBlock?.kind) === "kpiBlock") {
+        return buildAuthoredKpiBlock(normalizedBlock, datasetContext.fieldCatalog);
+      }
+      if (normalizeString(normalizedBlock?.kind) === "badgesBlock") {
+        return buildAuthoredBadgesBlock(normalizedBlock, datasetContext.fieldCatalog);
       }
       return normalizedBlock;
     })
@@ -829,6 +1239,21 @@ export function lowerReportDocumentToReportSpec(document = {}) {
     [...(Array.isArray(baseSpec?.blocks) ? baseSpec.blocks : []), ...additionalBlocks],
   );
   const nextBlocks = loweredLayout.blocks;
+  const referencedDatasetRefs = new Set(
+    nextBlocks
+      .map((block) => normalizeString(block?.datasetRef))
+      .filter((datasetRef) => !!datasetRef && datasetRef !== "primary"),
+  );
+  const additionalPublishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
+    scopedConfig,
+    scopedState,
+    referencedDatasetRefs,
+    runtimeDatasetScopeParams,
+  );
+  const mergedDatasets = [
+    ...(Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : []),
+    ...additionalPublishedDatasets.filter((dataset) => !((Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : []).some((entry) => normalizeString(entry?.id) === normalizeString(dataset?.id)))),
+  ];
   const nextSpec = {
     ...baseSpec,
     scope: {
@@ -840,6 +1265,7 @@ export function lowerReportDocumentToReportSpec(document = {}) {
       blockOrder: nextBlocks.map((block) => normalizeString(block?.id)).filter(Boolean),
       items: loweredLayout.items,
     },
+    datasets: mergedDatasets,
     blocks: nextBlocks,
   };
   return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig);

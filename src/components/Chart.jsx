@@ -28,9 +28,11 @@ import {
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import {
     aggregateDirectSeriesData,
+    buildPieSliceCellKey,
     buildPieChartData,
     fillMissingTemporalBuckets,
     formatTimestamp,
+    materializeChartDisplayRows,
     normalizeChartKey,
     readChartDataValue,
     resolveChartBodyState,
@@ -39,10 +41,15 @@ import {
     transformData,
 } from "./chartData.js";
 import {
+    normalizeSelectorLookupKey,
+    resolveChartDataSourceRef,
+} from "./chartContextRef.js";
+import {
     createKeyListSignature,
     normalizeKeys,
     reconcileSelectedDataKeys,
     reconcileVisibleColumns,
+    resolveSelectedValueKey,
     toggleSelectedDataKey,
 } from "./chartSeriesSelection.js";
 import {
@@ -54,6 +61,7 @@ import {
 import { SoftBlock } from "./SoftSkeleton.jsx";
 import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
+import { normalizeServiceErrorText } from "../utils/errorText.js";
 
 function ChartActionButton({
     children,
@@ -182,42 +190,7 @@ function tooltipFormatterForFormat(formatType) {
 }
 
 function formatChartErrorMessage(error) {
-    if (error == null) {
-        return "";
-    }
-    if (typeof error === "string") {
-        return error;
-    }
-    if (error instanceof Error) {
-        return error.message || String(error);
-    }
-    if (typeof error === "object") {
-        if (typeof error.message === "string" && error.message.trim()) {
-            return error.message;
-        }
-        try {
-            return JSON.stringify(error);
-        } catch (_) {
-            return "Chart data failed to load.";
-        }
-    }
-    return String(error);
-}
-
-function normalizeSelectorLookupKey(value) {
-    if (Array.isArray(value)) {
-        return normalizeSelectorLookupKey(value[0]);
-    }
-    if (value == null) {
-        return null;
-    }
-    if (typeof value === "object") {
-        if (value.value != null) return normalizeSelectorLookupKey(value.value);
-        if (value.id != null) return normalizeSelectorLookupKey(value.id);
-        if (value.key != null) return normalizeSelectorLookupKey(value.key);
-        return null;
-    }
-    return String(value);
+    return normalizeServiceErrorText(error, { serviceLabel: "chart data service" }) || "Chart data failed to load.";
 }
 
 function resolveMappedConfigValue(baseContext, entry = {}, valueKey = "", defaultSource = "windowForm") {
@@ -317,7 +290,7 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null}) => {
+const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true}) => {
     useSignals();
     const log = getLogger('chart');
     const {chart} = container;
@@ -349,39 +322,17 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const [expandedCell, setExpandedCell] = useState(null);
 
     const [selectedValueKey, setSelectedValueKey] = useState(series.valueKey || seriesDefinitions[0]?.value || "");
-    const resolveChartContext = () => {
-        if (!chart) return context;
-        const refs = chart.dataSourceRefs || {};
-        const selector = chart.dataSourceRefSelector || chart.dataSourceSelector;
-        const source = String(chart.dataSourceRefSource || 'windowForm').toLowerCase();
-        let directRef = chart.dataSourceRef || null;
-        if (!directRef && selector && refs && typeof refs === 'object') {
-        let scope = {};
-        switch (source) {
-            case 'form':
-                    scope = context?.signals?.form?.value || {};
-                    break;
-                case 'filter':
-                case 'filters':
-                    scope = context?.signals?.input?.value?.filter || {};
-                    break;
-                case 'input':
-                    scope = context?.signals?.input?.value || {};
-                    break;
-                case 'windowform':
-                default:
-                    scope = context?.signals?.windowForm?.value || {};
-                    break;
-            }
-            const key = normalizeSelectorLookupKey(resolveSelector(scope, selector));
-            if (key != null && refs[key]) {
-                directRef = refs[key];
-            }
-        }
-        return directRef ? context.Context(directRef) : context;
-    };
 
-    const chartContext = resolveChartContext();
+    const resolvedChartDataSourceRef = resolveChartDataSourceRef(context, chart);
+    const chartContext = (typeof context?.useDsContext === "function")
+        ? context.useDsContext(resolvedChartDataSourceRef || context?.identity?.dataSourceRef)
+        : (
+            resolvedChartDataSourceRef
+            && resolvedChartDataSourceRef !== context?.identity?.dataSourceRef
+            && typeof context?.Context === "function"
+                ? context.Context(resolvedChartDataSourceRef)
+                : context
+        );
     useEffect(() => {
         try {
             log.debug('[chart] resolved datasource', {
@@ -391,7 +342,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 selector: chart?.dataSourceRefSelector || chart?.dataSourceSelector || null,
             });
         } catch (_) {}
-    }, [chartContext, chart?.dataSourceRefSelector, chart?.dataSourceSelector, container?.id, context?.identity?.dataSourceRef]);
+    }, [chart?.dataSourceRefSelector, chart?.dataSourceSelector, chartContext, container?.id, context?.identity?.dataSourceRef]);
     const resolvedTickFormat = resolveMappedConfigValue(context, xAxis, "tickFormat", "windowForm");
     const { collection, loading, error } = useDataSourceState(chartContext);
     const chartMetrics = chartContext?.signals?.metrics?.value || {};
@@ -412,10 +363,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = type === "pie" || type === "donut";
     const isHorizontalBar = isHorizontalBarType(type);
     const prepared = useMemo(() => {
+        const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = buildPieChartData(effectiveCollection || [], nameKey, valueKey);
+            const rows = buildPieChartData(chartRows, nameKey, valueKey);
             return {
                 chartData: rows,
                 availableDataKeys: rows.map((row) => row.name),
@@ -424,7 +376,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
 
         if (directSeriesChart) {
-            const sorted = aggregateDirectSeriesData(effectiveCollection || [], xAxis?.dataKey, seriesDefinitions);
+            const sorted = aggregateDirectSeriesData(chartRows, xAxis?.dataKey, seriesDefinitions);
             return {
                 chartData: sorted,
                 availableDataKeys: seriesDefinitions.map((entry) => entry.value),
@@ -432,7 +384,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             };
         }
 
-        const {data, keys} = transformData(effectiveCollection, chart, selectedValueKey);
+        const {data, keys} = transformData(chartRows, chart, selectedValueKey);
         const selectedValue = (series.values || []).find((val) => val.value === selectedValueKey);
         return {
             chartData: data,
@@ -458,6 +410,18 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const availableDataKeysSignature = useMemo(
         () => createKeyListSignature(availableDataKeys),
         [availableDataKeys],
+    );
+    const seriesValueKeysSignature = useMemo(
+        () => createKeyListSignature(
+            Array.isArray(series?.values)
+                ? series.values.map((entry) => entry?.value)
+                : [],
+        ),
+        [series?.values],
+    );
+    const seriesDefinitionKeysSignature = useMemo(
+        () => createKeyListSignature(seriesDefinitions.map((entry) => entry?.value)),
+        [seriesDefinitions],
     );
     const stableAvailableDataKeys = useMemo(
         () => normalizeKeys(availableDataKeys),
@@ -489,10 +453,17 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [availableDataKeysSignature, stableAvailableDataKeys]);
 
     useEffect(() => {
-        if (embedded && viewMode !== "chart") {
+        setSelectedValueKey((previousValueKey) => {
+            const nextValueKey = resolveSelectedValueKey(previousValueKey, series, seriesDefinitions);
+            return nextValueKey === previousValueKey ? previousValueKey : nextValueKey;
+        });
+    }, [series?.valueKey, seriesDefinitionKeysSignature, seriesDefinitions, seriesValueKeysSignature, series]);
+
+    useEffect(() => {
+        if ((embedded || !showControls) && viewMode !== "chart") {
             setViewMode("chart");
         }
-    }, [embedded, viewMode]);
+    }, [embedded, showControls, viewMode]);
 
     const allTableColumns = useMemo(
         () => [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
@@ -877,7 +848,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 labelLine={!embedded}
             >
                 {pieFilteredData.map((entry, index) => (
-                    <Cell key={entry.name || index} fill={piePalette[index % piePalette.length]} />
+                    <Cell key={buildPieSliceCellKey(entry, index)} fill={piePalette[index % piePalette.length]} />
                 ))}
             </Pie>
             <Tooltip
@@ -1089,7 +1060,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             data-chart-loading={effectiveLoading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
         >
-            {showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
+            {showControls && showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
                 <div
                     aria-label="Chart series selector"
                     style={{
@@ -1138,7 +1109,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     })}
                 </div>
             ) : null}
-            {!embedded && showSeriesSelectionControls ? (
+            {showControls && !embedded && showSeriesSelectionControls ? (
                 <>
                     {!directSeriesChart && !isPieChart ? (
                         <RadioGroup

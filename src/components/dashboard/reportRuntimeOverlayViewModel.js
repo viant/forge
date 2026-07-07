@@ -10,7 +10,7 @@ export function buildReportRuntimeDiagnosticsViewModel(diagnostics = []) {
       }
       const severity = normalizeString(entry?.severity || "info").toLowerCase();
       const code = normalizeString(entry?.code || "diagnostic");
-      if (code === "runtimeRefinementUnsupported") {
+      if (code === "runtimeRefinementUnsupported" || code === "runtimePreviewError") {
         return null;
       }
       const blockId = normalizeString(entry?.blockId);

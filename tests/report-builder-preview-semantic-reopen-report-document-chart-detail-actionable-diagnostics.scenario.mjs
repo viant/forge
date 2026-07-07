@@ -1,4 +1,6 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
+  buildPreviewPatchReopenedCompileStateStep,
   buildClearDetailTargetBehaviorsSteps,
   buildDetailTargetBehaviorInjectionSteps,
   buildPreviewBootstrapSteps,
@@ -79,6 +81,10 @@ export default {
         "reportDocument.blocks.primaryChart.chartSpec.xField",
       ],
     }),
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date, Channel",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "waitForEval",
       expression: "document.querySelectorAll('.forge-report-builder__runtime-preview .forge-report-runtime-table-panel .forge-dashboard-row-action').length >= 2",
@@ -132,6 +138,29 @@ export default {
       text: "Primary Chart is no longer compatible with the current builder selection.",
       timeoutMs: 60000,
     },
+    buildPreviewPatchReopenedCompileStateStep({
+      compileState: {
+        status: "clean",
+        diagnostics: [],
+      },
+    }),
+    {
+      type: "waitForEval",
+      expression: "(() => { const state = window.__REPORT_BUILDER_PREVIEW__?.getBuilderState?.(); return state?.reportDocumentReopenSession?.reopenedCompileState?.status === 'clean'; })()",
+      timeoutMs: 60000,
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Reopened compile diagnostics",
+    },
+    {
+      type: "assertDomNotContains",
+      text: "Runtime Diagnostics",
+    },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date, Channel",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "screenshot",
       file: "report-builder-preview-semantic-reopen-report-document-chart-detail-actionable-diagnostics.png",

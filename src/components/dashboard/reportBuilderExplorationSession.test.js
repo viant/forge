@@ -20,7 +20,7 @@ const baseState = {
     selectedDimensions: ["eventDate", "channelId"],
     viewMode: "table",
     chartSpec: null,
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-04",
@@ -135,7 +135,7 @@ assert.deepEqual(keepReportBuilderExplorationState(withHistory), {
     selectedDimensions: ["eventDate", "channelId"],
     viewMode: "table",
     chartSpec: null,
-    staticFilters: {
+    scopeParams: {
         dateRange: {
             start: "2026-05-01",
             end: "2026-05-04",
@@ -219,6 +219,24 @@ assert.deepEqual(buildReportBuilderExplorationBannerState(startedFromChartSelect
         },
     },
 });
+
+const startedFromChartResult = beginReportBuilderExplorationSession({
+    ...baseState,
+    viewMode: "chart",
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+    },
+    sourceKind: "reportBuilder.chartResult",
+    nowMs: 2000,
+});
+
+assert.deepEqual(buildReportBuilderExplorationBannerState(startedFromChartResult, { nowMs: 2000 })?.hintItems, [
+    "Swap presets or edit the current view locally.",
+    "Switch to the table to inspect the same result rows.",
+    "Keep the draft only if the changes are worth saving.",
+]);
 
 assert.deepEqual(
     buildReportBuilderExplorationSourceContextFromTableRow({

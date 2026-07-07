@@ -1,4 +1,6 @@
 import {
+  buildAuthoredRuntimeSemanticSurfaceAbsentStep,
+  buildAuthoredRuntimeSemanticSurfaceWaitStep,
   buildPreviewBootstrapSteps,
   buildReopenedHydratedSessionVerificationSteps,
   buildSavedPayloadPreparationSteps,
@@ -96,11 +98,16 @@ export default {
       text: "Semantic model unavailable: Semantic binding is active, but no semantic model provider is available in the current runtime context.",
       timeoutMs: 60000,
     },
-    {
-      type: "waitForEval",
-      expression: "(() => { const preview = document.querySelector('[aria-label=\"Authored runtime preview\"]'); const text = preview?.innerText || preview?.textContent || ''; const retryButton = Array.from(document.querySelectorAll('button')).find((entry) => ((entry.innerText || entry.textContent || '').trim() === 'Retry model load')); return !!preview && text.includes('Capacity Trend Q3') && text.includes('Compile the authored runtime preview') && !text.includes('Model Ad Delivery') && !text.includes('Entity Line Delivery') && !retryButton; })()",
-      timeoutMs: 60000,
-    },
+    buildAuthoredRuntimeSemanticSurfaceAbsentStep({
+      requiredTexts: ["Capacity Trend Q3", "Compile the authored runtime preview"],
+      forbiddenTexts: [
+        "Model Ad Delivery",
+        "Entity Line Delivery",
+        "Dimensions Delivery Date, Channel",
+        "Measures Available Impressions",
+      ],
+      absentButtonText: "Retry model load",
+    }),
     {
       type: "eval",
       expression: "(() => { const preview = window.__REPORT_BUILDER_PREVIEW__; preview.__providerUnavailableBeforeRestore = Number(preview.getModelCount || 0); return preview.setSemanticModelProviderAvailable(true); })()",
@@ -119,11 +126,10 @@ export default {
       text: "Semantic binding: Ad Delivery • Entity: Line Delivery",
       timeoutMs: 60000,
     },
-    {
-      type: "waitForEval",
-      expression: "(() => { const preview = document.querySelector('[aria-label=\"Authored runtime preview\"]'); const text = preview?.innerText || preview?.textContent || ''; return !!preview && text.includes('Model Ad Delivery') && text.includes('Entity Line Delivery') && text.includes('Dimensions Delivery Date, Channel') && text.includes('Measures Available Impressions'); })()",
-      timeoutMs: 60000,
-    },
+    buildAuthoredRuntimeSemanticSurfaceWaitStep({
+      dimensionText: "Dimensions Delivery Date, Channel",
+      measureText: "Measures Available Impressions",
+    }),
     {
       type: "screenshot",
       file: "report-builder-preview-semantic-reopen-report-document-provider-unavailable-runtime-preview.png",

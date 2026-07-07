@@ -1,4 +1,12 @@
 import { normalizeReportBuilderDocumentBlocks } from "../../reporting/reportDocumentModel.js";
+import {
+    getScopeParamValue,
+    hasScopeParamValues,
+    listScopeParamValues,
+    resolveScopeParamId,
+    scopeParamStatePath,
+    scopeParamStateSlice,
+} from "../../reporting/scopeStateModel.js";
 import { buildReportBuilderCalculatedFieldConfig } from "./reportBuilderCalculatedFieldAuthoring.js";
 import {
     buildReportBuilderDocumentCompileDiagnostics,
@@ -6,6 +14,7 @@ import {
     normalizeReportBuilderDocumentLayoutState,
 } from "./reportBuilderDocumentBlocks.js";
 import {
+    buildReportBuilderDefaultState,
     buildReportBuilderChartFields,
     getSelectableReportBuilderMeasures,
     getVisibleReportBuilderDimensions,
@@ -13,6 +22,7 @@ import {
     normalizeReportBuilderChartSpec,
     validateReportBuilderChartSpec,
 } from "./reportBuilderUtils.js";
+import { resolveReportBuilderScopeParamFilters } from "./reportBuilderPredicates.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -61,6 +71,75 @@ function normalizeTemplateDocumentPatch(documentPatch = null) {
     };
 }
 
+function stableStringify(value) {
+    return JSON.stringify(value == null ? null : value);
+}
+
+function isPreservableStaticFilterValue(filter = {}, value = null) {
+    if (value == null) {
+        return false;
+    }
+    if (filter?.type === "dateRange") {
+        return !!normalizeString(value?.start) && !!normalizeString(value?.end);
+    }
+    if (filter?.multiple) {
+        return Array.isArray(value) && value.length > 0;
+    }
+    return normalizeString(value) !== "";
+}
+
+function preserveMeaningfulScopeParamValues(config = {}, templateScopeValues = null, baseScopeValues = null) {
+    const defaults = buildReportBuilderDefaultState(config);
+    const scopeParamFilterIndex = new Map(
+        resolveReportBuilderScopeParamFilters(config)
+            .map((filter) => [resolveScopeParamId(filter), filter]),
+    );
+    const nextScopeValues = isPlainObject(templateScopeValues)
+        ? cloneValue(templateScopeValues)
+        : {};
+    if (!isPlainObject(baseScopeValues)) {
+        return nextScopeValues;
+    }
+    Object.entries(baseScopeValues).forEach(([filterId, baseValue]) => {
+        const normalizedFilterId = normalizeString(filterId);
+        if (!normalizedFilterId) {
+            return;
+        }
+        const filter = scopeParamFilterIndex.get(normalizedFilterId) || null;
+        if (filter && !isPreservableStaticFilterValue(filter, baseValue)) {
+            return;
+        }
+        const defaultValue = getScopeParamValue(defaults, normalizedFilterId);
+        if (stableStringify(baseValue) === stableStringify(defaultValue)) {
+            return;
+        }
+        nextScopeValues[normalizedFilterId] = cloneValue(baseValue);
+    });
+    return nextScopeValues;
+}
+
+function preserveMeaningfulDynamicGroups(config = {}, templateDynamicGroups = null, baseDynamicGroups = null) {
+    const defaults = buildReportBuilderDefaultState(config);
+    const nextDynamicGroups = isPlainObject(templateDynamicGroups)
+        ? cloneValue(templateDynamicGroups)
+        : {};
+    if (!isPlainObject(baseDynamicGroups)) {
+        return nextDynamicGroups;
+    }
+    Object.entries(baseDynamicGroups).forEach(([groupId, baseRows]) => {
+        const normalizedGroupId = normalizeString(groupId);
+        if (!normalizedGroupId) {
+            return;
+        }
+        const defaultRows = defaults?.dynamicGroups?.[normalizedGroupId];
+        if (stableStringify(baseRows) === stableStringify(defaultRows)) {
+            return;
+        }
+        nextDynamicGroups[normalizedGroupId] = cloneValue(baseRows);
+    });
+    return nextDynamicGroups;
+}
+
 function buildTemplateStateDiagnostics(config = {}, template = null, nextState = {}) {
     const diagnostics = [];
     const normalizedTemplate = template && typeof template === "object" ? template : null;
@@ -83,8 +162,8 @@ function buildTemplateStateDiagnostics(config = {}, template = null, nextState =
             .filter(Boolean),
     );
     const availableStaticFilterIds = new Set(
-        (Array.isArray(config?.staticFilters) ? config.staticFilters : [])
-            .map((filter) => normalizeString(filter?.id || filter?.field))
+        resolveReportBuilderScopeParamFilters(config)
+            .map((filter) => resolveScopeParamId(filter))
             .filter(Boolean),
     );
 
@@ -116,7 +195,7 @@ function buildTemplateStateDiagnostics(config = {}, template = null, nextState =
             suggestedFix: "Update the template to use one of the current builder measures or restore the missing measure in the builder config.",
         });
     });
-    Object.keys(isPlainObject(statePatch?.staticFilters) ? statePatch.staticFilters : {}).forEach((filterId) => {
+    Object.keys(listScopeParamValues(statePatch)).forEach((filterId) => {
         const normalizedFilterId = normalizeString(filterId);
         if (!normalizedFilterId || availableStaticFilterIds.has(normalizedFilterId)) {
             return;
@@ -125,7 +204,7 @@ function buildTemplateStateDiagnostics(config = {}, template = null, nextState =
             id: `templateFilterUnavailable:${normalizedTemplate.id}:${normalizedFilterId}`,
             code: "templateFilterUnavailable",
             severity: "error",
-            path: `template.state.staticFilters.${normalizedFilterId}`,
+            path: `template.state.${scopeParamStatePath(normalizedFilterId)}`,
             message: `${templateLabel} references unavailable static filter '${normalizedFilterId}'.`,
             suggestedFix: "Update the template to use one of the current builder filters or restore the missing filter in the builder config.",
         });
@@ -181,7 +260,29 @@ export function normalizeReportBuilderDocumentTemplates(templates = []) {
         });
 }
 
-export function instantiateReportBuilderDocumentTemplate(config = {}, template = null) {
+export function buildBlankReportBuilderDocumentState(config = {}, {
+    baseState = null,
+} = {}) {
+    const nextBaseState = isPlainObject(baseState) ? cloneValue(baseState) : {};
+    Object.assign(nextBaseState, scopeParamStateSlice(preserveMeaningfulScopeParamValues(
+        config,
+        null,
+        listScopeParamValues(nextBaseState),
+    )));
+    delete nextBaseState.reportDocumentTitle;
+    delete nextBaseState.reportDocumentSubtitle;
+    delete nextBaseState.reportDocumentDescription;
+    delete nextBaseState.reportDocumentBlocks;
+    delete nextBaseState.reportDocumentLayout;
+    delete nextBaseState.reportDocumentTemplateId;
+    delete nextBaseState.reportDocumentTemplateLabel;
+    return mergeReportBuilderState(config, nextBaseState);
+}
+
+export function instantiateReportBuilderDocumentTemplate(config = {}, template = null, {
+    baseState = null,
+    preserveInputState = false,
+} = {}) {
     const normalizedTemplate = normalizeReportBuilderDocumentTemplate(template);
     if (!normalizedTemplate) {
         return {
@@ -199,7 +300,33 @@ export function instantiateReportBuilderDocumentTemplate(config = {}, template =
         };
     }
 
-    const nextState = mergeReportBuilderState(config, normalizedTemplate.statePatch);
+    const baseTemplateState = isPlainObject(baseState) ? cloneValue(baseState) : {};
+    const templatePatchScopeValues = hasScopeParamValues(normalizedTemplate.statePatch)
+        ? listScopeParamValues(normalizedTemplate.statePatch)
+        : null;
+    const baseScopeValues = hasScopeParamValues(baseTemplateState)
+        ? listScopeParamValues(baseTemplateState)
+        : null;
+    const seedScopeValues = preserveInputState
+        ? preserveMeaningfulScopeParamValues(config, templatePatchScopeValues, baseScopeValues)
+        : cloneValue(templatePatchScopeValues ?? baseScopeValues ?? {});
+    const mergedTemplateSeed = {
+        ...baseTemplateState,
+        ...normalizedTemplate.statePatch,
+        ...scopeParamStateSlice(seedScopeValues),
+        dynamicGroups: preserveInputState
+            ? preserveMeaningfulDynamicGroups(
+                config,
+                normalizedTemplate.statePatch?.dynamicGroups,
+                baseTemplateState?.dynamicGroups,
+            )
+            : (
+                isPlainObject(normalizedTemplate.statePatch?.dynamicGroups)
+                    ? cloneValue(normalizedTemplate.statePatch.dynamicGroups)
+                    : (isPlainObject(baseTemplateState?.dynamicGroups) ? cloneValue(baseTemplateState.dynamicGroups) : undefined)
+            ),
+    };
+    const nextState = mergeReportBuilderState(config, mergedTemplateSeed);
     if (normalizedTemplate.documentPatch.title) {
         nextState.reportDocumentTitle = normalizedTemplate.documentPatch.title;
     } else {

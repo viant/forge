@@ -3,6 +3,18 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import {
+  buildReportBuilderDefaultState,
+  buildReportBuilderDefaultChartSpecs,
+  buildReportBuilderDefaultTablePresets,
+  buildReportBuilderQuickViewOptions,
+  buildReportBuilderChartFields,
+  getReportBuilderQuickPresetPolicy,
+  validateReportBuilderChartSpec,
+  isExplicitReportBuilderChartMode,
+} from "../src/components/dashboard/reportBuilderUtils.js";
+import { buildReportBuilderActionModel } from "../src/components/dashboard/reportBuilderActionModel.js";
+import { buildReportBuilderDesktopResultHeaderState } from "../src/components/dashboard/reportBuilderResultHeader.js";
 
 const FORGE_ROOT = "/Users/awitas/go/src/github.com/viant/forge";
 const STEWARD_ROOT = "/Users/awitas/go/src/github.com/viant-internal/steward_ai/deployment/steward";
@@ -40,6 +52,24 @@ function titleizeId(value = "") {
     .replace(/[_-]+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function resolveConfigEntry(reportBuilder = {}, collectionKey = "", id = "") {
+  const normalizedCollectionKey = String(collectionKey || "").trim();
+  const normalizedId = String(id || "").trim();
+  if (!normalizedCollectionKey || !normalizedId) {
+    return null;
+  }
+  const entries = Array.isArray(reportBuilder?.[normalizedCollectionKey]) ? reportBuilder[normalizedCollectionKey] : [];
+  return entries.find((entry) => {
+    const entryId = String(entry?.id || entry?.key || "").trim();
+    return entryId === normalizedId;
+  }) || null;
+}
+
+function resolveConfigEntryLabel(reportBuilder = {}, collectionKey = "", id = "") {
+  const entry = resolveConfigEntry(reportBuilder, collectionKey, id);
+  return String(entry?.label || titleizeId(id)).trim() || titleizeId(id);
 }
 
 function pickDefaultMeasureIds(reportBuilder = {}) {
@@ -121,8 +151,196 @@ function buildSyntheticSemanticContainer(container) {
       },
     ],
   };
+  reportBuilder.result = {
+    ...(reportBuilder.result && typeof reportBuilder.result === "object" ? reportBuilder.result : {}),
+    runtimePreview: {
+      ...(
+        reportBuilder?.result?.runtimePreview && typeof reportBuilder.result.runtimePreview === "object"
+          ? reportBuilder.result.runtimePreview
+          : {}
+      ),
+      enabled: true,
+    },
+  };
   nextContainer.reportBuilder = reportBuilder;
   return nextContainer;
+}
+
+function buildHostedSyntheticDimensionValue(dimensionId = "", rowIndex = 0) {
+  const normalizedId = String(dimensionId || "").trim();
+  const normalizedKey = normalizedId.toLowerCase();
+  if (!normalizedKey) {
+    return `Value ${rowIndex + 1}`;
+  }
+  if (normalizedKey.includes("date")) {
+    return `2026-06-${String(23 + rowIndex).padStart(2, "0")}`;
+  }
+  if (normalizedKey === "channelid") {
+    return rowIndex + 1;
+  }
+  if (normalizedKey === "channelv2") {
+    return ["Display", "CTV", "Mobile"][rowIndex] || `Channel ${rowIndex + 1}`;
+  }
+  if (normalizedKey.includes("country")) {
+    return ["US", "CA", "GB"][rowIndex] || `C${rowIndex + 1}`;
+  }
+  if (normalizedKey.includes("region")) {
+    return ["North", "South", "West"][rowIndex] || `Region ${rowIndex + 1}`;
+  }
+  if (normalizedKey.includes("city")) {
+    return ["Warsaw", "Austin", "Berlin"][rowIndex] || `City ${rowIndex + 1}`;
+  }
+  if (normalizedKey.endsWith("id")) {
+    return rowIndex + 101;
+  }
+  return `${titleizeId(normalizedId)} ${rowIndex + 1}`;
+}
+
+function buildHostedSyntheticMeasureValue(measureId = "", rowIndex = 0, measureIndex = 0) {
+  const normalizedId = String(measureId || "").trim().toLowerCase();
+  if (normalizedId.includes("rate") || normalizedId.includes("pct") || normalizedId.includes("share")) {
+    return Number((0.12 + (rowIndex * 0.07) + (measureIndex * 0.01)).toFixed(4));
+  }
+  if (normalizedId.includes("price") || normalizedId.includes("ecpm")) {
+    return Number((8.5 + (rowIndex * 1.75) + (measureIndex * 0.25)).toFixed(2));
+  }
+  return ((rowIndex + 1) * 1000) + ((measureIndex + 1) * 125);
+}
+
+function buildHostedSyntheticCollection(reportBuilder = {}, seededBuilderState = null) {
+  const selectedDimensions = Array.isArray(seededBuilderState?.selectedDimensions)
+    ? seededBuilderState.selectedDimensions.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : pickDefaultDimensionIds(reportBuilder);
+  const selectedMeasures = Array.isArray(seededBuilderState?.selectedMeasures)
+    ? seededBuilderState.selectedMeasures.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : pickDefaultMeasureIds(reportBuilder);
+  return Array.from({ length: 3 }, (_, rowIndex) => {
+    const row = {};
+    selectedDimensions.forEach((dimensionId) => {
+      row[dimensionId] = buildHostedSyntheticDimensionValue(dimensionId, rowIndex);
+    });
+    selectedMeasures.forEach((measureId, measureIndex) => {
+      row[measureId] = buildHostedSyntheticMeasureValue(measureId, rowIndex, measureIndex);
+    });
+    return row;
+  });
+}
+
+function buildHostedResultExpectationState(container = {}) {
+  const reportBuilder = container?.reportBuilder || {};
+  const seededBuilderState = buildReportBuilderDefaultState({
+    ...reportBuilder,
+    binding: null,
+  });
+  if (reportBuilder?.binding && typeof reportBuilder.binding === "object") {
+    seededBuilderState.binding = reportBuilder.binding;
+  }
+  const selectedDimensions = Array.isArray(seededBuilderState?.selectedDimensions)
+    ? seededBuilderState.selectedDimensions.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : [];
+  const selectedMeasures = Array.isArray(seededBuilderState?.selectedMeasures)
+    ? seededBuilderState.selectedMeasures.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : [];
+  const expectedTableHeaders = [
+    ...selectedDimensions.map((id) => resolveConfigEntryLabel(reportBuilder, "dimensions", id)),
+    ...selectedMeasures.map((id) => resolveConfigEntryLabel(reportBuilder, "measures", id)),
+  ];
+  return {
+    seededBuilderState,
+    seededCollection: buildHostedSyntheticCollection(reportBuilder, seededBuilderState),
+    expectedMeasureCountLabel: `${selectedMeasures.length} ${selectedMeasures.length === 1 ? "measure" : "measures"}`,
+    expectedBreakdownCountLabel: `${selectedDimensions.length} ${selectedDimensions.length === 1 ? "breakdown" : "breakdowns"}`,
+    expectedTableHeaders,
+  };
+}
+
+function buildHostedChartExpectationState(container = {}) {
+  const reportBuilder = container?.reportBuilder || {};
+  const baseState = buildReportBuilderDefaultState({
+    ...reportBuilder,
+    binding: null,
+  });
+  if (reportBuilder?.binding && typeof reportBuilder.binding === "object") {
+    baseState.binding = reportBuilder.binding;
+  }
+  const defaultChartSpec = buildReportBuilderDefaultChartSpecs(reportBuilder, baseState)[0] || null;
+  const seededBuilderState = defaultChartSpec
+    ? {
+        ...baseState,
+        viewMode: "chart",
+        chartSpec: defaultChartSpec,
+      }
+    : baseState;
+  return {
+    seededBuilderState,
+    seededCollection: buildHostedSyntheticCollection(reportBuilder, seededBuilderState),
+    expectedMeasureCountLabel: `${Array.isArray(seededBuilderState?.selectedMeasures) ? seededBuilderState.selectedMeasures.length : 0} ${Array.isArray(seededBuilderState?.selectedMeasures) && seededBuilderState.selectedMeasures.length === 1 ? "measure" : "measures"}`,
+    expectedBreakdownCountLabel: `${Array.isArray(seededBuilderState?.selectedDimensions) ? seededBuilderState.selectedDimensions.length : 0} ${Array.isArray(seededBuilderState?.selectedDimensions) && seededBuilderState.selectedDimensions.length === 1 ? "breakdown" : "breakdowns"}`,
+    expectedChartTitle: String(defaultChartSpec?.title || "").trim(),
+    expectedChartTypeLabel: String(defaultChartSpec?.type || "").trim(),
+  };
+}
+
+function buildHostedHeaderExpectationState(container = {}, seededBuilderState = null, seededCollection = []) {
+  const reportBuilder = container?.reportBuilder || {};
+  const resolvedState = seededBuilderState && typeof seededBuilderState === "object"
+    ? seededBuilderState
+    : buildReportBuilderDefaultState({
+        ...reportBuilder,
+        binding: null,
+      });
+  if (!resolvedState.binding && reportBuilder?.binding && typeof reportBuilder.binding === "object") {
+    resolvedState.binding = reportBuilder.binding;
+  }
+  const explicitChartMode = isExplicitReportBuilderChartMode(reportBuilder);
+  const viewModes = Array.isArray(reportBuilder?.result?.viewModes) && reportBuilder.result.viewModes.length > 0
+    ? reportBuilder.result.viewModes
+    : ["chart", "table"];
+  const canRunReport = true;
+  const canShowResults = canRunReport && Array.isArray(seededCollection) && seededCollection.length > 0;
+  const defaultTablePresets = buildReportBuilderDefaultTablePresets(reportBuilder, resolvedState);
+  const defaultChartSpecs = buildReportBuilderDefaultChartSpecs(reportBuilder, resolvedState);
+  const quickPresetPolicy = getReportBuilderQuickPresetPolicy(reportBuilder);
+  const quickChartOptions = buildReportBuilderQuickViewOptions({
+    config: reportBuilder,
+    state: resolvedState,
+    quickPresetPolicy,
+    defaultTablePresets,
+    modifiedTablePreset: null,
+    defaultChartSpecs,
+    previousChartPresets: [],
+  });
+  const chartFields = buildReportBuilderChartFields(reportBuilder, resolvedState);
+  const chartValidation = validateReportBuilderChartSpec(reportBuilder, resolvedState.chartSpec, chartFields);
+  const hasValidChartSpec = !!resolvedState.chartSpec && chartValidation.valid;
+  const actionModel = buildReportBuilderActionModel({
+    viewModes,
+    explicitChartMode,
+    hasValidChartSpec,
+    canShowResults,
+    canRunReport,
+    loading: false,
+  });
+  const headerState = buildReportBuilderDesktopResultHeaderState({
+    desktopActionModel: actionModel.desktop,
+    resultViewModes: actionModel.resultModes,
+    currentViewMode: String(resolvedState?.viewMode || "").trim(),
+    explicitChartMode,
+    hasValidChartSpec,
+    canCreateChart: chartFields.some((entry) => String(entry?.kind || "").trim() === "dimension")
+      && chartFields.some((entry) => String(entry?.kind || "").trim() === "measure"),
+    hasTableQuickPresets: defaultTablePresets.length > 0,
+    quickChartOptions,
+    overflowActionCount: actionModel.desktop.overflowActionIds.length,
+  });
+  return {
+    expectedQuickActionLabel: headerState.quickActions.enabled && quickChartOptions.length > 0
+      ? String(headerState.quickActions.buttonLabel || "").trim()
+      : "",
+    expectedEditChartLabel: headerState.editChartEnabled ? "Edit Chart" : "",
+    expectedOverflowLabel: headerState.overflowEnabled ? "More actions" : "",
+    expectedViewToggleModes: headerState.viewToggleModes.map((entry) => String(entry?.mode || "").trim()).filter(Boolean),
+  };
 }
 
 function buildRenderHarnessScript(containerPath, expectations = {}) {
@@ -132,9 +350,69 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { signal } from '@preact/signals-react';
 import ReportBuilder from '${FORGE_ROOT}/src/components/dashboard/ReportBuilder.jsx';
+import { buildReportBuilderDefaultState } from '${FORGE_ROOT}/src/components/dashboard/reportBuilderUtils.js';
+import { resolveReportBuilderReadiness } from '${FORGE_ROOT}/src/components/dashboard/reportBuilderUtils.js';
 
 const container = JSON.parse(fs.readFileSync(${JSON.stringify(containerPath)}, 'utf8'));
 const expectedSemanticNotice = ${JSON.stringify(String(expectations?.semanticNotice || "").trim())};
+const expectedAuthoredRuntimeSemanticTitle = ${JSON.stringify(String(expectations?.authoredRuntimeSemanticTitle || "").trim())};
+const expectedAuthoredRuntimeModelChip = ${JSON.stringify(String(expectations?.authoredRuntimeModelChip || "").trim())};
+const expectedAuthoredRuntimeEntityChip = ${JSON.stringify(String(expectations?.authoredRuntimeEntityChip || "").trim())};
+const expectedAuthoredRuntimeScopeTitle = ${JSON.stringify(String(expectations?.authoredRuntimeScopeTitle || "").trim())};
+const expectedAuthoredRuntimeScopeValue = ${JSON.stringify(String(expectations?.authoredRuntimeScopeValue || "").trim())};
+const seedDefaultBuilderState = ${expectations?.seedDefaultBuilderState === true ? "true" : "false"};
+const seededCollection = ${JSON.stringify(Array.isArray(expectations?.seededCollection) ? expectations.seededCollection : [])};
+const expectedMeasureCountLabel = ${JSON.stringify(String(expectations?.expectedMeasureCountLabel || "").trim())};
+const expectedBreakdownCountLabel = ${JSON.stringify(String(expectations?.expectedBreakdownCountLabel || "").trim())};
+const expectedTableHeaders = ${JSON.stringify(Array.isArray(expectations?.expectedTableHeaders) ? expectations.expectedTableHeaders : [])};
+const expectedChartTitle = ${JSON.stringify(String(expectations?.expectedChartTitle || "").trim())};
+const expectedChartTypeLabel = ${JSON.stringify(String(expectations?.expectedChartTypeLabel || "").trim())};
+const expectedQuickActionLabel = ${JSON.stringify(String(expectations?.expectedQuickActionLabel || "").trim())};
+const expectedEditChartLabel = ${JSON.stringify(String(expectations?.expectedEditChartLabel || "").trim())};
+const expectedOverflowLabel = ${JSON.stringify(String(expectations?.expectedOverflowLabel || "").trim())};
+const expectedViewToggleModes = ${JSON.stringify(Array.isArray(expectations?.expectedViewToggleModes) ? expectations.expectedViewToggleModes : [])};
+const expectedWorkspaceMode = ${JSON.stringify(String(expectations?.workspaceMode || "").trim())};
+const seededBuilderStateOverride = ${JSON.stringify(expectations?.seededBuilderState && typeof expectations.seededBuilderState === "object" ? expectations.seededBuilderState : null)};
+const builderStateKey = String(container?.stateKey || container?.id || 'reportBuilder').trim() || 'reportBuilder';
+const seededBuilderState = seededBuilderStateOverride && typeof seededBuilderStateOverride === 'object'
+  ? seededBuilderStateOverride
+  : (seedDefaultBuilderState
+      ? (() => {
+      const reportBuilderConfig = container?.reportBuilder || {};
+      const defaults = buildReportBuilderDefaultState({
+        ...reportBuilderConfig,
+        binding: null,
+      });
+      return {
+        ...defaults,
+        ...(reportBuilderConfig?.binding && typeof reportBuilderConfig.binding === 'object'
+          ? { binding: reportBuilderConfig.binding }
+          : {}),
+      };
+    })()
+  : null);
+const seededWindowFormState = seededBuilderState ? { [builderStateKey]: seededBuilderState } : {};
+const seededBaseReadiness = seededBuilderState
+  ? resolveReportBuilderReadiness(container?.reportBuilder || {}, seededBuilderState)
+  : null;
+const workspaceModeStorage = new Map();
+if (expectedWorkspaceMode) {
+  workspaceModeStorage.set(\`reportBuilder.workspaceMode.desktop.\${builderStateKey}\`, JSON.stringify(expectedWorkspaceMode));
+}
+globalThis.window = {
+  innerWidth: 1280,
+  localStorage: {
+    getItem(key) {
+      return workspaceModeStorage.has(key) ? workspaceModeStorage.get(key) : null;
+    },
+    setItem(key, value) {
+      workspaceModeStorage.set(key, String(value));
+    },
+    removeItem(key) {
+      workspaceModeStorage.delete(key);
+    },
+  },
+};
 
 const context = {
   locale: 'en-US',
@@ -148,9 +426,9 @@ const context = {
     dialogs: [],
   },
   signals: {
-    collection: signal([]),
+    collection: signal(seededCollection),
     control: signal({ loading: false, error: null }),
-    windowForm: signal({}),
+    windowForm: signal(seededWindowFormState),
     collectionInfo: signal({ hasMore: false }),
     input: signal({ parameters: {} }),
     form: signal({}),
@@ -193,10 +471,47 @@ const context = {
 };
 
 const html = renderToStaticMarkup(React.createElement(ReportBuilder, { container, context }));
+const authoredRuntimePreviewIndex = (() => {
+  const reportSurfaceIndex = html.indexOf('aria-label="Authored report"');
+  return reportSurfaceIndex >= 0 ? reportSurfaceIndex : html.indexOf('aria-label="Authored runtime preview"');
+})();
+const authoredRuntimePreviewWindow = authoredRuntimePreviewIndex >= 0
+  ? html.slice(authoredRuntimePreviewIndex, authoredRuntimePreviewIndex + 12000)
+  : '';
+const resultHeaderFound = html.includes('forge-report-builder__result-header');
+const resultTableFound = html.includes('forge-report-builder__table');
+const resultMetaFound = html.includes('aria-label="Current result summary"');
+const chartWrapFound = html.includes('forge-report-builder__chart-wrap');
 console.log(JSON.stringify({
   renderOk: true,
   semanticNoticeFound: expectedSemanticNotice ? html.includes(expectedSemanticNotice) : true,
   semanticUnavailableFound: html.includes('Semantic model unavailable'),
+  authoredRuntimePreviewFound: authoredRuntimePreviewIndex >= 0,
+  authoredRuntimeSemanticTitleFound: expectedAuthoredRuntimeSemanticTitle ? authoredRuntimePreviewWindow.includes(expectedAuthoredRuntimeSemanticTitle) : true,
+  authoredRuntimeModelChipFound: expectedAuthoredRuntimeModelChip ? authoredRuntimePreviewWindow.includes(expectedAuthoredRuntimeModelChip) : true,
+  authoredRuntimeEntityChipFound: expectedAuthoredRuntimeEntityChip ? authoredRuntimePreviewWindow.includes(expectedAuthoredRuntimeEntityChip) : true,
+  authoredRuntimeScopeTitleFound: expectedAuthoredRuntimeScopeTitle ? authoredRuntimePreviewWindow.includes(expectedAuthoredRuntimeScopeTitle) : true,
+  authoredRuntimeScopeValueFound: expectedAuthoredRuntimeScopeValue ? authoredRuntimePreviewWindow.includes(expectedAuthoredRuntimeScopeValue) : true,
+  resultHeaderFound,
+  resultTableFound,
+  resultMetaFound,
+  chartWrapFound,
+  expectedMeasureCountFound: expectedMeasureCountLabel ? html.includes(expectedMeasureCountLabel) : true,
+  expectedBreakdownCountFound: expectedBreakdownCountLabel ? html.includes(expectedBreakdownCountLabel) : true,
+  expectedTableHeadersFound: expectedTableHeaders.every((entry) => html.includes(entry)),
+  expectedChartTitleFound: expectedChartTitle ? html.includes(expectedChartTitle) : true,
+  expectedChartTypeLabelFound: expectedChartTypeLabel ? html.toLowerCase().includes(expectedChartTypeLabel.toLowerCase()) : true,
+  expectedQuickActionLabelFound: expectedQuickActionLabel ? html.includes(expectedQuickActionLabel) : true,
+  expectedEditChartLabelFound: expectedEditChartLabel ? html.includes(expectedEditChartLabel) : true,
+  expectedOverflowLabelFound: expectedOverflowLabel ? html.includes(expectedOverflowLabel) : true,
+  expectedViewToggleModesFound: expectedViewToggleModes.every((entry) => html.includes(entry)),
+  workspacePreviewFound: html.includes('forge-report-builder--workspace-preview'),
+  workspaceReportFound: html.includes('forge-report-builder--workspace-report'),
+  seededCollectionRowCount: Array.isArray(seededCollection) ? seededCollection.length : 0,
+  builderStateKey,
+  seededBuilderStateScopeParams: seededBuilderState?.scopeParams || seededBuilderState?.staticFilters || null,
+  seededBaseReadiness,
+  authoredRuntimePreviewSnippet: authoredRuntimePreviewWindow.slice(0, 2400),
   snippet: html.slice(0, 800),
 }));
 `;
@@ -205,6 +520,24 @@ console.log(JSON.stringify({
 function assertHostedBuilderRender(windowKey, sharedConfigPath, {
   semanticVariant = false,
   semanticNotice = "",
+  authoredRuntimeSemanticTitle = "",
+  authoredRuntimeModelChip = "",
+  authoredRuntimeEntityChip = "",
+  authoredRuntimeScopeTitle = "",
+  authoredRuntimeScopeValue = "",
+  seedDefaultBuilderState = false,
+  seededCollection = [],
+  seededBuilderState = null,
+  expectedMeasureCountLabel = "",
+  expectedBreakdownCountLabel = "",
+  expectedTableHeaders = [],
+  expectedChartTitle = "",
+  expectedChartTypeLabel = "",
+  expectedQuickActionLabel = "",
+  expectedEditChartLabel = "",
+  expectedOverflowLabel = "",
+  expectedViewToggleModes = [],
+  workspaceMode = "",
 } = {}) {
   const baseContainer = buildWindowContentJSON(windowKey, sharedConfigPath);
   const container = semanticVariant ? buildSyntheticSemanticContainer(baseContainer) : baseContainer;
@@ -214,6 +547,24 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
   fs.writeFileSync(containerPath, JSON.stringify(container), "utf8");
   fs.writeFileSync(harnessPath, buildRenderHarnessScript(containerPath, {
     semanticNotice,
+    authoredRuntimeSemanticTitle,
+    authoredRuntimeModelChip,
+    authoredRuntimeEntityChip,
+    authoredRuntimeScopeTitle,
+    authoredRuntimeScopeValue,
+    seedDefaultBuilderState,
+    seededCollection,
+    seededBuilderState,
+    expectedMeasureCountLabel,
+    expectedBreakdownCountLabel,
+    expectedTableHeaders,
+    expectedChartTitle,
+    expectedChartTypeLabel,
+    expectedQuickActionLabel,
+    expectedEditChartLabel,
+    expectedOverflowLabel,
+    expectedViewToggleModes,
+    workspaceMode,
   }), "utf8");
   const output = execFileSync(
     "npx",
@@ -238,6 +589,137 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
       `${windowKey} semantic variant should not fall back to semantic-model-unavailable copy`,
     );
   }
+  if (authoredRuntimeSemanticTitle || authoredRuntimeModelChip || authoredRuntimeEntityChip || authoredRuntimeScopeTitle || authoredRuntimeScopeValue) {
+    assert.equal(
+      summary?.authoredRuntimePreviewFound,
+      true,
+      `${windowKey} semantic variant should render the authored runtime preview section\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.authoredRuntimeSemanticTitleFound,
+      true,
+      `${windowKey} authored runtime preview should render ${authoredRuntimeSemanticTitle}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.authoredRuntimeModelChipFound,
+      true,
+      `${windowKey} authored runtime preview should render ${authoredRuntimeModelChip}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.authoredRuntimeEntityChipFound,
+      true,
+      `${windowKey} authored runtime preview should render ${authoredRuntimeEntityChip}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.authoredRuntimeScopeTitleFound,
+      true,
+      `${windowKey} authoredRuntime preview should render ${authoredRuntimeScopeTitle}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.authoredRuntimeScopeValueFound,
+      true,
+      `${windowKey} authored runtime preview should render ${authoredRuntimeScopeValue}\n${JSON.stringify(summary, null, 2)}`,
+    );
+  }
+  if (Array.isArray(seededCollection) && seededCollection.length > 0) {
+    const expectsChartSurface = !!(expectedChartTitle || expectedChartTypeLabel);
+    if (workspaceMode === "preview" || workspaceMode === "report") {
+      assert.equal(
+        summary?.workspaceReportFound,
+        true,
+        `${windowKey} seeded hosted state should render on the report surface\n${JSON.stringify(summary, null, 2)}`,
+      );
+    }
+    assert.equal(
+      summary?.seededBaseReadiness?.canRun,
+      true,
+      `${windowKey} seeded hosted state should remain runnable\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.resultHeaderFound,
+      true,
+      `${windowKey} seeded hosted state should render the desktop result header\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.resultMetaFound,
+      true,
+      `${windowKey} seeded hosted state should render result meta chips\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.expectedMeasureCountFound,
+      true,
+      `${windowKey} seeded hosted state should render ${expectedMeasureCountLabel}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.expectedBreakdownCountFound,
+      true,
+      `${windowKey} seeded hosted state should render ${expectedBreakdownCountLabel}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.expectedQuickActionLabelFound,
+      true,
+      `${windowKey} seeded hosted state should render ${expectedQuickActionLabel}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    assert.equal(
+      summary?.expectedViewToggleModesFound,
+      true,
+      `${windowKey} seeded hosted state should render the expected view toggle modes ${JSON.stringify(expectedViewToggleModes)}\n${JSON.stringify(summary, null, 2)}`,
+    );
+    if (!expectsChartSurface) {
+      assert.equal(
+        summary?.resultTableFound,
+        true,
+        `${windowKey} seeded hosted state should render a result table\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.expectedTableHeadersFound,
+        true,
+        `${windowKey} seeded hosted state should render the expected table headers ${JSON.stringify(expectedTableHeaders)}\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.expectedEditChartLabelFound,
+        true,
+        `${windowKey} seeded hosted table state should reflect ${expectedEditChartLabel || "no edit-chart action"}\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.expectedOverflowLabelFound,
+        true,
+        `${windowKey} seeded hosted table state should reflect ${expectedOverflowLabel || "no overflow action"}\n${JSON.stringify(summary, null, 2)}`,
+      );
+    }
+    if (expectsChartSurface) {
+      assert.equal(
+        summary?.chartWrapFound,
+        true,
+        `${windowKey} seeded hosted chart state should render the chart surface\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.resultTableFound,
+        false,
+        `${windowKey} seeded hosted chart state should not fall back to the table surface\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.expectedChartTitleFound,
+        true,
+        `${windowKey} seeded hosted chart state should render ${expectedChartTitle}\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.expectedChartTypeLabelFound,
+        true,
+        `${windowKey} seeded hosted chart state should render ${expectedChartTypeLabel}\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.expectedEditChartLabelFound,
+        true,
+        `${windowKey} seeded hosted chart state should reflect ${expectedEditChartLabel || "no edit-chart action"}\n${JSON.stringify(summary, null, 2)}`,
+      );
+      assert.equal(
+        summary?.expectedOverflowLabelFound,
+        true,
+        `${windowKey} seeded hosted chart state should reflect ${expectedOverflowLabel || "no overflow action"}\n${JSON.stringify(summary, null, 2)}`,
+      );
+    }
+  }
 }
 
 assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml");
@@ -245,10 +727,75 @@ assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.
 assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml", {
   semanticVariant: true,
   semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeSemanticTitle: "Semantic Binding",
+  authoredRuntimeModelChip: `Model ${SYNTHETIC_SEMANTIC_MODEL_LABEL}`,
+  authoredRuntimeEntityChip: `Entity ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeScopeTitle: "Filters",
+  authoredRuntimeScopeValue: "Date Range",
+  seedDefaultBuilderState: true,
+  workspaceMode: "preview",
+  ...(() => {
+    const seeded = buildHostedResultExpectationState(buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", "metric_report_builder.yaml")));
+    return {
+      ...seeded,
+      ...buildHostedHeaderExpectationState(buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", "metric_report_builder.yaml")), seeded.seededBuilderState, seeded.seededCollection),
+    };
+  })(),
 });
 assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.yaml", {
   semanticVariant: true,
   semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeSemanticTitle: "Semantic Binding",
+  authoredRuntimeModelChip: `Model ${SYNTHETIC_SEMANTIC_MODEL_LABEL}`,
+  authoredRuntimeEntityChip: `Entity ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeScopeTitle: "Filters",
+  authoredRuntimeScopeValue: "Date Range",
+  seedDefaultBuilderState: true,
+  workspaceMode: "preview",
+  ...(() => {
+    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("forecastingCubeBuilder", "forecasting_report_builder.yaml"));
+    const seeded = buildHostedResultExpectationState(container);
+    return {
+      ...seeded,
+      ...buildHostedHeaderExpectationState(container, seeded.seededBuilderState, seeded.seededCollection),
+    };
+  })(),
+});
+assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml", {
+  semanticVariant: true,
+  semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeSemanticTitle: "Semantic Binding",
+  authoredRuntimeModelChip: `Model ${SYNTHETIC_SEMANTIC_MODEL_LABEL}`,
+  authoredRuntimeEntityChip: `Entity ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeScopeTitle: "Filters",
+  authoredRuntimeScopeValue: "Date Range",
+  workspaceMode: "preview",
+  ...(() => {
+    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", "metric_report_builder.yaml"));
+    const seeded = buildHostedChartExpectationState(container);
+    return {
+      ...seeded,
+      ...buildHostedHeaderExpectationState(container, seeded.seededBuilderState, seeded.seededCollection),
+    };
+  })(),
+});
+assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.yaml", {
+  semanticVariant: true,
+  semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeSemanticTitle: "Semantic Binding",
+  authoredRuntimeModelChip: `Model ${SYNTHETIC_SEMANTIC_MODEL_LABEL}`,
+  authoredRuntimeEntityChip: `Entity ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
+  authoredRuntimeScopeTitle: "Filters",
+  authoredRuntimeScopeValue: "Date Range",
+  workspaceMode: "preview",
+  ...(() => {
+    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("forecastingCubeBuilder", "forecasting_report_builder.yaml"));
+    const seeded = buildHostedChartExpectationState(container);
+    return {
+      ...seeded,
+      ...buildHostedHeaderExpectationState(container, seeded.seededBuilderState, seeded.seededCollection),
+    };
+  })(),
 });
 
-console.log("report-builder-hosted-steward-render-smoke ✓ hosted Steward builders render through Forge ReportBuilder and semantic binding is visible in the real builder shell");
+console.log("report-builder-hosted-steward-render-smoke ✓ hosted Steward builders render through Forge ReportBuilder, semantic binding is visible in the real builder shell, and the authored runtime semantic section renders for the hosted metrics and forecasting builders");

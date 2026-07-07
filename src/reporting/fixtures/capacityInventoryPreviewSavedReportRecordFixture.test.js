@@ -27,11 +27,11 @@ assert.equal(primaryBuilderBlock.state?.chartSpec?.title, "Inventory · Top Chan
 assert.equal(primaryBuilderBlock.state?.chartSpec?.type, "horizontal_bar");
 assert.deepEqual(primaryBuilderBlock.state?.selectedMeasures, ["avails"]);
 assert.deepEqual(primaryBuilderBlock.state?.selectedDimensions, ["channelV2"]);
-assert.deepEqual(primaryBuilderBlock.state?.staticFilters?.dateRange, {
+assert.deepEqual(primaryBuilderBlock.state?.scopeParams?.dateRange, {
   start: "2026-05-01",
   end: "2026-05-04",
 });
-assert.deepEqual(primaryBuilderBlock.state?.staticFilters?.channelsFilter, []);
+assert.deepEqual(primaryBuilderBlock.state?.scopeParams?.channelsFilter, []);
 assert.equal(Array.isArray(reportFill?.datasets?.[0]?.rows), true);
 assert.equal(reportFill.datasets[0].rows.length, 2);
 assert.equal(reportFill.datasets[0].rows[0].channelV2, "Display");
@@ -108,7 +108,7 @@ assert.equal(hydrated.state.chartSpec?.title, "Inventory · Top Channels");
 assert.equal(hydrated.state.chartSpec?.type, "horizontal_bar");
 assert.deepEqual(hydrated.state.selectedMeasures, ["avails"]);
 assert.deepEqual(hydrated.state.selectedDimensions, ["channelV2"]);
-assert.deepEqual(hydrated.state.staticFilters?.dateRange, {
+assert.deepEqual(hydrated.state.scopeParams?.dateRange, {
   start: "2026-05-01",
   end: "2026-05-04",
 });

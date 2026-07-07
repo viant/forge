@@ -11,6 +11,12 @@ function formatExecutionValue(value) {
   return normalized || String(value ?? "");
 }
 
+function formatDrillExecutionLabel(field = {}, descriptor = {}, displayValue = undefined) {
+  const sourceLabel = normalizeString(field?.label || descriptor?.fieldValueKey || "Selection");
+  const valueLabel = formatExecutionValue(displayValue);
+  return `${sourceLabel} = ${valueLabel}`;
+}
+
 export function buildReportRuntimeChartActionExecutions({
   blockId = "",
   descriptors = [],
@@ -61,7 +67,7 @@ export function buildReportRuntimeChartActionExecutions({
           value: descriptor.value,
           sourceBlockId: normalizedBlockId,
           fieldLabel: field?.label,
-          label: `${descriptor.label} = ${formatExecutionValue(descriptor.displayValue ?? descriptor.value)}`,
+          label: formatDrillExecutionLabel(field, descriptor, descriptor.displayValue ?? descriptor.value),
         },
       }];
     }

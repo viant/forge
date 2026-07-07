@@ -90,7 +90,7 @@ const semanticRuntimeState = resolveReportBuilderSemanticRuntimeState({
   state: {
     selectedMeasures: ["avails"],
     selectedDimensions: ["channelV2"],
-    staticFilters: {
+    scopeParams: {
       dateRange: {
         start: "2026-05-01",
         end: "2026-05-07",
@@ -193,7 +193,7 @@ const fallbackAwareRuntimeState = resolveReportBuilderSemanticRuntimeState({
   state: {
     selectedMeasures: ["avails"],
     selectedDimensions: ["channelV2"],
-    staticFilters: {
+    scopeParams: {
       dateRange: {
         start: "2026-05-01",
         end: "2026-05-07",
@@ -239,6 +239,87 @@ assert.equal(fallbackAwareRuntimeState.resolvedSemanticSummary.entityLabel, "Fal
 assert.equal(fallbackAwareRuntimeState.resolvedSemanticSummary.selectedMeasures[0].label, "Fallback Available Impressions");
 assert.equal(fallbackAwareRuntimeState.resolvedSemanticSummary.selectedDimensions[0].label, "Fallback Channel");
 
+const rawIdFallbackAwareRuntimeState = resolveReportBuilderSemanticRuntimeState({
+  config: {
+    staticFilters: [
+      { id: "dateRange", type: "dateRange", label: "Date Range", semanticRef: "reporting_window" },
+    ],
+    measures: [
+      { id: "totalSpend", key: "totalSpend", semanticRef: "spend", label: "Spend" },
+      { id: "impressions", key: "impressions", semanticRef: "impressions", label: "Impressions" },
+    ],
+    dimensions: [
+      { id: "eventDate", key: "eventDate", semanticRef: "event_date", label: "Date" },
+      { id: "channelId", key: "channelId", semanticRef: "channel", label: "Channel" },
+    ],
+  },
+  state: {
+    selectedMeasures: ["totalSpend", "impressions"],
+    selectedDimensions: ["eventDate", "channelId"],
+    scopeParams: {
+      dateRange: {
+        start: "2026-06-19",
+        end: "2026-06-25",
+      },
+    },
+    binding: {
+      mode: "semantic",
+      modelRef: "model://example/performance/delivery@v1",
+      entity: "line_delivery",
+      selectedDimensions: ["event_date", "channel"],
+      selectedMeasures: ["spend", "impressions"],
+    },
+  },
+  binding: {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+    selectedDimensions: ["event_date", "channel"],
+    selectedMeasures: ["spend", "impressions"],
+  },
+  model: null,
+  providerAvailable: true,
+  modelLoading: true,
+  fallbackSummary: {
+    kind: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    modelLabel: "Canonical Ad Delivery",
+    entity: "line_delivery",
+    entityLabel: "Canonical Line Delivery",
+    selectedDimensions: [
+      { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date" },
+      { id: "channel", rawId: "channelId", label: "Canonical Channel" },
+    ],
+    selectedMeasures: [
+      { id: "spend", rawId: "totalSpend", label: "Canonical Spend", format: "currency" },
+      { id: "impressions", rawId: "impressions", label: "Canonical Impressions", format: "compactNumber" },
+    ],
+    selectedParameters: [
+      { id: "reporting_window", rawId: "dateRange", label: "Canonical Reporting Window" },
+    ],
+  },
+  fallbackFingerprint: JSON.stringify({
+    modelRef: "model://example/performance/delivery@v1",
+    selection: {
+      entity: "line_delivery",
+      dimensions: ["event_date", "channel"],
+      measures: ["spend", "impressions"],
+      parameters: {
+        reporting_window: {
+          start: "2026-06-19",
+          end: "2026-06-25",
+        },
+      },
+    },
+  }),
+});
+
+assert.equal(rawIdFallbackAwareRuntimeState.resolvedSemanticSummary.modelLabel, "Canonical Ad Delivery");
+assert.equal(rawIdFallbackAwareRuntimeState.resolvedSemanticSummary.entityLabel, "Canonical Line Delivery");
+assert.equal(rawIdFallbackAwareRuntimeState.resolvedSemanticSummary.selectedDimensions[0].label, "Canonical Delivery Date");
+assert.equal(rawIdFallbackAwareRuntimeState.resolvedSemanticSummary.selectedMeasures[0].label, "Canonical Spend");
+assert.equal(rawIdFallbackAwareRuntimeState.resolvedSemanticSummary.selectedParameters[0].label, "Canonical Reporting Window");
+
 const noProviderFallbackRuntimeState = resolveReportBuilderSemanticRuntimeState({
   config: {
     staticFilters: [
@@ -254,7 +335,7 @@ const noProviderFallbackRuntimeState = resolveReportBuilderSemanticRuntimeState(
   state: {
     selectedMeasures: ["avails"],
     selectedDimensions: ["channelV2"],
-    staticFilters: {
+    scopeParams: {
       dateRange: {
         start: "2026-05-01",
         end: "2026-05-07",
@@ -428,7 +509,7 @@ const audienceFeatureRuntimeState = resolveReportBuilderSemanticRuntimeState({
   state: {
     selectedMeasures: ["audienceIndex"],
     selectedDimensions: ["publisherId"],
-    staticFilters: {
+    scopeParams: {
       audienceSegmentFilter: ["Young Adults"],
     },
     binding: {
@@ -526,7 +607,7 @@ const flatFieldAudienceRuntimeState = resolveReportBuilderSemanticRuntimeState({
   state: {
     selectedMeasures: ["audienceIndex"],
     selectedDimensions: ["publisherId"],
-    staticFilters: {
+    scopeParams: {
       audienceSegmentFilter: ["Young Adults"],
     },
     binding: {

@@ -1,6 +1,7 @@
 import {
   aggregateDirectSeriesData,
   buildPieChartData,
+  materializeChartDisplayRows,
   normalizeChartKey,
   transformData,
 } from "../components/chartData.js";
@@ -25,7 +26,7 @@ function cloneChartRows(rows = []) {
 
 export function buildReportFillChartPayload(chart = {}, rows = []) {
   const type = normalizeString(chart?.type).toLowerCase();
-  const chartRows = Array.isArray(rows) ? rows : [];
+  const chartRows = materializeChartDisplayRows(chart, rows);
   if (!type || chartRows.length === 0) {
     return null;
   }

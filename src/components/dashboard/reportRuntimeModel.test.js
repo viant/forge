@@ -4,8 +4,10 @@ import {
   formatReportRuntimeRefinement,
   formatReportRuntimeScopeValue,
   buildReportRuntimeUnsupportedRefinementDiagnostics,
+  resolveReportRuntimeActiveScopeSummary,
   resolveReportRuntimeChartActionFields,
   resolveReportRuntimeBindingSummaryChips,
+  resolveReportRuntimeCompactBindingSummaryChips,
   resolveReportRuntimeBindingSummary,
   resolveReportRuntimeBlocks,
   resolveReportRuntimeDatasetRequest,
@@ -130,6 +132,22 @@ assert.deepEqual(
 assert.deepEqual(
   resolveReportRuntimeBlocks(reportSpec, reportFill).find((block) => block.id === "narrativeIntro")?.layoutItem,
   { blockId: "narrativeIntro", size: "half" },
+);
+assert.deepEqual(
+  resolveReportRuntimeBlocks({
+    ...reportSpec,
+    layoutIntent: {
+      ...reportSpec.layoutIntent,
+      items: [
+        { blockId: "sharedFilters" },
+        { blockId: "activeRefinements" },
+        { blockId: "primaryTable" },
+        { blockId: "primaryChart" },
+        { blockId: "narrativeIntro", span: 8 },
+      ],
+    },
+  }, reportFill).find((block) => block.id === "narrativeIntro")?.layoutItem,
+  { blockId: "narrativeIntro", span: 8 },
 );
 
 assert.deepEqual(
@@ -377,8 +395,44 @@ assert.deepEqual(resolveReportRuntimeBindingSummaryChips({
   "1 draft",
 ]);
 
+assert.deepEqual(resolveReportRuntimeCompactBindingSummaryChips({
+  kind: "semantic",
+  modelRef: "model://example/performance/delivery@v1",
+  modelLabel: "Ad Delivery",
+  entity: "line_delivery",
+  entityLabel: "Line Delivery",
+  dimensionCount: 4,
+  measureCount: 4,
+  selectedDimensions: [
+    { id: "event_date", rawId: "eventDate", label: "Delivery Date", category: "Time" },
+    { id: "channel", rawId: "channelV2", label: "Channel", category: "Delivery" },
+    { id: "country_code", rawId: "country", label: "Market", category: "Location" },
+    { id: "region", rawId: "region", label: "Region", category: "Location" },
+  ],
+  selectedMeasures: [
+    { id: "available_impressions", rawId: "avails", label: "Available Impressions", category: "Metrics" },
+    { id: "household_uniques", rawId: "hhUniqs", label: "Household Uniques", category: "Metrics" },
+    { id: "reach_rate", rawId: "reachRate", label: "Reach Rate", category: "Metrics" },
+    { id: "reach_share", rawId: "reachShare", label: "Reach Share", category: "Metrics" },
+  ],
+  parameterCount: 1,
+  selectedParameters: [
+    { id: "reporting_window", rawId: "dateRange", label: "Reporting Window", category: "Scope" },
+  ],
+  governanceCounts: {
+    draft: 1,
+    deprecated: 2,
+  },
+}), [
+  "Model Ad Delivery",
+  "Entity Line Delivery",
+  "Dimensions Delivery Date, Channel +2",
+  "Measures Available Impressions, Household Uniques +2",
+  "Parameters Reporting Window",
+]);
+
 assert.deepEqual(resolveReportRuntimeScopeSummary(reportSpec), {
-  title: "Report Scope",
+  title: "Filters",
   paramCount: 1,
   params: [
     {
@@ -975,7 +1029,7 @@ assert.deepEqual(resolveReportRuntimeScopeSummary({
     },
   },
 }), {
-  title: "Report Scope",
+  title: "Filters",
   paramCount: 1,
   params: [
     {
@@ -989,5 +1043,27 @@ assert.deepEqual(resolveReportRuntimeScopeSummary({
     },
   ],
 });
+
+assert.equal(resolveReportRuntimeActiveScopeSummary([]), null);
+assert.equal(resolveReportRuntimeActiveScopeSummary(), null);
+assert.deepEqual(
+  resolveReportRuntimeActiveScopeSummary([
+    {
+      id: "drill:channel",
+      op: "drill",
+      field: "channel",
+      fieldLabel: "Channel",
+      values: ["Audio"],
+    },
+  ]),
+  {
+    title: "Active Refinements",
+    description: "Keep, exclude, and drill actions applied on top of the baseline scope above, for this session only.",
+    count: 1,
+    items: [
+      { id: "drill:channel", label: "Drill: Channel = Audio" },
+    ],
+  },
+);
 
 console.log("reportRuntimeModel ✓ orders runtime blocks and summarizes scope and semantic binding");

@@ -17,6 +17,9 @@ import {
     buildReportBuilderSavedReportPayloadSummary,
     serializeReportBuilderSavedReportPayload,
 } from "./reportBuilderSavedReportPayload.js";
+import {
+    applyReportBuilderPersistedRuntimePreviewInteraction,
+} from "./reportBuilderRuntimePreviewInteractionPersistence.js";
 
 const audienceArtifactFixture = JSON.parse(
     readFileSync(
@@ -310,7 +313,7 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadSummary(payload), {
     compileStatus: "clean",
     blockCount: 1,
     datasetCount: 1,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -347,7 +350,7 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadInspectorState(payload), {
     compileStatus: "clean",
     blockCount: 1,
     datasetCount: 1,
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -611,7 +614,7 @@ const embeddedSavedPayloadSummary = buildReportBuilderSavedReportPayloadSummary(
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -635,6 +638,97 @@ const embeddedSavedPayloadSummary = buildReportBuilderSavedReportPayloadSummary(
 });
 assert.equal(embeddedSavedPayloadSummary.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
 assert.equal(embeddedSavedPayloadSummary.scopeSummaryText, "Reporting Window");
+
+const runtimeScopedSavedPayload = buildReportBuilderSavedReportPayloadFromBuilderState({
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_runtime_scoped_dataset",
+    sourceArtifactId: "runtime_scoped_dataset",
+    title: "Runtime Scoped Dataset",
+    sourceSession: {
+        sessionId: "rb_session_runtime_scoped",
+    },
+}, {
+    container: {
+        id: "publishedDatasetBuilder",
+        stateKey: "publishedDatasetBuilder",
+        title: "Published Dataset Builder",
+        dataSourceRef: "demoReportSource",
+    },
+    config: {
+        title: "Published Dataset Builder",
+        measures: [
+            { id: "totalSpend", key: "totalSpend", label: "Spend", default: true, format: "currency" },
+        ],
+        dimensions: [
+            { id: "channelId", key: "channelId", label: "Channel", default: true },
+        ],
+        result: {
+            defaultMode: "table",
+        },
+        dataSources: [
+            {
+                id: "forecast_cube",
+                dataSourceRef: "forecastCubeSource",
+                label: "Forecast Cube",
+                kindLabel: "published",
+                request: {
+                    measures: { forecastRevenue: true },
+                    dimensions: { region: true },
+                    filters: {},
+                    limit: 25,
+                    offset: 0,
+                },
+                columnOptions: [
+                    { key: "region", label: "Region", kind: "dimension" },
+                    { key: "forecastRevenue", label: "Forecast Revenue", kind: "measure", format: "currency" },
+                ],
+                scopeParamOptions: [
+                    {
+                        value: "forecastRegion",
+                        label: "Forecast Region",
+                        kind: "multiSelect",
+                        paramPath: "filters.region",
+                    },
+                ],
+            },
+        ],
+    },
+    state: {
+        selectedMeasures: ["totalSpend"],
+        primaryMeasure: "totalSpend",
+        selectedDimensions: ["channelId"],
+        viewMode: "table",
+        reportDocumentBlocks: [
+            {
+                id: "forecastFilters",
+                kind: "filterBarBlock",
+                title: "Forecast Filters",
+                datasetRef: "forecast_cube",
+                paramIds: ["forecastRegion"],
+            },
+        ],
+        reportDocumentLayout: {
+            type: "stack",
+            items: [{ blockId: "forecastFilters" }],
+        },
+        ...applyReportBuilderPersistedRuntimePreviewInteraction({}, {
+            datasetScopeParams: {
+                forecast_cube: {
+                    forecastRegion: ["US/CA"],
+                },
+            },
+        }),
+    },
+});
+assert.deepEqual(runtimeScopedSavedPayload.sourceSession.runtimePreviewInteraction.datasetScopeParams, {
+    forecast_cube: {
+        forecastRegion: ["US/CA"],
+    },
+});
+assert.deepEqual(runtimeScopedSavedPayload.reportSpec.datasets.find((dataset) => dataset.id === "forecast_cube")?.request.filters, {
+    region: ["US/CA"],
+});
+assert.deepEqual(runtimeScopedSavedPayload.reportDocument.scope.params.find((param) => param.id === "forecastRegion")?.value, ["US/CA"]);
 
 const embeddedSavedPayloadSummaryWithEmptySpecScope = buildReportBuilderSavedReportPayloadSummary({
     version: 1,
@@ -691,7 +785,7 @@ const embeddedSavedPayloadSummaryWithEmptySpecScope = buildReportBuilderSavedRep
                     },
                     selectedDimensions: ["eventDate", "channelV2"],
                     selectedMeasures: ["avails"],
-                    staticFilters: {
+                    scopeParams: {
                         dateRange: {
                             start: "2026-05-01",
                             end: "2026-05-04",
@@ -811,6 +905,73 @@ assert.equal(buildReportBuilderSavedReportPayloadSummary({
         blockCount: 1,
         datasetCount: 1,
         diagnostics: [],
+    },
+})?.compileStatus, "clean");
+
+assert.equal(buildReportBuilderSavedReportPayloadSummary({
+    version: 1,
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_mixed_static_saved_payload",
+    sourceArtifactId: "mixed_static_saved_payload",
+    title: "Mixed Static Saved Payload",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "mixedStaticSavedPayload",
+        title: "Mixed Static Saved Payload",
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                config: {
+                    measures: [
+                        { id: "avails", key: "avails", label: "Available Impressions", default: true },
+                    ],
+                    dimensions: [
+                        { id: "eventDate", key: "eventDate", label: "Event Date", default: true },
+                    ],
+                },
+                state: {
+                    selectedMeasures: ["avails"],
+                    selectedDimensions: ["eventDate"],
+                    reportStaticDatasets: [
+                        {
+                            id: "segment_status_csv",
+                            label: "Segment Status",
+                            sourceFormat: "csv",
+                            columns: [
+                                { key: "segment", label: "Segment", kind: "dimension" },
+                                { key: "score", label: "Score", kind: "measure" },
+                                { key: "status", label: "Status", kind: "dimension" },
+                            ],
+                            rows: [
+                                { segment: "North", score: 10, status: "healthy" },
+                                { segment: "South", score: 7, status: "watch" },
+                            ],
+                        },
+                    ],
+                },
+            },
+            {
+                id: "segmentScoreKpi",
+                kind: "kpiBlock",
+                title: "Segment Score KPI",
+                datasetRef: "segment_status_csv",
+                valueField: "score",
+                valueLabel: "Score",
+                secondaryField: "segment",
+                secondaryLabel: "Segment",
+            },
+        ],
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "segmentScoreKpi" }],
+        datasets: [
+            { id: "primary" },
+            { id: "segment_status_csv" },
+        ],
     },
 })?.compileStatus, "clean");
 
@@ -1001,7 +1162,7 @@ const reopenedPayload = buildReportBuilderSavedReportPayloadFromBuilderState({
             yFields: ["avails"],
             seriesField: "channelV2",
         },
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -1476,7 +1637,7 @@ const derivedSemanticPayload = buildReportBuilderSavedReportPayloadFromBuilderSt
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -1515,6 +1676,7 @@ assert.equal(derivedSemanticPayload.reportDocument.semanticSummary.modelLabel, "
 assert.equal(derivedSemanticPayload.reportSpec.semanticSummary.entityLabel, "Line Delivery");
 assert.equal(derivedSemanticPayload.reportSpec.semanticSummary.selectedDimensions[1].definitionRef, "semantic://example/channel");
 assert.equal(derivedSemanticPayload.reportSpec.semanticSummary.selectedMeasures[0].category, "Metrics");
+assert.equal(derivedSemanticPayload.reportDocument.blocks[0].config.semanticModel.modelRef, "model://example/performance/delivery@v1");
 assert.equal(derivedSemanticPayload.reportDocument.blocks[0].config.measures[0].label, "Available Impressions");
 assert.equal(derivedSemanticPayload.reportDocument.blocks[0].config.dimensions[0].label, "Delivery Date");
 assert.equal(derivedSemanticPayload.semanticBindingViewState.title, "Semantic Binding");
@@ -1554,7 +1716,7 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadSummary(derivedSemanticPayl
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "dateRange",
     scopeSummaryItems: [
         {
@@ -1598,7 +1760,7 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadInspectorState(derivedSeman
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "dateRange",
     scopeSummaryItems: [
         {
@@ -1774,7 +1936,7 @@ const reopenedPayloadFromResponse = buildReportBuilderSavedReportPayloadFromBuil
             yFields: ["avails"],
             seriesField: "channelV2",
         },
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -1883,7 +2045,7 @@ const localCalcSavedPayload = buildReportBuilderSavedReportPayloadFromBuilderSta
             xField: "eventDate",
             yFields: ["reachRate"],
         },
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -2009,7 +2171,7 @@ const dependentLocalCalcSavedPayload = buildReportBuilderSavedReportPayloadFromB
             xField: "eventDate",
             yFields: ["runningCtvAvails"],
         },
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -2147,7 +2309,7 @@ const authoredDerivedOnlySavedPayload = buildReportBuilderSavedReportPayloadFrom
         selectedDimensions: ["eventDate"],
         viewMode: "table",
         chartSpec: null,
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -2323,7 +2485,7 @@ const derivedTemplate = {
         selectedDimensions: ["eventDate"],
         viewMode: "table",
         chartSpec: null,
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",

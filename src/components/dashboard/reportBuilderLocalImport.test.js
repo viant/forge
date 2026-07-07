@@ -251,6 +251,7 @@ const rawSemanticReportDocument = {
                     selectedDimensions: ["event_date", "channel"],
                     selectedMeasures: ["available_impressions"],
                 },
+                // Legacy pre-scopeParams state key kept intentionally: proves old saved artifacts still import.
                 staticFilters: {
                     dateRange: {
                         start: "2026-05-01",
@@ -384,6 +385,28 @@ assert.deepEqual(importedDetailTargetSavedPayload.getReportDocumentResponse?.rep
     ],
 });
 assert.equal(importedDetailTargetSavedPayload.message, "Imported saved report payload Imported Detail Target Modal Demo. Reopen in builder is ready.");
+
+const downloadedShapeSavedPayload = {
+    ...savedReportPayload,
+    reportDocument: undefined,
+    document: {
+        ...savedReportPayload.reportDocument,
+        version: 1,
+    },
+};
+
+const importedDownloadedShapeSavedPayload = parseReportBuilderLocalImport(
+    JSON.stringify(downloadedShapeSavedPayload),
+    {
+        fileName: "downloaded-shape.saved-report-payload.json",
+    },
+);
+
+assert.equal(importedDownloadedShapeSavedPayload.valid, true);
+assert.equal(importedDownloadedShapeSavedPayload.kind, "reportBuilder.savedReportPayload");
+assert.equal(importedDownloadedShapeSavedPayload.getReportDocumentResponse?.reportRef?.reportId, "demoReportBuilder");
+assert.equal(importedDownloadedShapeSavedPayload.getReportDocumentResponse?.documentVersion, 1);
+assert.equal(importedDownloadedShapeSavedPayload.message, "Imported saved report payload Imported Saved Payload. Reopen in builder is ready.");
 
 const importedSavedViewArtifact = detailTargetImportedFixture.savedViewArtifact;
 
@@ -572,6 +595,7 @@ const importedExplorationArtifact = {
                         xField: "eventDate",
                         yFields: ["spend"],
                     },
+                    // Legacy pre-scopeParams state key kept intentionally: proves old saved artifacts still import.
                     staticFilters: {
                         dateRange: {
                             start: "2026-05-01",
@@ -697,7 +721,7 @@ const hydratedImportedAudienceGetResponse = buildHydratedReportBuilderDocument(i
     },
 });
 assert.equal(hydratedImportedAudienceGetResponse.valid, true);
-assert.deepEqual(hydratedImportedAudienceGetResponse.state.staticFilters?.audienceSegmentFilter, ["Young Adults"]);
+assert.deepEqual(hydratedImportedAudienceGetResponse.state.scopeParams?.audienceSegmentFilter, ["Young Adults"]);
 
 const listResponse = {
     version: 1,
@@ -895,6 +919,7 @@ const reopenableImportedDocument = {
                     xField: "eventDate",
                     yFields: ["runningCtvAvails"],
                 },
+                // Legacy pre-scopeParams state key kept intentionally: proves old saved artifacts still import.
                 staticFilters: {
                     dateRange: {
                         start: "2026-05-01",
@@ -1111,7 +1136,7 @@ const hydratedImportedAudienceSavedPayload = buildHydratedReportBuilderDocument(
     },
 });
 assert.equal(hydratedImportedAudienceSavedPayload.valid, true);
-assert.deepEqual(hydratedImportedAudienceSavedPayload.state.staticFilters?.audienceSegmentFilter, ["Young Adults"]);
+assert.deepEqual(hydratedImportedAudienceSavedPayload.state.scopeParams?.audienceSegmentFilter, ["Young Adults"]);
 
 const importedAudienceSavedRecord = parseReportBuilderLocalImport(JSON.stringify(audienceArtifactFixture.legacySavedReportRecord), {
     fileName: "audience-saved-record.json",

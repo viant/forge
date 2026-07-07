@@ -80,7 +80,7 @@ const rawState = {
   pageSize: 25,
   orderField: "totalSpend",
   orderDir: "desc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
@@ -171,7 +171,7 @@ const semanticState = {
   pageSize: 50,
   orderField: "eventDate",
   orderDir: "asc",
-  staticFilters: {
+  scopeParams: {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
   binding: semanticConfig.binding,
@@ -281,7 +281,7 @@ const authoredDocument = buildReportBuilderReportDocument({
     pageSize: 25,
     orderField: "eventDate",
     orderDir: "asc",
-    staticFilters: {
+    scopeParams: {
       dateRange: { start: "2026-05-01", end: "2026-05-04" },
     },
     reportDocumentLayout: {

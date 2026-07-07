@@ -157,6 +157,7 @@ export const reportSpecSchema = {
       properties: {
         blockId: { type: "string" },
         size: { enum: ["half"] },
+        span: { type: "integer", minimum: 1, maximum: 12 },
       },
     },
     scope: {
@@ -180,6 +181,7 @@ export const reportSpecSchema = {
         kind: { type: "string" },
         label: { type: "string" },
         description: { type: "string" },
+        datasetRef: { type: "string" },
         required: { type: "boolean" },
         value: { $ref: "#/$defs/jsonValue" },
       },
@@ -475,6 +477,10 @@ export const reportSpecSchema = {
         key: { type: "string" },
         sourceKey: { type: "string" },
         displayKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         label: { type: "string" },
         kind: { type: "string" },
         format: { type: "string" },
@@ -663,6 +669,11 @@ export const reportSpecSchema = {
       required: ["dataKey"],
       properties: {
         dataKey: { type: "string" },
+        sourceDataKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         tickFormat: { type: "string" },
       },
     },
@@ -693,6 +704,11 @@ export const reportSpecSchema = {
       required: ["nameKey", "valueKey", "values", "palette"],
       properties: {
         nameKey: { type: "string" },
+        sourceNameKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         valueKey: { type: "string" },
         values: {
           type: "array",
@@ -727,6 +743,11 @@ export const reportSpecSchema = {
       required: ["nameKey", "valueKey", "palette"],
       properties: {
         nameKey: { type: "string" },
+        sourceNameKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         valueKey: { type: "string" },
         palette: {
           type: "array",
@@ -779,6 +800,11 @@ export const reportSpecSchema = {
         valueLabel: { type: "string" },
         secondaryField: { type: "string" },
         secondaryLabel: { type: "string" },
+        secondaryDisplayKey: { type: "string" },
+        secondaryDisplayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
         description: { type: "string" },
         emptyLabel: { type: "string" },
       },
@@ -791,6 +817,7 @@ export const reportSpecSchema = {
         id: { type: "string" },
         kind: { const: "filterBarBlock" },
         title: { type: "string" },
+        datasetRef: { type: "string" },
         paramIds: {
           type: "array",
           items: { type: "string" },

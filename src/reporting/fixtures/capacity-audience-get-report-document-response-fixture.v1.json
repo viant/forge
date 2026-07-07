@@ -560,7 +560,7 @@
       {
         "id": "sharedFilters",
         "kind": "filterBarBlock",
-        "title": "Report Scope",
+        "title": "Filters",
         "paramIds": [
           "dateRange",
           "channelsFilter",
@@ -947,7 +947,7 @@
       {
         "id": "sharedFilters",
         "kind": "filterBarBlock",
-        "title": "Report Scope",
+        "title": "Filters",
         "paramIds": [
           "dateRange",
           "channelsFilter",

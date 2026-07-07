@@ -144,7 +144,7 @@ const detailTargetImportedPayload = buildReportBuilderSavedReportPayloadFromBuil
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate", "channelV2"],
         viewMode: "table",
-        staticFilters: {
+        scopeParams: {
             dateRange: {
                 start: "2026-05-01",
                 end: "2026-05-04",
@@ -248,7 +248,7 @@ assert.deepEqual(importedLocalReopenablePanelState, {
             importedArtifactKind: "reportBuilder.savedReportPayload",
             active: false,
             metaChips: ["capacityTrendQ3", "v6", "report-file artifact"],
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: "Reporting Window",
             scopeSummaryItems: [
                 {
@@ -291,7 +291,7 @@ assert.deepEqual(importedLocalReopenablePanelState, {
                     ],
                 },
             ],
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: "Reporting Window",
             scopeSummaryItems: [
                 {
@@ -404,7 +404,7 @@ assert.deepEqual(importedLocalSavedRecordPanelState, {
             importedArtifactKind: "reportBuilder.savedReportRecord",
             active: true,
             metaChips: ["capacityKpiBlendByDateQ3", "v9", "export-ready", "report-record artifact"],
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: "Reporting Window",
             scopeSummaryItems: [
                 {
@@ -447,7 +447,7 @@ assert.deepEqual(importedLocalSavedRecordPanelState, {
                     ],
                 },
             ],
-            scopeSummaryTitle: "Report Scope",
+            scopeSummaryTitle: "Filters",
             scopeSummaryText: "Reporting Window",
             scopeSummaryItems: [
                 {
@@ -1024,6 +1024,162 @@ const anonymousFieldGroupCarriedImportedSavedRecordPanelState = buildImportedLoc
 assert.equal(anonymousFieldGroupCarriedImportedSavedRecordPanelState.entries[0].semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(anonymousFieldGroupCarriedImportedSavedRecordPanelState.entries[0].semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
 
+const canonicalMetadataPreferredReopenablePanelState = buildImportedLocalReopenablePanelState({
+    importedLocalGetReportDocumentResponses: [
+        {
+            id: "getReportDocumentResponse::canonicalImportedDeliveryTrend",
+            title: "Canonical Imported Delivery Trend",
+            reportId: "canonicalImportedDeliveryTrend",
+            documentVersion: 7,
+            importedArtifactKind: "getReportDocumentResponse",
+            semanticBindingViewState: {
+                title: "Semantic Binding",
+                chips: [
+                    "Model model://example/performance/delivery@v1",
+                    "Entity line_delivery",
+                    "Dimensions event_date",
+                    "Measures available_impressions",
+                ],
+                fieldGroups: [
+                    {
+                        id: "dimensions",
+                        title: "Selected dimensions (1)",
+                        fields: [
+                            { id: "event_date", rawId: "event_date", label: "event_date" },
+                        ],
+                    },
+                    {
+                        id: "measures",
+                        title: "Selected measures (1)",
+                        fields: [
+                            { id: "available_impressions", rawId: "available_impressions", label: "available_impressions" },
+                        ],
+                    },
+                ],
+            },
+            reportSpec: {
+                version: 1,
+                kind: "reportSpec",
+                semanticSummary: {
+                    kind: "semantic",
+                    modelRef: "model://example/performance/delivery@v1",
+                    entity: "line_delivery",
+                    selectedDimensions: ["event_date"],
+                    selectedMeasures: ["available_impressions"],
+                },
+            },
+            document: {
+                version: 1,
+                kind: "reportDocument",
+                id: "canonicalImportedDeliveryTrend",
+                title: "Canonical Imported Delivery Trend",
+                semanticSummary: {
+                    kind: "semantic",
+                    modelRef: "model://example/performance/delivery@v1",
+                    modelLabel: "Canonical Ad Delivery",
+                    entity: "line_delivery",
+                    entityLabel: "Canonical Line Delivery",
+                    selectedDimensions: [
+                        { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+                    ],
+                    selectedMeasures: [
+                        { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+                    ],
+                },
+            },
+        },
+    ],
+    activeResponseIdentity: "",
+});
+assert.equal(canonicalMetadataPreferredReopenablePanelState.entries[0].semanticBindingChips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(canonicalMetadataPreferredReopenablePanelState.entries[0].semanticBindingChips.includes("Entity Canonical Line Delivery"), true);
+assert.equal(canonicalMetadataPreferredReopenablePanelState.entries[0].semanticBindingChips.includes("Dimensions Canonical Delivery Date"), true);
+assert.equal(canonicalMetadataPreferredReopenablePanelState.entries[0].semanticBindingChips.includes("Measures Canonical Available Impressions"), true);
+
+const canonicalMetadataPreferredSavedRecordPanelState = buildImportedLocalSavedRecordPanelState({
+    importedLocalSavedReportRecords: [
+        {
+            id: "reportBuilder.savedReportPayload::canonical_imported_delivery_trend::canonicalImportedDeliveryTrend",
+            title: "Canonical Imported Delivery Trend",
+            reportId: "canonicalImportedDeliveryTrend",
+            documentVersion: 7,
+            exportable: true,
+            importedArtifactKind: "reportBuilder.savedReportRecord",
+            semanticBindingViewState: {
+                title: "Semantic Binding",
+                chips: [
+                    "Model model://example/performance/delivery@v1",
+                    "Entity line_delivery",
+                    "Dimensions event_date",
+                    "Measures available_impressions",
+                ],
+                fieldGroups: [
+                    {
+                        id: "dimensions",
+                        title: "Selected dimensions (1)",
+                        fields: [
+                            { id: "event_date", rawId: "event_date", label: "event_date" },
+                        ],
+                    },
+                    {
+                        id: "measures",
+                        title: "Selected measures (1)",
+                        fields: [
+                            { id: "available_impressions", rawId: "available_impressions", label: "available_impressions" },
+                        ],
+                    },
+                ],
+            },
+            savedReportPayload: {
+                version: 1,
+                kind: "reportBuilder.savedReportPayload",
+                reportDocument: {
+                    version: 1,
+                    kind: "reportDocument",
+                    id: "canonicalImportedDeliveryTrend",
+                    title: "Canonical Imported Delivery Trend",
+                    semanticSummary: {
+                        kind: "semantic",
+                        modelRef: "model://example/performance/delivery@v1",
+                        modelLabel: "Canonical Ad Delivery",
+                        entity: "line_delivery",
+                        entityLabel: "Canonical Line Delivery",
+                        selectedDimensions: [
+                            { id: "event_date", rawId: "eventDate", label: "Canonical Delivery Date", category: "Time" },
+                        ],
+                        selectedMeasures: [
+                            { id: "available_impressions", rawId: "avails", label: "Canonical Available Impressions", format: "compactNumber" },
+                        ],
+                    },
+                    binding: {
+                        mode: "semantic",
+                        modelRef: "model://example/performance/delivery@v1",
+                        entity: "line_delivery",
+                        selectedDimensions: ["event_date"],
+                        selectedMeasures: ["available_impressions"],
+                    },
+                },
+                reportSpec: {
+                    version: 1,
+                    kind: "reportSpec",
+                    semanticSummary: {
+                        kind: "semantic",
+                        modelRef: "model://example/performance/delivery@v1",
+                        entity: "line_delivery",
+                        selectedDimensions: ["event_date"],
+                        selectedMeasures: ["available_impressions"],
+                    },
+                },
+            },
+        },
+    ],
+    activeRecordIdentity: "",
+});
+assert.equal(canonicalMetadataPreferredSavedRecordPanelState.entries[0].semanticBindingChips.includes("Model Canonical Ad Delivery"), true);
+assert.equal(canonicalMetadataPreferredSavedRecordPanelState.entries[0].semanticBindingChips.includes("Entity Canonical Line Delivery"), true);
+assert.equal(canonicalMetadataPreferredSavedRecordPanelState.entries[0].semanticBindingChips.includes("Dimensions Canonical Delivery Date"), true);
+assert.equal(canonicalMetadataPreferredSavedRecordPanelState.entries[0].semanticBindingChips.includes("Measures Canonical Available Impressions"), true);
+
 const runtimePanelState = buildImportedPipelinePreviewPanelState({
     importedPipelineSummary: {
         title: "Capacity Trend Q3",
@@ -1116,7 +1272,7 @@ assert.deepEqual(runtimePanelState, {
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -1457,7 +1613,7 @@ assert.deepEqual(importedPipelineInspectorState, {
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -1669,7 +1825,7 @@ assert.deepEqual(importedFillPanelState, {
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -1788,7 +1944,7 @@ assert.deepEqual(buildImportedStandaloneReportFillInspectorState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -1873,7 +2029,7 @@ assert.deepEqual(importedPrintPanelState, {
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -2003,7 +2159,7 @@ assert.deepEqual(buildImportedStandaloneReportPrintInspectorState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -2050,7 +2206,7 @@ const importedExportRequestPanelState = buildImportedStandaloneExportRequestPane
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -2084,7 +2240,7 @@ assert.deepEqual(importedExportRequestPanelState, {
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {
@@ -2140,7 +2296,7 @@ const importedExportRequestReviewOnlyPanelState = buildImportedStandaloneExportR
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -2624,7 +2780,7 @@ assert.deepEqual(buildImportedStandaloneExportRequestInspectorState({
                 ],
             },
         ],
-        scopeSummaryTitle: "Report Scope",
+        scopeSummaryTitle: "Filters",
         scopeSummaryText: "Reporting Window",
         scopeSummaryItems: [
             {
@@ -2648,7 +2804,7 @@ assert.deepEqual(buildImportedStandaloneExportRequestInspectorState({
             ],
         },
     ],
-    scopeSummaryTitle: "Report Scope",
+    scopeSummaryTitle: "Filters",
     scopeSummaryText: "Reporting Window",
     scopeSummaryItems: [
         {

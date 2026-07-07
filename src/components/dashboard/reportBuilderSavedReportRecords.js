@@ -86,6 +86,17 @@ export function matchesReportBuilderSavedPayloadSourceIdentity(expected = null, 
         && normalizeString(expected?.reportId) === normalizeString(actual?.reportId);
 }
 
+function buildSavedReportRecordIdentity(sourceIdentity = null, fallbackReportId = "") {
+    const payloadId = normalizeString(sourceIdentity?.payloadId);
+    const sourceArtifactId = normalizeString(sourceIdentity?.sourceArtifactId);
+    const kind = normalizeString(sourceIdentity?.kind || sourceIdentity?.artifactKind);
+    const reportId = normalizeString(sourceIdentity?.reportId || fallbackReportId);
+    if (payloadId || sourceArtifactId) {
+        return [kind, payloadId, sourceArtifactId, reportId].join("::");
+    }
+    return reportId;
+}
+
 function buildSavedReportPayloadSource(savedReportPayload = null) {
     if (!savedReportPayload || typeof savedReportPayload !== "object" || Array.isArray(savedReportPayload)) {
         return null;
@@ -104,6 +115,48 @@ function buildSavedReportPayloadSource(savedReportPayload = null) {
     return source;
 }
 
+function buildSavedReportPayloadFromStoredArtifact(record = null) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+        return null;
+    }
+    if (normalizeString(record?.kind) !== "reportBuilder.savedReportPayload") {
+        return null;
+    }
+    if (record?.reportDocument && typeof record.reportDocument === "object" && !Array.isArray(record.reportDocument)) {
+        return null;
+    }
+    const payloadId = normalizeString(record?.metadata?.payloadId || record?.payloadId);
+    const sourceArtifactId = normalizeString(record?.sourceArtifactId);
+    const reportDocument = record?.reportDocument && typeof record.reportDocument === "object" && !Array.isArray(record.reportDocument)
+        ? cloneValue(record.reportDocument)
+        : (record?.document && typeof record.document === "object" && !Array.isArray(record.document)
+            ? cloneValue(record.document)
+            : null);
+    const reportSpec = record?.reportSpec && typeof record.reportSpec === "object" && !Array.isArray(record.reportSpec)
+        ? cloneValue(record.reportSpec)
+        : null;
+    const compileState = record?.compileState && typeof record.compileState === "object" && !Array.isArray(record.compileState)
+        ? cloneValue(record.compileState)
+        : null;
+    if (!reportDocument || !reportSpec) {
+        return null;
+    }
+    return {
+        version: 1,
+        kind: "reportBuilder.savedReportPayload",
+        ...(payloadId ? { payloadId } : {}),
+        ...(sourceArtifactId ? { sourceArtifactId } : {}),
+        savedAt: normalizeTimestamp(record?.createdAt || record?.savedAt, Date.now()),
+        title: normalizeString(record?.title || reportDocument?.title || "Report") || "Report",
+        ...(record?.metadata?.sourceSession && typeof record.metadata.sourceSession === "object" && !Array.isArray(record.metadata.sourceSession)
+            ? { sourceSession: cloneValue(record.metadata.sourceSession) }
+            : {}),
+        reportDocument,
+        reportSpec,
+        ...(compileState ? { compileState } : {}),
+    };
+}
+
 export function normalizeReportBuilderSavedReportRecord(record = null, {
     documentVersion = 0,
     savedAt = Date.now(),
@@ -117,6 +170,7 @@ export function normalizeReportBuilderSavedReportRecord(record = null, {
         && record?.source && typeof record.source === "object" && !Array.isArray(record.source)
     ) {
         const sourceIdentity = normalizeReportBuilderSavedPayloadSourceIdentity(record?.source || record);
+        const normalizedId = normalizeString(record?.id) || buildSavedReportRecordIdentity(sourceIdentity, record?.reportId);
         const savedViewOverlay = extractSavedViewOverlayArtifactState(
             normalizeString(record?.source?.kind) === "reportBuilder.savedView"
                 ? record
@@ -124,6 +178,7 @@ export function normalizeReportBuilderSavedReportRecord(record = null, {
         );
         return {
             ...cloneValue(record),
+            ...(normalizedId ? { id: normalizedId } : {}),
             sourceIdentity,
             exportable: !!record?.exportRequest,
             ...(savedViewOverlay ? { savedViewOverlay } : {}),
@@ -131,7 +186,10 @@ export function normalizeReportBuilderSavedReportRecord(record = null, {
     }
     const savedReportPayload = record?.savedReportPayload && typeof record.savedReportPayload === "object" && !Array.isArray(record.savedReportPayload)
         ? record.savedReportPayload
-        : (normalizeString(record?.kind) === "reportBuilder.savedReportPayload" ? record : null);
+        : (
+            buildSavedReportPayloadFromStoredArtifact(record)
+            || (normalizeString(record?.kind) === "reportBuilder.savedReportPayload" ? record : null)
+        );
     if (!savedReportPayload) {
         return null;
     }
@@ -159,8 +217,10 @@ export function normalizeReportBuilderSavedReportRecord(record = null, {
     const normalizedVersion = Number(record?.documentVersion ?? savedReportPayload?.documentVersion ?? documentVersion) || 0;
     const source = buildSavedReportPayloadSource(savedReportPayload);
     const sourceIdentity = normalizeReportBuilderSavedPayloadSourceIdentity(savedReportPayload);
+    const normalizedId = normalizeString(record?.id) || buildSavedReportRecordIdentity(sourceIdentity, reportRef.reportId);
     const importedArtifactKind = normalizeString(record?.importedArtifactKind);
     return {
+        ...(normalizedId ? { id: normalizedId } : {}),
         reportId: reportRef.reportId,
         title: normalizeString(document?.title || reportRef.reportId),
         documentVersion: normalizedVersion,

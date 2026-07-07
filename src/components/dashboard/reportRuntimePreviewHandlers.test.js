@@ -244,6 +244,60 @@ assert.deepEqual(
   ],
 );
 
+const duplicateMergedProvider = resolveReportRuntimePreviewDetailProvider({
+  semanticModelHandler: {
+    async listAvailableRefinements() {
+      return {
+        actions: [
+          { id: "semantic_drill_channel", label: "Drill Channel", kind: "drill", nextFieldRef: "publisherId" },
+        ],
+      };
+    },
+  },
+  reportSpec: {
+    kind: "reportSpec",
+    drillMetadata: {
+      hierarchies: [
+        {
+          id: "inventory",
+          levels: [
+            { field: "channelId", label: "Channel" },
+            { field: "publisherId", label: "Publisher" },
+          ],
+        },
+      ],
+      fieldActions: [
+        {
+          fieldRef: "channelId",
+          actions: [
+            { id: "drill_publisher", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisherId" },
+            { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
+          ],
+        },
+      ],
+      detailTargets: [
+        {
+          targetRef: "target://example/performance/channel-detail",
+          navigationMode: "hostRoute",
+          parameters: {
+            channelId: "$value",
+          },
+        },
+      ],
+    },
+  },
+});
+
+assert.deepEqual(
+  await duplicateMergedProvider.listAvailableRefinements("tableBlock", "channelId"),
+  [
+    { id: "keep:channelId", label: "Keep only", kind: "keep" },
+    { id: "exclude:channelId", label: "Exclude", kind: "exclude" },
+    { id: "drill_publisher", label: "Drill to Publisher", kind: "drill", nextFieldRef: "publisherId" },
+    { id: "detail_channel", label: "Show channel details", kind: "detail", targetRef: "target://example/performance/channel-detail" },
+  ],
+);
+
 let parityHostIntent = null;
 let parityDetailDiagnostic = undefined;
 const openParityDetailTarget = createReportRuntimeDetailTargetOpener({

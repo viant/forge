@@ -151,7 +151,7 @@ function buildReportBuilderExplorationHintItems(sourceRef = {}) {
     switch (kind) {
         case "reportBuilder.chartResult":
             return [
-                "Swap chart presets or edit the chart locally.",
+                "Swap presets or edit the current view locally.",
                 "Switch to the table to inspect the same result rows.",
                 "Keep the draft only if the changes are worth saving.",
             ];

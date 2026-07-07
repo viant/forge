@@ -51,4 +51,34 @@ actorContext.init();
 assert.equal(actorContext.identity.actorRef, 'user://awitas');
 assert.equal(actorContext.Context('lookup').identity.actorRef, 'user://awitas');
 
+const lazyMetadata = {
+  namespace: 'Performance Metrics',
+  actions: {
+    import() {
+      return {
+        'Performance Metrics': {
+          stewardReportBuilder: {
+            buildRequest() {
+              return 'ok';
+            },
+          },
+        },
+      };
+    },
+  },
+  dataSource: {
+    lookup: {
+      selectionMode: 'single',
+      selectors: {},
+      uniqueKey: [{ field: 'id', parameter: 'id' }],
+    },
+  },
+  view: {},
+};
+
+const lazyContext = Context('W_ctx_lazy', lazyMetadata, 'lookup', {});
+const lazyHandler = lazyContext.lookupHandler('Performance Metrics.stewardReportBuilder.buildRequest');
+assert.equal(typeof lazyHandler, 'function');
+assert.equal(lazyHandler(), 'ok');
+
 console.log('Context ✓ preserves selectionMode overrides for dataSource handlers');

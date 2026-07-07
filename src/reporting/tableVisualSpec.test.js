@@ -122,4 +122,21 @@ assert.deepEqual(normalizeReportDocumentTableBlock({
   ],
 });
 
+assert.deepEqual(normalizeReportDocumentTableBlock({
+  id: "legacyTable",
+  title: "Legacy Table",
+  datasetRef: "primary",
+  columnKeys: ["eventDate", "channelId", "totalSpend"],
+}), {
+  id: "legacyTable",
+  kind: "tableBlock",
+  title: "Legacy Table",
+  datasetRef: "primary",
+  columns: [
+    { key: "eventDate" },
+    { key: "channelId" },
+    { key: "totalSpend" },
+  ],
+});
+
 console.log("tableVisualSpec ✓ normalizes authored table visual contracts");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { extractData } from "./dataSourceExtract.js";
+import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
 
 const payload = {
     rows: [
@@ -41,5 +41,12 @@ const nullRowsExtracted = extractData(
     nullRowsPayload,
 );
 assert.deepEqual(nullRowsExtracted.records, []);
+assert.equal(isDeferredCacheHitEnvelope(nullRowsPayload), false);
+
+const deferredCachePayload = {
+    rows: null,
+    cache: { hit: true, fetchedAt: "2026-07-01T19:14:35.344023Z", ttlSeconds: 1800 },
+};
+assert.equal(isDeferredCacheHitEnvelope(deferredCachePayload), true);
 
 console.log("dataSourceExtract ✓ explicit selectors override generic envelope rows");

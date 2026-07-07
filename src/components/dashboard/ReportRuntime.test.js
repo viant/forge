@@ -137,7 +137,7 @@ assert.ok(html.includes("Selected measures (1)"));
 assert.ok(html.includes("Selected parameters (1)"));
 assert.ok(html.includes("Reporting Window"));
 assert.ok(html.includes("Approved reporting window for semantic preview."));
-assert.ok(html.includes("Shared scope parameters compiled into this runtime artifact."));
+assert.ok(html.includes("Baseline filters compiled into this runtime. Live keep, exclude, and drill changes appear in Active refinements."));
 assert.ok(html.includes("2026-05-01 to 2026-05-07"));
 assert.ok(html.includes("Certified available inventory"));
 assert.ok(html.includes("Certified"));
@@ -150,6 +150,212 @@ assert.ok(html.includes("Update the authored target mapping or remove the missin
 assert.ok(html.includes("semanticProviderDiagnostics"));
 assert.ok(html.includes("Block primaryChart"));
 assert.ok(html.includes("reportDocument.blocks.primaryChart.targetRef"));
+
+const hiddenContextSummaryHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec,
+    reportFill,
+    title: "Runtime Preview",
+    subtitle: "Compiled authored report runtime surface.",
+    showContextSummary: false,
+  }),
+);
+assert.ok(!hiddenContextSummaryHtml.includes("Runtime Preview"));
+assert.ok(!hiddenContextSummaryHtml.includes("Semantic Binding"));
+assert.ok(!hiddenContextSummaryHtml.includes("Report Scope"));
+assert.ok(hiddenContextSummaryHtml.includes("Model Ad Delivery"));
+assert.ok(hiddenContextSummaryHtml.includes("Entity Line Delivery"));
+assert.ok(hiddenContextSummaryHtml.includes("Dimensions Delivery Date, Channel"));
+assert.ok(hiddenContextSummaryHtml.includes("Measures Available Impressions"));
+assert.ok(hiddenContextSummaryHtml.includes("Runtime Diagnostics"));
+
+const kpiToneHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Tone Runtime",
+      layoutIntent: {
+        blockOrder: ["headlineKpi"],
+        items: [{ blockId: "headlineKpi" }],
+      },
+      blocks: [
+        {
+          id: "headlineKpi",
+          kind: "kpiBlock",
+          title: "Primary blocker family",
+          datasetRef: "primary",
+          valueField: "primary_blocker_family",
+          valueLabel: "Primary blocker family",
+          tone: "danger",
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {},
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          rows: [{ primary_blocker_family: "supply" }],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "headlineKpi",
+          kind: "kpiBlock",
+          datasetRef: "primary",
+          title: "Primary blocker family",
+          content: {
+            title: "Primary blocker family",
+            tone: "danger",
+            valueField: "primary_blocker_family",
+            valueLabel: "Primary blocker family",
+            value: "supply",
+            rowCount: 1,
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(kpiToneHtml.includes('data-report-runtime-kpi-tone="danger"'));
+assert.ok(kpiToneHtml.includes("supply"));
+
+const badgesBlockHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Badges Runtime",
+      layoutIntent: {
+        blockOrder: ["statusPills"],
+        items: [{ blockId: "statusPills" }],
+      },
+      blocks: [
+        {
+          id: "statusPills",
+          kind: "badgesBlock",
+          title: "Status Pills",
+          items: [
+            { id: "setup", label: "Setup", value: "Live", tone: "success" },
+            { id: "pacing", label: "Pacing", value: "Behind", tone: "warning" },
+          ],
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "statusPills",
+          kind: "badgesBlock",
+          title: "Status Pills",
+          content: {
+            title: "Status Pills",
+            items: [
+              { id: "setup", label: "Setup", value: "Live", tone: "success" },
+              { id: "pacing", label: "Pacing", value: 0.0267, format: "percentFraction", tone: "warning" },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(badgesBlockHtml.includes("Status Pills"));
+assert.ok(badgesBlockHtml.includes("Setup: Live"));
+assert.ok(badgesBlockHtml.includes("Pacing: 2.7%"));
+assert.ok(badgesBlockHtml.includes('data-report-runtime-badge-tone="success"'));
+assert.ok(badgesBlockHtml.includes('data-report-runtime-badge-tone="warning"'));
+
+const zeroBadgeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Zero Badge Runtime",
+      layoutIntent: {
+        blockOrder: ["statusPills"],
+        items: [{ blockId: "statusPills" }],
+      },
+      blocks: [
+        {
+          id: "statusPills",
+          kind: "badgesBlock",
+          title: "Status Pills",
+          items: [
+            { id: "quota", label: "Quota", value: 0, tone: "warning" },
+            { id: "active", label: "Active", value: false, tone: "info" },
+          ],
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "statusPills",
+          kind: "badgesBlock",
+          title: "Status Pills",
+          content: {
+            title: "Status Pills",
+            items: [
+              { id: "quota", label: "Quota", value: 0, tone: "warning" },
+              { id: "active", label: "Active", value: false, tone: "info" },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(zeroBadgeHtml.includes("Quota: 0"));
+assert.ok(zeroBadgeHtml.includes("Active: false"));
+
+const dedupedMarkdownHeadingHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Markdown Runtime",
+      layoutIntent: {
+        blockOrder: ["posture"],
+        items: [{ blockId: "posture" }],
+      },
+      blocks: [
+        {
+          id: "posture",
+          kind: "markdownBlock",
+          title: "Posture",
+          markdown: "## Posture\nCompact summary text.",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "posture",
+          kind: "markdownBlock",
+          title: "Posture",
+          content: {
+            title: "Posture",
+            markdown: "## Posture\nCompact summary text.",
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.equal((dedupedMarkdownHeadingHtml.match(/>Posture</g) || []).length, 1);
+assert.ok(dedupedMarkdownHeadingHtml.includes("Compact summary text."));
 
 const bindingOnlyHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -197,7 +403,7 @@ assert.ok(bindingOnlyHtml.includes("Selected dimensions (2)"));
 assert.ok(bindingOnlyHtml.includes("Selected measures (2)"));
 assert.ok(bindingOnlyHtml.includes("Dimensions event_date, channel"));
 assert.ok(bindingOnlyHtml.includes("Measures available_impressions, household_uniques"));
-assert.ok(bindingOnlyHtml.includes("Report Scope"));
+assert.ok(bindingOnlyHtml.includes("Filters"));
 assert.ok(bindingOnlyHtml.includes("Reporting Window"));
 assert.ok(bindingOnlyHtml.includes("2026-05-01 to 2026-05-07"));
 
@@ -560,7 +766,7 @@ const scopeFilterHtml = renderToStaticMarkup(
         {
           id: "sharedFilters",
           kind: "filterBarBlock",
-          title: "Report Scope",
+          title: "Filters",
         },
       ],
       datasets: [],
@@ -573,7 +779,7 @@ const scopeFilterHtml = renderToStaticMarkup(
           id: "sharedFilters",
           kind: "filterBarBlock",
           content: {
-            title: "Report Scope",
+            title: "Filters",
             params: [
               {
                 id: "dateRange",
@@ -592,11 +798,384 @@ const scopeFilterHtml = renderToStaticMarkup(
     title: "Runtime Preview",
   }),
 );
-assert.ok(scopeFilterHtml.includes("Report Scope"));
+assert.ok(scopeFilterHtml.includes("Filters"));
 assert.ok(scopeFilterHtml.includes("Reporting Window"));
 assert.ok(scopeFilterHtml.includes("2026-05-01 to 2026-05-07"));
 assert.ok(scopeFilterHtml.includes("Approved reporting window for semantic preview."));
-assert.equal((scopeFilterHtml.match(/Report Scope/g) || []).length, 1);
+assert.ok(!scopeFilterHtml.includes("Report Scope"));
+
+const editableScopeFilterHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Editable Filter Runtime",
+      layoutIntent: {
+        blockOrder: ["sharedFilters"],
+        items: [{ blockId: "sharedFilters" }],
+      },
+      scope: {
+        dataSourceRef: "demoReportSource",
+        params: [
+          {
+            id: "dateRange",
+            kind: "dateRange",
+            type: "dateRange",
+            label: "Date Range",
+            value: {
+              start: "2026-05-01",
+              end: "2026-05-07",
+            },
+          },
+          {
+            id: "channelIds",
+            kind: "multiSelect",
+            label: "Channels",
+            multiple: true,
+            presentation: "compactIconRow",
+            options: [
+              { value: "Display", label: "Display", icon: "media" },
+              { value: "CTV", label: "CTV", icon: "video" },
+            ],
+            value: ["Display"],
+          },
+        ],
+      },
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          title: "Filters",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          content: {
+            title: "Filters",
+            params: [
+              {
+                id: "dateRange",
+                type: "dateRange",
+                label: "Date Range",
+                value: {
+                  start: "2026-05-01",
+                  end: "2026-05-07",
+                },
+              },
+              {
+                id: "channelIds",
+                label: "Channels",
+                multiple: true,
+                presentation: "compactIconRow",
+                options: [
+                  { value: "Display", label: "Display", icon: "media" },
+                  { value: "CTV", label: "CTV", icon: "video" },
+                ],
+                value: ["Display"],
+              },
+            ],
+          },
+        },
+      ],
+    },
+    runtimeHandlers: {
+      toggleScopeParamOption() {},
+      setScopeParamDate() {},
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(editableScopeFilterHtml.includes(">Filters<"));
+assert.ok(!editableScopeFilterHtml.includes("Filters (baseline)"));
+assert.ok(editableScopeFilterHtml.includes("Change these baseline report filters here."));
+assert.ok(editableScopeFilterHtml.includes('type="date"'));
+assert.ok(editableScopeFilterHtml.includes("Display"));
+assert.ok(editableScopeFilterHtml.includes("CTV"));
+
+const scopedEditableFilterHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Scoped Filter Runtime",
+      layoutIntent: {
+        blockOrder: ["forecastFilters"],
+        items: [{ blockId: "forecastFilters" }],
+      },
+      blocks: [
+        {
+          id: "forecastFilters",
+          kind: "filterBarBlock",
+          title: "Filters",
+          datasetRef: "forecast_cube",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "forecastFilters",
+          kind: "filterBarBlock",
+          datasetRef: "forecast_cube",
+          content: {
+            title: "Filters",
+            params: [
+              {
+                id: "forecastRegion",
+                datasetRef: "forecast_cube",
+                label: "Region",
+                multiple: true,
+                options: [
+                  { value: "US/NY", label: "US/NY" },
+                  { value: "US/NJ", label: "US/NJ" },
+                ],
+                value: ["US/NY"],
+              },
+            ],
+          },
+        },
+      ],
+    },
+    runtimeHandlers: {
+      toggleScopeParamOption() {},
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(scopedEditableFilterHtml.includes("Change filters for this block here. These filters apply to this data block only."));
+
+const scopeFilterWithActiveDrillHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Scope Runtime Report With Drill",
+      layoutIntent: {
+        blockOrder: ["sharedFilters"],
+        items: [{ blockId: "sharedFilters" }],
+      },
+      scope: {
+        dataSourceRef: "demoReportSource",
+        params: [
+          {
+            id: "channel",
+            kind: "multiSelect",
+            label: "Channels",
+            value: [],
+          },
+        ],
+      },
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          title: "Filters",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      refinements: [
+        {
+          id: "drill:channel:publisher",
+          op: "drill",
+          field: "channel",
+          fieldLabel: "Channel",
+          values: ["Audio"],
+        },
+      ],
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          content: {
+            title: "Filters",
+            params: [
+              {
+                id: "channel",
+                label: "Channels",
+                value: [],
+              },
+            ],
+          },
+        },
+      ],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(scopeFilterWithActiveDrillHtml.includes("Filters (baseline)"));
+assert.ok(scopeFilterWithActiveDrillHtml.includes("Channels"));
+assert.ok(scopeFilterWithActiveDrillHtml.includes("None"));
+assert.ok(scopeFilterWithActiveDrillHtml.includes("Baseline filters compiled from the live builder state. Live keep, exclude, and drill changes appear in Active refinements."));
+assert.ok(scopeFilterWithActiveDrillHtml.includes("Active Refinements (1)"));
+assert.ok(scopeFilterWithActiveDrillHtml.includes("Drill: Channel = Audio"));
+assert.ok(scopeFilterWithActiveDrillHtml.includes('data-report-runtime-active-scope-summary="true"'));
+
+const scopeFilterWithDedicatedRefinementBarHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Scope Runtime Report With Dedicated Refinement Bar",
+      layoutIntent: {
+        blockOrder: ["sharedFilters", "activeDrillPath"],
+        items: [{ blockId: "sharedFilters" }, { blockId: "activeDrillPath" }],
+      },
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          title: "Filters",
+        },
+        {
+          id: "activeDrillPath",
+          kind: "refinementBarBlock",
+          title: "Active Drill Path",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      refinements: [
+        {
+          id: "drill:channel:publisher",
+          op: "drill",
+          field: "channel",
+          fieldLabel: "Channel",
+          values: ["Audio"],
+        },
+      ],
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          content: {
+            title: "Filters",
+            params: [
+              {
+                id: "channel",
+                label: "Channels",
+                value: [],
+              },
+            ],
+          },
+        },
+        {
+          id: "activeDrillPath",
+          kind: "refinementBarBlock",
+          content: {
+            title: "Active Drill Path",
+            refinements: [
+              {
+                id: "drill:channel:publisher",
+                op: "drill",
+                field: "channel",
+                fieldLabel: "Channel",
+                values: ["Audio"],
+              },
+            ],
+          },
+        },
+      ],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("Filters (baseline)"));
+assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("Active Drill Path"));
+assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("Channel = Audio"));
+assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("This session — live keep, exclude, and drill changes layered on top of the baseline scope."));
+assert.ok(!scopeFilterWithDedicatedRefinementBarHtml.includes('data-report-runtime-active-scope-summary="true"'));
+
+const scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Scope Runtime Report With Authored Drill Label",
+      layoutIntent: {
+        blockOrder: ["activeDrillPath"],
+        items: [{ blockId: "activeDrillPath" }],
+      },
+      blocks: [
+        {
+          id: "activeDrillPath",
+          kind: "refinementBarBlock",
+          title: "Active Drill Path",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      refinements: [],
+      blocks: [
+        {
+          id: "activeDrillPath",
+          kind: "refinementBarBlock",
+          content: {
+            title: "Active Drill Path",
+            refinements: [
+              {
+                id: "drill:channel:publisher",
+                op: "drill",
+                field: "channel",
+                label: "Drill to Publisher: Channel = Audio",
+              },
+            ],
+          },
+        },
+      ],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml.includes("Channel = Audio"));
+assert.ok(!scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml.includes("Drill to Publisher: Channel = Audio"));
+
+const scopeFilterWithoutActiveRefinementsHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Scope Runtime Report Without Drill",
+      layoutIntent: {
+        blockOrder: ["sharedFilters"],
+        items: [{ blockId: "sharedFilters" }],
+      },
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          title: "Filters",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      refinements: [],
+      blocks: [
+        {
+          id: "sharedFilters",
+          kind: "filterBarBlock",
+          content: {
+            title: "Filters",
+            params: [],
+          },
+        },
+      ],
+    },
+    title: "Runtime Preview",
+  }),
+);
+assert.ok(!scopeFilterWithoutActiveRefinementsHtml.includes("Active Refinements"));
+assert.ok(!scopeFilterWithoutActiveRefinementsHtml.includes('data-report-runtime-active-scope-summary="true"'));
 
 const emptyRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -700,6 +1279,307 @@ const unsupportedRefinementHtml = renderToStaticMarkup(
 );
 assert.ok(!unsupportedRefinementHtml.includes("runtimeRefinementUnsupported"));
 assert.ok(!unsupportedRefinementHtml.includes("Runtime refinement actions are unavailable for Age Group because no backend runtime filter mapping is declared."));
+
+const emptyTableBlockHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Empty Table Runtime",
+      layoutIntent: {
+        blockOrder: ["detailTable"],
+        items: [{ blockId: "detailTable" }],
+      },
+      blocks: [
+        {
+          id: "detailTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          columns: [],
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {},
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          rows: [{ eventDate: "2026-05-01", totalSpend: 1200 }],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "detailTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          content: {
+            columns: [],
+            resolvedRows: [],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(emptyTableBlockHtml.includes("No table fields selected. Edit this table block in Design to choose at least one field."));
+
+const malformedTableColumnsHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Malformed Table Runtime",
+      layoutIntent: {
+        blockOrder: ["detailTable"],
+        items: [{ blockId: "detailTable" }],
+      },
+      blocks: [
+        {
+          id: "detailTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          columns: "not-an-array",
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {},
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          rows: [{ eventDate: "2026-05-01", totalSpend: 1200 }],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "detailTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          content: {},
+        },
+      ],
+    },
+  }),
+);
+assert.ok(malformedTableColumnsHtml.includes("No table fields selected. Edit this table block in Design to choose at least one field."));
+
+const wideHalfTableHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Wide Half Table Runtime",
+      layoutIntent: {
+        blockOrder: ["comparisonTable"],
+        items: [{ blockId: "comparisonTable", size: "half" }],
+      },
+      blocks: [
+        {
+          id: "comparisonTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          columns: [
+            { key: "channelId", sourceKey: "channelId", displayKey: "channelId", label: "Channel", kind: "dimension" },
+            { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
+            { key: "impressions", sourceKey: "impressions", displayKey: "impressions", label: "Impressions", kind: "measure", format: "compactNumber" },
+            { key: "ctr", sourceKey: "ctr", displayKey: "ctr", label: "CTR", kind: "measure", format: "percent" },
+          ],
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {
+            dimensions: {
+              channelId: true,
+            },
+          },
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          rows: [
+            { channelId: "CTV", totalSpend: 1200, impressions: 45000, ctr: 2.5 },
+          ],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "comparisonTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          content: {
+            columns: [
+              { key: "channelId", sourceKey: "channelId", displayKey: "channelId", label: "Channel", kind: "dimension" },
+              { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
+              { key: "impressions", sourceKey: "impressions", displayKey: "impressions", label: "Impressions", kind: "measure", format: "compactNumber" },
+              { key: "ctr", sourceKey: "ctr", displayKey: "ctr", label: "CTR", kind: "measure", format: "percent" },
+            ],
+            resolvedRows: [
+              {
+                rowIndex: 0,
+                cells: [
+                  { key: "channelId", sourceKey: "channelId", displayKey: "channelId", value: "CTV", displayValue: "CTV" },
+                  { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", value: 1200, displayValue: 1200 },
+                  { key: "impressions", sourceKey: "impressions", displayKey: "impressions", value: 45000, displayValue: 45000 },
+                  { key: "ctr", sourceKey: "ctr", displayKey: "ctr", value: 2.5, displayValue: 2.5 },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(wideHalfTableHtml.includes('data-report-runtime-block-id="comparisonTable"'));
+assert.ok(wideHalfTableHtml.includes('data-report-runtime-layout-span="12"'));
+
+const datasetBackedBlockErrorHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Dataset Error Runtime",
+      layoutIntent: {
+        blockOrder: ["detailTable", "headlineKpi", "primaryChart"],
+        items: [{ blockId: "detailTable" }, { blockId: "headlineKpi" }, { blockId: "primaryChart" }],
+      },
+      blocks: [
+        {
+          id: "detailTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          columns: [
+            { key: "eventDate", sourceKey: "eventDate", displayKey: "eventDate", label: "Date", kind: "dimension" },
+            { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
+          ],
+        },
+        {
+          id: "headlineKpi",
+          kind: "kpiBlock",
+          datasetRef: "primary",
+          title: "Headline KPI",
+          valueField: "totalSpend",
+          valueLabel: "Spend",
+          emptyLabel: "No KPI value available.",
+        },
+        {
+          id: "primaryChart",
+          kind: "chartBlock",
+          datasetRef: "primary",
+          title: "Chart",
+          chartSpec: {
+            title: "Chart",
+            type: "bar",
+            xField: "eventDate",
+            yFields: ["totalSpend"],
+          },
+        },
+      ],
+      datasets: [
+        {
+          id: "primary",
+          request: {},
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          rows: [],
+          provenance: {
+            diagnostics: [
+              {
+                severity: "error",
+                message: "The reporting service at http://steward.viantinc.com:5000/mcp did not respond in time. Try again after the service is available.",
+              },
+            ],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "detailTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          content: {
+            columns: [
+              { key: "eventDate", sourceKey: "eventDate", displayKey: "eventDate", label: "Date", kind: "dimension" },
+              { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
+            ],
+            resolvedRows: [],
+          },
+        },
+        {
+          id: "headlineKpi",
+          kind: "kpiBlock",
+          datasetRef: "primary",
+          content: {
+            title: "Headline KPI",
+            valueField: "totalSpend",
+            valueLabel: "Spend",
+            value: null,
+            rowCount: 0,
+            emptyLabel: "No KPI value available.",
+          },
+        },
+        {
+          id: "primaryChart",
+          kind: "chartBlock",
+          datasetRef: "primary",
+          content: {
+            chartSpec: {
+              title: "Chart",
+              type: "bar",
+              xField: "eventDate",
+              yFields: ["totalSpend"],
+            },
+            chartModel: {
+              type: "bar",
+              xAxis: { dataKey: "eventDate" },
+              yAxis: { format: "currency" },
+              series: {
+                values: [
+                  { value: "totalSpend", label: "Spend", color: "#1f77b4", type: "bar" },
+                ],
+                palette: ["#1f77b4"],
+              },
+            },
+            rowCount: 0,
+            resolvedChart: {
+              rows: [],
+            },
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(datasetBackedBlockErrorHtml.includes("The reporting service at http://steward.viantinc.com:5000/mcp did not respond in time. Try again after the service is available."));
+assert.ok(!datasetBackedBlockErrorHtml.includes("No data."));
+assert.ok(!datasetBackedBlockErrorHtml.includes("No KPI value available."));
+assert.ok(!datasetBackedBlockErrorHtml.includes("No data for the selected period."));
+assert.ok(!datasetBackedBlockErrorHtml.includes("runtimePreviewError"));
 
 const chartErrorHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -856,6 +1736,63 @@ assert.equal((blockWarningHtml.match(/Retry action provider/g) || []).length, 2)
 assert.ok(blockWarningHtml.includes("Block primaryTable"));
 assert.ok(blockWarningHtml.includes("reportRuntime.blocks.primaryTable.actions.channelV2"));
 
+const displayValueRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Display Value Runtime",
+      layoutIntent: {
+        blockOrder: ["primaryTable"],
+        items: [{ blockId: "primaryTable" }],
+      },
+      blocks: [
+        {
+          id: "primaryTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          columns: [
+            { key: "channelId", sourceKey: "channelId", displayKey: "channel.channel", label: "Channel", kind: "dimension" },
+            { key: "avails", sourceKey: "avails", displayKey: "avails", label: "Avails", kind: "measure" },
+          ],
+        },
+      ],
+      datasets: [{ id: "primary", request: { dimensions: { channelId: true }, measures: { avails: true } } }],
+    },
+    reportFill: {
+      datasets: [
+        {
+          id: "primary",
+          rows: [{ channelId: 1, avails: 120000 }],
+          provenance: { diagnostics: [] },
+        },
+      ],
+      blocks: [
+        {
+          id: "primaryTable",
+          kind: "tableBlock",
+          datasetRef: "primary",
+          content: {
+            columns: [
+              { key: "channelId", sourceKey: "channelId", displayKey: "channel.channel", label: "Channel", kind: "dimension" },
+              { key: "avails", sourceKey: "avails", displayKey: "avails", label: "Avails", kind: "measure" },
+            ],
+            resolvedRows: [
+              {
+                rowIndex: 0,
+                cells: [
+                  { key: "channelId", sourceKey: "channelId", displayKey: "channel.channel", value: 1, displayValue: "Display" },
+                  { key: "avails", sourceKey: "avails", displayKey: "avails", value: 120000, displayValue: 120000 },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(displayValueRuntimeHtml.includes("Display"));
+assert.ok(!displayValueRuntimeHtml.includes(">1<"));
+
 const geoWarningHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {
@@ -953,7 +1890,7 @@ const refinementBlock = {
         field: "country",
         values: ["US"],
         sourceBlockId: "reachRateTrend",
-        label: "Drill to Region = US",
+        label: "Market = US",
       },
       {
         id: "keep:channelV2:reachRateTable",
@@ -992,7 +1929,7 @@ const refinementTree = RefinementBarBlock({
 });
 const buttons = collectReactElements(refinementTree, (element) => element.type === "button");
 
-const removeDrillButton = buttons.find((button) => button.props?.["aria-label"] === "Remove refinement Drill to Region = US") || null;
+const removeDrillButton = buttons.find((button) => button.props?.["aria-label"] === "Remove refinement Market = US") || null;
 assert.ok(removeDrillButton);
 removeDrillButton.props.onClick();
 assert.deepEqual(removeCalls, ["drill:country:reachRateTrend"]);
@@ -1019,12 +1956,32 @@ const refinementHtml = renderToStaticMarkup(
     },
   }),
 );
-assert.ok(refinementHtml.includes("Drill to Region = US"));
+assert.ok(refinementHtml.includes("Market = US"));
 assert.ok(refinementHtml.includes("Keep Channel = Display"));
 assert.ok(refinementHtml.includes("Clear all"));
+assert.ok(refinementHtml.includes("Active Drill Path"));
+assert.ok(refinementHtml.includes("This session — live keep, exclude, and drill changes layered on top of the baseline scope."));
 assert.ok(!refinementHtml.includes("Generic refinement trail compiled from the authored report contract."));
 assert.ok(!refinementHtml.includes(">remove<"));
 assert.ok(!refinementHtml.includes(">clearAll<"));
+
+const defaultTitleRefinementHtml = renderToStaticMarkup(
+  React.createElement(RefinementBarBlock, {
+    block: {
+      id: "activeDrillPath",
+      kind: "refinementBarBlock",
+      content: {
+        refinements: refinementBlock.content.refinements,
+      },
+    },
+    runtimeHandlers: {
+      removeRefinement() {},
+      clearRefinements() {},
+    },
+  }),
+);
+assert.ok(defaultTitleRefinementHtml.includes("Active Refinements"));
+assert.ok(defaultTitleRefinementHtml.includes("This session — live keep, exclude, and drill changes layered on top of the baseline scope."));
 
 const emptyRefinementHtml = renderToStaticMarkup(
   React.createElement(RefinementBarBlock, {
@@ -1345,6 +2302,60 @@ assert.ok(!readOnlyImportedRuntimeHtml.includes("Click a chart mark to apply aut
 assert.ok(!readOnlyImportedRuntimeHtml.includes(">Actions<"));
 assert.ok(!readOnlyImportedRuntimeHtml.includes("Keep Channel"));
 assert.ok(!readOnlyImportedRuntimeHtml.includes("Exclude Channel"));
+
+const authoredReportHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec,
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          dataSourceRef: "demoSource",
+          rows: [
+            { eventDate: "2026-05-01", channelId: "Display", avails: 1200 },
+            { eventDate: "2026-05-02", channelId: "CTV", avails: 900 },
+          ],
+        },
+      ],
+      blocks: [
+        {
+          id: "trendChart",
+          kind: "chartBlock",
+          title: "Trend Chart",
+          datasetRef: "primary",
+          content: {
+            chartSpec: {
+              title: "Trend Chart",
+              type: "line",
+              xField: "eventDate",
+              yFields: ["avails"],
+              seriesField: "channelId",
+            },
+            chartModel: {
+              type: "line",
+              xAxis: { dataKey: "eventDate" },
+              yAxis: {},
+              series: {
+                nameKey: "channelId",
+                valueKey: "avails",
+                values: [{ value: "avails", label: "Avails", type: "line" }],
+              },
+            },
+          },
+        },
+      ],
+    },
+    title: "Audience Report",
+    presentationMode: "report",
+  }),
+);
+assert.ok(!authoredReportHtml.includes("Semantic Binding"));
+assert.ok(!authoredReportHtml.includes("Governed model and field selections compiled into this runtime artifact."));
+assert.ok(!authoredReportHtml.includes("Chart actions are unavailable because this runtime preview is read-only."));
+assert.ok(!authoredReportHtml.includes('aria-label="Chart series selector"'));
+assert.ok(authoredReportHtml.includes("Filters"));
+assert.ok(authoredReportHtml.includes("Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."));
 
 const documentBackedRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
