@@ -62,7 +62,7 @@ const horizontalBar = buildReportPrintChartSvg({
     type: "horizontal_bar",
     series: {
       values: [
-        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "horizontal_bar" },
+        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "horizontal_bar", format: "compactNumber" },
       ],
     },
   },
@@ -85,6 +85,7 @@ assert.match(horizontalBar.svg, /<rect/);
 assert.match(horizontalBar.svg, /Display/);
 assert.match(horizontalBar.svg, /CTV/);
 assert.match(horizontalBar.svg, /158.4K/);
+assert.match(horizontalBar.svg, /158 400/);
 assert.match(horizontalBar.svg, /Available Impressions/);
 
 const funnelBar = buildReportPrintChartSvg({
@@ -92,7 +93,7 @@ const funnelBar = buildReportPrintChartSvg({
     type: "funnel_bar",
     series: {
       values: [
-        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "funnel_bar" },
+        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "funnel_bar", format: "compactNumber" },
       ],
     },
   },
@@ -115,6 +116,7 @@ assert.match(funnelBar.svg, /<rect/);
 assert.match(funnelBar.svg, /Display/);
 assert.match(funnelBar.svg, /CTV/);
 assert.match(funnelBar.svg, /158.4K/);
+assert.match(funnelBar.svg, /158 400/);
 assert.match(funnelBar.svg, /Available Impressions/);
 
 const donut = buildReportPrintChartSvg({

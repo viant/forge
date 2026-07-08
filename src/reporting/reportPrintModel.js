@@ -1,6 +1,7 @@
 import { buildReportSpecHash, buildReportFillHash } from "./reportFillModel.js";
 import { buildReportPrintChartSvg } from "./reportPrintChartSvg.js";
 import { buildReportPrintGeoSvg } from "./reportPrintGeoSvg.js";
+import { formatExportValue } from "./reportExportValueFormatter.js";
 import {
   REPORT_LAYOUT_GRID_COLUMNS,
   resolveReportLayoutSpan,
@@ -546,25 +547,20 @@ function normalizeMarkdownToPlainText(markdown = "") {
     .trim();
 }
 
-function formatReportPrintValue(value) {
-  if (value === undefined || value === null || value === "") {
-    return "—";
+function formatReportPrintValue(value, format = "") {
+  return formatExportValue(value, format);
+}
+
+function inferReportPrintNumericFormat(value, format = "") {
+  const explicit = normalizeString(format);
+  if (explicit) {
+    return explicit;
   }
-  if (Array.isArray(value)) {
-    return value.map((entry) => formatReportPrintValue(entry)).join(", ");
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && Number.isInteger(numeric) && Math.abs(numeric) >= 1000) {
+    return "compactNumber";
   }
-  if (isPlainObject(value)) {
-    const start = normalizeString(value?.start);
-    const end = normalizeString(value?.end);
-    if (start || end) {
-      if (start && end) {
-        return `${start} to ${end}`;
-      }
-      return start || end;
-    }
-    return JSON.stringify(value);
-  }
-  return String(value);
+  return "";
 }
 
 function wrapReportPrintText(text = "", width = 0, fontSize = REPORT_PRINT_THEME.bodyFontSize) {
@@ -1037,9 +1033,13 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
 } = {}) {
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const content = block?.content || {};
+  const valueFormat = inferReportPrintNumericFormat(
+    content?.value,
+    content?.valueFormat || content?.format,
+  );
   renderReportPrintTextLines(state, {
     idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__value`,
-    lines: [`${normalizeString(content?.valueLabel || content?.valueField || "Value")}: ${formatReportPrintValue(content?.value)}`],
+    lines: [`${normalizeString(content?.valueLabel || content?.valueField || "Value")}: ${formatReportPrintValue(content?.value, valueFormat)}`],
     fontSize: REPORT_PRINT_THEME.kpiValueFontSize,
     lineHeight: REPORT_PRINT_THEME.kpiValueLineHeight,
     fontWeight: "700",
@@ -1047,7 +1047,7 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   });
   const detailLines = [];
   if (normalizeString(content?.secondaryField || content?.secondaryLabel)) {
-    detailLines.push(`${normalizeString(content?.secondaryLabel || content?.secondaryField)}: ${formatReportPrintValue(content?.secondaryValue)}`);
+    detailLines.push(`${normalizeString(content?.secondaryLabel || content?.secondaryField)}: ${formatReportPrintValue(content?.secondaryValue, normalizeString(content?.secondaryFormat))}`);
   }
   if (normalizeString(content?.description)) {
     detailLines.push(normalizeString(content.description));
@@ -1265,7 +1265,12 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
       },
       rowKey,
       columnKey,
-      text: formatReportPrintValue(cell?.displayValue),
+      text: formatReportPrintValue(
+        cell?.displayValue !== undefined && cell?.displayValue !== null && cell?.displayValue !== ""
+          ? cell.displayValue
+          : cell?.value,
+        normalizeString(column?.format),
+      ),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
       align: resolveReportPrintTableColumnAlign(column, cell),
     }));

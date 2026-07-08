@@ -3,6 +3,7 @@ package xlsx
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -93,7 +94,7 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			if err := workbook.SetCellStr(sheetName, cellName, formatXLSXValue(cell.DisplayValue)); err != nil {
+			if err := workbook.SetCellStr(sheetName, cellName, formatXLSXValue(column, cell)); err != nil {
 				return nil, err
 			}
 		}
@@ -106,7 +107,54 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func formatXLSXValue(value any) string {
+func formatGroupedNumberWithSpaces(value float64, decimals int) string {
+	text := strconv.FormatFloat(value, 'f', decimals, 64)
+	parts := strings.SplitN(text, ".", 2)
+	sign := ""
+	integer := parts[0]
+	if strings.HasPrefix(integer, "-") {
+		sign = "-"
+		integer = strings.TrimPrefix(integer, "-")
+	}
+	var builder strings.Builder
+	for index, char := range integer {
+		if index > 0 && (len(integer)-index)%3 == 0 {
+			builder.WriteByte(' ')
+		}
+		builder.WriteRune(char)
+	}
+	if len(parts) == 2 {
+		return sign + builder.String() + "." + parts[1]
+	}
+	return sign + builder.String()
+}
+
+func formatXLSXNumericValue(format string, value float64) string {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "currency":
+		return "$" + formatGroupedNumberWithSpaces(value, 2)
+	case "compactnumber":
+		if math.Mod(value, 1) == 0 {
+			return formatGroupedNumberWithSpaces(value, 0)
+		}
+		return formatGroupedNumberWithSpaces(value, 5)
+	case "percent":
+		return strconv.FormatFloat(value, 'f', 1, 64) + "%"
+	case "percentfraction":
+		return strconv.FormatFloat(value*100, 'f', 1, 64) + "%"
+	case "number", "":
+		return strconv.FormatFloat(value, 'f', 5, 64)
+	default:
+		return strconv.FormatFloat(value, 'f', 5, 64)
+	}
+}
+
+func formatXLSXValue(column reportfill.TableColumn, cell reportfill.ResolvedTableCell) string {
+	value := cell.DisplayValue
+	if value == nil || value == "" {
+		value = cell.Value
+	}
+	format := strings.TrimSpace(column.Format)
 	switch actual := value.(type) {
 	case nil:
 		return ""
@@ -115,18 +163,43 @@ func formatXLSXValue(value any) string {
 	case bool:
 		return strconv.FormatBool(actual)
 	case float64:
-		return strconv.FormatFloat(actual, 'f', -1, 64)
+		return formatXLSXNumericValue(format, actual)
 	case float32:
-		return strconv.FormatFloat(float64(actual), 'f', -1, 64)
+		return formatXLSXNumericValue(format, float64(actual))
 	case int:
-		return strconv.Itoa(actual)
+		return formatXLSXNumericValue(format, float64(actual))
 	case int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprint(actual)
+		return formatXLSXNumericValue(format, toFloat64(actual))
 	default:
 		data, err := json.Marshal(actual)
 		if err != nil {
 			return fmt.Sprint(actual)
 		}
 		return string(data)
+	}
+}
+
+func toFloat64(value any) float64 {
+	switch actual := value.(type) {
+	case int8:
+		return float64(actual)
+	case int16:
+		return float64(actual)
+	case int32:
+		return float64(actual)
+	case int64:
+		return float64(actual)
+	case uint:
+		return float64(actual)
+	case uint8:
+		return float64(actual)
+	case uint16:
+		return float64(actual)
+	case uint32:
+		return float64(actual)
+	case uint64:
+		return float64(actual)
+	default:
+		return 0
 	}
 }

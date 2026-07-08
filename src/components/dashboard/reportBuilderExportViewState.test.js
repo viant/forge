@@ -319,6 +319,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
         jobId: "job-1",
         status: "queued",
         artifactId: "",
+        format: "pdf",
         canRefresh: true,
         hasArtifact: false,
         hasFailure: false,
@@ -376,7 +377,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
     ],
     refreshLabel: "Refresh status",
     refreshDisabled: false,
-    downloadLabel: "Download artifact",
+    downloadLabel: "Download PDF",
     downloadDisabled: true,
 });
 
@@ -385,6 +386,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
         jobId: "job-2",
         status: "failed",
         artifactId: "artifact-7",
+        format: "xlsx",
         canRefresh: false,
         hasArtifact: true,
         hasFailure: true,
@@ -442,7 +444,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
     ],
     refreshLabel: "Refreshing...",
     refreshDisabled: true,
-    downloadLabel: "Loading artifact...",
+    downloadLabel: "Loading XLSX...",
     downloadDisabled: true,
 });
 
@@ -451,6 +453,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
         jobId: "job-3",
         status: "succeeded",
         artifactId: "artifact-9",
+        format: "pdf",
         canRefresh: false,
         hasArtifact: true,
         hasFailure: false,
@@ -509,7 +512,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
     ],
     refreshLabel: "Refresh status",
     refreshDisabled: true,
-    downloadLabel: "Download artifact",
+    downloadLabel: "Download PDF",
     downloadDisabled: false,
 });
 

@@ -124,6 +124,59 @@ func TestRender_AcceptsFilterBarWithRichParams(t *testing.T) {
 	require.NotEmpty(t, data)
 }
 
+func TestRender_FormatsDefaultNumbersAndCompactValues(t *testing.T) {
+	report, err := reportfill.DecodeJSON([]byte(`{
+		"version": 1,
+		"kind": "reportFill",
+		"specVersion": 1,
+		"specHash": "spec-1",
+		"source": {"kind":"dashboard.reportBuilder","containerId":"demo","stateKey":"demo","dataSourceRef":"demo"},
+		"parameters": {"viewMode":"table","groupBy":"","pageSize":25,"orderField":"","orderDir":"asc"},
+		"refinements": [],
+		"calculatedFields": [],
+		"datasets": [{
+			"id": "primary",
+			"dataSourceRef": "demo",
+			"request": {"limit": 25, "offset": 0},
+			"provenance": {"requestHash":"fnv1a:9702fdec","rowCount":1,"truncated":false,"hasMore":false,"diagnostics":[]},
+			"rows": [{"avails":25095562010,"minClearingPrice":13.151637212662237}]
+		}],
+		"blocks": [{
+			"id":"primaryTable",
+			"kind":"tableBlock",
+			"datasetRef":"primary",
+			"columns":[
+				{"key":"avails","label":"Avails","format":"compactNumber"},
+				{"key":"minClearingPrice","label":"Min Clearing Price","format":"number"}
+			],
+			"content":{
+				"columns":[
+					{"key":"avails","label":"Avails","format":"compactNumber"},
+					{"key":"minClearingPrice","label":"Min Clearing Price","format":"number"}
+				],
+				"rowCount":1,
+				"resolvedRows":[
+					{"rowIndex":0,"cells":[
+						{"key":"avails","sourceKey":"avails","displayKey":"avails","value":25095562010,"displayValue":25095562010,"visualState":null},
+						{"key":"minClearingPrice","sourceKey":"minClearingPrice","displayKey":"minClearingPrice","value":13.151637212662237,"displayValue":13.151637212662237,"visualState":null}
+					]}
+				]
+			}
+		}],
+		"diagnostics": []
+	}`))
+	require.NoError(t, err)
+
+	data, err := Render(report)
+	require.NoError(t, err)
+	require.NotEmpty(t, data)
+
+	workbook, err := excelize.OpenReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	require.Equal(t, "25 095 562 010", mustCellValue(t, workbook, "Report", "A2"))
+	require.Equal(t, "13.15164", mustCellValue(t, workbook, "Report", "B2"))
+}
+
 func mustCellValue(t *testing.T, workbook *excelize.File, sheet, cell string) string {
 	t.Helper()
 	value, err := workbook.GetCellValue(sheet, cell)
