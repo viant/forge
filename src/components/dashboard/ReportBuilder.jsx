@@ -6331,32 +6331,24 @@ export default function ReportBuilder({ container, context }) {
                                     <Popover
                                         placement="bottom-start"
                                         usePortal={false}
-                                        content={(
-                                            <Menu>
-                                                <MenuItem
-                                                    icon="document"
-                                                    text="PDF"
-                                                    disabled={draftExportActionState?.submitDisabled || !draftExportRequest}
-                                                    onClick={() => {
-                                                        closeCompactChartSheet();
-                                                        triggerDraftExport();
-                                                    }}
-                                                />
-                                                <MenuItem
-                                                    icon="th"
-                                                    text="XLSX"
-                                                    disabled={!draftXlsxExportRequest}
-                                                    onClick={() => {
-                                                        closeCompactChartSheet();
-                                                        triggerDraftXlsxExport();
-                                                    }}
-                                                />
-                                            </Menu>
-                                        )}
+                                        content={renderDraftExportMenuContent({ onClose: closeCompactChartSheet })}
                                     >
-                                        <Button small outlined icon="download" disabled={!canOpenDraftExportMenu}>
-                                            Export
-                                        </Button>
+                                        {draftToolbarExportControlState ? (
+                                            <Button
+                                                small
+                                                outlined={draftToolbarExportControlState.intent !== "success"}
+                                                intent={draftToolbarExportControlState.intent || "none"}
+                                                icon={draftToolbarExportControlState.icon || "download"}
+                                                loading={draftToolbarExportControlState.loading === true}
+                                                disabled={!canOpenDraftExportMenu || draftToolbarExportControlState.disabled === true}
+                                            >
+                                                {draftToolbarExportControlState.label}
+                                            </Button>
+                                        ) : (
+                                            <Button small outlined icon="download" disabled={!canOpenDraftExportMenu}>
+                                                Export
+                                            </Button>
+                                        )}
                                     </Popover>
                                 ) : null}
                             </div>
@@ -11427,6 +11419,7 @@ export default function ReportBuilder({ container, context }) {
     } = draftExportExecution;
     const {
         requestSummary: draftXlsxExportRequestSummary,
+        submitting: draftXlsxExportSubmitting,
         job: draftXlsxExportJob,
         jobSummary: draftXlsxExportJobSummary,
         statusLoading: draftXlsxExportStatusLoading,
@@ -11675,6 +11668,151 @@ export default function ReportBuilder({ container, context }) {
             runtimePreviewArtifact?.document,
         ],
     );
+    const draftPdfPending = !!draftExportSubmitting || (!!draftExportJobSummary?.canRefresh && !draftExportJobSummary?.hasArtifact && !draftExportJobSummary?.hasFailure);
+    const draftXlsxPending = !!draftXlsxExportSubmitting || (!!draftXlsxExportJobSummary?.canRefresh && !draftXlsxExportJobSummary?.hasArtifact && !draftXlsxExportJobSummary?.hasFailure);
+    const draftPdfReady = !!draftExportJobSummary?.hasArtifact;
+    const draftXlsxReady = !!draftXlsxExportJobSummary?.hasArtifact;
+    const draftPdfFailed = !!draftExportJobSummary?.hasFailure;
+    const draftXlsxFailed = !!draftXlsxExportJobSummary?.hasFailure;
+    const draftPdfFormatLabel = draftExportJobSummary?.format ? String(draftExportJobSummary.format || "").toUpperCase() : "PDF";
+    const draftXlsxFormatLabel = draftXlsxExportJobSummary?.format ? String(draftXlsxExportJobSummary.format || "").toUpperCase() : "XLSX";
+    const renderDraftExportMenuContent = React.useCallback(({ onClose = null } = {}) => {
+        const closeAndRun = (handler) => () => {
+            if (typeof onClose === "function") {
+                onClose();
+            }
+            if (typeof handler === "function") {
+                handler();
+            }
+        };
+        return (
+            <Menu>
+                {draftPdfReady ? (
+                    <MenuItem
+                        icon="download"
+                        text={`Download ${draftPdfFormatLabel}`}
+                        onClick={closeAndRun(downloadDraftExportArtifact)}
+                    />
+                ) : null}
+                {draftXlsxReady ? (
+                    <MenuItem
+                        icon="download"
+                        text={`Download ${draftXlsxFormatLabel}`}
+                        onClick={closeAndRun(downloadDraftXlsxExportArtifact)}
+                    />
+                ) : null}
+                {(draftPdfReady || draftXlsxReady) ? <MenuDivider title="New export" /> : null}
+                <MenuItem
+                    icon={draftPdfPending ? "time" : "document"}
+                    text={draftPdfPending ? `Exporting ${draftPdfFormatLabel}…` : (draftPdfReady ? `Export ${draftPdfFormatLabel} again` : draftPdfFormatLabel)}
+                    disabled={draftExportActionState?.submitDisabled || !draftExportRequest || draftPdfPending}
+                    onClick={closeAndRun(triggerDraftExport)}
+                />
+                <MenuItem
+                    icon={draftXlsxPending ? "time" : "th"}
+                    text={draftXlsxPending ? `Exporting ${draftXlsxFormatLabel}…` : (draftXlsxReady ? `Export ${draftXlsxFormatLabel} again` : draftXlsxFormatLabel)}
+                    disabled={!draftXlsxExportRequest || draftXlsxPending}
+                    onClick={closeAndRun(triggerDraftXlsxExport)}
+                />
+            </Menu>
+        );
+    }, [
+        downloadDraftExportArtifact,
+        downloadDraftXlsxExportArtifact,
+        draftExportActionState?.submitDisabled,
+        draftExportRequest,
+        draftPdfFormatLabel,
+        draftPdfPending,
+        draftPdfReady,
+        draftXlsxExportRequest,
+        draftXlsxFormatLabel,
+        draftXlsxPending,
+        draftXlsxReady,
+        triggerDraftExport,
+        triggerDraftXlsxExport,
+    ]);
+    const draftToolbarExportControlState = useMemo(() => {
+        if (draftPdfReady && !draftXlsxReady) {
+            return {
+                mode: "ready",
+                label: `Download ${draftPdfFormatLabel}`,
+                icon: "download",
+                intent: "success",
+                loading: false,
+                disabled: false,
+                onClick: downloadDraftExportArtifact,
+            };
+        }
+        if (draftXlsxReady && !draftPdfReady) {
+            return {
+                mode: "ready",
+                label: `Download ${draftXlsxFormatLabel}`,
+                icon: "download",
+                intent: "success",
+                loading: false,
+                disabled: false,
+                onClick: downloadDraftXlsxExportArtifact,
+            };
+        }
+        if (draftPdfPending && !draftXlsxReady) {
+            return {
+                mode: "pending",
+                label: `Exporting ${draftPdfFormatLabel}…`,
+                icon: "time",
+                intent: "primary",
+                loading: true,
+                disabled: true,
+                onClick: null,
+            };
+        }
+        if (draftXlsxPending && !draftPdfReady) {
+            return {
+                mode: "pending",
+                label: `Exporting ${draftXlsxFormatLabel}…`,
+                icon: "time",
+                intent: "primary",
+                loading: true,
+                disabled: true,
+                onClick: null,
+            };
+        }
+        if (draftPdfFailed && !draftXlsxReady) {
+            return {
+                mode: "failed",
+                label: `Retry ${draftPdfFormatLabel} export`,
+                icon: "warning-sign",
+                intent: "danger",
+                loading: false,
+                disabled: false,
+                onClick: triggerDraftExport,
+            };
+        }
+        if (draftXlsxFailed && !draftPdfReady) {
+            return {
+                mode: "failed",
+                label: `Retry ${draftXlsxFormatLabel} export`,
+                icon: "warning-sign",
+                intent: "danger",
+                loading: false,
+                disabled: false,
+                onClick: triggerDraftXlsxExport,
+            };
+        }
+        return null;
+    }, [
+        downloadDraftExportArtifact,
+        downloadDraftXlsxExportArtifact,
+        draftPdfFailed,
+        draftPdfFormatLabel,
+        draftPdfPending,
+        draftPdfReady,
+        draftXlsxFailed,
+        draftXlsxFormatLabel,
+        draftXlsxPending,
+        draftXlsxReady,
+        triggerDraftExport,
+        triggerDraftXlsxExport,
+    ]);
     const importedStandaloneExportFailureNotice = useMemo(
         () => buildImportedStandaloneExportFailureNotice({
             importedStandaloneExportJob,
@@ -13890,16 +14028,66 @@ export default function ReportBuilder({ container, context }) {
         const metaChips = Array.isArray(chartApplyFeedback?.metaChips)
             ? chartApplyFeedback.metaChips.filter(Boolean)
             : [];
+        const feedbackAction = !compact ? (() => {
+            switch (chartApplyFeedback?.action) {
+                case "runReport":
+                    return typeof onAction === "function" ? onAction : null;
+                case "downloadArtifact":
+                    switch (String(chartApplyFeedback?.exportKind || "").trim()) {
+                        case "draft":
+                            return String(chartApplyFeedback?.exportFormat || "").trim().toLowerCase() === "xlsx"
+                                ? downloadDraftXlsxExportArtifact
+                                : downloadDraftExportArtifact;
+                        case "savedPayload":
+                            return savedReportPayloadExportExecution?.downloadArtifact || null;
+                        case "reopened":
+                            return reopenedExportExecution?.downloadArtifact || null;
+                        case "selectedListEntry":
+                            return selectedListEntryExportExecution?.downloadArtifact || null;
+                        case "latestSharedArtifact":
+                            return latestLifecycleSharedArtifactExportExecution?.downloadArtifact || null;
+                        case "importedStandalone":
+                            return importedStandaloneExportExecution?.downloadArtifact || null;
+                        case "importedPipeline":
+                            return importedPipelineExportExecution?.downloadArtifact || null;
+                        default:
+                            return null;
+                    }
+                case "retryExport":
+                    switch (String(chartApplyFeedback?.exportKind || "").trim()) {
+                        case "draft":
+                            return String(chartApplyFeedback?.exportFormat || "").trim().toLowerCase() === "xlsx"
+                                ? triggerDraftXlsxExport
+                                : triggerDraftExport;
+                        case "savedPayload":
+                            return savedReportPayloadExportExecution?.submit || null;
+                        case "reopened":
+                            return reopenedExportExecution?.submit || null;
+                        case "selectedListEntry":
+                            return selectedListEntryExportExecution?.submit || null;
+                        case "latestSharedArtifact":
+                            return latestLifecycleSharedArtifactExportExecution?.submit || null;
+                        case "importedStandalone":
+                            return importedStandaloneExportExecution?.submit || null;
+                        case "importedPipeline":
+                            return importedPipelineExportExecution?.submit || null;
+                        default:
+                            return null;
+                    }
+                default:
+                    return null;
+            }
+        })() : null;
         return (
             <ReportBuilderInlineNotice
                 notice={{
                     level: chartApplyFeedback.level || "warning",
                     message: chartApplyFeedback.message,
-                    actionLabel: !compact && chartApplyFeedback.action === "runReport" && typeof onAction === "function"
-                        ? "Run now"
+                    actionLabel: !compact && typeof feedbackAction === "function"
+                        ? (String(chartApplyFeedback?.actionLabel || "").trim() || (chartApplyFeedback.action === "runReport" ? "Run now" : ""))
                         : "",
                 }}
-                onAction={!compact && chartApplyFeedback.action === "runReport" && typeof onAction === "function" ? onAction : null}
+                onAction={!compact && typeof feedbackAction === "function" ? feedbackAction : null}
             >
                 {metaChips.length > 0 ? (
                     <div className="forge-report-builder__result-meta" aria-label="Feedback summary" style={{ marginTop: 8 }}>
@@ -15593,34 +15781,47 @@ export default function ReportBuilder({ container, context }) {
                                     >
                                         Run
                                     </Button>
-                                    <Popover
-                                        placement="bottom-start"
-                                        content={(
-                                            <Menu>
-                                                <MenuItem
-                                                    icon="document"
-                                                    text="PDF"
-                                                    disabled={draftExportActionState?.submitDisabled || !draftExportRequest}
-                                                    onClick={triggerDraftExport}
+                                    {draftToolbarExportControlState ? (
+                                        <div className="forge-report-builder__toolbar-split-control">
+                                            <Button
+                                                small
+                                                intent={draftToolbarExportControlState.intent || "none"}
+                                                outlined={draftToolbarExportControlState.intent !== "success"}
+                                                icon={draftToolbarExportControlState.icon || "download"}
+                                                loading={draftToolbarExportControlState.loading === true}
+                                                disabled={draftToolbarExportControlState.disabled === true}
+                                                onClick={draftToolbarExportControlState.onClick || undefined}
+                                            >
+                                                {draftToolbarExportControlState.label}
+                                            </Button>
+                                            <Popover
+                                                placement="bottom-start"
+                                                content={renderDraftExportMenuContent()}
+                                            >
+                                                <Button
+                                                    small
+                                                    outlined
+                                                    icon="caret-down"
+                                                    aria-label="More export options"
+                                                    disabled={!canOpenDraftExportMenu}
                                                 />
-                                                <MenuItem
-                                                    icon="th"
-                                                    text="XLSX"
-                                                    disabled={!draftXlsxExportRequest}
-                                                    onClick={triggerDraftXlsxExport}
-                                                />
-                                            </Menu>
-                                        )}
-                                    >
-                                        <Button
-                                            small
-                                            outlined
-                                            icon="download"
-                                            disabled={!canOpenDraftExportMenu}
+                                            </Popover>
+                                        </div>
+                                    ) : (
+                                        <Popover
+                                            placement="bottom-start"
+                                            content={renderDraftExportMenuContent()}
                                         >
-                                            Export
-                                        </Button>
-                                    </Popover>
+                                            <Button
+                                                small
+                                                outlined
+                                                icon="download"
+                                                disabled={!canOpenDraftExportMenu}
+                                            >
+                                                Export
+                                            </Button>
+                                        </Popover>
+                                    )}
                                     <Button
                                         small
                                         outlined

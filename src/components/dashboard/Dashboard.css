@@ -2964,6 +2964,12 @@
     box-shadow: 0 4px 12px rgba(15, 30, 50, 0.04);
 }
 
+.forge-report-builder__toolbar-split-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 .forge-report-builder__toolbar-group {
     display: inline-flex;
     align-items: center;

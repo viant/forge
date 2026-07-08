@@ -303,9 +303,18 @@ export function useReportBuilderExportExecution({
                     ...(normalizedSourceKind ? { triggerSource: normalizedSourceKind } : {}),
                 },
             });
+            const readyAction = normalizedJob?.status === "succeeded" && normalizeString(normalizedJob?.artifactId)
+                ? {
+                    action: "downloadArtifact",
+                    actionLabel: `Download ${buildExportFormatLabel(normalizedJob?.format || request?.target?.format)}`,
+                    exportKind: normalizedSourceKind,
+                    exportFormat: normalizeString(normalizedJob?.format || request?.target?.format).toLowerCase(),
+                }
+                : {};
             setFeedback({
                 level: auditResult.issue ? "warning" : "success",
                 message: `${normalizeString(result?.message) || `Submitted ${format} export for ${title}.`}${auditResult.issue ? ` ${auditResult.issue}` : ""}`,
+                ...readyAction,
             });
             if (historyAvailable) {
                 Promise.resolve().then(() => refreshHistory({ silent: true }));
@@ -383,6 +392,10 @@ export function useReportBuilderExportExecution({
                     setFeedback({
                         level: "success",
                         message: `${buildExportFormatLabel(nextJob.format || request?.target?.format)} export for ${title} is ready to download.`,
+                        action: "downloadArtifact",
+                        actionLabel: `Download ${buildExportFormatLabel(nextJob.format || request?.target?.format)}`,
+                        exportKind: normalizeString(sourceKind),
+                        exportFormat: normalizeString(nextJob.format || request?.target?.format).toLowerCase(),
                     });
                 }
                 if (historyAvailable) {
@@ -402,6 +415,12 @@ export function useReportBuilderExportExecution({
                 setFeedback({
                     level: "warning",
                     message: failure.message,
+                    action: failure.job?.status === "failed" ? "retryExport" : "",
+                    actionLabel: failure.job?.status === "failed"
+                        ? `Retry ${buildExportFormatLabel(failure.job?.format || request?.target?.format)} export`
+                        : "",
+                    exportKind: normalizeString(sourceKind),
+                    exportFormat: normalizeString(failure.job?.format || request?.target?.format).toLowerCase(),
                 });
             }
             return null;
