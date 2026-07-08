@@ -8,6 +8,7 @@ import {
     normalizeReportBuilderExportArtifactList,
     normalizeReportBuilderExportJob,
     normalizeReportBuilderExportJobList,
+    isReportBuilderExportJobTerminal,
 } from "./reportBuilderExportLifecycle.js";
 import {
     buildReportBuilderExportRequestDownload,
@@ -56,6 +57,26 @@ function buildExportFailureMessage({
         return `Could not submit export for ${normalizedTitle}.`;
     }
     return "Could not submit export.";
+}
+
+function buildExportFormatLabel(format = "") {
+    return normalizeString(format).toUpperCase() || "EXPORT";
+}
+
+export const REPORT_EXPORT_STATUS_POLL_INTERVAL_MS = 1500;
+
+export function shouldAutoRefreshReportBuilderExportJob(job = null, reportExportHandler = null) {
+    const normalizedJob = normalizeReportBuilderExportJob(job);
+    if (!normalizedJob) {
+        return false;
+    }
+    if (typeof reportExportHandler?.getStatus !== "function") {
+        return false;
+    }
+    if (normalizeString(normalizedJob.artifactId)) {
+        return false;
+    }
+    return !isReportBuilderExportJobTerminal(normalizedJob);
 }
 
 export function resolveReportBuilderExportSubmitFailure(error = null, {
@@ -157,6 +178,7 @@ export function useReportBuilderExportExecution({
     const [historyJobs, setHistoryJobs] = React.useState([]);
     const [historyArtifacts, setHistoryArtifacts] = React.useState([]);
     const historyRequestVersionRef = React.useRef(0);
+    const statusPollTimerRef = React.useRef(null);
     const jobSummary = React.useMemo(
         () => buildReportBuilderExportJobSummary(job),
         [job],
@@ -316,20 +338,25 @@ export function useReportBuilderExportExecution({
         sourceKind,
     ]);
 
-    const refreshStatus = React.useCallback(async ({ jobId: requestedJobId = "" } = {}) => {
+    const refreshStatus = React.useCallback(async ({ jobId: requestedJobId = "", silent = false } = {}) => {
         const jobId = normalizeString(requestedJobId || job?.jobId);
+        const title = normalizeString(request?.source?.title || request?.reportSpec?.title || "Report") || "Report";
         if (!jobId) {
-            setFeedback({
-                level: "warning",
-                message: missingJobMessage,
-            });
+            if (!silent) {
+                setFeedback({
+                    level: "warning",
+                    message: missingJobMessage,
+                });
+            }
             return null;
         }
         if (typeof reportExportHandler?.getStatus !== "function") {
-            setFeedback({
-                level: "info",
-                message: "The current host export handler does not expose export status polling.",
-            });
+            if (!silent) {
+                setFeedback({
+                    level: "info",
+                    message: "The current host export handler does not expose export status polling.",
+                });
+            }
             return null;
         }
         setStatusLoading(true);
@@ -340,12 +367,24 @@ export function useReportBuilderExportExecution({
                 if (!normalizeString(nextJob.artifactId)) {
                     setArtifact(null);
                 }
-                setFeedback({
-                    level: nextJob.status === "failed" ? "warning" : "success",
-                    message: nextJob.status === "failed"
-                        ? (normalizeString(nextJob.error) || `Export ${jobId} failed.`)
-                        : `Export ${jobId} is ${nextJob.status}.`,
-                });
+                if (!silent) {
+                    setFeedback({
+                        level: nextJob.status === "failed" ? "warning" : "success",
+                        message: nextJob.status === "failed"
+                            ? (normalizeString(nextJob.error) || `Export ${jobId} failed.`)
+                            : `Export ${jobId} is ${nextJob.status}.`,
+                    });
+                } else if (nextJob.status === "failed") {
+                    setFeedback({
+                        level: "warning",
+                        message: normalizeString(nextJob.error) || `Export ${jobId} failed.`,
+                    });
+                } else if (nextJob.status === "succeeded" && normalizeString(nextJob.artifactId)) {
+                    setFeedback({
+                        level: "success",
+                        message: `${buildExportFormatLabel(nextJob.format || request?.target?.format)} export for ${title} is ready to download.`,
+                    });
+                }
                 if (historyAvailable) {
                     Promise.resolve().then(() => refreshHistory({ silent: true }));
                 }
@@ -359,15 +398,43 @@ export function useReportBuilderExportExecution({
                     setArtifact(null);
                 }
             }
-            setFeedback({
-                level: "warning",
-                message: failure.message,
-            });
+            if (!silent || failure.job?.status === "failed") {
+                setFeedback({
+                    level: "warning",
+                    message: failure.message,
+                });
+            }
             return null;
         } finally {
             setStatusLoading(false);
         }
-    }, [historyAvailable, job, missingJobMessage, refreshHistory, reportExportHandler, setFeedback]);
+    }, [historyAvailable, job, missingJobMessage, refreshHistory, reportExportHandler, request, setFeedback]);
+
+    React.useEffect(() => {
+        if (statusPollTimerRef.current != null) {
+            globalThis.clearTimeout(statusPollTimerRef.current);
+            statusPollTimerRef.current = null;
+        }
+        if (!shouldAutoRefreshReportBuilderExportJob(job, reportExportHandler)) {
+            return undefined;
+        }
+        const normalizedJob = normalizeReportBuilderExportJob(job);
+        statusPollTimerRef.current = globalThis.setTimeout(() => {
+            statusPollTimerRef.current = null;
+            if (normalizedJob?.jobId) {
+                refreshStatus({
+                    jobId: normalizedJob.jobId,
+                    silent: true,
+                });
+            }
+        }, REPORT_EXPORT_STATUS_POLL_INTERVAL_MS);
+        return () => {
+            if (statusPollTimerRef.current != null) {
+                globalThis.clearTimeout(statusPollTimerRef.current);
+                statusPollTimerRef.current = null;
+            }
+        };
+    }, [job, refreshStatus, reportExportHandler]);
 
     const downloadArtifactByReference = React.useCallback(async ({
         artifactId = "",

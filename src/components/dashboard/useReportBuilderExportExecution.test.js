@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 
 import {
+    REPORT_EXPORT_STATUS_POLL_INTERVAL_MS,
     resolveReportBuilderExportStatusFailure,
     resolveReportBuilderExportSubmitFailure,
+    shouldAutoRefreshReportBuilderExportJob,
 } from "./useReportBuilderExportExecution.js";
 
 const emptyTimingFields = {
@@ -142,6 +144,50 @@ assert.deepEqual(
         job: null,
         message: "status endpoint unavailable",
     },
+);
+
+assert.equal(REPORT_EXPORT_STATUS_POLL_INTERVAL_MS, 1500);
+
+assert.equal(
+    shouldAutoRefreshReportBuilderExportJob({
+        jobId: "job-queued",
+        status: "queued",
+        artifactId: "",
+    }, {
+        getStatus() {},
+    }),
+    true,
+);
+
+assert.equal(
+    shouldAutoRefreshReportBuilderExportJob({
+        jobId: "job-ready",
+        status: "succeeded",
+        artifactId: "artifact-1",
+    }, {
+        getStatus() {},
+    }),
+    false,
+);
+
+assert.equal(
+    shouldAutoRefreshReportBuilderExportJob({
+        jobId: "job-failed",
+        status: "failed",
+        artifactId: "",
+    }, {
+        getStatus() {},
+    }),
+    false,
+);
+
+assert.equal(
+    shouldAutoRefreshReportBuilderExportJob({
+        jobId: "job-missing-handler",
+        status: "queued",
+        artifactId: "",
+    }, null),
+    false,
 );
 
 console.log("useReportBuilderExportExecution ✓ resolves failed export submit state from structured host errors");

@@ -7,6 +7,14 @@ function capitalizeLabel(value = "") {
     return normalized ? `${normalized[0].toUpperCase()}${normalized.slice(1)}` : "";
 }
 
+function buildArtifactDownloadLabel(jobSummary = null, artifactLoading = false) {
+    const formatLabel = normalizeString(jobSummary?.format).toUpperCase();
+    if (artifactLoading) {
+        return formatLabel ? `Loading ${formatLabel}...` : "Loading artifact...";
+    }
+    return formatLabel ? `Download ${formatLabel}` : "Download artifact";
+}
+
 export function buildReportBuilderExportProvenanceMetaChips({
     backingState = "",
     backingSource = "",
@@ -158,7 +166,7 @@ export function buildReportBuilderExportJobPanelState({
             : {}),
         refreshLabel: statusLoading ? "Refreshing..." : "Refresh status",
         refreshDisabled: !!statusLoading || !jobSummary.canRefresh,
-        downloadLabel: artifactLoading ? "Loading artifact..." : "Download artifact",
+        downloadLabel: buildArtifactDownloadLabel(jobSummary, artifactLoading),
         downloadDisabled: !!artifactLoading || !jobSummary.hasArtifact,
     };
 }

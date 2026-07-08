@@ -11426,7 +11426,14 @@ export default function ReportBuilder({ container, context }) {
         downloadRequest: downloadDraftExportRequest,
     } = draftExportExecution;
     const {
+        requestSummary: draftXlsxExportRequestSummary,
+        job: draftXlsxExportJob,
+        jobSummary: draftXlsxExportJobSummary,
+        statusLoading: draftXlsxExportStatusLoading,
+        artifactLoading: draftXlsxExportArtifactLoading,
         submit: triggerDraftXlsxExport,
+        refreshStatus: refreshDraftXlsxExportStatus,
+        downloadArtifact: downloadDraftXlsxExportArtifact,
     } = draftXlsxExportExecution;
     const {
         requestOpen: importedStandaloneExportRequestOpen,
@@ -11637,6 +11644,34 @@ export default function ReportBuilder({ container, context }) {
             draftExportJobSummary,
             draftExportRequestSummary,
             draftExportStatusLoading,
+            runtimePreviewArtifact?.document,
+        ],
+    );
+    const draftXlsxExportFailureNotice = useMemo(
+        () => buildReportBuilderDraftExportFailureNotice({
+            job: draftXlsxExportJob,
+            requestSummary: draftXlsxExportRequestSummary,
+            document: runtimePreviewArtifact?.document || null,
+        }),
+        [
+            draftXlsxExportJob,
+            draftXlsxExportRequestSummary,
+            runtimePreviewArtifact?.document,
+        ],
+    );
+    const draftXlsxExportJobPanelState = useMemo(
+        () => buildReportBuilderDraftExportJobPanelState({
+            jobSummary: draftXlsxExportJobSummary,
+            requestSummary: draftXlsxExportRequestSummary,
+            document: runtimePreviewArtifact?.document || null,
+            statusLoading: draftXlsxExportStatusLoading,
+            artifactLoading: draftXlsxExportArtifactLoading,
+        }),
+        [
+            draftXlsxExportArtifactLoading,
+            draftXlsxExportJobSummary,
+            draftXlsxExportRequestSummary,
+            draftXlsxExportStatusLoading,
             runtimePreviewArtifact?.document,
         ],
     );
@@ -16186,6 +16221,11 @@ export default function ReportBuilder({ container, context }) {
                         refreshStatus: refreshDraftExportStatus,
                         downloadArtifact: downloadDraftExportArtifact,
                         failureNotice: draftExportFailureNotice,
+                    })}
+                    {renderExportJobPanelNotice(draftXlsxExportJobPanelState, {
+                        refreshStatus: refreshDraftXlsxExportStatus,
+                        downloadArtifact: downloadDraftXlsxExportArtifact,
+                        failureNotice: draftXlsxExportFailureNotice,
                     })}
                     {importedStandaloneReportFillPanelState ? (
                         <ReportBuilderSummaryNotice

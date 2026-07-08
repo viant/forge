@@ -727,6 +727,7 @@ assert.deepEqual(buildReportBuilderDraftExportJobPanelState({
         jobId: "job-draft",
         status: "queued",
         artifactId: "",
+        format: "pdf",
         canRefresh: true,
         hasArtifact: false,
         hasFailure: false,
@@ -749,7 +750,7 @@ assert.deepEqual(buildReportBuilderDraftExportJobPanelState({
     semanticBindingChips: ["Model Ad Delivery"],
     refreshLabel: "Refresh status",
     refreshDisabled: false,
-    downloadLabel: "Download artifact",
+    downloadLabel: "Download PDF",
     downloadDisabled: true,
 });
 

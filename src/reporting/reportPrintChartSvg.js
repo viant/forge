@@ -1,3 +1,5 @@
+import { formatExportNumericValue } from "./reportExportValueFormatter.js";
+
 function normalizeString(value = "") {
   return String(value || "").trim();
 }
@@ -68,6 +70,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           label: normalizeString(matched?.label || normalizedKey),
           type: normalizeString(matched?.type || chartType) || chartType,
           color: normalizeString(matched?.color || palette[index % palette.length]) || palette[index % palette.length],
+          format: normalizeString(matched?.format),
         };
       })
       .filter(Boolean);
@@ -84,6 +87,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           label: normalizedKey,
           type: chartType,
           color: palette[index % palette.length],
+          format: "",
         };
       })
       .filter(Boolean);
@@ -114,22 +118,8 @@ function resolveChartSupportedSeriesType(type = "") {
   return ["line", "area", "bar", "horizontal_bar"].includes(normalized) ? normalized : "";
 }
 
-function formatAxisTick(value) {
-  const numeric = normalizeNumber(value);
-  if (numeric == null) {
-    return normalizeString(value);
-  }
-  const absolute = Math.abs(numeric);
-  if (absolute >= 1000000) {
-    return `${(numeric / 1000000).toFixed(1).replace(/\.0$/, "")}M`;
-  }
-  if (absolute >= 1000) {
-    return `${(numeric / 1000).toFixed(1).replace(/\.0$/, "")}K`;
-  }
-  if (Number.isInteger(numeric)) {
-    return String(numeric);
-  }
-  return numeric.toFixed(1).replace(/\.0$/, "");
+function formatAxisTick(value, format = "") {
+  return formatExportNumericValue(value, format, { axis: true });
 }
 
 function computeCartesianValueBounds(rows = [], seriesDescriptors = []) {
@@ -341,7 +331,7 @@ function renderCartesianChartSvg({
 
   const gridLines = yTicks.map((tick) => `
     <line x1="${leftPad}" y1="${tick.y}" x2="${leftPad + plotWidth}" y2="${tick.y}" stroke="#eaecf0" stroke-width="1" />
-    <text x="${leftPad - 8}" y="${tick.y + 4}" text-anchor="end" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value))}</text>
+    <text x="${leftPad - 8}" y="${tick.y + 4}" text-anchor="end" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value, seriesDescriptors[0]?.format))}</text>
   `).join("\n");
 
   const xAxisLabels = rows.map((row, index) => {
@@ -481,7 +471,7 @@ function renderHorizontalBarChartSvg({
 
   const gridLines = xTicks.map((tick) => `
     <line x1="${tick.x}" y1="${topPad}" x2="${tick.x}" y2="${topPad + plotHeight}" stroke="#eaecf0" stroke-width="1" />
-    <text x="${tick.x}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value))}</text>
+    <text x="${tick.x}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value, seriesDescriptors[0]?.format))}</text>
   `).join("\n");
 
   const categoryLabels = rows.map((row, rowIndex) => {
@@ -507,7 +497,7 @@ function renderHorizontalBarChartSvg({
       const labelAnchor = value >= 0 ? "start" : "end";
       return `
         <rect x="${x}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="2" fill="${escapeXml(series.color)}" />
-        <text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value))}</text>
+        <text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatExportNumericValue(value, series.format, { axis: false }))}</text>
       `;
     }).join("\n")
   )).join("\n");
