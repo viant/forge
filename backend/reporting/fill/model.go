@@ -73,6 +73,7 @@ type Block struct {
 	ValueLabel           string                `json:"valueLabel,omitempty"`
 	SecondaryField       string                `json:"secondaryField,omitempty"`
 	SecondaryLabel       string                `json:"secondaryLabel,omitempty"`
+	SecondaryDisplayKey  string                `json:"secondaryDisplayKey,omitempty"`
 	Description          string                `json:"description,omitempty"`
 	EmptyLabel           string                `json:"emptyLabel,omitempty"`
 	Markdown             string                `json:"markdown,omitempty"`
@@ -211,11 +212,24 @@ type FilterBarContent struct {
 	Params []FilterBarContentParams `json:"params"`
 }
 
-type FilterBarContentParams struct {
-	ID          string `json:"id"`
-	Label       string `json:"label,omitempty"`
-	Description string `json:"description,omitempty"`
+type FilterBarContentParamOption struct {
+	Label       string `json:"label"`
 	Value       any    `json:"value"`
+	Icon        string `json:"icon,omitempty"`
+	Default     *bool  `json:"default,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+type FilterBarContentParams struct {
+	ID           string                        `json:"id"`
+	Label        string                        `json:"label,omitempty"`
+	Description  string                        `json:"description,omitempty"`
+	Type         string                        `json:"type,omitempty"`
+	Required     *bool                         `json:"required,omitempty"`
+	Multiple     *bool                         `json:"multiple,omitempty"`
+	Presentation string                        `json:"presentation,omitempty"`
+	Options      []FilterBarContentParamOption `json:"options,omitempty"`
+	Value        any                           `json:"value"`
 }
 
 type RefinementBarContent struct {
@@ -279,25 +293,27 @@ type rawChartBlock struct {
 }
 
 type rawKPIBlock struct {
-	ID             string     `json:"id"`
-	Kind           string     `json:"kind"`
-	Title          string     `json:"title"`
-	DatasetRef     string     `json:"datasetRef"`
-	ValueField     string     `json:"valueField"`
-	ValueLabel     string     `json:"valueLabel"`
-	SecondaryField string     `json:"secondaryField,omitempty"`
-	SecondaryLabel string     `json:"secondaryLabel,omitempty"`
-	Description    string     `json:"description,omitempty"`
-	EmptyLabel     string     `json:"emptyLabel,omitempty"`
-	Content        KPIContent `json:"content"`
+	ID                  string     `json:"id"`
+	Kind                string     `json:"kind"`
+	Title               string     `json:"title"`
+	DatasetRef          string     `json:"datasetRef"`
+	ValueField          string     `json:"valueField"`
+	ValueLabel          string     `json:"valueLabel"`
+	SecondaryField      string     `json:"secondaryField,omitempty"`
+	SecondaryLabel      string     `json:"secondaryLabel,omitempty"`
+	SecondaryDisplayKey string     `json:"secondaryDisplayKey,omitempty"`
+	Description         string     `json:"description,omitempty"`
+	EmptyLabel          string     `json:"emptyLabel,omitempty"`
+	Content             KPIContent `json:"content"`
 }
 
 type rawFilterBarBlock struct {
-	ID       string           `json:"id"`
-	Kind     string           `json:"kind"`
-	Title    string           `json:"title,omitempty"`
-	ParamIDs []string         `json:"paramIds,omitempty"`
-	Content  FilterBarContent `json:"content"`
+	ID         string           `json:"id"`
+	Kind       string           `json:"kind"`
+	Title      string           `json:"title,omitempty"`
+	DatasetRef string           `json:"datasetRef,omitempty"`
+	ParamIDs   []string         `json:"paramIds,omitempty"`
+	Content    FilterBarContent `json:"content"`
 }
 
 type rawRefinementBarBlock struct {
@@ -408,17 +424,18 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] kpiBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
-				ID:             kpiBlock.ID,
-				Kind:           kpiBlock.Kind,
-				Title:          kpiBlock.Title,
-				DatasetRef:     kpiBlock.DatasetRef,
-				ValueField:     kpiBlock.ValueField,
-				ValueLabel:     kpiBlock.ValueLabel,
-				SecondaryField: kpiBlock.SecondaryField,
-				SecondaryLabel: kpiBlock.SecondaryLabel,
-				Description:    kpiBlock.Description,
-				EmptyLabel:     kpiBlock.EmptyLabel,
-				KPIContent:     &kpiBlock.Content,
+				ID:                  kpiBlock.ID,
+				Kind:                kpiBlock.Kind,
+				Title:               kpiBlock.Title,
+				DatasetRef:          kpiBlock.DatasetRef,
+				ValueField:          kpiBlock.ValueField,
+				ValueLabel:          kpiBlock.ValueLabel,
+				SecondaryField:      kpiBlock.SecondaryField,
+				SecondaryLabel:      kpiBlock.SecondaryLabel,
+				SecondaryDisplayKey: kpiBlock.SecondaryDisplayKey,
+				Description:         kpiBlock.Description,
+				EmptyLabel:          kpiBlock.EmptyLabel,
+				KPIContent:          &kpiBlock.Content,
 			})
 		case "filterBarBlock":
 			filterBarBlock := rawFilterBarBlock{}
@@ -431,6 +448,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				ID:               filterBarBlock.ID,
 				Kind:             filterBarBlock.Kind,
 				Title:            filterBarBlock.Title,
+				DatasetRef:       filterBarBlock.DatasetRef,
 				FilterBarContent: &filterBarBlock.Content,
 			})
 		case "refinementBarBlock":

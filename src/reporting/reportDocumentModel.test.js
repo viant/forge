@@ -364,6 +364,25 @@ assert.deepEqual(document.blocks[6], comparisonTableBlock);
 assert.deepEqual(document.blocks[7], geoMapBlock);
 assert.deepEqual(document.blocks[8], markdownBlock);
 
+const hostedWindowFallbackDocument = buildReportBuilderReportDocument({
+  container: {
+    windowKey: "forecastingCubeBuilder",
+    windowId: "mcpui:forecastingCubeBuilder",
+    title: "Forecasting",
+    dataSourceRef: "forecasting_cube_report",
+  },
+  config,
+  state,
+});
+
+assert.equal(hostedWindowFallbackDocument.id, "forecastingCubeBuilder");
+assert.deepEqual(hostedWindowFallbackDocument.blocks[0].source, {
+  kind: "dashboard.reportBuilder",
+  containerId: "forecastingCubeBuilder",
+  stateKey: "forecastingCubeBuilder",
+  dataSourceRef: "forecasting_cube_report",
+});
+
 assert.deepEqual(buildReportDocumentScopeParams(config, state), document.scope.params);
 assert.deepEqual(buildReportBuilderBlockScopeBindings(config), document.blocks[0].scopeBindings);
 

@@ -132,6 +132,24 @@ assert.equal(rawSpec.blocks[1].chartModel.series.nameKey, "channelId");
 assert.equal(rawSpec.blocks[1].chartModel.series.valueKey, "totalSpend");
 assert.equal(rawSpec.drillMetadata, undefined);
 
+const hostedWindowFallbackSpec = buildReportBuilderReportSpec({
+  container: {
+    windowKey: "forecastingCubeBuilder",
+    windowId: "mcpui:forecastingCubeBuilder",
+    title: "Forecasting",
+    dataSourceRef: "forecasting_cube_report",
+  },
+  config: rawConfig,
+  state: rawState,
+});
+
+assert.deepEqual(hostedWindowFallbackSpec.source, {
+  kind: "dashboard.reportBuilder",
+  containerId: "forecastingCubeBuilder",
+  stateKey: "forecastingCubeBuilder",
+  dataSourceRef: "forecasting_cube_report",
+});
+
 const multiSourceConfig = {
   ...rawConfig,
   dataSources: [

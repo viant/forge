@@ -35,6 +35,15 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
+function resolveContainerIdentity(container = {}) {
+  return normalizeString(
+    container?.id
+    || container?.stateKey
+    || container?.windowKey
+    || container?.windowId,
+  );
+}
+
 function normalizeFilterBarTitle(value = "") {
   const normalized = normalizeString(value);
   const lowered = normalized.toLowerCase();
@@ -488,7 +497,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
 }
 
 function resolveDocumentId(container = {}) {
-  return normalizeString(container?.id || container?.stateKey || "reportDocument");
+  return resolveContainerIdentity(container) || "reportDocument";
 }
 
 function resolveDocumentTitle(container = {}, config = {}) {
@@ -997,8 +1006,8 @@ export function buildReportBuilderReportDocument({
   );
   const source = {
     kind: "dashboard.reportBuilder",
-    containerId: normalizeString(container?.id),
-    stateKey: normalizeString(container?.stateKey || container?.id),
+    containerId: resolveContainerIdentity(container),
+    stateKey: normalizeString(container?.stateKey || resolveContainerIdentity(container)),
     dataSourceRef: resolveDocumentDataSourceRef(container, config),
   };
 

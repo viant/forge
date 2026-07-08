@@ -122,6 +122,43 @@ assert.deepEqual(draftExportRequest.metadata, {
 });
 assert.equal(validateReportExportRequest(draftExportRequest).valid, true);
 
+const hostedWindowDraftSpec = buildReportBuilderReportSpec({
+  container: {
+    windowKey: "forecastingCubeBuilder",
+    windowId: "mcpui:forecastingCubeBuilder",
+    title: "Forecasting",
+    dataSourceRef: "forecasting_cube_report",
+  },
+  config,
+  state,
+});
+
+const hostedWindowDraftFill = buildReportFillFromReportSpec(hostedWindowDraftSpec, {
+  primary: {
+    rows: [
+      { eventDate: "2026-05-01", channelId: "DOOH", totalSpend: 1, impressions: 2 },
+    ],
+  },
+});
+
+const hostedWindowDraftPrint = buildReportPrintFromReportFill({
+  reportSpec: hostedWindowDraftSpec,
+  reportFill: hostedWindowDraftFill,
+});
+
+const hostedWindowDraftExportRequest = buildDraftReportExportRequest({
+  reportDocument: {
+    title: "Forecasting",
+  },
+  reportSpec: hostedWindowDraftSpec,
+  reportFill: hostedWindowDraftFill,
+  reportPrint: hostedWindowDraftPrint,
+  format: "pdf",
+});
+
+assert.ok(hostedWindowDraftExportRequest);
+assert.equal(hostedWindowDraftExportRequest.source.artifactRef, "dashboard.reportBuilder://forecastingCubeBuilder");
+
 const staleDraftExportRequest = JSON.parse(JSON.stringify(draftExportRequest));
 staleDraftExportRequest.reportPrint.fillHash = "fnv1a:deadbeef";
 assert.equal(validateReportExportRequest(staleDraftExportRequest).valid, false);

@@ -159,6 +159,95 @@ func TestDecodeJSON_ReportFillFixtureWithChartAndKPIContent(t *testing.T) {
 	require.True(t, foundRefinementBar)
 }
 
+func TestDecodeJSON_ReportFillAcceptsRichFilterBarParams(t *testing.T) {
+	report, err := DecodeJSON([]byte(`{
+		"version": 1,
+		"kind": "reportFill",
+		"specVersion": 1,
+		"specHash": "spec-1",
+		"source": {"kind":"dashboard.reportBuilder","containerId":"demo","stateKey":"demo","dataSourceRef":"demo"},
+		"parameters": {"viewMode":"table","groupBy":"","pageSize":25,"orderField":"","orderDir":"asc"},
+		"refinements": [],
+		"calculatedFields": [],
+		"datasets": [{
+			"id": "primary",
+			"dataSourceRef": "demo",
+			"request": {"limit": 25, "offset": 0},
+			"provenance": {"requestHash":"fnv1a:9702fdec","rowCount":2,"truncated":false,"hasMore":false,"diagnostics":[]},
+			"rows": [{"channel":"Display","spend":42.5},{"channel":"CTV","spend":30}]
+		}],
+		"blocks": [{
+			"id":"scopeFilters",
+			"kind":"filterBarBlock",
+			"title":"Filters",
+			"datasetRef":"primary",
+			"paramIds":["dateRange","channelIds"],
+			"content":{
+				"title":"Filters",
+				"params":[
+					{
+						"id":"dateRange",
+						"label":"Date Range",
+						"type":"dateRange",
+						"required":true,
+						"presentation":"inlineToolbar",
+						"value":{"start":"2026-07-06","end":"2026-07-08"}
+					},
+					{
+						"id":"channelIds",
+						"label":"Channels",
+						"type":"multiSelect",
+						"required":false,
+						"multiple":true,
+						"presentation":"compactIconRow",
+						"options":[
+							{"label":"Display","value":1,"icon":"media"},
+							{"label":"CTV","value":6,"icon":"video"}
+						],
+						"value":[]
+					}
+				]
+			}
+		},{
+			"id":"primaryTable",
+			"kind":"tableBlock",
+			"datasetRef":"primary",
+			"columns":[
+				{"key":"channel","label":"Channel"},
+				{"key":"spend","label":"Spend","format":"currency"}
+			],
+			"content":{
+				"columns":[
+					{"key":"channel","label":"Channel"},
+					{"key":"spend","label":"Spend","format":"currency"}
+				],
+				"rowCount":2,
+				"resolvedRows":[
+					{"rowIndex":0,"cells":[
+						{"key":"channel","sourceKey":"channel","displayKey":"channel","value":"Display","displayValue":"Display","visualState":null},
+						{"key":"spend","sourceKey":"spend","displayKey":"spend","value":42.5,"displayValue":"$42.50","visualState":null}
+					]},
+					{"rowIndex":1,"cells":[
+						{"key":"channel","sourceKey":"channel","displayKey":"channel","value":"CTV","displayValue":"CTV","visualState":null},
+						{"key":"spend","sourceKey":"spend","displayKey":"spend","value":30,"displayValue":"$30.00","visualState":null}
+					]}
+				]
+			}
+		}],
+		"diagnostics": []
+	}`))
+	require.NoError(t, err)
+	require.Len(t, report.Blocks, 2)
+	require.NotNil(t, report.Blocks[0].FilterBarContent)
+	require.Len(t, report.Blocks[0].FilterBarContent.Params, 2)
+	require.Equal(t, "inlineToolbar", report.Blocks[0].FilterBarContent.Params[0].Presentation)
+	require.NotNil(t, report.Blocks[0].FilterBarContent.Params[0].Required)
+	require.True(t, *report.Blocks[0].FilterBarContent.Params[0].Required)
+	require.NotNil(t, report.Blocks[0].FilterBarContent.Params[1].Multiple)
+	require.True(t, *report.Blocks[0].FilterBarContent.Params[1].Multiple)
+	require.Len(t, report.Blocks[0].FilterBarContent.Params[1].Options, 2)
+}
+
 func TestDecodeJSON_ReportFillFixtureWithGroupedSeriesChartContent(t *testing.T) {
 	report := loadReportFillFromPerformanceFixture(t, "raw")
 	require.Equal(t, "reportFill", report.Kind)

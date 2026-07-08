@@ -22,6 +22,15 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
+function resolveContainerIdentity(container = {}) {
+  return normalizeString(
+    container?.id
+    || container?.stateKey
+    || container?.windowKey
+    || container?.windowId,
+  );
+}
+
 function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -477,8 +486,8 @@ export function buildReportBuilderReportSpec({
     kind: "reportSpec",
     source: {
       kind: "dashboard.reportBuilder",
-      containerId: normalizeString(container?.id),
-      stateKey: normalizeString(container?.stateKey || container?.id),
+      containerId: resolveContainerIdentity(container),
+      stateKey: normalizeString(container?.stateKey || resolveContainerIdentity(container)),
       dataSourceRef: resolveReportSpecDataSourceRef(container, config),
     },
     title: resolveReportSpecTitle(container, config),

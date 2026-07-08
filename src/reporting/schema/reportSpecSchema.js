@@ -183,6 +183,23 @@ export const reportSpecSchema = {
         description: { type: "string" },
         datasetRef: { type: "string" },
         required: { type: "boolean" },
+        multiple: { type: "boolean" },
+        presentation: { type: "string" },
+        options: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["label", "value"],
+            properties: {
+              label: { type: "string" },
+              value: { $ref: "#/$defs/jsonValue" },
+              icon: { type: "string" },
+              default: { type: "boolean" },
+              description: { type: "string" },
+            },
+          },
+        },
         value: { $ref: "#/$defs/jsonValue" },
       },
     },
