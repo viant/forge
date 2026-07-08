@@ -135,6 +135,105 @@ assert.deepEqual(rawFill.refinements, []);
 assert.equal(rawFill.datasets[0].provenance.rowCount, 2);
 assert.equal(rawFill.datasets[0].provenance.truncated, false);
 assert.equal(typeof rawFill.datasets[0].provenance.requestHash, "string");
+const requestHashOrderOne = buildReportFillFromReportSpec({
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "hashBuilder",
+    stateKey: "hashBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Hash Builder",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["primaryTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "demoReportSource",
+      request: {
+        dimensions: { channelId: true },
+        filters: { date: "2026-07-08" },
+        limit: 25,
+        measures: { totalSpend: true },
+        offset: 0,
+        orderBy: ["totalSpend desc"],
+      },
+    },
+  ],
+  blocks: [
+    {
+      id: "primaryTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [{ key: "channelId", label: "Channel" }],
+    },
+  ],
+}, {
+  primary: { rows: [{ channelId: "Display", totalSpend: 1 }] },
+}).datasets[0].provenance.requestHash;
+const requestHashOrderTwo = buildReportFillFromReportSpec({
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "hashBuilder",
+    stateKey: "hashBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Hash Builder",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["primaryTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "demoReportSource",
+      request: {
+        orderBy: ["totalSpend desc"],
+        offset: 0,
+        measures: { totalSpend: true },
+        limit: 25,
+        filters: { date: "2026-07-08" },
+        dimensions: { channelId: true },
+      },
+    },
+  ],
+  blocks: [
+    {
+      id: "primaryTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [{ key: "channelId", label: "Channel" }],
+    },
+  ],
+}, {
+  primary: { rows: [{ channelId: "Display", totalSpend: 1 }] },
+}).datasets[0].provenance.requestHash;
+assert.equal(requestHashOrderOne, requestHashOrderTwo);
 assert.deepEqual(rawFill.blocks[0].content.columns.map((column) => column.key), [
   "eventDate",
   "channelId",

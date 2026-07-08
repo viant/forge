@@ -59,6 +59,71 @@ func TestRender_RejectsMissingCells(t *testing.T) {
 	require.EqualError(t, err, `xlsx export missing cell for column "spend" at row 0`)
 }
 
+func TestRender_AcceptsFilterBarWithRichParams(t *testing.T) {
+	report, err := reportfill.DecodeJSON([]byte(`{
+		"version": 1,
+		"kind": "reportFill",
+		"specVersion": 1,
+		"specHash": "spec-1",
+		"source": {"kind":"dashboard.reportBuilder","containerId":"demo","stateKey":"demo","dataSourceRef":"demo"},
+		"parameters": {"viewMode":"table","groupBy":"","pageSize":25,"orderField":"","orderDir":"asc"},
+		"refinements": [],
+		"calculatedFields": [],
+		"datasets": [{
+			"id": "primary",
+			"dataSourceRef": "demo",
+			"request": {"limit": 25, "offset": 0},
+			"provenance": {"requestHash":"fnv1a:9702fdec","rowCount":2,"truncated":false,"hasMore":false,"diagnostics":[]},
+			"rows": [{"channel":"Display","spend":42.5},{"channel":"CTV","spend":30}]
+		}],
+		"blocks": [{
+			"id":"scopeFilters",
+			"kind":"filterBarBlock",
+			"title":"Filters",
+			"datasetRef":"primary",
+			"paramIds":["dateRange","channelIds"],
+			"content":{
+				"title":"Filters",
+				"params":[
+					{"id":"dateRange","label":"Date Range","type":"dateRange","required":true,"presentation":"inlineToolbar","value":{"start":"2026-07-06","end":"2026-07-08"}},
+					{"id":"channelIds","label":"Channels","type":"multiSelect","required":false,"multiple":true,"presentation":"compactIconRow","options":[{"label":"Display","value":1,"icon":"media"}],"value":[]}
+				]
+			}
+		},{
+			"id":"primaryTable",
+			"kind":"tableBlock",
+			"datasetRef":"primary",
+			"columns":[
+				{"key":"channel","label":"Channel"},
+				{"key":"spend","label":"Spend","format":"currency"}
+			],
+			"content":{
+				"columns":[
+					{"key":"channel","label":"Channel"},
+					{"key":"spend","label":"Spend","format":"currency"}
+				],
+				"rowCount":2,
+				"resolvedRows":[
+					{"rowIndex":0,"cells":[
+						{"key":"channel","sourceKey":"channel","displayKey":"channel","value":"Display","displayValue":"Display","visualState":null},
+						{"key":"spend","sourceKey":"spend","displayKey":"spend","value":42.5,"displayValue":"$42.50","visualState":null}
+					]},
+					{"rowIndex":1,"cells":[
+						{"key":"channel","sourceKey":"channel","displayKey":"channel","value":"CTV","displayValue":"CTV","visualState":null},
+						{"key":"spend","sourceKey":"spend","displayKey":"spend","value":30,"displayValue":"$30.00","visualState":null}
+					]}
+				]
+			}
+		}],
+		"diagnostics": []
+	}`))
+	require.NoError(t, err)
+
+	data, err := Render(report)
+	require.NoError(t, err)
+	require.NotEmpty(t, data)
+}
+
 func mustCellValue(t *testing.T, workbook *excelize.File, sheet, cell string) string {
 	t.Helper()
 	value, err := workbook.GetCellValue(sheet, cell)

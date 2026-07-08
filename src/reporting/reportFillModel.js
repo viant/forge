@@ -34,6 +34,25 @@ function hashString(value = "") {
   return `fnv1a:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
+function stableCloneForHash(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stableCloneForHash(entry));
+  }
+  if (value && typeof value === "object") {
+    return Object.keys(value)
+      .sort()
+      .reduce((acc, key) => {
+        acc[key] = stableCloneForHash(value[key]);
+        return acc;
+      }, {});
+  }
+  return value;
+}
+
+function stableJSONStringify(value = null) {
+  return JSON.stringify(stableCloneForHash(value));
+}
+
 export function buildReportSpecHash(reportSpec = {}) {
   return hashString(JSON.stringify(reportSpec || {}));
 }
@@ -54,7 +73,7 @@ function buildReportFillDataset(dataset = {}, payload = {}, calculatedFields = [
     dataSourceRef: normalizeString(dataset?.dataSourceRef),
     request,
     provenance: {
-      requestHash: hashString(JSON.stringify(request)),
+      requestHash: hashString(stableJSONStringify(request)),
       rowCount: rows.length,
       truncated: !!payload?.hasMore,
       hasMore: !!payload?.hasMore,

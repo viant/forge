@@ -113,7 +113,11 @@ export function buildReportExportRequest({
       ? { metadata: cloneValue(metadata) }
       : {}),
   };
-  return validateReportExportRequest(next).valid ? next : null;
+  const validation = validateReportExportRequest(next);
+  if (validation.valid) {
+    return next;
+  }
+  return null;
 }
 
 export function buildDraftReportExportRequest({
