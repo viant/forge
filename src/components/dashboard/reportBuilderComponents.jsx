@@ -3355,6 +3355,9 @@ export function ReportBuilderChartQuickActions({
     onSelectQuickOption,
     buttonLabel = "Presets",
     buttonIcon = "timeline-line-chart",
+    busy = false,
+    busyButtonLabel = "",
+    busyStatusMessage = "",
     usePortal = true,
 }) {
     if (!canCreate && quickOptions.length === 0) {
@@ -3381,7 +3384,7 @@ export function ReportBuilderChartQuickActions({
                     small
                     className="forge-report-builder__chart-action-button forge-report-builder__chart-action-button--create"
                     icon="add"
-                    disabled={!canCreate}
+                    disabled={!canCreate || busy}
                     onClick={onCreate}
                 >
                     Create Chart
@@ -3446,10 +3449,17 @@ export function ReportBuilderChartQuickActions({
                         className="forge-report-builder__chart-action-button forge-report-builder__chart-action-button--quick"
                         icon={buttonIcon}
                         rightIcon="caret-down"
+                        loading={busy}
+                        disabled={busy}
                     >
-                        {buttonLabel}
+                        {busy ? (busyButtonLabel || "Applying...") : buttonLabel}
                     </Button>
                 </Popover>
+            ) : null}
+            {busyStatusMessage ? (
+                <div className="forge-report-builder__quick-action-status" role="status" aria-live="polite">
+                    {busyStatusMessage}
+                </div>
             ) : null}
         </div>
     );

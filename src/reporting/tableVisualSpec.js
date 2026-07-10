@@ -2,6 +2,10 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
+function isTruncatedPlaceholder(value = "") {
+  return normalizeString(value) === "[MaxDepth]";
+}
+
 function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -67,7 +71,7 @@ export function normalizeReportTableBlockColumn(column = {}) {
     return null;
   }
   const key = normalizeString(column.key);
-  if (!key) {
+  if (!key || isTruncatedPlaceholder(key)) {
     return null;
   }
   const cellVisual = normalizeReportTableCellVisual(column.cellVisual);
@@ -91,12 +95,25 @@ export function normalizeReportDocumentTableBlock(block = {}) {
   const id = normalizeString(block?.id || "tableBlock");
   const title = normalizeString(block?.title || "Table");
   const datasetRef = normalizeString(block?.datasetRef || "primary");
+  const rawColumns = Array.isArray(block?.columns) ? block.columns : [];
+  const rawColumnKeys = Array.isArray(block?.columnKeys) ? block.columnKeys : [];
   const explicitColumns = (Array.isArray(block?.columns) ? block.columns : [])
     .map((column) => normalizeReportTableBlockColumn(column))
     .filter(Boolean);
   const columns = explicitColumns.length > 0
     ? explicitColumns
-    : normalizeStringArray(block?.columnKeys).map((key) => ({ key }));
+    : normalizeStringArray(block?.columnKeys)
+      .filter((key) => !isTruncatedPlaceholder(key))
+      .map((key) => ({ key }));
+  if (
+    columns.length === 0
+    && (
+      rawColumns.some((column) => isTruncatedPlaceholder(column?.key))
+      || rawColumnKeys.some((key) => isTruncatedPlaceholder(key))
+    )
+  ) {
+    return null;
+  }
   return {
     id,
     kind: "tableBlock",

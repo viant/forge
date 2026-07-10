@@ -1,7 +1,6 @@
 import { resolveKey } from "../../utils/selector.js";
 import { extractData } from "../dataSourceExtract.js";
 import {
-    applyReportBuilderFilterAliases,
     projectLookupSelections,
 } from "./reportBuilderUtils.js";
 import { resolveReportBuilderDataSourceFetcher } from "./reportBuilderDataSourceFetch.js";
@@ -91,7 +90,7 @@ export function applyReportBuilderStateHook(builderContext, config = {}, state =
 export function applyReportBuilderRequestHook(builderContext, config = {}, state = {}, request = {}) {
     const handlerName = String(config?.hooks?.buildRequest || "").trim();
     if (!handlerName || !builderContext?.lookupHandler) {
-        return applyReportBuilderFilterAliases(request);
+        return request;
     }
     try {
         const handler = resolveReportBuilderHookHandler(builderContext, handlerName);
@@ -101,12 +100,10 @@ export function applyReportBuilderRequestHook(builderContext, config = {}, state
             state,
             config,
         });
-        return applyReportBuilderFilterAliases(
-            (result && typeof result === "object" && !Array.isArray(result)) ? result : request,
-        );
+        return (result && typeof result === "object" && !Array.isArray(result)) ? result : request;
     } catch (error) {
         console.error("reportBuilder request hook failed", error);
-        return applyReportBuilderFilterAliases(request);
+        return request;
     }
 }
 

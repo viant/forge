@@ -191,8 +191,6 @@ assert.deepEqual(
     {
         filters: {
             channelIds: [1, 2],
-            channel_ids: [1, 2],
-            channel_id: [1, 2],
         },
     },
 );

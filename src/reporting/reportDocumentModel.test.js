@@ -126,6 +126,11 @@ assert.deepEqual(buildReportDocumentFilterBarBlock({
   datasetRef: "primary",
   paramIds: ["dateRange"],
 });
+assert.equal(buildReportDocumentFilterBarBlock({
+  id: "truncatedScopeFilters",
+  title: "Scope",
+  paramIds: ["[MaxDepth]"],
+}), null);
 const refinementBarBlock = buildReportDocumentRefinementBarBlock({
   id: "activeRefinements",
   title: "Applied Refinements",

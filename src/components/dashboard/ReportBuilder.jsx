@@ -38,6 +38,12 @@ import {
     buildReportBuilderDesktopResultHeaderState,
 } from "./reportBuilderResultHeader.js";
 import {
+    beginQuickPresetActivation as buildQuickPresetActivationState,
+    buildQuickPresetActionState,
+    shouldScheduleQuickPresetActivationRelease,
+    updateQuickPresetActivationForLoading,
+} from "./reportBuilderQuickPresetFeedback.js";
+import {
     buildReportBuilderActiveSavedArtifactNoticeState,
     buildReportBuilderDraftExportActionState,
     buildReportBuilderDraftExportFailureNotice,
@@ -267,7 +273,6 @@ import {
     buildReportBuilderDefaultTablePresets,
     buildReportBuilderQuickViewOptions,
     buildReportBuilderDefaultState,
-    applyReportBuilderFilterAliases,
     getReportBuilderQuickPresetPolicy,
     buildReportBuilderRequest,
     buildReportBuilderSettingsHash,
@@ -2022,6 +2027,7 @@ export default function ReportBuilder({ container, context }) {
     const [updateReportDocumentConflictDiagnostic, setUpdateReportDocumentConflictDiagnostic] = useState(null);
     const [updateReportDocumentConflictDiagnosticOpen, setUpdateReportDocumentConflictDiagnosticOpen] = useState(false);
     const [chartApplyFeedback, setChartApplyFeedback] = useState(null);
+    const [quickPresetActivation, setQuickPresetActivation] = useState(null);
     useEffect(() => {
         const autoClearMs = Math.max(0, Number(chartApplyFeedback?.autoClearMs || 0) || 0);
         if (!chartApplyFeedback?.message || autoClearMs < 1) {
@@ -2189,6 +2195,39 @@ export default function ReportBuilder({ container, context }) {
 
     const { collection = [], loading, error } = useDataSourceState(builderContext);
     const locale = context?.locale || "en-US";
+    useEffect(() => {
+        setQuickPresetActivation((current) => updateQuickPresetActivationForLoading(current, { loading }));
+    }, [loading]);
+    useEffect(() => {
+        const remainingMs = shouldScheduleQuickPresetActivationRelease(quickPresetActivation, { loading });
+        if (remainingMs <= 0) {
+            return undefined;
+        }
+        const timerId = window.setTimeout(() => {
+            setQuickPresetActivation((current) => (current === quickPresetActivation ? null : current));
+        }, remainingMs);
+        return () => window.clearTimeout(timerId);
+    }, [loading, quickPresetActivation]);
+    const beginQuickPresetActivation = React.useCallback(({
+        title = "",
+        kind = "chart",
+        awaitingFetch = false,
+    } = {}) => {
+        if (!awaitingFetch) {
+            setQuickPresetActivation(null);
+            return;
+        }
+        setQuickPresetActivation(buildQuickPresetActivationState({
+            title,
+            kind,
+            awaitingFetch,
+            loading,
+        }));
+    }, [loading]);
+    const quickPresetActionState = useMemo(
+        () => buildQuickPresetActionState(quickPresetActivation),
+        [quickPresetActivation],
+    );
     const collectionInfo = builderContext?.signals?.collectionInfo?.value || {};
     const computedCollection = useMemo(
         () => applyReportBuilderComputedMeasures(collection, displayConfig),
@@ -6642,6 +6681,9 @@ export default function ReportBuilder({ container, context }) {
                                 quickOptions={compactChartSheetState.quickActions.quickOptions}
                                 buttonLabel={compactChartSheetState.quickActions.buttonLabel}
                                 buttonIcon={compactChartSheetState.quickActions.buttonIcon}
+                                busy={quickPresetActionState.busy}
+                                busyButtonLabel={quickPresetActionState.buttonLabel}
+                                busyStatusMessage={quickPresetActionState.statusMessage}
                                 usePortal={false}
                                 onSelectQuickOption={(value) => {
                                     setSelectedQuickChartOption(value);
@@ -7899,8 +7941,15 @@ export default function ReportBuilder({ container, context }) {
             binding: semanticBinding,
             semanticModel: semanticModelState.model,
             includePrimaryBlocks: false,
+            requestTransform: ({ request, state: runtimeState }) => applyReportBuilderRequestHook(
+                builderContext,
+                displayConfig,
+                runtimeState,
+                request,
+            ),
         });
     }, [
+        builderContext,
         compiledRuntimePreviewModel,
         container,
         displayConfig,
@@ -9619,10 +9668,16 @@ export default function ReportBuilder({ container, context }) {
                 preparedReadiness,
                 requiresManualRun: prepared.requiresManualRun,
             }));
+            beginQuickPresetActivation({
+                title: prepared.normalizedPreset?.title || "Table preset",
+                kind: "table",
+                awaitingFetch: didFetchPreparedState,
+            });
             setSelectedQuickChartOption("");
             return;
         }
         if (next.kind !== "default") {
+            beginQuickPresetActivation({ awaitingFetch: false });
             applyChartSpec(next.spec);
             setSelectedQuickChartOption("");
             return;
@@ -9644,38 +9699,43 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         setSelectedBuilderChartSelection(null);
-            const nextPreparedState = applyQuickChartToAuthoredDocument(prepared.nextState, prepared.normalizedChartSpec);
-            persistExplorationMutation(nextPreparedState, {
-                sourceKind: "reportBuilder.chartResult",
-                sourceContext: {
-                    label: prepared.normalizedChartSpec?.title || next.label || "Chart",
-                },
-            });
-            const preparedReadiness = resolveStateReadiness(nextPreparedState);
-            const didFetchPreparedState = prepared.shouldFetch && preparedReadiness.canRun;
-            if (didFetchPreparedState) {
-                dispatchReportRequest(nextPreparedState, { forceFetch: true });
-            }
-            const changedParts = [];
-            if (prepared.measureSelectionChanged || prepared.primaryMeasureChanged) {
+        const nextPreparedState = applyQuickChartToAuthoredDocument(prepared.nextState, prepared.normalizedChartSpec);
+        persistExplorationMutation(nextPreparedState, {
+            sourceKind: "reportBuilder.chartResult",
+            sourceContext: {
+                label: prepared.normalizedChartSpec?.title || next.label || "Chart",
+            },
+        });
+        const preparedReadiness = resolveStateReadiness(nextPreparedState);
+        const didFetchPreparedState = prepared.shouldFetch && preparedReadiness.canRun;
+        if (didFetchPreparedState) {
+            dispatchReportRequest(nextPreparedState, { forceFetch: true });
+        }
+        const changedParts = [];
+        if (prepared.measureSelectionChanged || prepared.primaryMeasureChanged) {
             changedParts.push("measures");
         }
         if (prepared.dimensionSelectionChanged) {
             changedParts.push("breakdowns");
         }
-            setChartApplyFeedback(buildReportBuilderPresetApplyFeedback({
-                kind: "chart",
-                changedParts,
-                selectionChanged: prepared.selectionChanged,
-                didFetchPreparedState,
+        setChartApplyFeedback(buildReportBuilderPresetApplyFeedback({
+            kind: "chart",
+            changedParts,
+            selectionChanged: prepared.selectionChanged,
+            didFetchPreparedState,
             preparedReadiness,
             requiresManualRun: prepared.requiresManualRun,
-            }));
-            saveChartPreset(prepared.normalizedChartSpec, {
-                settingsHash: buildReportBuilderSettingsHash(nextPreparedState),
-            });
-            setSelectedQuickChartOption("");
-    }, [applyChartSpec, applyQuickChartToAuthoredDocument, dispatchReportRequest, displayConfig, persistExplorationMutation, quickChartOptions, quickPresetPolicy.autoFetchOnSelect, quickPresetPolicy.autoProvisionMissingDimensions, quickPresetPolicy.selectionPolicy, resolveStateReadiness, saveChartPreset, selectedQuickChartOption, state]);
+        }));
+        beginQuickPresetActivation({
+            title: prepared.normalizedChartSpec?.title || next.label || "Preset",
+            kind: "chart",
+            awaitingFetch: didFetchPreparedState,
+        });
+        saveChartPreset(prepared.normalizedChartSpec, {
+            settingsHash: buildReportBuilderSettingsHash(nextPreparedState),
+        });
+        setSelectedQuickChartOption("");
+    }, [applyChartSpec, applyQuickChartToAuthoredDocument, beginQuickPresetActivation, dispatchReportRequest, displayConfig, persistExplorationMutation, quickChartOptions, quickPresetPolicy.autoFetchOnSelect, quickPresetPolicy.autoProvisionMissingDimensions, quickPresetPolicy.selectionPolicy, resolveStateReadiness, saveChartPreset, selectedQuickChartOption, state]);
     const runCompactPrimaryAction = React.useCallback(() => {
         closeCompactSheet();
         closeCompactChartSheet();
@@ -16399,6 +16459,9 @@ export default function ReportBuilder({ container, context }) {
                             quickOptions={desktopResultHeaderState.quickActions.quickOptions}
                             buttonLabel={desktopResultHeaderState.quickActions.buttonLabel}
                             buttonIcon={desktopResultHeaderState.quickActions.buttonIcon}
+                            busy={quickPresetActionState.busy}
+                            busyButtonLabel={quickPresetActionState.buttonLabel}
+                            busyStatusMessage={quickPresetActionState.statusMessage}
                             onSelectQuickOption={(value) => {
                                 setSelectedQuickChartOption(value);
                                 setChartApplyFeedback(null);
@@ -16846,6 +16909,9 @@ export default function ReportBuilder({ container, context }) {
                                         quickOptions={desktopResultHeaderState.quickActions.quickOptions}
                                         buttonLabel={desktopResultHeaderState.quickActions.buttonLabel}
                                         buttonIcon={desktopResultHeaderState.quickActions.buttonIcon}
+                                        busy={quickPresetActionState.busy}
+                                        busyButtonLabel={quickPresetActionState.buttonLabel}
+                                        busyStatusMessage={quickPresetActionState.statusMessage}
                                         onSelectQuickOption={(value) => {
                                             setSelectedQuickChartOption(value);
                                             setChartApplyFeedback(null);
