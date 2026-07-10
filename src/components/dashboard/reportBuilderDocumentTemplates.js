@@ -238,12 +238,23 @@ export function normalizeReportBuilderDocumentTemplate(template = null) {
     if (!id || !label) {
         return null;
     }
+    const documentPatch = normalizeTemplateDocumentPatch(template.documentPatch || template.document);
+    const datasetRefs = Array.from(
+        new Set(
+            documentPatch.blocks
+                .map((block) => normalizeString(block?.datasetRef))
+                .filter(Boolean),
+        ),
+    );
     return {
         id,
         label,
         description: normalizeString(template.description),
         statePatch: normalizeTemplateStatePatch(template.statePatch || template.state),
-        documentPatch: normalizeTemplateDocumentPatch(template.documentPatch || template.document),
+        documentPatch,
+        datasetRefs,
+        datasetCount: datasetRefs.length,
+        blockCount: documentPatch.blocks.length,
     };
 }
 

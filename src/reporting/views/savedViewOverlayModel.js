@@ -2,6 +2,11 @@ import {
   listReportBuilderPinnedPredicates,
   resolveReportBuilderScopeParamFilters,
 } from "../../components/dashboard/reportBuilderPredicates.js";
+import {
+  resolveReportDocumentPresentation,
+  resolveReportDocumentBuilderContext,
+} from "../reportDocumentModel.js";
+import { resolveReportBuilderBlock } from "../reportBuilderBlockModel.js";
 import { isSupportedScopeBindingTarget } from "../scopeBindingModel.js";
 import { mergeScopeParamValues } from "../scopeStateModel.js";
 
@@ -119,14 +124,8 @@ function normalizeOverlay(overlay = null) {
   };
 }
 
-function extractReportBuilderBlock(document = null) {
-  const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
-  return blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null;
-}
-
 function collectScopeFilterIds(document = null) {
-  const block = extractReportBuilderBlock(document);
-  const config = isPlainObject(block?.config) ? block.config : {};
+  const config = collectBuilderConfig(document);
   return new Set([
     ...listReportBuilderPinnedPredicates(config).map((predicate) => predicate.id),
     ...resolveReportBuilderScopeParamFilters(config)
@@ -136,7 +135,7 @@ function collectScopeFilterIds(document = null) {
 }
 
 function collectScopeBindingTargets(document = null) {
-  const block = extractReportBuilderBlock(document);
+  const block = resolveReportBuilderBlock(document);
   const bindings = Array.isArray(block?.scopeBindings) ? block.scopeBindings : [];
   const next = new Map();
   bindings.forEach((binding) => {
@@ -165,8 +164,8 @@ function collectScopeParamIds(document = null, reportSpec = null) {
 }
 
 function collectBuilderFieldKeys(document = null, reportSpec = null) {
-  const block = extractReportBuilderBlock(document);
-  const config = isPlainObject(block?.config) ? block.config : {};
+  const block = resolveReportBuilderBlock(document);
+  const config = collectBuilderConfig(document);
   const state = isPlainObject(block?.state) ? block.state : {};
   const configFieldCollections = [
     ...(Array.isArray(config?.measures) ? config.measures : []),
@@ -194,21 +193,24 @@ function isSavedViewOverlayGroupByCompatible(document = null, state = {}, groupB
   if (!normalizedGroupBy) {
     return false;
   }
-  const config = collectBuilderConfig(document);
   const selectedDimensions = new Set(
     (Array.isArray(state?.selectedDimensions) ? state.selectedDimensions : [])
       .map((entry) => normalizeString(entry))
       .filter(Boolean),
   );
-  const groupByOptions = Array.isArray(config?.groupBy?.options) ? config.groupBy.options : [];
+  const presentation = resolveReportDocumentPresentation(document, collectBuilderConfig(document), state);
+  const groupByOptions = Array.isArray(presentation?.groupByOptions) ? presentation.groupByOptions : [];
   const matchingOption = groupByOptions.find((entry) => normalizeString(entry?.value) === normalizedGroupBy);
   const dimensionId = normalizeString(matchingOption?.dimensionId || normalizedGroupBy);
   return !!dimensionId && selectedDimensions.has(dimensionId);
 }
 
 function collectBuilderConfig(document = null) {
-  const block = extractReportBuilderBlock(document);
-  return isPlainObject(block?.config) ? block.config : {};
+  const block = resolveReportBuilderBlock(document);
+  if (!isPlainObject(block?.config)) {
+    return {};
+  }
+  return resolveReportDocumentBuilderContext(document, block.config, block?.state || {}).config || {};
 }
 
 function collectConfiguredMeasureEntries(document = null, state = {}) {
@@ -224,10 +226,8 @@ function collectConfiguredMeasureEntries(document = null, state = {}) {
 }
 
 function collectOrderFieldEntries(document = null) {
-  const config = collectBuilderConfig(document);
-  return Array.isArray(config?.result?.orderFields)
-    ? config.result.orderFields
-    : (Array.isArray(config?.orderFields) ? config.orderFields : []);
+  const presentation = resolveReportDocumentPresentation(document, collectBuilderConfig(document));
+  return Array.isArray(presentation?.orderFields) ? presentation.orderFields : [];
 }
 
 function resolveFieldEntryByToken(entries = [], token = "") {
@@ -280,10 +280,8 @@ function isSavedViewOverlayOrderFieldCompatible(document = null, state = {}, ord
 }
 
 function collectPresetTitles(document = null) {
-  const block = extractReportBuilderBlock(document);
-  const presets = Array.isArray(block?.config?.result?.defaultTablePresets)
-    ? block.config.result.defaultTablePresets
-    : [];
+  const presentation = resolveReportDocumentPresentation(document, collectBuilderConfig(document));
+  const presets = Array.isArray(presentation?.defaultTablePresets) ? presentation.defaultTablePresets : [];
   return new Set(
     presets
       .map((entry) => normalizeString(entry?.title))
@@ -342,10 +340,8 @@ function normalizePresetEntry(preset = null, index = 0) {
 }
 
 function collectPresetMap(document = null) {
-  const block = extractReportBuilderBlock(document);
-  const presets = Array.isArray(block?.config?.result?.defaultTablePresets)
-    ? block.config.result.defaultTablePresets
-    : [];
+  const presentation = resolveReportDocumentPresentation(document, collectBuilderConfig(document));
+  const presets = Array.isArray(presentation?.defaultTablePresets) ? presentation.defaultTablePresets : [];
   return new Map(
     presets
       .map((entry, index) => {
@@ -548,8 +544,8 @@ export function buildSavedViewOverlaySummary(value = null, {
 
   const scopeFilterIds = collectScopeFilterIds(document);
   const scopeBindingTargets = collectScopeBindingTargets(document);
-  const baseBuilderState = isPlainObject(extractReportBuilderBlock(document)?.state)
-    ? extractReportBuilderBlock(document).state
+  const baseBuilderState = isPlainObject(resolveReportBuilderBlock(document)?.state)
+    ? resolveReportBuilderBlock(document).state
     : {};
   Object.keys(isPlainObject(overlayState.overlay?.filters) ? overlayState.overlay.filters : {}).forEach((filterId) => {
     if (scopeFilterIds.size > 0 && !scopeFilterIds.has(filterId)) {

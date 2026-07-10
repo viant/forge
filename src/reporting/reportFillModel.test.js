@@ -260,7 +260,89 @@ assert.deepEqual(rawFill.blocks[1].content.resolvedChart, {
   ],
   seriesKeys: ["Display", "CTV"],
 });
+assert.equal(rawFill.datasets[0].source, undefined);
 assert.deepEqual(rawFill.diagnostics, []);
+
+const authoredHelperFill = buildReportBuilderReportFill({
+  container: rawContainer,
+  config: rawConfig,
+  state: {
+    ...rawState,
+    reportDocumentBlocks: [
+      {
+        id: "narrativeIntro",
+        kind: "markdownBlock",
+        title: "Narrative",
+        markdown: "## Narrative\nAuthor-provided context.",
+      },
+      {
+        id: "headlineKpi",
+        kind: "kpiBlock",
+        title: "Headline KPI",
+        datasetRef: "primary",
+        valueField: "totalSpend",
+        valueLabel: "Spend",
+      },
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "narrativeIntro" },
+        { blockId: "primaryBuilder" },
+        { blockId: "headlineKpi" },
+      ],
+    },
+  },
+  primaryRows: rawRows,
+});
+assert.equal(authoredHelperFill.blocks.some((block) => block.kind === "markdownBlock" && block.id === "narrativeIntro"), true);
+assert.equal(authoredHelperFill.blocks.some((block) => block.kind === "kpiBlock" && block.id === "headlineKpi"), true);
+assert.equal(
+  authoredHelperFill.blocks.find((block) => block.kind === "kpiBlock" && block.id === "headlineKpi")?.content?.valueFormat,
+  "currency",
+);
+
+const singleDatasetDashboardFill = buildReportFillFromReportSpec({
+  title: "Single Dataset Dashboard",
+  datasets: [
+    {
+      id: "forecast_summary",
+      request: {},
+    },
+  ],
+  blocks: [
+    {
+      id: "headlineKpi",
+      kind: "kpiBlock",
+      title: "Headline KPI",
+      valueField: "totalSpend",
+      valueLabel: "Spend",
+    },
+    {
+      id: "comparisonTable",
+      kind: "tableBlock",
+      columns: [
+        { key: "eventDate", sourceKey: "eventDate", displayKey: "eventDate", label: "Date", kind: "dimension" },
+        { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
+      ],
+    },
+  ],
+}, {
+  forecast_summary: {
+    rows: [
+      { eventDate: "2026-05-01", totalSpend: 1200 },
+    ],
+  },
+});
+
+assert.equal(
+  singleDatasetDashboardFill.blocks.find((block) => block.id === "headlineKpi")?.content?.value,
+  1200,
+);
+assert.equal(
+  singleDatasetDashboardFill.blocks.find((block) => block.id === "comparisonTable")?.content?.rowCount,
+  1,
+);
 
 const semanticModel = {
   modelRef: "model://example/performance/delivery@v1",
@@ -492,7 +574,7 @@ assert.deepEqual(documentFill.refinements, [
     label: "Drill Display",
   },
 ]);
-assert.deepEqual(documentFill.blocks[2].content, {
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "sharedFilters").content, {
   title: "Shared Filters",
   params: [
     {
@@ -566,7 +648,93 @@ assert.deepEqual(interactiveFilterBlock.content.params[1], {
   ],
   value: ["Display"],
 });
-assert.deepEqual(documentFill.blocks[3].content, {
+
+// canonical path: older documents with thin scope params (id/value only) lower
+// to a spec that carries the filter metadata itself, so the fill resolves the
+// filter bar without any embedded builder config (lowered specs carry none)
+const staleScopeFilterDocument = JSON.parse(JSON.stringify(interactiveFilterDocument));
+staleScopeFilterDocument.scope.params = staleScopeFilterDocument.scope.params
+  .map(({ id, value }) => ({ id, value }));
+const staleScopeFilterSpec = lowerReportDocumentToReportSpec(staleScopeFilterDocument);
+assert.deepEqual(staleScopeFilterSpec.scope.params, interactiveFilterSpec.scope.params);
+assert.equal(staleScopeFilterSpec.blocks.some((block) => block.kind === "reportBuilderBlock"), false);
+const staleScopeFilterFill = buildReportFillFromReportSpec(staleScopeFilterSpec, {
+  primary: {
+    rows: rawRows,
+  },
+});
+assert.deepEqual(
+  staleScopeFilterFill.blocks.find((block) => block.id === "sharedFilters").content,
+  interactiveFilterBlock.content,
+);
+
+// fallback path: legacy document-shaped specs that never got the enriched
+// lowering still resolve filter metadata from the embedded builder config
+const legacyEmbeddedConfigSpec = JSON.parse(JSON.stringify(interactiveFilterDocument));
+legacyEmbeddedConfigSpec.scope.params = legacyEmbeddedConfigSpec.scope.params
+  .map(({ id, value }) => ({ id, value }));
+const legacyEmbeddedConfigFill = buildReportFillFromReportSpec(legacyEmbeddedConfigSpec, {
+  primary: {
+    rows: rawRows,
+  },
+});
+const legacyEmbeddedFilterBlock = legacyEmbeddedConfigFill.blocks.find((block) => block.id === "sharedFilters");
+assert.deepEqual(legacyEmbeddedFilterBlock.content.params[1], {
+  id: "channelIds",
+  label: "Channels",
+  type: "multiSelect",
+  multiple: true,
+  presentation: "compactIconRow",
+  options: [
+    { value: "Display", label: "Display", icon: "media" },
+    { value: "CTV", label: "CTV", icon: "video" },
+  ],
+  value: ["Display"],
+});
+// scope-param enrichment must not disturb the fill fingerprint: consumers
+// compare specHash against a hash of the spec as stored
+assert.equal(legacyEmbeddedConfigFill.specHash, buildReportSpecHash(legacyEmbeddedConfigSpec));
+
+// plain builder specs now carry the same scope metadata directly, so fill can
+// resolve filter bars without any embedded builder block/config at all.
+const interactiveBuilderSpec = buildReportBuilderReportSpec({
+  container: rawContainer,
+  config: interactiveFilterConfig,
+  state: interactiveFilterState,
+});
+const interactiveBuilderFill = buildReportFillFromReportSpec({
+  ...interactiveBuilderSpec,
+  blocks: [
+    ...interactiveBuilderSpec.blocks,
+    {
+      id: "sharedFilters",
+      kind: "filterBarBlock",
+      title: "Filters",
+      paramIds: ["dateRange", "channelIds"],
+    },
+  ],
+}, {
+  primary: {
+    rows: rawRows,
+  },
+});
+assert.deepEqual(
+  interactiveBuilderFill.blocks.find((block) => block.id === "sharedFilters").content.params[1],
+  {
+    id: "channelIds",
+    label: "Channels",
+    type: "multiSelect",
+    multiple: true,
+    presentation: "compactIconRow",
+    options: [
+      { value: "Display", label: "Display", icon: "media" },
+      { value: "CTV", label: "CTV", icon: "video" },
+    ],
+    value: ["Display"],
+  },
+);
+
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "activeRefinements").content, {
   title: "Applied Refinements",
   actionKinds: ["remove", "clearAll", "redo"],
   emptyLabel: "No drill path selected",
@@ -581,11 +749,12 @@ assert.deepEqual(documentFill.blocks[3].content, {
     },
   ],
 });
-assert.deepEqual(documentFill.blocks[4].content, {
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "headlineKpi").content, {
   title: "Headline KPI",
   description: "Summarizes the first authored runtime row.",
   valueField: "totalSpend",
   valueLabel: "Spend",
+  valueFormat: "currency",
   value: 40400,
   rowCount: 2,
   secondaryField: "channelId",
@@ -593,7 +762,7 @@ assert.deepEqual(documentFill.blocks[4].content, {
   secondaryValue: "Display",
   emptyLabel: "No headline KPI value available.",
 });
-assert.deepEqual(documentFill.blocks[5].content, {
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "statusPills").content, {
   title: "Status Pills",
   rowCount: 2,
   items: [
@@ -601,13 +770,13 @@ assert.deepEqual(documentFill.blocks[5].content, {
     { id: "spend", label: "Spend", value: 40400, valueField: "totalSpend", format: "currency", displayValue: "$40,400", tone: "success" },
   ],
 });
-assert.deepEqual(documentFill.blocks[6].content.columns[0].cellVisual, {
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "comparisonTable").content.columns[0].cellVisual, {
   kind: "dataBar",
   valueField: "totalSpend",
   range: { mode: "columnMax" },
   palette: ["#dbeafe", "#2563eb"],
 });
-assert.deepEqual(documentFill.blocks[6].content.columns[1].cellVisual, {
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "comparisonTable").content.columns[1].cellVisual, {
   kind: "badge",
   rules: [
     {
@@ -616,8 +785,8 @@ assert.deepEqual(documentFill.blocks[6].content.columns[1].cellVisual, {
     },
   ],
 });
-assert.equal(documentFill.blocks[6].content.rowCount, 2);
-assert.deepEqual(documentFill.blocks[6].content.resolvedRows[0].cells[0], {
+assert.equal(documentFill.blocks.find((block) => block.id === "comparisonTable").content.rowCount, 2);
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "comparisonTable").content.resolvedRows[0].cells[0], {
   key: "totalSpend",
   sourceKey: "totalSpend",
   displayKey: "totalSpend",
@@ -630,7 +799,7 @@ assert.deepEqual(documentFill.blocks[6].content.resolvedRows[0].cells[0], {
     palette: ["#dbeafe", "#2563eb"],
   },
 });
-assert.deepEqual(documentFill.blocks[6].content.resolvedRows[0].cells[1], {
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "comparisonTable").content.resolvedRows[0].cells[1], {
   key: "status",
   sourceKey: "status",
   displayKey: "status",
@@ -638,7 +807,7 @@ assert.deepEqual(documentFill.blocks[6].content.resolvedRows[0].cells[1], {
   displayValue: null,
   visualState: null,
 });
-assert.deepEqual(documentFill.blocks[7].content, {
+assert.deepEqual(documentFill.blocks.find((block) => block.id === "narrativeIntro").content, {
   title: "Executive Summary",
   markdown: "## Executive Summary\nThe report opens with a short narrative block.",
 });
@@ -1475,6 +1644,87 @@ const mappedKpiFill = buildReportFillFromReportSpec({
 assert.equal(mappedKpiFill.blocks[0].content.value, 12);
 assert.equal(mappedKpiFill.blocks[0].content.secondaryValue, "Display");
 
+const executionMetadataFill = buildReportFillFromReportSpec({
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "mcpMetadataBuilder",
+    stateKey: "mcpMetadataBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "MCP Metadata Builder",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "left",
+    blockOrder: ["primaryTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [
+    {
+      id: "mcp_only_dataset",
+      dataSourceRef: "mcpOnlySource",
+      scope: {
+        inheritContext: true,
+      },
+      source: {
+        kind: "mcp",
+        toolName: "demo:forecast_summary",
+      },
+      resultContract: {
+        shape: "rowSet",
+        rowPath: "payload.records",
+      },
+      capabilities: {
+        backendRefetch: true,
+        datly: {
+          unifiedCube: true,
+        },
+      },
+      request: {
+        query: "mcp_only_summary",
+      },
+    },
+  ],
+  blocks: [
+    {
+      id: "primaryTable",
+      kind: "tableBlock",
+      datasetRef: "mcp_only_dataset",
+      columns: [{ key: "region", label: "Region" }],
+    },
+  ],
+}, {
+  mcp_only_dataset: {
+    rows: [{ region: "US/TX" }],
+  },
+});
+assert.deepEqual(executionMetadataFill.datasets[0].scope, {
+  inheritContext: true,
+});
+assert.deepEqual(executionMetadataFill.datasets[0].source, {
+  kind: "mcp",
+  toolName: "demo:forecast_summary",
+});
+assert.deepEqual(executionMetadataFill.datasets[0].resultContract, {
+  shape: "rowSet",
+  rowPath: "payload.records",
+});
+assert.deepEqual(executionMetadataFill.datasets[0].capabilities, {
+  backendRefetch: true,
+  datly: {
+    unifiedCube: true,
+  },
+});
+
 const mappedBadgesFill = buildReportFillFromReportSpec({
   version: 1,
   source: {
@@ -1910,7 +2160,7 @@ const geoFill = buildReportFillFromReportSpec(lowerReportDocumentToReportSpec(ge
   },
 });
 
-assert.deepEqual(geoFill.blocks[2].content.geo, {
+assert.deepEqual(geoFill.blocks.find((block) => block.id === "stateGeo").content.geo, {
   key: "stateCode",
   labelKey: "stateName",
   metric: {
@@ -1926,13 +2176,13 @@ assert.deepEqual(geoFill.blocks[2].content.geo, {
     ],
   },
 });
-assert.equal(geoFill.blocks[2].content.rowCount, 3);
-assert.deepEqual(geoFill.blocks[2].content.resolvedGeo.summary, {
+assert.equal(geoFill.blocks.find((block) => block.id === "stateGeo").content.rowCount, 3);
+assert.deepEqual(geoFill.blocks.find((block) => block.id === "stateGeo").content.resolvedGeo.summary, {
   regionCount: 2,
   totalValue: "$220",
   topKey: "CA",
 });
-assert.deepEqual(geoFill.blocks[2].content.resolvedGeo.regions[0], {
+assert.deepEqual(geoFill.blocks.find((block) => block.id === "stateGeo").content.resolvedGeo.regions[0], {
   key: "CA",
   label: "California",
   rawValue: 140,
@@ -1942,7 +2192,7 @@ assert.deepEqual(geoFill.blocks[2].content.resolvedGeo.regions[0], {
   statusLabel: "Critical",
   rowCount: 2,
 });
-assert.deepEqual(geoFill.blocks[2].content.resolvedGeo.regions[1], {
+assert.deepEqual(geoFill.blocks.find((block) => block.id === "stateGeo").content.resolvedGeo.regions[1], {
   key: "WA",
   label: "Washington",
   rawValue: 80,

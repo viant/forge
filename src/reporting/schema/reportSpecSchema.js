@@ -165,11 +165,26 @@ export const reportSpecSchema = {
       additionalProperties: false,
       required: ["params", "dataSourceRef"],
       properties: {
+        contextPreset: { $ref: "#/$defs/contextPreset" },
         params: {
           type: "array",
           items: { $ref: "#/$defs/scopeParam" },
         },
         dataSourceRef: { type: "string" },
+      },
+    },
+    contextPreset: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "paramIds"],
+      properties: {
+        id: { type: "string" },
+        paramIds: {
+          type: "array",
+          minItems: 1,
+          uniqueItems: true,
+          items: { type: "string" },
+        },
       },
     },
     scopeParam: {
@@ -403,7 +418,25 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         dataSourceRef: { type: "string" },
+        scope: { $ref: "#/$defs/datasetScope" },
+        source: { $ref: "#/$defs/jsonObject" },
+        resultContract: { $ref: "#/$defs/jsonObject" },
+        capabilities: { $ref: "#/$defs/jsonObject" },
         request: { $ref: "#/$defs/requestPayload" },
+      },
+    },
+    datasetScope: {
+      type: "object",
+      additionalProperties: true,
+      properties: {
+        mode: { enum: ["inherit", "append", "override", "exclude"] },
+        local: { $ref: "#/$defs/jsonObject" },
+        exclude: {
+          type: "array",
+          uniqueItems: true,
+          items: { type: "string" },
+        },
+        inheritContext: { type: "boolean" },
       },
     },
     requestValue: {
@@ -815,8 +848,10 @@ export const reportSpecSchema = {
         datasetRef: { type: "string" },
         valueField: { type: "string" },
         valueLabel: { type: "string" },
+        valueFormat: { enum: ["currency", "number", "percent", "percentFraction", "compact", "compactNumber"] },
         secondaryField: { type: "string" },
         secondaryLabel: { type: "string" },
+        secondaryFormat: { enum: ["currency", "number", "percent", "percentFraction", "compact", "compactNumber"] },
         secondaryDisplayKey: { type: "string" },
         secondaryDisplayValueMap: {
           type: "object",

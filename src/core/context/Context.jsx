@@ -33,6 +33,16 @@ function resolveActionHandler(actions, handlers, name) {
     return result;
 }
 
+function buildDataSourceNotFoundError(dataSourceRef = "", identity = null) {
+    const error = new Error(`DataSource not found: ${dataSourceRef}`);
+    error.code = "DataSourceNotFound";
+    error.dataSourceRef = dataSourceRef;
+    if (identity && typeof identity === "object" && !Array.isArray(identity)) {
+        error.identity = identity;
+    }
+    return error;
+}
+
 
 export const Context = (windowId, metadata, dataSourceRef, services) => {
     // ------------------------------------------------------------------
@@ -193,12 +203,12 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 dataSourceId: getDataSourceId(dataSourceRef)
             }
             const baseDataSource = metadata.dataSource[dataSourceRef]
+            if (!baseDataSource) {
+                throw buildDataSourceNotFoundError(dataSourceRef, identity)
+            }
             const dataSource = selectionModeOverride
                 ? { ...baseDataSource, selectionMode: selectionModeOverride }
                 : baseDataSource;
-            if (!dataSource) {
-                throw new Error(`DataSource not found: ${dataSourceRef}`, identity)
-            }
 
             let result = dataSourceContextCache[contextCacheKey]
             if (result) {
@@ -289,12 +299,12 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 dataSourceId: getDataSourceId(dataSourceRef)
             };
             const baseDataSource = metadata.dataSource[dataSourceRef];
+            if (!baseDataSource) {
+                throw buildDataSourceNotFoundError(dataSourceRef, identity);
+            }
             const dataSource = selectionModeOverride
                 ? { ...baseDataSource, selectionMode: selectionModeOverride }
                 : baseDataSource;
-            if (!dataSource) {
-                throw new Error(`DataSource not found: ${dataSourceRef}`, identity);
-            }
 
             const connector = createDataConnector(dataSource, connectorRuntime);
 

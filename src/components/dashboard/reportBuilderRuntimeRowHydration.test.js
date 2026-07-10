@@ -78,4 +78,65 @@ assert.deepEqual(hydrated, [
   { publisherId: 147, publisherName: "FreeWheel", totalSpend: 300 },
 ]);
 
+const connectorRequests = [];
+const connectorHydrated = await hydrateReportBuilderRuntimeRows({
+  builderContext: {
+    Context(dataSourceRef) {
+      assert.equal(dataSourceRef, "publisher_lookup");
+      return {
+        dataSource: {
+          selectors: {
+            data: "data",
+          },
+        },
+        connector: {
+          async get({ inputParameters }) {
+            connectorRequests.push(inputParameters);
+            return {
+              data: [
+                { id: 147, name: "FreeWheel" },
+              ],
+            };
+          },
+        },
+        handlers: {
+          dataSource: {},
+        },
+      };
+    },
+  },
+  config: {
+    dimensions: [
+      {
+        id: "publisherId",
+        key: "publisherId",
+        displayKey: "publisherName",
+        displayLookup: {
+          dataSourceRef: "publisher_lookup",
+          resolveInput: "PublisherId",
+          valuePath: "id",
+          labelPath: "name",
+        },
+      },
+    ],
+  },
+  request: {
+    dimensions: {
+      publisherId: true,
+    },
+  },
+  rows: [
+    { publisherId: 147, totalSpend: 1200 },
+  ],
+});
+
+assert.deepEqual(connectorRequests, [
+  {
+    PublisherId: 147,
+  },
+]);
+assert.deepEqual(connectorHydrated, [
+  { publisherId: 147, publisherName: "FreeWheel", totalSpend: 1200 },
+]);
+
 console.log("reportBuilderRuntimeRowHydration ✓ batches lookup-backed display hydration for runtime rows");

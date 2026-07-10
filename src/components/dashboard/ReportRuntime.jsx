@@ -15,8 +15,8 @@ import {
   resolveReportRuntimeChartActionFields,
   resolveReportRuntimeBindingSummaryChips,
   resolveReportRuntimeBindingSummary,
+  resolveReportRuntimeBlocks,
   resolveReportRuntimeRefinementFields,
-  resolveReportRuntimePrimaryBlocks,
   resolveReportRuntimeScopeSummary,
 } from "./reportRuntimeModel.js";
 import {
@@ -52,6 +52,7 @@ import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGover
 import { formatDashboardValue } from "./dashboardUtils.js";
 import { resolveDashboardRowActionIdentity } from "./dashboardRowActionPresentation.js";
 import { InlineStaticFilterControl } from "./reportBuilderComponents.jsx";
+import { resolveReportDatasetRefResolution } from "../../reporting/reportDatasetRefModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -225,18 +226,17 @@ function resolveRuntimeLayoutGridColumn(block = {}) {
   return span >= REPORT_LAYOUT_GRID_COLUMNS ? "1 / -1" : `span ${span}`;
 }
 
-function formatKpiValue(value) {
+function formatKpiValue(value, format = "", locale = "en-US") {
   if (value == null) {
     return "—";
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => formatKpiValue(entry)).join(", ");
+    return value.map((entry) => formatKpiValue(entry, format, locale)).join(", ");
   }
   if (typeof value === "object") {
     return JSON.stringify(value);
   }
-  const normalized = normalizeString(value);
-  return normalized || String(value);
+  return formatDashboardValue(value, format, locale);
 }
 
 function resolveRuntimeKpiToneStyles(tone = "") {
@@ -764,6 +764,10 @@ function ScopeDetailsPanel({ scopeSummary = null, activeScopeSummary = null, pre
   if (params.length === 0) {
     return null;
   }
+  const normalizedPresentationMode = normalizeString(presentationMode).toLowerCase();
+  const baselineSubtitle = normalizedPresentationMode === "report"
+    ? ""
+    : "Baseline filters compiled into this runtime. Live keep, exclude, and drill changes appear in Active refinements.";
   return (
     <div
       data-report-runtime-scope-panel="shared"
@@ -779,11 +783,11 @@ function ScopeDetailsPanel({ scopeSummary = null, activeScopeSummary = null, pre
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
           {normalizeString(scopeSummary.title || "Filters")} (baseline)
         </div>
-        <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>
-          {normalizeString(presentationMode).toLowerCase() === "report"
-            ? "Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."
-            : "Baseline filters compiled into this runtime. Live keep, exclude, and drill changes appear in Active refinements."}
-        </div>
+        {baselineSubtitle ? (
+          <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>
+            {baselineSubtitle}
+          </div>
+        ) : null}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
         {params.map((param) => (
@@ -1013,6 +1017,19 @@ function buildBlockDiagnosticsIndex(diagnostics = []) {
   return next;
 }
 
+function resolveRuntimeBlockDatasetRef(block = {}, {
+  availableDatasetRefs = [],
+} = {}) {
+  const paramDatasetRef = Array.isArray(block?.content?.params)
+    ? normalizeString(block.content.params.find((param) => normalizeString(param?.datasetRef))?.datasetRef)
+    : "";
+  return resolveReportDatasetRefResolution({
+    preferredDatasetRef: normalizeString(block?.datasetRef || paramDatasetRef),
+    availableDatasetRefs,
+    fallbackDatasetRef: "primary",
+  });
+}
+
 function resolveDatasetBackedBlockDiagnostics(block = {}, diagnostics = [], dataset = null) {
   const resolvedDiagnostics = Array.isArray(diagnostics) ? diagnostics : [];
   const datasetDiagnostics = Array.isArray(dataset?.provenance?.diagnostics)
@@ -1232,7 +1249,7 @@ function BadgesBlock({ block = {}, locale = "en-US" }) {
   );
 }
 
-function KpiBlock({ block = {}, diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
+function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -1280,7 +1297,7 @@ function KpiBlock({ block = {}, diagnostics = [], onRetryProviderActions = null,
               </span>
             ) : null}
             <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
-              {formatKpiValue(content?.value)}
+              {formatKpiValue(content?.value, normalizeString(content?.valueFormat || content?.format), locale)}
             </span>
           </div>
           {hasSecondaryValue ? (
@@ -1288,7 +1305,7 @@ function KpiBlock({ block = {}, diagnostics = [], onRetryProviderActions = null,
               <strong style={{ color: "#182026" }}>
                 {normalizeString(content?.secondaryLabel || content?.secondaryField)}
               </strong>
-              <span>{formatKpiValue(content?.secondaryValue)}</span>
+              <span>{formatKpiValue(content?.secondaryValue, normalizeString(content?.secondaryFormat), locale)}</span>
             </div>
           ) : null}
         </div>
@@ -1369,9 +1386,9 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
   );
 }
 
-function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummary = null, presentationMode = "preview", runtimeHandlers = null }) {
+function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummary = null, presentationMode = "preview", runtimeHandlers = null, availableDatasetRefs = [] }) {
   const params = Array.isArray(block?.content?.params) ? block.content.params : [];
-  const normalizedDatasetRef = normalizeString(block?.datasetRef || params.find((param) => normalizeString(param?.datasetRef))?.datasetRef || "primary") || "primary";
+  const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
   const isPrimaryScope = normalizedDatasetRef === "primary";
   const canEditFilterParams = params.some((param) => (
     (normalizeString(param?.type).toLowerCase() === "daterange" && typeof runtimeHandlers?.setScopeParamDate === "function")
@@ -1384,12 +1401,14 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
         : `${normalizeString(block?.content?.title || block?.title || "Filters")} (baseline)`}
       subtitle={canEditFilterParams
         ? (
-            isPrimaryScope
+            normalizeString(presentationMode).toLowerCase() === "report"
+              ? ""
+              : (isPrimaryScope
               ? "Change these baseline report filters here. Live keep, exclude, and drill changes appear in Active refinements."
-              : "Change filters for this block here. These filters apply to this data block only."
+              : "Change filters for this block here. These filters apply to this data block only.")
           )
         : (normalizeString(presentationMode).toLowerCase() === "report"
-            ? "Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."
+            ? ""
             : "Baseline filters compiled from the live builder state. Live keep, exclude, and drill changes appear in Active refinements.")}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -1870,6 +1889,10 @@ export default function ReportRuntime({
       .map((dataset) => [normalizeString(dataset?.id), dataset])
       .filter(([id]) => !!id),
   ), [reportFill]);
+  const availableDatasetRefs = useMemo(
+    () => Array.from(datasetIndex.keys()),
+    [datasetIndex],
+  );
   const scopeSummary = useMemo(
     () => resolveReportRuntimeScopeSummary({
       reportSpec,
@@ -1895,13 +1918,9 @@ export default function ReportRuntime({
     }),
     [reportSpec, reportDocument, title],
   );
-  const { primary, beforePrimary, afterPrimary } = useMemo(
-    () => resolveReportRuntimePrimaryBlocks(reportSpec, reportFill),
-    [reportSpec, reportFill],
-  );
   const allRuntimeBlocks = useMemo(
-    () => [...beforePrimary, ...primary, ...afterPrimary],
-    [beforePrimary, primary, afterPrimary],
+    () => resolveReportRuntimeBlocks(reportSpec, reportFill),
+    [reportSpec, reportFill],
   );
   const hasTopLevelFilterBarBlock = useMemo(
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "filterBarBlock"),
@@ -1913,15 +1932,11 @@ export default function ReportRuntime({
           if (normalizeString(block?.kind) !== "filterBarBlock") {
             return false;
           }
-          const normalizedDatasetRef = normalizeString(
-            block?.datasetRef
-            || (Array.isArray(block?.content?.params) ? block.content.params.find((param) => normalizeString(param?.datasetRef))?.datasetRef : "")
-            || "primary",
-          ) || "primary";
+          const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
           return !suppressedFilterBarDatasetRefs.has(normalizedDatasetRef);
         })
       : [],
-    [allRuntimeBlocks, reportPresentation, suppressedFilterBarDatasetRefs],
+    [allRuntimeBlocks, availableDatasetRefs, reportPresentation, suppressedFilterBarDatasetRefs],
   );
   const hasTopLevelRefinementBarBlock = useMemo(
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "refinementBarBlock"),
@@ -2005,6 +2020,7 @@ export default function ReportRuntime({
       activeScopeSummary={hasTopLevelRefinementBarBlock ? null : activeScopeSummary}
       presentationMode={presentationMode}
       runtimeHandlers={runtimeHandlers}
+      availableDatasetRefs={availableDatasetRefs}
     />
   );
 
@@ -2017,15 +2033,11 @@ export default function ReportRuntime({
       return <BadgesBlock key={block.id} block={block} locale={locale} />;
     }
     if (kind === "kpiBlock") {
-      const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || null;
-      return <KpiBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
+      const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
+      return <KpiBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     if (kind === "filterBarBlock") {
-      const normalizedDatasetRef = normalizeString(
-        block?.datasetRef
-        || (Array.isArray(block?.content?.params) ? block.content.params.find((param) => normalizeString(param?.datasetRef))?.datasetRef : "")
-        || "primary",
-      ) || "primary";
+      const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
       if (suppressFilterBarBlocks || suppressedFilterBarDatasetRefs.has(normalizedDatasetRef) || (reportPresentation && topFilterBarBlocks.length > 0)) {
         return null;
       }
@@ -2038,7 +2050,8 @@ export default function ReportRuntime({
       return <RefinementBarBlock key={block.id} block={block} runtimeHandlers={runtimeHandlers} />;
     }
     if (kind === "tableBlock") {
-      const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || { id: block?.datasetRef, rows: [] };
+      const resolvedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
+      const dataset = datasetIndex.get(resolvedDatasetRef) || { id: resolvedDatasetRef || block?.datasetRef, rows: [] };
       return (
         <TableBlock
           key={block.id}
@@ -2055,7 +2068,8 @@ export default function ReportRuntime({
       );
     }
     if (kind === "chartBlock") {
-      const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || { id: block?.datasetRef, rows: [] };
+      const resolvedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
+      const dataset = datasetIndex.get(resolvedDatasetRef) || { id: resolvedDatasetRef || block?.datasetRef, rows: [] };
       const diagnostics = resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset);
       const invalidDiagnostic = diagnostics
         .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
@@ -2151,7 +2165,7 @@ export default function ReportRuntime({
       );
     }
     if (kind === "geoMapBlock") {
-      const dataset = datasetIndex.get(normalizeString(block?.datasetRef)) || null;
+      const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
       return <GeoMapBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     return <UnsupportedBlock key={block?.id || kind} block={block} />;
@@ -2204,7 +2218,7 @@ export default function ReportRuntime({
           ) : null}
         </RuntimePanel>
       ) : null}
-      {!showContextSummary ? <CompactBindingChips bindingSummary={bindingSummary} /> : null}
+      {!showContextSummary && !reportPresentation ? <CompactBindingChips bindingSummary={bindingSummary} /> : null}
       {topFilterBarBlocks.length > 0 ? (
         <div
           style={{
@@ -2220,19 +2234,7 @@ export default function ReportRuntime({
       <DiagnosticsPanel diagnostics={[
         ...runtimeDiagnostics,
       ]} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
-      {renderLayoutBlockGrid(beforePrimary, "beforePrimary")}
-      {primary.length > 0 ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: primary.length > 1 ? "repeat(auto-fit, minmax(320px, 1fr))" : "minmax(0, 1fr)",
-            gap: 16,
-          }}
-        >
-          {primary.map((block) => renderBlock(block))}
-        </div>
-      ) : null}
-      {renderLayoutBlockGrid(afterPrimary, "afterPrimary")}
+      {renderLayoutBlockGrid(allRuntimeBlocks, "runtime")}
     </div>
   );
 }

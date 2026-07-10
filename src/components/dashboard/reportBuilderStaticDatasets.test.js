@@ -29,6 +29,7 @@ const normalizedDatasets = normalizeReportBuilderStaticDatasets([staticDataset])
 assert.equal(normalizedDatasets.length, 1);
 assert.equal(normalizedDatasets[0].valueFieldOptions.length, 2);
 assert.equal(normalizedDatasets[0].secondaryFieldOptions.length, 1);
+assert.equal(normalizedDatasets[0].chartFieldOptions.length, 3);
 
 assert.deepEqual(buildReportBuilderStaticDatasetOptions([staticDataset]), [
   {
@@ -48,6 +49,11 @@ assert.deepEqual(buildReportBuilderStaticDatasetOptions([staticDataset]), [
     ],
     secondaryFieldOptions: [
       { value: "region", label: "Region" },
+    ],
+    chartFieldOptions: [
+      { key: "region", label: "Region", kind: "dimension" },
+      { key: "revenue", label: "Revenue", kind: "measure" },
+      { key: "orders", label: "Orders", kind: "measure" },
     ],
   },
 ]);

@@ -1112,6 +1112,10 @@ const authoredOnlyBlocksModel = buildReportBuilderRuntimePreviewModel({
   includePrimaryBlocks: false,
 });
 assert.deepEqual(
+  authoredOnlyBlocksModel.document.layout.items.map((item) => item.blockId),
+  ["sharedFilters", "narrativeIntro", "headlineKpi"],
+);
+assert.deepEqual(
   authoredOnlyBlocksModel.reportSpec.blocks.map((block) => block.id),
   ["sharedFilters", "narrativeIntro", "headlineKpi"],
 );
@@ -1119,6 +1123,7 @@ assert.equal(
   authoredOnlyBlocksModel.reportSpec.blocks.some((block) => block.id === "primaryTable" || block.id === "primaryChart"),
   false,
 );
+assert.equal(authoredOnlyBlocksModel.reportSpec.datasets.some((dataset) => dataset.id === "primary"), true);
 assert.equal(authoredOnlyBlocksModel.reportSpec.datasets[0].request.dimensions.channelV2, true);
 const authoredOnlyBlocksPreview = buildReportBuilderRuntimePreview({
   model: authoredOnlyBlocksModel,
@@ -1127,6 +1132,10 @@ const authoredOnlyBlocksPreview = buildReportBuilderRuntimePreview({
   ],
   hasMore: false,
 });
+assert.deepEqual(
+  authoredOnlyBlocksPreview.document.layout.items.map((item) => item.blockId),
+  ["sharedFilters", "narrativeIntro", "headlineKpi"],
+);
 assert.equal(authoredOnlyBlocksPreview.reportFill.blocks.some((block) => block.id === "primaryTable" || block.id === "primaryChart"), false);
 assert.equal(authoredOnlyBlocksPreview.reportFill.blocks.some((block) => block.kind === "markdownBlock" && block.id === "narrativeIntro"), true);
 assert.equal(authoredOnlyBlocksPreview.reportFill.blocks.some((block) => block.kind === "kpiBlock" && block.id === "headlineKpi" && block.content?.value === 1200000), true);

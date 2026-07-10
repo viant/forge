@@ -123,4 +123,29 @@ assert.deepEqual(fetchedRowsPreferredOverEmptyCollectionSource, {
     loading: false,
 });
 
+const authoredRuntimeFetchedRowsPreferredOverVisibleCollectionSource = resolveReportBuilderRuntimePreviewRowsSource({
+    currentRequestFingerprint: '{"dimensions":{"channelV2":true}}',
+    requestDispatchFingerprint: '{"dimensions":{"channelV2":true}}::fetch',
+    currentRequestShouldFetch: true,
+    runtimePreviewFingerprint: '{"dimensions":{"channelV2":true}}',
+    preferFetchedRows: true,
+    collection: [
+        { record: { avails: 1200000, channelV2: 6 } },
+    ],
+    collectionInfo: { hasMore: false },
+    loading: false,
+    error: null,
+    fetchedRows: [{ avails: 115912068055, channelV2: 6 }],
+    fetchedHasMore: false,
+    fetchedError: null,
+    fetchedLoading: false,
+});
+assert.deepEqual(authoredRuntimeFetchedRowsPreferredOverVisibleCollectionSource, {
+    source: "runtimePreview",
+    rows: [{ avails: 115912068055, channelV2: 6 }],
+    hasMore: false,
+    error: null,
+    loading: false,
+});
+
 console.log("reportBuilderRuntimePreviewSource ✓ reuses visible result rows only when the compiled runtime request matches the current builder request");

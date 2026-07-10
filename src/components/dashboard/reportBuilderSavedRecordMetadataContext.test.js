@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import {
+    resolveEmbeddedReportBuilderSemanticSummary,
+    resolveEmbeddedReportBuilderScope,
+} from "./reportBuilderImportedDocumentMetadata.js";
+import {
     resolveNormalizedSavedReportRecordContext,
     resolveNormalizedReportSpecDocumentContext,
     resolveSavedReportRecordContextByReportId,
@@ -141,6 +145,70 @@ assert.equal(rawSpecDocumentBackedContext.semanticSummary.entityLabel, "Canonica
 assert.equal(rawSpecDocumentBackedContext.semanticSummary.selectedMeasures[0].definitionRef, "semantic://example/available_impressions");
 assert.equal(rawSpecDocumentBackedContext.reportSpec.semanticSummary.modelLabel, "Canonical Ad Delivery");
 assert.equal(rawSpecDocumentBackedContext.reportSpec.semanticSummary.selectedDimensions[1].label, "Channel");
+
+const sparsePrimaryDocument = {
+    version: 1,
+    kind: "reportDocument",
+    title: "Sparse Primary Document",
+    binding: {
+        mode: "semantic",
+        modelRef: "model://example/performance/delivery@v1",
+        entity: "line_delivery",
+    },
+    scope: {
+        dataSourceRef: "demoReportSource",
+    },
+    datasets: [
+        {
+            id: "primary",
+            dataSourceRef: "demoReportSource",
+            label: "Primary",
+            kindLabel: "primary",
+            columnOptions: [
+                { key: "country", label: "Market", kind: "dimension", rawId: "country_code", semanticRef: "country_code" },
+                { key: "avails", label: "Available Impressions", kind: "measure", format: "compactNumber", rawId: "available_impressions", semanticRef: "available_impressions" },
+            ],
+            valueFieldOptions: [
+                { value: "avails", label: "Available Impressions", format: "compactNumber", rawId: "available_impressions", semanticRef: "available_impressions" },
+            ],
+            secondaryFieldOptions: [
+                { value: "country", label: "Market", rawId: "country_code", semanticRef: "country_code" },
+            ],
+            scopeParamOptions: [
+                { value: "dateRange", label: "Date Range", kind: "dateRange", required: true },
+            ],
+        },
+    ],
+    blocks: [
+        {
+            id: "primaryBuilder",
+            kind: "reportBuilderBlock",
+            source: {
+                kind: "dashboard.reportBuilder",
+                containerId: "demoReportBuilder",
+                stateKey: "demoReportBuilder",
+                dataSourceRef: "demoReportSource",
+            },
+            config: {
+                title: "Sparse Primary Document",
+            },
+            state: {
+                selectedMeasures: ["avails"],
+                selectedDimensions: ["country"],
+                scopeParams: {
+                    dateRange: {
+                        start: "2026-06-01",
+                        end: "2026-06-07",
+                    },
+                },
+            },
+        },
+    ],
+};
+assert.equal(resolveEmbeddedReportBuilderSemanticSummary(sparsePrimaryDocument)?.selectedMeasures?.[0]?.label, "Available Impressions");
+assert.equal(resolveEmbeddedReportBuilderSemanticSummary(sparsePrimaryDocument)?.selectedDimensions?.[0]?.label, "Market");
+assert.equal(resolveEmbeddedReportBuilderScope(sparsePrimaryDocument)?.params?.[0]?.id, "dateRange");
+assert.equal(resolveEmbeddedReportBuilderScope(sparsePrimaryDocument)?.dataSourceRef, "demoReportSource");
 
 const normalizedContext = resolveNormalizedSavedReportRecordContext({
     documentVersion: 13,

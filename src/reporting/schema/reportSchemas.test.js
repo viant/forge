@@ -107,6 +107,71 @@ assert.deepEqual(validateReportSpec(reportSpec), {
   valid: true,
   errors: [],
 });
+assert.deepEqual(validateReportSpec({
+  ...reportSpec,
+  scope: {
+    ...reportSpec.scope,
+    contextPreset: {
+      id: "performance_order",
+      paramIds: ["dateRange"],
+    },
+  },
+}), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportSpec({
+  ...reportSpec,
+  datasets: reportSpec.datasets.map((dataset) => (
+    dataset.id === "primary"
+      ? {
+        ...dataset,
+        scope: {
+          inheritContext: true,
+        },
+        source: {
+          kind: "mcp",
+          server: "steward",
+          tool: "performance.summary",
+        },
+        resultContract: {
+          shape: "rowSet",
+          rowPath: "payload.records",
+        },
+        capabilities: {
+          fieldCatalog: true,
+          backendRefetch: true,
+          datly: {
+            unifiedCube: true,
+          },
+        },
+      }
+      : dataset
+  )),
+}), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportSpec({
+  ...reportSpec,
+  datasets: reportSpec.datasets.map((dataset) => (
+    dataset.id === "primary"
+      ? {
+        ...dataset,
+        scope: {
+          mode: "exclude",
+          local: {
+            grain: "day",
+          },
+          exclude: ["audienceIds"],
+        },
+      }
+      : dataset
+  )),
+}), {
+  valid: true,
+  errors: [],
+});
 
 const semanticSummarySpec = {
   ...reportSpec,
@@ -421,6 +486,36 @@ assert.deepEqual(validateReportSpec(invalidPercentOfTotalSourceSpec), {
 });
 
 assert.deepEqual(validateReportFill(reportFill), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill({
+  ...reportFill,
+  datasets: reportFill.datasets.map((dataset, index) => (
+    index === 0
+      ? {
+        ...dataset,
+        scope: {
+          inheritContext: true,
+        },
+        source: {
+          kind: "mcp",
+          toolName: "demo:forecast_summary",
+        },
+        resultContract: {
+          shape: "rowSet",
+          rowPath: "payload.records",
+        },
+        capabilities: {
+          backendRefetch: true,
+          datly: {
+            unifiedCube: true,
+          },
+        },
+      }
+      : dataset
+  )),
+}), {
   valid: true,
   errors: [],
 });
@@ -1116,5 +1211,127 @@ assert.deepEqual(invalidPrintValidation.errors, [
     message: "Unexpected property.",
   },
 ]);
+
+const compactNumberKpiReportSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "forecastingCubeBuilder",
+    stateKey: "forecastingCubeBuilder",
+    dataSourceRef: "forecasting_cube_report",
+  },
+  title: "Forecast Inventory Brief",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "avails",
+    orderDir: "desc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["headlineKpi"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "forecasting_cube_report",
+      request: {
+        measures: { avails: true },
+        dimensions: { channelV2: true },
+        filters: {},
+        limit: 25,
+        offset: 0,
+      },
+    },
+  ],
+  blocks: [
+    {
+      id: "headlineKpi",
+      kind: "kpiBlock",
+      title: "Top Channel Inventory",
+      datasetRef: "primary",
+      valueField: "avails",
+      valueLabel: "Avails",
+      valueFormat: "compactNumber",
+      secondaryField: "channelV2",
+      secondaryLabel: "Channel",
+      description: "Highlights the leading inventory channel before drilling deeper.",
+      emptyLabel: "No forecast KPI value available.",
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(compactNumberKpiReportSpec), {
+  valid: true,
+  errors: [],
+});
+
+const compactNumberKpiReportFill = {
+  version: 1,
+  kind: "reportFill",
+  specVersion: 1,
+  specHash: "fnv1a:test",
+  source: compactNumberKpiReportSpec.source,
+  parameters: compactNumberKpiReportSpec.parameters,
+  refinements: [],
+  calculatedFields: [],
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "forecasting_cube_report",
+      request: compactNumberKpiReportSpec.datasets[0].request,
+      provenance: {
+        requestHash: "fnv1a:test",
+        rowCount: 1,
+        truncated: false,
+        hasMore: false,
+        diagnostics: [],
+      },
+      rows: [
+        {
+          avails: 5900000000,
+          channelV2: "CTV",
+        },
+      ],
+    },
+  ],
+  blocks: [
+    {
+      id: "headlineKpi",
+      kind: "kpiBlock",
+      title: "Top Channel Inventory",
+      datasetRef: "primary",
+      valueField: "avails",
+      valueLabel: "Avails",
+      valueFormat: "compactNumber",
+      secondaryField: "channelV2",
+      secondaryLabel: "Channel",
+      description: "Highlights the leading inventory channel before drilling deeper.",
+      emptyLabel: "No forecast KPI value available.",
+      content: {
+        title: "Top Channel Inventory",
+        description: "Highlights the leading inventory channel before drilling deeper.",
+        valueField: "avails",
+        valueLabel: "Avails",
+        valueFormat: "compactNumber",
+        value: 5900000000,
+        rowCount: 1,
+        secondaryField: "channelV2",
+        secondaryLabel: "Channel",
+        secondaryValue: "CTV",
+        emptyLabel: "No forecast KPI value available.",
+      },
+    },
+  ],
+  diagnostics: [],
+};
+assert.deepEqual(validateReportFill(compactNumberKpiReportFill), {
+  valid: true,
+  errors: [],
+});
 
 console.log("reportSchemas ✓ validates current ReportSpec/ReportFill/ReportPrint artifacts and rejects unknown fields");

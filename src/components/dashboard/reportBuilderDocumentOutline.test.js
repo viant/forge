@@ -13,6 +13,11 @@ import {
 
 const outline = buildReportBuilderDocumentOutlineEntries({
   activeDataViewLabel: "Current data selection",
+  authoredDatasetOptions: [
+    { value: "primary", label: "Performance Cube" },
+    { value: "forecast_cube", label: "Forecast Cube" },
+  ],
+  primaryDatasetLabel: "Metrics Ad Cube Report",
   primaryResultChildren: [
     {
       id: "primaryBuilder:chart",
@@ -42,6 +47,7 @@ const outline = buildReportBuilderDocumentOutlineEntries({
       id: "detailTable",
       kind: "tableBlock",
       title: "Detail Table",
+      datasetRef: "forecast_cube",
       columns: [
         { key: "channel", label: "Channel" },
         { key: "spend", label: "Spend" },
@@ -86,6 +92,7 @@ assert.equal(outline[1].id, "narrativeIntro");
 assert.equal(outline[1].children.length, 0);
 assert.equal(outline[2].id, "detailTable");
 assert.equal(outline[2].summary, "2 fields");
+assert.equal(outline[2].datasetLabel, "Forecast Cube");
 assert.equal(outline[2].children.length, 0);
 assert.equal(outline[3].id, "statusPills");
 assert.equal(outline[3].summary, "2 pills");
@@ -103,6 +110,10 @@ assert.deepEqual(
     "0:detailTable",
     "0:statusPills",
   ],
+);
+assert.equal(
+  flattenedOutline.find((entry) => entry.id === "detailTable")?.datasetLabel,
+  "Forecast Cube",
 );
 
 assert.deepEqual(
@@ -276,6 +287,79 @@ assert.deepEqual(
     selectedTitle: "Add drill branch",
     insertionAfterId: "primaryBuilder",
     insertionAnchorTitle: "",
+  },
+);
+
+const fallbackLayoutOutline = buildReportBuilderDocumentOutlineEntries({
+  activeDataViewLabel: "Current data selection",
+  authoredDocumentBlocks: [
+    {
+      id: "narrativeIntro",
+      kind: "markdownBlock",
+      title: "Narrative",
+      markdown: "## Narrative\nReader-facing context.",
+    },
+    {
+      id: "detailTable",
+      kind: "tableBlock",
+      title: "Detail Table",
+      columns: [{ key: "channel", label: "Channel" }],
+    },
+  ],
+  authoredDocumentLayout: null,
+  authoredDrillSummary: {
+    hierarchies: [],
+  },
+});
+
+assert.deepEqual(
+  fallbackLayoutOutline.map((entry) => entry.id),
+  ["narrativeIntro", "detailTable", "primaryBuilder"],
+);
+assert.equal(fallbackLayoutOutline[0].title, "Narrative");
+assert.equal(fallbackLayoutOutline[1].title, "Detail Table");
+assert.equal(fallbackLayoutOutline[2].title, "Current data selection");
+assert.deepEqual(
+  resolveReportBuilderDocumentInsertionTarget(fallbackLayoutOutline, ""),
+  {
+    selectedEntryId: "primaryBuilder",
+    selectedTitle: "Current data selection",
+    insertionAfterId: "primaryBuilder",
+    insertionAnchorTitle: "",
+  },
+);
+
+const authoredOnlyOutline = buildReportBuilderDocumentOutlineEntries({
+  authoredDocumentBlocks: [
+    {
+      id: "narrativeIntro",
+      kind: "markdownBlock",
+      title: "Narrative",
+      markdown: "## Narrative\nReader-facing context.",
+    },
+    {
+      id: "detailTable",
+      kind: "tableBlock",
+      title: "Detail Table",
+      columns: [{ key: "channel", label: "Channel" }],
+    },
+  ],
+  authoredDocumentLayout: {
+    items: [{ blockId: "narrativeIntro" }, { blockId: "detailTable" }],
+  },
+});
+
+assert.deepEqual(
+  authoredOnlyOutline.map((entry) => entry.id),
+  ["narrativeIntro", "detailTable"],
+);
+assert.deepEqual(
+  resolveReportBuilderDocumentInsertionTarget(authoredOnlyOutline, "missingSelection"),
+  {
+    selectedEntryId: "narrativeIntro",
+    selectedTitle: "Narrative",
+    insertionAfterId: "narrativeIntro",
+    insertionAnchorTitle: "Narrative",
   },
 );
 

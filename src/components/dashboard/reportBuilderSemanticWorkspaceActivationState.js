@@ -5,9 +5,9 @@ function normalizeString(value = "") {
 function shouldOfferSemanticActivation(semanticWorkspacePanelState = null) {
     const normalizedTitle = normalizeString(semanticWorkspacePanelState?.title).toLowerCase();
     return new Set([
-        "semantic modeling inactive",
-        "semantic model unavailable",
-        "semantic model error",
+        "no data model configured",
+        "data model unavailable",
+        "data model failed to load",
     ]).has(normalizedTitle);
 }
 
@@ -17,6 +17,28 @@ function hasSemanticEntryContent(entry = null) {
     ) || !!(
         Array.isArray(entry?.semanticBindingFieldGroups) && entry.semanticBindingFieldGroups.length > 0
     );
+}
+
+function normalizeSemanticActivationMetaChips(metaChips = [], reportId = "") {
+    const normalizedReportId = normalizeString(reportId);
+    const mapped = (Array.isArray(metaChips) ? metaChips : [])
+        .map((chip) => normalizeString(chip))
+        .filter(Boolean)
+        .filter((chip) => !normalizedReportId || chip !== normalizedReportId)
+        .map((chip) => {
+            const normalizedChip = chip.toLowerCase();
+            if (normalizedChip === "local-only") {
+                return "Local file";
+            }
+            if (normalizedChip === "reopen-ready") {
+                return "Ready to reopen";
+            }
+            if (normalizedChip === "export-ready") {
+                return "Ready to export";
+            }
+            return chip;
+        });
+    return Array.from(new Set(mapped));
 }
 
 function buildActivationEntries(entries = [], kind = "") {
@@ -31,7 +53,7 @@ function buildActivationEntries(entries = [], kind = "") {
             kind: normalizeString(kind),
             title: normalizeString(entry.title || entry.reportId),
             description: normalizeString(entry.scopeSummaryText || entry.authoredBlockSummaryText || entry.reopenSourceResolutionText),
-            metaChips: (Array.isArray(entry.metaChips) ? entry.metaChips : []).filter(Boolean).slice(0, 4),
+            metaChips: normalizeSemanticActivationMetaChips(entry.metaChips, entry.reportId).slice(0, 4),
             semanticBindingChips: (Array.isArray(entry.semanticBindingChips) ? entry.semanticBindingChips : []).filter(Boolean),
             semanticBindingFieldGroups: Array.isArray(entry.semanticBindingFieldGroups) ? entry.semanticBindingFieldGroups : [],
             activateLabel: normalizeString(entry.activateLabel || "Use"),
@@ -53,10 +75,10 @@ export function buildReportBuilderSemanticWorkspaceActivationState({
     const savedRecordEntries = buildActivationEntries(importedLocalSavedRecordPanelState?.entries, "savedRecord");
     const entries = [...reopenableEntries, ...savedRecordEntries];
     return {
-        title: "Activate semantic mode",
-        description: normalizeString(semanticWorkspacePanelState?.title).toLowerCase() === "semantic modeling inactive"
-            ? "Load a semantic report file or activate an imported semantic report to switch this builder from raw mode to model-backed mappings."
-            : "Load a semantic report file or activate an imported semantic report to restore model-backed mappings in this builder.",
+        title: "Activate data model",
+        description: normalizeString(semanticWorkspacePanelState?.title).toLowerCase() === "no data model configured"
+            ? "Load a report file or activate an imported data model to switch this builder from raw mode to data-model mappings."
+            : "Load a report file or activate an imported data model to restore data-model mappings in this builder.",
         entries,
     };
 }

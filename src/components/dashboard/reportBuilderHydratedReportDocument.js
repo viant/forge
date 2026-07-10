@@ -10,9 +10,11 @@ import {
     normalizeReportBuilderSemanticSummary,
 } from "./reportBuilderSemantic.js";
 import {
+    resolveReportDocumentBuilderContext,
     extractReportDocumentTemplateIdentity as extractReportDocumentTemplateIdentityFromModel,
     normalizeReportBuilderDocumentBlocks,
 } from "../../reporting/reportDocumentModel.js";
+import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockModel.js";
 import { resolveScopeBindingFilterId } from "../../reporting/scopeBindingModel.js";
 import { mergeScopeParamValues } from "../../reporting/scopeStateModel.js";
 import { resolveNormalizedReportSpecDocumentContext } from "./reportBuilderSavedRecordMetadataContext.js";
@@ -27,6 +29,8 @@ import { normalizeReportBuilderSavedReportRecords } from "./reportBuilderSavedRe
 import {
     resolveReportBuilderSavedViewOverlayReferencedRecord as resolveSavedViewOverlayReferencedRecord,
 } from "./reportBuilderReopenSourceResolution.js";
+import { normalizeReportBuilderPublishedDataSources } from "../../reporting/reportBuilderPublishedDatasetModel.js";
+import equal from "fast-deep-equal";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -409,11 +413,6 @@ function extractHydratedDocumentTemplateIdentity(hydratedDocument = null) {
     };
 }
 
-function extractReportBuilderBlock(document = null) {
-    const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
-    return blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null;
-}
-
 function extractReportBuilderAdditionalBlocks(document = null) {
     const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
     return normalizeReportBuilderDocumentBlocks(
@@ -535,17 +534,19 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
             reportSpec: sourceReportSpec,
         })
         : null;
-    const sourceBlock = extractReportBuilderBlock(sourceDocument);
-    const config = sourceBlock?.config && typeof sourceBlock.config === "object" && !Array.isArray(sourceBlock.config)
+    const sourceBlock = resolveReportBuilderBlock(sourceDocument);
+    const baseConfig = sourceBlock?.config && typeof sourceBlock.config === "object" && !Array.isArray(sourceBlock.config)
         ? cloneValue(sourceBlock.config)
         : null;
-    if (!sourceDocument || !sourceBlock || !config) {
+    if (!sourceDocument || !sourceBlock || !baseConfig) {
         return {
             valid: false,
             code: "invalidDocument",
             message: "The saved ReportDocument does not contain a compatible reportBuilderBlock.",
         };
     }
+    const builderContext = resolveReportDocumentBuilderContext(sourceDocument, baseConfig, sourceBlock?.state || {});
+    const config = builderContext?.config || null;
     const source = sourceBlock?.source && typeof sourceBlock.source === "object" && !Array.isArray(sourceBlock.source)
         ? cloneValue(sourceBlock.source)
         : {};
@@ -591,14 +592,23 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
             },
         }
         : sourceDocument;
+    const resolvedBinding = builderContext?.binding || null;
+    const effectiveConfig = config;
     const hydratedState = sanitizeReportBuilderState(
-        config,
+        effectiveConfig,
         applySavedViewOverlayToBuilderState(savedViewOverlay && !hasBlockingSavedViewOverlayDiagnostics ? getResponse : null, {
             document: sourceDocument,
             reportSpec: sourceReportSpec,
             state: applyReportDocumentScopeBindings(scopeBindingDocument, sourceBlock, effectiveScopeParams),
         }),
     );
+    if (resolvedBinding) {
+        hydratedState.binding = cloneValue(resolvedBinding);
+    }
+    const resolvedStaticDatasets = Array.isArray(builderContext?.staticDatasets) ? builderContext.staticDatasets : [];
+    if (resolvedStaticDatasets.length > 0) {
+        hydratedState.reportStaticDatasets = cloneValue(resolvedStaticDatasets);
+    }
     const overlayApplicationDiagnostics = savedViewOverlay
         ? buildSavedViewOverlayApplicationDiagnostics(savedViewOverlay, hydratedState, config)
         : [];
@@ -641,7 +651,7 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
         source,
         ...(savedSource ? { savedSource } : {}),
         ...(sharedArtifactState ? sharedArtifactState : {}),
-        config,
+        config: effectiveConfig,
         ...(compileState ? { compileState } : {}),
         ...(runtimePreviewInteraction ? { runtimePreviewInteraction } : {}),
         ...(effectiveScopeParams.length > 0 ? { scopeParams: cloneValue(effectiveScopeParams) } : {}),
@@ -834,6 +844,42 @@ export function setReportBuilderHydratedDocumentSessionRuntimePreviewInteraction
     return {
         ...cloneValue(normalizedSession),
         runtimePreviewInteraction: normalizedRuntimePreviewInteraction,
+    };
+}
+
+export function setReportBuilderHydratedDocumentSessionReopenedDataset(session = null, datasetRef = "", patch = null) {
+    const normalizedSession = normalizeReportBuilderHydratedDocumentSession(session);
+    const normalizedDatasetRef = normalizeString(datasetRef);
+    const normalizedPatch = patch && typeof patch === "object" && !Array.isArray(patch)
+        ? cloneValue(patch)
+        : null;
+    if (!normalizedSession || !normalizedDatasetRef || !normalizedPatch) {
+        return normalizedSession ? cloneValue(normalizedSession) : null;
+    }
+    const reopenedConfig = cloneValue(normalizedSession.reopenedConfig || {});
+    const currentDatasets = normalizeReportBuilderPublishedDataSources(reopenedConfig);
+    const nextDatasets = currentDatasets.map((entry) => (
+        normalizeString(entry?.id) === normalizedDatasetRef || normalizeString(entry?.dataSourceRef) === normalizedDatasetRef
+            ? {
+                ...cloneValue(entry),
+                ...normalizedPatch,
+            }
+            : cloneValue(entry)
+    ));
+    const didUpdate = nextDatasets.some((entry, index) => !equal(entry, currentDatasets[index]));
+    if (!didUpdate) {
+        return cloneValue(normalizedSession);
+    }
+    reopenedConfig.datasets = nextDatasets;
+    delete reopenedConfig.dataSources;
+    return {
+        ...cloneValue(normalizedSession),
+        reopenedConfig,
+        liveSnapshot: {
+            ...(normalizedSession.liveSnapshot ? cloneValue(normalizedSession.liveSnapshot) : {}),
+            config: cloneValue(reopenedConfig),
+            state: cloneValue(normalizedSession?.liveSnapshot?.state || {}),
+        },
     };
 }
 

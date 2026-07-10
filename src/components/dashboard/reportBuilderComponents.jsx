@@ -5,6 +5,7 @@ import { useSignals } from "@preact/signals-react/runtime";
 import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import MarkdownEditor from "../MarkdownEditor.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
+import { resolveReportDatasetRefResolution } from "../../reporting/reportDatasetRefModel.js";
 import { resolveKey } from "../../utils/selector.js";
 import { REPORT_BUILDER_TABLE_CALC_FUNCTIONS } from "./reportBuilderCalculatedFieldAuthoring.js";
 import {
@@ -26,6 +27,14 @@ import {
 import { placeReportBuilderTableColumnKeyRelative } from "./reportBuilderTableColumnOrder.js";
 
 const REPORT_BUILDER_TABLE_DND_MIME = "application/x-forge-report-builder-table";
+
+function normalizeString(value = "") {
+    return String(value || "").trim();
+}
+
+function cloneValue(value) {
+    return value == null ? value : JSON.parse(JSON.stringify(value));
+}
 
 function normalizeFieldOptions(options = []) {
     const seen = new Set();
@@ -172,6 +181,18 @@ export function normalizeDialogDatasetOptions(options = [], requestedDatasetRef 
                     valueFieldOptions,
                     secondaryFieldOptions,
                     scopeParamOptions,
+                    ...(option?.scope && typeof option.scope === "object" && !Array.isArray(option.scope)
+                        ? { scope: cloneValue(option.scope) }
+                        : {}),
+                    ...(option?.source && typeof option.source === "object" && !Array.isArray(option.source)
+                        ? { source: cloneValue(option.source) }
+                        : {}),
+                    ...(option?.resultContract && typeof option.resultContract === "object" && !Array.isArray(option.resultContract)
+                        ? { resultContract: cloneValue(option.resultContract) }
+                        : {}),
+                    ...(option?.capabilities && typeof option.capabilities === "object" && !Array.isArray(option.capabilities)
+                        ? { capabilities: cloneValue(option.capabilities) }
+                        : {}),
                     columnCount,
                     measureCount,
                     dimensionCount,
@@ -205,6 +226,51 @@ export function normalizeDialogDatasetOptions(options = [], requestedDatasetRef 
         ];
     }
     return baseOptions;
+}
+
+function resolveDialogDatasetRef(preferredDatasetRef = "", datasetOptions = []) {
+    return resolveReportDatasetRefResolution({
+        preferredDatasetRef,
+        availableDatasetRefs: (Array.isArray(datasetOptions) ? datasetOptions : [])
+            .map((option) => normalizeString(option?.value))
+            .filter(Boolean),
+        fallbackDatasetRef: "primary",
+    }).datasetRef;
+}
+
+function buildDatasetExecutionSummary(selectedOption = null) {
+    const option = selectedOption && typeof selectedOption === "object" && !Array.isArray(selectedOption)
+        ? selectedOption
+        : null;
+    if (!option) {
+        return null;
+    }
+    const source = option?.source && typeof option.source === "object" && !Array.isArray(option.source)
+        ? option.source
+        : null;
+    const resultContract = option?.resultContract && typeof option.resultContract === "object" && !Array.isArray(option.resultContract)
+        ? option.resultContract
+        : null;
+    const capabilities = option?.capabilities && typeof option.capabilities === "object" && !Array.isArray(option.capabilities)
+        ? option.capabilities
+        : null;
+    const scope = option?.scope && typeof option.scope === "object" && !Array.isArray(option.scope)
+        ? option.scope
+        : null;
+    const request = option?.request && typeof option.request === "object" && !Array.isArray(option.request)
+        ? option.request
+        : null;
+    const requestSummary = request
+        ? [
+            Object.keys(request?.dimensions || {}).length > 0 ? `${Object.keys(request.dimensions).length} dimensions` : "",
+            Object.keys(request?.measures || {}).length > 0 ? `${Object.keys(request.measures).length} measures` : "",
+            Object.keys(request?.filters || {}).length > 0 ? `${Object.keys(request.filters).length} filters` : "",
+        ].map((entry) => String(entry || "").trim()).filter(Boolean).join(" • ")
+        : "";
+    if (!requestSummary) {
+        return null;
+    }
+    return { requestSummary };
 }
 
 function ReportBuilderDatasetPicker({
@@ -907,8 +973,9 @@ export function ReportBuilderChartDialog({
     const draftType = String(draft?.type || supportedTypes[0] || "line").trim().toLowerCase();
     const requestedDatasetRef = String(datasetRef || "").trim();
     const normalizedDatasetOptions = normalizeDialogDatasetOptions(datasetOptions, requestedDatasetRef);
-    const selectedDatasetRef = String(datasetRef || normalizedDatasetOptions[0]?.value || "primary").trim() || "primary";
+    const selectedDatasetRef = resolveDialogDatasetRef(datasetRef, normalizedDatasetOptions);
     const selectedDatasetOption = normalizedDatasetOptions.find((option) => option.value === selectedDatasetRef) || null;
+    const datasetExecutionSummary = buildDatasetExecutionSummary(selectedDatasetOption);
     const [chartFieldSearch, setChartFieldSearch] = useState("");
     const family = chartFamilyForType(draftType);
     const isSingleMeasureCategory = SINGLE_MEASURE_CATEGORY_TYPES.has(draftType);
@@ -1136,6 +1203,18 @@ export function ReportBuilderChartDialog({
                                 </div>
                             </div>
                         ) : null}
+                        {datasetExecutionSummary ? (
+                            <div style={{ display: "grid", gap: 6, marginTop: 6, marginBottom: dataViewLabel ? 12 : 0 }}>
+                                <span>Source query</span>
+                                <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                                    {datasetExecutionSummary.requestSummary ? (
+                                        <div className="forge-report-builder__quick-option-description">
+                                            {datasetExecutionSummary.requestSummary}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                        ) : null}
                         {dataViewLabel ? (
                             <div style={{ display: "grid", gap: 6 }}>
                                 <span>Starter projection</span>
@@ -1250,6 +1329,131 @@ export function ReportBuilderChartDialog({
             <div className="forge-report-builder__chart-dialog-actions">
                 <Button outlined onClick={onClose}>Cancel</Button>
                 <Button intent="primary" onClick={onApply} disabled={!validation?.valid}>Apply Chart</Button>
+            </div>
+        </Dialog>
+    );
+}
+
+export function ReportBuilderSourceDialog({
+    isOpen = false,
+    onClose,
+    draft = null,
+    onDraftChange,
+    onApply,
+    errorMessage = "",
+    validation = { valid: false, errors: [] },
+}) {
+    const errors = Array.isArray(validation?.errors) ? validation.errors : [];
+    const errorByField = new Map();
+    errors.forEach((entry) => {
+        const field = String(entry?.field || "").trim();
+        if (!field || errorByField.has(field)) {
+            return;
+        }
+        errorByField.set(field, entry);
+    });
+    const setDraftPatch = (patch = {}) => {
+        if (typeof onDraftChange !== "function") {
+            return;
+        }
+        onDraftChange({
+            ...(draft || {}),
+            ...(patch || {}),
+        });
+    };
+    return (
+        <Dialog
+            isOpen={isOpen}
+            onClose={onClose}
+            title="Edit source"
+            style={{ width: "min(760px, calc(100vw - 48px))" }}
+        >
+            <div className="forge-report-builder__chart-dialog">
+                <div className="forge-report-builder__chart-dialog-grid">
+                    <label className="forge-report-builder__chart-field">
+                        <span>Label</span>
+                        <input
+                            type="text"
+                            className={errorByField.has("label") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.label || ""}
+                            onChange={(event) => setDraftPatch({ label: event.target.value })}
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Tool</span>
+                        <input
+                            type="text"
+                            className="forge-report-builder-select"
+                            value={draft?.toolName || ""}
+                            onChange={(event) => setDraftPatch({ toolName: event.target.value })}
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                        <span>Description</span>
+                        <input
+                            type="text"
+                            className="forge-report-builder-select"
+                            value={draft?.description || ""}
+                            onChange={(event) => setDraftPatch({ description: event.target.value })}
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                        <span>Request JSON</span>
+                        <textarea
+                            className={errorByField.has("requestText") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
+                            rows={6}
+                            value={draft?.requestText || ""}
+                            onChange={(event) => setDraftPatch({ requestText: event.target.value })}
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Result shape</span>
+                        <select
+                            className={errorByField.has("resultShape") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.resultShape || "rowSet"}
+                            onChange={(event) => setDraftPatch({ resultShape: event.target.value })}
+                        >
+                            <option value="rowSet">Row set</option>
+                            <option value="singleRow">Single row</option>
+                        </select>
+                    </label>
+                    <label className="forge-report-builder__chart-field">
+                        <span>Has-more path</span>
+                        <input
+                            type="text"
+                            className={errorByField.has("resultHasMorePath") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.resultHasMorePath || ""}
+                            onChange={(event) => setDraftPatch({ resultHasMorePath: event.target.value })}
+                            placeholder="page.hasMore"
+                        />
+                    </label>
+                    <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                        <span>Row path</span>
+                        <input
+                            type="text"
+                            className={errorByField.has("resultRowPath") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                            value={draft?.resultRowPath || ""}
+                            onChange={(event) => setDraftPatch({ resultRowPath: event.target.value })}
+                            placeholder="payload.records"
+                        />
+                    </label>
+                </div>
+                {errors.length > 0 ? (
+                    <div className="forge-report-builder__chart-errors">
+                        {errors.map((entry, index) => (
+                            <div key={`${entry.field || "source"}_${index}`} className="forge-report-builder__chart-error">{entry.message}</div>
+                        ))}
+                    </div>
+                ) : null}
+                {normalizeString(errorMessage) ? (
+                    <div className="forge-report-builder__chart-errors">
+                        <div className="forge-report-builder__chart-error">{normalizeString(errorMessage)}</div>
+                    </div>
+                ) : null}
+            </div>
+            <div className="forge-report-builder__chart-dialog-actions">
+                <Button outlined onClick={onClose}>Cancel</Button>
+                <Button intent="primary" onClick={onApply} disabled={!validation?.valid}>Apply Source</Button>
             </div>
         </Dialog>
     );
@@ -2009,8 +2213,9 @@ export function ReportBuilderDocumentBlockDialog({
             .filter(Boolean)
         : [];
     const namedProjectionOptions = normalizedProjectionOptions.filter((option) => option.value !== "__current__");
-    const selectedDatasetRef = String(draft?.datasetRef || normalizedDatasetOptions[0]?.value || "primary").trim() || "primary";
+    const selectedDatasetRef = resolveDialogDatasetRef(draft?.datasetRef, normalizedDatasetOptions);
     const selectedDatasetOption = normalizedDatasetOptions.find((option) => option.value === selectedDatasetRef) || null;
+    const datasetExecutionSummary = buildDatasetExecutionSummary(selectedDatasetOption);
     const usesPrimaryDataset = selectedDatasetRef === "primary";
     const datasetTableColumnOptions = Array.isArray(selectedDatasetOption?.columnOptions) && selectedDatasetOption.columnOptions.length > 0
         ? selectedDatasetOption.columnOptions
@@ -2103,6 +2308,7 @@ export function ReportBuilderDocumentBlockDialog({
         const targetDatasetOption = normalizedDatasetOptions.find((option) => option.value === normalizedDatasetValue) || null;
         const nextDraft = rebindReportBuilderDocumentBlockDraft(draft, {
             datasetRef: normalizedDatasetValue,
+            datasetOptions: normalizedDatasetOptions,
             valueFieldOptions: Array.isArray(targetDatasetOption?.valueFieldOptions) ? targetDatasetOption.valueFieldOptions : [],
             secondaryFieldOptions: Array.isArray(targetDatasetOption?.secondaryFieldOptions) ? targetDatasetOption.secondaryFieldOptions : [],
             tableColumnOptions: Array.isArray(targetDatasetOption?.columnOptions) ? targetDatasetOption.columnOptions : [],
@@ -2306,6 +2512,18 @@ export function ReportBuilderDocumentBlockDialog({
                                 error={errorByField.has("datasetRef")}
                             />
                         ) : null
+                    ) : null}
+                    {supportsDatasetBinding && datasetExecutionSummary ? (
+                        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                            <span>Source query</span>
+                            <div className="forge-report-builder__chart-inline-notice forge-report-builder__chart-inline-notice--info">
+                                {datasetExecutionSummary.requestSummary ? (
+                                    <div className="forge-report-builder__quick-option-description">
+                                        {datasetExecutionSummary.requestSummary}
+                                    </div>
+                                ) : null}
+                            </div>
+                        </div>
                     ) : null}
                     {supportsSharedDataViewHandoff && dataViewLabel ? (
                         <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">

@@ -1,6 +1,11 @@
 import React from "react";
 
-import { extractData } from "../dataSourceExtract.js";
+import {
+  isReportDatasetMCPSource,
+  normalizeReportDatasetCapabilities,
+  normalizeReportDatasetSource,
+} from "../../reporting/reportDatasetSourceModel.js";
+import { resolveReportBuilderDatasetPreviewFetcher } from "./reportBuilderDataSourceFetch.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -8,25 +13,6 @@ function normalizeString(value = "") {
 
 function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
-}
-
-function normalizeExtractConfig(value = null) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {
-      selectors: {},
-      paging: null,
-    };
-  }
-  const selectors = value?.selectors && typeof value.selectors === "object" && !Array.isArray(value.selectors)
-    ? value.selectors
-    : {};
-  const paging = value?.paging && typeof value.paging === "object" && !Array.isArray(value.paging)
-    ? value.paging
-    : null;
-  return {
-    selectors,
-    paging,
-  };
 }
 
 function buildDatasetDiagnostic({
@@ -74,27 +60,11 @@ function buildFailedDatasetPayload(dataset = {}, error = null) {
   };
 }
 
-function resolveDatasetFetchResult(body = null, extractConfig = null) {
-  const normalizedExtractConfig = normalizeExtractConfig(extractConfig);
-  const { records } = extractData(
-    normalizedExtractConfig.selectors,
-    normalizedExtractConfig.paging,
-    body,
-  );
-  const hasMore = body?.dataInfo?.hasMore === true
-    || body?.info?.hasMore === true
-    || body?.hasMore === true;
-  return {
-    rows: Array.isArray(records) ? records : [],
-    hasMore,
-    diagnostics: [],
-  };
-}
-
 export async function fetchReportRuntimePreviewDatasetPayloads({
   builderContext = null,
   datasets = [],
   requestKind = "runtimePreviewDataset",
+  fetcherOptions = null,
 } = {}) {
   const normalizedDatasets = (Array.isArray(datasets) ? datasets : [])
     .map((dataset) => (
@@ -109,25 +79,40 @@ export async function fetchReportRuntimePreviewDatasetPayloads({
       request: dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
         ? cloneValue(dataset.request)
         : null,
+      resultContract: dataset?.resultContract && typeof dataset.resultContract === "object" && !Array.isArray(dataset.resultContract)
+        ? cloneValue(dataset.resultContract)
+        : null,
+      source: normalizeReportDatasetSource(dataset?.source),
+      capabilities: normalizeReportDatasetCapabilities(dataset?.capabilities),
       label: normalizeString(dataset?.label || dataset?.id || dataset?.dataSourceRef),
     }))
-    .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
-  if (!builderContext?.Context || normalizedDatasets.length === 0) {
+    .filter((dataset) => dataset.id && dataset.request && (dataset.dataSourceRef || isReportDatasetMCPSource(dataset.source)));
+  if (normalizedDatasets.length === 0) {
     return {};
   }
   const entries = await Promise.all(
     normalizedDatasets.map(async (dataset) => {
       try {
-        const dataSourceContext = builderContext.Context(dataset.dataSourceRef);
-        const handlers = dataSourceContext?.handlers?.dataSource;
-        if (!handlers?.fetchRecords) {
+        const resolvedFetcher = resolveReportBuilderDatasetPreviewFetcher(
+          builderContext,
+          dataset,
+          fetcherOptions && typeof fetcherOptions === "object" && !Array.isArray(fetcherOptions)
+            ? fetcherOptions
+            : {},
+        );
+        if (!resolvedFetcher?.fetcher || typeof resolvedFetcher?.resolveResult !== "function") {
           return [dataset.id, buildUnavailableDatasetPayload(dataset)];
         }
-        const body = await handlers.fetchRecords({
+        const body = await resolvedFetcher.fetcher({
           parameters: dataset.request,
           requestKind,
         });
-        return [dataset.id, resolveDatasetFetchResult(body, dataSourceContext?.dataSource)];
+        const resolvedPayload = resolvedFetcher.resolveResult(body);
+        return [dataset.id, {
+          rows: Array.isArray(resolvedPayload?.rows) ? resolvedPayload.rows : [],
+          hasMore: resolvedPayload?.hasMore === true,
+          diagnostics: [],
+        }];
       } catch (error) {
         return [dataset.id, buildFailedDatasetPayload(dataset, error)];
       }
@@ -141,6 +126,7 @@ export function useReportRuntimePreviewDatasetPayloads({
   builderContext = null,
   datasets = [],
   requestKey = "",
+  fetcherOptions = null,
 } = {}) {
   const [state, setState] = React.useState(() => ({
     requestKey: "",
@@ -150,6 +136,12 @@ export function useReportRuntimePreviewDatasetPayloads({
   const stateRef = React.useRef(state);
   stateRef.current = state;
   const mountedRef = React.useRef(true);
+  const builderContextRef = React.useRef(builderContext);
+  builderContextRef.current = builderContext;
+  const datasetsRef = React.useRef(datasets);
+  datasetsRef.current = datasets;
+  const fetcherOptionsRef = React.useRef(fetcherOptions);
+  fetcherOptionsRef.current = fetcherOptions;
   React.useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -164,12 +156,15 @@ export function useReportRuntimePreviewDatasetPayloads({
           id: normalizeString(dataset?.id),
           dataSourceRef: normalizeString(dataset?.dataSourceRef),
           request: dataset?.request || null,
+          resultContract: dataset?.resultContract || null,
+          source: dataset?.source || null,
+          capabilities: dataset?.capabilities || null,
         })),
     );
 
   React.useEffect(() => {
-    const hasDatasets = Array.isArray(datasets) && datasets.length > 0;
-    if (!enabled || !hasDatasets || !builderContext?.Context || !normalizedRequestKey) {
+    const hasDatasets = Array.isArray(datasetsRef.current) && datasetsRef.current.length > 0;
+    if (!enabled || !hasDatasets || !builderContextRef.current || !normalizedRequestKey) {
       if (stateRef.current.loading || Object.keys(stateRef.current.payloads || {}).length > 0 || stateRef.current.requestKey) {
         setState({
           requestKey: "",
@@ -179,7 +174,7 @@ export function useReportRuntimePreviewDatasetPayloads({
       }
       return undefined;
     }
-    if (stateRef.current.requestKey === normalizedRequestKey && stateRef.current.loading === false) {
+    if (stateRef.current.requestKey === normalizedRequestKey) {
       return undefined;
     }
     let cancelled = false;
@@ -189,8 +184,9 @@ export function useReportRuntimePreviewDatasetPayloads({
       payloads: {},
     });
     fetchReportRuntimePreviewDatasetPayloads({
-      builderContext,
-      datasets,
+      builderContext: builderContextRef.current,
+      datasets: datasetsRef.current,
+      fetcherOptions: fetcherOptionsRef.current,
     }).then((payloads) => {
       if (cancelled || !mountedRef.current) {
         return;
@@ -206,7 +202,7 @@ export function useReportRuntimePreviewDatasetPayloads({
     return () => {
       cancelled = true;
     };
-  }, [builderContext, datasets, enabled, normalizedRequestKey]);
+  }, [enabled, normalizedRequestKey]);
 
   return state;
 }

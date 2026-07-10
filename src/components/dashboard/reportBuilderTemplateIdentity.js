@@ -1,4 +1,5 @@
 import { extractReportDocumentTemplateIdentity } from "../../reporting/reportDocumentModel.js";
+import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockModel.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -32,8 +33,7 @@ export function resolveReportBuilderSourceSessionTemplateIdentity(sourceSession 
 }
 
 export function resolveEmbeddedReportBuilderTemplateIdentity(document = null) {
-    const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
-    const reportBuilderBlock = blocks.find((block) => String(block?.kind || "").trim() === "reportBuilderBlock") || null;
+    const reportBuilderBlock = resolveReportBuilderBlock(document);
     const templateId = normalizeString(reportBuilderBlock?.state?.reportDocumentTemplateId);
     const templateLabel = normalizeString(reportBuilderBlock?.state?.reportDocumentTemplateLabel);
     if (!templateId && !templateLabel) {

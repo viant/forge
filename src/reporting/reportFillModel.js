@@ -1,4 +1,11 @@
-import { buildReportBuilderReportSpec } from "./reportSpecModel.js";
+import {
+  buildReportBuilderReportSpec,
+  normalizeReportSpecScopeParams,
+} from "./reportSpecModel.js";
+import {
+  buildReportBuilderReportDocument,
+  lowerReportDocumentToReportSpec,
+} from "./reportDocumentModel.js";
 import {
   normalizeRefinementBarActionKinds,
   normalizeRefinementBarText,
@@ -10,11 +17,15 @@ import {
 import { buildReportFillChartPayload } from "./reportFillChartPayload.js";
 import { buildReportFillGeoPayload } from "./reportFillGeoPayload.js";
 import { buildReportFillTableRows } from "./reportFillTablePayload.js";
+import {
+  normalizeReportDatasetCapabilities,
+  normalizeReportDatasetSource,
+} from "./reportDatasetSourceModel.js";
+import { normalizeReportDatasetScope } from "./reportDatasetScopeModel.js";
 import { formatDashboardValue } from "../components/dashboard/dashboardUtils.js";
-import { resolveReportBuilderScopeParamFilters } from "../components/dashboard/reportBuilderPredicates.js";
-import { resolveScopeParamId } from "./scopeStateModel.js";
 import { resolveKey } from "../utils/selector.js";
 import equal from "fast-deep-equal";
+import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -71,6 +82,18 @@ function buildReportFillDataset(dataset = {}, payload = {}, calculatedFields = [
   return {
     id: normalizeString(dataset?.id),
     dataSourceRef: normalizeString(dataset?.dataSourceRef),
+    ...(normalizeReportDatasetScope(dataset?.scope)
+      ? { scope: normalizeReportDatasetScope(dataset.scope) }
+      : {}),
+    ...(normalizeReportDatasetSource(dataset?.source)
+      ? { source: normalizeReportDatasetSource(dataset?.source) }
+      : {}),
+    ...(dataset?.resultContract && typeof dataset.resultContract === "object" && !Array.isArray(dataset.resultContract)
+      ? { resultContract: cloneValue(dataset.resultContract) }
+      : {}),
+    ...(normalizeReportDatasetCapabilities(dataset?.capabilities)
+      ? { capabilities: normalizeReportDatasetCapabilities(dataset?.capabilities) }
+      : {}),
     request,
     provenance: {
       requestHash: hashString(stableJSONStringify(request)),
@@ -133,12 +156,14 @@ function buildReportFillKpiContent(block = {}, dataset = {}) {
     ...(normalizeString(block?.tone) ? { tone: normalizeString(block.tone) } : {}),
     valueField,
     valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
+    ...(normalizeString(block?.valueFormat) ? { valueFormat: normalizeString(block.valueFormat) } : {}),
     value: valueField && firstRow ? firstRow[valueField] ?? null : null,
     rowCount: Number(dataset?.provenance?.rowCount || 0),
     ...(secondaryField
       ? {
         secondaryField,
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
+        ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
         secondaryValue: firstRow
           ? resolveReportFillFieldDisplayValue(firstRow, {
             sourceField: secondaryField,
@@ -218,19 +243,16 @@ function buildReportFillBadgesContent(block = {}, dataset = {}) {
 }
 
 function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map()) {
-  const reportBuilderBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
-    .find((entry) => normalizeString(entry?.kind) === "reportBuilderBlock") || null;
-  const reportBuilderConfig = reportBuilderBlock?.config && typeof reportBuilderBlock.config === "object" && !Array.isArray(reportBuilderBlock.config)
-    ? reportBuilderBlock.config
-    : {};
-  const scopeFilterIndex = new Map(
-    resolveReportBuilderScopeParamFilters(reportBuilderConfig)
-      .map((filter) => [resolveScopeParamId(filter), filter])
-      .filter(([id]) => !!id),
-  );
+  const scopeParams = Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [];
+  const availableDatasetRefs = Array.from(datasetsById.keys());
   return (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : []).map((block) => {
     const normalizedBlock = cloneValue(block);
-    const dataset = datasetsById.get(normalizeString(block?.datasetRef)) || null;
+    const datasetResolution = resolveReportDatasetRefResolution({
+      preferredDatasetRef: normalizeString(block?.datasetRef),
+      availableDatasetRefs,
+      fallbackDatasetRef: "primary",
+    });
+    const dataset = datasetsById.get(datasetResolution.datasetRef) || null;
     if (normalizeString(block?.kind) === "tableBlock") {
       const columns = cloneValue(block?.columns || []);
       return {
@@ -295,18 +317,17 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map()) {
             .map((paramId) => normalizeString(paramId))
             .filter(Boolean)
             .map((paramId) => {
-              const scopeParam = (Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [])
+              const scopeParam = scopeParams
                 .find((entry) => normalizeString(entry?.id) === paramId);
-              const scopeFilter = scopeFilterIndex.get(paramId) || null;
               return {
                 id: paramId,
-                ...(normalizeString(scopeParam?.label || scopeFilter?.label || paramId) ? { label: normalizeString(scopeParam?.label || scopeFilter?.label || paramId) } : {}),
-                ...(normalizeString(scopeParam?.kind || scopeFilter?.type) ? { type: normalizeString(scopeParam?.kind || scopeFilter?.type) } : {}),
+                ...(normalizeString(scopeParam?.label || paramId) ? { label: normalizeString(scopeParam?.label || paramId) } : {}),
+                ...(normalizeString(scopeParam?.kind) ? { type: normalizeString(scopeParam?.kind) } : {}),
                 ...(normalizeString(scopeParam?.datasetRef) ? { datasetRef: normalizeString(scopeParam.datasetRef) } : {}),
-                ...((scopeParam?.multiple === true || scopeFilter?.multiple === true) ? { multiple: true } : {}),
-                ...(normalizeString(scopeParam?.presentation || scopeFilter?.presentation) ? { presentation: normalizeString(scopeParam?.presentation || scopeFilter?.presentation) } : {}),
-                ...((scopeParam?.required === true || scopeFilter?.required === true) ? { required: true } : {}),
-                ...(Array.isArray(scopeParam?.options) ? { options: cloneValue(scopeParam.options) } : (Array.isArray(scopeFilter?.options) ? { options: cloneValue(scopeFilter.options) } : {})),
+                ...(scopeParam?.multiple === true ? { multiple: true } : {}),
+                ...(normalizeString(scopeParam?.presentation) ? { presentation: normalizeString(scopeParam?.presentation) } : {}),
+                ...(scopeParam?.required === true ? { required: true } : {}),
+                ...(Array.isArray(scopeParam?.options) ? { options: cloneValue(scopeParam.options) } : {}),
                 ...(normalizeString(scopeParam?.description) ? { description: normalizeString(scopeParam.description) } : {}),
                 value: cloneValue(scopeParam?.value),
               };
@@ -339,6 +360,18 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map()) {
 
 export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads = {}) {
   const normalizedReportSpec = cloneValue(reportSpec || {});
+  // Fingerprint the spec as provided: consumers compare fill.specHash against
+  // a hash of the stored spec, which scope-param enrichment must not disturb.
+  const specHash = buildReportSpecHash(normalizedReportSpec);
+  const normalizedScopeParams = normalizeReportSpecScopeParams(normalizedReportSpec);
+  if (normalizedScopeParams.length > 0 || normalizedReportSpec?.scope) {
+    normalizedReportSpec.scope = {
+      ...(normalizedReportSpec?.scope && typeof normalizedReportSpec.scope === "object" && !Array.isArray(normalizedReportSpec.scope)
+        ? normalizedReportSpec.scope
+        : {}),
+      params: normalizedScopeParams,
+    };
+  }
   const calculatedFields = cloneReportCalculatedFields(normalizedReportSpec?.calculatedFields || []);
   const datasets = (Array.isArray(normalizedReportSpec?.datasets) ? normalizedReportSpec.datasets : []).map((dataset) => (
     buildReportFillDataset(dataset, datasetPayloads?.[normalizeString(dataset?.id)] || {}, calculatedFields)
@@ -348,7 +381,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
     version: 1,
     kind: "reportFill",
     specVersion: Number(normalizedReportSpec?.version || 0) || 1,
-    specHash: buildReportSpecHash(normalizedReportSpec),
+    specHash,
     source: cloneValue(normalizedReportSpec?.source || {}),
     parameters: cloneValue(normalizedReportSpec?.parameters || {}),
     refinements: cloneValue(normalizedReportSpec?.refinements || []),
@@ -367,11 +400,18 @@ export function buildReportBuilderReportFill({
   primaryHasMore = false,
   primaryDiagnostics = [],
 } = {}) {
-  const reportSpec = buildReportBuilderReportSpec({
-    container,
-    config,
-    state,
-  });
+  const hasAuthoredDocumentBlocks = Array.isArray(state?.reportDocumentBlocks) && state.reportDocumentBlocks.length > 0;
+  const reportSpec = hasAuthoredDocumentBlocks
+    ? lowerReportDocumentToReportSpec(buildReportBuilderReportDocument({
+      container,
+      config,
+      state,
+    }))
+    : buildReportBuilderReportSpec({
+      container,
+      config,
+      state,
+    });
   return buildReportFillFromReportSpec(reportSpec, {
     primary: {
       rows: primaryRows,

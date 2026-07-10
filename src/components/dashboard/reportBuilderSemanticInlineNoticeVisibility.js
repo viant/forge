@@ -5,10 +5,13 @@ function normalizeString(value = "") {
 export function resolveReportBuilderVisibleSemanticInlineNotices(notices = [], {
     reportWorkspaceMode = false,
     showAuthoredReportSurface = false,
+    designWorkspaceMode = false,
 } = {}) {
     const normalizedNotices = (Array.isArray(notices) ? notices : [])
         .filter((notice) => notice && typeof notice === "object" && !Array.isArray(notice));
-    if (!reportWorkspaceMode || !showAuthoredReportSurface) {
+    const shouldSuppressInformationalBindingNotice = designWorkspaceMode
+        || (reportWorkspaceMode && showAuthoredReportSurface);
+    if (!shouldSuppressInformationalBindingNotice) {
         return normalizedNotices;
     }
     return normalizedNotices.filter((notice) => {
@@ -20,6 +23,6 @@ export function resolveReportBuilderVisibleSemanticInlineNotices(notices = [], {
         if (!message.startsWith("Semantic binding:")) {
             return true;
         }
-        return true;
+        return false;
     });
 }

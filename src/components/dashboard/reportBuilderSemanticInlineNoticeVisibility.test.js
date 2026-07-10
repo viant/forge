@@ -23,6 +23,7 @@ assert.deepEqual(
     ], {
         reportWorkspaceMode: false,
         showAuthoredReportSurface: true,
+        designWorkspaceMode: false,
     }),
     [
         semanticBindingInfoNotice,
@@ -37,9 +38,23 @@ assert.deepEqual(
     ], {
         reportWorkspaceMode: true,
         showAuthoredReportSurface: true,
+        designWorkspaceMode: false,
     }),
     [
+        validationNotice,
+    ],
+);
+
+assert.deepEqual(
+    resolveReportBuilderVisibleSemanticInlineNotices([
         semanticBindingInfoNotice,
+        validationNotice,
+    ], {
+        reportWorkspaceMode: false,
+        showAuthoredReportSurface: false,
+        designWorkspaceMode: true,
+    }),
+    [
         validationNotice,
     ],
 );
@@ -52,10 +67,9 @@ assert.deepEqual(
     ], {
         reportWorkspaceMode: true,
         showAuthoredReportSurface: true,
+        designWorkspaceMode: false,
     }),
-    [
-        semanticBindingInfoNotice,
-    ],
+    [],
 );
 
-console.log("reportBuilderSemanticInlineNoticeVisibility ✓ keeps compact semantic binding notices visible in authored report mode");
+console.log("reportBuilderSemanticInlineNoticeVisibility ✓ trims compact semantic binding notices from authored report mode while preserving actionable issues");

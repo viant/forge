@@ -36,6 +36,7 @@ import {
     buildSavedViewOverlaySummary,
     extractSavedViewOverlayArtifactState,
 } from "../../reporting/views/savedViewOverlayModel.js";
+import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockModel.js";
 import { resolveReportBuilderSavedViewOverlayReopenSourceResolution } from "./reportBuilderReopenSourceResolution.js";
 import { resolveReportBuilderPersistedRuntimePreviewInteraction } from "./reportBuilderRuntimePreviewInteractionPersistence.js";
 
@@ -99,9 +100,10 @@ function applyReportDocumentIdentity(reportDocument = {}, reportSpec = {}, {
         nextDocument.id = normalizedReportId;
     }
     nextDocument.title = normalizedTitle;
-    if (Array.isArray(nextDocument.blocks)) {
+    const builderBlockId = normalizeString(resolveReportBuilderBlock(nextDocument)?.id);
+    if (builderBlockId && Array.isArray(nextDocument.blocks)) {
         nextDocument.blocks = nextDocument.blocks.map((block) => (
-            normalizeString(block?.kind) === "reportBuilderBlock"
+            normalizeString(block?.id) === builderBlockId
                 ? {
                     ...block,
                     title: normalizedTitle,
@@ -622,6 +624,41 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
         semanticSummary: semanticSummary || semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
         binding: authoredState?.binding || config?.binding || null,
     });
+    const synthesizedTemplateSourceRef = normalizeString(authoredState?.reportDocumentTemplateId) || normalizeString(authoredState?.reportDocumentTemplateLabel)
+        ? {
+            kind: "reportBuilder.reportTemplate",
+            ...(normalizeString(authoredState?.reportDocumentTemplateId)
+                ? { templateId: normalizeString(authoredState.reportDocumentTemplateId) }
+                : {}),
+            ...(normalizeString(authoredState?.reportDocumentTemplateLabel)
+                ? { templateLabel: normalizeString(authoredState.reportDocumentTemplateLabel) }
+                : {}),
+            contextLabel: persistedTitle,
+        }
+        : null;
+    const nextSourceSession = seed.sourceSession
+        ? {
+            ...cloneValue(seed.sourceSession),
+            ...(synthesizedTemplateSourceRef
+                ? {
+                    sourceRef: {
+                        ...(seed.sourceSession?.sourceRef && typeof seed.sourceSession.sourceRef === "object" && !Array.isArray(seed.sourceSession.sourceRef)
+                            ? cloneValue(seed.sourceSession.sourceRef)
+                            : {}),
+                        ...synthesizedTemplateSourceRef,
+                    },
+                }
+                : {}),
+            ...(runtimePreviewInteraction ? { runtimePreviewInteraction } : {}),
+        }
+        : (
+            synthesizedTemplateSourceRef || runtimePreviewInteraction
+                ? {
+                    ...(synthesizedTemplateSourceRef ? { sourceRef: synthesizedTemplateSourceRef } : {}),
+                    ...(runtimePreviewInteraction ? { runtimePreviewInteraction } : {}),
+                }
+                : null
+        );
     return {
         version: 1,
         kind: seed.kind,
@@ -629,12 +666,7 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
         savedAt: Number(savedAt || Date.now()) || Date.now(),
         title: persistedTitle,
         sourceArtifactId,
-        sourceSession: seed.sourceSession
-            ? {
-                ...cloneValue(seed.sourceSession),
-                ...(runtimePreviewInteraction ? { runtimePreviewInteraction } : {}),
-            }
-            : (runtimePreviewInteraction ? { runtimePreviewInteraction } : null),
+        sourceSession: nextSourceSession,
         reportDocument: withIdentity.reportDocument,
         reportSpec: withIdentity.reportSpec,
         ...(semanticBindingViewState ? { semanticBindingViewState } : {}),

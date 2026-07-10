@@ -12,6 +12,7 @@ import {
     buildReportBuilderSavedReportPayload,
     buildReportBuilderSavedReportPayloadRecord,
     buildReportBuilderSavedReportPayloadFromBuilderState,
+    buildReportBuilderSavedReportExportRequestFromBuilderState,
     buildReportBuilderSavedReportPayloadDownload,
     buildReportBuilderSavedReportPayloadInspectorState,
     buildReportBuilderSavedReportPayloadSummary,
@@ -27,6 +28,15 @@ const audienceArtifactFixture = JSON.parse(
         "utf8",
     ),
 );
+
+function resolvePrimaryBuilderBlock(document = null) {
+    return (Array.isArray(document?.blocks) ? document.blocks : [])
+        .find((block) => String(block?.id || "").trim() === "primaryBuilder") || null;
+}
+
+function resolvePrimaryBuilderState(document = null) {
+    return resolvePrimaryBuilderBlock(document)?.state || {};
+}
 
 const explorationArtifact = {
     version: 1,
@@ -671,6 +681,17 @@ const runtimeScopedSavedPayload = buildReportBuilderSavedReportPayloadFromBuilde
                 dataSourceRef: "forecastCubeSource",
                 label: "Forecast Cube",
                 kindLabel: "published",
+                source: {
+                    kind: "mcp",
+                    toolName: "demo:forecast_summary",
+                },
+                resultContract: {
+                    shape: "rowSet",
+                    rowPath: "payload.records",
+                },
+                capabilities: {
+                    backendRefetch: true,
+                },
                 request: {
                     measures: { forecastRevenue: true },
                     dimensions: { region: true },
@@ -727,6 +748,199 @@ assert.deepEqual(runtimeScopedSavedPayload.sourceSession.runtimePreviewInteracti
 });
 assert.deepEqual(runtimeScopedSavedPayload.reportSpec.datasets.find((dataset) => dataset.id === "forecast_cube")?.request.filters, {
     region: ["US/CA"],
+});
+const runtimeScopedSavedPreview = buildReportBuilderRuntimePreview({
+    model: buildReportBuilderRuntimePreviewModel({
+        container: {
+            id: "publishedDatasetBuilder",
+            stateKey: "publishedDatasetBuilder",
+            title: "Published Dataset Builder",
+            dataSourceRef: "demoReportSource",
+        },
+        config: {
+            title: "Published Dataset Builder",
+            measures: [
+                { id: "totalSpend", key: "totalSpend", label: "Spend", default: true, format: "currency" },
+            ],
+            dimensions: [
+                { id: "channelId", key: "channelId", label: "Channel", default: true },
+            ],
+            result: {
+                defaultMode: "table",
+            },
+            dataSources: [
+                {
+                    id: "forecast_cube",
+                    dataSourceRef: "forecastCubeSource",
+                    label: "Forecast Cube",
+                    kindLabel: "published",
+                    source: {
+                        kind: "mcp",
+                        toolName: "demo:forecast_summary",
+                    },
+                    resultContract: {
+                        shape: "rowSet",
+                        rowPath: "payload.records",
+                    },
+                    capabilities: {
+                        backendRefetch: true,
+                    },
+                    request: {
+                        measures: { forecastRevenue: true },
+                        dimensions: { region: true },
+                        filters: {},
+                        limit: 25,
+                        offset: 0,
+                    },
+                    columnOptions: [
+                        { key: "region", label: "Region", kind: "dimension" },
+                        { key: "forecastRevenue", label: "Forecast Revenue", kind: "measure", format: "currency" },
+                    ],
+                    scopeParamOptions: [
+                        {
+                            value: "forecastRegion",
+                            label: "Forecast Region",
+                            kind: "multiSelect",
+                            paramPath: "filters.region",
+                        },
+                    ],
+                },
+            ],
+        },
+        state: {
+            selectedMeasures: ["totalSpend"],
+            primaryMeasure: "totalSpend",
+            selectedDimensions: ["channelId"],
+            viewMode: "table",
+            reportDocumentBlocks: [
+                {
+                    id: "forecastFilters",
+                    kind: "filterBarBlock",
+                    title: "Forecast Filters",
+                    datasetRef: "forecast_cube",
+                    paramIds: ["forecastRegion"],
+                },
+            ],
+            reportDocumentLayout: {
+                type: "stack",
+                items: [{ blockId: "forecastFilters" }],
+            },
+            ...applyReportBuilderPersistedRuntimePreviewInteraction({}, {
+                datasetScopeParams: {
+                    forecast_cube: {
+                        forecastRegion: ["US/CA"],
+                    },
+                },
+            }),
+        },
+        includePrimaryBlocks: false,
+    }),
+    rows: [],
+    hasMore: false,
+    datasetPayloads: {
+        forecast_cube: {
+            rows: [{ region: "US/CA", forecastRevenue: 1200 }],
+            hasMore: false,
+            diagnostics: [],
+        },
+    },
+});
+const runtimeScopedSavedExportRequest = buildReportBuilderSavedReportExportRequestFromBuilderState(runtimeScopedSavedPayload, {
+    container: {
+        id: "publishedDatasetBuilder",
+        stateKey: "publishedDatasetBuilder",
+        title: "Published Dataset Builder",
+        dataSourceRef: "demoReportSource",
+    },
+    config: {
+        title: "Published Dataset Builder",
+        measures: [
+            { id: "totalSpend", key: "totalSpend", label: "Spend", default: true, format: "currency" },
+        ],
+        dimensions: [
+            { id: "channelId", key: "channelId", label: "Channel", default: true },
+        ],
+        result: {
+            defaultMode: "table",
+        },
+        dataSources: [
+            {
+                id: "forecast_cube",
+                dataSourceRef: "forecastCubeSource",
+                label: "Forecast Cube",
+                kindLabel: "published",
+                source: {
+                    kind: "mcp",
+                    toolName: "demo:forecast_summary",
+                },
+                resultContract: {
+                    shape: "rowSet",
+                    rowPath: "payload.records",
+                },
+                capabilities: {
+                    backendRefetch: true,
+                },
+                request: {
+                    measures: { forecastRevenue: true },
+                    dimensions: { region: true },
+                    filters: {},
+                    limit: 25,
+                    offset: 0,
+                },
+                columnOptions: [
+                    { key: "region", label: "Region", kind: "dimension" },
+                    { key: "forecastRevenue", label: "Forecast Revenue", kind: "measure", format: "currency" },
+                ],
+                scopeParamOptions: [
+                    {
+                        value: "forecastRegion",
+                        label: "Forecast Region",
+                        kind: "multiSelect",
+                        paramPath: "filters.region",
+                    },
+                ],
+            },
+        ],
+    },
+    state: {
+        selectedMeasures: ["totalSpend"],
+        primaryMeasure: "totalSpend",
+        selectedDimensions: ["channelId"],
+        viewMode: "table",
+        reportDocumentBlocks: [
+            {
+                id: "forecastFilters",
+                kind: "filterBarBlock",
+                title: "Forecast Filters",
+                datasetRef: "forecast_cube",
+                paramIds: ["forecastRegion"],
+            },
+        ],
+        reportDocumentLayout: {
+            type: "stack",
+            items: [{ blockId: "forecastFilters" }],
+        },
+        ...applyReportBuilderPersistedRuntimePreviewInteraction({}, {
+            datasetScopeParams: {
+                forecast_cube: {
+                    forecastRegion: ["US/CA"],
+                },
+            },
+        }),
+    },
+    runtimeArtifact: runtimeScopedSavedPreview,
+    documentVersion: 1,
+});
+assert.deepEqual(runtimeScopedSavedExportRequest.reportFill.datasets.find((dataset) => dataset.id === "forecast_cube")?.source, {
+    kind: "mcp",
+    toolName: "demo:forecast_summary",
+});
+assert.deepEqual(runtimeScopedSavedExportRequest.reportFill.datasets.find((dataset) => dataset.id === "forecast_cube")?.resultContract, {
+    shape: "rowSet",
+    rowPath: "payload.records",
+});
+assert.deepEqual(runtimeScopedSavedExportRequest.reportFill.datasets.find((dataset) => dataset.id === "forecast_cube")?.capabilities, {
+    backendRefetch: true,
 });
 assert.deepEqual(runtimeScopedSavedPayload.reportDocument.scope.params.find((param) => param.id === "forecastRegion")?.value, ["US/CA"]);
 
@@ -1206,11 +1420,11 @@ assert.equal(reopenedPayload.reportDocument.id, "capacityTrendQ3");
 assert.equal(reopenedPayload.reportDocument.title, "Capacity Trend Q3");
 assert.equal(reopenedPayload.reportSpec.title, "Capacity Trend Q3");
 assert.equal(reopenedPayload.reportSpec.semanticSummary.modelLabel, "Ad Delivery");
-assert.equal(reopenedPayload.reportDocument.blocks[0].state.viewMode, "table");
+assert.equal(resolvePrimaryBuilderState(reopenedPayload.reportDocument).viewMode, "table");
 assert.equal(reopenedPayload.compileState.diagnostics[0].code, "semanticGovernance");
 assert.equal(reopenedPayload.compileState.status, "clean");
 assert.equal(
-    Object.prototype.hasOwnProperty.call(reopenedPayload.reportDocument.blocks[0].state, "reportDocumentReopenSession"),
+    Object.prototype.hasOwnProperty.call(resolvePrimaryBuilderState(reopenedPayload.reportDocument), "reportDocumentReopenSession"),
     false,
 );
 assert.equal(reopenedPayload.savedAt, 9400);
@@ -1677,8 +1891,8 @@ assert.equal(derivedSemanticPayload.reportSpec.semanticSummary.entityLabel, "Lin
 assert.equal(derivedSemanticPayload.reportSpec.semanticSummary.selectedDimensions[1].definitionRef, "semantic://example/channel");
 assert.equal(derivedSemanticPayload.reportSpec.semanticSummary.selectedMeasures[0].category, "Metrics");
 assert.equal(derivedSemanticPayload.reportDocument.blocks[0].config.semanticModel.modelRef, "model://example/performance/delivery@v1");
-assert.equal(derivedSemanticPayload.reportDocument.blocks[0].config.measures[0].label, "Available Impressions");
-assert.equal(derivedSemanticPayload.reportDocument.blocks[0].config.dimensions[0].label, "Delivery Date");
+assert.equal(derivedSemanticPayload.reportDocument.datasets[0].measures[0].label, "Available Impressions");
+assert.equal(derivedSemanticPayload.reportDocument.datasets[0].dimensions[0].label, "Delivery Date");
 assert.equal(derivedSemanticPayload.semanticBindingViewState.title, "Semantic Binding");
 assert.equal(derivedSemanticPayload.semanticBindingViewState.chips.includes("Model Ad Delivery"), true);
 assert.deepEqual(buildReportBuilderSavedReportPayloadSummary(derivedSemanticPayload), {
@@ -1853,10 +2067,13 @@ assert.deepEqual(payloadWithAuthoredBlocks.reportDocument.layout, {
         { blockId: "headlineKpi" },
     ],
 });
-assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks[1].kind, "markdownBlock");
-assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks[2].kind, "kpiBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "narrativeIntro")?.kind, "markdownBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "headlineKpi")?.kind, "kpiBlock");
 assert.equal(
-    Object.prototype.hasOwnProperty.call(payloadWithAuthoredBlocks.reportDocument.blocks[0].state, "reportDocumentBlocks"),
+    Object.prototype.hasOwnProperty.call(
+        payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "primaryBuilder")?.state || {},
+        "reportDocumentBlocks",
+    ),
     false,
 );
 assert.deepEqual(payloadWithAuthoredBlocks.reportSpec.layoutIntent.blockOrder, [
@@ -1971,7 +2188,7 @@ assert.equal(reopenedPayloadFromResponse.reportDocument.title, "Capacity Trend Q
 assert.equal(reopenedPayloadFromResponse.kind, "reportBuilder.savedReportPayload");
 assert.equal(reopenedPayloadFromResponse.payloadId, "rbreport_capacity_q3_channel_trend");
 assert.equal(reopenedPayloadFromResponse.sourceArtifactId, "capacity_q3_channel_trend");
-assert.equal(reopenedPayloadFromResponse.reportDocument.blocks[0].state.viewMode, "table");
+assert.equal(resolvePrimaryBuilderState(reopenedPayloadFromResponse.reportDocument).viewMode, "table");
 assert.equal(reopenedPayloadFromResponse.reportDocument.semanticSummary.modelLabel, "Ad Delivery");
 assert.equal(reopenedPayloadFromResponse.reportSpec.semanticSummary.entityLabel, "Line Delivery");
 
@@ -2009,6 +2226,72 @@ const calculationConfig = {
         ],
     },
 };
+
+const hostedTemplateBackedSavedPayload = buildReportBuilderSavedReportPayloadFromBuilderState({
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_hosted_template_save",
+    sourceArtifactId: "hosted_template_save",
+    title: "Performance Inventory Brief",
+    reportRef: {
+        reportId: "performanceInventoryBrief",
+    },
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "performanceInventoryBrief",
+        title: "Performance Inventory Brief",
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        blocks: [{ id: "primaryTable" }],
+        datasets: [{ id: "primary" }],
+    },
+}, {
+    container: {
+        id: "metricsCubeBuilder",
+        stateKey: "metricsCubeBuilder",
+        title: "Performance Metrics",
+        dataSourceRef: "metrics_ad_cube_report",
+    },
+    config: calculationConfig,
+    state: applyReportBuilderPersistedRuntimePreviewInteraction({
+        selectedMeasures: ["avails"],
+        primaryMeasure: "avails",
+        selectedDimensions: ["channelV2"],
+        viewMode: "table",
+        chartSpec: null,
+        scopeParams: {
+            dateRange: {
+                start: "2026-05-01",
+                end: "2026-05-04",
+            },
+        },
+        localCalculatedFields: [],
+        localTableCalculations: [],
+        reportDocumentTitle: "Performance Inventory Brief",
+        reportDocumentTemplateId: "performance_inventory_brief",
+        reportDocumentTemplateLabel: "Performance Inventory Brief",
+    }, {
+        refinements: [
+            {
+                id: "keep:channelV2:primaryTable",
+                op: "keep",
+                field: "channelV2",
+                values: ["CTV"],
+                sourceBlockId: "primaryTable",
+                label: "Keep Channel = CTV",
+            },
+        ],
+    }),
+    savedAt: 9755,
+});
+assert.equal(hostedTemplateBackedSavedPayload.title, "Performance Inventory Brief");
+assert.equal(hostedTemplateBackedSavedPayload.sourceSession.sourceRef.kind, "reportBuilder.reportTemplate");
+assert.equal(hostedTemplateBackedSavedPayload.sourceSession.sourceRef.templateId, "performance_inventory_brief");
+assert.equal(hostedTemplateBackedSavedPayload.sourceSession.sourceRef.templateLabel, "Performance Inventory Brief");
+assert.equal(hostedTemplateBackedSavedPayload.sourceSession.sourceRef.contextLabel, "Performance Inventory Brief");
+assert.equal(hostedTemplateBackedSavedPayload.sourceSession.runtimePreviewInteraction.refinements[0].field, "channelV2");
 
 const localCalcSeed = {
     version: 1,
@@ -2086,8 +2369,8 @@ const localCalcSavedPayload = buildReportBuilderSavedReportPayloadFromBuilderSta
     savedAt: 9400,
 });
 
-assert.equal(localCalcSavedPayload.reportDocument.blocks[0].state.localCalculatedFields[0].id, "reachRate");
-assert.equal(localCalcSavedPayload.reportDocument.blocks[0].state.localTableCalculations[0].id, "reachShare");
+assert.equal(resolvePrimaryBuilderState(localCalcSavedPayload.reportDocument).localCalculatedFields[0].id, "reachRate");
+assert.equal(resolvePrimaryBuilderState(localCalcSavedPayload.reportDocument).localTableCalculations[0].id, "reachShare");
 assert.equal(localCalcSavedPayload.reportSpec.calculatedFields.some((field) => field.id === "reachRate" && field.kind === "rowCalc"), true);
 assert.equal(localCalcSavedPayload.reportSpec.calculatedFields.some((field) => field.id === "reachShare" && field.kind === "tableCalc"), true);
 
@@ -2214,10 +2497,10 @@ const dependentLocalCalcSavedPayload = buildReportBuilderSavedReportPayloadFromB
     savedAt: 9402,
 });
 
-assert.equal(dependentLocalCalcSavedPayload.reportDocument.blocks[0].state.selectedMeasures[0], "runningCtvAvails");
-assert.equal(dependentLocalCalcSavedPayload.reportDocument.blocks[0].state.localCalculatedFields[0].id, "ctvAvails");
-assert.equal(dependentLocalCalcSavedPayload.reportDocument.blocks[0].state.localTableCalculations[0].id, "runningCtvAvails");
-assert.equal(dependentLocalCalcSavedPayload.reportDocument.blocks[0].state.localTableCalculations[0].compute.sourceField, "ctvAvails");
+assert.equal(resolvePrimaryBuilderState(dependentLocalCalcSavedPayload.reportDocument).selectedMeasures[0], "runningCtvAvails");
+assert.equal(resolvePrimaryBuilderState(dependentLocalCalcSavedPayload.reportDocument).localCalculatedFields[0].id, "ctvAvails");
+assert.equal(resolvePrimaryBuilderState(dependentLocalCalcSavedPayload.reportDocument).localTableCalculations[0].id, "runningCtvAvails");
+assert.equal(resolvePrimaryBuilderState(dependentLocalCalcSavedPayload.reportDocument).localTableCalculations[0].compute.sourceField, "ctvAvails");
 assert.equal(dependentLocalCalcSavedPayload.reportSpec.calculatedFields.some((field) => field.id === "ctvAvails" && field.kind === "rowCalc"), true);
 assert.equal(dependentLocalCalcSavedPayload.reportSpec.calculatedFields.some((field) => field.id === "runningCtvAvails" && field.kind === "tableCalc"), true);
 assert.equal(dependentLocalCalcSavedPayload.reportSpec.datasets[0].request.measures.avails, true);
@@ -2397,9 +2680,9 @@ const authoredDerivedOnlySavedPayload = buildReportBuilderSavedReportPayloadFrom
 
 assert.equal(authoredDerivedOnlySavedPayload.compileState.status, "clean");
 assert.deepEqual(authoredDerivedOnlySavedPayload.compileState.diagnostics || [], []);
-assert.deepEqual(authoredDerivedOnlySavedPayload.reportDocument.blocks[0].state.selectedMeasures, ["avails"]);
-assert.equal(authoredDerivedOnlySavedPayload.reportDocument.blocks[0].state.localCalculatedFields[0].id, "reachRate");
-assert.equal(authoredDerivedOnlySavedPayload.reportDocument.blocks[0].state.localTableCalculations[0].id, "reachShare");
+assert.deepEqual(resolvePrimaryBuilderState(authoredDerivedOnlySavedPayload.reportDocument).selectedMeasures, ["avails"]);
+assert.equal(resolvePrimaryBuilderState(authoredDerivedOnlySavedPayload.reportDocument).localCalculatedFields[0].id, "reachRate");
+assert.equal(resolvePrimaryBuilderState(authoredDerivedOnlySavedPayload.reportDocument).localTableCalculations[0].id, "reachShare");
 assert.equal(authoredDerivedOnlySavedPayload.reportSpec.calculatedFields.some((field) => field.id === "reachRate" && field.kind === "rowCalc"), true);
 assert.equal(authoredDerivedOnlySavedPayload.reportSpec.calculatedFields.some((field) => field.id === "reachShare" && field.kind === "tableCalc"), true);
 assert.equal(authoredDerivedOnlySavedPayload.reportSpec.datasets[0].request.measures.avails, true);
@@ -2623,11 +2906,11 @@ const templatedDerivedSavedPayload = buildReportBuilderSavedReportPayloadFromBui
 
 assert.equal(templatedDerivedSavedPayload.compileState.status, "clean");
 assert.deepEqual(templatedDerivedSavedPayload.compileState.diagnostics || [], []);
-assert.deepEqual(templatedDerivedSavedPayload.reportDocument.blocks[0].state.selectedMeasures, ["avails"]);
-assert.equal(templatedDerivedSavedPayload.reportDocument.blocks[0].state.reportDocumentTemplateId, "market_efficiency_brief");
-assert.equal(templatedDerivedSavedPayload.reportDocument.blocks[0].state.reportDocumentTemplateLabel, "Market Efficiency Brief");
-assert.deepEqual(templatedDerivedSavedPayload.reportDocument.blocks[0].state.localCalculatedFields, derivedTemplate.statePatch.localCalculatedFields);
-assert.deepEqual(templatedDerivedSavedPayload.reportDocument.blocks[0].state.localTableCalculations, derivedTemplate.statePatch.localTableCalculations);
+assert.deepEqual(resolvePrimaryBuilderState(templatedDerivedSavedPayload.reportDocument).selectedMeasures, ["avails"]);
+assert.equal(resolvePrimaryBuilderState(templatedDerivedSavedPayload.reportDocument).reportDocumentTemplateId, "market_efficiency_brief");
+assert.equal(resolvePrimaryBuilderState(templatedDerivedSavedPayload.reportDocument).reportDocumentTemplateLabel, "Market Efficiency Brief");
+assert.deepEqual(resolvePrimaryBuilderState(templatedDerivedSavedPayload.reportDocument).localCalculatedFields, derivedTemplate.statePatch.localCalculatedFields);
+assert.deepEqual(resolvePrimaryBuilderState(templatedDerivedSavedPayload.reportDocument).localTableCalculations, derivedTemplate.statePatch.localTableCalculations);
 assert.equal(templatedDerivedSavedPayload.reportSpec.calculatedFields.some((field) => field.id === "reachRate" && field.kind === "rowCalc"), true);
 assert.equal(templatedDerivedSavedPayload.reportSpec.calculatedFields.some((field) => field.id === "reachShare" && field.kind === "tableCalc"), true);
 assert.equal(templatedDerivedSavedPayload.reportSpec.datasets[0].request.measures.avails, true);

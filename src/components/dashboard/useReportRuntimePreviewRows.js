@@ -1,6 +1,10 @@
 import React from "react";
 
-import { extractData, isDeferredCacheHitEnvelope } from "../dataSourceExtract.js";
+import { isDeferredCacheHitEnvelope } from "../../reporting/dataEnvelopeModel.js";
+import {
+  buildReportDatasetExtractConfigFingerprint,
+  buildReportDatasetResultContractFingerprint,
+} from "../../reporting/reportDatasetResultContract.js";
 import {
   buildIdleReportRuntimePreviewRowsState,
   buildRejectedReportRuntimePreviewRowsState,
@@ -16,31 +20,12 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
-function normalizeExtractConfig(value = null) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {
-      selectors: {},
-      paging: null,
-    };
-  }
-  const selectors = value?.selectors && typeof value.selectors === "object" && !Array.isArray(value.selectors)
-    ? value.selectors
-    : {};
-  const paging = value?.paging && typeof value.paging === "object" && !Array.isArray(value.paging)
-    ? value.paging
-    : null;
-  return {
-    selectors,
-    paging,
-  };
+export function buildReportRuntimePreviewExtractConfigFingerprint(extractConfig = null) {
+  return buildReportDatasetExtractConfigFingerprint(extractConfig);
 }
 
-export function buildReportRuntimePreviewExtractConfigFingerprint(extractConfig = null) {
-  const normalizedExtractConfig = normalizeExtractConfig(extractConfig);
-  return JSON.stringify({
-    selectors: normalizedExtractConfig.selectors,
-    paging: normalizedExtractConfig.paging,
-  });
+export function buildReportRuntimePreviewResultContractFingerprint(resultContract = null) {
+  return buildReportDatasetResultContractFingerprint(resultContract);
 }
 
 export function buildReportRuntimePreviewRequestKey(
@@ -48,6 +33,7 @@ export function buildReportRuntimePreviewRequestKey(
   runSequence = 0,
   recoveryToken = "",
   extractConfigFingerprint = "",
+  resultContractFingerprint = "",
 ) {
   const normalizedFingerprint = normalizeString(fingerprint);
   if (!normalizedFingerprint) {
@@ -68,23 +54,11 @@ export function buildReportRuntimePreviewRequestKey(
   if (normalizedExtractConfigFingerprint) {
     parts.push(normalizedExtractConfigFingerprint);
   }
+  const normalizedResultContractFingerprint = normalizeString(resultContractFingerprint);
+  if (normalizedResultContractFingerprint) {
+    parts.push(normalizedResultContractFingerprint);
+  }
   return parts.join("::");
-}
-
-export function resolveReportRuntimePreviewFetchResult(body = null, extractConfig = null) {
-  const normalizedExtractConfig = normalizeExtractConfig(extractConfig);
-  const { records } = extractData(
-    normalizedExtractConfig.selectors,
-    normalizedExtractConfig.paging,
-    body,
-  );
-  const hasMore = body?.dataInfo?.hasMore === true
-    || body?.info?.hasMore === true
-    || body?.hasMore === true;
-  return {
-    rows: Array.isArray(records) ? records : [],
-    hasMore,
-  };
 }
 
 export function useReportRuntimePreviewRows({
@@ -95,12 +69,12 @@ export function useReportRuntimePreviewRows({
   fingerprint = "",
   requestKey = "",
   fetchRecords = null,
-  extractConfig = null,
   requestKind = "runtimePreview",
   unavailableErrorMessage = "Runtime preview fetch is unavailable for this data source.",
   seedRows = null,
   seedHasMore = false,
   hydrateRows = null,
+  resolveFetchResult = null,
 } = {}) {
   const [state, setState] = React.useState(buildIdleReportRuntimePreviewRowsState);
   const stateRef = React.useRef(state);
@@ -134,7 +108,7 @@ export function useReportRuntimePreviewRows({
       hasRequest: !!request,
       fingerprint,
       requestKey,
-      fetchAvailable: typeof fetchRecords === "function",
+      fetchAvailable: typeof fetchRecords === "function" && typeof resolveFetchResult === "function",
       currentState: stateRef.current,
       unavailableError,
       seedRows: seedRowsRef.current,
@@ -170,7 +144,8 @@ export function useReportRuntimePreviewRows({
         if (!settlementPlan.shouldApply) {
           return;
         }
-        let { rows, hasMore } = resolveReportRuntimePreviewFetchResult(body, extractConfig);
+        const resolvedPayload = resolveFetchResult(body);
+        let { rows, hasMore } = resolvedPayload;
         if (typeof hydrateRows === "function" && Array.isArray(rows) && rows.length > 0) {
           try {
             const hydratedRows = await hydrateRows({
@@ -227,11 +202,11 @@ export function useReportRuntimePreviewRows({
     fetchRecords,
     fingerprint,
     hasModel,
-    extractConfig,
     request,
     requestKey,
     requestKind,
     hydrateRows,
+    resolveFetchResult,
     unavailableError,
   ]);
 

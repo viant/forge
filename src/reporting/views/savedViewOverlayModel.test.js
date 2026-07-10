@@ -568,4 +568,78 @@ assert.deepEqual(
   ["savedViewOverlayUnknownFilter"],
 );
 
+const sparseSavedViewArtifact = {
+  ...savedViewArtifact,
+  document: {
+    ...savedViewArtifact.document,
+    presentation: {
+      orderFields: savedViewArtifact.document.blocks[0].config.result.orderFields,
+      defaultTablePresets: savedViewArtifact.document.blocks[0].config.result.defaultTablePresets,
+    },
+    datasets: [
+      {
+        id: "primary",
+        dataSourceRef: "demoReportSource",
+        label: "Primary",
+        kindLabel: "primary",
+        columnOptions: [
+          { key: "eventDate", label: "Event Date", kind: "dimension" },
+          { key: "channelV2", label: "Channel", kind: "dimension" },
+          { key: "avails", label: "Avails", kind: "measure" },
+        ],
+        valueFieldOptions: [
+          { value: "avails", label: "Avails" },
+        ],
+        secondaryFieldOptions: [
+          { value: "eventDate", label: "Event Date" },
+          { value: "channelV2", label: "Channel" },
+        ],
+        scopeParamOptions: [
+          { value: "dateRange", label: "Date Range", kind: "dateRange", required: true },
+          { value: "channelsFilter", label: "Channels", kind: "multiSelect" },
+        ],
+      },
+    ],
+    blocks: [
+      {
+        ...savedViewArtifact.document.blocks[0],
+        config: {
+          title: "Capacity Q3",
+        },
+      },
+    ],
+  },
+};
+assert.equal(applySavedViewOverlayToBuilderState(sparseSavedViewArtifact, {
+  document: sparseSavedViewArtifact.document,
+  reportSpec: {
+    version: 1,
+    kind: "reportSpec",
+    datasets: [
+      {
+        id: "primary",
+        request: {
+          dimensions: { eventDate: true, channelV2: true },
+          measures: { avails: true },
+        },
+      },
+    ],
+  },
+  state: {
+    selectedDimensions: ["eventDate", "channelV2"],
+    selectedMeasures: ["avails"],
+    primaryMeasure: "avails",
+    scopeParams: {},
+    orderField: "eventDate",
+    orderDir: "asc",
+    pageSize: 50,
+    page: 1,
+    viewMode: "chart",
+    groupBy: "",
+    chartSpec: null,
+    activeTablePreset: null,
+    lastTablePreset: null,
+  },
+}).activeTablePreset?.title, "Inventory Ladder");
+
 console.log("savedViewOverlayModel ✓ normalizes saved-view overlays and surfaces compatibility diagnostics");

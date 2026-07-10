@@ -42,7 +42,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes('{ id: "runtime", label: "Filters & Controls" }'),
+  source.includes('{ id: "runtime", label: "Filters" }'),
   true,
   "ReportBuilder should keep the compact design focus strip centered on document and runtime phases.",
 );
@@ -114,21 +114,93 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("removeStaticDataset(card.id)"),
+  source.includes("removeStaticDataset(inspectedReportDataSourceDetails.sourceCardId)"),
   true,
   "ReportBuilder should let authors remove imported static datasets from the designer data-source catalog.",
 );
 
 assert.equal(
-  source.includes("Replace source file"),
+  source.includes("Replace file"),
   true,
   "ReportBuilder should let authors replace an imported static dataset from the source manager.",
 );
 
 assert.equal(
-  source.includes("View source details"),
+  source.includes("View details for"),
   true,
   "ReportBuilder should let authors inspect source details from the source manager without binding the source at report level.",
+);
+
+assert.equal(
+  source.includes("Add block"),
+  true,
+  "ReportBuilder should expose a compact add-block action from each dataset row instead of separate block-type buttons.",
+);
+
+assert.equal(
+  source.includes('text="Table"'),
+  true,
+  "ReportBuilder should keep Table as an explicit dataset-scoped add-block menu choice.",
+);
+
+assert.equal(
+  source.includes('text="Chart"') && source.includes('text="KPI"'),
+  true,
+  "ReportBuilder should keep Chart and KPI as explicit dataset-scoped add-block menu choices.",
+);
+
+assert.equal(
+  source.includes("const resolvedTemplateBlocks = resolveReportBuilderDocumentBlockList(result.nextState);"),
+  true,
+  "ReportBuilder should resolve the applied template's authored block order before resetting selection and insertion anchors.",
+);
+
+assert.equal(
+  source.includes("authoredBlocks: resolvedTemplateBlocks"),
+  true,
+  "ReportBuilder should reset the insertion anchor against the newly applied template blocks instead of reusing stale document state.",
+);
+
+assert.equal(
+  source.includes("const [pendingDocumentInsertionAfterId, setPendingDocumentInsertionAfterId] = useState(() => resolveDefaultReportBuilderInsertionAfterId({"),
+  true,
+  "ReportBuilder should initialize the insertion anchor from the current authored document instead of hardcoding primaryBuilder.",
+);
+
+assert.equal(
+  source.includes("const closeReportDocumentShellPanels = React.useCallback(() => {"),
+  true,
+  "ReportBuilder should centralize the shell-panel reset logic used when the current report document is replaced.",
+);
+
+assert.equal(
+  source.includes("setPendingDocumentInsertionPlacement(\"after\");\n                closeReportDocumentShellPanels();"),
+  true,
+  "ReportBuilder should also close stale shell panels when an imported starter auto-replaces the current blank document.",
+);
+
+assert.equal(
+  source.includes("setPendingDocumentInsertionPlacement(\"after\");\n        closeReportDocumentShellPanels();"),
+  true,
+  "ReportBuilder should also close stale shell panels when resetting the current report back to a blank document.",
+);
+
+assert.equal(
+  source.includes("runtimePreviewInteraction.clearInteractionState();\n                setSelectedDocumentOutlineEntryId(\"\");\n                setPendingDocumentInsertionAfterId(resolveDefaultReportBuilderInsertionAfterId({"),
+  true,
+  "ReportBuilder should also reset shell selection and insertion state when a blank starter is auto-applied.",
+);
+
+assert.equal(
+  source.includes("Edit source"),
+  true,
+  "ReportBuilder should expose a source editor action from inspected source details for editable published or MCP-backed datasets.",
+);
+
+assert.equal(
+  source.includes("ReportBuilderSourceDialog"),
+  true,
+  "ReportBuilder should render the shared source editor dialog component instead of inlining that UI.",
 );
 
 assert.equal(
@@ -264,9 +336,21 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("Reset report"),
+  source.includes("Reset to blank..."),
   true,
-  "ReportBuilder should expose a direct reset path back to a blank authored report once blocks already exist.",
+  "ReportBuilder should expose a direct reset-to-blank path for authored reports through compact report actions.",
+);
+
+assert.equal(
+  source.includes("Switch report..."),
+  true,
+  "ReportBuilder should expose switching the authored report through the compact report actions menu.",
+);
+
+assert.equal(
+  source.includes("Report actions"),
+  true,
+  "ReportBuilder should collapse rare whole-report actions behind a compact labeled menu trigger.",
 );
 
 assert.equal(
@@ -288,15 +372,15 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("extractConfig: builderContext?.dataSource || null"),
+  source.includes("currentSourceRef: normalizeString(") && source.includes("authoredDocumentFieldOptions.datasetOptions || []"),
   true,
-  "ReportBuilder should pass the active data source extraction contract into authored runtime preview row fetching so real workspace payloads are decoded with the same selectors as the main collection.",
+  "ReportBuilder should route authored dataset options through the prepared document field-options model so published and secondary sources carry their current fetch contract and field catalogs.",
 );
 
 assert.equal(
-  source.includes('authoredDocumentBlockCount > 0 ? "Compose report" : "Report"'),
+  source.includes("const layoutTitle = designWorkspaceFlowState.presentation.rows[0]?.value || \"Report\";"),
   true,
-  "ReportBuilder should shorten the blank-state header instead of using the full compose-report label before any blocks exist.",
+  "ReportBuilder should promote the authored report title into the layout stage heading instead of repeating a generic report-layout label.",
 );
 
 assert.equal(
@@ -312,9 +396,9 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("Add the first block, then keep shaping the report in the same outline."),
+  source.includes("Use the block toolbar above to add the first block."),
   true,
-  "ReportBuilder should reduce the report-document header copy to a compact design-oriented prompt.",
+  "ReportBuilder should keep the empty-state prompt compact and focused on the next authoring action.",
 );
 
 assert.equal(
@@ -366,9 +450,11 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("forge-report-builder__authored-toolbar-icon"),
+  source.includes('title="Add block"')
+    && source.includes('aria-label="Add block"')
+    && source.includes("Add block"),
   true,
-  "ReportBuilder should expose compact add-block toolbar buttons directly from the report outline composition flow.",
+  "ReportBuilder should expose one compact add-block menu from the report outline composition flow instead of a dense icon strip.",
 );
 
 assert.equal(
@@ -399,6 +485,12 @@ assert.equal(
   source.includes("forge-report-builder__design-outline-toolbar"),
   true,
   "ReportBuilder should render an inline toolbar on selected authored outline rows.",
+);
+
+assert.equal(
+  source.includes("More actions for"),
+  true,
+  "ReportBuilder should demote destructive selected-row actions behind a compact overflow affordance.",
 );
 
 assert.equal(
@@ -462,7 +554,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("setSelectedBuilderChartSelection(null);\n        persistExplorationMutation(prepared.nextState"),
+  source.includes("setSelectedBuilderChartSelection(null);\n            const nextPreparedState = applyQuickChartToAuthoredDocument"),
   true,
   "ReportBuilder should also clear stale chart selections when applying quick-chart presets that bypass the explicit chart dialog path.",
 );
@@ -546,7 +638,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("Add the first authored block from Report Document, then return here to compose runtime controls in context."),
+  source.includes("Add the first authored block from Layout, then return here to compose runtime controls in context."),
   true,
   "ReportBuilder should avoid exposing a second first-block add surface from the runtime tab.",
 );
@@ -632,7 +724,7 @@ assert.equal(
 assert.equal(
   source.includes('data-testid="report-builder-runtime-filter-editor"'),
   true,
-  "ReportBuilder should render the real predicate editor directly in the Filters & Controls design focus center stage.",
+  "ReportBuilder should render the real predicate editor directly in the Filters design focus center stage.",
 );
 
 assert.equal(
@@ -663,6 +755,18 @@ assert.equal(
   source.includes("workspaceModeStorageReadyRef"),
   true,
   "ReportBuilder should guard workspace-mode persistence so compact/desktop breakpoint changes do not overwrite the just-loaded mode.",
+);
+
+assert.equal(
+  source.includes('className="forge-report-builder__settings-dialog"'),
+  true,
+  "ReportBuilder should render toolbar settings in a dedicated dialog surface instead of only an inline popover.",
+);
+
+assert.equal(
+  source.includes("renderSettingsDialog()"),
+  true,
+  "ReportBuilder should route the shared settings controls through an explicit dialog renderer.",
 );
 
 assert.equal(

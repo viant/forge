@@ -252,6 +252,11 @@ export function normalizeReportBuilderStaticDatasets(datasets = []) {
         })),
         valueFieldOptions: buildFieldOptions(columns, "measure"),
         secondaryFieldOptions: buildFieldOptions(columns, "dimension"),
+        chartFieldOptions: columns.map((column) => ({
+          key: normalizeString(column?.key),
+          label: normalizeString(column?.label || column?.key),
+          kind: normalizeString(column?.kind || "dimension") || "dimension",
+        })),
       };
     })
     .filter(Boolean);
@@ -267,6 +272,7 @@ export function buildReportBuilderStaticDatasetOptions(datasets = []) {
     columnOptions: cloneValue(dataset.columnOptions),
     valueFieldOptions: cloneValue(dataset.valueFieldOptions),
     secondaryFieldOptions: cloneValue(dataset.secondaryFieldOptions),
+    chartFieldOptions: cloneValue(dataset.chartFieldOptions),
   }));
 }
 

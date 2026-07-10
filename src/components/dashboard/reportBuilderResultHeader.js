@@ -6,6 +6,17 @@ function iconForMode(mode = "") {
     return normalizeMode(mode) === "table" ? "th" : "timeline-line-chart";
 }
 
+function labelForMode(mode = "") {
+    const normalizedMode = normalizeMode(mode).toLowerCase();
+    if (normalizedMode === "table") {
+        return "Table";
+    }
+    if (normalizedMode === "chart") {
+        return "Chart";
+    }
+    return normalizeMode(mode);
+}
+
 export function buildReportBuilderDesktopResultHeaderState({
     desktopActionModel = {},
     resultViewModes = [],
@@ -30,6 +41,7 @@ export function buildReportBuilderDesktopResultHeaderState({
         editChartEnabled: desktopActionModel.showEditChart === true,
         viewToggleModes: normalizedModes.map((mode) => ({
             mode,
+            label: labelForMode(mode),
             icon: iconForMode(mode),
             active: normalizeMode(currentViewMode) === normalizeMode(mode),
             disabled: explicitChartMode && normalizeMode(mode) === "chart" && !hasValidChartSpec,

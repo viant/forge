@@ -72,7 +72,7 @@ const container = {
       {
         id: "channel_mix",
         label: "Channel Mix",
-        description: "Channel-first starter.",
+        description: "Channel-first mixed starter.",
         statePatch: {
           selectedDimensions: ["channelId"],
           selectedMeasures: ["totalSpend"],
@@ -97,12 +97,21 @@ const container = {
                 { key: "totalSpend", label: "Spend", format: "currency" },
               ],
             },
+            {
+              id: "forecastHeadline",
+              kind: "kpiBlock",
+              title: "Forecast Headline",
+              datasetRef: "forecast_cube",
+              valueField: "totalSpend",
+              valueLabel: "Spend",
+            },
           ],
           layout: {
             type: "stack",
             items: [
               { blockId: "primaryBuilder" },
               { blockId: "detailTable" },
+              { blockId: "forecastHeadline" },
             ],
           },
         },
@@ -306,24 +315,20 @@ assert.ok(!html.includes("Report Starters"));
 assert.ok(!html.includes("Choose what to build"));
 assert.ok(html.includes("Data Sources"));
 assert.ok(html.includes("Edit data"));
-assert.ok(html.includes("Load report file"));
+assert.ok(!html.includes("Load report file"));
 assert.ok(html.includes("Performance Cube"));
 assert.ok(html.includes("Forecast Cube"));
 assert.ok(html.includes("Regional Mix CSV"));
 assert.ok(html.includes("Current source"));
-assert.ok(html.includes("Published"));
-assert.ok(html.includes("View source details"));
-assert.ok(html.includes("Replace source file"));
-assert.ok(html.includes("Import source"));
-assert.ok(html.includes("Remove source"));
+assert.ok(html.includes("Cube"));
+assert.ok(html.includes("View details for"));
 assert.ok(html.includes("Overview · Spend by Date and Channel"));
 assert.ok(html.includes("Report blocks"));
 assert.ok(!html.includes("After Detail Table"));
 assert.ok(html.includes("forge-report-builder__design-outline-node is-selected"));
 assert.ok(html.includes("forge-report-builder__design-outline-toolbar"));
 assert.ok(html.includes("Selected Fields"));
-assert.ok(html.includes("Dimensions, measures, and parameters currently bound to the selected item."));
-assert.ok(html.includes("forge-report-builder__authored-toolbar-icon"));
+assert.ok(html.includes(">Add block<"));
 assert.ok(html.includes("forge-report-builder__settings-anchor--metadata"));
 assert.ok(html.includes("aria-label=\"Edit report metadata\""));
 assert.ok(!html.includes("aria-label=\"Report document metadata\""));
@@ -338,21 +343,22 @@ assert.ok(!html.includes("Uses Current data selection."));
 assert.ok(!html.includes("Open data view"));
 assert.ok(!html.includes("Add drill branch"));
 assert.ok(html.includes("Edit Detail Table"));
-assert.ok(html.includes("Move Detail Table down"));
-assert.ok(html.includes("Remove Detail Table"));
+assert.ok(html.includes("More actions for Detail Table"));
 assert.ok(!html.includes("Block Composer"));
 assert.ok(!html.includes("Selected Item"));
 assert.ok(html.includes("Detail Table"));
-assert.ok(html.includes("Add the first block, then keep shaping the report in the same outline."));
-assert.ok(html.includes("Reset report"));
+assert.ok(html.includes("Use the block toolbar above to add the first block.") || !html.includes("No blocks yet."));
+assert.ok(html.includes("Report actions"));
 assert.ok(html.includes('aria-label="Designer Render settings"'));
 assert.ok(!html.includes('aria-label="Performance metrics settings"'));
 assert.ok(html.includes("aria-pressed=\"true\""));
-assert.ok(html.includes("Select"));
+assert.ok(html.includes("Performance Overview"));
+assert.ok(!html.includes(">Select<"));
 assert.equal((html.match(/Open data editor/g) || []).length, 0);
 assert.ok(!html.includes(">Data<"));
 assert.ok(!html.includes(">Drill Downs<"));
-assert.ok(html.includes("Change report"));
+assert.ok(!html.includes("Change report"));
+assert.ok(!html.includes("Reset report"));
 assert.ok(!html.includes("Pick another starter or a new report."));
 
 const filterBarSelectionHtml = renderBuilder({
@@ -483,11 +489,13 @@ assert.ok(emptyHtml.includes("Performance Cube"));
 assert.ok(emptyHtml.includes("Forecast Cube"));
 assert.ok(emptyHtml.includes("Regional Mix CSV"));
 assert.ok(emptyHtml.includes("Current source"));
-assert.ok(emptyHtml.includes("View source details"));
-assert.ok(emptyHtml.includes("Replace source file"));
-assert.ok(emptyHtml.includes("Import source"));
+assert.ok(emptyHtml.includes("View details for"));
 assert.ok(emptyHtml.includes("New report"));
 assert.ok(emptyHtml.includes("Current"));
+assert.ok(emptyHtml.includes("2 datasets"));
+assert.ok(emptyHtml.includes("1 block"));
+assert.ok(emptyHtml.includes("2 blocks"));
+assert.ok(!emptyHtml.includes("Report actions"));
 assert.ok(!emptyHtml.includes("Reset report"));
 assert.ok(!emptyHtml.includes("Change report"));
 assert.ok(!emptyHtml.includes("id=\"report-builder-design-group-document\""));

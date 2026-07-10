@@ -155,13 +155,13 @@ export function resolveCompactSemanticActionLabel({
 } = {}) {
   const normalizedTitle = String(semanticTitle || "").trim().toLowerCase();
   const normalizedTone = String(tone || "").trim().toLowerCase();
-  if (normalizedTitle === "semantic modeling inactive") {
-    return Number(activationCount || 0) > 0 ? "Activate semantic" : "Semantic setup";
+  if (normalizedTitle === "no data model configured" || normalizedTitle === "data model inactive") {
+    return Number(activationCount || 0) > 0 ? "Activate data model" : "Data model setup";
   }
   if (normalizedTone === "danger" || (normalizedTone === "warning" && Number(diagnosticsCount || 0) > 0)) {
-    return "Model issues";
+    return "Data model issues";
   }
-  return "Model";
+  return "Data model";
 }
 
 export function resolveCompactSemanticHintText({
@@ -170,13 +170,13 @@ export function resolveCompactSemanticHintText({
 } = {}) {
   const normalizedTitle = String(semanticTitle || "").trim().toLowerCase();
   const count = Number(activationCount || 0) || 0;
-  if (normalizedTitle !== "semantic modeling inactive") {
+  if (normalizedTitle !== "no data model configured" && normalizedTitle !== "data model inactive") {
     return "";
   }
   if (count > 0) {
     return count === 1
-      ? "A semantic report is ready to activate from this workspace."
-      : `${count} semantic reports are ready to activate from this workspace.`;
+      ? "A data-model report is ready to activate from this workspace."
+      : `${count} data-model reports are ready to activate from this workspace.`;
   }
-  return "Load a semantic report file to switch this builder from raw mode to model-backed mappings.";
+  return "Load a report file to switch this builder from raw mode to data-model mappings.";
 }

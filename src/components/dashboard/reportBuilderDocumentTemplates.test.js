@@ -110,7 +110,8 @@ const template = normalizeReportBuilderDocumentTemplate({
             {
                 id: "scopeFilters",
                 kind: "filterBarBlock",
-                title: "Scope",
+                title: "Filters",
+                datasetRef: "primary",
                 paramIds: ["dateRange", "channelsFilter"],
             },
             {
@@ -182,7 +183,8 @@ assert.deepEqual(template, {
             {
                 id: "scopeFilters",
                 kind: "filterBarBlock",
-                title: "Scope",
+                title: "Filters",
+                datasetRef: "primary",
                 paramIds: ["dateRange", "channelsFilter"],
             },
             {
@@ -212,6 +214,9 @@ assert.deepEqual(template, {
             ],
         },
     },
+    datasetRefs: ["primary"],
+    datasetCount: 1,
+    blockCount: 3,
 });
 
 assert.deepEqual(
@@ -219,9 +224,56 @@ assert.deepEqual(
         template,
         { ...template, label: "Duplicate label" },
         null,
-    ]).map((entry) => entry.id),
-    ["market_brief"],
+    ]).map((entry) => ({
+        id: entry.id,
+        datasetCount: entry.datasetCount,
+        blockCount: entry.blockCount,
+        datasetRefs: entry.datasetRefs,
+    })),
+    [{
+        id: "market_brief",
+        datasetCount: 1,
+        blockCount: 3,
+        datasetRefs: ["primary"],
+    }],
 );
+
+const multiDatasetTemplate = normalizeReportBuilderDocumentTemplate({
+    id: "country_dashboard",
+    label: "Country Dashboard",
+    documentPatch: {
+        blocks: [
+            {
+                id: "primaryHeadline",
+                kind: "kpiBlock",
+                datasetRef: "primary",
+                valueField: "avails",
+            },
+            {
+                id: "countrySnapshotChart",
+                kind: "chartBlock",
+                datasetRef: "country_snapshot",
+                chartSpec: {
+                    title: "Country Snapshot",
+                    type: "horizontal_bar",
+                    xField: "country",
+                    yFields: ["avails"],
+                },
+            },
+            {
+                id: "countrySnapshotTable",
+                kind: "tableBlock",
+                datasetRef: "country_snapshot",
+                columns: [
+                    { key: "country", label: "Country" },
+                ],
+            },
+        ],
+    },
+});
+assert.deepEqual(multiDatasetTemplate.datasetRefs, ["primary", "country_snapshot"]);
+assert.equal(multiDatasetTemplate.datasetCount, 2);
+assert.equal(multiDatasetTemplate.blockCount, 3);
 
 const instantiated = instantiateReportBuilderDocumentTemplate(config, template);
 assert.equal(instantiated.valid, true);

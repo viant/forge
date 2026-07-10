@@ -532,7 +532,7 @@ assert.ok(printElements.some((element) => (
 )));
 assert.ok(printElements.some((element) => (
   element.kind === "text"
-  && /Spend: 20000/.test(element.text)
+  && /Spend: \$20,000/.test(element.text)
 )));
 const headlineKpiTitle = loweredPrint.pages
   .flatMap((page) => (page.elements || []).map((element) => ({ page: page.number, element })))

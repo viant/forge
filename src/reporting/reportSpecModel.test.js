@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { buildReportBuilderReportSpec } from "./reportSpecModel.js";
+import { buildReportBuilderReportSpec, normalizeReportBuilderPublishedDataSources } from "./reportSpecModel.js";
 import { applyReportBuilderSemanticConfig } from "../components/dashboard/reportBuilderSemantic.js";
 
 const rawConfig = {
@@ -107,6 +107,21 @@ assert.deepEqual(rawSpec.parameters, {
   pageSize: 25,
   orderField: "totalSpend",
   orderDir: "desc",
+});
+assert.deepEqual(rawSpec.scope, {
+  params: [
+    {
+      id: "dateRange",
+      kind: "dateRange",
+      label: "dateRange",
+      required: true,
+      value: {
+        start: "2026-05-01",
+        end: "2026-05-04",
+      },
+    },
+  ],
+  dataSourceRef: "demoReportSource",
 });
 assert.deepEqual(rawSpec.layoutIntent, {
   kind: "single",
@@ -216,6 +231,363 @@ assert.deepEqual(
     filters: { region: ["US/NY"] },
     limit: 25,
     offset: 0,
+  },
+);
+
+const datasetCatalogConfig = {
+  ...rawConfig,
+  datasets: [
+    {
+      id: "reach_summary",
+      dataSourceRef: "reachSummarySource",
+      dimensions: [
+        { id: "country", key: "country", label: "Country", default: true },
+      ],
+      measures: [
+        { id: "hhUniqs", key: "hhUniqs", label: "HH Uniques", format: "compactNumber", default: true },
+      ],
+      scope: {
+        inheritContext: true,
+      },
+      source: {
+        kind: "mcp",
+        server: "steward",
+        tool: "reach.summary",
+      },
+      resultContract: {
+        shape: "rowSet",
+        rowPath: "rows",
+      },
+      capabilities: {
+        fieldCatalog: true,
+        backendRefetch: true,
+        datly: {
+          unifiedCube: true,
+        },
+      },
+      request: {
+        measures: { hhUniqs: true },
+        dimensions: { country: true },
+        filters: {},
+        limit: 10,
+        offset: 0,
+      },
+      scopeParamOptions: [
+        {
+          value: "reachCountry",
+          label: "Reach Country",
+          kind: "multiSelect",
+          paramPath: "filters.country",
+        },
+      ],
+    },
+  ],
+};
+assert.deepEqual(normalizeReportBuilderPublishedDataSources(datasetCatalogConfig), [
+    {
+      id: "reach_summary",
+      dataSourceRef: "reachSummarySource",
+      label: "reachSummarySource",
+      description: "",
+      kindLabel: "published",
+      scope: {
+        inheritContext: true,
+      },
+      source: {
+        kind: "mcp",
+        server: "steward",
+        tool: "reach.summary",
+      },
+      resultContract: {
+        shape: "rowSet",
+        rowPath: "rows",
+      },
+      capabilities: {
+        fieldCatalog: true,
+        backendRefetch: true,
+        datly: {
+          unifiedCube: true,
+        },
+      },
+      request: {
+        measures: { hhUniqs: true },
+        dimensions: { country: true },
+      filters: {},
+      limit: 10,
+      offset: 0,
+    },
+    columnOptions: [
+      { key: "country", label: "Country", kind: "dimension", sourceKey: "country", default: true },
+      { key: "hhUniqs", label: "HH Uniques", kind: "measure", sourceKey: "hhUniqs", format: "compactNumber", default: true },
+    ],
+    valueFieldOptions: [
+      { value: "hhUniqs", label: "HH Uniques", format: "compactNumber", default: true },
+    ],
+    secondaryFieldOptions: [
+      { value: "country", label: "Country", default: true },
+    ],
+    chartFieldOptions: [
+      { key: "country", aliases: ["country"], label: "Country", kind: "dimension", default: true },
+      { key: "hhUniqs", aliases: ["hhUniqs"], label: "HH Uniques", kind: "measure", format: "compactNumber", default: true },
+    ],
+    scopeParamOptions: [
+      {
+        value: "reachCountry",
+        label: "Reach Country",
+        kind: "multiSelect",
+        paramPath: "filters.country",
+      },
+    ],
+  },
+]);
+assert.deepEqual(normalizeReportBuilderPublishedDataSources({
+  ...rawConfig,
+  datasets: [
+    {
+      id: "timeline_snapshot",
+      dataSourceRef: "timelineSnapshotSource",
+      scope: {
+        mode: "append",
+        local: {
+          grain: "day",
+        },
+        exclude: ["audienceIds", "", "audienceIds"],
+      },
+      request: {
+        measures: { hhUniqs: true },
+        dimensions: { country: true },
+        filters: {},
+        limit: 10,
+        offset: 0,
+      },
+    },
+  ],
+}), [
+  {
+    id: "timeline_snapshot",
+    dataSourceRef: "timelineSnapshotSource",
+    label: "timelineSnapshotSource",
+    description: "",
+    kindLabel: "published",
+    scope: {
+      mode: "append",
+      local: {
+        grain: "day",
+      },
+      exclude: ["audienceIds"],
+    },
+    source: null,
+    resultContract: null,
+    capabilities: null,
+    request: {
+      measures: { hhUniqs: true },
+      dimensions: { country: true },
+      filters: {},
+      limit: 10,
+      offset: 0,
+    },
+    columnOptions: [],
+    valueFieldOptions: [],
+    secondaryFieldOptions: [],
+    chartFieldOptions: [],
+    scopeParamOptions: [],
+  },
+]);
+const datasetCatalogState = {
+  ...rawState,
+  scopeParams: {
+    ...rawState.scopeParams,
+    reachCountry: ["US"],
+  },
+  reportDocumentBlocks: [
+    {
+      id: "reachSummaryTable",
+      kind: "tableBlock",
+      title: "Reach Summary",
+      datasetRef: "reach_summary",
+      columns: [
+        { key: "country", label: "Country" },
+        { key: "hhUniqs", label: "HH Uniques", format: "compactNumber" },
+      ],
+    },
+  ],
+};
+const datasetCatalogSpec = buildReportBuilderReportSpec({
+  container: {
+    id: "reachDashboardBuilder",
+    stateKey: "reachDashboardBuilder",
+    title: "Reach Dashboard",
+    dataSourceRef: "demoReportSource",
+  },
+  config: datasetCatalogConfig,
+  state: datasetCatalogState,
+});
+assert.equal(datasetCatalogSpec.datasets.some((dataset) => dataset.id === "reach_summary"), true);
+assert.deepEqual(
+  datasetCatalogSpec.datasets.find((dataset) => dataset.id === "reach_summary")?.request,
+  {
+    measures: { hhUniqs: true },
+    dimensions: { country: true },
+    filters: { country: ["US"] },
+    limit: 10,
+    offset: 0,
+  },
+);
+assert.deepEqual(
+  datasetCatalogSpec.datasets.find((dataset) => dataset.id === "reach_summary")?.resultContract,
+  {
+    shape: "rowSet",
+    rowPath: "rows",
+  },
+);
+assert.deepEqual(
+  datasetCatalogSpec.datasets.find((dataset) => dataset.id === "reach_summary")?.source,
+  {
+    kind: "mcp",
+    server: "steward",
+    tool: "reach.summary",
+  },
+);
+assert.deepEqual(
+  datasetCatalogSpec.datasets.find((dataset) => dataset.id === "reach_summary")?.capabilities,
+  {
+    fieldCatalog: true,
+    backendRefetch: true,
+    datly: {
+      unifiedCube: true,
+    },
+  },
+);
+
+const scopePolicyDatasetConfig = {
+  ...rawConfig,
+  datasets: [
+    {
+      id: "timeline_append",
+      dataSourceRef: "timelineAppendSource",
+      scope: {
+        mode: "append",
+        local: {
+          filters: {
+            grain: "day",
+            country: ["CA"],
+          },
+        },
+      },
+      request: {
+        measures: { hhUniqs: true },
+        dimensions: { country: true },
+        filters: {},
+        limit: 10,
+        offset: 0,
+      },
+      scopeParamOptions: [
+        {
+          value: "reachCountry",
+          label: "Reach Country",
+          kind: "multiSelect",
+          paramPath: "filters.country",
+        },
+      ],
+    },
+    {
+      id: "timeline_override",
+      dataSourceRef: "timelineOverrideSource",
+      scope: {
+        mode: "override",
+        local: {
+          filters: {
+            grain: "day",
+            country: ["CA"],
+          },
+        },
+      },
+      request: {
+        measures: { hhUniqs: true },
+        dimensions: { country: true },
+        filters: {},
+        limit: 10,
+        offset: 0,
+      },
+      scopeParamOptions: [
+        {
+          value: "reachCountry",
+          label: "Reach Country",
+          kind: "multiSelect",
+          paramPath: "filters.country",
+        },
+      ],
+    },
+    {
+      id: "timeline_exclude",
+      dataSourceRef: "timelineExcludeSource",
+      scope: {
+        mode: "exclude",
+        local: {
+          filters: {
+            grain: "day",
+          },
+        },
+        exclude: ["reachCountry"],
+      },
+      request: {
+        measures: { hhUniqs: true },
+        dimensions: { country: true },
+        filters: {},
+        limit: 10,
+        offset: 0,
+      },
+      scopeParamOptions: [
+        {
+          value: "reachCountry",
+          label: "Reach Country",
+          kind: "multiSelect",
+          paramPath: "filters.country",
+        },
+      ],
+    },
+  ],
+};
+const scopePolicyDatasetState = {
+  ...rawState,
+  scopeParams: {
+    ...rawState.scopeParams,
+    reachCountry: ["US"],
+  },
+  reportDocumentBlocks: [
+    { id: "appendTable", kind: "tableBlock", datasetRef: "timeline_append", columns: [{ key: "country", label: "Country" }] },
+    { id: "overrideTable", kind: "tableBlock", datasetRef: "timeline_override", columns: [{ key: "country", label: "Country" }] },
+    { id: "excludeTable", kind: "tableBlock", datasetRef: "timeline_exclude", columns: [{ key: "country", label: "Country" }] },
+  ],
+};
+const scopePolicyDatasetSpec = buildReportBuilderReportSpec({
+  container: {
+    id: "scopePolicyBuilder",
+    stateKey: "scopePolicyBuilder",
+    title: "Scope Policy Dashboard",
+    dataSourceRef: "demoReportSource",
+  },
+  config: scopePolicyDatasetConfig,
+  state: scopePolicyDatasetState,
+});
+assert.deepEqual(
+  scopePolicyDatasetSpec.datasets.find((dataset) => dataset.id === "timeline_append")?.request.filters,
+  {
+    grain: "day",
+    country: ["US"],
+  },
+);
+assert.deepEqual(
+  scopePolicyDatasetSpec.datasets.find((dataset) => dataset.id === "timeline_override")?.request.filters,
+  {
+    grain: "day",
+    country: ["CA"],
+  },
+);
+assert.deepEqual(
+  scopePolicyDatasetSpec.datasets.find((dataset) => dataset.id === "timeline_exclude")?.request.filters,
+  {
+    grain: "day",
   },
 );
 

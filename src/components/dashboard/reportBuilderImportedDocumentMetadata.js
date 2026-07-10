@@ -3,6 +3,9 @@ import {
   resolveReportBuilderSemanticSelections,
 } from "./reportBuilderSemantic.js";
 import { buildReportBuilderDocumentCompileDiagnostics } from "./reportBuilderDocumentBlocks.js";
+import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockModel.js";
+import { resolveReportDocumentBuilderContext } from "../../reporting/reportDocumentModel.js";
+import { resolveReportDocumentBinding } from "../../reporting/reportDocumentModel.js";
 import { buildReportDocumentScopeParams } from "../../reporting/reportDocumentModel.js";
 import { lowerReportDocumentToReportSpec } from "../../reporting/reportDocumentModel.js";
 import { buildReportDocumentCompileState } from "../../reporting/reportDocumentStore.js";
@@ -37,13 +40,12 @@ function buildPreferredScope(reportSpecScope = null, embeddedScope = null) {
   };
 }
 
-function resolveEmbeddedReportBuilderBlock(document = null) {
-  const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
-  return blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null;
-}
-
 export function resolveEmbeddedReportBuilderBinding(document = null) {
-  const reportBuilderBlock = resolveEmbeddedReportBuilderBlock(document);
+  const documentBinding = resolveReportDocumentBinding(document);
+  if (documentBinding) {
+    return documentBinding;
+  }
+  const reportBuilderBlock = resolveReportBuilderBlock(document);
   const stateBinding = isPlainObject(reportBuilderBlock?.state?.binding)
     ? cloneValue(reportBuilderBlock.state.binding)
     : null;
@@ -57,14 +59,18 @@ export function resolveEmbeddedReportBuilderBinding(document = null) {
 }
 
 export function resolveEmbeddedReportBuilderSemanticSummary(document = null) {
-  const reportBuilderBlock = resolveEmbeddedReportBuilderBlock(document);
-  const config = isPlainObject(reportBuilderBlock?.config)
+  const reportBuilderBlock = resolveReportBuilderBlock(document);
+  const baseConfig = isPlainObject(reportBuilderBlock?.config)
     ? cloneValue(reportBuilderBlock.config)
     : null;
-  const state = isPlainObject(reportBuilderBlock?.state)
-    ? cloneValue(reportBuilderBlock.state)
+  const builderContext = baseConfig
+    ? resolveReportDocumentBuilderContext(document, baseConfig, reportBuilderBlock?.state || {})
+    : null;
+  const config = builderContext?.config || null;
+  const state = builderContext?.state && typeof builderContext.state === "object" && !Array.isArray(builderContext.state)
+    ? builderContext.state
     : {};
-  const binding = resolveEmbeddedReportBuilderBinding(document);
+  const binding = builderContext?.binding || resolveEmbeddedReportBuilderBinding(document);
   if (!config || !binding) {
     return null;
   }
@@ -87,12 +93,13 @@ export function resolveEmbeddedReportBuilderSemanticSummary(document = null) {
 }
 
 export function resolveEmbeddedReportBuilderScope(document = null) {
-  const reportBuilderBlock = resolveEmbeddedReportBuilderBlock(document);
-  const config = isPlainObject(reportBuilderBlock?.config)
-    ? cloneValue(reportBuilderBlock.config)
+  const reportBuilderBlock = resolveReportBuilderBlock(document);
+  const builderContext = isPlainObject(reportBuilderBlock?.config)
+    ? resolveReportDocumentBuilderContext(document, cloneValue(reportBuilderBlock.config), reportBuilderBlock?.state || {})
     : null;
-  const state = isPlainObject(reportBuilderBlock?.state)
-    ? cloneValue(reportBuilderBlock.state)
+  const config = builderContext?.config || null;
+  const state = builderContext?.state && typeof builderContext.state === "object" && !Array.isArray(builderContext.state)
+    ? builderContext.state
     : {};
   if (!config) {
     return null;

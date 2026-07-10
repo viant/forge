@@ -1273,8 +1273,8 @@ const derivedCreatePayload = buildReportBuilderCreateReportDocumentPayloadFromBu
 });
 
 assert.equal(derivedCreatePayload.document.semanticSummary.modelLabel, "Ad Delivery");
-assert.equal(derivedCreatePayload.document.blocks[0].config.measures[0].label, "Available Impressions");
-assert.equal(derivedCreatePayload.document.blocks[0].config.dimensions[0].label, "Delivery Date");
+assert.equal(derivedCreatePayload.document.datasets[0].measures[0].label, "Available Impressions");
+assert.equal(derivedCreatePayload.document.datasets[0].dimensions[0].label, "Delivery Date");
 assert.equal(derivedCreatePayload.compileState.diagnostics[0].code, "semanticProviderDiagnostics");
 assert.equal(derivedCreatePayload.createdAt, 9420);
 
@@ -1528,7 +1528,7 @@ assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.selectedMeas
 assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.localCalculatedFields[0].id, "ctvAvails");
 assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.localTableCalculations[0].id, "runningCtvAvails");
 assert.equal(dependentDerivedCreatePayload.document.blocks[0].state.localTableCalculations[0].compute.sourceField, "ctvAvails");
-assert.equal(dependentDerivedCreatePayload.document.blocks[0].config.measures[0].label, "Available Impressions");
+assert.equal(dependentDerivedCreatePayload.document.datasets[0].measures[0].label, "Available Impressions");
 assert.equal(dependentDerivedCreatePayload.compileState.status, "clean");
 assert.equal(dependentDerivedCreatePayload.compileState.reportSpecVersion, 1);
 assert.equal(dependentDerivedCreatePayload.createdAt, 9423);

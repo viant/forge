@@ -32,6 +32,18 @@ assert.equal(
 );
 
 assert.equal(
+  source.includes("Source query"),
+  true,
+  "ReportBuilderChartDialog should surface a concise source-query summary for selected non-primary datasets while editing.",
+);
+
+assert.equal(
+  source.includes("requestSummary"),
+  true,
+  "ReportBuilderChartDialog should summarize the stored dataset request for non-primary datasets.",
+);
+
+assert.equal(
   source.includes("onDatasetRefChange"),
   true,
   "ReportBuilderChartDialog should propagate authored chart data-source changes back to the parent draft state.",

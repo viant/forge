@@ -62,6 +62,18 @@ assert.equal(
 );
 
 assert.equal(
+  source.includes("Source query"),
+  true,
+  "ReportBuilderDocumentBlockDialog should surface a concise source-query summary for bound datasets while editing.",
+);
+
+assert.equal(
+  source.includes("requestSummary"),
+  true,
+  "ReportBuilderDocumentBlockDialog should summarize the stored dataset request for bound non-primary datasets.",
+);
+
+assert.equal(
   source.includes("normalizedValueFieldOptions.map"),
   true,
   "ReportBuilderDocumentBlockDialog should source KPI value choices from the currently selected dataset.",

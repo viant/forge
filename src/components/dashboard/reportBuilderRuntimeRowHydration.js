@@ -1,5 +1,6 @@
 import { extractData } from "../dataSourceExtract.js";
 import { resolveKey, setSelector } from "../../utils/selector.js";
+import { resolveReportBuilderDataSourceFetcher } from "./reportBuilderDataSourceFetch.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -109,9 +110,9 @@ function uniqueHydrationValues(rows = [], spec = {}) {
 async function fetchDisplayLookupRecords(builderContext, spec = {}, values = []) {
     const displayLookup = spec?.displayLookup || {};
     const dataSourceContext = builderContext?.Context?.(displayLookup.dataSourceRef);
-    const handlers = dataSourceContext?.handlers?.dataSource;
-    if (!handlers?.fetchRecords) {
-        throw new Error(`display lookup datasource '${displayLookup.dataSourceRef}' has no fetchRecords handler`);
+    const fetcher = resolveReportBuilderDataSourceFetcher(dataSourceContext);
+    if (!fetcher) {
+        throw new Error(`display lookup datasource '${displayLookup.dataSourceRef}' has no fetch handler`);
     }
     const selectors = dataSourceContext?.dataSource?.selectors || {};
     const paging = dataSourceContext?.dataSource?.paging || null;
@@ -126,7 +127,7 @@ async function fetchDisplayLookupRecords(builderContext, spec = {}, values = [])
     } else if (displayLookup.resolveInput && values.length > 0) {
         parameters[displayLookup.resolveInput] = values[0];
     }
-    const body = await handlers.fetchRecords({
+    const body = await fetcher({
         parameters,
         requestKind: "runtimeDisplayHydration",
     });

@@ -26,8 +26,8 @@ assert.deepEqual(buildReportBuilderDesktopResultHeaderState({
     },
     editChartEnabled: true,
     viewToggleModes: [
-        { mode: "table", icon: "th", active: true, disabled: false },
-        { mode: "chart", icon: "timeline-line-chart", active: false, disabled: false },
+        { mode: "table", label: "Table", icon: "th", active: true, disabled: false },
+        { mode: "chart", label: "Chart", icon: "timeline-line-chart", active: false, disabled: false },
     ],
     overflowEnabled: true,
 });
@@ -56,8 +56,8 @@ assert.deepEqual(buildReportBuilderDesktopResultHeaderState({
     },
     editChartEnabled: false,
     viewToggleModes: [
-        { mode: "table", icon: "th", active: true, disabled: false },
-        { mode: "chart", icon: "timeline-line-chart", active: false, disabled: true },
+        { mode: "table", label: "Table", icon: "th", active: true, disabled: false },
+        { mode: "chart", label: "Chart", icon: "timeline-line-chart", active: false, disabled: true },
     ],
     overflowEnabled: false,
 });
@@ -89,8 +89,8 @@ assert.deepEqual(buildReportBuilderDesktopResultHeaderState({
     },
     editChartEnabled: true,
     viewToggleModes: [
-        { mode: "table", icon: "th", active: false, disabled: false },
-        { mode: "chart", icon: "timeline-line-chart", active: true, disabled: false },
+        { mode: "table", label: "Table", icon: "th", active: false, disabled: false },
+        { mode: "chart", label: "Chart", icon: "timeline-line-chart", active: true, disabled: false },
     ],
     overflowEnabled: true,
 });

@@ -174,23 +174,23 @@ assert.deepEqual(
 assert.deepEqual(
     resolveCompactSemanticSummaryItems({
         semanticMetaChips: [
-            "Raw mode",
-            "Provider unavailable",
+            "No data model",
+            "Data model source unavailable",
         ],
     }),
     [
-        "Raw mode",
-        "Provider unavailable",
+        "No data model",
+        "Data model source unavailable",
     ],
 );
 
 assert.equal(
     resolveCompactSemanticActionLabel({
-        semanticTitle: "Semantic modeling inactive",
+        semanticTitle: "No data model configured",
         tone: "info",
         activationCount: 0,
     }),
-    "Semantic setup",
+    "Data model setup",
 );
 
 assert.equal(
@@ -199,7 +199,7 @@ assert.equal(
         tone: "warning",
         diagnosticsCount: 2,
     }),
-    "Model issues",
+    "Data model issues",
 );
 
 assert.equal(
@@ -207,31 +207,31 @@ assert.equal(
         semanticTitle: "Semantic Binding",
         tone: "info",
     }),
-    "Model",
+    "Data model",
 );
 
 assert.equal(
     resolveCompactSemanticActionLabel({
-        semanticTitle: "Semantic modeling inactive",
+        semanticTitle: "No data model configured",
         activationCount: 1,
     }),
-    "Activate semantic",
+    "Activate data model",
 );
 
 assert.equal(
     resolveCompactSemanticHintText({
-        semanticTitle: "Semantic modeling inactive",
+        semanticTitle: "No data model configured",
         activationCount: 0,
     }),
-    "Load a semantic report file to switch this builder from raw mode to model-backed mappings.",
+    "Load a report file to switch this builder from raw mode to data-model mappings.",
 );
 
 assert.equal(
     resolveCompactSemanticHintText({
-        semanticTitle: "Semantic modeling inactive",
+        semanticTitle: "No data model configured",
         activationCount: 1,
     }),
-    "A semantic report is ready to activate from this workspace.",
+    "A data-model report is ready to activate from this workspace.",
 );
 
 console.log("reportBuilderCompactState ✓");

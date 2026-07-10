@@ -6,7 +6,7 @@ assert.equal(buildReportBuilderSemanticWorkspaceActivationState(), null);
 
 assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
     semanticWorkspacePanelState: {
-        title: "Semantic modeling inactive",
+        title: "No data model configured",
     },
     importedLocalReopenablePanelState: {
         entries: [
@@ -39,8 +39,8 @@ assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
         ],
     },
 }), {
-    title: "Activate semantic mode",
-    description: "Load a semantic report file or activate an imported semantic report to switch this builder from raw mode to model-backed mappings.",
+    title: "Activate data model",
+    description: "Load a report file or activate an imported data model to switch this builder from raw mode to data-model mappings.",
     entries: [
         {
             id: "reopenable::reopenable-1",
@@ -71,7 +71,7 @@ assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
 
 assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
     semanticWorkspacePanelState: {
-        title: "Semantic model unavailable",
+        title: "Data model unavailable",
     },
     importedLocalSavedRecordPanelState: {
         entries: [
@@ -85,8 +85,8 @@ assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
         ],
     },
 }), {
-    title: "Activate semantic mode",
-    description: "Load a semantic report file or activate an imported semantic report to restore model-backed mappings in this builder.",
+    title: "Activate data model",
+    description: "Load a report file or activate an imported data model to restore data-model mappings in this builder.",
     entries: [
         {
             id: "savedRecord::saved-record-1",
@@ -105,7 +105,7 @@ assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
 
 assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
     semanticWorkspacePanelState: {
-        title: "Semantic model error",
+        title: "Data model failed to load",
     },
     importedLocalReopenablePanelState: {
         entries: [
@@ -118,8 +118,8 @@ assert.deepEqual(buildReportBuilderSemanticWorkspaceActivationState({
         ],
     },
 }), {
-    title: "Activate semantic mode",
-    description: "Load a semantic report file or activate an imported semantic report to restore model-backed mappings in this builder.",
+    title: "Activate data model",
+    description: "Load a report file or activate an imported data model to restore data-model mappings in this builder.",
     entries: [
         {
             id: "reopenable::reopenable-1",

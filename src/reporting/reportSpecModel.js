@@ -11,12 +11,20 @@ import {
   validateReportBuilderChartSpec,
 } from "../components/dashboard/reportBuilderUtils.js";
 import { buildReportBuilderCalculatedFieldConfig } from "../components/dashboard/reportBuilderCalculatedFieldAuthoring.js";
+import { resolveReportBuilderScopeParamFilters } from "../components/dashboard/reportBuilderPredicates.js";
 import { buildReportBuilderStaticDatasetDeclarations } from "../components/dashboard/reportBuilderStaticDatasets.js";
-import { getScopeParamValue } from "./scopeStateModel.js";
+import { normalizeReportBuilderPublishedDataSources as normalizePublishedDataSources } from "./reportBuilderPublishedDatasetModel.js";
+import { buildReportBuilderScopeParams } from "./reportBuilderScopeParamModel.js";
+import { getScopeParamValue, resolveScopeParamId } from "./scopeStateModel.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
 import { normalizeReportCalculatedFields } from "./calculatedFieldModel.js";
 import { resolveReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
 import { normalizeReportTableCellVisual } from "./tableVisualSpec.js";
+import { shouldKeepPrimaryDataset } from "./reportPrimaryDatasetModel.js";
+import { isReportDatasetBackedBlockKind } from "./reportBlockKindModel.js";
+import { resolveReportScopeContextPresetFromState } from "./reportContextPresetModel.js";
+import { normalizeReportDatasetScope } from "./reportDatasetScopeModel.js";
+import { resolveReportDatasetScopePolicy } from "./reportDatasetScopeModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -55,6 +63,30 @@ function setNestedValue(target, path, value) {
   cursor[segments[segments.length - 1]] = value;
 }
 
+function mergeReportDatasetRequestValues(base = {}, patch = {}, {
+  patchWins = true,
+} = {}) {
+  const normalizedBase = isPlainObject(base) ? cloneValue(base) : {};
+  const normalizedPatch = isPlainObject(patch) ? cloneValue(patch) : {};
+  const result = {
+    ...normalizedBase,
+  };
+  Object.keys(normalizedPatch).forEach((key) => {
+    const baseValue = result[key];
+    const patchValue = normalizedPatch[key];
+    if (isPlainObject(baseValue) && isPlainObject(patchValue)) {
+      result[key] = mergeReportDatasetRequestValues(baseValue, patchValue, {
+        patchWins,
+      });
+      return;
+    }
+    result[key] = patchWins || !Object.prototype.hasOwnProperty.call(result, key)
+      ? cloneValue(patchValue)
+      : cloneValue(baseValue);
+  });
+  return result;
+}
+
 function normalizeStringArray(values = []) {
   return (Array.isArray(values) ? values : [])
     .map((value) => normalizeString(value))
@@ -84,31 +116,62 @@ function resolveReportSpecDataSourceRef(container = {}, config = {}) {
 }
 
 export function normalizeReportBuilderPublishedDataSources(config = {}) {
-  return (Array.isArray(config?.dataSources) ? config.dataSources : [])
-    .map((entry) => {
-      if (!isPlainObject(entry)) {
-        return null;
-      }
-      const id = normalizeString(entry?.id || entry?.dataSourceRef || entry?.value);
-      const dataSourceRef = normalizeString(entry?.dataSourceRef || entry?.value || entry?.id);
-      if (!id || !dataSourceRef) {
-        return null;
-      }
-      return {
-        id,
-        dataSourceRef,
-        label: normalizeString(entry?.label || dataSourceRef),
-        description: normalizeString(entry?.description),
-        kindLabel: normalizeString(entry?.kindLabel || entry?.kind),
-        request: isPlainObject(entry?.request) ? cloneValue(entry.request) : null,
-        columnOptions: Array.isArray(entry?.columnOptions) ? cloneValue(entry.columnOptions) : [],
-        valueFieldOptions: Array.isArray(entry?.valueFieldOptions) ? cloneValue(entry.valueFieldOptions) : [],
-        secondaryFieldOptions: Array.isArray(entry?.secondaryFieldOptions) ? cloneValue(entry.secondaryFieldOptions) : [],
-        chartFieldOptions: Array.isArray(entry?.chartFieldOptions) ? cloneValue(entry.chartFieldOptions) : [],
-        scopeParamOptions: Array.isArray(entry?.scopeParamOptions) ? cloneValue(entry.scopeParamOptions) : [],
-      };
-    })
-    .filter(Boolean);
+  return normalizePublishedDataSources(config);
+}
+
+// Legacy document-shaped specs may carry thin scope params (id/value only)
+// while the filter metadata still lives on an embedded reportBuilderBlock
+// config. Enrich those params here so consumers can rely on scope.params
+// alone; fully described specs pass through with a plain clone.
+export function normalizeReportSpecScopeParams(reportSpec = {}) {
+  const scopeParams = Array.isArray(reportSpec?.scope?.params) ? cloneValue(reportSpec.scope.params) : [];
+  if (scopeParams.length === 0) {
+    return [];
+  }
+  if (scopeParams.every((entry) => normalizeString(entry?.label) && normalizeString(entry?.kind))) {
+    return scopeParams;
+  }
+  const reportBuilderBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
+    .find((entry) => normalizeString(entry?.kind) === "reportBuilderBlock") || null;
+  const reportBuilderConfig = isPlainObject(reportBuilderBlock?.config)
+    ? reportBuilderBlock.config
+    : {};
+  const primaryDataset = (Array.isArray(reportSpec?.datasets) ? reportSpec.datasets : [])
+    .find((dataset) => normalizeString(dataset?.id) === "primary" && !Array.isArray(dataset?.rows)) || null;
+  const filterIndex = new Map(
+    [
+      ...resolveReportBuilderScopeParamFilters(reportBuilderConfig),
+      ...(Array.isArray(primaryDataset?.scopeParamOptions) ? primaryDataset.scopeParamOptions.map((entry) => ({
+        id: normalizeString(entry?.value || entry?.id),
+        label: normalizeString(entry?.label || entry?.value || entry?.id),
+        type: normalizeString(entry?.kind || "value"),
+        ...(entry?.multiple === true ? { multiple: true } : {}),
+        ...(normalizeString(entry?.presentation) ? { presentation: normalizeString(entry.presentation) } : {}),
+        ...(entry?.required === true ? { required: true } : {}),
+        ...(Array.isArray(entry?.options) ? { options: cloneValue(entry.options) } : {}),
+        ...(normalizeString(entry?.description) ? { description: normalizeString(entry.description) } : {}),
+      })) : []),
+    ]
+      .map((filter) => [resolveScopeParamId(filter), filter])
+      .filter(([id]) => !!id),
+  );
+  return scopeParams.map((scopeParam) => {
+    const paramId = normalizeString(scopeParam?.id);
+    const filter = filterIndex.get(paramId) || null;
+    if (!filter) {
+      return scopeParam;
+    }
+    return {
+      ...scopeParam,
+      ...(normalizeString(scopeParam?.label || filter?.label || paramId) ? { label: normalizeString(scopeParam?.label || filter?.label || paramId) } : {}),
+      ...(normalizeString(scopeParam?.kind || filter?.type) ? { kind: normalizeString(scopeParam?.kind || filter?.type) } : {}),
+      ...((scopeParam?.multiple === true || filter?.multiple === true) ? { multiple: true } : {}),
+      ...(normalizeString(scopeParam?.presentation || filter?.presentation) ? { presentation: normalizeString(scopeParam?.presentation || filter?.presentation) } : {}),
+      ...((scopeParam?.required === true || filter?.required === true) ? { required: true } : {}),
+      ...(Array.isArray(scopeParam?.options) ? { options: cloneValue(scopeParam.options) } : (Array.isArray(filter?.options) ? { options: cloneValue(filter.options) } : {})),
+      ...(normalizeString(scopeParam?.description || filter?.description) ? { description: normalizeString(scopeParam?.description || filter?.description) } : {}),
+    };
+  });
 }
 
 export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null) {
@@ -177,12 +240,19 @@ function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, data
   if (!request) {
     return null;
   }
+  const scopePolicy = resolveReportDatasetScopePolicy(source?.scope);
+  const excludedParamIds = new Set(Array.isArray(scopePolicy?.exclude) ? scopePolicy.exclude : []);
+  const contextPatch = {};
   (Array.isArray(source?.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
     const paramId = normalizeString(option?.id || option?.value);
     if (!paramId) {
       return;
     }
-    const rawValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId)
+    const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
+    if (!hasDatasetScopedValue && excludedParamIds.has(paramId)) {
+      return;
+    }
+    const rawValue = hasDatasetScopedValue
       ? datasetScopeParamValues[paramId]
       : getScopeParamValue(state, paramId);
     const kind = normalizeString(option?.kind || "");
@@ -190,10 +260,10 @@ function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, data
       const startParamPath = normalizeString(option?.startParamPath);
       const endParamPath = normalizeString(option?.endParamPath);
       if (normalizeString(rawValue?.start) && startParamPath) {
-        setNestedValue(request, startParamPath, rawValue.start);
+        setNestedValue(contextPatch, startParamPath, rawValue.start);
       }
       if (normalizeString(rawValue?.end) && endParamPath) {
-        setNestedValue(request, endParamPath, rawValue.end);
+        setNestedValue(contextPatch, endParamPath, rawValue.end);
       }
       return;
     }
@@ -204,9 +274,24 @@ function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, data
     if (!paramPath) {
       return;
     }
-    setNestedValue(request, paramPath, cloneValue(rawValue));
+    setNestedValue(contextPatch, paramPath, cloneValue(rawValue));
   });
-  return request;
+  const localPatch = isPlainObject(scopePolicy?.local) ? scopePolicy.local : {};
+  if (scopePolicy.mode === "append") {
+    return mergeReportDatasetRequestValues(
+      mergeReportDatasetRequestValues(request, localPatch, { patchWins: true }),
+      contextPatch,
+      { patchWins: true },
+    );
+  }
+  if (scopePolicy.mode === "override" || scopePolicy.mode === "exclude") {
+    return mergeReportDatasetRequestValues(
+      mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true }),
+      localPatch,
+      { patchWins: true },
+    );
+  }
+  return mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true });
 }
 
 export function buildReportBuilderPublishedDatasetDeclarations(config = {}, state = {}, referencedDatasetRefs = new Set(), runtimeDatasetScopeParams = null) {
@@ -234,6 +319,10 @@ export function buildReportBuilderPublishedDatasetDeclarations(config = {}, stat
       return {
         id: matchedRef,
         dataSourceRef: source.dataSourceRef,
+        ...(normalizeReportDatasetScope(source?.scope) ? { scope: normalizeReportDatasetScope(source?.scope) } : {}),
+        ...(isPlainObject(source?.source) ? { source: cloneValue(source.source) } : {}),
+        ...(isPlainObject(source?.resultContract) ? { resultContract: cloneValue(source.resultContract) } : {}),
+        ...(isPlainObject(source?.capabilities) ? { capabilities: cloneValue(source.capabilities) } : {}),
         request,
       };
     })
@@ -454,13 +543,28 @@ export function buildReportBuilderReportSpec({
   const calculatedFields = buildReportSpecCalculatedFields(effectiveConfig, normalizedState);
   const drillMetadata = buildReportSpecDrillMetadata(effectiveConfig, normalizedState);
   const normalizedSemanticSummary = normalizeSemanticSummary(semanticSummary);
+  const scopeParams = buildReportBuilderScopeParams(effectiveConfig, normalizedState);
+  const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
   const referencedDatasetRefs = new Set(
     (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
       .map((block) => normalizeString(block?.datasetRef))
       .filter((datasetRef) => !!datasetRef && datasetRef !== "primary"),
   );
+  const authoredDatasetBackedBlocks = (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
+    .filter((block) => isReportDatasetBackedBlockKind(block?.kind));
   const publishedDatasets = buildReportBuilderPublishedDatasetDeclarations(effectiveConfig, normalizedState, referencedDatasetRefs);
   const staticDatasets = buildReportBuilderStaticDatasetDeclarations(normalizedState?.reportStaticDatasets);
+  const explicitDatasetRefs = authoredDatasetBackedBlocks
+    .map((block) => normalizeString(block?.datasetRef))
+    .filter(Boolean);
+  const shouldIncludePrimaryDataset = shouldKeepPrimaryDataset({
+    includePrimaryBlocks,
+    datasetBackedBlockDatasetRefs: explicitDatasetRefs.length === authoredDatasetBackedBlocks.length ? explicitDatasetRefs : [],
+    availableNonPrimaryDatasetRefs: [
+      ...publishedDatasets.map((dataset) => normalizeString(dataset?.id)),
+      ...staticDatasets.map((dataset) => normalizeString(dataset?.id)),
+    ],
+  });
   const chartBlock = chartSpec
     ? buildReportSpecChartBlock({
       container,
@@ -508,12 +612,21 @@ export function buildReportBuilderReportSpec({
     ...(drillMetadata ? { drillMetadata: cloneValue(drillMetadata) } : {}),
     refinements: normalizedRefinements,
     calculatedFields,
+    scope: {
+      ...(contextPreset ? { contextPreset: cloneValue(contextPreset) } : {}),
+      params: scopeParams,
+      dataSourceRef: resolveReportSpecDataSourceRef(container, config),
+    },
     datasets: [
-      {
+      ...(shouldIncludePrimaryDataset ? [{
         id: "primary",
         dataSourceRef: resolveReportSpecDataSourceRef(container, config),
+        ...(normalizeReportDatasetScope(config?.scope) ? { scope: normalizeReportDatasetScope(config?.scope) } : {}),
+        ...(isPlainObject(config?.source) ? { source: cloneValue(config.source) } : {}),
+        ...(isPlainObject(config?.resultContract) ? { resultContract: cloneValue(config.resultContract) } : {}),
+        ...(isPlainObject(config?.capabilities) ? { capabilities: cloneValue(config.capabilities) } : {}),
         request: cloneValue(request),
-      },
+      }] : []),
       ...publishedDatasets,
       ...staticDatasets,
     ],

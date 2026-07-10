@@ -2672,6 +2672,7 @@ const sourceLessLocalListResponse = {
     entries: [
         {
             reportRef: { reportId: "demoReportBuilder" },
+            artifactId: "reportBuilder.savedReportPayload::rbreport_rbexploration_rbexplore_1000_5000::rbexploration_rbexplore_1000_5000::demoReportBuilder",
             documentVersion: 11,
             title: "Exploration Demo",
         },
@@ -3293,6 +3294,7 @@ assert.deepEqual(listResponse, {
     entries: [
         {
             reportRef: { reportId: "demoReportBuilder" },
+            artifactId: "reportBuilder.savedReportPayload::rbreport_rbexploration_rbexplore_1000_5000::rbexploration_rbexplore_1000_5000::demoReportBuilder",
             documentVersion: 11,
             title: "Exploration Demo",
             subtitle: "Executive Snapshot",
@@ -3370,6 +3372,7 @@ assert.deepEqual(listResponse, {
         },
         {
             reportRef: { reportId: "capacityQ3" },
+            artifactId: "reportBuilder.savedReportPayload::rbreport_capacity_q3_inventory_ladder::capacity_q3_inventory_ladder::capacityQ3",
             documentVersion: 4,
             title: "Capacity Q3",
             savedAt: 8900,
@@ -3389,6 +3392,7 @@ assert.deepEqual(listResponse, {
         },
         {
             reportRef: { reportId: "capacityLocationQ3" },
+            artifactId: "reportBuilder.savedReportPayload::rbreport_capacity_q3_location_ladder::capacity_q3_location_ladder::capacityLocationQ3",
             documentVersion: 5,
             title: "Capacity Location Q3",
             savedAt: 8950,
@@ -3408,6 +3412,7 @@ assert.deepEqual(listResponse, {
         },
         {
             reportRef: { reportId: "capacityTrendQ3" },
+            artifactId: "reportBuilder.savedReportPayload::rbreport_capacity_q3_trend::capacity_q3_trend::capacityTrendQ3",
             documentVersion: 6,
             title: "Capacity Trend Q3",
             savedAt: 8990,
@@ -3425,6 +3430,7 @@ assert.deepEqual(listResponse, {
         },
         {
             reportRef: { reportId: "capacityInventoryTopChannelsQ3" },
+            artifactId: "reportBuilder.savedReportPayload::rbreport_capacity_q3_inventory_top_channels::capacity_q3_inventory_top_channels::capacityInventoryTopChannelsQ3",
             documentVersion: 7,
             title: "Capacity Inventory Top Channels Q3",
             savedAt: 8995,
@@ -3444,6 +3450,7 @@ assert.deepEqual(listResponse, {
         },
         {
             reportRef: { reportId: "capacityLocationsTopMarketsQ3" },
+            artifactId: "reportBuilder.savedReportPayload::rbreport_capacity_q3_locations_top_markets::capacity_q3_locations_top_markets::capacityLocationsTopMarketsQ3",
             documentVersion: 8,
             title: "Capacity Locations Top Markets Q3",
             savedAt: 8998,
@@ -3881,6 +3888,8 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(list
             description: "Approved reporting window for semantic preview.",
         },
     ],
+    artifactId: "reportBuilder.savedReportPayload::rbreport_rbexploration_rbexplore_1000_5000::rbexploration_rbexplore_1000_5000::demoReportBuilder",
+    sourceArtifactId: "rbexploration_rbexplore_1000_5000",
     content: serializeReportBuilderReportDocumentReadResponse(listResponse),
 });
 assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(listResponse, {
@@ -3914,6 +3923,8 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(list
     },
     templateId: "capacity_inventory_brief",
     templateLabel: "Capacity Inventory Brief",
+    artifactId: "reportBuilder.savedReportPayload::rbreport_capacity_q3_inventory_ladder::capacity_q3_inventory_ladder::capacityQ3",
+    sourceArtifactId: "capacity_q3_inventory_ladder",
     content: serializeReportBuilderReportDocumentReadResponse(listResponse),
 });
 assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(semanticSpecListResponse, {
@@ -3997,6 +4008,8 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
             description: "Approved reporting window for semantic preview.",
         },
     ],
+    artifactId: "reportBuilder.savedReportPayload::rbreport_rbexploration_rbexplore_1000_5000::rbexploration_rbexplore_1000_5000::demoReportBuilder",
+    sourceArtifactId: "rbexploration_rbexplore_1000_5000",
     content: serializeReportBuilderReportDocumentReadResponse(semanticSpecListResponse),
 });
 
@@ -4090,6 +4103,8 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
             description: "Approved reporting window for semantic preview.",
         },
     ],
+    artifactId: "reportBuilder.savedReportPayload::rbreport_rbexploration_rbexplore_1000_5000::rbexploration_rbexplore_1000_5000::demoReportBuilder",
+    sourceArtifactId: "rbexploration_rbexplore_1000_5000",
     content: serializeReportBuilderReportDocumentReadResponse(semanticSpecListResponse),
 });
 assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(directSemanticListResponse, {

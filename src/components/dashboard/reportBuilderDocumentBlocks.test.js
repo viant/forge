@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+    buildReportBuilderDatasetOptions,
     buildReportBuilderScopeParamSummary,
     buildReportBuilderScopeSummaryFromParams,
     buildReportBuilderDocumentCompileValidation,
@@ -125,6 +126,41 @@ assert.deepEqual(unscopedDatasetFilterBarDraft, {
     paramIds: [],
 });
 
+const multiDatasetDefaultTableDraft = buildReportBuilderDocumentBlockDraft("tableBlock", null, {
+    datasetOptions: [
+        { value: "primary" },
+        { value: "segment_status_csv" },
+    ],
+    tableColumnOptions: [
+        { key: "eventDate", label: "Event Date", kind: "dimension", selected: true },
+        { key: "avails", label: "Avails", kind: "measure", selected: true },
+    ],
+});
+assert.equal(multiDatasetDefaultTableDraft.datasetRef, "primary");
+
+const staticDatasetTableDraft = buildReportBuilderDocumentBlockDraft("tableBlock", {
+    datasetRef: "regional_mix_csv",
+}, {
+    datasetOptions: [
+        { value: "primary" },
+        {
+            value: "regional_mix_csv",
+            columnOptions: [
+                { key: "region", label: "Region", kind: "dimension" },
+                { key: "forecastRevenue", label: "ForecastRevenue", kind: "measure" },
+                { key: "share", label: "Share", kind: "measure" },
+            ],
+        },
+    ],
+    tableColumnOptions: [
+        { key: "eventDate", label: "Event Date", kind: "dimension", selected: true },
+        { key: "avails", label: "Avails", kind: "measure", selected: true },
+    ],
+});
+assert.equal(staticDatasetTableDraft.datasetRef, "regional_mix_csv");
+assert.deepEqual(staticDatasetTableDraft.columnKeys, ["region", "forecastRevenue", "share"]);
+assert.deepEqual(staticDatasetTableDraft.columns.map((column) => column.key), ["region", "forecastRevenue", "share"]);
+
 assert.deepEqual(buildReportBuilderScopeParamSummary(["dateRange", "channelsFilter"], [
     { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "dateRange", required: true },
     { value: "channelsFilter", label: "Channels", description: "Approved channel scope for the authored report.", kind: "multiSelect", required: false },
@@ -197,6 +233,307 @@ assert.deepEqual(chartBlockDraft, {
     },
 });
 
+const chartBlockDatasetDefaultDraft = buildReportBuilderDocumentBlockDraft("chartBlock", null, {
+    datasetOptions: [
+        { value: "primary", scopeParamOptions: [] },
+        { value: "reach_summary", scopeParamOptions: [] },
+    ],
+    chartConfig: {
+        measures: [{ id: "avails", key: "avails", label: "Avails" }],
+        dimensions: [{ id: "eventDate", key: "eventDate", label: "Event Date", chartAxis: true }],
+        result: {
+            supportedChartTypes: ["line", "horizontal_bar"],
+        },
+    },
+    chartState: {
+        selectedMeasures: ["avails"],
+        primaryMeasure: "avails",
+        selectedDimensions: ["eventDate"],
+    },
+});
+assert.equal(chartBlockDatasetDefaultDraft.datasetRef, "primary");
+
+const chartBlockStaticDatasetDraft = buildReportBuilderDocumentBlockDraft("chartBlock", {
+    datasetRef: "regional_mix_csv",
+}, {
+    datasetOptions: [
+        { value: "primary", scopeParamOptions: [] },
+        {
+            value: "regional_mix_csv",
+            chartFieldOptions: [
+                { key: "region", label: "Region", kind: "dimension" },
+                { key: "forecastRevenue", label: "Forecast Revenue", kind: "measure" },
+                { key: "share", label: "Share", kind: "measure" },
+            ],
+        },
+    ],
+    chartConfig: {
+        measures: [{ id: "avails", key: "avails", label: "Avails" }],
+        dimensions: [{ id: "eventDate", key: "eventDate", label: "Event Date", chartAxis: true }],
+        result: {
+            supportedChartTypes: ["line", "horizontal_bar"],
+        },
+    },
+    chartState: {
+        selectedMeasures: ["avails"],
+        primaryMeasure: "avails",
+        selectedDimensions: ["eventDate"],
+    },
+});
+assert.deepEqual(chartBlockStaticDatasetDraft, {
+    kind: "chartBlock",
+    id: "chartBlock",
+    title: "Chart",
+    datasetRef: "regional_mix_csv",
+    chartSpec: {
+        title: "Chart",
+        type: "bar",
+        xField: "region",
+        yFields: ["forecastRevenue"],
+    },
+});
+
+assert.deepEqual(buildReportBuilderDatasetOptions({
+    currentSourceRef: "demoReportSource",
+    configuredSources: [
+        {
+            id: "reach_summary",
+            dataSourceRef: "reachSummarySource",
+            label: "Reach Summary",
+            kindLabel: "published",
+            dimensions: [
+                { id: "country", key: "country", label: "Country", default: true },
+            ],
+            measures: [
+                { id: "avails", key: "avails", label: "Avails", format: "compactNumber", default: true },
+            ],
+            source: {
+                kind: "mcp",
+                toolName: "demo:reach_summary",
+            },
+            request: {
+                filters: {
+                    country: ["US"],
+                },
+            },
+            resultContract: {
+                shape: "rowSet",
+                rowPath: "payload.records",
+            },
+            capabilities: {
+                backendRefetch: true,
+            },
+            scope: {
+                inheritContext: true,
+            },
+            scopeParamOptions: [{ value: "reachCountry", label: "Reach Country" }],
+        },
+    ],
+    staticDatasets: [],
+    tableColumnOptions: [{ key: "country", label: "Country", kind: "dimension" }],
+    valueFieldOptions: [{ value: "avails", label: "Avails" }],
+    secondaryFieldOptions: [{ value: "country", label: "Country" }],
+    chartFieldOptions: [{ key: "avails", label: "Avails", kind: "measure" }],
+    scopeParamOptions: [{ value: "dateRange", label: "Date Range", kind: "dateRange", required: true }],
+}), [
+    {
+        value: "primary",
+        dataSourceRef: "demoReportSource",
+        label: "demoReportSource",
+        description: "",
+        kindLabel: "published",
+        columnOptions: [{ key: "country", label: "Country", kind: "dimension" }],
+        valueFieldOptions: [{ value: "avails", label: "Avails" }],
+        secondaryFieldOptions: [{ value: "country", label: "Country" }],
+        chartFieldOptions: [{ key: "avails", label: "Avails", kind: "measure" }],
+        scopeParamOptions: [{ value: "dateRange", label: "Date Range", kind: "dateRange", required: true }],
+    },
+    {
+        value: "reach_summary",
+        dataSourceRef: "reachSummarySource",
+        label: "Reach Summary",
+        description: "",
+        kindLabel: "published",
+        request: {
+            filters: {
+                country: ["US"],
+            },
+        },
+        source: {
+            kind: "mcp",
+            toolName: "demo:reach_summary",
+        },
+        resultContract: {
+            shape: "rowSet",
+            rowPath: "payload.records",
+        },
+        capabilities: {
+            backendRefetch: true,
+        },
+        scope: {
+            inheritContext: true,
+        },
+        columnOptions: [
+            { key: "country", label: "Country", kind: "dimension", sourceKey: "country", default: true },
+            { key: "avails", label: "Avails", kind: "measure", sourceKey: "avails", format: "compactNumber", default: true },
+        ],
+        valueFieldOptions: [
+            { value: "avails", label: "Avails", format: "compactNumber", default: true },
+        ],
+        secondaryFieldOptions: [
+            { value: "country", label: "Country", default: true },
+        ],
+        chartFieldOptions: [
+            { key: "country", aliases: ["country"], label: "Country", kind: "dimension", default: true },
+            { key: "avails", aliases: ["avails"], label: "Avails", kind: "measure", format: "compactNumber", default: true },
+        ],
+        scopeParamOptions: [{ value: "reachCountry", label: "Reach Country" }],
+    },
+]);
+
+const fieldOptionsWithDatasets = buildReportBuilderDocumentBlockFieldOptions({
+    config: {
+        dataSourceRef: "demoReportSource",
+        measures: [{ id: "avails", key: "avails", label: "Avails", default: true, format: "compactNumber" }],
+        dimensions: [{ id: "country", key: "country", label: "Country", default: true }],
+        staticFilters: [{ id: "dateRange", type: "dateRange", required: true }],
+        result: { defaultMode: "table" },
+        datasets: [
+            {
+                id: "reach_summary",
+                dataSourceRef: "reachSummarySource",
+                label: "Reach Summary",
+                kindLabel: "published",
+                scopeParamOptions: [{ value: "reachCountry", label: "Reach Country" }],
+            },
+        ],
+    },
+    state: {
+        selectedMeasures: ["avails"],
+        primaryMeasure: "avails",
+        selectedDimensions: ["country"],
+    },
+    currentSourceRef: "demoReportSource",
+});
+assert.equal(Array.isArray(fieldOptionsWithDatasets.datasetOptions), true);
+assert.equal(fieldOptionsWithDatasets.datasetOptions.some((option) => option.value === "primary"), true);
+assert.equal(fieldOptionsWithDatasets.datasetOptions.some((option) => option.value === "reach_summary"), true);
+
+const fieldOptionsWithDocumentDatasetCatalog = buildReportBuilderDocumentBlockFieldOptions({
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        datasets: [
+            {
+                id: "primary",
+                dataSourceRef: "demoReportSource",
+                label: "Primary",
+                kindLabel: "primary",
+                columnOptions: [
+                    { key: "country", label: "Country", kind: "dimension" },
+                    { key: "avails", label: "Avails", kind: "measure", format: "compactNumber" },
+                ],
+                valueFieldOptions: [{ value: "avails", label: "Avails", format: "compactNumber" }],
+                secondaryFieldOptions: [{ value: "country", label: "Country" }],
+                chartFieldOptions: [
+                    { key: "country", label: "Country", kind: "dimension" },
+                    { key: "avails", label: "Avails", kind: "measure", format: "compactNumber" },
+                ],
+                scopeParamOptions: [{ value: "dateRange", label: "Date Range", kind: "dateRange", required: true }],
+            },
+            {
+                id: "reach_summary",
+                dataSourceRef: "reachSummarySource",
+                label: "Reach Summary",
+                kindLabel: "published",
+                scopeParamOptions: [{ value: "reachCountry", label: "Reach Country" }],
+            },
+        ],
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    dataSourceRef: "demoReportSource",
+                },
+                config: {
+                    dataSourceRef: "demoReportSource",
+                    measures: [{ id: "avails", key: "avails", label: "Avails", default: true, format: "compactNumber" }],
+                    dimensions: [{ id: "country", key: "country", label: "Country", default: true }],
+                    staticFilters: [{ id: "dateRange", type: "dateRange", required: true }],
+                    result: { defaultMode: "table" },
+                },
+                state: {
+                    selectedMeasures: ["avails"],
+                    primaryMeasure: "avails",
+                    selectedDimensions: ["country"],
+                },
+            },
+        ],
+    },
+});
+assert.equal(fieldOptionsWithDocumentDatasetCatalog.datasetOptions.some((option) => option.value === "reach_summary"), true);
+
+const fieldOptionsWithPrimaryDocumentDatasetFallback = buildReportBuilderDocumentBlockFieldOptions({
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+        },
+        datasets: [
+            {
+                id: "primary",
+                dataSourceRef: "demoReportSource",
+                label: "Primary",
+                kindLabel: "primary",
+                columnOptions: [
+                    { key: "country", label: "Country", kind: "dimension" },
+                    { key: "avails", label: "Avails", kind: "measure", format: "compactNumber" },
+                ],
+                valueFieldOptions: [{ value: "avails", label: "Avails", format: "compactNumber" }],
+                secondaryFieldOptions: [{ value: "country", label: "Country" }],
+                chartFieldOptions: [
+                    { key: "country", label: "Country", kind: "dimension" },
+                    { key: "avails", label: "Avails", kind: "measure", format: "compactNumber" },
+                ],
+                scopeParamOptions: [{ value: "dateRange", label: "Date Range", kind: "dateRange", required: true }],
+            },
+            {
+                id: "reach_summary",
+                dataSourceRef: "reachSummarySource",
+                label: "Reach Summary",
+                kindLabel: "published",
+                scopeParamOptions: [{ value: "reachCountry", label: "Reach Country" }],
+            },
+        ],
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    dataSourceRef: "demoReportSource",
+                },
+                state: {
+                    selectedMeasures: ["avails"],
+                    primaryMeasure: "avails",
+                    selectedDimensions: ["country"],
+                },
+            },
+        ],
+    },
+});
+assert.deepEqual(fieldOptionsWithPrimaryDocumentDatasetFallback.valueFieldOptions, [
+    { value: "avails", label: "Avails", format: "compactNumber" },
+]);
+assert.deepEqual(fieldOptionsWithPrimaryDocumentDatasetFallback.secondaryFieldOptions, [
+    { value: "country", label: "Country" },
+]);
+assert.equal(fieldOptionsWithPrimaryDocumentDatasetFallback.datasetOptions.some((option) => option.value === "primary"), true);
+assert.equal(fieldOptionsWithPrimaryDocumentDatasetFallback.datasetOptions.some((option) => option.value === "reach_summary"), true);
+
 const geoMapDraft = buildReportBuilderDocumentBlockDraft("geoMapBlock", null, {
     tableColumnOptions: [
         { key: "country", label: "Country", kind: "dimension" },
@@ -218,6 +555,48 @@ assert.deepEqual(geoMapDraft, {
         },
         aggregate: "sum",
     },
+});
+
+const kpiDatasetDefaultDraft = buildReportBuilderDocumentBlockDraft("kpiBlock", null, {
+    datasetOptions: [
+        { value: "primary", scopeParamOptions: [] },
+        { value: "reach_summary", scopeParamOptions: [] },
+    ],
+    valueFieldOptions: [{ value: "avails", label: "Avails" }],
+    secondaryFieldOptions: [{ value: "country", label: "Country" }],
+});
+assert.equal(kpiDatasetDefaultDraft.datasetRef, "primary");
+
+const kpiStaticDatasetDraft = buildReportBuilderDocumentBlockDraft("kpiBlock", {
+    datasetRef: "regional_mix_csv",
+}, {
+    datasetOptions: [
+        { value: "primary", scopeParamOptions: [] },
+        {
+            value: "regional_mix_csv",
+            valueFieldOptions: [
+                { value: "forecastRevenue", label: "ForecastRevenue" },
+                { value: "share", label: "Share" },
+            ],
+            secondaryFieldOptions: [
+                { value: "region", label: "Region" },
+            ],
+        },
+    ],
+    valueFieldOptions: [{ value: "avails", label: "Avails" }],
+    secondaryFieldOptions: [{ value: "country", label: "Country" }],
+});
+assert.deepEqual(kpiStaticDatasetDraft, {
+    kind: "kpiBlock",
+    id: "kpiBlock",
+    title: "Headline KPI",
+    datasetRef: "regional_mix_csv",
+    valueField: "forecastRevenue",
+    valueLabel: "ForecastRevenue",
+    secondaryField: "",
+    secondaryLabel: "",
+    description: "",
+    emptyLabel: "No KPI value available.",
 });
 
 const kpiDraft = buildReportBuilderDocumentBlockDraft("kpiBlock", null, {
@@ -363,6 +742,27 @@ assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
 });
 
 assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
+    kind: "filterBarBlock",
+    id: "singleDatasetFilters",
+    title: "Filters",
+    paramIds: [],
+}, {
+    datasetOptions: [
+        {
+            value: "forecast_cube",
+            scopeParamOptions: [],
+        },
+    ],
+    scopeParamOptions: [{ value: "dateRange", label: "Date Range" }],
+}), {
+    kind: "filterBarBlock",
+    id: "singleDatasetFilters",
+    title: "Filters",
+    datasetRef: "forecast_cube",
+    paramIds: ["dateRange"],
+});
+
+assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
     kind: "tableBlock",
     id: "regionalMixTable",
     title: "Regional Mix",
@@ -432,6 +832,42 @@ assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
     secondaryLabel: "",
     description: "",
     emptyLabel: "No KPI value available.",
+});
+
+assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
+    kind: "chartBlock",
+    id: "chart1",
+    title: "Regional Revenue",
+    datasetRef: "regional_mix_csv",
+    chartSpec: {
+        title: "Regional Revenue",
+        type: "bar",
+        xField: "region",
+        yFields: ["forecastRevenue"],
+    },
+}, {
+    datasetRef: "primary",
+    datasetOptions: [
+        {
+            value: "primary",
+            chartFieldOptions: [
+                { key: "eventDate", label: "Date", kind: "dimension" },
+                { key: "channelV2", label: "Channel", kind: "dimension" },
+                { key: "avails", label: "Avails", kind: "measure" },
+            ],
+        },
+    ],
+}), {
+    kind: "chartBlock",
+    id: "chart1",
+    title: "Regional Revenue",
+    datasetRef: "primary",
+    chartSpec: {
+        title: "Regional Revenue",
+        type: "bar",
+        xField: "eventDate",
+        yFields: ["avails"],
+    },
 });
 
 assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
@@ -515,6 +951,20 @@ assert.deepEqual(validateReportBuilderDocumentBlockDraft({
             message: "Select at least one report filter for the filter bar block.",
         },
     ],
+});
+
+assert.deepEqual(validateReportBuilderDocumentBlockDraft({
+    kind: "filterBarBlock",
+    id: "singleDatasetScopeFilters",
+    paramIds: ["dateRange"],
+}, {
+    scopeParamOptions: [{ value: "dateRange", label: "Date Range" }],
+    datasetOptions: [
+        { value: "forecast_cube", scopeParamOptions: [] },
+    ],
+}), {
+    valid: true,
+    errors: [],
 });
 
 assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
@@ -1072,15 +1522,14 @@ assert.deepEqual(normalizeReportBuilderDocumentLayoutState({
     type: "stack",
     items: [
         { blockId: "narrativeIntro" },
-        { blockId: "primaryBuilder" },
         { blockId: "headlineKpi" },
     ],
 }, authoredBlocks), {
     type: "stack",
     items: [
         { blockId: "narrativeIntro" },
-        { blockId: "primaryBuilder" },
         { blockId: "headlineKpi" },
+        { blockId: "primaryBuilder" },
     ],
 });
 
@@ -1150,6 +1599,38 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
     ],
     scopeParamOptions: [
         { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "dateRange", required: true },
+    ],
+    datasetOptions: [
+        {
+            value: "primary",
+            dataSourceRef: "",
+            label: "Primary",
+            description: "",
+            kindLabel: "published",
+            columnOptions: [
+                { key: "channelV2", sourceKey: "channelV2", displayKey: "channelV2", label: "Channel", kind: "dimension", selected: true },
+                { key: "eventDate", sourceKey: "eventDate", displayKey: "eventDate", label: "Event Date", kind: "dimension", selected: false },
+                { key: "hhUniqs", sourceKey: "hhUniqs", displayKey: "hhUniqs", label: "HH Uniques", kind: "measure", selected: true },
+                { key: "avails", sourceKey: "avails", displayKey: "avails", label: "Avails", kind: "measure", selected: false },
+            ],
+            valueFieldOptions: [
+                { value: "hhUniqs", label: "HH Uniques" },
+                { value: "avails", label: "Avails" },
+            ],
+            secondaryFieldOptions: [
+                { value: "channelV2", label: "Channel" },
+                { value: "eventDate", label: "Event Date" },
+            ],
+            chartFieldOptions: [
+                { key: "channelV2", aliases: ["channelV2"], label: "Channel", kind: "dimension", format: undefined, align: undefined },
+                { key: "eventDate", aliases: ["eventDate"], label: "Event Date", kind: "dimension", format: undefined, align: undefined },
+                { key: "hhUniqs", aliases: ["hhUniqs"], label: "HH Uniques", kind: "measure", format: undefined, align: "right" },
+                { key: "avails", aliases: ["avails"], label: "Avails", kind: "measure", format: undefined, align: "right" },
+            ],
+            scopeParamOptions: [
+                { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "dateRange", required: true },
+            ],
+        },
     ],
     chartFieldOptions: [
         { key: "channelV2", aliases: ["channelV2"], label: "Channel", kind: "dimension", format: undefined, align: undefined },
@@ -1319,6 +1800,74 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
         },
     ],
     scopeParamOptions: [],
+    datasetOptions: [
+        {
+            value: "primary",
+            dataSourceRef: "",
+            label: "Primary",
+            description: "",
+            kindLabel: "published",
+            columnOptions: [
+                {
+                    key: "country",
+                    sourceKey: "country",
+                    displayKey: "country",
+                    rawId: "country_code",
+                    label: "Country",
+                    kind: "dimension",
+                    selected: true,
+                    description: "Approved market dimension.",
+                    category: "Location",
+                    definitionRef: "semantic://example/country",
+                    semanticRef: "country_code",
+                    governance: { status: "approved" },
+                },
+                {
+                    key: "avails",
+                    sourceKey: "avails",
+                    displayKey: "avails",
+                    rawId: "available_impressions",
+                    label: "Available Impressions",
+                    kind: "measure",
+                    selected: true,
+                    format: "compactNumber",
+                    description: "Certified available inventory.",
+                    category: "Metrics",
+                    semanticRef: "available_impressions",
+                    governance: { status: "approved", certification: "certified", ownerRef: "team://example/performance" },
+                },
+            ],
+            valueFieldOptions: [
+                {
+                    value: "avails",
+                    rawId: "available_impressions",
+                    label: "Available Impressions",
+                    format: "compactNumber",
+                    description: "Certified available inventory.",
+                    category: "Metrics",
+                    semanticRef: "available_impressions",
+                    governance: { status: "approved", certification: "certified", ownerRef: "team://example/performance" },
+                },
+            ],
+            secondaryFieldOptions: [
+                {
+                    value: "country",
+                    rawId: "country_code",
+                    label: "Country",
+                    description: "Approved market dimension.",
+                    category: "Location",
+                    definitionRef: "semantic://example/country",
+                    semanticRef: "country_code",
+                    governance: { status: "approved" },
+                },
+            ],
+            chartFieldOptions: [
+                { key: "country", aliases: ["country"], label: "Country", kind: "dimension", format: undefined, align: undefined },
+                { key: "avails", aliases: ["avails"], label: "Available Impressions", kind: "measure", format: "compactNumber", align: "right" },
+            ],
+            scopeParamOptions: [],
+        },
+    ],
     chartFieldOptions: [
         { key: "country", aliases: ["country"], label: "Country", kind: "dimension", format: undefined, align: undefined },
         { key: "avails", aliases: ["avails"], label: "Available Impressions", kind: "measure", format: "compactNumber", align: "right" },
@@ -1366,6 +1915,22 @@ assert.deepEqual(buildReportBuilderDocumentCompileDiagnostics({
     document: {
         version: 1,
         kind: "reportDocument",
+        datasets: [
+            {
+                id: "segment_status_csv",
+                label: "Segment Status",
+                sourceFormat: "csv",
+                columns: [
+                    { key: "segment", label: "Segment", kind: "dimension" },
+                    { key: "score", label: "Score", kind: "measure" },
+                    { key: "status", label: "Status", kind: "dimension" },
+                ],
+                rows: [
+                    { segment: "North", score: 10, status: "healthy" },
+                    { segment: "South", score: 7, status: "watch" },
+                ],
+            },
+        ],
         blocks: [
             {
                 id: "primaryBuilder",
@@ -1406,6 +1971,80 @@ assert.deepEqual(buildReportBuilderDocumentCompileDiagnostics({
     document: {
         version: 1,
         kind: "reportDocument",
+        datasets: [
+            {
+                id: "primary",
+                dataSourceRef: "demoReportSource",
+                label: "Primary",
+                kindLabel: "primary",
+                columnOptions: [
+                    { key: "eventDate", label: "Event Date", kind: "dimension" },
+                    { key: "channelV2", label: "Channel", kind: "dimension" },
+                    { key: "avails", label: "Avails", kind: "measure" },
+                ],
+                valueFieldOptions: [
+                    { value: "avails", label: "Avails" },
+                ],
+                secondaryFieldOptions: [
+                    { value: "eventDate", label: "Event Date" },
+                    { value: "channelV2", label: "Channel" },
+                ],
+                chartFieldOptions: [
+                    { key: "eventDate", label: "Event Date", kind: "dimension" },
+                    { key: "channelV2", label: "Channel", kind: "dimension" },
+                    { key: "avails", label: "Avails", kind: "measure" },
+                ],
+                scopeParamOptions: [
+                    { value: "dateRange", label: "Date Range", kind: "dateRange", required: true },
+                ],
+            },
+        ],
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    dataSourceRef: "demoReportSource",
+                },
+                state: {
+                    selectedMeasures: ["avails"],
+                    selectedDimensions: ["eventDate"],
+                },
+            },
+            {
+                id: "headlineKpi",
+                kind: "kpiBlock",
+                title: "Headline KPI",
+                datasetRef: "primary",
+                valueField: "avails",
+                valueLabel: "Avails",
+                secondaryField: "channelV2",
+                secondaryLabel: "Channel",
+            },
+        ],
+    },
+}), []);
+
+assert.deepEqual(buildReportBuilderDocumentCompileDiagnostics({
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        datasets: [
+            {
+                id: "segment_status_csv",
+                label: "Segment Status",
+                sourceFormat: "csv",
+                columns: [
+                    { key: "segment", label: "Segment", kind: "dimension" },
+                    { key: "score", label: "Score", kind: "measure" },
+                    { key: "status", label: "Status", kind: "dimension" },
+                ],
+                rows: [
+                    { segment: "North", score: 10, status: "healthy" },
+                    { segment: "South", score: 7, status: "watch" },
+                ],
+            },
+        ],
         blocks: [
             {
                 id: "primaryBuilder",
@@ -1467,6 +2106,22 @@ assert.deepEqual(buildReportBuilderDocumentCompileDiagnostics({
     document: {
         version: 1,
         kind: "reportDocument",
+        datasets: [
+            {
+                id: "segment_status_csv",
+                label: "Segment Status",
+                sourceFormat: "csv",
+                columns: [
+                    { key: "segment", label: "Segment", kind: "dimension" },
+                    { key: "score", label: "Score", kind: "measure" },
+                    { key: "status", label: "Status", kind: "dimension" },
+                ],
+                rows: [
+                    { segment: "North", score: 10, status: "healthy" },
+                    { segment: "South", score: 7, status: "watch" },
+                ],
+            },
+        ],
         blocks: [
             {
                 id: "primaryBuilder",
@@ -1482,22 +2137,6 @@ assert.deepEqual(buildReportBuilderDocumentCompileDiagnostics({
                 state: {
                     selectedMeasures: ["avails"],
                     selectedDimensions: ["eventDate"],
-                    reportStaticDatasets: [
-                        {
-                            id: "segment_status_csv",
-                            label: "Segment Status",
-                            sourceFormat: "csv",
-                            columns: [
-                                { key: "segment", label: "Segment", kind: "dimension" },
-                                { key: "score", label: "Score", kind: "measure" },
-                                { key: "status", label: "Status", kind: "dimension" },
-                            ],
-                            rows: [
-                                { segment: "North", score: 10, status: "healthy" },
-                                { segment: "South", score: 7, status: "watch" },
-                            ],
-                        },
-                    ],
                 },
             },
             {
