@@ -139,4 +139,25 @@ assert.deepEqual(normalizeReportDocumentTableBlock({
   ],
 });
 
+assert.equal(normalizeReportTableBlockColumn({
+  key: "[MaxDepth]",
+  label: "[MaxDepth]",
+}), null);
+
+assert.equal(normalizeReportDocumentTableBlock({
+  id: "truncatedTable",
+  title: "Truncated Table",
+  datasetRef: "primary",
+  columns: [
+    { key: "[MaxDepth]" },
+  ],
+}), null);
+
+assert.equal(normalizeReportDocumentTableBlock({
+  id: "truncatedLegacyTable",
+  title: "Truncated Legacy Table",
+  datasetRef: "primary",
+  columnKeys: ["[MaxDepth]"],
+}), null);
+
 console.log("tableVisualSpec ✓ normalizes authored table visual contracts");

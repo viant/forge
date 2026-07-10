@@ -3560,6 +3560,14 @@
     box-shadow: 0 8px 18px rgba(29, 78, 216, 0.16);
 }
 
+.forge-report-builder__quick-action-status {
+    color: #1e3a8a;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin-top: 6px;
+}
+
 .forge-report-builder__panel-action-button.bp6-button {
     background: #eff6ff;
     border: 1px solid #bfdbfe;

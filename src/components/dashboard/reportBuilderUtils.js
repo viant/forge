@@ -282,61 +282,6 @@ function defaultStaticFilterValue(filter = {}) {
     return defaults[0] ?? "";
 }
 
-function camelToSnake(value = "") {
-    return String(value || "")
-        .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-        .replace(/[-\s]+/g, "_")
-        .toLowerCase();
-}
-
-function buildFilterAliases(filters = {}) {
-    const source = filters && typeof filters === "object" && !Array.isArray(filters) ? filters : {};
-    const aliases = {};
-    Object.entries(source).forEach(([key, value]) => {
-        const trimmed = String(key || "").trim();
-        if (!trimmed) return;
-        const lower = trimmed.toLowerCase();
-        const candidates = new Set([camelToSnake(trimmed)]);
-        if (/Ids$/.test(trimmed)) {
-            candidates.add(`${camelToSnake(trimmed.slice(0, -3))}_id`);
-        } else if (/Id$/.test(trimmed)) {
-            candidates.add(`${camelToSnake(trimmed.slice(0, -2))}_id`);
-        }
-        if (lower === "from" || lower === "to") {
-            candidates.add(lower);
-        }
-        if (lower.endsWith("incl")) {
-            candidates.add(camelToSnake(trimmed));
-        }
-        if (lower.endsWith("excl")) {
-            candidates.add(camelToSnake(trimmed));
-        }
-        candidates.forEach((alias) => {
-            if (!alias || alias === trimmed || Object.prototype.hasOwnProperty.call(source, alias) || Object.prototype.hasOwnProperty.call(aliases, alias)) {
-                return;
-            }
-            aliases[alias] = clone(value);
-        });
-    });
-    return aliases;
-}
-
-export function applyReportBuilderFilterAliases(request = {}) {
-    if (!request || typeof request !== "object" || Array.isArray(request)) {
-        return request;
-    }
-    if (!request.filters || typeof request.filters !== "object" || Array.isArray(request.filters)) {
-        return request;
-    }
-    return {
-        ...request,
-        filters: {
-            ...request.filters,
-            ...buildFilterAliases(request.filters),
-        },
-    };
-}
-
 function isVisibleField(entry = {}) {
     if (!entry || typeof entry !== "object") {
         return false;
@@ -2173,7 +2118,6 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
         setNestedValue(request, paramPath, values);
     });
 
-    request = applyReportBuilderFilterAliases(request);
     const semanticSelection = buildReportBuilderSemanticSelection(effectiveConfig, state);
     if (semanticSelection) {
         request.semanticSelection = semanticSelection;

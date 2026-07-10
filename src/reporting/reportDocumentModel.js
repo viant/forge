@@ -46,6 +46,10 @@ function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
+function isTruncatedPlaceholder(value = "") {
+  return normalizeString(value) === "[MaxDepth]";
+}
+
 function resolveContainerIdentity(container = {}) {
   return normalizeString(
     container?.id
@@ -1326,14 +1330,18 @@ export function buildReportDocumentFilterBarBlock({
   paramIds = [],
   datasetRef = "primary",
 } = {}) {
+  const normalizedParamIds = (Array.isArray(paramIds) ? paramIds : [])
+    .map((entry) => normalizeString(entry))
+    .filter((entry) => !!entry && !isTruncatedPlaceholder(entry));
+  if (normalizedParamIds.length === 0 && (Array.isArray(paramIds) ? paramIds : []).some((entry) => isTruncatedPlaceholder(entry))) {
+    return null;
+  }
   return {
     id: normalizeString(id || "filterBar"),
     kind: "filterBarBlock",
     title: normalizeFilterBarTitle(title || "Filters"),
     datasetRef: normalizeString(datasetRef || "primary") || "primary",
-    paramIds: (Array.isArray(paramIds) ? paramIds : [])
-      .map((entry) => normalizeString(entry))
-      .filter(Boolean),
+    paramIds: normalizedParamIds,
   };
 }
 
