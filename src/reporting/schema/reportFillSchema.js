@@ -297,12 +297,30 @@ export const reportFillSchema = {
       properties: {
         id: { type: "string" },
         dataSourceRef: { type: "string" },
+        scope: { $ref: "#/$defs/datasetScope" },
+        source: { $ref: "#/$defs/jsonObject" },
+        resultContract: { $ref: "#/$defs/jsonObject" },
+        capabilities: { $ref: "#/$defs/jsonObject" },
         request: { $ref: "#/$defs/requestPayload" },
         provenance: { $ref: "#/$defs/provenance" },
         rows: {
           type: "array",
           items: { $ref: "#/$defs/jsonObject" },
         },
+      },
+    },
+    datasetScope: {
+      type: "object",
+      additionalProperties: true,
+      properties: {
+        mode: { enum: ["inherit", "append", "override", "exclude"] },
+        local: { $ref: "#/$defs/jsonObject" },
+        exclude: {
+          type: "array",
+          uniqueItems: true,
+          items: { type: "string" },
+        },
+        inheritContext: { type: "boolean" },
       },
     },
     requestValue: {
@@ -951,8 +969,10 @@ export const reportFillSchema = {
         datasetRef: { type: "string" },
         valueField: { type: "string" },
         valueLabel: { type: "string" },
+        valueFormat: { enum: ["currency", "number", "percent", "percentFraction", "compact", "compactNumber"] },
         secondaryField: { type: "string" },
         secondaryLabel: { type: "string" },
+        secondaryFormat: { enum: ["currency", "number", "percent", "percentFraction", "compact", "compactNumber"] },
         secondaryDisplayKey: { type: "string" },
         secondaryDisplayValueMap: {
           type: "object",
@@ -969,10 +989,12 @@ export const reportFillSchema = {
             description: { type: "string" },
             valueField: { type: "string" },
             valueLabel: { type: "string" },
+            valueFormat: { enum: ["currency", "number", "percent", "percentFraction", "compact", "compactNumber"] },
             value: { $ref: "#/$defs/jsonValue" },
             rowCount: { type: "integer", minimum: 0 },
             secondaryField: { type: "string" },
             secondaryLabel: { type: "string" },
+            secondaryFormat: { enum: ["currency", "number", "percent", "percentFraction", "compact", "compactNumber"] },
             secondaryDisplayKey: { type: "string" },
             secondaryDisplayValueMap: {
               type: "object",

@@ -290,6 +290,85 @@ assert.deepEqual(
   ],
 );
 
+assert.deepEqual(
+  normalizeDialogDatasetOptions([
+    {
+      value: "reach_summary",
+      label: "Reach Summary",
+      kindLabel: "published",
+      columnOptions: [
+        { key: "country", label: "Country", kind: "dimension", sourceKey: "country" },
+        { key: "avails", label: "Avails", kind: "measure", sourceKey: "avails", format: "compactNumber" },
+      ],
+      valueFieldOptions: [
+        { value: "avails", label: "Avails", format: "compactNumber" },
+      ],
+      secondaryFieldOptions: [
+        { value: "country", label: "Country" },
+      ],
+      source: {
+        kind: "mcp",
+        server: "steward",
+        toolName: "demo:reach_summary",
+      },
+      resultContract: {
+        shape: "rowSet",
+        rowPath: "payload.records",
+      },
+      capabilities: {
+        backendRefetch: true,
+        datly: {
+          unifiedCube: true,
+        },
+      },
+      scope: {
+        inheritContext: true,
+      },
+    },
+  ]),
+  [
+    {
+      value: "reach_summary",
+      label: "Reach Summary",
+      description: "",
+      kindLabel: "published",
+      columnOptions: [
+        { key: "country", label: "Country", kind: "dimension", sourceKey: "country" },
+        { key: "avails", label: "Avails", kind: "measure", sourceKey: "avails", format: "compactNumber" },
+      ],
+      valueFieldOptions: [
+        { value: "avails", label: "Avails", format: "compactNumber" },
+      ],
+      secondaryFieldOptions: [
+        { value: "country", label: "Country" },
+      ],
+      scopeParamOptions: [],
+      source: {
+        kind: "mcp",
+        server: "steward",
+        toolName: "demo:reach_summary",
+      },
+      resultContract: {
+        shape: "rowSet",
+        rowPath: "payload.records",
+      },
+      capabilities: {
+        backendRefetch: true,
+        datly: {
+          unifiedCube: true,
+        },
+      },
+      scope: {
+        inheritContext: true,
+      },
+      columnCount: 2,
+      measureCount: 1,
+      dimensionCount: 1,
+      missing: false,
+    },
+  ],
+);
+
 const normalizedPrimarySelectionDatasetOptions = normalizeDialogDatasetOptions([
   {
     value: "primary",

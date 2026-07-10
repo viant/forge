@@ -4,12 +4,12 @@ import { buildReportBuilderSemanticWorkspacePanelState } from "./reportBuilderSe
 
 assert.deepEqual(buildReportBuilderSemanticWorkspacePanelState(), {
     tone: "info",
-    eyebrow: "Semantic model",
-    title: "Semantic modeling inactive",
-    description: "This builder is currently running without semantic binding or a semantic model provider.",
+    eyebrow: "Data model",
+    title: "No data model configured",
+    description: "This report is not using a data model yet.",
     metaChips: [
-        "Raw mode",
-        "Provider unavailable",
+        "No data model",
+        "Data model source unavailable",
     ],
     semanticBindingTitle: "",
     semanticBindingChips: [],
@@ -25,12 +25,12 @@ assert.deepEqual(buildReportBuilderSemanticWorkspacePanelState({
     providerAvailable: true,
 }), {
     tone: "info",
-    eyebrow: "Semantic model",
-    title: "Semantic modeling inactive",
-    description: "This builder is currently running in raw mode. Import or reopen a semantic report to activate model-backed mappings.",
+    eyebrow: "Data model",
+    title: "No data model configured",
+    description: "This report is not using a data model yet.",
     metaChips: [
-        "Raw mode",
-        "Provider available",
+        "No data model",
+        "Data model source available",
     ],
     semanticBindingTitle: "",
     semanticBindingChips: [],
@@ -51,7 +51,7 @@ assert.deepEqual(buildReportBuilderSemanticWorkspacePanelState({
     modelLoading: true,
 }), {
     tone: "info",
-    eyebrow: "Semantic model",
+    eyebrow: "Data model",
     title: "Semantic Binding",
     description: "Mapped fields, runtime validation, and governance are visible here.",
     metaChips: [],
@@ -63,7 +63,7 @@ assert.deepEqual(buildReportBuilderSemanticWorkspacePanelState({
         "0 measures",
     ],
     semanticBindingFieldGroups: [],
-    diagnosticsTitle: "Semantic diagnostics",
+    diagnosticsTitle: "Data model diagnostics",
     diagnosticsDescription: "",
     diagnostics: [],
     governanceTitle: "",
@@ -119,7 +119,7 @@ assert.deepEqual(buildReportBuilderSemanticWorkspacePanelState({
     },
 }), {
     tone: "warning",
-    eyebrow: "Semantic model",
+    eyebrow: "Data model",
     title: "Semantic binding",
     description: "Performance Model • Entity: Line Delivery",
     metaChips: [

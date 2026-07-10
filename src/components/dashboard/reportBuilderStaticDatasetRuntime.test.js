@@ -120,6 +120,7 @@ const model = buildReportBuilderRuntimePreviewModel({
 });
 
 assert.ok(model);
+assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "primary"), false);
 assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "regional_mix_csv"), true);
 assert.equal(model.staticDatasetPayloads.regional_mix_csv.rows.length, 2);
 

@@ -1377,6 +1377,61 @@ const malformedTableColumnsHtml = renderToStaticMarkup(
 );
 assert.ok(malformedTableColumnsHtml.includes("No table fields selected. Edit this table block in Design to choose at least one field."));
 
+const singleDatasetRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Single Dataset Runtime",
+      layoutIntent: {
+        blockOrder: ["comparisonTable"],
+        items: [{ blockId: "comparisonTable" }],
+      },
+      blocks: [
+        {
+          id: "comparisonTable",
+          kind: "tableBlock",
+          columns: [
+            { key: "eventDate", sourceKey: "eventDate", displayKey: "eventDate", label: "Date", kind: "dimension" },
+            { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
+          ],
+        },
+      ],
+      datasets: [
+        {
+          id: "forecast_summary",
+          request: {},
+        },
+      ],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "forecast_summary",
+          rows: [{ eventDate: "2026-05-01", totalSpend: 1200 }],
+          provenance: {
+            diagnostics: [],
+          },
+        },
+      ],
+      blocks: [
+        {
+          id: "comparisonTable",
+          kind: "tableBlock",
+          content: {
+            columns: [
+              { key: "eventDate", sourceKey: "eventDate", displayKey: "eventDate", label: "Date", kind: "dimension" },
+              { key: "totalSpend", sourceKey: "totalSpend", displayKey: "totalSpend", label: "Spend", kind: "measure", format: "currency" },
+            ],
+            resolvedRows: [],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(singleDatasetRuntimeHtml.includes("2026-05-01"));
+assert.match(singleDatasetRuntimeHtml, /(1200|1,200|\$1,200)/);
+
 const wideHalfTableHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {
@@ -2355,7 +2410,7 @@ assert.ok(!authoredReportHtml.includes("Governed model and field selections comp
 assert.ok(!authoredReportHtml.includes("Chart actions are unavailable because this runtime preview is read-only."));
 assert.ok(!authoredReportHtml.includes('aria-label="Chart series selector"'));
 assert.ok(authoredReportHtml.includes("Filters"));
-assert.ok(authoredReportHtml.includes("Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."));
+assert.ok(!authoredReportHtml.includes("Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."));
 
 const documentBackedRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {

@@ -1,8 +1,10 @@
 import { resolveKey } from "../../utils/selector.js";
+import { extractData } from "../dataSourceExtract.js";
 import {
     applyReportBuilderFilterAliases,
     projectLookupSelections,
 } from "./reportBuilderUtils.js";
+import { resolveReportBuilderDataSourceFetcher } from "./reportBuilderDataSourceFetch.js";
 import {
     applyReportBuilderPredicatePrefill,
     resolveReportBuilderDynamicFilterGroups,
@@ -212,17 +214,19 @@ export function buildLookupHydrationJobs(builderContext, config = {}, state = {}
 }
 
 async function fetchLookupHydrationRecord(job) {
-    const handlers = job?.dataSourceContext?.handlers?.dataSource;
-    if (!handlers?.fetchRecords) {
-        throw new Error("lookup label resolve unavailable: dataSource fetchRecords handler missing");
+    const fetcher = resolveReportBuilderDataSourceFetcher(job?.dataSourceContext);
+    if (!fetcher) {
+        throw new Error("lookup label resolve unavailable: dataSource fetch handler missing");
     }
-    const body = await handlers.fetchRecords({
+    const body = await fetcher({
         parameters: {
             ...(job?.parameters || {}),
             [job.resolveInput]: job.value,
         },
     });
-    const rows = Array.isArray(body?.rows) ? body.rows : [];
+    const selectors = job?.dataSourceContext?.dataSource?.selectors || {};
+    const paging = job?.dataSourceContext?.dataSource?.paging || null;
+    const rows = extractData(selectors, paging, body).records || [];
     return rows[0] || null;
 }
 

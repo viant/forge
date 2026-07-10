@@ -63,6 +63,28 @@ export function resolveReportBuilderSurfaceAutoRunAction({
     currentRequestDispatchFingerprint = "",
     requestDispatchFingerprint = "",
 } = {}) {
+    const normalizedAutoRunKey = normalizeString(autoRunKey);
+    const normalizedConsumedAutoRunKey = normalizeString(consumedAutoRunKey);
+    const normalizedCurrentDispatchFingerprint = normalizeString(currentRequestDispatchFingerprint);
+    const normalizedRequestDispatchFingerprint = normalizeString(requestDispatchFingerprint);
+    const shouldPromoteExistingRows = !deferForPrefill
+        && !!canRunReport
+        && !!currentRequestShouldFetch
+        && !loading
+        && !error
+        && hasRows === true
+        && hasCompletedCurrentRun !== true
+        && !!normalizedAutoRunKey
+        && normalizedAutoRunKey !== normalizedConsumedAutoRunKey
+        && normalizedRequestDispatchFingerprint !== ""
+        && normalizedRequestDispatchFingerprint === normalizedCurrentDispatchFingerprint
+        && (normalizeString(workspaceMode).toLowerCase() === "preview" || normalizeString(workspaceMode).toLowerCase() === "report");
+    if (shouldPromoteExistingRows) {
+        return {
+            type: "promote",
+            autoRunKey: normalizedAutoRunKey,
+        };
+    }
     const shouldAutoRun = shouldAutoRunReportBuilderSurface({
         workspaceMode,
         requestFingerprint,
@@ -77,11 +99,10 @@ export function resolveReportBuilderSurfaceAutoRunAction({
     if (!shouldAutoRun) {
         return { type: "skip" };
     }
-    const normalizedAutoRunKey = normalizeString(autoRunKey);
     if (!normalizedAutoRunKey || normalizedAutoRunKey === normalizeString(consumedAutoRunKey)) {
         return { type: "skip" };
     }
-    if (normalizeString(requestDispatchFingerprint) !== normalizeString(currentRequestDispatchFingerprint)) {
+    if (normalizedRequestDispatchFingerprint !== normalizedCurrentDispatchFingerprint) {
         return {
             type: "dispatch",
             autoRunKey: normalizedAutoRunKey,

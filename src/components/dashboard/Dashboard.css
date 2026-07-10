@@ -1525,6 +1525,35 @@
     gap: 6px;
 }
 
+.forge-report-builder__design-stage-header--headline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.forge-report-builder__design-stage-header-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.forge-report-builder__design-stage-header--headline .forge-report-builder__design-stage-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.forge-report-builder__design-stage-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
 .forge-report-builder__design-stage-eyebrow {
     font-size: 10px;
     font-weight: 800;

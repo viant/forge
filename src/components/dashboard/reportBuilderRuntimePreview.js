@@ -456,10 +456,21 @@ function buildRuntimePreviewDocumentAndSpec({
     semanticModel,
     runtimeDatasetScopeParams,
   });
+  const normalizedPreviewDocument = includePrimaryBlocks
+    ? document
+    : {
+        ...document,
+        layout: {
+          ...(document?.layout || {}),
+          items: (Array.isArray(document?.layout?.items) ? document.layout.items : [])
+            .filter((item) => normalizeString(item?.blockId) !== "primaryBuilder")
+            .map((item) => cloneValue(item)),
+        },
+      };
   return {
-    document,
+    document: normalizedPreviewDocument,
     reportSpec: augmentRuntimePreviewPrimaryRequest(
-      lowerReportDocumentToReportSpec(document, {
+      lowerReportDocumentToReportSpec(normalizedPreviewDocument, {
         includePrimaryBlocks,
         runtimeDatasetScopeParams,
       }),

@@ -49,6 +49,33 @@ function formatCountChip(count = 0, singular = "", plural = "") {
     return `${numeric} ${numeric === 1 ? singular : plural}`;
 }
 
+function normalizeImportedArtifactMetaChip(chip = "") {
+    const normalizedChip = normalizeString(chip);
+    if (!normalizedChip) {
+        return "";
+    }
+    switch (normalizedChip.toLowerCase()) {
+        case "local-only":
+            return "Local file";
+        case "reopen-ready":
+            return "Ready to reopen";
+        case "export-ready":
+            return "Ready to export";
+        case "export-ready available":
+            return "Ready to export";
+        default:
+            return normalizedChip;
+    }
+}
+
+function normalizeImportedArtifactMetaChips(metaChips = []) {
+    return Array.from(new Set(
+        (Array.isArray(metaChips) ? metaChips : [])
+            .map((chip) => normalizeImportedArtifactMetaChip(chip))
+            .filter(Boolean),
+    ));
+}
+
 function buildRawImportedEntryMetadataContext(entry = null) {
     if (!isPlainObject(entry)) {
         return null;
@@ -407,7 +434,7 @@ export function buildImportedLocalReopenablePanelState({
                 reportId,
                 importedArtifactKind: normalizeString(entry?.importedArtifactKind),
                 active: normalizeString(activeResponseIdentity) === id,
-                metaChips: [
+                metaChips: normalizeImportedArtifactMetaChips([
                     reportId,
                     Number(entry?.documentVersion || 0) > 0 ? `v${Number(entry.documentVersion)}` : "local-only",
                     templateConflict?.templateConflictLabel || "",
@@ -416,7 +443,7 @@ export function buildImportedLocalReopenablePanelState({
                         ? reopenSourceResolutionState.reopenSourceResolutionChips
                         : []),
                     ...(Array.isArray(overlaySummary?.chips) ? overlaySummary.chips : []),
-                ].filter(Boolean),
+                ]),
                 ...(templateConflict ? {
                     notice: {
                         level: "warning",
@@ -462,14 +489,14 @@ export function buildImportedLocalReopenablePanelState({
     return {
         title: "Imported reopen artifacts",
         description: "These imported local report artifacts can back imported catalog entries and reopen flows without server persistence.",
-        metaChips: [
+        metaChips: normalizeImportedArtifactMetaChips([
             formatCountChip(entries.length, "artifact", "artifacts"),
             entries.some((entry) => entry.active) ? "current reopen artifact tracked" : "",
             entries.some((entry) => entry.templateConflict) ? "template mismatch" : "",
             entries.some((entry) => normalizeString(entry?.importedArtifactKind) === "reportBuilder.explorationArtifact")
                 ? buildReportBuilderImportedArtifactSourceLabel("reportBuilder.explorationArtifact")
                 : "",
-        ].filter(Boolean),
+        ]),
         entries,
         clearAllLabel: "Clear imported reopen artifacts",
     };
@@ -509,7 +536,7 @@ export function buildImportedLocalSavedRecordPanelState({
                 reportId,
                 importedArtifactKind: normalizeString(entry?.importedArtifactKind),
                 active: normalizeString(activeRecordIdentity) === id,
-                metaChips: [
+                metaChips: normalizeImportedArtifactMetaChips([
                     reportId,
                     Number(entry?.documentVersion || 0) > 0 ? `v${Number(entry.documentVersion)}` : "local-only",
                     entry?.exportable === true ? "export-ready" : "reopen-ready",
@@ -519,7 +546,7 @@ export function buildImportedLocalSavedRecordPanelState({
                         ? reopenSourceResolutionState.reopenSourceResolutionChips
                         : []),
                     ...(Array.isArray(overlaySummary?.chips) ? overlaySummary.chips : []),
-                ].filter(Boolean),
+                ]),
                 ...(templateConflict ? {
                     notice: {
                         level: "warning",
@@ -565,15 +592,15 @@ export function buildImportedLocalSavedRecordPanelState({
     return {
         title: "Imported report files",
         description: "These imported local report files keep richer reopen and export context available without server persistence.",
-        metaChips: [
+        metaChips: normalizeImportedArtifactMetaChips([
             formatCountChip(entries.length, "record", "records"),
             entries.some((entry) => entry.active) ? "current report file tracked" : "",
-            entries.some((entry) => entry.metaChips.includes("export-ready")) ? "export-ready available" : "",
+            entries.some((entry) => entry.metaChips.includes("Ready to export")) ? "Ready to export" : "",
             entries.some((entry) => entry.templateConflict) ? "template mismatch" : "",
             entries.some((entry) => normalizeString(entry?.importedArtifactKind) === "reportBuilder.explorationArtifact")
                 ? buildReportBuilderImportedArtifactSourceLabel("reportBuilder.explorationArtifact")
                 : "",
-        ].filter(Boolean),
+        ]),
         entries,
         clearAllLabel: "Clear imported report files",
     };

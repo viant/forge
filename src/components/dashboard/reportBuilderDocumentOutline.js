@@ -137,6 +137,7 @@ export function flattenReportBuilderDocumentOutlineEntries(entries = [], {
             title: normalizeString(entry.title),
             summary: normalizeString(entry.summary),
             actionLabel: normalizeString(entry.actionLabel),
+            datasetLabel: normalizeString(entry.datasetLabel),
             widthLabel: normalizeString(entry.widthLabel),
             parentId: normalizeString(parentId),
             depth: Math.max(0, Number(depth || 0) || 0),
@@ -201,6 +202,8 @@ export function resolveReportBuilderDocumentInsertionTarget(entries = [], select
 export function buildReportBuilderDocumentOutlineEntries({
     authoredDocumentBlocks = [],
     authoredDocumentLayout = null,
+    authoredDatasetOptions = [],
+    primaryDatasetLabel = "",
     authoredScopeParamOptions = [],
     authoredDrillSummary = {},
     currentBreakdownDrillHierarchy = null,
@@ -220,10 +223,20 @@ export function buildReportBuilderDocumentOutlineEntries({
             title: normalizeString(entry.title),
             summary: normalizeString(entry.summary),
             actionLabel: normalizeString(entry.actionLabel),
+            datasetLabel: normalizeString(entry.datasetLabel),
             widthLabel: normalizeString(entry.widthLabel),
             children: Array.isArray(entry.children) ? entry.children : [],
         }))
         .filter((entry) => entry.id && entry.kind && entry.title);
+    const authoredDatasetLabelIndex = new Map(
+        (Array.isArray(authoredDatasetOptions) ? authoredDatasetOptions : [])
+            .map((option) => {
+                const datasetRef = normalizeString(option?.value ?? option?.id);
+                const datasetLabel = normalizeString(option?.label);
+                return datasetRef && datasetLabel ? [datasetRef, datasetLabel] : null;
+            })
+            .filter(Boolean),
+    );
     const drillHierarchies = Array.isArray(authoredDrillSummary?.hierarchies)
         ? authoredDrillSummary.hierarchies
         : [];
@@ -254,9 +267,15 @@ export function buildReportBuilderDocumentOutlineEntries({
             children: [],
         }];
     };
+    const authoredBlockIds = (Array.isArray(authoredDocumentBlocks) ? authoredDocumentBlocks : [])
+        .map((block) => normalizeString(block?.id))
+        .filter(Boolean);
     const layoutItems = Array.isArray(authoredDocumentLayout?.items) && authoredDocumentLayout.items.length > 0
         ? authoredDocumentLayout.items
-        : [{ blockId: "primaryBuilder" }];
+        : [
+            ...authoredBlockIds.map((blockId) => ({ blockId })),
+            { blockId: "primaryBuilder" },
+        ];
     return layoutItems.map((item) => {
         const blockId = normalizeString(item?.blockId);
         const widthLabels = resolveReportBuilderDocumentWidthLabels(item);
@@ -304,11 +323,16 @@ export function buildReportBuilderDocumentOutlineEntries({
             const metricLabel = block?.geo?.metric?.label || block?.geo?.metric?.key || "Metric";
             summary = `${metricLabel} by ${block?.geo?.key || "region"}`;
         }
+        const datasetRef = normalizeString(block?.datasetRef || "primary") || "primary";
+        const datasetLabel = datasetRef === "primary"
+            ? (normalizeString(primaryDatasetLabel) || authoredDatasetLabelIndex.get(datasetRef) || "")
+            : (authoredDatasetLabelIndex.get(datasetRef) || "");
         return {
             id: blockId,
             kind: normalizedKind,
             title: normalizeString(block?.title || blockId) || blockId,
             summary,
+            datasetLabel,
             widthLabel: widthLabels.currentLabel,
             actionLabel: "Edit block",
             children: [],

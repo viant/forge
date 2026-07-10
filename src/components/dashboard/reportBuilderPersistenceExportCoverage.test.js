@@ -24,6 +24,12 @@ assert.equal(
 );
 
 assert.equal(
+    reportBuilderSource.includes("buildReportBuilderSavedReportPayloadFromBuilderState"),
+    true,
+    "ReportBuilder should support saving the current authored report state even when no exploration session is active.",
+);
+
+assert.equal(
     reportBuilderSource.includes("reportStoreHandler?.saveReport") || reportBuilderSource.includes("typeof reportStoreHandler?.saveReport === \"function\""),
     true,
     "ReportBuilder should persist saved reports through the host report store when available.",
@@ -36,7 +42,9 @@ assert.equal(
 );
 
 assert.equal(
-    reportBuilderSource.includes("text=\"PDF\"") && reportBuilderSource.includes("text=\"XLSX\""),
+    reportBuilderSource.includes("draftPdfFormatLabel")
+        && reportBuilderSource.includes("draftXlsxFormatLabel")
+        && reportBuilderSource.includes("renderDraftExportMenuContent"),
     true,
     "ReportBuilder should expose PDF and XLSX options in the visible export menu.",
 );

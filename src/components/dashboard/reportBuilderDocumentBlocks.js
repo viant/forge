@@ -1,4 +1,5 @@
 import {
+    resolveReportDocumentBuilderContext,
     buildReportDocumentBadgesBlock,
     buildReportDocumentChartBlock,
     buildReportDocumentFilterBarBlock,
@@ -9,6 +10,7 @@ import {
     buildReportDocumentTableBlock,
     normalizeReportBuilderDocumentBlocks,
 } from "../../reporting/reportDocumentModel.js";
+import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockModel.js";
 import {
     buildReportLayoutItem,
     resolveNextReportLayoutSpan,
@@ -16,9 +18,11 @@ import {
     resolveReportLayoutSpan,
 } from "../../reporting/reportLayoutModel.js";
 import { normalizeReportTableCellVisual } from "../../reporting/tableVisualSpec.js";
+import { resolveReportDatasetRefResolution } from "../../reporting/reportDatasetRefModel.js";
 import { buildReportBuilderCalculatedFieldConfig } from "./reportBuilderCalculatedFieldAuthoring.js";
 import { resolveReportBuilderScopeParamFilters } from "./reportBuilderPredicates.js";
 import { buildReportBuilderStaticDatasetOptions } from "./reportBuilderStaticDatasets.js";
+import { normalizeReportBuilderPublishedDataSources } from "../../reporting/reportSpecModel.js";
 import {
     buildReportBuilderChartFields,
     buildDefaultReportBuilderChartSpec,
@@ -71,12 +75,35 @@ function normalizeScopeParamOptions(options = []) {
                 ...(normalizeString(option?.description) ? { description: normalizeString(option.description) } : {}),
                 kind: normalizeString(option?.kind || "value") || "value",
                 required: option?.required === true,
+                ...(option?.multiple === true ? { multiple: true } : {}),
+                ...(normalizeString(option?.presentation) ? { presentation: normalizeString(option.presentation) } : {}),
+                ...(Array.isArray(option?.options) ? { options: cloneValue(option.options) } : {}),
+                ...(normalizeString(option?.semanticRef) ? { semanticRef: normalizeString(option.semanticRef) } : {}),
+                ...(normalizeString(option?.paramPath) ? { paramPath: normalizeString(option.paramPath) } : {}),
+                ...(normalizeString(option?.startParamPath) ? { startParamPath: normalizeString(option.startParamPath) } : {}),
+                ...(normalizeString(option?.endParamPath) ? { endParamPath: normalizeString(option.endParamPath) } : {}),
             };
         })
         .filter(Boolean);
 }
 
-function resolveDocumentBlockScopeParamOptions(datasetRef = "primary", datasetOptions = [], scopeParamOptions = []) {
+function resolveDatasetOptionValues(datasetOptions = []) {
+    return (Array.isArray(datasetOptions) ? datasetOptions : [])
+        .map((option) => normalizeString(option?.value ?? option?.id))
+        .filter(Boolean);
+}
+
+function resolveDocumentBlockDatasetRefResolution(preferredDatasetRef = "", datasetOptions = []) {
+    return resolveReportDatasetRefResolution({
+        preferredDatasetRef,
+        availableDatasetRefs: resolveDatasetOptionValues(datasetOptions),
+        fallbackDatasetRef: "primary",
+    });
+}
+
+function resolveDocumentBlockScopeParamOptions(datasetRef = "primary", datasetOptions = [], scopeParamOptions = [], {
+    allowImplicitTopLevelFallback = false,
+} = {}) {
     const normalizedDatasetRef = normalizeString(datasetRef || "primary") || "primary";
     const normalizedDatasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
         .find((option) => normalizeString(option?.value ?? option?.id) === normalizedDatasetRef) || null;
@@ -86,9 +113,13 @@ function resolveDocumentBlockScopeParamOptions(datasetRef = "primary", datasetOp
             return datasetScopedOptions;
         }
     }
-    return normalizedDatasetRef === "primary"
+    return normalizedDatasetRef === "primary" || allowImplicitTopLevelFallback
         ? normalizeScopeParamOptions(scopeParamOptions)
         : [];
+}
+
+function resolveDefaultDocumentBlockDatasetRef(preferredDatasetRef = "", datasetOptions = []) {
+    return resolveDocumentBlockDatasetRefResolution(preferredDatasetRef, datasetOptions).datasetRef;
 }
 
 function normalizeTableColumnOptions(options = []) {
@@ -138,12 +169,120 @@ function normalizeChartFieldOptions(options = []) {
         .filter(Boolean);
 }
 
+function buildDatasetChartSpecSeed(datasetOption = null, title = "Chart", fallbackType = "bar") {
+    const normalizedOption = datasetOption && typeof datasetOption === "object" && !Array.isArray(datasetOption)
+        ? datasetOption
+        : null;
+    const chartFieldOptions = normalizeChartFieldOptions(normalizedOption?.chartFieldOptions);
+    const xField = normalizeString(
+        chartFieldOptions.find((option) => normalizeString(option?.kind) === "dimension")?.key,
+    );
+    const yField = normalizeString(
+        chartFieldOptions.find((option) => normalizeString(option?.kind) === "measure")?.key,
+    );
+    if (!xField || !yField) {
+        return null;
+    }
+    return normalizeReportBuilderChartSpec({
+        title: normalizeString(title || "Chart") || "Chart",
+        type: normalizeString(fallbackType || "bar") || "bar",
+        xField,
+        yFields: [yField],
+    });
+}
+
 function normalizeGeoMetricFormat(value = "") {
     const normalized = normalizeString(value);
     if (normalized === "compactNumber") {
         return "compact";
     }
     return normalized;
+}
+
+export function buildReportBuilderDatasetOptions({
+    currentSourceRef = "",
+    configuredSources = [],
+    configuredDatasets = [],
+    staticDatasets = [],
+    tableColumnOptions = [],
+    valueFieldOptions = [],
+    secondaryFieldOptions = [],
+    chartFieldOptions = [],
+    scopeParamOptions = [],
+} = {}) {
+    const normalizedCurrentSourceRef = normalizeString(currentSourceRef);
+    const normalizedConfiguredSources = normalizeReportBuilderPublishedDataSources({
+        datasets: Array.isArray(configuredDatasets) ? configuredDatasets : [],
+        dataSources: Array.isArray(configuredSources) ? configuredSources : [],
+    });
+    const configuredPrimarySource = normalizedConfiguredSources
+        .find((entry) => normalizeString(entry?.dataSourceRef) === normalizedCurrentSourceRef) || null;
+    const configuredPublishedDatasetOptions = normalizedConfiguredSources
+        .map((entry) => {
+            const dataSourceRef = normalizeString(entry?.dataSourceRef || entry?.value || entry?.id);
+            const value = normalizeString(entry?.id || dataSourceRef);
+            if (!dataSourceRef || !value || dataSourceRef === normalizedCurrentSourceRef) {
+                return null;
+            }
+            return {
+                value,
+                dataSourceRef,
+                label: normalizeString(entry?.label || dataSourceRef),
+                description: normalizeString(entry?.description),
+                kindLabel: normalizeString(entry?.kindLabel || entry?.kind || "published") || "published",
+                ...(entry?.request && typeof entry.request === "object" && !Array.isArray(entry.request)
+                    ? { request: cloneValue(entry.request) }
+                    : {}),
+                ...(entry?.scope && typeof entry.scope === "object" && !Array.isArray(entry.scope)
+                    ? { scope: cloneValue(entry.scope) }
+                    : {}),
+                ...(entry?.source && typeof entry.source === "object" && !Array.isArray(entry.source)
+                    ? { source: cloneValue(entry.source) }
+                    : {}),
+                ...(entry?.resultContract && typeof entry.resultContract === "object" && !Array.isArray(entry.resultContract)
+                    ? { resultContract: cloneValue(entry.resultContract) }
+                    : {}),
+                ...(entry?.capabilities && typeof entry.capabilities === "object" && !Array.isArray(entry.capabilities)
+                    ? { capabilities: cloneValue(entry.capabilities) }
+                    : {}),
+                columnOptions: Array.isArray(entry?.columnOptions) ? entry.columnOptions : [],
+                valueFieldOptions: Array.isArray(entry?.valueFieldOptions) ? entry.valueFieldOptions : [],
+                secondaryFieldOptions: Array.isArray(entry?.secondaryFieldOptions) ? entry.secondaryFieldOptions : [],
+                chartFieldOptions: Array.isArray(entry?.chartFieldOptions) ? entry.chartFieldOptions : [],
+                scopeParamOptions: Array.isArray(entry?.scopeParamOptions) ? entry.scopeParamOptions : [],
+            };
+        })
+        .filter(Boolean);
+    const primaryLabel = normalizeString(configuredPrimarySource?.label || normalizedCurrentSourceRef) || normalizedCurrentSourceRef || "Primary";
+    return [{
+        value: "primary",
+        dataSourceRef: normalizedCurrentSourceRef,
+        label: primaryLabel,
+        description: normalizeString(configuredPrimarySource?.description),
+        kindLabel: normalizeString(configuredPrimarySource?.kindLabel || configuredPrimarySource?.kind || "published") || "published",
+        ...(configuredPrimarySource?.request && typeof configuredPrimarySource.request === "object" && !Array.isArray(configuredPrimarySource.request)
+            ? { request: cloneValue(configuredPrimarySource.request) }
+            : {}),
+        ...(configuredPrimarySource?.scope && typeof configuredPrimarySource.scope === "object" && !Array.isArray(configuredPrimarySource.scope)
+            ? { scope: cloneValue(configuredPrimarySource.scope) }
+            : {}),
+        ...(configuredPrimarySource?.source && typeof configuredPrimarySource.source === "object" && !Array.isArray(configuredPrimarySource.source)
+            ? { source: cloneValue(configuredPrimarySource.source) }
+            : {}),
+        ...(configuredPrimarySource?.resultContract && typeof configuredPrimarySource.resultContract === "object" && !Array.isArray(configuredPrimarySource.resultContract)
+            ? { resultContract: cloneValue(configuredPrimarySource.resultContract) }
+            : {}),
+        ...(configuredPrimarySource?.capabilities && typeof configuredPrimarySource.capabilities === "object" && !Array.isArray(configuredPrimarySource.capabilities)
+            ? { capabilities: cloneValue(configuredPrimarySource.capabilities) }
+            : {}),
+        columnOptions: Array.isArray(tableColumnOptions) ? tableColumnOptions : [],
+        valueFieldOptions: Array.isArray(valueFieldOptions) ? valueFieldOptions : [],
+        secondaryFieldOptions: Array.isArray(secondaryFieldOptions) ? secondaryFieldOptions : [],
+        chartFieldOptions: Array.isArray(chartFieldOptions) ? chartFieldOptions : [],
+        scopeParamOptions: Array.isArray(configuredPrimarySource?.scopeParamOptions) && configuredPrimarySource.scopeParamOptions.length > 0
+            ? configuredPrimarySource.scopeParamOptions
+            : (Array.isArray(scopeParamOptions) ? scopeParamOptions : []),
+    }, ...configuredPublishedDatasetOptions, ...buildReportBuilderStaticDatasetOptions(staticDatasets)];
 }
 
 function normalizeColumnVisualKinds(value = {}) {
@@ -256,7 +395,7 @@ function resolveDocumentPrimaryIndex(items = [], authoredIds = new Set()) {
             authoredBeforePrimary += 1;
         }
     }
-    return 0;
+    return authoredBeforePrimary;
 }
 
 function stripMarkdownPreviewDecorators(value = "") {
@@ -807,7 +946,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
         }))
         .filter((option) => !!option.value);
     if (normalizedKind === "filterBarBlock") {
-        const normalizedDatasetRef = normalizeString(seed?.datasetRef || "primary") || "primary";
+        const normalizedDatasetRef = resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions);
         const normalizedScopeParamOptions = resolveDocumentBlockScopeParamOptions(
             normalizedDatasetRef,
             normalizedDatasetOptions,
@@ -839,19 +978,28 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
         };
     }
     if (normalizedKind === "chartBlock") {
+        const normalizedDatasetRef = resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions);
+        const datasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
+            .find((option) => normalizeString(option?.value ?? option?.id) === normalizedDatasetRef) || null;
         const seededChartSpec = normalizeReportBuilderChartSpec(seed?.chartSpec || {});
-        const chartSpec = buildDefaultReportBuilderChartSpec(
+        const hasExplicitSeededChartFields = !!normalizeString(seed?.chartSpec?.xField)
+            || normalizeStringArray(seed?.chartSpec?.yFields || seed?.chartSpec?.yField).length > 0
+            || !!normalizeString(seed?.chartSpec?.seriesField);
+        const title = normalizeString(seed?.title || seededChartSpec?.title || "Chart") || "Chart";
+        const datasetChartSpec = !hasExplicitSeededChartFields && normalizedDatasetRef !== "primary"
+            ? buildDatasetChartSpecSeed(datasetOption, title, "bar")
+            : null;
+        const chartSpec = datasetChartSpec || buildDefaultReportBuilderChartSpec(
             chartConfig && typeof chartConfig === "object" && !Array.isArray(chartConfig) ? chartConfig : {},
             chartState && typeof chartState === "object" && !Array.isArray(chartState) ? chartState : {},
             seededChartSpec || {},
             { suggestSeriesField: true },
         ) || seededChartSpec || null;
-        const title = normalizeString(seed?.title || chartSpec?.title || "Chart") || "Chart";
         return {
             kind: "chartBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "chartBlock")),
             title,
-            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
+            datasetRef: normalizedDatasetRef,
             chartSpec: chartSpec
                 ? normalizeReportBuilderChartSpec({
                     ...chartSpec,
@@ -888,7 +1036,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             kind: "geoMapBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "geoMapBlock")),
             title: normalizeString(seed?.title || "Geo Map") || "Geo Map",
-            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
+            datasetRef: resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions),
             geo: {
                 shape: normalizeString(geo?.shape || "us-states") || "us-states",
                 key,
@@ -903,15 +1051,22 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
         };
     }
     if (normalizedKind === "kpiBlock") {
-        const normalizedValueOptions = normalizeFieldOptions(valueFieldOptions);
-        const normalizedSecondaryOptions = normalizeFieldOptions(secondaryFieldOptions);
+        const normalizedDatasetRef = resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions);
+        const datasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
+            .find((option) => normalizeString(option?.value ?? option?.id) === normalizedDatasetRef) || null;
+        const normalizedValueOptions = Array.isArray(datasetOption?.valueFieldOptions) && datasetOption.valueFieldOptions.length > 0
+            ? normalizeFieldOptions(datasetOption.valueFieldOptions)
+            : normalizeFieldOptions(valueFieldOptions);
+        const normalizedSecondaryOptions = Array.isArray(datasetOption?.secondaryFieldOptions) && datasetOption.secondaryFieldOptions.length > 0
+            ? normalizeFieldOptions(datasetOption.secondaryFieldOptions)
+            : normalizeFieldOptions(secondaryFieldOptions);
         const valueField = normalizeString(seed?.valueField || normalizedValueOptions[0]?.value);
         const secondaryField = normalizeString(seed?.secondaryField || "");
         return {
             kind: "kpiBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "kpiBlock")),
             title: normalizeString(seed?.title || "Headline KPI") || "Headline KPI",
-            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
+            datasetRef: normalizedDatasetRef,
             valueField,
             valueLabel: normalizeString(seed?.valueLabel || resolveOptionLabel(normalizedValueOptions, valueField) || "Value"),
             secondaryField,
@@ -930,7 +1085,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             kind: "badgesBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "badgesBlock")),
             title: normalizeString(seed?.title || "Status Pills") || "Status Pills",
-            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
+            datasetRef: resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions),
             items: items.length > 0
                 ? items.map((item) => ({
                     ...item,
@@ -949,7 +1104,12 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
         };
     }
     if (normalizedKind === "tableBlock") {
-        const normalizedColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
+        const normalizedDatasetRef = resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions);
+        const datasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
+            .find((option) => normalizeString(option?.value ?? option?.id) === normalizedDatasetRef) || null;
+        const normalizedColumnOptions = Array.isArray(datasetOption?.columnOptions) && datasetOption.columnOptions.length > 0
+            ? normalizeTableColumnOptions(datasetOption.columnOptions)
+            : normalizeTableColumnOptions(tableColumnOptions);
         const selectedColumnDefaults = normalizedColumnOptions.filter((option) => option.selected).map((option) => option.key);
         const defaultColumnKeys = selectedColumnDefaults.length > 0
             ? selectedColumnDefaults
@@ -972,7 +1132,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             kind: "tableBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "tableBlock")),
             title: normalizeString(seed?.title || "Detail Table") || "Detail Table",
-            datasetRef: normalizeString(seed?.datasetRef || "primary") || "primary",
+            datasetRef: normalizedDatasetRef,
             columnKeys: resolvedColumnKeys,
             columns: resolvedColumnKeys.map((columnKey) => {
                 const existing = existingColumns.get(columnKey);
@@ -1032,7 +1192,8 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
 }
 
 export function rebindReportBuilderDocumentBlockDraft(draft = null, {
-    datasetRef = "primary",
+    datasetRef = "",
+    datasetOptions = [],
     valueFieldOptions = [],
     secondaryFieldOptions = [],
     tableColumnOptions = [],
@@ -1045,7 +1206,11 @@ export function rebindReportBuilderDocumentBlockDraft(draft = null, {
         return normalizedDraft;
     }
     const normalizedKind = normalizeString(normalizedDraft?.kind);
-    const nextDatasetRef = normalizeString(datasetRef || normalizedDraft?.datasetRef || "primary") || "primary";
+    const datasetResolution = resolveDocumentBlockDatasetRefResolution(
+        normalizeString(datasetRef || normalizedDraft?.datasetRef),
+        datasetOptions,
+    );
+    const nextDatasetRef = datasetResolution.datasetRef;
     normalizedDraft.datasetRef = nextDatasetRef;
 
     const normalizedValueOptions = normalizeFieldOptions(valueFieldOptions);
@@ -1058,6 +1223,9 @@ export function rebindReportBuilderDocumentBlockDraft(draft = null, {
             nextDatasetRef,
             [{ value: nextDatasetRef, scopeParamOptions: normalizedScopeParamOptions }],
             [],
+            {
+                allowImplicitTopLevelFallback: datasetResolution.source === "singleAvailable",
+            },
         );
         const allowedParamIds = new Set(scopedParamOptions.map((option) => option.value));
         const defaultParamIds = scopedParamOptions.map((option) => option.value);
@@ -1141,6 +1309,30 @@ export function rebindReportBuilderDocumentBlockDraft(draft = null, {
                 ? (normalizedSecondaryOptions.find((option) => option.value === nextSecondaryField)?.label || normalizedDraft?.secondaryLabel || nextSecondaryField)
                 : "",
         );
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "chartBlock") {
+        const datasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
+            .find((option) => normalizeString(option?.value ?? option?.id) === nextDatasetRef) || null;
+        const availableChartFields = normalizeChartFieldOptions(
+            Array.isArray(datasetOption?.chartFieldOptions) ? datasetOption.chartFieldOptions : [],
+        );
+        const availableFieldKeys = new Set(availableChartFields.map((option) => normalizeString(option?.key)));
+        const currentChartSpec = normalizeReportBuilderChartSpec(normalizedDraft?.chartSpec || {});
+        const hasValidCurrentSpec = !!normalizeString(currentChartSpec?.xField)
+            && availableFieldKeys.has(normalizeString(currentChartSpec?.xField))
+            && normalizeStringArray(currentChartSpec?.yFields).length > 0
+            && normalizeStringArray(currentChartSpec?.yFields).every((field) => availableFieldKeys.has(normalizeString(field)))
+            && (!normalizeString(currentChartSpec?.seriesField) || availableFieldKeys.has(normalizeString(currentChartSpec?.seriesField)));
+        const fallbackChartSpec = buildDatasetChartSpecSeed(
+            datasetOption,
+            normalizeString(currentChartSpec?.title || normalizedDraft?.title || "Chart") || "Chart",
+            normalizeString(currentChartSpec?.type || "bar") || "bar",
+        );
+        normalizedDraft.chartSpec = hasValidCurrentSpec
+            ? currentChartSpec
+            : fallbackChartSpec;
         return normalizedDraft;
     }
 
@@ -1242,13 +1434,19 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
                 ])
                 .filter(([value]) => !!value),
         );
-        const normalizedDatasetRef = normalizeString(draft?.datasetRef || "primary") || "primary";
+        const datasetResolution = resolveDocumentBlockDatasetRefResolution(
+            normalizeString(draft?.datasetRef),
+            datasetOptions,
+        );
+        const normalizedDatasetRef = datasetResolution.datasetRef;
         const datasetScopedOptions = datasetOptionsByValue.has(normalizedDatasetRef)
             ? (datasetOptionsByValue.get(normalizedDatasetRef) || [])
             : [];
         const normalizedScopeParamOptions = datasetScopedOptions.length > 0
             ? datasetScopedOptions
-            : (normalizedDatasetRef === "primary" ? normalizeScopeParamOptions(scopeParamOptions) : []);
+            : ((normalizedDatasetRef === "primary" || datasetResolution.source === "singleAvailable")
+                ? normalizeScopeParamOptions(scopeParamOptions)
+                : []);
         const allowedParamIds = new Set(normalizedScopeParamOptions.map((option) => option.value));
         const paramIds = normalizeStringArray(draft?.paramIds);
         if (paramIds.length === 0 && normalizedScopeParamOptions.length > 0) {
@@ -1269,7 +1467,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
                 .map((option) => normalizeString(option?.value ?? option?.id))
                 .filter(Boolean),
         );
-        if (datasetOptionIds.size > 0 && normalizedDatasetRef !== "primary" && !datasetOptionIds.has(normalizedDatasetRef)) {
+        if (datasetResolution.source === "explicit" && datasetOptionIds.size > 0 && normalizedDatasetRef !== "primary" && !datasetOptionIds.has(normalizedDatasetRef)) {
             errors.push({
                 field: "datasetRef",
                 code: "unknown",
@@ -1568,7 +1766,11 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
         const blockId = normalizeString(block?.id || `documentBlock_${index + 1}`);
         const blockTitle = formatDocumentBlockTitle(block);
         const normalizedKind = normalizeString(block?.kind);
-        const normalizedDatasetRef = normalizeString(block?.datasetRef);
+        const datasetResolution = resolveDocumentBlockDatasetRefResolution(
+            normalizeString(block?.datasetRef),
+            normalizedDatasetOptions,
+        );
+        const normalizedDatasetRef = datasetResolution.datasetRef;
         const datasetOption = datasetOptionsByValue.get(normalizedDatasetRef) || null;
         const effectiveValueOptionIds = datasetOption
             ? new Set((datasetOption.valueFieldOptions || []).map((option) => option.value))
@@ -1600,7 +1802,7 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                 : [];
             const effectiveScopeParamOptions = datasetScopedOptions.length > 0
                 ? datasetScopedOptions
-                : (normalizedDatasetRef === "primary" ? normalizedScopeParamOptions : []);
+                : ((normalizedDatasetRef === "primary" || datasetResolution.source === "singleAvailable") ? normalizedScopeParamOptions : []);
             const effectiveScopeParamOptionIds = new Set(effectiveScopeParamOptions.map((option) => option.value));
             (Array.isArray(block?.paramIds) ? block.paramIds : []).forEach((paramId, paramIndex) => {
                 const normalizedParamId = normalizeString(paramId);
@@ -1804,18 +2006,14 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
     return diagnostics;
 }
 
-function extractReportBuilderBlock(document = null) {
-    const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
-    return blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null;
-}
-
 export function buildReportBuilderDocumentBlockFieldOptions({
     document = null,
     config = null,
     state = null,
+    currentSourceRef = "",
 } = {}) {
-    const reportBuilderBlock = extractReportBuilderBlock(document);
-    const effectiveConfig = config && typeof config === "object" && !Array.isArray(config)
+    const reportBuilderBlock = resolveReportBuilderBlock(document);
+    const embeddedConfig = config && typeof config === "object" && !Array.isArray(config)
         ? cloneValue(config)
         : (reportBuilderBlock?.config && typeof reportBuilderBlock.config === "object" && !Array.isArray(reportBuilderBlock.config)
             ? cloneValue(reportBuilderBlock.config)
@@ -1825,7 +2023,9 @@ export function buildReportBuilderDocumentBlockFieldOptions({
         : (reportBuilderBlock?.state && typeof reportBuilderBlock.state === "object" && !Array.isArray(reportBuilderBlock.state)
             ? cloneValue(reportBuilderBlock.state)
             : null);
-    if (!effectiveConfig) {
+    const builderContext = resolveReportDocumentBuilderContext(document, embeddedConfig, effectiveState);
+    const resolvedConfig = builderContext?.config || null;
+    if (!resolvedConfig) {
         return {
             valueFieldOptions: [],
             secondaryFieldOptions: [],
@@ -1836,19 +2036,21 @@ export function buildReportBuilderDocumentBlockFieldOptions({
             chartConfig: null,
         };
     }
-    const normalizedState = effectiveState && typeof effectiveState === "object" && !Array.isArray(effectiveState)
-        ? effectiveState
+    const normalizedState = builderContext?.state && typeof builderContext.state === "object" && !Array.isArray(builderContext.state)
+        ? builderContext.state
         : {};
-    const calculatedFieldConfig = buildReportBuilderCalculatedFieldConfig(effectiveConfig, normalizedState);
+    const calculatedFieldConfig = buildReportBuilderCalculatedFieldConfig(resolvedConfig, normalizedState);
     return buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
         config: calculatedFieldConfig,
         state: normalizedState,
+        currentSourceRef: normalizeString(currentSourceRef || reportBuilderBlock?.source?.dataSourceRef || calculatedFieldConfig?.dataSourceRef),
     });
 }
 
 export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
     config = null,
     state = null,
+    currentSourceRef = "",
 } = {}) {
     const preparedConfig = config && typeof config === "object" && !Array.isArray(config)
         ? cloneValue(config)
@@ -1862,6 +2064,7 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
             secondaryFieldOptions: [],
             tableColumnOptions: [],
             scopeParamOptions: [],
+            datasetOptions: [],
             chartFieldOptions: [],
             supportedChartTypes: [],
             chartConfig: null,
@@ -1920,37 +2123,52 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
             ...(measure.governance ? { governance: cloneValue(measure.governance) } : {}),
         })),
     ].filter((option) => option.key);
+    const valueFieldOptions = availableMeasures
+        .map((measure) => ({
+            value: measure.id,
+            ...(measure.rawId ? { rawId: measure.rawId } : {}),
+            label: measure.label,
+            ...(measure.format ? { format: measure.format } : {}),
+            ...(measure.description ? { description: measure.description } : {}),
+            ...(measure.category ? { category: measure.category } : {}),
+            ...(measure.definitionRef ? { definitionRef: measure.definitionRef } : {}),
+            ...(measure.semanticRef ? { semanticRef: measure.semanticRef } : {}),
+            ...(measure.governance ? { governance: cloneValue(measure.governance) } : {}),
+        }))
+        .filter((option) => option.value);
+    const secondaryFieldOptions = availableDimensions
+        .map((dimension) => ({
+            value: dimension.id,
+            ...(dimension.rawId ? { rawId: dimension.rawId } : {}),
+            label: dimension.label,
+            ...(dimension.format ? { format: dimension.format } : {}),
+            ...(dimension.description ? { description: dimension.description } : {}),
+            ...(dimension.category ? { category: dimension.category } : {}),
+            ...(dimension.definitionRef ? { definitionRef: dimension.definitionRef } : {}),
+            ...(dimension.semanticRef ? { semanticRef: dimension.semanticRef } : {}),
+            ...(dimension.governance ? { governance: cloneValue(dimension.governance) } : {}),
+        }))
+        .filter((option) => option.value);
+    const chartFieldOptions = buildReportBuilderChartFields(preparedConfig, buildAuthoringChartState(preparedConfig, normalizedState));
     const chartState = buildAuthoringChartState(preparedConfig, normalizedState);
+    const datasetOptions = buildReportBuilderDatasetOptions({
+        currentSourceRef: normalizeString(currentSourceRef || preparedConfig?.dataSourceRef),
+        configuredSources: preparedConfig?.dataSources,
+        configuredDatasets: preparedConfig?.datasets,
+        staticDatasets: normalizedState?.reportStaticDatasets,
+        tableColumnOptions,
+        valueFieldOptions,
+        secondaryFieldOptions,
+        chartFieldOptions,
+        scopeParamOptions,
+    });
     return {
-        valueFieldOptions: availableMeasures
-            .map((measure) => ({
-                value: measure.id,
-                ...(measure.rawId ? { rawId: measure.rawId } : {}),
-                label: measure.label,
-                ...(measure.format ? { format: measure.format } : {}),
-                ...(measure.description ? { description: measure.description } : {}),
-                ...(measure.category ? { category: measure.category } : {}),
-                ...(measure.definitionRef ? { definitionRef: measure.definitionRef } : {}),
-                ...(measure.semanticRef ? { semanticRef: measure.semanticRef } : {}),
-                ...(measure.governance ? { governance: cloneValue(measure.governance) } : {}),
-            }))
-            .filter((option) => option.value),
-        secondaryFieldOptions: availableDimensions
-            .map((dimension) => ({
-                value: dimension.id,
-                ...(dimension.rawId ? { rawId: dimension.rawId } : {}),
-                label: dimension.label,
-                ...(dimension.format ? { format: dimension.format } : {}),
-                ...(dimension.description ? { description: dimension.description } : {}),
-                ...(dimension.category ? { category: dimension.category } : {}),
-                ...(dimension.definitionRef ? { definitionRef: dimension.definitionRef } : {}),
-                ...(dimension.semanticRef ? { semanticRef: dimension.semanticRef } : {}),
-                ...(dimension.governance ? { governance: cloneValue(dimension.governance) } : {}),
-            }))
-            .filter((option) => option.value),
+        valueFieldOptions,
+        secondaryFieldOptions,
         tableColumnOptions,
         scopeParamOptions,
-        chartFieldOptions: buildReportBuilderChartFields(preparedConfig, chartState),
+        datasetOptions,
+        chartFieldOptions,
         supportedChartTypes: getReportBuilderSupportedChartTypes(preparedConfig),
         chartConfig: cloneValue(preparedConfig),
         chartState: cloneValue(chartState),
@@ -1976,22 +2194,7 @@ export function buildReportBuilderDocumentCompileDiagnostics({
         config,
         state,
     });
-    const reportBuilderBlock = document && typeof document === "object" && !Array.isArray(document)
-        ? (Array.isArray(document?.blocks) ? document.blocks.find((block) => normalizeString(block?.kind) === "reportBuilderBlock") || null : null)
-        : null;
-    const embeddedState = reportBuilderBlock?.state && typeof reportBuilderBlock.state === "object" && !Array.isArray(reportBuilderBlock.state)
-        ? reportBuilderBlock.state
-        : null;
-    const stateDatasetOptions = buildReportBuilderStaticDatasetOptions(state?.reportStaticDatasets);
-    const embeddedDatasetOptions = buildReportBuilderStaticDatasetOptions(embeddedState?.reportStaticDatasets);
-    return buildReportBuilderDocumentBlockDiagnostics(blocks, {
-        ...fieldOptions,
-        datasetOptions: [
-            ...(Array.isArray(fieldOptions?.datasetOptions) ? fieldOptions.datasetOptions : []),
-            ...stateDatasetOptions,
-            ...embeddedDatasetOptions,
-        ],
-    });
+    return buildReportBuilderDocumentBlockDiagnostics(blocks, fieldOptions);
 }
 
 export function buildReportBuilderDocumentCompileValidation(diagnostics = []) {

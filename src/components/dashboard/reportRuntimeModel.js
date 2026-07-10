@@ -257,38 +257,6 @@ export function resolveReportRuntimeBlocks(reportSpec = {}, reportFill = {}) {
   return ordered;
 }
 
-export function resolveReportRuntimePrimaryBlocks(reportSpec = {}, reportFill = {}) {
-  const blocks = resolveReportRuntimeBlocks(reportSpec, reportFill);
-  const blockIndex = new Map(blocks.map((block) => [normalizeString(block?.id), block]));
-  const orderedPrimaryIds = normalizeString(reportSpec?.parameters?.viewMode).toLowerCase() === "table"
-    ? ["primaryTable", "primaryChart"]
-    : ["primaryChart", "primaryTable"];
-  const primary = orderedPrimaryIds
-    .map((blockId) => blockIndex.get(blockId))
-    .filter(Boolean);
-  const primaryIds = new Set(primary.map((block) => normalizeString(block?.id)).filter(Boolean));
-  const beforePrimary = [];
-  const afterPrimary = [];
-  let encounteredPrimary = false;
-  blocks.forEach((block) => {
-    const blockId = normalizeString(block?.id);
-    if (primaryIds.has(blockId)) {
-      encounteredPrimary = true;
-      return;
-    }
-    if (encounteredPrimary) {
-      afterPrimary.push(block);
-      return;
-    }
-    beforePrimary.push(block);
-  });
-  return {
-    primary,
-    beforePrimary,
-    afterPrimary,
-  };
-}
-
 export function resolveReportRuntimeBindingSummary(reportSpecOrContext = {}, reportDocument = null) {
   const metadataContext = resolveReportRuntimeMetadataContext(reportSpecOrContext, reportDocument);
   const semanticSummary = metadataContext?.semanticSummary && typeof metadataContext.semanticSummary === "object" && !Array.isArray(metadataContext.semanticSummary)

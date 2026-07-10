@@ -229,8 +229,8 @@ const semanticArtifact = buildReportBuilderExplorationArtifact({
 
 assert.equal(semanticArtifact.document.semanticSummary.modelLabel, "Ad Delivery");
 assert.equal(semanticArtifact.reportSpec.semanticSummary.entityLabel, "Line Delivery");
-assert.equal(semanticArtifact.document.blocks[0].config.measures[0].label, "Total Spend");
-assert.equal(semanticArtifact.document.blocks[0].config.dimensions[0].label, "Event Date");
+assert.equal(semanticArtifact.document.datasets[0].measures[0].label, "Total Spend");
+assert.equal(semanticArtifact.document.datasets[0].dimensions[0].label, "Event Date");
 assert.equal(semanticArtifact.compileState.status, "clean");
 assert.equal(semanticArtifact.compileState.diagnostics[0].code, "semanticProviderDiagnostics");
 assert.equal(semanticArtifact.semanticBindingViewState.title, "Semantic Binding");

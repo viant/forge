@@ -40,14 +40,12 @@ export function buildReportBuilderSemanticWorkspacePanelState({
         if (normalizedBindingMode !== "semantic") {
             return {
                 tone: "info",
-                eyebrow: "Semantic model",
-                title: "Semantic modeling inactive",
-                description: providerAvailable || model || normalizeString(modelRef)
-                    ? "This builder is currently running in raw mode. Import or reopen a semantic report to activate model-backed mappings."
-                    : "This builder is currently running without semantic binding or a semantic model provider.",
+                eyebrow: "Data model",
+                title: "No data model configured",
+                description: "This report is not using a data model yet.",
                 metaChips: [
-                    "Raw mode",
-                    ...(providerAvailable || model ? ["Provider available"] : ["Provider unavailable"]),
+                    "No data model",
+                    ...(providerAvailable || model ? ["Data model source available"] : ["Data model source unavailable"]),
                 ],
                 semanticBindingTitle: "",
                 semanticBindingChips: [],
@@ -62,10 +60,10 @@ export function buildReportBuilderSemanticWorkspacePanelState({
         if (modelLoading) {
             return {
                 tone: "info",
-                eyebrow: "Semantic model",
-                title: "Loading semantic model",
-                description: "Semantic binding is active and the model metadata is still loading.",
-                metaChips: ["Semantic mode", "Loading"],
+                eyebrow: "Data model",
+                title: "Loading data model...",
+                description: "Data-model details are still loading.",
+                metaChips: ["Data model active", "Loading"],
                 semanticBindingTitle: "",
                 semanticBindingChips: [],
                 semanticBindingFieldGroups: [],
@@ -79,10 +77,10 @@ export function buildReportBuilderSemanticWorkspacePanelState({
         if (normalizeString(modelError)) {
             return {
                 tone: "danger",
-                eyebrow: "Semantic model",
-                title: "Semantic model error",
+                eyebrow: "Data model",
+                title: "Data model failed to load",
                 description: normalizeString(modelError),
-                metaChips: ["Semantic mode", "Blocked"],
+                metaChips: ["Data model active", "Blocked"],
                 semanticBindingTitle: "",
                 semanticBindingChips: [],
                 semanticBindingFieldGroups: [],
@@ -95,10 +93,10 @@ export function buildReportBuilderSemanticWorkspacePanelState({
         }
         return {
             tone: "warning",
-            eyebrow: "Semantic model",
-            title: "Semantic model unavailable",
-            description: "Semantic binding is active, but no semantic model metadata is currently available for this report.",
-            metaChips: ["Semantic mode", "Provider unavailable"],
+            eyebrow: "Data model",
+            title: "Data model unavailable",
+            description: "This report is using a data model, but its details are unavailable right now.",
+            metaChips: ["Data model active", "Data model source unavailable"],
             semanticBindingTitle: "",
             semanticBindingChips: [],
             semanticBindingFieldGroups: [],
@@ -109,7 +107,7 @@ export function buildReportBuilderSemanticWorkspacePanelState({
             governanceItems: [],
         };
     }
-    const title = normalizeString(semanticStatus?.title || bindingViewState?.title || "Semantic model") || "Semantic model";
+    const title = normalizeString(semanticStatus?.title || bindingViewState?.title || "Data model") || "Data model";
     const description = normalizeString(semanticStatus?.message)
         || "Mapped fields, runtime validation, and governance are visible here.";
     const normalizedTone = normalizeString(semanticDiagnosticsNotice?.level || semanticStatus?.level || "info").toLowerCase() || "info";
@@ -129,14 +127,14 @@ export function buildReportBuilderSemanticWorkspacePanelState({
     }
     return {
         tone: normalizedTone,
-        eyebrow: "Semantic model",
+        eyebrow: "Data model",
         title,
         description,
         metaChips,
         semanticBindingTitle: normalizeString(bindingViewState?.title),
         semanticBindingChips: Array.isArray(bindingViewState?.chips) ? bindingViewState.chips : [],
         semanticBindingFieldGroups: Array.isArray(bindingViewState?.fieldGroups) ? bindingViewState.fieldGroups : [],
-        diagnosticsTitle: normalizeString(semanticDiagnosticsNotice?.title || "Semantic diagnostics"),
+        diagnosticsTitle: normalizeString(semanticDiagnosticsNotice?.title || "Data model diagnostics"),
         diagnosticsDescription: normalizeString(semanticDiagnosticsNotice?.description)
             || (diagnostics.length > 0 ? pluralize(diagnostics.length, "diagnostic") : ""),
         diagnostics: diagnostics.map((entry, index) => ({

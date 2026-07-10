@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 
 import {
   buildReportRuntimePreviewExtractConfigFingerprint,
+  buildReportRuntimePreviewResultContractFingerprint,
   buildReportRuntimePreviewRequestKey,
-  resolveReportRuntimePreviewFetchResult,
 } from "./useReportRuntimePreviewRows.js";
+import { resolveReportDatasetFetchResult } from "../../reporting/reportDatasetResultContract.js";
 import { isDeferredCacheHitEnvelope } from "../dataSourceExtract.js";
 
 assert.equal(buildReportRuntimePreviewRequestKey("", 0), "");
@@ -30,6 +31,14 @@ assert.equal(
   'runtime::5::1::semantic::2::{"selectors":{"data":"payload.items"},"paging":{"enabled":true}}',
 );
 assert.equal(
+  buildReportRuntimePreviewResultContractFingerprint({
+    shape: "rowSet",
+    rowPath: "payload.records",
+    hasMorePath: "page.hasMore",
+  }),
+  '{"shape":"rowSet","rowPath":"payload.records","hasMorePath":"page.hasMore"}',
+);
+assert.equal(
   buildReportRuntimePreviewExtractConfigFingerprint({
     selectors: {
       data: "payload.items",
@@ -42,8 +51,8 @@ assert.equal(
 );
 
 assert.deepEqual(
-  resolveReportRuntimePreviewFetchResult(
-    {
+  resolveReportDatasetFetchResult({
+    body: {
       payload: {
         items: [
           { channel: "Display", spend: 12 },
@@ -54,7 +63,7 @@ assert.deepEqual(
         hasMore: true,
       },
     },
-    {
+    extractConfig: {
       selectors: {
         data: "payload.items",
       },
@@ -62,7 +71,42 @@ assert.deepEqual(
         enabled: true,
       },
     },
-  ),
+  }),
+  {
+    rows: [
+      { channel: "Display", spend: 12 },
+      { channel: "CTV", spend: 7 },
+    ],
+    hasMore: false,
+  },
+);
+assert.deepEqual(
+  resolveReportDatasetFetchResult({
+    body: {
+      payload: {
+        records: [
+          { channel: "Display", spend: 12 },
+          { channel: "CTV", spend: 7 },
+        ],
+      },
+      page: {
+        hasMore: true,
+      },
+    },
+    extractConfig: {
+      selectors: {
+        data: "payload.items",
+      },
+      paging: {
+        enabled: true,
+      },
+    },
+    resultContract: {
+      shape: "rowSet",
+      rowPath: "payload.records",
+      hasMorePath: "page.hasMore",
+    },
+  }),
   {
     rows: [
       { channel: "Display", spend: 12 },

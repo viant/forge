@@ -90,6 +90,24 @@ assert.deepEqual(
         requestFingerprint: '{"q":1}',
         canRunReport: true,
         currentRequestShouldFetch: true,
+        hasRows: true,
+        hasCompletedCurrentRun: false,
+        autoRunKey: 'report::{"q":1}',
+        consumedAutoRunKey: "",
+        currentRequestDispatchFingerprint: '{"q":1}::fetch',
+        requestDispatchFingerprint: '{"q":1}::fetch',
+    }),
+    {
+        type: "promote",
+        autoRunKey: 'report::{"q":1}',
+    },
+);
+assert.deepEqual(
+    resolveReportBuilderSurfaceAutoRunAction({
+        workspaceMode: "report",
+        requestFingerprint: '{"q":1}',
+        canRunReport: true,
+        currentRequestShouldFetch: true,
         autoRunKey: 'report::{"q":1}',
         consumedAutoRunKey: "",
         currentRequestDispatchFingerprint: '{"q":1}::fetch',

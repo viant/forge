@@ -6,6 +6,7 @@ import {
     buildReportBuilderHydratedDocumentSession,
     buildReportBuilderHydratedSessionRoundTrip,
     resolveReportBuilderHydratedDocumentSessionFromState,
+    setReportBuilderHydratedDocumentSessionReopenedDataset,
     setReportBuilderHydratedDocumentSessionSharedArtifact,
     setReportBuilderHydratedDocumentSessionRuntimePreviewInteraction,
     stripReportBuilderHydratedDocumentSessionState,
@@ -296,8 +297,6 @@ assert.deepEqual(hydrated, {
             mode: "semantic",
             modelRef: "model://example/performance/delivery@v1",
             entity: "line_delivery",
-            selectedDimensions: [],
-            selectedMeasures: [],
         },
         localCalculatedFields: [],
         localTableCalculations: [],
@@ -379,6 +378,49 @@ assert.deepEqual(hydratedWithScopeParamBindings.state.scopeParams, {
     },
 });
 
+const hydratedWithDocumentBinding = buildHydratedReportBuilderDocument({
+    ...getResponse,
+    document: {
+        ...getResponse.document,
+        binding: {
+            mode: "semantic",
+            modelRef: "model://example/performance/delivery@v1",
+            entity: "line_delivery",
+        },
+        blocks: [
+            {
+                ...getResponse.document.blocks[0],
+                config: {
+                    ...getResponse.document.blocks[0].config,
+                    binding: undefined,
+                },
+                state: {
+                    ...getResponse.document.blocks[0].state,
+                    binding: undefined,
+                },
+            },
+        ],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.equal(hydratedWithDocumentBinding.valid, true);
+assert.deepEqual(hydratedWithDocumentBinding.state.binding, {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+});
+assert.deepEqual(hydratedWithDocumentBinding.config.binding, {
+    mode: "semantic",
+    modelRef: "model://example/performance/delivery@v1",
+    entity: "line_delivery",
+});
+
 const hydratedWithAuthoredBlocks = buildHydratedReportBuilderDocument({
     ...getResponse,
     document: {
@@ -442,6 +484,121 @@ assert.deepEqual(hydratedWithAuthoredBlocks.state.reportDocumentBlocks, [
     },
 ]);
 assert.equal(hydratedWithAuthoredBlocks.compileState, undefined);
+
+const hydratedWithDocumentStaticDataset = buildHydratedReportBuilderDocument({
+    ...getResponse,
+    document: {
+        ...getResponse.document,
+        datasets: [
+            {
+                id: "segment_status_csv",
+                label: "Segment Status",
+                sourceFormat: "csv",
+                columns: [
+                    { key: "segment", label: "Segment", kind: "dimension" },
+                    { key: "score", label: "Score", kind: "measure" },
+                ],
+                rows: [
+                    { segment: "North", score: 10 },
+                    { segment: "South", score: 7 },
+                ],
+            },
+        ],
+        blocks: [
+            {
+                ...getResponse.document.blocks[0],
+                state: {
+                    ...getResponse.document.blocks[0].state,
+                    reportStaticDatasets: undefined,
+                },
+            },
+        ],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.deepEqual(hydratedWithDocumentStaticDataset.state.reportStaticDatasets, [
+    {
+        id: "segment_status_csv",
+        label: "Segment Status",
+        description: "CSV • 2 rows • 2 columns",
+        dataSourceRef: "static_csv_segment_status_csv",
+        kindLabel: "static csv",
+        sourceFormat: "csv",
+        rows: [
+            { segment: "North", score: 10 },
+            { segment: "South", score: 7 },
+        ],
+        columns: [
+            { key: "segment", label: "Segment", kind: "dimension" },
+            { key: "score", label: "Score", kind: "measure" },
+        ],
+        rowCount: 2,
+        columnCount: 2,
+        columnOptions: [
+            { key: "segment", label: "Segment", kind: "dimension" },
+            { key: "score", label: "Score", kind: "measure" },
+        ],
+        valueFieldOptions: [
+            { value: "score", label: "Score" },
+        ],
+        secondaryFieldOptions: [
+            { value: "segment", label: "Segment" },
+        ],
+    },
+]);
+
+const hydratedWithLegacyStateStaticDataset = buildHydratedReportBuilderDocument({
+    ...getResponse,
+    document: {
+        ...getResponse.document,
+        blocks: [
+            {
+                ...getResponse.document.blocks[0],
+                state: {
+                    ...getResponse.document.blocks[0].state,
+                    reportStaticDatasets: [
+                        {
+                            id: "segment_status_csv",
+                            label: "Segment Status",
+                            sourceFormat: "csv",
+                            columns: [
+                                { key: "segment", label: "Segment", kind: "dimension" },
+                                { key: "score", label: "Score", kind: "measure" },
+                            ],
+                            rows: [
+                                { segment: "North", score: 10 },
+                                { segment: "South", score: 7 },
+                            ],
+                        },
+                    ],
+                },
+            },
+        ],
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.equal(hydratedWithLegacyStateStaticDataset.valid, true);
+assert.deepEqual(
+    hydratedWithLegacyStateStaticDataset.state.reportStaticDatasets.map((dataset) => dataset.id),
+    ["segment_status_csv"],
+);
+assert.deepEqual(hydratedWithLegacyStateStaticDataset.state.reportStaticDatasets[0].rows, [
+    { segment: "North", score: 10 },
+    { segment: "South", score: 7 },
+]);
+assert.equal(hydratedWithLegacyStateStaticDataset.state.reportStaticDatasets[0].dataSourceRef, "static_csv_segment_status_csv");
 
 const hydratedLegacyTableKeys = buildHydratedReportBuilderDocument({
     ...getResponse,
@@ -567,6 +724,127 @@ const rootTemplatePreviewModel = buildReportBuilderRuntimePreviewModel({
 });
 assert.equal(rootTemplatePreviewModel?.document?.templateId, "market_brief");
 assert.equal(rootTemplatePreviewModel?.document?.templateLabel, "Market Brief");
+
+const publishedDatasetHydrateContainer = {
+    id: "publishedDatasetBuilder",
+    stateKey: "publishedDatasetBuilder",
+    title: "Published Dataset Builder",
+    dataSourceRef: "demoReportSource",
+};
+const publishedDatasetHydrateConfig = {
+    title: "Published Dataset Builder",
+    measures: [
+        { id: "totalSpend", key: "totalSpend", label: "Spend", default: true, format: "currency" },
+    ],
+    dimensions: [
+        { id: "channelId", key: "channelId", label: "Channel", default: true },
+    ],
+    result: {
+        defaultMode: "table",
+    },
+    dataSources: [
+        {
+            id: "forecast_cube",
+            dataSourceRef: "forecastCubeSource",
+            label: "Forecast Cube",
+            request: {
+                measures: { forecastRevenue: true },
+                dimensions: { region: true },
+                filters: {},
+                limit: 25,
+                offset: 0,
+            },
+            columnOptions: [
+                { key: "region", label: "Region", kind: "dimension" },
+                { key: "forecastRevenue", label: "Forecast Revenue", kind: "measure", format: "currency" },
+            ],
+            valueFieldOptions: [
+                { value: "forecastRevenue", label: "Forecast Revenue" },
+            ],
+            secondaryFieldOptions: [
+                { value: "region", label: "Region" },
+            ],
+            chartFieldOptions: [
+                { key: "region", label: "Region", kind: "dimension" },
+                { key: "forecastRevenue", label: "Forecast Revenue", kind: "measure", format: "currency" },
+            ],
+            scopeParamOptions: [
+                {
+                    value: "forecastRegion",
+                    label: "Forecast Region",
+                    kind: "multiSelect",
+                    paramPath: "filters.region",
+                },
+            ],
+        },
+    ],
+};
+const publishedDatasetHydrateState = {
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    selectedDimensions: ["channelId"],
+    viewMode: "table",
+    scopeParams: {
+        forecastRegion: ["US/NY"],
+    },
+    reportDocumentBlocks: [
+        {
+            id: "forecastTable",
+            kind: "tableBlock",
+            title: "Forecast Regions",
+            datasetRef: "forecast_cube",
+            columns: [
+                { key: "region", label: "Region" },
+                { key: "forecastRevenue", label: "Forecast Revenue", format: "currency" },
+            ],
+        },
+    ],
+};
+const publishedDatasetHydrateModel = buildReportBuilderRuntimePreviewModel({
+    container: publishedDatasetHydrateContainer,
+    config: publishedDatasetHydrateConfig,
+    state: publishedDatasetHydrateState,
+    includePrimaryBlocks: false,
+});
+assert.equal(Array.isArray(publishedDatasetHydrateModel?.document?.blocks?.[0]?.config?.dataSources), false);
+const hydratedPublishedDatasetDocument = buildHydratedReportBuilderDocument({
+    version: 1,
+    kind: "getReportDocumentResponse",
+    reportRef: {
+        reportId: "publishedDatasetBuilder",
+    },
+    documentVersion: 2,
+    document: publishedDatasetHydrateModel.document,
+    reportSpec: publishedDatasetHydrateModel.reportSpec,
+}, {
+    container: publishedDatasetHydrateContainer,
+    builderIdentity: {
+        containerId: "publishedDatasetBuilder",
+        stateKey: "publishedDatasetBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+});
+assert.equal(hydratedPublishedDatasetDocument.valid, true);
+assert.equal(hydratedPublishedDatasetDocument.config.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
+assert.equal(Array.isArray(hydratedPublishedDatasetDocument.config.dataSources), false);
+assert.deepEqual(hydratedPublishedDatasetDocument.state.scopeParams.forecastRegion, ["US/NY"]);
+assert.deepEqual(hydratedPublishedDatasetDocument.config.dimensions, [
+    {
+        id: "channelId",
+        key: "channelId",
+        label: "Channel",
+        default: true,
+    },
+]);
+assert.deepEqual(hydratedPublishedDatasetDocument.config.measures, [
+    {
+        id: "totalSpend",
+        key: "totalSpend",
+        label: "Spend",
+        default: true,
+        format: "currency",
+    },
+]);
 
 const rebuiltRootTemplatedPayload = buildReportBuilderSavedReportPayloadFromBuilderState({
     version: 1,
@@ -2795,4 +3073,290 @@ assert.equal(archivedSharedArtifactSession?.savedSource?.sourceArtifactId, "publ
 assert.equal(archivedSharedArtifactSession?.capabilities?.share, true);
 assert.equal(archivedSharedArtifactSession?.capabilities?.archive, undefined);
 
+const datasetEditableSession = {
+    ...session,
+    reopenedConfig: {
+        ...session.reopenedConfig,
+        datasets: [
+            {
+                id: "forecast_cube",
+                dataSourceRef: "forecastCubeSource",
+                label: "Forecast Cube",
+                description: "Original forecast source",
+                source: {
+                    kind: "mcp",
+                    toolName: "demo:forecast_summary",
+                },
+                resultContract: {
+                    shape: "rowSet",
+                    rowPath: "payload.records",
+                },
+                capabilities: {
+                    backendRefetch: true,
+                },
+                request: {
+                    query: "old_request",
+                },
+            },
+        ],
+    },
+    liveSnapshot: {
+        config: {
+            ...session.liveSnapshot.config,
+            datasets: [
+                {
+                    id: "forecast_cube",
+                    dataSourceRef: "forecastCubeSource",
+                    label: "Forecast Cube",
+                    description: "Original forecast source",
+                    source: {
+                        kind: "mcp",
+                        toolName: "demo:forecast_summary",
+                    },
+                    resultContract: {
+                        shape: "rowSet",
+                        rowPath: "payload.records",
+                    },
+                    capabilities: {
+                        backendRefetch: true,
+                    },
+                    request: {
+                        query: "old_request",
+                    },
+                },
+            ],
+        },
+        state: JSON.parse(JSON.stringify(session.liveSnapshot.state)),
+    },
+};
+const updatedDatasetSession = setReportBuilderHydratedDocumentSessionReopenedDataset(datasetEditableSession, "forecast_cube", {
+    label: "Edited Forecast Cube",
+    description: "Edited source metadata",
+    request: {
+        query: "new_request",
+    },
+    source: {
+        kind: "mcp",
+        toolName: "demo:forecast_summary_v2",
+    },
+    resultContract: {
+        shape: "rowSet",
+        rowPath: "payload.nextRecords",
+    },
+});
+assert.equal(updatedDatasetSession?.reopenedConfig?.datasets?.[0]?.label, "Edited Forecast Cube");
+assert.equal(updatedDatasetSession?.reopenedConfig?.datasets?.[0]?.description, "Edited source metadata");
+assert.equal(updatedDatasetSession?.reopenedConfig?.datasets?.[0]?.request?.query, "new_request");
+assert.equal(updatedDatasetSession?.reopenedConfig?.datasets?.[0]?.source?.toolName, "demo:forecast_summary_v2");
+assert.equal(updatedDatasetSession?.reopenedConfig?.datasets?.[0]?.resultContract?.rowPath, "payload.nextRecords");
+assert.equal(updatedDatasetSession?.liveSnapshot?.config?.datasets?.[0]?.label, "Edited Forecast Cube");
+
+const sparsePrimaryFallbackGetResponse = {
+    version: 1,
+    kind: "getReportDocumentResponse",
+    reportRef: {
+        reportId: "sparsePrimaryReport",
+    },
+    documentVersion: 3,
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "sparsePrimaryReport",
+        title: "Sparse Primary Report",
+        datasets: [
+            {
+                id: "primary",
+                dataSourceRef: "demoReportSource",
+                label: "Sparse Primary Report",
+                kindLabel: "primary",
+                columnOptions: [
+                    { key: "eventDate", label: "Event Date", kind: "dimension", format: "date" },
+                    { key: "channel", label: "Channel", kind: "dimension" },
+                    { key: "avails", label: "Avails", kind: "measure", format: "compactNumber" },
+                ],
+                scopeParamOptions: [
+                    { value: "dateRange", label: "Date Range", kind: "dateRange", required: true },
+                ],
+            },
+        ],
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    kind: "dashboard.reportBuilder",
+                    containerId: "demoReportBuilder",
+                    stateKey: "demoReportBuilder",
+                    dataSourceRef: "demoReportSource",
+                },
+                config: {
+                    title: "Sparse Primary Report",
+                },
+                state: {
+                    selectedMeasures: ["avails"],
+                    selectedDimensions: ["eventDate"],
+                    viewMode: "table",
+                },
+            },
+        ],
+    },
+};
+
+const sparsePrimaryFallbackHydrated = buildHydratedReportBuilderDocument(sparsePrimaryFallbackGetResponse, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.equal(sparsePrimaryFallbackHydrated.valid, true);
+assert.deepEqual(sparsePrimaryFallbackHydrated.config?.dimensions, [
+    { id: "eventDate", key: "eventDate", label: "Event Date", format: "date" },
+    { id: "channel", key: "channel", label: "Channel" },
+]);
+assert.deepEqual(sparsePrimaryFallbackHydrated.config?.measures, [
+    { id: "avails", key: "avails", label: "Avails", format: "compactNumber" },
+]);
+assert.deepEqual(sparsePrimaryFallbackHydrated.config?.staticFilters, [
+    { id: "dateRange", label: "Date Range", type: "dateRange", required: true },
+]);
+assert.deepEqual(sparsePrimaryFallbackHydrated.state?.selectedMeasures, ["avails"]);
+assert.deepEqual(sparsePrimaryFallbackHydrated.state?.selectedDimensions, ["eventDate"]);
+
+const legacyEmbeddedConfigGetResponse = {
+    version: 1,
+    kind: "getReportDocumentResponse",
+    reportRef: {
+        reportId: "legacyEmbeddedReport",
+    },
+    documentVersion: 2,
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "legacyEmbeddedReport",
+        title: "Legacy Embedded Report",
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    kind: "dashboard.reportBuilder",
+                    containerId: "demoReportBuilder",
+                    stateKey: "demoReportBuilder",
+                    dataSourceRef: "demoReportSource",
+                },
+                config: {
+                    measures: [
+                        { id: "avails", key: "avails", label: "Avails", default: true },
+                    ],
+                    dimensions: [
+                        { id: "eventDate", key: "eventDate", label: "Event Date", default: true, chartAxis: true },
+                    ],
+                },
+                state: {
+                    selectedMeasures: ["avails"],
+                    selectedDimensions: ["eventDate"],
+                    viewMode: "table",
+                },
+            },
+        ],
+    },
+};
+
+const legacyEmbeddedConfigHydrated = buildHydratedReportBuilderDocument(legacyEmbeddedConfigGetResponse, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.equal(legacyEmbeddedConfigHydrated.valid, true);
+assert.deepEqual(legacyEmbeddedConfigHydrated.config?.dimensions, [
+    { id: "eventDate", key: "eventDate", label: "Event Date", default: true, chartAxis: true },
+]);
+assert.deepEqual(legacyEmbeddedConfigHydrated.config?.measures, [
+    { id: "avails", key: "avails", label: "Avails", default: true },
+]);
+assert.equal(legacyEmbeddedConfigHydrated.config?.staticFilters, undefined);
+
+const modernEmbeddedConfigGetResponse = {
+    version: 1,
+    kind: "getReportDocumentResponse",
+    reportRef: {
+        reportId: "modernEmbeddedReport",
+    },
+    documentVersion: 4,
+    document: {
+        version: 1,
+        kind: "reportDocument",
+        id: "modernEmbeddedReport",
+        title: "Modern Embedded Report",
+        datasets: [
+            {
+                id: "primary",
+                dataSourceRef: "demoReportSource",
+                label: "Modern Embedded Report",
+                kindLabel: "primary",
+                columnOptions: [
+                    { key: "channel", label: "Catalog Channel", kind: "dimension" },
+                    { key: "revenue", label: "Catalog Revenue", kind: "measure" },
+                ],
+                scopeParamOptions: [
+                    { value: "channelFilter", label: "Catalog Channel Filter", kind: "value" },
+                ],
+            },
+        ],
+        blocks: [
+            {
+                id: "primaryBuilder",
+                kind: "reportBuilderBlock",
+                source: {
+                    kind: "dashboard.reportBuilder",
+                    containerId: "demoReportBuilder",
+                    stateKey: "demoReportBuilder",
+                    dataSourceRef: "demoReportSource",
+                },
+                config: {
+                    measures: [
+                        { id: "avails", key: "avails", label: "Avails", default: true },
+                    ],
+                    dimensions: [
+                        { id: "eventDate", key: "eventDate", label: "Event Date", default: true, chartAxis: true },
+                    ],
+                    staticFilters: [
+                        { id: "dateRange", label: "Date Range", type: "dateRange", required: true },
+                    ],
+                },
+                state: {
+                    selectedMeasures: ["avails"],
+                    selectedDimensions: ["eventDate"],
+                    viewMode: "table",
+                },
+            },
+        ],
+    },
+};
+
+const modernEmbeddedConfigHydrated = buildHydratedReportBuilderDocument(modernEmbeddedConfigGetResponse, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.equal(modernEmbeddedConfigHydrated.valid, true);
+assert.deepEqual(modernEmbeddedConfigHydrated.config?.dimensions, [
+    { id: "eventDate", key: "eventDate", label: "Event Date", default: true, chartAxis: true },
+]);
+assert.deepEqual(modernEmbeddedConfigHydrated.config?.measures, [
+    { id: "avails", key: "avails", label: "Avails", default: true },
+]);
+assert.deepEqual(modernEmbeddedConfigHydrated.config?.staticFilters, [
+    { id: "dateRange", label: "Date Range", type: "dateRange", required: true },
+]);
+
 console.log("reportBuilderHydratedReportDocument ✓ hydrates compatible ReportDocument responses back into live builder config and state");
+console.log("reportBuilderHydratedReportDocument ✓ recovers primary dimensions/measures/filter metadata from reportDocument.datasets when embedded config is sparse");

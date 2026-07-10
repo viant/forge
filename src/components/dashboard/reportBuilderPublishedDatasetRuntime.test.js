@@ -29,6 +29,17 @@ const config = {
       dataSourceRef: "forecastCubeSource",
       label: "Forecast Cube",
       kindLabel: "published",
+      source: {
+        kind: "mcp",
+        toolName: "demo:forecast_summary",
+      },
+      resultContract: {
+        shape: "rowSet",
+        rowPath: "payload.records",
+      },
+      capabilities: {
+        backendRefetch: true,
+      },
       request: {
         measures: { forecastRevenue: true },
         dimensions: { region: true },
@@ -168,8 +179,13 @@ const model = buildReportBuilderRuntimePreviewModel({
 });
 
 assert.ok(model);
+assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "primary"), false);
 assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
 assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "forecast_chart_only"), true);
+assert.equal(model.document.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
+assert.equal(model.document.datasets.some((dataset) => dataset.id === "forecast_chart_only"), true);
+assert.equal(Array.isArray(model.document.blocks[0]?.config?.dataSources), false);
+assert.equal(Array.isArray(model.document.blocks[0]?.config?.datasets), false);
 assert.deepEqual(
   model.reportSpec.datasets.find((dataset) => dataset.id === "forecast_cube")?.request,
   {
@@ -209,6 +225,17 @@ assert.ok(artifacts);
 const forecastDataset = artifacts.reportFill.datasets.find((dataset) => dataset.id === "forecast_cube");
 assert.ok(forecastDataset);
 assert.equal(forecastDataset.rows.length, 2);
+assert.deepEqual(forecastDataset.source, {
+  kind: "mcp",
+  toolName: "demo:forecast_summary",
+});
+assert.deepEqual(forecastDataset.resultContract, {
+  shape: "rowSet",
+  rowPath: "payload.records",
+});
+assert.deepEqual(forecastDataset.capabilities, {
+  backendRefetch: true,
+});
 
 const filterBlock = artifacts.reportFill.blocks.find((block) => block.id === "forecastFilters");
 assert.ok(filterBlock);
@@ -283,5 +310,23 @@ assert.deepEqual(
   scopedRuntimeModel.reportSpec.scope.params.find((param) => param.id === "forecastRegion")?.value,
   ["US/CA"],
 );
+
+const datasetCatalogModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config: {
+    ...config,
+    datasets: config.dataSources,
+    dataSources: [],
+  },
+  state,
+  includePrimaryBlocks: false,
+});
+
+assert.ok(datasetCatalogModel);
+assert.equal(datasetCatalogModel.reportSpec.datasets.some((dataset) => dataset.id === "primary"), false);
+assert.equal(datasetCatalogModel.reportSpec.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
+assert.equal(datasetCatalogModel.reportSpec.datasets.some((dataset) => dataset.id === "forecast_chart_only"), true);
+assert.equal(datasetCatalogModel.document.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
+assert.equal(Array.isArray(datasetCatalogModel.document.blocks[0]?.config?.datasets), false);
 
 console.log("reportBuilderPublishedDatasetRuntime ✓ carries configured published datasets through report spec and runtime fill");

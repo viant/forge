@@ -619,6 +619,95 @@ assert.equal(
     "Resolved Audience",
 );
 
+const connectorHydrationCalls = [];
+const connectorHydrationContext = {
+    metadata: {
+        dialogs: [
+            {
+                id: "audiencePicker",
+                dataSourceRef: "audience_lookup",
+                properties: {
+                    resolveInput: "AudienceId",
+                },
+            },
+        ],
+    },
+    Context(dataSourceRef) {
+        assert.equal(dataSourceRef, "audience_lookup");
+        return {
+            dataSource: {
+                selectors: {
+                    data: "data",
+                },
+            },
+            connector: {
+                async get({ inputParameters }) {
+                    connectorHydrationCalls.push(inputParameters);
+                    return {
+                        data: [
+                            {
+                                audienceId: inputParameters.AudienceId,
+                                audienceName: "Resolved Audience Via Connector",
+                            },
+                        ],
+                    };
+                },
+            },
+            handlers: {
+                dataSource: {},
+            },
+        };
+    },
+};
+const connectorHydrated = await hydrateReportBuilderLookupLabels(
+    connectorHydrationContext,
+    {
+        dynamicFilterGroups: [
+            {
+                id: "scope",
+                filters: [
+                    {
+                        id: "audienceIds",
+                        dialogId: "audiencePicker",
+                        valueSelector: "audienceId",
+                        labelSelector: "audienceName",
+                    },
+                ],
+            },
+        ],
+    },
+    {
+        dynamicGroups: {
+            scope: [
+                {
+                    id: "row_scope_connector",
+                    filterId: "audienceIds",
+                    selections: [
+                        {
+                            value: 54321,
+                            label: "54321",
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    () => ({
+        dialogId: "audiencePicker",
+        dataSourceRef: "audience_lookup",
+        resolveInput: "AudienceId",
+    }),
+);
+assert.deepEqual(connectorHydrationCalls, [
+    {
+        AudienceId: 54321,
+    },
+]);
+assert.equal(
+    connectorHydrated.dynamicGroups.scope[0].selections[0].label,
+    "Resolved Audience Via Connector",
+);
+
 const targetingHydrationCalls = [];
 const targetingHydrationContext = {
     metadata: {

@@ -1098,8 +1098,8 @@ const derivedUpdatePayload = buildReportBuilderUpdateReportDocumentPayloadFromBu
 });
 
 assert.equal(derivedUpdatePayload.document.semanticSummary.modelLabel, "Ad Delivery");
-assert.equal(derivedUpdatePayload.document.blocks[0].config.measures[0].label, "Available Impressions");
-assert.equal(derivedUpdatePayload.document.blocks[0].config.dimensions[0].label, "Delivery Date");
+assert.equal(derivedUpdatePayload.document.datasets[0].measures[0].label, "Available Impressions");
+assert.equal(derivedUpdatePayload.document.datasets[0].dimensions[0].label, "Delivery Date");
 assert.equal(derivedUpdatePayload.compileState.diagnostics[0].code, "missingSemanticRef");
 assert.equal(derivedUpdatePayload.compileState.status, "invalid");
 assert.equal(derivedUpdatePayload.expectedVersion, 9);
@@ -1357,7 +1357,7 @@ assert.equal(dependentDerivedUpdatePayload.document.blocks[0].state.selectedMeas
 assert.equal(dependentDerivedUpdatePayload.document.blocks[0].state.localCalculatedFields[0].id, "ctvAvails");
 assert.equal(dependentDerivedUpdatePayload.document.blocks[0].state.localTableCalculations[0].id, "runningCtvAvails");
 assert.equal(dependentDerivedUpdatePayload.document.blocks[0].state.localTableCalculations[0].compute.sourceField, "ctvAvails");
-assert.equal(dependentDerivedUpdatePayload.document.blocks[0].config.measures[0].label, "Available Impressions");
+assert.equal(dependentDerivedUpdatePayload.document.datasets[0].measures[0].label, "Available Impressions");
 assert.equal(dependentDerivedUpdatePayload.compileState.status, "clean");
 assert.equal(dependentDerivedUpdatePayload.expectedVersion, 10);
 assert.equal(dependentDerivedUpdatePayload.updatedAt, 9433);

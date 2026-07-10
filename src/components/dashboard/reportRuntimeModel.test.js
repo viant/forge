@@ -12,7 +12,6 @@ import {
   resolveReportRuntimeBlocks,
   resolveReportRuntimeDatasetRequest,
   resolveReportRuntimeRefinementFields,
-  resolveReportRuntimePrimaryBlocks,
   resolveReportRuntimeScopeSummary,
 } from "./reportRuntimeModel.js";
 
@@ -148,24 +147,6 @@ assert.deepEqual(
     },
   }, reportFill).find((block) => block.id === "narrativeIntro")?.layoutItem,
   { blockId: "narrativeIntro", span: 8 },
-);
-
-assert.deepEqual(
-  resolveReportRuntimePrimaryBlocks(reportSpec, reportFill).primary.map((block) => block.id),
-  ["primaryChart", "primaryTable"],
-);
-assert.deepEqual(
-  resolveReportRuntimePrimaryBlocks(reportSpec, reportFill).beforePrimary.map((block) => block.id),
-  ["sharedFilters", "activeRefinements"],
-);
-assert.deepEqual(
-  resolveReportRuntimePrimaryBlocks(reportSpec, {
-    blocks: [
-      ...reportFill.blocks,
-      { id: "narrativeAfter", kind: "markdownBlock" },
-    ],
-  }).afterPrimary.map((block) => block.id),
-  ["narrativeIntro", "narrativeAfter"],
 );
 
 assert.deepEqual(resolveReportRuntimeBindingSummary(reportSpec), {
