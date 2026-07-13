@@ -125,6 +125,10 @@ import {
 } from "./reportBuilderSemanticValidationState.js";
 import ReportRuntime from "./ReportRuntime.jsx";
 import {
+    REPORT_LAYOUT_GRID_COLUMNS,
+    resolveReportLayoutSnappedSpan,
+} from "../../reporting/reportLayoutModel.js";
+import {
     buildReportBuilderRuntimePreview,
     buildReportBuilderRuntimePreviewModel,
 } from "./reportBuilderRuntimePreview.js";
@@ -905,6 +909,7 @@ const PREPARED_API_ARTIFACT_KEYS = Object.freeze({
 
 const PREPARED_API_ARTIFACT_HANDOFF_ORIGIN = "savedPayloadApiHandoff";
 const PREPARED_API_ARTIFACT_IMPORTED_ORIGIN = "importedArtifact";
+const REPORT_LAYOUT_PRESET_MARKERS = new Set([3, 4, 6, 8, 12]);
 
 function buildEmptyPreparedApiArtifactOrigins() {
     return {
@@ -2106,6 +2111,11 @@ export default function ReportBuilder({ container, context }) {
         blockId: "",
         active: false,
     });
+    const [documentBlockResizeDragState, setDocumentBlockResizeDragState] = useState({
+        blockId: "",
+        span: 0,
+        active: false,
+    });
     const [documentOutlineDropTarget, setDocumentOutlineDropTarget] = useState({
         targetId: "",
         placement: "",
@@ -2114,6 +2124,7 @@ export default function ReportBuilder({ container, context }) {
     const [documentDataViewOpen, setDocumentDataViewOpen] = useState(false);
     const [reportMetadataPanelOpen, setReportMetadataPanelOpen] = useState(false);
     const [starterChooserOpen, setStarterChooserOpen] = useState(false);
+    const [openDocumentWidthControlId, setOpenDocumentWidthControlId] = useState("");
     const [semanticPanelOpen, setSemanticPanelOpen] = useState(false);
     const [measuresCollapsed, setMeasuresCollapsed] = useState(false);
     const [authoredBlocksCollapsed, setAuthoredBlocksCollapsed] = useState(false);
@@ -2124,6 +2135,7 @@ export default function ReportBuilder({ container, context }) {
     const [compactSemanticSheetOpen, setCompactSemanticSheetOpen] = useState(false);
     const reportBuilderMountedRef = useRef(true);
     const appliedReportStarterIdRef = useRef("");
+    const documentBlockResizeCleanupRef = useRef(null);
 
     useEffect(() => {
         reportBuilderMountedRef.current = true;
@@ -2196,10 +2208,16 @@ export default function ReportBuilder({ container, context }) {
     const { collection = [], loading, error } = useDataSourceState(builderContext);
     const locale = context?.locale || "en-US";
     useEffect(() => {
-        setQuickPresetActivation((current) => updateQuickPresetActivationForLoading(current, { loading }));
+        setQuickPresetActivation((current) => updateQuickPresetActivationForLoading(current, {
+            loading,
+            currentDispatchFingerprint: requestFingerprintRef.current,
+        }));
     }, [loading]);
     useEffect(() => {
-        const remainingMs = shouldScheduleQuickPresetActivationRelease(quickPresetActivation, { loading });
+        const remainingMs = shouldScheduleQuickPresetActivationRelease(quickPresetActivation, {
+            loading,
+            currentDispatchFingerprint: requestFingerprintRef.current,
+        });
         if (remainingMs <= 0) {
             return undefined;
         }
@@ -2222,6 +2240,7 @@ export default function ReportBuilder({ container, context }) {
             kind,
             awaitingFetch,
             loading,
+            targetDispatchFingerprint: "",
         }));
     }, [loading]);
     const quickPresetActionState = useMemo(
@@ -2540,6 +2559,17 @@ export default function ReportBuilder({ container, context }) {
         } catch (_) {
             node.scrollIntoView();
         }
+    }, []);
+    const clearDocumentBlockResizeDragState = React.useCallback(() => {
+        if (typeof documentBlockResizeCleanupRef.current === "function") {
+            documentBlockResizeCleanupRef.current();
+            documentBlockResizeCleanupRef.current = null;
+        }
+        setDocumentBlockResizeDragState({
+            blockId: "",
+            span: 0,
+            active: false,
+        });
     }, []);
     const focusDesignArea = React.useCallback((area = "") => {
         const normalizedArea = String(area || "").trim().toLowerCase();
@@ -2994,6 +3024,7 @@ export default function ReportBuilder({ container, context }) {
     const authoredKpiValueFieldOptions = authoredDocumentFieldOptions.valueFieldOptions || [];
     const authoredKpiSecondaryFieldOptions = authoredDocumentFieldOptions.secondaryFieldOptions || [];
     const authoredScopeParamOptions = authoredDocumentFieldOptions.scopeParamOptions || [];
+    const authoredFilterBarGroupOptions = authoredDocumentFieldOptions.filterBarGroupOptions || [];
     const authoredTableColumnOptions = authoredDocumentFieldOptions.tableColumnOptions || [];
     const authoredChartFieldOptions = authoredDocumentFieldOptions.chartFieldOptions || [];
     const authoredChartConfig = authoredDocumentFieldOptions.chartConfig || displayConfig;
@@ -3458,10 +3489,11 @@ export default function ReportBuilder({ container, context }) {
             tableColumnOptions: documentBlockDraftTableColumnOptions,
             datasetOptions: authoredDatasetOptions,
             scopeParamOptions: authoredScopeParamOptions,
+            filterBarGroupOptions: authoredFilterBarGroupOptions,
             chartConfig: authoredChartConfig,
             chartFieldOptions: authoredChartFieldOptions,
         }),
-        [authoredChartConfig, authoredChartFieldOptions, authoredDatasetOptions, authoredScopeParamOptions, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions],
+        [authoredChartConfig, authoredChartFieldOptions, authoredDatasetOptions, authoredFilterBarGroupOptions, authoredScopeParamOptions, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions],
     );
     const authoredChartBlockDraftValidation = useMemo(
         () => validateReportBuilderDocumentBlockDraft(authoredChartBlockDraft, {
@@ -3511,6 +3543,11 @@ export default function ReportBuilder({ container, context }) {
         [config],
     );
     const showFilterCategoryBar = config.showFilterCategoryBar !== false;
+    const unifiedReportSurfaceFiltersEnabled = normalizeString(
+        config.reportSurfaceFilterMode
+        || config.result?.reportSurfaceFilterMode
+        || "",
+    ).toLowerCase() === "unified";
     const lookupExtension = useMemo(() => getLookupExtensionConfig(config), [config]);
     const explicitChartMode = isExplicitReportBuilderChartMode(semanticDisplayConfig);
     const viewModes = Array.isArray(semanticDisplayConfig?.result?.viewModes) && semanticDisplayConfig.result.viewModes.length > 0
@@ -4190,6 +4227,7 @@ export default function ReportBuilder({ container, context }) {
     const [activeOptionalFilterKeys, setActiveOptionalFilterKeys] = useState([]);
     const [activeDynamicGroupIds, setActiveDynamicGroupIds] = useState([]);
     const [activeDynamicFamilyIds, setActiveDynamicFamilyIds] = useState([]);
+    const [activeInlineUnifiedGroupIds, setActiveInlineUnifiedGroupIds] = useState([]);
     const [dimensionsCollapsed, setDimensionsCollapsed] = useState(false);
     const designRailVisibility = useMemo(() => ({
         measures: false,
@@ -4311,6 +4349,82 @@ export default function ReportBuilder({ container, context }) {
         const excludeCount = excludeRows.filter((row) => family.excludeFilterIds.includes(String(row?.filterId || "").trim()) && Array.isArray(row.selections) && row.selections.length > 0).length;
         return includeCount + excludeCount;
     }, [state]);
+    const authoredPrimaryFilterBarBlock = useMemo(
+        () => authoredDocumentBlocks.find((block) => normalizeString(block?.kind) === "filterBarBlock" && normalizeString(block?.datasetRef || "primary") === "primary") || null,
+        [authoredDocumentBlocks],
+    );
+    const authoredPrimaryFilterBarMode = useMemo(() => {
+        const explicit = normalizeString(authoredPrimaryFilterBarBlock?.mode).toLowerCase();
+        if (explicit === "baseline" || explicit === "unified") {
+            return explicit;
+        }
+        return unifiedReportSurfaceFiltersEnabled ? "unified" : "baseline";
+    }, [authoredPrimaryFilterBarBlock, unifiedReportSurfaceFiltersEnabled]);
+    const authoredPrimaryFilterBarPlacement = useMemo(() => {
+        const explicit = normalizeString(authoredPrimaryFilterBarBlock?.placement).toLowerCase();
+        if (["inline", "rail-left", "hidden"].includes(explicit)) {
+            return explicit;
+        }
+        if (explicit === "inherit") {
+            return normalizeString(config?.filterPresentation).toLowerCase() === "rail-left" ? "rail-left" : "inline";
+        }
+        return "inline";
+    }, [authoredPrimaryFilterBarBlock, config?.filterPresentation]);
+    const authoredPrimaryFilterBarVisibleGroups = useMemo(
+        () => (Array.isArray(authoredPrimaryFilterBarBlock?.visibleGroups) ? authoredPrimaryFilterBarBlock.visibleGroups : []).map((entry) => normalizeString(entry)).filter(Boolean),
+        [authoredPrimaryFilterBarBlock],
+    );
+    const authoredPrimaryFilterBarGroupOrder = useMemo(
+        () => (Array.isArray(authoredPrimaryFilterBarBlock?.groupOrder) ? authoredPrimaryFilterBarBlock.groupOrder : []).map((entry) => normalizeString(entry)).filter(Boolean),
+        [authoredPrimaryFilterBarBlock],
+    );
+    const authoredPrimaryFilterBarCollapsedGroups = useMemo(
+        () => (Array.isArray(authoredPrimaryFilterBarBlock?.collapsedGroups) ? authoredPrimaryFilterBarBlock.collapsedGroups : []).map((entry) => normalizeString(entry)).filter(Boolean),
+        [authoredPrimaryFilterBarBlock],
+    );
+    const inlineUnifiedFilterEntries = useMemo(() => {
+        if (authoredPrimaryFilterBarMode !== "unified") {
+            return [];
+        }
+        const staticEntries = compactRequiredStaticFilters
+            .map((filter) => {
+                const key = resolveScopeParamId(filter);
+                return key ? {
+                    id: key,
+                    kind: "static",
+                    label: normalizeString(filter?.label || filter?.id || key) || key,
+                    filter,
+                } : null;
+            })
+            .filter(Boolean);
+        const familyEntries = familyMode
+            ? dynamicFilterFamilies.map((family) => ({
+                id: normalizeString(family?.id),
+                kind: "family",
+                label: normalizeString(family?.label || family?.id),
+                family,
+            })).filter((entry) => entry.id)
+            : dynamicFilterGroups
+                .filter((group) => !hiddenDynamicGroupIds.has(group.id))
+                .map((group) => ({
+                    id: normalizeString(group?.id),
+                    kind: "dynamic",
+                    label: normalizeString(group?.label || group?.id),
+                    group,
+                }))
+                .filter((entry) => entry.id);
+        const byId = new Map([...staticEntries, ...familyEntries].map((entry) => [entry.id, entry]));
+        const visibleIds = authoredPrimaryFilterBarVisibleGroups.length > 0
+            ? authoredPrimaryFilterBarVisibleGroups.filter((groupId) => byId.has(groupId))
+            : [...staticEntries.map((entry) => entry.id), ...familyEntries.map((entry) => entry.id)];
+        const orderedIds = authoredPrimaryFilterBarGroupOrder.length > 0
+            ? [
+                ...authoredPrimaryFilterBarGroupOrder.filter((groupId) => visibleIds.includes(groupId)),
+                ...visibleIds.filter((groupId) => !authoredPrimaryFilterBarGroupOrder.includes(groupId)),
+            ]
+            : visibleIds;
+        return orderedIds.map((groupId) => byId.get(groupId)).filter(Boolean);
+    }, [authoredPrimaryFilterBarGroupOrder, authoredPrimaryFilterBarMode, authoredPrimaryFilterBarVisibleGroups, compactRequiredStaticFilters, dynamicFilterFamilies, dynamicFilterGroups, familyMode, hiddenDynamicGroupIds]);
     const hasFilterDrawerContent = notices.length > 0
         || requiredStaticFilters.length > 0
         || optionalStaticFilters.length > 0
@@ -4620,6 +4734,91 @@ export default function ReportBuilder({ container, context }) {
         </>
     );
 
+    const renderAuthoredUnifiedFilterCategoryControls = () => (
+        <div className="forge-report-builder__filter-category-scroll">
+            <div className="forge-report-builder__filter-category-bar" aria-label="Filter categories">
+                {inlineUnifiedFilterEntries.map((entry) => {
+                    const active = activeInlineUnifiedGroupIds.includes(entry.id);
+                    const configuredCount = entry.kind === "static"
+                        ? countConfiguredFilterValue(entry.filter, getScopeParamValue(state, entry.id))
+                        : entry.kind === "family"
+                            ? familyConfiguredCount(entry.family)
+                            : countConfiguredDynamicSelections(state?.dynamicGroups?.[entry.id] || []);
+                    const stateLabel = filterCategoryStateLabel({ active, configuredCount });
+                    return (
+                        <button
+                            key={entry.id}
+                            type="button"
+                            className={[
+                                "forge-report-builder__category-chip",
+                                active ? "is-active" : "is-inactive",
+                                configuredCount > 0 ? "has-configured-state" : "",
+                            ].filter(Boolean).join(" ")}
+                            onClick={() => setActiveInlineUnifiedGroupIds((current) => current.includes(entry.id) ? current.filter((groupId) => groupId !== entry.id) : [...current, entry.id])}
+                            aria-pressed={active}
+                            title={filterCategoryTitle(entry.label, { active, configuredCount })}
+                        >
+                            <span className="forge-report-builder__category-chip-icon">
+                                <Icon icon={entry.kind === "static" ? filterCategoryIcon(entry.filter) : filterCategoryIcon(entry.family || entry.group || { id: entry.id, label: entry.label })} size={12} />
+                            </span>
+                            <span className="forge-report-builder__category-chip-label">{entry.label}</span>
+                            {configuredCount > 0 ? (
+                                <span className="forge-report-builder__category-chip-count">{configuredCount}</span>
+                            ) : (
+                                <span className="forge-report-builder__category-chip-state">{stateLabel}</span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+
+    const renderAuthoredUnifiedFilterBody = () => (
+        <>
+            {notices.length > 0 ? (
+                <div className="forge-report-builder__notices">
+                    {notices.map((notice) => (
+                        <section key={notice.id} className={`forge-report-builder__notice forge-report-builder__notice--${notice.level}`}>
+                            {notice.title ? <div className="forge-report-builder__notice-title">{notice.title}</div> : null}
+                            {notice.description ? <div className="forge-report-builder__notice-description">{notice.description}</div> : null}
+                            <div className="forge-report-builder__notice-items">
+                                {notice.items.map((item) => (
+                                    <span key={`${notice.id}_${item}`} className="forge-report-builder__notice-chip">{item}</span>
+                                ))}
+                            </div>
+                        </section>
+                    ))}
+                </div>
+            ) : null}
+            {inlineUnifiedFilterEntries
+                .filter((entry) => activeInlineUnifiedGroupIds.includes(entry.id))
+                .map((entry) => {
+                    if (entry.kind === "static") {
+                        return (
+                            <div key={`static_${entry.id}`} className="forge-report-builder__optional-filter-row">
+                                {renderStaticFilterSection(entry.filter)}
+                            </div>
+                        );
+                    }
+                    if (entry.kind === "family") {
+                        return (
+                            <div key={`family_${entry.id}`} className="forge-report-builder__family-grid">
+                                {renderDynamicFamily(entry.family)}
+                            </div>
+                        );
+                    }
+                    return (
+                        <div key={`group_${entry.id}`} className="forge-report-builder__bottom-grid forge-report-builder__bottom-grid--dynamic">
+                            <div className="forge-report-builder__dynamic-group-full">
+                                {renderDynamicGroup(entry.id)}
+                            </div>
+                        </div>
+                    );
+                })}
+        </>
+    );
+
     const renderFiltersPanel = ({ inlineReportMode = false } = {}) => (
         <aside className={[
             "forge-report-builder__bottom",
@@ -4667,8 +4866,14 @@ export default function ReportBuilder({ container, context }) {
                     "forge-report-builder__bottom-body",
                     inlineReportMode ? "forge-report-builder__bottom-body--inline-report" : "",
                 ].filter(Boolean).join(" ")}>
-                    {renderFilterCategoryControls()}
-                    {filterPanels.common ? renderFilterBody() : null}
+                    {inlineReportMode && authoredPrimaryFilterBarMode === "unified"
+                        ? renderAuthoredUnifiedFilterCategoryControls()
+                        : renderFilterCategoryControls()}
+                    {filterPanels.common
+                        ? (inlineReportMode && authoredPrimaryFilterBarMode === "unified"
+                            ? renderAuthoredUnifiedFilterBody()
+                            : renderFilterBody())
+                        : null}
                 </div>
             </section>
         </aside>
@@ -4724,6 +4929,18 @@ export default function ReportBuilder({ container, context }) {
             return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextGroups;
         });
     }, [dynamicFilterGroups, hiddenDynamicGroupIds, pinnedDynamicGroupIds, state]);
+    useEffect(() => {
+        const nextGroupIds = inlineUnifiedFilterEntries
+            .map((entry) => entry?.id)
+            .filter(Boolean)
+            .filter((groupId) => !authoredPrimaryFilterBarCollapsedGroups.includes(groupId));
+        setActiveInlineUnifiedGroupIds((current) => {
+            const validCurrent = current.filter((groupId) => inlineUnifiedFilterEntries.some((entry) => entry.id === groupId));
+            const nextSorted = [...nextGroupIds].sort();
+            const currentSorted = [...validCurrent].sort();
+            return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextGroupIds;
+        });
+    }, [authoredPrimaryFilterBarCollapsedGroups, inlineUnifiedFilterEntries]);
     const renderStaticFilterSection = (filter) => {
         const filterKey = resolveScopeParamId(filter);
         const currentValue = getScopeParamValue(state, filterKey);
@@ -6042,10 +6259,16 @@ export default function ReportBuilder({ container, context }) {
                                 </div>
                             </div>
                         ) : null}
-                        {authoredDocumentBlocks.map((block, index) => {
+                {authoredDocumentBlocks.map((block, index) => {
                     const normalizedKind = String(block?.kind || "").trim();
                     const layoutItem = authoredDocumentLayoutItemIndex.get(String(block?.id || "").trim()) || null;
-                    const widthLabels = resolveReportBuilderDocumentWidthLabels(layoutItem);
+                    const baseWidthLabels = resolveReportBuilderDocumentWidthLabels(layoutItem);
+                    const effectiveSpan = documentBlockResizeDragState.blockId === block.id && documentBlockResizeDragState.span > 0
+                        ? documentBlockResizeDragState.span
+                        : baseWidthLabels.span;
+                    const widthLabels = effectiveSpan === baseWidthLabels.span
+                        ? baseWidthLabels
+                        : resolveReportBuilderDocumentWidthLabels({ span: effectiveSpan });
                     const summary = normalizedKind === "kpiBlock"
                         ? [
                             block?.valueLabel || block?.valueField || "Value",
@@ -6188,6 +6411,50 @@ export default function ReportBuilder({ container, context }) {
                                             <span className="forge-report-builder__result-meta-chip">{widthLabels.currentLabel}</span>
                                         </div>
                                         <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>{summary}</div>
+                                        <div className="forge-report-builder__document-block-width-control">
+                                            <div className="forge-report-builder__document-block-width-copy">
+                                                <span className="forge-report-builder__document-block-width-title">Resize</span>
+                                                <span className="forge-report-builder__document-block-width-hint">Drag to snap across 12 columns</span>
+                                            </div>
+                                            <div
+                                                className={[
+                                                    "forge-report-builder__document-block-width-rail",
+                                                    documentBlockResizeDragState.active && documentBlockResizeDragState.blockId === block.id ? "is-dragging" : "",
+                                                ].filter(Boolean).join(" ")}
+                                                role="slider"
+                                                tabIndex={0}
+                                                aria-label={`Width for ${block.title || block.id}`}
+                                                aria-valuemin={1}
+                                                aria-valuemax={REPORT_LAYOUT_GRID_COLUMNS}
+                                                aria-valuenow={effectiveSpan}
+                                                aria-valuetext={widthLabels.currentLabel.replace(/^Width:\s*/, "")}
+                                                data-report-builder-layout-rail={block.id}
+                                                data-report-builder-layout-span={effectiveSpan}
+                                                onPointerDown={(event) => startDocumentBlockResizeDrag(event, block.id, baseWidthLabels.span)}
+                                                onKeyDown={(event) => handleDocumentBlockResizeKeyDown(event, block.id, effectiveSpan)}
+                                            >
+                                                <div className="forge-report-builder__document-block-width-segments" aria-hidden="true">
+                                                    {Array.from({ length: REPORT_LAYOUT_GRID_COLUMNS }, (_, segmentIndex) => {
+                                                        const span = segmentIndex + 1;
+                                                        return (
+                                                            <span
+                                                                key={`${block.id}:segment:${span}`}
+                                                                className={[
+                                                                    "forge-report-builder__document-block-width-segment",
+                                                                    span <= effectiveSpan ? "is-active" : "",
+                                                                    REPORT_LAYOUT_PRESET_MARKERS.has(span) ? "is-preset" : "",
+                                                                ].filter(Boolean).join(" ")}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                                <span
+                                                    className="forge-report-builder__document-block-width-thumb"
+                                                    aria-hidden="true"
+                                                    style={{ left: `${(effectiveSpan / REPORT_LAYOUT_GRID_COLUMNS) * 100}%` }}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -7874,13 +8141,12 @@ export default function ReportBuilder({ container, context }) {
     );
     const showAuthoredReportSurface = !designWorkspaceMode && authoredDocumentBlockCount > 0;
     const authoredAudienceReportMode = reportWorkspaceMode && showAuthoredReportSurface;
-    const showInlineReportBaselineControls = !designWorkspaceMode
+    const showInlineReportBaselineControls = authoredPrimaryFilterBarMode === "unified"
+        && !designWorkspaceMode
         && showAuthoredReportSurface
-        && hasFilterDrawerContent
-        && (
-            activeDynamicFilterCount > 0
-            || (familyMode ? activeDynamicFamilyIds.length > 0 : visibleActiveDynamicGroupIds.length > 0)
-        );
+        && authoredPrimaryFilterBarPlacement !== "hidden"
+        && hasFilterDrawerContent;
+    const showRailLeftUnifiedReportFilters = showInlineReportBaselineControls && authoredPrimaryFilterBarPlacement === "rail-left";
     const authoredPreviewAutoFetchKey = useMemo(
         () => [
             buildReportBuilderSurfaceAutoRunKey({
@@ -9643,9 +9909,9 @@ export default function ReportBuilder({ container, context }) {
             });
             const preparedReadiness = resolveStateReadiness(prepared.nextState);
             const didFetchPreparedState = prepared.shouldFetch && preparedReadiness.canRun;
-            if (didFetchPreparedState) {
-                dispatchReportRequest(prepared.nextState, { forceFetch: true });
-            }
+            const dispatchResult = didFetchPreparedState
+                ? dispatchReportRequest(prepared.nextState, { forceFetch: true })
+                : null;
             const changedParts = [];
             if (prepared.measureSelectionChanged || prepared.primaryMeasureChanged) {
                 changedParts.push("measures");
@@ -9672,6 +9938,7 @@ export default function ReportBuilder({ container, context }) {
                 title: prepared.normalizedPreset?.title || "Table preset",
                 kind: "table",
                 awaitingFetch: didFetchPreparedState,
+                targetDispatchFingerprint: dispatchResult ? `${dispatchResult.fingerprint}::${dispatchResult.shouldFetch ? "fetch" : "hold"}` : "",
             });
             setSelectedQuickChartOption("");
             return;
@@ -9708,9 +9975,9 @@ export default function ReportBuilder({ container, context }) {
         });
         const preparedReadiness = resolveStateReadiness(nextPreparedState);
         const didFetchPreparedState = prepared.shouldFetch && preparedReadiness.canRun;
-        if (didFetchPreparedState) {
-            dispatchReportRequest(nextPreparedState, { forceFetch: true });
-        }
+        const dispatchResult = didFetchPreparedState
+            ? dispatchReportRequest(nextPreparedState, { forceFetch: true })
+            : null;
         const changedParts = [];
         if (prepared.measureSelectionChanged || prepared.primaryMeasureChanged) {
             changedParts.push("measures");
@@ -9730,6 +9997,7 @@ export default function ReportBuilder({ container, context }) {
             title: prepared.normalizedChartSpec?.title || next.label || "Preset",
             kind: "chart",
             awaitingFetch: didFetchPreparedState,
+            targetDispatchFingerprint: dispatchResult ? `${dispatchResult.fingerprint}::${dispatchResult.shouldFetch ? "fetch" : "hold"}` : "",
         });
         saveChartPreset(prepared.normalizedChartSpec, {
             settingsHash: buildReportBuilderSettingsHash(nextPreparedState),
@@ -9783,11 +10051,12 @@ export default function ReportBuilder({ container, context }) {
             tableColumnOptions: authoredTableColumnOptions,
             datasetOptions: authoredDatasetOptions,
             scopeParamOptions: authoredScopeParamOptions,
+            filterBarGroupOptions: authoredFilterBarGroupOptions,
             chartConfig: authoredChartConfig,
             chartState: authoredChartState,
         }));
         setDocumentBlockDialogOpen(true);
-    }, [authoredChartConfig, authoredChartState, authoredDatasetOptions, authoredDocumentBlocks, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
+    }, [authoredChartConfig, authoredChartState, authoredDatasetOptions, authoredDocumentBlocks, authoredFilterBarGroupOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
     const openAuthoredChartBlockDialog = React.useCallback((seed = null, options = {}) => {
         const nextDraft = buildReportBuilderDocumentBlockDraft("chartBlock", seed, {
             existingBlocks: authoredDocumentBlocks,
@@ -10644,6 +10913,24 @@ export default function ReportBuilder({ container, context }) {
             placement: "",
         });
     }, []);
+    const resolveDocumentOutlineDropPlacement = React.useCallback((bounds = null, clientX = 0, clientY = 0, depth = 0) => {
+        if (!bounds || !Number.isFinite(bounds.left) || !Number.isFinite(bounds.top) || !Number.isFinite(bounds.width) || !Number.isFinite(bounds.height)) {
+            return "before";
+        }
+        const normalizedDepth = Math.max(0, Math.trunc(Number(depth) || 0));
+        if (normalizedDepth === 0) {
+            const relativeX = bounds.width > 0 ? (clientX - bounds.left) / bounds.width : 0;
+            const relativeY = bounds.height > 0 ? (clientY - bounds.top) / bounds.height : 0;
+            if (relativeY <= 0.18) {
+                return "before";
+            }
+            if (relativeY >= 0.82) {
+                return "after";
+            }
+            return relativeX >= 0.5 ? "after" : "before";
+        }
+        return (clientY - bounds.top) > (bounds.height / 2) ? "after" : "before";
+    }, []);
     const updateDocumentOutlineDropTarget = React.useCallback((event, targetId = "") => {
         const normalizedTargetId = String(targetId || "").trim();
         if (!normalizedTargetId) {
@@ -10651,22 +10938,47 @@ export default function ReportBuilder({ container, context }) {
         }
         event.preventDefault();
         const bounds = event.currentTarget?.getBoundingClientRect?.();
-        const placement = bounds && Number.isFinite(bounds.top) && Number.isFinite(bounds.height)
-            ? ((event.clientY - bounds.top) > (bounds.height / 2) ? "after" : "before")
-            : "before";
+        const depth = Number(event.currentTarget?.getAttribute?.("data-outline-depth") || 0);
+        const placement = resolveDocumentOutlineDropPlacement(bounds, event.clientX, event.clientY, depth);
         setDocumentOutlineDropTarget({
             targetId: normalizedTargetId,
             placement,
         });
         return placement;
-    }, []);
+    }, [resolveDocumentOutlineDropPlacement]);
     useEffect(() => {
         if (!documentOutlinePointerDragState.active || !documentOutlinePointerDragState.blockId) {
             return undefined;
         }
+        document.body.style.setProperty("cursor", "grabbing");
+        document.body.style.setProperty("user-select", "none");
         const handleMove = (event) => {
             const hovered = document.elementFromPoint(event.clientX, event.clientY);
-            const targetNode = hovered?.closest?.('[data-testid="report-builder-outline-node"]');
+            const sideTargetNode = hovered?.closest?.('[data-testid="report-builder-outline-side-target"]');
+            const sideTargetId = normalizeString(sideTargetNode?.getAttribute?.("data-outline-target-id"));
+            const sidePlacement = normalizeString(sideTargetNode?.getAttribute?.("data-outline-placement")).toLowerCase() === "after"
+                ? "after"
+                : "before";
+            if (sideTargetId && sideTargetId !== documentOutlinePointerDragState.blockId) {
+                setDocumentOutlineDropTarget({
+                    targetId: sideTargetId,
+                    placement: sidePlacement,
+                });
+                return;
+            }
+            const gapTargetNode = hovered?.closest?.('[data-testid="report-builder-outline-gap-target"]');
+            const gapTargetId = normalizeString(gapTargetNode?.getAttribute?.("data-outline-target-id"));
+            const gapPlacement = normalizeString(gapTargetNode?.getAttribute?.("data-outline-placement")).toLowerCase() === "after"
+                ? "after"
+                : "before";
+            if (gapTargetId && gapTargetId !== documentOutlinePointerDragState.blockId) {
+                setDocumentOutlineDropTarget({
+                    targetId: gapTargetId,
+                    placement: gapPlacement,
+                });
+                return;
+            }
+            const targetNode = hovered?.closest?.('[data-testid="report-builder-outline-branch"]');
             const targetId = normalizeString(targetNode?.getAttribute?.("data-outline-entry-id"));
             const targetDepth = Number(targetNode?.getAttribute?.("data-outline-depth") || 0);
             if (!targetId || targetDepth !== 0 || targetId === documentOutlinePointerDragState.blockId) {
@@ -10677,20 +10989,49 @@ export default function ReportBuilder({ container, context }) {
                 return;
             }
             const rect = targetNode.getBoundingClientRect();
-            const placement = (event.clientY - rect.top) > (rect.height / 2) ? "after" : "before";
+            const placement = resolveDocumentOutlineDropPlacement(rect, event.clientX, event.clientY, targetDepth);
             setDocumentOutlineDropTarget({
                 targetId,
                 placement,
             });
         };
         const handleUp = (event) => {
+            const persistedTargetId = normalizeString(documentOutlineDropTarget.targetId);
+            const persistedPlacement = normalizeString(documentOutlineDropTarget.placement).toLowerCase() === "after"
+                ? "after"
+                : "before";
+            if (persistedTargetId && persistedTargetId !== documentOutlinePointerDragState.blockId) {
+                moveDocumentBlockRelative(documentOutlinePointerDragState.blockId, persistedTargetId, persistedPlacement);
+                clearDocumentOutlineDragState();
+                return;
+            }
             const hovered = document.elementFromPoint(event.clientX, event.clientY);
-            const targetNode = hovered?.closest?.('[data-testid="report-builder-outline-node"]');
+            const sideTargetNode = hovered?.closest?.('[data-testid="report-builder-outline-side-target"]');
+            const sideTargetId = normalizeString(sideTargetNode?.getAttribute?.("data-outline-target-id"));
+            const sidePlacement = normalizeString(sideTargetNode?.getAttribute?.("data-outline-placement")).toLowerCase() === "after"
+                ? "after"
+                : "before";
+            if (sideTargetId && sideTargetId !== documentOutlinePointerDragState.blockId) {
+                moveDocumentBlockRelative(documentOutlinePointerDragState.blockId, sideTargetId, sidePlacement);
+                clearDocumentOutlineDragState();
+                return;
+            }
+            const gapTargetNode = hovered?.closest?.('[data-testid="report-builder-outline-gap-target"]');
+            const gapTargetId = normalizeString(gapTargetNode?.getAttribute?.("data-outline-target-id"));
+            const gapPlacement = normalizeString(gapTargetNode?.getAttribute?.("data-outline-placement")).toLowerCase() === "after"
+                ? "after"
+                : "before";
+            if (gapTargetId && gapTargetId !== documentOutlinePointerDragState.blockId) {
+                moveDocumentBlockRelative(documentOutlinePointerDragState.blockId, gapTargetId, gapPlacement);
+                clearDocumentOutlineDragState();
+                return;
+            }
+            const targetNode = hovered?.closest?.('[data-testid="report-builder-outline-branch"]');
             const targetId = normalizeString(targetNode?.getAttribute?.("data-outline-entry-id"));
             const targetDepth = Number(targetNode?.getAttribute?.("data-outline-depth") || 0);
             if (targetId && targetDepth === 0 && targetId !== documentOutlinePointerDragState.blockId) {
                 const rect = targetNode.getBoundingClientRect();
-                const placement = (event.clientY - rect.top) > (rect.height / 2) ? "after" : "before";
+                const placement = resolveDocumentOutlineDropPlacement(rect, event.clientX, event.clientY, targetDepth);
                 moveDocumentBlockRelative(documentOutlinePointerDragState.blockId, targetId, placement);
             }
             clearDocumentOutlineDragState();
@@ -10705,12 +11046,17 @@ export default function ReportBuilder({ container, context }) {
             window.removeEventListener("pointermove", handleMove);
             window.removeEventListener("pointerup", handleUp);
             window.removeEventListener("pointercancel", handleCancel);
+            document.body.style.removeProperty("cursor");
+            document.body.style.removeProperty("user-select");
         };
     }, [
         clearDocumentOutlineDragState,
+        documentOutlineDropTarget.placement,
+        documentOutlineDropTarget.targetId,
         documentOutlinePointerDragState.active,
         documentOutlinePointerDragState.blockId,
         moveDocumentBlockRelative,
+        resolveDocumentOutlineDropPlacement,
     ]);
     const resizeDocumentBlock = React.useCallback((blockId = "", size = "full") => {
         const normalizedBlockId = String(blockId || "").trim();
@@ -10730,6 +11076,107 @@ export default function ReportBuilder({ container, context }) {
             message: `${currentBlock?.title || normalizedBlockId} resized to ${nextWidthLabels.currentLabel.replace(/^Width:\s*/, "")} in the authored report layout.`,
         });
     }, [authoredDocumentBlocks, persistExplorationMutation, state]);
+    const startDocumentBlockResizeDrag = React.useCallback((event, blockId = "", currentSpan = REPORT_LAYOUT_GRID_COLUMNS) => {
+        const normalizedBlockId = String(blockId || "").trim();
+        if (!normalizedBlockId) {
+            return;
+        }
+        if (typeof event.button === "number" && event.button !== 0) {
+            return;
+        }
+        const railNode = event.currentTarget;
+        const rect = railNode?.getBoundingClientRect?.();
+        if (!rect || !rect.width) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        const pointerId = Number(event.pointerId);
+        const updatePreview = (clientX) => {
+            const nextSpan = resolveReportLayoutSnappedSpan({
+                clientX,
+                left: rect.left,
+                width: rect.width,
+                columns: REPORT_LAYOUT_GRID_COLUMNS,
+            });
+            setDocumentBlockResizeDragState({
+                blockId: normalizedBlockId,
+                span: nextSpan,
+                active: true,
+            });
+            return nextSpan;
+        };
+        const finishDrag = (nextSpan = currentSpan) => {
+            clearDocumentBlockResizeDragState();
+            if (nextSpan !== currentSpan) {
+                resizeDocumentBlock(normalizedBlockId, nextSpan);
+            }
+        };
+        const handlePointerMove = (moveEvent) => {
+            if (Number.isFinite(pointerId) && Number(moveEvent.pointerId) !== pointerId) {
+                return;
+            }
+            updatePreview(moveEvent.clientX);
+        };
+        const handlePointerUp = (upEvent) => {
+            if (Number.isFinite(pointerId) && Number(upEvent.pointerId) !== pointerId) {
+                return;
+            }
+            finishDrag(updatePreview(upEvent.clientX));
+        };
+        const handlePointerCancel = () => {
+            finishDrag(documentBlockResizeDragState.blockId === normalizedBlockId && documentBlockResizeDragState.span > 0
+                ? documentBlockResizeDragState.span
+                : currentSpan);
+        };
+        documentBlockResizeCleanupRef.current = () => {
+            window.removeEventListener("pointermove", handlePointerMove);
+            window.removeEventListener("pointerup", handlePointerUp);
+            window.removeEventListener("pointercancel", handlePointerCancel);
+            window.removeEventListener("blur", handlePointerCancel);
+            document.body.style.removeProperty("cursor");
+            document.body.style.removeProperty("user-select");
+        };
+        document.body.style.setProperty("cursor", "ew-resize");
+        document.body.style.setProperty("user-select", "none");
+        try {
+            railNode?.setPointerCapture?.(pointerId);
+        } catch (_) {}
+        updatePreview(event.clientX);
+        window.addEventListener("pointermove", handlePointerMove);
+        window.addEventListener("pointerup", handlePointerUp);
+        window.addEventListener("pointercancel", handlePointerCancel);
+        window.addEventListener("blur", handlePointerCancel);
+    }, [clearDocumentBlockResizeDragState, documentBlockResizeDragState.blockId, documentBlockResizeDragState.span, resizeDocumentBlock]);
+    const handleDocumentBlockResizeKeyDown = React.useCallback((event, blockId = "", currentSpan = REPORT_LAYOUT_GRID_COLUMNS) => {
+        const normalizedBlockId = String(blockId || "").trim();
+        if (!normalizedBlockId) {
+            return;
+        }
+        const key = String(event.key || "");
+        let nextSpan = 0;
+        if (key === "ArrowLeft" || key === "ArrowDown") {
+            nextSpan = Math.max(1, currentSpan - 1);
+        } else if (key === "ArrowRight" || key === "ArrowUp") {
+            nextSpan = Math.min(REPORT_LAYOUT_GRID_COLUMNS, currentSpan + 1);
+        } else if (key === "Home") {
+            nextSpan = 1;
+        } else if (key === "End") {
+            nextSpan = REPORT_LAYOUT_GRID_COLUMNS;
+        }
+        if (!nextSpan || nextSpan === currentSpan) {
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        resizeDocumentBlock(normalizedBlockId, nextSpan);
+    }, [resizeDocumentBlock]);
+    useEffect(() => () => {
+        if (typeof documentBlockResizeCleanupRef.current === "function") {
+            documentBlockResizeCleanupRef.current();
+            documentBlockResizeCleanupRef.current = null;
+        }
+    }, []);
     const duplicateDocumentBlock = React.useCallback((blockId = "") => {
         const normalizedBlockId = String(blockId || "").trim();
         if (!normalizedBlockId) {
@@ -13543,7 +13990,7 @@ export default function ReportBuilder({ container, context }) {
             openDocumentBlockDialog(block);
         };
         const renderOutlineNodes = (entries = [], depth = 0) => (
-            (Array.isArray(entries) ? entries : []).map((entry) => {
+            (Array.isArray(entries) ? entries : []).flatMap((entry) => {
                 const normalizedKind = normalizeString(entry?.kind);
                 const isPrimaryBuilder = normalizedKind === "primaryBuilder";
                 const isPrimaryChartView = normalizedKind === "chartView";
@@ -13551,14 +13998,98 @@ export default function ReportBuilder({ container, context }) {
                 const isDrillNode = normalizedKind === "drillHierarchy" || normalizedKind === "drillPlaceholder";
                 const isSelected = entry.id === effectiveSelectedDocumentOutlineEntryId;
                 const outlineBlock = authoredDocumentBlocks.find((candidate) => normalizeString(candidate?.id) === normalizeString(entry?.id)) || null;
+                const outlineLayoutItem = authoredDocumentLayoutItemIndex.get(normalizeString(entry?.id)) || null;
+                const outlineBaseWidthLabels = resolveReportBuilderDocumentWidthLabels(outlineLayoutItem);
+                const outlineEffectiveSpan = documentBlockResizeDragState.blockId === entry.id && documentBlockResizeDragState.span > 0
+                    ? documentBlockResizeDragState.span
+                    : outlineBaseWidthLabels.span;
+                const outlineWidthLabels = outlineEffectiveSpan === outlineBaseWidthLabels.span
+                    ? outlineBaseWidthLabels
+                    : resolveReportBuilderDocumentWidthLabels({ span: outlineEffectiveSpan });
+                const isDropTargetEntry = !!draggingDocumentBlockId
+                    && draggingDocumentBlockId !== entry.id
+                    && documentOutlineDropTarget.targetId === entry.id;
+                const placeholderSpan = (() => {
+                    if (documentBlockResizeDragState.active && documentBlockResizeDragState.blockId === draggingDocumentBlockId && documentBlockResizeDragState.span > 0) {
+                        return documentBlockResizeDragState.span;
+                    }
+                    const draggedLayoutItem = authoredDocumentLayoutItemIndex.get(normalizeString(draggingDocumentBlockId)) || null;
+                    return resolveReportBuilderDocumentWidthLabels(draggedLayoutItem).span;
+                })();
+                const renderDropPlaceholder = (placement = "before") => (
+                    <div
+                        key={`${entry.id}:placeholder:${placement}`}
+                        className="forge-report-builder__design-outline-placeholder"
+                        data-outline-placeholder-for={entry.id}
+                        data-outline-placeholder-placement={placement}
+                        style={depth === 0 ? { gridColumn: placeholderSpan >= REPORT_LAYOUT_GRID_COLUMNS ? "1 / -1" : `span ${placeholderSpan}` } : undefined}
+                    >
+                        <div className="forge-report-builder__design-outline-placeholder-shell">
+                            <span className="forge-report-builder__design-outline-placeholder-label">
+                                {placement === "after" ? "Drop after" : "Drop before"}
+                            </span>
+                            <span className="forge-report-builder__design-outline-placeholder-meta">{`${placeholderSpan}/12`}</span>
+                        </div>
+                    </div>
+                );
+                const renderGapTarget = (placement = "after") => {
+                    if (depth !== 0 || !canDragOutlineBlock || !draggingDocumentBlockId || draggingDocumentBlockId === entry.id) {
+                        return null;
+                    }
+                    const isActiveGap = documentOutlineDropTarget.targetId === entry.id
+                        && documentOutlineDropTarget.placement === placement;
+                    return (
+                        <div
+                            key={`${entry.id}:gap:${placement}`}
+                            className={[
+                                "forge-report-builder__design-outline-gap-target",
+                                isActiveGap ? "is-active" : "",
+                            ].filter(Boolean).join(" ")}
+                            data-testid="report-builder-outline-gap-target"
+                            data-outline-target-id={entry.id}
+                            data-outline-placement={placement}
+                            style={{ gridColumn: "1 / -1" }}
+                        >
+                            <span className="forge-report-builder__design-outline-gap-line" />
+                            <span className="forge-report-builder__design-outline-gap-label">
+                                {isActiveGap ? `Drop ${placement}` : " "}
+                            </span>
+                            <span className="forge-report-builder__design-outline-gap-meta">
+                            {isActiveGap ? `${placeholderSpan}/12` : ""}
+                            </span>
+                        </div>
+                    );
+                };
+                const renderSideTarget = (placement = "before") => {
+                    if (depth !== 0 || !canDragOutlineBlock || !draggingDocumentBlockId || draggingDocumentBlockId === entry.id) {
+                        return null;
+                    }
+                    const isActiveSide = documentOutlineDropTarget.targetId === entry.id
+                        && documentOutlineDropTarget.placement === placement;
+                    return (
+                        <span
+                            key={`${entry.id}:side:${placement}`}
+                            className={[
+                                "forge-report-builder__design-outline-side-target",
+                                `is-${placement}`,
+                                isActiveSide ? "is-active" : "",
+                            ].filter(Boolean).join(" ")}
+                            data-testid="report-builder-outline-side-target"
+                            data-outline-target-id={entry.id}
+                            data-outline-placement={placement}
+                            aria-hidden="true"
+                        >
+                            <span className="forge-report-builder__design-outline-side-target-label">
+                                {placement === "after" ? "After" : "Before"}
+                            </span>
+                        </span>
+                    );
+                };
                 const repairDraft = outlineBlock ? buildRepairableDocumentBlockDraft(outlineBlock) : null;
                 const canRepairOutlineBlock = !!repairDraft;
                 const outlineBlockIndex = authoredDocumentBlocks.findIndex((candidate) => normalizeString(candidate?.id) === normalizeString(entry?.id));
                 const canDragOutlineBlock = !!outlineBlock && depth === 0 && !isDrillNode && !isPrimaryBuilder && !isPrimaryChartView && !isPrimaryTableView;
-                const isOutlineDropTarget = canDragOutlineBlock
-                    && !!draggingDocumentBlockId
-                    && draggingDocumentBlockId !== entry.id
-                    && documentOutlineDropTarget.targetId === entry.id;
+                const isOutlineDropTarget = canDragOutlineBlock && isDropTargetEntry;
                 const selectedActionLabel = isPrimaryBuilder || isPrimaryTableView
                     ? (documentDataViewOpen ? "Close data editor" : "Open data editor")
                     : (isPrimaryChartView
@@ -13576,9 +14107,19 @@ export default function ReportBuilder({ container, context }) {
                         : (isPrimaryTableView
                             ? "th"
                             : (isDrillNode ? "git-branch" : reportBuilderDocumentBlockIcon(normalizedKind))));
-                return (
-                    <div key={entry.id} className="forge-report-builder__design-outline-branch">
+                const branch = (
+                    <div
+                        key={entry.id}
+                        className="forge-report-builder__design-outline-branch"
+                        data-testid="report-builder-outline-branch"
+                        data-outline-depth={depth}
+                        data-outline-entry-id={entry.id}
+                        data-report-builder-layout-span={outlineEffectiveSpan}
+                        style={depth === 0 ? { gridColumn: outlineEffectiveSpan >= REPORT_LAYOUT_GRID_COLUMNS ? "1 / -1" : `span ${outlineEffectiveSpan}` } : undefined}
+                    >
                         <div className="forge-report-builder__design-outline-node-shell">
+                            {renderSideTarget("before")}
+                            {renderSideTarget("after")}
                             {canDragOutlineBlock ? (
                                 <div
                                     className={[
@@ -13587,7 +14128,6 @@ export default function ReportBuilder({ container, context }) {
                                     ].filter(Boolean).join(" ")}
                                     data-testid="report-builder-outline-drag-handle"
                                     data-outline-entry-id={entry.id}
-                                    draggable
                                     aria-label={`Drag ${entry.title}`}
                                     title={`Drag ${entry.title}`}
                                     onPointerDown={(event) => {
@@ -13603,25 +14143,6 @@ export default function ReportBuilder({ container, context }) {
                                             active: true,
                                         });
                                     }}
-                                    onDragStart={(event) => {
-                                        if (!outlineBlock?.id || !event?.dataTransfer) {
-                                            return;
-                                        }
-                                        setDocumentOutlinePointerDragState({
-                                            blockId: outlineBlock.id,
-                                            active: false,
-                                        });
-                                        const payload = JSON.stringify({
-                                            blockId: outlineBlock.id,
-                                            dragKind: "document-block",
-                                        });
-                                        event.dataTransfer.effectAllowed = "move";
-                                        event.dataTransfer.setData(REPORT_BUILDER_DOCUMENT_BLOCK_DND_MIME, payload);
-                                        event.dataTransfer.setData("text/plain", payload);
-                                        setSelectedDocumentOutlineEntryId(entry.id);
-                                        setDraggingDocumentBlockId(outlineBlock.id);
-                                    }}
-                                    onDragEnd={clearDocumentOutlineDragState}
                                 >
                                     <Icon icon="drag-handle-vertical" size={12} />
                                 </div>
@@ -13632,6 +14153,7 @@ export default function ReportBuilder({ container, context }) {
                                     "forge-report-builder__design-outline-node",
                                     draggingDocumentBlockId === entry.id ? "is-dragging" : "",
                                     isOutlineDropTarget ? `is-drop-${documentOutlineDropTarget.placement || "before"}` : "",
+                                    isOutlineDropTarget ? "is-drop-target" : "",
                                     isSelected ? "is-selected" : "",
                                 ].filter(Boolean).join(" ")}
                                 data-outline-depth={depth}
@@ -13641,33 +14163,6 @@ export default function ReportBuilder({ container, context }) {
                                 aria-label={isSelected
                                     ? `${entry.title}. Selected. ${selectedActionLabel}.`
                                     : `${entry.title}. Select to view actions.`}
-                                onDragOver={(event) => {
-                                    // Drag payload data is not readable during dragover in real
-                                    // browsers, so gate on the advertised MIME type / local drag
-                                    // state instead and read the payload only on drop.
-                                    const transferTypes = Array.from(event?.dataTransfer?.types || []);
-                                    const carriesDocumentBlock = transferTypes.includes(REPORT_BUILDER_DOCUMENT_BLOCK_DND_MIME)
-                                        || !!draggingDocumentBlockId;
-                                    if (!canDragOutlineBlock || !carriesDocumentBlock || draggingDocumentBlockId === entry.id) {
-                                        return;
-                                    }
-                                    if (event?.dataTransfer) {
-                                        event.dataTransfer.dropEffect = "move";
-                                    }
-                                    updateDocumentOutlineDropTarget(event, entry.id);
-                                }}
-                                onDrop={(event) => {
-                                    const dragPayload = parseReportBuilderDocumentBlockDragPayload(event);
-                                    const dragBlockId = normalizeString(dragPayload?.blockId || draggingDocumentBlockId);
-                                    if (!canDragOutlineBlock || !dragBlockId || dragBlockId === entry.id) {
-                                        clearDocumentOutlineDragState();
-                                        return;
-                                    }
-                                    const placement = updateDocumentOutlineDropTarget(event, entry.id) || documentOutlineDropTarget.placement || "before";
-                                    event.preventDefault();
-                                    moveDocumentBlockRelative(dragBlockId, entry.id, placement);
-                                    clearDocumentOutlineDragState();
-                                }}
                                 onClick={() => {
                                     setSelectedDocumentOutlineEntryId(entry.id);
                                     if (!isSelected) {
@@ -13715,6 +14210,86 @@ export default function ReportBuilder({ container, context }) {
                             </button>
                             {showInlineToolbar ? (
                                 <div className="forge-report-builder__design-outline-toolbar" aria-label={`${entry.title} actions`}>
+                                    {outlineBlock ? (
+                                        <Popover
+                                            usePortal={!compactMode}
+                                            placement="bottom-start"
+                                            isOpen={openDocumentWidthControlId === entry.id}
+                                            onInteraction={(nextOpen) => {
+                                                setOpenDocumentWidthControlId(nextOpen ? entry.id : "");
+                                            }}
+                                            content={(
+                                                <div className="forge-report-builder__design-outline-width-popover">
+                                                    <div className="forge-report-builder__design-outline-width-popover-header">
+                                                        <div className="forge-report-builder__design-outline-width-popover-copy">
+                                                            <span className="forge-report-builder__design-outline-width-label">{outlineWidthLabels.currentLabel}</span>
+                                                            <span className="forge-report-builder__document-block-width-hint">Drag to snap across 12 columns</span>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="forge-report-builder__design-outline-toolbar-button"
+                                                            aria-label={`Close width editor for ${entry.title}`}
+                                                            onClick={(event) => {
+                                                                event.preventDefault();
+                                                                event.stopPropagation();
+                                                                setOpenDocumentWidthControlId("");
+                                                            }}
+                                                        >
+                                                            <Icon icon="cross" size={12} />
+                                                        </button>
+                                                    </div>
+                                                    <div
+                                                        className={[
+                                                            "forge-report-builder__document-block-width-rail",
+                                                            "forge-report-builder__document-block-width-rail--compact",
+                                                            documentBlockResizeDragState.active && documentBlockResizeDragState.blockId === entry.id ? "is-dragging" : "",
+                                                        ].filter(Boolean).join(" ")}
+                                                        role="slider"
+                                                        tabIndex={0}
+                                                        aria-label={`Width for ${entry.title}`}
+                                                        aria-valuemin={1}
+                                                        aria-valuemax={REPORT_LAYOUT_GRID_COLUMNS}
+                                                        aria-valuenow={outlineEffectiveSpan}
+                                                        aria-valuetext={outlineWidthLabels.currentLabel.replace(/^Width:\s*/, "")}
+                                                        data-report-builder-layout-rail={entry.id}
+                                                        data-report-builder-layout-span={outlineEffectiveSpan}
+                                                        onPointerDown={(event) => startDocumentBlockResizeDrag(event, entry.id, outlineBaseWidthLabels.span)}
+                                                        onKeyDown={(event) => handleDocumentBlockResizeKeyDown(event, entry.id, outlineEffectiveSpan)}
+                                                    >
+                                                        <div className="forge-report-builder__document-block-width-segments" aria-hidden="true">
+                                                            {Array.from({ length: REPORT_LAYOUT_GRID_COLUMNS }, (_, segmentIndex) => {
+                                                                const span = segmentIndex + 1;
+                                                                return (
+                                                                    <span
+                                                                        key={`${entry.id}:outline-segment:${span}`}
+                                                                        className={[
+                                                                            "forge-report-builder__document-block-width-segment",
+                                                                            span <= outlineEffectiveSpan ? "is-active" : "",
+                                                                            REPORT_LAYOUT_PRESET_MARKERS.has(span) ? "is-preset" : "",
+                                                                        ].filter(Boolean).join(" ")}
+                                                                    />
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        <span
+                                                            className="forge-report-builder__document-block-width-thumb"
+                                                            aria-hidden="true"
+                                                            style={{ left: `${(outlineEffectiveSpan / REPORT_LAYOUT_GRID_COLUMNS) * 100}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        >
+                                            <button
+                                                type="button"
+                                                className="forge-report-builder__design-outline-width-trigger"
+                                                aria-label={`Edit width for ${entry.title}`}
+                                                title={outlineWidthLabels.actionTitle}
+                                            >
+                                                {outlineWidthLabels.currentLabel}
+                                            </button>
+                                        </Popover>
+                                    ) : null}
                                     <button
                                         type="button"
                                         className="forge-report-builder__design-outline-toolbar-button"
@@ -13786,6 +14361,13 @@ export default function ReportBuilder({ container, context }) {
                         ) : null}
                     </div>
                 );
+                if (!isDropTargetEntry || depth !== 0) {
+                    return [branch, renderGapTarget("after")].filter(Boolean);
+                }
+                const gapTarget = renderGapTarget("after");
+                return documentOutlineDropTarget.placement === "after"
+                    ? [branch, renderDropPlaceholder("after"), gapTarget].filter(Boolean)
+                    : [renderDropPlaceholder("before"), branch, gapTarget].filter(Boolean);
             })
         );
         const renderSelectedOutlineInspector = () => {
@@ -16449,7 +17031,42 @@ export default function ReportBuilder({ container, context }) {
                 {authoredRuntimePreviewState.canRenderRuntime && authoredRuntimePreviewState.updatingNotice ? (
                     <ReportBuilderInlineNotice notice={authoredRuntimePreviewState.updatingNotice} />
                 ) : null}
-                {authoredRuntimePreviewState.canRenderRuntime && showInlineReportBaselineControls ? renderFiltersPanel({ inlineReportMode: true }) : null}
+                {(() => {
+                    if (!authoredRuntimePreviewState.canRenderRuntime) {
+                        return null;
+                    }
+                    const unifiedFilterPanel = showInlineReportBaselineControls ? renderFiltersPanel({ inlineReportMode: true }) : null;
+                    const runtimeContent = (
+                        <ReportRuntime
+                            reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
+                            reportDocument={runtimePreviewArtifact?.document || null}
+                            reportFill={authoredRuntimePreviewState.runtimeConfig.reportFill}
+                            title={runtimePreviewArtifact?.runtimeBlock?.title || ""}
+                            subtitle={runtimePreviewArtifact?.runtimeBlock?.subtitle || ""}
+                            locale={locale}
+                            hostIntent={runtimePreviewHostIntent}
+                            runtimeHandlers={runtimePreviewHandlers}
+                            presentationMode={reportWorkspaceMode ? "report" : "preview"}
+                            showContextSummary={false}
+                            suppressFilterBarBlocks={showUnifiedRuntimeFilterSurface}
+                            suppressFilterBarBlockDatasetRefs={(showInlineReportBaselineControls || authoredPrimaryFilterBarPlacement === "hidden") ? ["primary"] : []}
+                        />
+                    );
+                    if (showRailLeftUnifiedReportFilters && unifiedFilterPanel) {
+                        return (
+                            <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 360px) minmax(0, 1fr)", gap: 16, alignItems: "start", marginBottom: 12 }}>
+                                <div>{unifiedFilterPanel}</div>
+                                <div>{runtimeContent}</div>
+                            </div>
+                        );
+                    }
+                    return (
+                        <>
+                            {unifiedFilterPanel}
+                            {runtimeContent}
+                        </>
+                    );
+                })()}
                 {authoredRuntimePreviewState.canRenderRuntime && desktopResultHeaderState.quickActions.enabled ? (
                     <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 12 }}>
                         <ReportBuilderChartQuickActions
@@ -16471,22 +17088,6 @@ export default function ReportBuilder({ container, context }) {
                             }}
                         />
                     </div>
-                ) : null}
-                {authoredRuntimePreviewState.canRenderRuntime ? (
-                    <ReportRuntime
-                        reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
-                        reportDocument={runtimePreviewArtifact?.document || null}
-                        reportFill={authoredRuntimePreviewState.runtimeConfig.reportFill}
-                        title={runtimePreviewArtifact?.runtimeBlock?.title || ""}
-                        subtitle={runtimePreviewArtifact?.runtimeBlock?.subtitle || ""}
-                        locale={locale}
-                        hostIntent={runtimePreviewHostIntent}
-                        runtimeHandlers={runtimePreviewHandlers}
-                        presentationMode={reportWorkspaceMode ? "report" : "preview"}
-                        showContextSummary={false}
-                        suppressFilterBarBlocks={showUnifiedRuntimeFilterSurface}
-                        suppressFilterBarBlockDatasetRefs={showInlineReportBaselineControls ? ["primary"] : []}
-                    />
                 ) : null}
             </section>
         );
@@ -19453,6 +20054,7 @@ export default function ReportBuilder({ container, context }) {
                 datasetOptions={authoredDatasetOptions}
                 projectionOptions={authoredProjectionOptions}
                 scopeParamOptions={authoredScopeParamOptions}
+                filterBarGroupOptions={authoredFilterBarGroupOptions}
                 isEditing={!!editingDocumentBlockId}
                 dataViewLabel={activeAuthoringProjectionLabel}
                 dataViewDescription={activeAuthoringProjectionDescription}

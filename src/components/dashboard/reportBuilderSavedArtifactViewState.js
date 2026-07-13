@@ -95,6 +95,16 @@ function buildTemplateMetaChips({
 }
 
 function buildExportRequestSummaryContext(requestSummary = null) {
+    const scopeSummaryItems = Array.isArray(requestSummary?.scopeSummaryItems)
+        ? requestSummary.scopeSummaryItems
+        : [];
+    const scopeSummaryText = normalizeString(requestSummary?.scopeSummaryText);
+    const exportScopeSummaryText = scopeSummaryItems.length > 0
+        ? [
+            scopeSummaryText,
+            "Read-only values captured for this export snapshot. Use the live Filters workspace to change targeting or date range.",
+        ].filter(Boolean).join(" ")
+        : "";
     return {
         semanticBindingTitle: normalizeString(requestSummary?.semanticBindingTitle),
         semanticBindingChips: Array.isArray(requestSummary?.semanticBindingChips)
@@ -103,11 +113,9 @@ function buildExportRequestSummaryContext(requestSummary = null) {
         semanticBindingFieldGroups: Array.isArray(requestSummary?.semanticBindingFieldGroups)
             ? requestSummary.semanticBindingFieldGroups
             : [],
-        scopeSummaryTitle: normalizeString(requestSummary?.scopeSummaryTitle),
-        scopeSummaryText: normalizeString(requestSummary?.scopeSummaryText),
-        scopeSummaryItems: Array.isArray(requestSummary?.scopeSummaryItems)
-            ? requestSummary.scopeSummaryItems
-            : [],
+        scopeSummaryTitle: scopeSummaryItems.length > 0 ? "Export Snapshot Filters" : "",
+        scopeSummaryText: exportScopeSummaryText,
+        scopeSummaryItems,
     };
 }
 

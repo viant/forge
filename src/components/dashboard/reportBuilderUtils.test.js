@@ -2428,6 +2428,32 @@ assert.deepEqual(projectedMany, [
     },
 ]);
 
+const projectedManyIntStrings = projectLookupSelections(
+    {
+        valueSelector: "segmentId",
+        labelSelector: "segmentName",
+        manualValueType: "int",
+    },
+    [
+        { segmentId: "1394660", segmentName: "Sports Fans" },
+        { segmentId: "1416062", segmentName: "Auto Intenders" },
+    ],
+);
+assert.deepEqual(projectedManyIntStrings, [
+    {
+        value: 1394660,
+        label: "Sports Fans",
+        group: "",
+        record: { segmentId: "1394660", segmentName: "Sports Fans" },
+    },
+    {
+        value: 1416062,
+        label: "Auto Intenders",
+        group: "",
+        record: { segmentId: "1416062", segmentName: "Auto Intenders" },
+    },
+]);
+
 assert.deepEqual(
     projectManualSelection(
         {
@@ -2511,6 +2537,21 @@ assert.deepEqual(publisherProjected, {
     group: "",
     record: null,
 });
+
+assert.equal(
+    projectLookupSelection(
+        {
+            valueSelector: "segmentId",
+            labelSelector: "segmentName",
+            manualValueType: "int",
+        },
+        {
+            segmentId: "not-a-number",
+            segmentName: "Broken Segment",
+        },
+    ),
+    null,
+);
 
 const metricAliasConfig = {
     request: {

@@ -19,7 +19,7 @@ import {
 } from "./reportRuntimeInteractionStateModel.js";
 import { resolveReportRuntimeRefinementFields } from "./reportRuntimeModel.js";
 import { buildReportRuntimeTableInteractionState } from "./reportRuntimeTableInteractionState.js";
-import { validateReportExportRequest, validateReportPrint } from "../../reporting/schema/reportSchemas.js";
+import { validateReportExportRequest, validateReportFill, validateReportPrint } from "../../reporting/schema/reportSchemas.js";
 
 const container = {
   id: "capacityBuilder",
@@ -90,7 +90,7 @@ const refinements = [{
   field: "channelV2",
   values: ["Display"],
   sourceBlockId: "primaryTable",
-  label: "Channel = Display",
+  label: "Drill to Publisher: Channel = Display",
 }];
 
 const drillTransitions = [{
@@ -1579,13 +1579,117 @@ const interactiveFilterPreview = buildReportBuilderRuntimePreview({
   hasMore: false,
 });
 const interactiveScopeFilters = interactiveFilterPreview.reportFill.blocks.find((block) => block.id === "scopeFilters") || null;
-assert.equal(interactiveScopeFilters?.content?.params?.[1]?.label, "Channels");
-assert.equal(interactiveScopeFilters?.content?.params?.[1]?.multiple, true);
-assert.equal(interactiveScopeFilters?.content?.params?.[1]?.presentation, "compactIconRow");
-assert.deepEqual(interactiveScopeFilters?.content?.params?.[1]?.options, [
+const interactiveChannelsParam = interactiveScopeFilters?.content?.params?.find((param) => param.id === "channelIds") || null;
+assert.equal(interactiveChannelsParam?.label, "Channels");
+assert.equal(interactiveChannelsParam?.multiple, true);
+assert.equal(interactiveChannelsParam?.presentation, "compactIconRow");
+assert.deepEqual(interactiveChannelsParam?.options, [
   { value: "Display", label: "Display", icon: "media" },
   { value: "CTV", label: "CTV", icon: "video" },
 ]);
+
+const unifiedFilterModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config: {
+    ...config,
+    reportSurfaceFilterMode: "unified",
+    dynamicFilterGroups: [
+      {
+        id: "include",
+        filters: [
+          { id: "includeSiteType", label: "Site Type" },
+          { id: "includeViantSegment", label: "1st Party Segment" },
+        ],
+      },
+      {
+        id: "exclude",
+        filters: [
+          { id: "excludePostalCodeList", label: "Postal Code List" },
+        ],
+      },
+    ],
+    dynamicFilterFamilies: [
+      { id: "inventory", label: "Inventory", includeFilterIds: ["includeSiteType"], excludeFilterIds: [] },
+      { id: "data", label: "Data", includeFilterIds: ["includeViantSegment"], excludeFilterIds: [] },
+      { id: "location", label: "Location", includeFilterIds: [], excludeFilterIds: ["excludePostalCodeList"] },
+    ],
+  },
+  state: {
+    ...state,
+    dynamicGroups: {
+      include: [
+        { id: "row_site_type", filterId: "includeSiteType", enabled: true, selections: [{ value: "web", label: "web" }] },
+        { id: "row_segment", filterId: "includeViantSegment", enabled: true, selections: [{ value: 1394660, label: "1394660" }, { value: 1416062, label: "1416062" }] },
+      ],
+      exclude: [
+        { id: "row_postal", filterId: "excludePostalCodeList", enabled: false, selections: [{ value: 53279, label: "53279" }, { value: 71462, label: "71462" }] },
+      ],
+    },
+    reportDocumentBlocks: [
+      {
+        id: "scopeFilters",
+        kind: "filterBarBlock",
+        title: "Filters",
+        paramIds: ["dateRange"],
+      },
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [{ blockId: "scopeFilters" }, { blockId: "primaryBuilder" }],
+    },
+  },
+});
+const unifiedFilterPreview = buildReportBuilderRuntimePreview({
+  model: unifiedFilterModel,
+  rows: [
+    { channelV2: "Display", avails: 1200000 },
+  ],
+  hasMore: false,
+});
+const unifiedScopeFilters = unifiedFilterPreview.reportFill.blocks.find((block) => block.id === "scopeFilters") || null;
+assert.equal(validateReportFill(unifiedFilterPreview.reportFill).valid, true);
+assert.deepEqual(unifiedScopeFilters?.content?.criteria, [
+  {
+    id: "include:includeSiteType:1",
+    groupId: "inventory",
+    label: "Inventory · Include Site Type",
+    groupLabel: "Inventory",
+    filterLabel: "Site Type",
+    direction: "include",
+    enabled: true,
+    rawValues: ["web"],
+    displayValues: ["web"],
+  },
+  {
+    id: "include:includeViantSegment:2",
+    groupId: "data",
+    label: "Data · Include 1st Party Segment",
+    groupLabel: "Data",
+    filterLabel: "1st Party Segment",
+    direction: "include",
+    enabled: true,
+    rawValues: [1394660, 1416062],
+    displayValues: ["1394660", "1416062"],
+  },
+  {
+    id: "exclude:excludePostalCodeList:1",
+    groupId: "location",
+    label: "Location · Exclude Postal Code List",
+    groupLabel: "Location",
+    filterLabel: "Postal Code List",
+    direction: "exclude",
+    enabled: false,
+    rawValues: [53279, 71462],
+    displayValues: ["53279", "71462"],
+  },
+]);
+const unifiedPrintTexts = unifiedFilterPreview.reportPrint.pages
+  .flatMap((entry) => entry.elements || [])
+  .filter((element) => element.kind === "text")
+  .map((element) => element.text);
+assert.equal(unifiedPrintTexts.some((text) => /Inventory · Include Site Type: web/.test(text)), true);
+assert.equal(unifiedPrintTexts.some((text) => /Data · Include 1st Party Segment: 1394660, 1416062/.test(text)), true);
+assert.equal(unifiedPrintTexts.some((text) => /Location · Exclude Postal Code List \(Off\): 53279, 71462/.test(text)), true);
 
 const localCalculatedModel = buildReportBuilderRuntimePreviewModel({
   container,
@@ -1834,7 +1938,7 @@ assert.deepEqual(authoredReachRateTableDrillExecution, {
     value: "Display",
     sourceBlockId: "reachRateTable",
     fieldLabel: "Channel",
-    label: "Channel = Display",
+    label: "Drill to Publisher: Channel = Display",
   },
 });
 let authoredReachRateTableInteractionState = createReportRuntimeInteractionState();
@@ -1953,7 +2057,7 @@ const unboundDrillRefinements = [{
   field: "publisherId",
   values: ["Acme Media"],
   sourceBlockId: "publisherTable",
-  label: "Publisher = Acme Media",
+  label: "Drill to Site Type: Publisher = Acme Media",
 }];
 const unboundDrillTransitions = [{
   refinementId: "drill:publisherId:siteType",

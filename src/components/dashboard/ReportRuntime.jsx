@@ -78,19 +78,6 @@ function titleizeRuntimeField(value = "") {
 }
 
 function formatRuntimeRefinementChipLabel(refinement = {}) {
-  const label = normalizeString(refinement?.label);
-  const op = normalizeString(refinement?.op).toLowerCase();
-  if (op === "drill" && label && /^drill\b/i.test(label)) {
-    const sourceValueMatch = label.match(/:\s*([^=]+?)\s*=\s*(.+)$/);
-    if (sourceValueMatch) {
-      return `${normalizeString(sourceValueMatch[1])} = ${normalizeString(sourceValueMatch[2])}`;
-    }
-    const valueOnlyMatch = label.match(/=\s*(.+)$/);
-    const fieldLabel = normalizeString(refinement?.fieldLabel) || titleizeRuntimeField(refinement?.field);
-    if (valueOnlyMatch && fieldLabel) {
-      return `${fieldLabel} = ${normalizeString(valueOnlyMatch[1])}`;
-    }
-  }
   return formatReportRuntimeRefinement(refinement);
 }
 
@@ -224,6 +211,22 @@ function resolveRuntimeLayoutSpanForBlock(block = {}) {
 function resolveRuntimeLayoutGridColumn(block = {}) {
   const span = resolveRuntimeLayoutSpanForBlock(block);
   return span >= REPORT_LAYOUT_GRID_COLUMNS ? "1 / -1" : `span ${span}`;
+}
+
+function resolveRuntimeLayoutGridColumns(viewportWidth = 0) {
+  const normalizedWidth = Number(viewportWidth) || 0;
+  if (normalizedWidth > 0 && normalizedWidth <= 960) {
+    return 1;
+  }
+  return REPORT_LAYOUT_GRID_COLUMNS;
+}
+
+function resolveResponsiveRuntimeLayoutGridColumn(block = {}, gridColumns = REPORT_LAYOUT_GRID_COLUMNS) {
+  if (Number(gridColumns || 0) <= 1) {
+    return "1 / -1";
+  }
+  const span = resolveRuntimeLayoutSpanForBlock(block);
+  return span >= gridColumns ? "1 / -1" : `span ${Math.max(1, Math.min(gridColumns, span))}`;
 }
 
 function formatKpiValue(value, format = "", locale = "en-US") {
@@ -1156,6 +1159,73 @@ function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
   );
 }
 
+function renderRuntimeMarkdownInline(value = "") {
+  const segments = String(value || "").split(/(\*\*[^*]+?\*\*|`[^`]+?`|\*[^*]+?\*)/g).filter((segment) => segment !== "");
+  return segments.map((segment, index) => {
+    if (segment.startsWith("**") && segment.endsWith("**")) {
+      return <strong key={index}>{segment.slice(2, -2)}</strong>;
+    }
+    if (segment.startsWith("*") && segment.endsWith("*")) {
+      return <em key={index}>{segment.slice(1, -1)}</em>;
+    }
+    if (segment.startsWith("`") && segment.endsWith("`")) {
+      return (
+        <code key={index} style={{ fontSize: "0.92em", background: "#eef3f8", borderRadius: 4, padding: "1px 4px" }}>
+          {segment.slice(1, -1)}
+        </code>
+      );
+    }
+    return segment;
+  });
+}
+
+function RuntimeMarkdownBody({ markdown = "" }) {
+  const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  const renderedLines = lines
+    .map((line, index) => {
+      const trimmed = normalizeString(line);
+      if (!trimmed) {
+        return null;
+      }
+      if (trimmed.startsWith("## ")) {
+        return <h4 key={index} style={{ margin: 0, fontSize: 16, color: "#182026" }}>{renderRuntimeMarkdownInline(trimmed.slice(3))}</h4>;
+      }
+      if (trimmed.startsWith("# ")) {
+        return <h3 key={index} style={{ margin: 0, fontSize: 18, color: "#182026" }}>{renderRuntimeMarkdownInline(trimmed.slice(2))}</h3>;
+      }
+      if (/^\d+\.\s+/.test(trimmed)) {
+        return <p key={index} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>{renderRuntimeMarkdownInline(trimmed)}</p>;
+      }
+      if (/^[-*+]\s+/.test(trimmed)) {
+        return <p key={index} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>• {renderRuntimeMarkdownInline(trimmed.replace(/^[-*+]\s+/, ""))}</p>;
+      }
+      if (trimmed.startsWith("> ")) {
+        return (
+          <p
+            key={index}
+            style={{
+              margin: 0,
+              fontSize: 13,
+              lineHeight: 1.6,
+              color: "#486581",
+              borderLeft: "3px solid #d8e2eb",
+              paddingLeft: 10,
+            }}
+          >
+            {renderRuntimeMarkdownInline(trimmed.slice(2))}
+          </p>
+        );
+      }
+      return <p key={index} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>{renderRuntimeMarkdownInline(trimmed)}</p>;
+    })
+    .filter(Boolean);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {renderedLines}
+    </div>
+  );
+}
+
 function MarkdownBlock({ block = {} }) {
   const markdown = String(block?.content?.markdown || block?.markdown || "");
   const lines = markdown.split(/\n+/).filter((line) => line.length > 0);
@@ -1169,17 +1239,7 @@ function MarkdownBlock({ block = {} }) {
     : title;
   return (
     <RuntimePanel title={panelTitle}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {lines.map((line, index) => {
-          if (line.startsWith("## ")) {
-            return <h4 key={index} style={{ margin: 0, fontSize: 16, color: "#182026" }}>{line.slice(3)}</h4>;
-          }
-          if (line.startsWith("# ")) {
-            return <h3 key={index} style={{ margin: 0, fontSize: 18, color: "#182026" }}>{line.slice(2)}</h3>;
-          }
-          return <p key={index} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>{line}</p>;
-        })}
-      </div>
+      <RuntimeMarkdownBody markdown={markdown || "No narrative content."} />
     </RuntimePanel>
   );
 }
@@ -1262,6 +1322,12 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
   const blockTitle = normalizeString(block?.title || content?.title || "KPI");
   const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
   const showValueLabel = !!valueLabel && valueLabel.toLowerCase() !== blockTitle.toLowerCase();
+  const presentationMode = ["body", "both"].includes(normalizeString(content?.presentationMode || block?.presentationMode).toLowerCase())
+    ? normalizeString(content?.presentationMode || block?.presentationMode).toLowerCase()
+    : "card";
+  const showCard = presentationMode !== "body";
+  const bodyMarkdown = String(content?.bodyMarkdown || "");
+  const showBody = presentationMode !== "card" && !!bodyMarkdown.trim();
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
@@ -1290,23 +1356,40 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {showValueLabel ? (
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
-                {valueLabel}
-              </span>
-            ) : null}
-            <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
-              {formatKpiValue(content?.value, normalizeString(content?.valueFormat || content?.format), locale)}
-            </span>
-          </div>
-          {hasSecondaryValue ? (
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "#30404d" }}>
-              <strong style={{ color: "#182026" }}>
-                {normalizeString(content?.secondaryLabel || content?.secondaryField)}
-              </strong>
-              <span>{formatKpiValue(content?.secondaryValue, normalizeString(content?.secondaryFormat), locale)}</span>
+          {showCard ? (
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {showValueLabel ? (
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
+                    {valueLabel}
+                  </span>
+                ) : null}
+                <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
+                  {formatKpiValue(content?.value, normalizeString(content?.valueFormat || content?.format), locale)}
+                </span>
+              </div>
+              {hasSecondaryValue ? (
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "#30404d" }}>
+                  <strong style={{ color: "#182026" }}>
+                    {normalizeString(content?.secondaryLabel || content?.secondaryField)}
+                  </strong>
+                  <span>{formatKpiValue(content?.secondaryValue, normalizeString(content?.secondaryFormat), locale)}</span>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+          {showBody ? (
+            <div
+              style={{
+                borderTop: showCard ? "1px solid #e6edf3" : "none",
+                paddingTop: showCard ? 10 : 0,
+              }}
+            >
+              <RuntimeMarkdownBody markdown={bodyMarkdown} />
             </div>
+          ) : null}
+          {!showCard && !showBody ? (
+            <RuntimeMarkdownBody markdown={`${valueLabel}: ${formatKpiValue(content?.value, normalizeString(content?.valueFormat || content?.format), locale)}`} />
           ) : null}
         </div>
       )}
@@ -1388,6 +1471,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
 
 function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummary = null, presentationMode = "preview", runtimeHandlers = null, availableDatasetRefs = [] }) {
   const params = Array.isArray(block?.content?.params) ? block.content.params : [];
+  const criteria = Array.isArray(block?.content?.criteria) ? block.content.criteria : [];
   const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
   const isPrimaryScope = normalizedDatasetRef === "primary";
   const canEditFilterParams = params.some((param) => (
@@ -1468,6 +1552,46 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
         })}
         {params.length === 0 ? <span style={{ fontSize: 12, color: "#5f6b7c" }}>No report filters.</span> : null}
       </div>
+      {criteria.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px dashed #d8e1e8", paddingTop: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+            Active Targeting
+          </div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {criteria.map((criterion) => (
+              <div
+                key={normalizeString(criterion?.id || criterion?.label)}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  gap: 8,
+                  border: "1px solid #d4dee8",
+                  background: "#f7fafc",
+                  borderRadius: 12,
+                  padding: "8px 10px",
+                  fontSize: 12,
+                  color: "#30404d",
+                }}
+              >
+                <strong style={{ color: "#182026" }}>
+                  {normalizeString(criterion?.label || criterion?.filterLabel || criterion?.id)}
+                </strong>
+                <span>
+                  {Array.isArray(criterion?.displayValues) && criterion.displayValues.length > 0
+                    ? criterion.displayValues.join(", ")
+                    : (Array.isArray(criterion?.rawValues)
+                      ? criterion.rawValues.map((value) => String(value ?? "")).filter(Boolean).join(", ")
+                      : "—")}
+                </span>
+                {criterion?.enabled === false ? (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#8a5d00" }}>Off</span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <ActiveScopeSummary activeScopeSummary={activeScopeSummary} />
     </RuntimePanel>
   );
@@ -1876,6 +2000,23 @@ export default function ReportRuntime({
   suppressFilterBarBlockDatasetRefs = [],
 }) {
   const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
+  const [runtimeViewportWidth, setRuntimeViewportWidth] = useState(() => (
+    typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0
+  ));
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    const handleResize = () => {
+      setRuntimeViewportWidth(Number(window.innerWidth || 0) || 0);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+  const runtimeGridColumns = resolveRuntimeLayoutGridColumns(runtimeViewportWidth);
   const suppressedFilterBarDatasetRefs = useMemo(
     () => new Set(
       (Array.isArray(suppressFilterBarBlockDatasetRefs) ? suppressFilterBarBlockDatasetRefs : [])
@@ -2179,9 +2320,12 @@ export default function ReportRuntime({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(12, minmax(0, 1fr))",
+          gridTemplateColumns: runtimeGridColumns <= 1
+            ? "minmax(0, 1fr)"
+            : `repeat(${REPORT_LAYOUT_GRID_COLUMNS}, minmax(0, 1fr))`,
           gap: 16,
         }}
+        data-report-runtime-layout-columns={runtimeGridColumns}
       >
         {blocks.map((block) => (
           <div
@@ -2190,7 +2334,7 @@ export default function ReportRuntime({
             data-report-runtime-layout-span={resolveRuntimeLayoutSpanForBlock(block)}
             style={{
               minWidth: 0,
-              gridColumn: resolveRuntimeLayoutGridColumn(block),
+              gridColumn: resolveResponsiveRuntimeLayoutGridColumn(block, runtimeGridColumns),
             }}
           >
             {renderBlock(block)}

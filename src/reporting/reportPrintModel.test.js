@@ -307,6 +307,37 @@ assert.equal(
 );
 assert.equal(compactDerivedPrint.pages.flatMap((page) => page.elements || []).some((element) => element.kind === "tableCellText" && element.columnKey === "reachRate"), true);
 
+const snappedCompactDerivedSpec = {
+  ...compactDerivedSpec,
+  layoutIntent: {
+    ...compactDerivedSpec.layoutIntent,
+    items: (Array.isArray(compactDerivedSpec.layoutIntent?.items) ? compactDerivedSpec.layoutIntent.items : []).map((item, index) => (
+      index === 0
+        ? { ...item, span: 5 }
+        : (index === 1 ? { ...item, span: 7 } : item)
+    )),
+  },
+};
+const snappedCompactDerivedFill = buildReportFillFromReportSpec(
+  snappedCompactDerivedSpec,
+  Object.fromEntries(
+    (Array.isArray(compactDerivedFill.datasets) ? compactDerivedFill.datasets : []).map((dataset) => [
+      dataset.id,
+      { rows: dataset.rows || [] },
+    ]),
+  ),
+);
+const snappedCompactDerivedPrint = buildReportPrintFromReportFill({
+  reportSpec: snappedCompactDerivedSpec,
+  reportFill: snappedCompactDerivedFill,
+});
+assert.deepEqual(validateReportPrint(snappedCompactDerivedPrint), { valid: true, errors: [] });
+const snappedPageOne = snappedCompactDerivedPrint.pages[0];
+const snappedPageOneTitles = (snappedPageOne.elements || []).filter((element) => element.kind === "text" && /__title_0$/.test(String(element.id || "")));
+assert.ok(snappedPageOneTitles.length >= 2);
+assert.equal(snappedPageOneTitles[0].box.x, 36);
+assert.ok(snappedPageOneTitles[1].box.x > snappedPageOneTitles[0].box.x);
+
 const invalidReportPrint = {
   ...reportPrint,
   pages: [
@@ -386,6 +417,8 @@ const authoredDocument = buildReportBuilderReportDocument({
       secondaryField: "channelId",
       secondaryLabel: "Channel",
       description: "Summarizes the first authored runtime row.",
+      presentationMode: "both",
+      bodyTemplate: "Print note ${format(row.totalSpend,currency)} for ${secondaryValue}.",
     }),
     buildReportDocumentTableBlock({
       id: "comparisonTable",
@@ -533,6 +566,10 @@ assert.ok(printElements.some((element) => (
 assert.ok(printElements.some((element) => (
   element.kind === "text"
   && /Spend: \$20,000/.test(element.text)
+)));
+assert.ok(printElements.some((element) => (
+  element.kind === "text"
+  && /Print note \$20,000 for Display\./.test(element.text)
 )));
 const headlineKpiTitle = loweredPrint.pages
   .flatMap((page) => (page.elements || []).map((element) => ({ page: page.number, element })))

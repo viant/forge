@@ -80,7 +80,7 @@ assert.deepEqual(executions, [
       value: "Display",
       sourceBlockId: "primaryChart",
       fieldLabel: "Channel",
-      label: "Channel = Display",
+      label: "Drill to Market: Channel = Display",
     },
   },
   {
@@ -193,7 +193,7 @@ assert.deepEqual(authoredDerivedExecutions, [
       value: "US",
       sourceBlockId: "reachRateTrend",
       fieldLabel: "Market",
-      label: "Market = US",
+      label: "Drill to Region: Market = US",
     },
   },
   {

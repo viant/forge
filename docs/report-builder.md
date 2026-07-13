@@ -4,6 +4,14 @@
 composition. It is intentionally separate from the existing dashboard filters /
 timeline / table grammar so current dashboards stay backward compatible.
 
+Detailed primitive/reference documentation lives in
+[report-builder-primitives.md](/Users/awitas/go/src/github.com/viant/forge/docs/report-builder-primitives.md).
+
+Notable current direction:
+
+- `filterBarBlock` is treated as a placement/presentation primitive for report
+  filters rather than the canonical inventory of available filters.
+
 ## Layout
 
 - top: measure shelf

@@ -192,6 +192,23 @@ assert.deepEqual(buildReportDocumentKpiBlock(), {
   valueField: "value",
   valueLabel: "value",
 });
+assert.deepEqual(buildReportDocumentKpiBlock({
+  id: "hybridKpi",
+  valueField: "totalSpend",
+  valueLabel: "Spend",
+  presentationMode: "both",
+  bodyTemplate: "**${valueLabel}:** ${value}",
+}), {
+  id: "hybridKpi",
+  kind: "kpiBlock",
+  title: "KPI",
+  datasetRef: "primary",
+  valueField: "totalSpend",
+  valueLabel: "Spend",
+  presentationMode: "both",
+  bodyFormat: "markdown",
+  bodyTemplate: "**${valueLabel}:** ${value}",
+});
 assert.deepEqual(buildReportDocumentBadgesBlock(), {
   id: "badgesBlock",
   kind: "badgesBlock",

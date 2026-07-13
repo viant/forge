@@ -27,6 +27,7 @@ import {
 import { placeReportBuilderTableColumnKeyRelative } from "./reportBuilderTableColumnOrder.js";
 
 const REPORT_BUILDER_TABLE_DND_MIME = "application/x-forge-report-builder-table";
+const REPORT_BUILDER_FILTER_GROUP_DND_MIME = "application/x-forge-report-builder-filter-group";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -117,6 +118,26 @@ function normalizeScopeParamOptions(options = []) {
         .filter(Boolean);
 }
 
+function normalizeFilterBarGroupOptions(options = []) {
+    const seen = new Set();
+    return (Array.isArray(options) ? options : [])
+        .map((option) => {
+            const value = String((option?.value ?? option?.id) || "").trim();
+            if (!value || seen.has(value)) {
+                return null;
+            }
+            seen.add(value);
+            return {
+                value,
+                label: String(option?.label || value).trim() || value,
+                kind: String(option?.kind || "group").trim() || "group",
+                ...(String(option?.description || "").trim() ? { description: String(option.description).trim() } : {}),
+                required: option?.required === true,
+            };
+        })
+        .filter(Boolean);
+}
+
 function resolveDialogScopeParamOptions(selectedDatasetRef = "primary", selectedDatasetOption = null, scopeParamOptions = []) {
     const normalizedDatasetRef = String(selectedDatasetRef || "primary").trim() || "primary";
     if (selectedDatasetOption) {
@@ -128,6 +149,46 @@ function resolveDialogScopeParamOptions(selectedDatasetRef = "primary", selected
     return normalizedDatasetRef === "primary"
         ? normalizeScopeParamOptions(scopeParamOptions)
         : [];
+}
+
+function resolveDialogFilterBarGroupOptions(selectedDatasetRef = "primary", selectedDatasetOption = null, scopeParamOptions = [], filterBarGroupOptions = []) {
+    const normalizedDatasetRef = String(selectedDatasetRef || "primary").trim() || "primary";
+    if (selectedDatasetOption) {
+        const datasetScopedOptions = normalizeFilterBarGroupOptions(selectedDatasetOption?.filterBarGroupOptions);
+        if (datasetScopedOptions.length > 0) {
+            return datasetScopedOptions;
+        }
+    }
+    if (normalizedDatasetRef !== "primary") {
+        return normalizeScopeParamOptions(scopeParamOptions).map((option) => ({
+            value: option.value,
+            label: option.label,
+            kind: "scopeParam",
+            ...(option.description ? { description: option.description } : {}),
+            required: option.required === true,
+        }));
+    }
+    const normalizedPrimaryGroups = normalizeFilterBarGroupOptions(filterBarGroupOptions);
+    if (normalizedPrimaryGroups.length > 0) {
+        return normalizedPrimaryGroups;
+    }
+    return normalizeScopeParamOptions(scopeParamOptions).map((option) => ({
+        value: option.value,
+        label: option.label,
+        kind: "scopeParam",
+        ...(option.description ? { description: option.description } : {}),
+        required: option.required === true,
+    }));
+}
+
+function normalizeFilterBarBlockMode(value = "") {
+    const normalized = String(value || "").trim().toLowerCase();
+    return ["baseline", "unified"].includes(normalized) ? normalized : "baseline";
+}
+
+function normalizeFilterBarBlockPlacement(value = "") {
+    const normalized = String(value || "").trim().toLowerCase();
+    return ["inherit", "inline", "rail-left", "hidden"].includes(normalized) ? normalized : "inherit";
 }
 
 function parseReportBuilderTableDragPayload(event = null) {
@@ -152,6 +213,29 @@ function parseReportBuilderTableDragPayload(event = null) {
             columnKey,
             dragKind,
         };
+    } catch (_) {
+        return null;
+    }
+}
+
+function parseReportBuilderFilterGroupDragPayload(event = null) {
+    const dataTransfer = event?.dataTransfer;
+    if (!dataTransfer) {
+        return null;
+    }
+    const rawPayload = dataTransfer.getData(REPORT_BUILDER_FILTER_GROUP_DND_MIME)
+        || dataTransfer.getData("text/plain")
+        || "";
+    if (!rawPayload) {
+        return null;
+    }
+    try {
+        const parsed = JSON.parse(rawPayload);
+        const groupId = String(parsed?.groupId || "").trim();
+        if (!groupId) {
+            return null;
+        }
+        return { groupId };
     } catch (_) {
         return null;
     }
@@ -1865,6 +1949,7 @@ export function ReportBuilderDocumentBlockDialog({
     datasetOptions = [],
     projectionOptions = [],
     scopeParamOptions = [],
+    filterBarGroupOptions = [],
     isEditing = false,
     dataViewLabel = "",
     dataViewDescription = "",
@@ -1905,7 +1990,8 @@ export function ReportBuilderDocumentBlockDialog({
     const isKpiBlock = normalizedKind === "kpiBlock";
     const isBadgesBlock = normalizedKind === "badgesBlock";
     const isTableBlock = normalizedKind === "tableBlock";
-    const supportsDatasetBinding = isFilterBarBlock || isGeoMapBlock || isKpiBlock || isBadgesBlock || isTableBlock;
+    const isMarkdownBlock = normalizedKind === "markdownBlock";
+    const supportsDatasetBinding = isFilterBarBlock || isGeoMapBlock || isKpiBlock || isBadgesBlock || isTableBlock || isMarkdownBlock;
     const geo = draft?.geo && typeof draft.geo === "object" && !Array.isArray(draft.geo)
         ? draft.geo
         : {};
@@ -1915,6 +2001,7 @@ export function ReportBuilderDocumentBlockDialog({
     const normalizedBaseTableColumnOptions = normalizeTableColumnOptions(tableColumnOptions);
     const normalizedBaseValueFieldOptions = normalizeFieldOptions(valueFieldOptions);
     const normalizedBaseSecondaryFieldOptions = normalizeFieldOptions(secondaryFieldOptions);
+    const normalizedBaseFilterBarGroupOptions = normalizeFilterBarGroupOptions(filterBarGroupOptions);
     const setDraftPatch = (patch = {}) => {
         if (typeof onDraftChange !== "function") {
             return;
@@ -1946,9 +2033,6 @@ export function ReportBuilderDocumentBlockDialog({
         ? draft.columnKeys.map((entry) => String(entry || "").trim()).filter(Boolean)
         : [];
     const selectedColumnKeySet = new Set(selectedColumnKeys);
-    const selectedParamIds = Array.isArray(draft?.paramIds)
-        ? draft.paramIds.map((entry) => String(entry || "").trim()).filter(Boolean)
-        : [];
     const selectedRefinementActionKinds = Array.isArray(draft?.actionKinds)
         ? draft.actionKinds.map((entry) => String(entry || "").trim()).filter(Boolean)
         : [];
@@ -2020,16 +2104,6 @@ export function ReportBuilderDocumentBlockDialog({
         if (nextColumnKeys.join("::") !== selectedColumnKeys.join("::")) {
             setDraftPatch({ columnKeys: nextColumnKeys });
         }
-    };
-    const toggleScopeParam = (paramId = "") => {
-        const normalizedParamId = String(paramId || "").trim();
-        if (!normalizedParamId) {
-            return;
-        }
-        const nextParamIds = selectedParamIds.includes(normalizedParamId)
-            ? selectedParamIds.filter((entry) => entry !== normalizedParamId)
-            : [...selectedParamIds, normalizedParamId];
-        setDraftPatch({ paramIds: nextParamIds });
     };
     const toggleRefinementActionKind = (actionKind = "") => {
         const normalizedActionKind = String(actionKind || "").trim();
@@ -2231,6 +2305,12 @@ export function ReportBuilderDocumentBlockDialog({
         selectedDatasetOption,
         scopeParamOptions,
     );
+    const normalizedFilterBarGroupOptions = resolveDialogFilterBarGroupOptions(
+        selectedDatasetRef,
+        selectedDatasetOption,
+        scopeParamOptions,
+        normalizedBaseFilterBarGroupOptions,
+    );
     const geoDimensionOptions = datasetTableColumnOptions.filter((option) => String(option?.kind || "").trim() === "dimension");
     const geoMetricOptions = datasetTableColumnOptions.filter((option) => String(option?.kind || "").trim() === "measure");
     const tableBreakdownOptions = datasetTableColumnOptions.filter((option) => String(option?.kind || "").trim() === "dimension");
@@ -2267,6 +2347,111 @@ export function ReportBuilderDocumentBlockDialog({
     const matchedProjectionOption = usesPrimaryDataset ? (normalizedProjectionOptions.find((option) => (
         matchesProjectionKeys(option.columnKeys, selectedColumnKeys)
     )) || null) : null;
+    const filterBarMode = normalizeFilterBarBlockMode(draft?.mode || "");
+    const filterBarPlacement = normalizeFilterBarBlockPlacement(draft?.placement || "") || "inherit";
+    const effectiveFilterBarGroupOptions = filterBarMode === "baseline"
+        ? normalizedFilterBarGroupOptions.filter((option) => option.kind === "scopeParam")
+        : normalizedFilterBarGroupOptions;
+    const selectedFilterBarVisibleGroups = Array.isArray(draft?.visibleGroups)
+        ? draft.visibleGroups.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const selectedFilterBarGroupOrder = Array.isArray(draft?.groupOrder)
+        ? draft.groupOrder.map((entry) => String(entry || "").trim()).filter(Boolean)
+        : [];
+    const selectedFilterBarCollapsedGroups = new Set(
+        Array.isArray(draft?.collapsedGroups)
+            ? draft.collapsedGroups.map((entry) => String(entry || "").trim()).filter(Boolean)
+            : [],
+    );
+    const filterBarGroupOptionIndex = new Map(normalizedFilterBarGroupOptions.map((option) => [option.value, option]));
+    const orderedVisibleFilterBarGroups = selectedFilterBarGroupOrder
+        .filter((groupId) => selectedFilterBarVisibleGroups.includes(groupId))
+        .map((groupId) => filterBarGroupOptionIndex.get(groupId) || null)
+        .filter(Boolean);
+    const remainingVisibleFilterBarGroups = selectedFilterBarVisibleGroups
+        .filter((groupId) => !selectedFilterBarGroupOrder.includes(groupId))
+        .map((groupId) => filterBarGroupOptionIndex.get(groupId) || null)
+        .filter(Boolean);
+    const visibleFilterBarGroupOptions = [...orderedVisibleFilterBarGroups, ...remainingVisibleFilterBarGroups];
+    const availableFilterBarGroupOptions = effectiveFilterBarGroupOptions.filter((option) => !selectedFilterBarVisibleGroups.includes(option.value));
+    const [draggingFilterBarGroupId, setDraggingFilterBarGroupId] = useState("");
+    const applyFilterBarSelection = (nextVisibleGroups = [], nextCollapsedGroups = []) => {
+        const visibleGroups = nextVisibleGroups.map((entry) => String(entry || "").trim()).filter(Boolean);
+        const collapsedGroups = nextCollapsedGroups.map((entry) => String(entry || "").trim()).filter(Boolean).filter((groupId) => visibleGroups.includes(groupId));
+        const paramIds = visibleGroups.filter((groupId) => filterBarGroupOptionIndex.get(groupId)?.kind === "scopeParam");
+        setDraftPatch({
+            visibleGroups,
+            groupOrder: [...visibleGroups],
+            collapsedGroups,
+            paramIds,
+        });
+    };
+    const addFilterBarGroup = (groupId = "") => {
+        const normalizedGroupId = String(groupId || "").trim();
+        if (!normalizedGroupId || selectedFilterBarVisibleGroups.includes(normalizedGroupId)) {
+            return;
+        }
+        applyFilterBarSelection([...selectedFilterBarVisibleGroups, normalizedGroupId], Array.from(selectedFilterBarCollapsedGroups));
+    };
+    const removeFilterBarGroup = (groupId = "") => {
+        const normalizedGroupId = String(groupId || "").trim();
+        if (!normalizedGroupId) {
+            return;
+        }
+        applyFilterBarSelection(
+            selectedFilterBarVisibleGroups.filter((entry) => entry !== normalizedGroupId),
+            Array.from(selectedFilterBarCollapsedGroups).filter((entry) => entry !== normalizedGroupId),
+        );
+    };
+    const toggleCollapsedFilterBarGroup = (groupId = "") => {
+        const normalizedGroupId = String(groupId || "").trim();
+        if (!normalizedGroupId || !selectedFilterBarVisibleGroups.includes(normalizedGroupId)) {
+            return;
+        }
+        const nextCollapsed = selectedFilterBarCollapsedGroups.has(normalizedGroupId)
+            ? Array.from(selectedFilterBarCollapsedGroups).filter((entry) => entry !== normalizedGroupId)
+            : [...Array.from(selectedFilterBarCollapsedGroups), normalizedGroupId];
+        applyFilterBarSelection(selectedFilterBarVisibleGroups, nextCollapsed);
+    };
+    const moveFilterBarGroupRelative = (groupId = "", targetGroupId = "", placement = "before") => {
+        const normalizedGroupId = String(groupId || "").trim();
+        const normalizedTargetGroupId = String(targetGroupId || "").trim();
+        if (!normalizedGroupId || !normalizedTargetGroupId || normalizedGroupId === normalizedTargetGroupId) {
+            return;
+        }
+        const base = selectedFilterBarVisibleGroups.filter((entry) => entry !== normalizedGroupId);
+        const targetIndex = base.indexOf(normalizedTargetGroupId);
+        if (targetIndex === -1) {
+            return;
+        }
+        const insertIndex = String(placement || "").trim().toLowerCase() === "after"
+            ? targetIndex + 1
+            : targetIndex;
+        base.splice(insertIndex, 0, normalizedGroupId);
+        applyFilterBarSelection(base, Array.from(selectedFilterBarCollapsedGroups));
+    };
+    const kpiPresentationMode = ["body", "both"].includes(String(draft?.presentationMode || "").trim().toLowerCase())
+        ? String(draft.presentationMode).trim().toLowerCase()
+        : "card";
+    const buildDefaultKpiBodyTemplate = () => {
+        const primaryLabel = normalizeString(draft?.valueLabel || draft?.valueField || "Value") || "Value";
+        const secondaryLabel = normalizeString(draft?.secondaryLabel || draft?.secondaryField);
+        return [
+            `**${primaryLabel}:** \${value}`,
+            ...(secondaryLabel ? [`**${secondaryLabel}:** \${secondaryValue}`] : []),
+        ].join("\n");
+    };
+    const applyKpiPresentationMode = (value = "card") => {
+        const normalizedMode = ["body", "both"].includes(String(value || "").trim().toLowerCase())
+            ? String(value).trim().toLowerCase()
+            : "card";
+        setDraftPatch({
+            presentationMode: normalizedMode,
+            ...(normalizedMode !== "card" && !String(draft?.bodyTemplate || "").trim()
+                ? { bodyTemplate: buildDefaultKpiBodyTemplate() }
+                : {}),
+        });
+    };
     const [tableFieldSearch, setTableFieldSearch] = useState("");
     const [openColumnSettingsColumnKey, setOpenColumnSettingsColumnKey] = useState("");
     const [draggingTableColumnKey, setDraggingTableColumnKey] = useState("");
@@ -2313,6 +2498,7 @@ export function ReportBuilderDocumentBlockDialog({
             secondaryFieldOptions: Array.isArray(targetDatasetOption?.secondaryFieldOptions) ? targetDatasetOption.secondaryFieldOptions : [],
             tableColumnOptions: Array.isArray(targetDatasetOption?.columnOptions) ? targetDatasetOption.columnOptions : [],
             scopeParamOptions: Array.isArray(targetDatasetOption?.scopeParamOptions) ? targetDatasetOption.scopeParamOptions : [],
+            filterBarGroupOptions: Array.isArray(targetDatasetOption?.filterBarGroupOptions) ? targetDatasetOption.filterBarGroupOptions : normalizedBaseFilterBarGroupOptions,
         });
         if (typeof onDraftChange === "function" && nextDraft) {
             onDraftChange(nextDraft);
@@ -2546,43 +2732,149 @@ export function ReportBuilderDocumentBlockDialog({
                         </div>
                     ) : null}
                     {isFilterBarBlock ? (
-                        <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
-                            <span>{selectedDatasetRef === "primary" ? "Available report filters" : "Available source filters"}</span>
-                            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                                {normalizedScopeParamOptions.length === 0 ? (
-                                    <span style={{ fontSize: 12, color: "#5f6b7c" }}>
-                                        {selectedDatasetRef === "primary"
-                                            ? "No report filters are configured in the current builder."
-                                            : "This data source does not expose runtime filters yet."}
-                                    </span>
-                                ) : normalizedScopeParamOptions.map((option) => {
-                                    const selected = selectedParamIds.includes(option.value);
-                                    return (
-                                        <button
-                                            key={option.value}
-                                            type="button"
-                                            className={[
-                                                "forge-report-builder__dimension-pill",
-                                                selected ? "is-active" : "",
-                                            ].filter(Boolean).join(" ")}
-                                            onClick={() => toggleScopeParam(option.value)}
-                                            style={{ cursor: "pointer", width: "fit-content" }}
-                                        >
-                                            <span className="forge-report-builder__pill-copy">
-                                                <span className="forge-report-builder__pill-text">{option.label}</span>
-                                                {option.description ? (
-                                                    <span className="forge-report-builder__quick-option-description">
-                                                        {option.description}
+                        <>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Mode</span>
+                                <select
+                                    className={errorByField.has("mode") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={filterBarMode}
+                                    onChange={(event) => {
+                                        const nextMode = normalizeFilterBarBlockMode(event.target.value);
+                                        const nextVisibleGroups = nextMode === "baseline"
+                                            ? selectedFilterBarVisibleGroups.filter((groupId) => filterBarGroupOptionIndex.get(groupId)?.kind === "scopeParam")
+                                            : (selectedFilterBarVisibleGroups.length > 0
+                                                ? selectedFilterBarVisibleGroups
+                                                : normalizedFilterBarGroupOptions.map((option) => option.value));
+                                        const nextCollapsedGroups = Array.from(selectedFilterBarCollapsedGroups).filter((groupId) => nextVisibleGroups.includes(groupId));
+                                        const nextParamIds = nextVisibleGroups.filter((groupId) => filterBarGroupOptionIndex.get(groupId)?.kind === "scopeParam");
+                                        setDraftPatch({
+                                            mode: nextMode,
+                                            visibleGroups: nextVisibleGroups,
+                                            groupOrder: nextVisibleGroups,
+                                            collapsedGroups: nextCollapsedGroups,
+                                            paramIds: nextParamIds,
+                                        });
+                                    }}
+                                >
+                                    <option value="baseline">Baseline</option>
+                                    <option value="unified">Unified</option>
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Placement</span>
+                                <select
+                                    className={errorByField.has("placement") ? "forge-report-builder-select is-invalid" : "forge-report-builder-select"}
+                                    value={filterBarPlacement}
+                                    onChange={(event) => setDraftPatch({ placement: normalizeFilterBarBlockPlacement(event.target.value) })}
+                                >
+                                    <option value="inherit">Inherit workspace</option>
+                                    <option value="inline">Inline</option>
+                                    <option value="rail-left">Left rail</option>
+                                    <option value="hidden">Hidden</option>
+                                </select>
+                            </label>
+                            <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Visible groups</span>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                                    {visibleFilterBarGroupOptions.length > 0 ? (
+                                        <div style={{ display: "grid", gap: 8 }}>
+                                            {visibleFilterBarGroupOptions.map((option) => (
+                                                <div
+                                                    key={option.value}
+                                                    draggable
+                                                    onDragStart={(event) => {
+                                                        const payload = JSON.stringify({ groupId: option.value });
+                                                        event.dataTransfer.effectAllowed = "move";
+                                                        event.dataTransfer.setData(REPORT_BUILDER_FILTER_GROUP_DND_MIME, payload);
+                                                        event.dataTransfer.setData("text/plain", payload);
+                                                        setDraggingFilterBarGroupId(option.value);
+                                                    }}
+                                                    onDragEnd={() => setDraggingFilterBarGroupId("")}
+                                                    onDragOver={(event) => {
+                                                        event.preventDefault();
+                                                        if (event.dataTransfer) {
+                                                            event.dataTransfer.dropEffect = "move";
+                                                        }
+                                                    }}
+                                                    onDrop={(event) => {
+                                                        event.preventDefault();
+                                                        const payload = parseReportBuilderFilterGroupDragPayload(event);
+                                                        if (!payload?.groupId) {
+                                                            setDraggingFilterBarGroupId("");
+                                                            return;
+                                                        }
+                                                        moveFilterBarGroupRelative(payload.groupId, option.value, "before");
+                                                        setDraggingFilterBarGroupId("");
+                                                    }}
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 10,
+                                                        padding: "10px 12px",
+                                                        borderRadius: 12,
+                                                        border: draggingFilterBarGroupId === option.value ? "1px solid #93c5fd" : "1px solid #d7e2ee",
+                                                        background: draggingFilterBarGroupId === option.value ? "#eef6ff" : "#fbfdff",
+                                                    }}
+                                                >
+                                                    <span style={{ cursor: "grab", color: "#738694", fontSize: 14 }} aria-label={`Drag ${option.label}`}>⋮⋮</span>
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: "1 1 auto" }}>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                                            <strong style={{ color: "#183247", fontSize: 12 }}>{option.label}</strong>
+                                                            <span className="forge-report-builder__result-meta-chip">{option.kind === "scopeParam" ? "Baseline" : "Unified"}</span>
+                                                            {option.required ? <span className="forge-report-builder__result-meta-chip">Required</span> : null}
+                                                        </div>
+                                                        {option.description ? (
+                                                            <span style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>{option.description}</span>
+                                                        ) : null}
+                                                    </div>
+                                                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#486579" }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={!selectedFilterBarCollapsedGroups.has(option.value)}
+                                                            onChange={() => toggleCollapsedFilterBarGroup(option.value)}
+                                                        />
+                                                        Expanded
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        className="forge-report-builder__table-canvas-icon-btn"
+                                                        aria-label={`Remove ${option.label}`}
+                                                        onClick={() => removeFilterBarGroup(option.value)}
+                                                    >
+                                                        <Icon icon="cross" size={12} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span style={{ fontSize: 12, color: "#5f6b7c" }}>
+                                            No visible groups selected yet.
+                                        </span>
+                                    )}
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                        <span style={{ fontSize: 12, color: "#486579" }}>Available groups</span>
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                                            {availableFilterBarGroupOptions.length === 0 ? (
+                                                <span style={{ fontSize: 12, color: "#5f6b7c" }}>No additional groups available.</span>
+                                            ) : availableFilterBarGroupOptions.map((option) => (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    className="forge-report-builder__dimension-pill"
+                                                    onClick={() => addFilterBarGroup(option.value)}
+                                                    style={{ cursor: "pointer" }}
+                                                >
+                                                    <span className="forge-report-builder__pill-copy">
+                                                        <span className="forge-report-builder__pill-text">{option.label}</span>
                                                     </span>
-                                                ) : null}
-                                            </span>
-                                            {option.required ? <span className="forge-report-builder__result-meta-chip">Required</span> : null}
-                                            {selected ? <span aria-hidden="true">✓</span> : null}
-                                        </button>
-                                    );
-                                })}
+                                                    <span aria-hidden="true">+</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </>
                     ) : isRefinementBarBlock ? (
                         <>
                             <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
@@ -2746,6 +3038,65 @@ export function ReportBuilderDocumentBlockDialog({
                                     disabled={!draft?.secondaryField}
                                 />
                             </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Resolved row</span>
+                                <select
+                                    className="forge-report-builder-select"
+                                    value={normalizeString(draft?.rowSelector).toLowerCase() === "maxbyvalue"
+                                        ? "maxbyvalue"
+                                        : normalizeString(draft?.rowSelector).toLowerCase() === "minbyvalue"
+                                            ? "minbyvalue"
+                                            : "firstRow"}
+                                    onChange={(event) => setDraftPatch({ rowSelector: event.target.value, bodyFormat: "markdown" })}
+                                >
+                                    <option value="firstRow">Leading row (current sort/order)</option>
+                                    <option value="maxbyvalue">Highest value field</option>
+                                    <option value="minbyvalue">Lowest value field</option>
+                                </select>
+                            </label>
+                            <label className="forge-report-builder__chart-field">
+                                <span>Body format</span>
+                                <input
+                                    type="text"
+                                    className="forge-report-builder-select"
+                                    value="Markdown"
+                                    disabled
+                                />
+                            </label>
+                            <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                <span>Presentation</span>
+                                <select
+                                    className="forge-report-builder-select"
+                                    value={kpiPresentationMode}
+                                    onChange={(event) => applyKpiPresentationMode(event.target.value)}
+                                >
+                                    <option value="card">Card only (current KPI style)</option>
+                                    <option value="body">Body only (narrative KPI)</option>
+                                    <option value="both">Card and body</option>
+                                </select>
+                                <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c" }}>
+                                    Card mode keeps the familiar KPI tile. Body modes add a Markdown note resolved from the same KPI fields.
+                                </span>
+                            </label>
+                            {kpiPresentationMode !== "card" ? (
+                                <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
+                                    <span>Body template</span>
+                                    <MarkdownEditor
+                                        className={errorByField.has("bodyTemplate") ? "forge-report-builder__calculated-field-textarea is-invalid" : "forge-report-builder__calculated-field-textarea"}
+                                        value={draft?.bodyTemplate || ""}
+                                        onChange={(value) => setDraftPatch({ bodyTemplate: value })}
+                                        placeholder={"Summarize the KPI using macros like ${value}, ${secondaryValue}, or ${row.fieldName}."}
+                                        options={{
+                                            minHeight: "150px",
+                                            textToolbar: true,
+                                            toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list"],
+                                        }}
+                                    />
+                                    <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c" }}>
+                                        Available macros: {"${value}"}, {"${valueLabel}"}, {"${secondaryValue}"}, {"${secondaryLabel}"}, {"${row.fieldName}"}, {"${dataset.label}"}, {"${primary.avails}"}, {"${forecasting_cube_report.avails}"}, {"${fmt.compact(row.avails)}"}, {"${fmt.currency(row.ecpm)}"}, {"${fmt.percent(row.winRate)}"}, and {"${format(row.fieldName,currency})"}.
+                                    </span>
+                                </label>
+                            ) : null}
                             <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
                                 <span>Description</span>
                                 <input
@@ -3309,6 +3660,9 @@ export function ReportBuilderDocumentBlockDialog({
                                     toolbar: ["bold", "italic", "heading", "|", "quote", "unordered-list", "ordered-list", "|", "link", "preview"],
                                 }}
                             />
+                            <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c", marginTop: 6 }}>
+                                Narrative blocks can use data macros like {"${primary.avails}"}, {"${forecasting_cube_report.avails}"}, {"${row.fieldName}"} when a data source is selected, and formatter helpers like {"${fmt.compact(primary.avails)}"}.
+                            </span>
                         </label>
                     )}
                 </div>
@@ -3320,7 +3674,7 @@ export function ReportBuilderDocumentBlockDialog({
                             : isGeoMapBlock
                                 ? <><strong>Geo map blocks</strong> project one available breakdown and one available measure into the authored report geo contract and runtime preview.</>
                         : isKpiBlock
-                        ? <><strong>KPI blocks</strong> bind to the current available measures and optional available breakdowns.</>
+                        ? <><strong>KPI blocks</strong> bind to the current available measures and optional breakdowns, then can add a Markdown body with friendly macros.</>
                         : isBadgesBlock
                             ? <><strong>Pills blocks</strong> surface compact, dashboard-style status chips for labels, values, and short callouts.</>
                         : isTableBlock

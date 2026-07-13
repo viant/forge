@@ -734,6 +734,8 @@ const kpiSpec = {
       secondaryLabel: "Channel",
       description: "Summarizes the first authored runtime row.",
       emptyLabel: "No headline KPI value available.",
+      presentationMode: "both",
+      bodyTemplate: "**${valueLabel}:** ${value}",
     },
   ],
 };
@@ -1262,6 +1264,8 @@ const compactNumberKpiReportSpec = {
       secondaryLabel: "Channel",
       description: "Highlights the leading inventory channel before drilling deeper.",
       emptyLabel: "No forecast KPI value available.",
+      presentationMode: "body",
+      bodyTemplate: "Top channel ${secondaryValue}: ${value}",
     },
   ],
 };
@@ -1324,6 +1328,9 @@ const compactNumberKpiReportFill = {
         secondaryLabel: "Channel",
         secondaryValue: "CTV",
         emptyLabel: "No forecast KPI value available.",
+        presentationMode: "body",
+        bodyTemplate: "Top channel ${secondaryValue}: ${value}",
+        bodyMarkdown: "Top channel CTV: 5.9B",
       },
     },
   ],

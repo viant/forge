@@ -567,10 +567,22 @@ export function formatReportRuntimeScopeValue(param = {}) {
 
 export function formatReportRuntimeRefinement(refinement = {}) {
   const label = normalizeString(refinement?.label);
+  const op = normalizeString(refinement?.op).toLowerCase();
+  if (op === "drill" && label) {
+    const drillWithSourceMatch = label.match(/^Drill to\s+(.+?):\s*([^=]+?)\s*=\s*(.+)$/i);
+    if (drillWithSourceMatch) {
+      return `Drill to ${normalizeString(drillWithSourceMatch[1])}: ${normalizeString(drillWithSourceMatch[2])} = ${normalizeString(drillWithSourceMatch[3])}`;
+    }
+    const legacyDrillMatch = label.match(/^Drill to\s+(.+?)\s*=\s*(.+)$/i);
+    if (legacyDrillMatch) {
+      const fieldText = normalizeString(refinement?.fieldLabel) || normalizeString(refinement?.field) || "field";
+      return `Drill to ${normalizeString(legacyDrillMatch[1])}: ${fieldText} = ${normalizeString(legacyDrillMatch[2])}`;
+    }
+  }
   if (label) {
     return label;
   }
-  const op = normalizeString(refinement?.op);
+  const normalizedOp = normalizeString(refinement?.op);
   const field = normalizeString(refinement?.field);
   const values = formatList(refinement?.values);
   const opLabel = {
@@ -578,7 +590,7 @@ export function formatReportRuntimeRefinement(refinement = {}) {
     exclude: "Exclude",
     drill: "Drill",
     detail: "Detail",
-  }[op] || op || "Refinement";
+  }[normalizedOp] || normalizedOp || "Refinement";
   const fieldText = normalizeString(refinement?.fieldLabel) || field || "field";
   return values ? `${opLabel}: ${fieldText} = ${values}` : `${opLabel}: ${fieldText}`;
 }

@@ -31,6 +31,7 @@ assert.deepEqual(
         kind: "chart",
         awaitingFetch: true,
         observedLoading: false,
+        targetDispatchFingerprint: "",
         minVisibleUntil: 1300,
     },
 );
@@ -68,6 +69,30 @@ assert.equal(
 );
 
 assert.equal(
+    shouldScheduleQuickPresetActivationRelease({
+        ...activation,
+        targetDispatchFingerprint: '{"q":1}::fetch',
+    }, {
+        loading: false,
+        currentDispatchFingerprint: '{"q":1}::fetch',
+        nowMs: 1000,
+    }),
+    300,
+);
+
+assert.equal(
+    updateQuickPresetActivationForLoading({
+        ...activation,
+        targetDispatchFingerprint: '{"q":1}::fetch',
+    }, {
+        loading: false,
+        currentDispatchFingerprint: '{"q":1}::fetch',
+        nowMs: 1300,
+    }),
+    null,
+);
+
+assert.equal(
     shouldScheduleQuickPresetActivationRelease(observed, {
         loading: false,
         nowMs: 1000,
@@ -97,6 +122,7 @@ assert.deepEqual(
         title: "Top Sites",
         kind: "table",
         awaitingFetch: true,
+        targetDispatchFingerprint: "",
     }),
     {
         busy: true,

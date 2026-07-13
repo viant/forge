@@ -7,6 +7,7 @@ export function beginQuickPresetActivation({
     kind = "chart",
     awaitingFetch = false,
     loading = false,
+    targetDispatchFingerprint = "",
     nowMs = Date.now(),
     minVisibleMs = 1200,
 } = {}) {
@@ -18,12 +19,14 @@ export function beginQuickPresetActivation({
         kind: normalizeString(kind) || "chart",
         awaitingFetch: true,
         observedLoading: !!loading,
+        targetDispatchFingerprint: normalizeString(targetDispatchFingerprint),
         minVisibleUntil: Number(nowMs || 0) + Math.max(0, Number(minVisibleMs || 0) || 0),
     };
 }
 
 export function updateQuickPresetActivationForLoading(current = null, {
     loading = false,
+    currentDispatchFingerprint = "",
     nowMs = Date.now(),
 } = {}) {
     if (!current?.awaitingFetch) {
@@ -35,7 +38,16 @@ export function updateQuickPresetActivationForLoading(current = null, {
             observedLoading: true,
         };
     }
+    const targetDispatchFingerprint = normalizeString(current?.targetDispatchFingerprint);
+    const normalizedCurrentDispatchFingerprint = normalizeString(currentDispatchFingerprint);
+    const requestSettledWithoutObservedLoading = !current.observedLoading
+        && !loading
+        && targetDispatchFingerprint !== ""
+        && targetDispatchFingerprint === normalizedCurrentDispatchFingerprint;
     if (current.observedLoading && !loading && Number(current.minVisibleUntil || 0) <= Number(nowMs || 0)) {
+        return null;
+    }
+    if (requestSettledWithoutObservedLoading && Number(current.minVisibleUntil || 0) <= Number(nowMs || 0)) {
         return null;
     }
     return current;
@@ -43,9 +55,18 @@ export function updateQuickPresetActivationForLoading(current = null, {
 
 export function shouldScheduleQuickPresetActivationRelease(current = null, {
     loading = false,
+    currentDispatchFingerprint = "",
     nowMs = Date.now(),
 } = {}) {
-    if (!current?.awaitingFetch || !current?.observedLoading || loading) {
+    if (!current?.awaitingFetch || loading) {
+        return 0;
+    }
+    const targetDispatchFingerprint = normalizeString(current?.targetDispatchFingerprint);
+    const normalizedCurrentDispatchFingerprint = normalizeString(currentDispatchFingerprint);
+    const requestSettledWithoutObservedLoading = !current.observedLoading
+        && targetDispatchFingerprint !== ""
+        && targetDispatchFingerprint === normalizedCurrentDispatchFingerprint;
+    if (!current?.observedLoading && !requestSettledWithoutObservedLoading) {
         return 0;
     }
     return Math.max(0, Number(current.minVisibleUntil || 0) - Number(nowMs || 0));

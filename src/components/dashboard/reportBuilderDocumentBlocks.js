@@ -20,7 +20,7 @@ import {
 import { normalizeReportTableCellVisual } from "../../reporting/tableVisualSpec.js";
 import { resolveReportDatasetRefResolution } from "../../reporting/reportDatasetRefModel.js";
 import { buildReportBuilderCalculatedFieldConfig } from "./reportBuilderCalculatedFieldAuthoring.js";
-import { resolveReportBuilderScopeParamFilters } from "./reportBuilderPredicates.js";
+import { resolveReportBuilderDynamicFilterFamilies, resolveReportBuilderScopeParamFilters } from "./reportBuilderPredicates.js";
 import { buildReportBuilderStaticDatasetOptions } from "./reportBuilderStaticDatasets.js";
 import { normalizeReportBuilderPublishedDataSources } from "../../reporting/reportSpecModel.js";
 import {
@@ -85,6 +85,43 @@ function normalizeScopeParamOptions(options = []) {
             };
         })
         .filter(Boolean);
+}
+
+function normalizeFilterBarGroupOptions(options = []) {
+    const seen = new Set();
+    return (Array.isArray(options) ? options : [])
+        .map((option) => {
+            const value = normalizeString(option?.value ?? option?.id);
+            if (!value || seen.has(value)) {
+                return null;
+            }
+            seen.add(value);
+            return {
+                value,
+                label: normalizeString(option?.label || value),
+                kind: normalizeString(option?.kind || "group") || "group",
+                ...(normalizeString(option?.description) ? { description: normalizeString(option.description) } : {}),
+                required: option?.required === true,
+            };
+        })
+        .filter(Boolean);
+}
+
+function deriveFilterBarParamIdsFromVisibleGroups(visibleGroups = [], filterBarGroupOptions = []) {
+    const optionIndex = new Map(
+        normalizeFilterBarGroupOptions(filterBarGroupOptions).map((option) => [option.value, option]),
+    );
+    return normalizeStringArray(visibleGroups).filter((groupId) => optionIndex.get(groupId)?.kind === "scopeParam");
+}
+
+function normalizeFilterBarBlockMode(value = "") {
+    const normalized = normalizeString(value).toLowerCase();
+    return ["baseline", "unified"].includes(normalized) ? normalized : "baseline";
+}
+
+function normalizeFilterBarBlockPlacement(value = "") {
+    const normalized = normalizeString(value).toLowerCase();
+    return ["inherit", "inline", "rail-left", "hidden"].includes(normalized) ? normalized : "inherit";
 }
 
 function resolveDatasetOptionValues(datasetOptions = []) {
@@ -209,6 +246,7 @@ export function buildReportBuilderDatasetOptions({
     secondaryFieldOptions = [],
     chartFieldOptions = [],
     scopeParamOptions = [],
+    filterBarGroupOptions = [],
 } = {}) {
     const normalizedCurrentSourceRef = normalizeString(currentSourceRef);
     const normalizedConfiguredSources = normalizeReportBuilderPublishedDataSources({
@@ -250,6 +288,7 @@ export function buildReportBuilderDatasetOptions({
                 secondaryFieldOptions: Array.isArray(entry?.secondaryFieldOptions) ? entry.secondaryFieldOptions : [],
                 chartFieldOptions: Array.isArray(entry?.chartFieldOptions) ? entry.chartFieldOptions : [],
                 scopeParamOptions: Array.isArray(entry?.scopeParamOptions) ? entry.scopeParamOptions : [],
+                filterBarGroupOptions: Array.isArray(entry?.filterBarGroupOptions) ? entry.filterBarGroupOptions : [],
             };
         })
         .filter(Boolean);
@@ -282,6 +321,7 @@ export function buildReportBuilderDatasetOptions({
         scopeParamOptions: Array.isArray(configuredPrimarySource?.scopeParamOptions) && configuredPrimarySource.scopeParamOptions.length > 0
             ? configuredPrimarySource.scopeParamOptions
             : (Array.isArray(scopeParamOptions) ? scopeParamOptions : []),
+        filterBarGroupOptions: Array.isArray(filterBarGroupOptions) ? filterBarGroupOptions : [],
     }, ...configuredPublishedDatasetOptions, ...buildReportBuilderStaticDatasetOptions(staticDatasets)];
 }
 
@@ -934,6 +974,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
     secondaryFieldOptions = [],
     tableColumnOptions = [],
     scopeParamOptions = [],
+    filterBarGroupOptions = [],
     datasetOptions = [],
     chartConfig = null,
     chartState = null,
@@ -952,18 +993,44 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             normalizedDatasetOptions,
             scopeParamOptions,
         );
-        const defaultParamIds = normalizedScopeParamOptions.map((option) => option.value);
-        const paramIds = normalizeStringArray(
-            Array.isArray(seed?.paramIds)
-                ? seed.paramIds
-                : defaultParamIds,
+        const normalizedMode = normalizeFilterBarBlockMode(seed?.mode || "");
+        const normalizedPlacement = normalizeFilterBarBlockPlacement(seed?.placement || "");
+        const primaryGroupFallback = normalizedScopeParamOptions.map((option) => ({
+            ...option,
+            kind: "scopeParam",
+        }));
+        const scopedGroupOptions = normalizeFilterBarGroupOptions(
+            normalizedDatasetRef === "primary"
+                ? ((Array.isArray(filterBarGroupOptions) && filterBarGroupOptions.length > 0) ? filterBarGroupOptions : primaryGroupFallback)
+                : primaryGroupFallback,
         );
+        const defaultVisibleGroups = scopedGroupOptions.map((option) => option.value);
+        const legacyParamIds = normalizeStringArray(seed?.paramIds);
+        const visibleGroups = normalizeStringArray(
+            Array.isArray(seed?.visibleGroups) && seed.visibleGroups.length > 0
+                ? seed.visibleGroups
+                : legacyParamIds.length > 0
+                    ? legacyParamIds
+                    : defaultVisibleGroups,
+        ).filter((groupId) => scopedGroupOptions.some((option) => option.value === groupId));
+        const groupOrder = normalizeStringArray(
+            Array.isArray(seed?.groupOrder) && seed.groupOrder.length > 0
+                ? seed.groupOrder
+                : visibleGroups,
+        ).filter((groupId) => visibleGroups.includes(groupId));
+        const collapsedGroups = normalizeStringArray(seed?.collapsedGroups).filter((groupId) => visibleGroups.includes(groupId));
+        const paramIds = deriveFilterBarParamIdsFromVisibleGroups(visibleGroups, scopedGroupOptions);
         return {
             kind: "filterBarBlock",
             id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "filterBar")),
             title: normalizeString(seed?.title || "Filters") || "Filters",
             datasetRef: normalizedDatasetRef,
-            paramIds: paramIds.length > 0 ? paramIds : defaultParamIds,
+            paramIds,
+            mode: normalizedMode === "baseline" ? "baseline" : "unified",
+            placement: normalizedPlacement || "inherit",
+            visibleGroups,
+            groupOrder,
+            collapsedGroups,
         };
     }
     if (normalizedKind === "refinementBarBlock") {
@@ -1077,6 +1144,23 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
             ),
             description: normalizeString(seed?.description),
             emptyLabel: normalizeString(seed?.emptyLabel || "No KPI value available."),
+            presentationMode: ["body", "both"].includes(normalizeString(seed?.presentationMode).toLowerCase())
+                ? normalizeString(seed.presentationMode).toLowerCase()
+                : "card",
+            rowSelector: ["maxbyvalue", "minbyvalue"].includes(normalizeString(seed?.rowSelector).toLowerCase())
+                ? normalizeString(seed.rowSelector).toLowerCase()
+                : "firstRow",
+            bodyFormat: "markdown",
+            bodyTemplate: String(seed?.bodyTemplate || ""),
+        };
+    }
+    if (normalizedKind === "markdownBlock") {
+        return {
+            kind: "markdownBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "markdownBlock")),
+            title: normalizeString(seed?.title || "Narrative") || "Narrative",
+            datasetRef: resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions),
+            markdown: String(seed?.markdown || ""),
         };
     }
     if (normalizedKind === "badgesBlock") {
@@ -1198,6 +1282,7 @@ export function rebindReportBuilderDocumentBlockDraft(draft = null, {
     secondaryFieldOptions = [],
     tableColumnOptions = [],
     scopeParamOptions = [],
+    filterBarGroupOptions = [],
 } = {}) {
     const normalizedDraft = draft && typeof draft === "object" && !Array.isArray(draft)
         ? cloneValue(draft)
@@ -1227,12 +1312,31 @@ export function rebindReportBuilderDocumentBlockDraft(draft = null, {
                 allowImplicitTopLevelFallback: datasetResolution.source === "singleAvailable",
             },
         );
-        const allowedParamIds = new Set(scopedParamOptions.map((option) => option.value));
-        const defaultParamIds = scopedParamOptions.map((option) => option.value);
-        const selectedParamIds = normalizeStringArray(normalizedDraft?.paramIds).filter((paramId) => allowedParamIds.has(paramId));
-        normalizedDraft.paramIds = selectedParamIds.length > 0
-            ? selectedParamIds
-            : defaultParamIds;
+        const primaryGroupFallback = scopedParamOptions.map((option) => ({
+            ...option,
+            kind: "scopeParam",
+        }));
+        const scopedGroupOptions = normalizeFilterBarGroupOptions(
+            nextDatasetRef === "primary"
+                ? ((Array.isArray(filterBarGroupOptions) && filterBarGroupOptions.length > 0) ? filterBarGroupOptions : primaryGroupFallback)
+                : primaryGroupFallback,
+        );
+        const allowedGroupIds = new Set(scopedGroupOptions.map((option) => option.value));
+        const defaultVisibleGroups = scopedGroupOptions.map((option) => option.value);
+        const visibleGroups = normalizeStringArray(normalizedDraft?.visibleGroups).filter((groupId) => allowedGroupIds.has(groupId));
+        normalizedDraft.visibleGroups = visibleGroups.length > 0
+            ? visibleGroups
+            : defaultVisibleGroups;
+        normalizedDraft.groupOrder = normalizeStringArray(normalizedDraft?.groupOrder)
+            .filter((groupId) => normalizedDraft.visibleGroups.includes(groupId));
+        if (normalizedDraft.groupOrder.length === 0) {
+            normalizedDraft.groupOrder = [...normalizedDraft.visibleGroups];
+        }
+        normalizedDraft.collapsedGroups = normalizeStringArray(normalizedDraft?.collapsedGroups)
+            .filter((groupId) => normalizedDraft.visibleGroups.includes(groupId));
+        normalizedDraft.paramIds = deriveFilterBarParamIdsFromVisibleGroups(normalizedDraft.visibleGroups, scopedGroupOptions);
+        normalizedDraft.mode = normalizeFilterBarBlockMode(normalizedDraft?.mode || "");
+        normalizedDraft.placement = normalizeFilterBarBlockPlacement(normalizedDraft?.placement || "") || "inherit";
         return normalizedDraft;
     }
 
@@ -1309,6 +1413,10 @@ export function rebindReportBuilderDocumentBlockDraft(draft = null, {
                 ? (normalizedSecondaryOptions.find((option) => option.value === nextSecondaryField)?.label || normalizedDraft?.secondaryLabel || nextSecondaryField)
                 : "",
         );
+        normalizedDraft.rowSelector = ["maxbyvalue", "minbyvalue"].includes(normalizeString(normalizedDraft?.rowSelector).toLowerCase())
+            ? normalizeString(normalizedDraft.rowSelector).toLowerCase()
+            : "firstRow";
+        normalizedDraft.bodyFormat = "markdown";
         return normalizedDraft;
     }
 
@@ -1411,6 +1519,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
     secondaryFieldOptions = [],
     tableColumnOptions = [],
     scopeParamOptions = [],
+    filterBarGroupOptions = [],
     datasetOptions = [],
     chartConfig = null,
     chartFieldOptions = [],
@@ -1447,20 +1556,65 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
             : ((normalizedDatasetRef === "primary" || datasetResolution.source === "singleAvailable")
                 ? normalizeScopeParamOptions(scopeParamOptions)
                 : []);
-        const allowedParamIds = new Set(normalizedScopeParamOptions.map((option) => option.value));
-        const paramIds = normalizeStringArray(draft?.paramIds);
-        if (paramIds.length === 0 && normalizedScopeParamOptions.length > 0) {
+        const primaryGroupFallback = normalizedScopeParamOptions.map((option) => ({
+            ...option,
+            kind: "scopeParam",
+        }));
+        const scopedGroupOptions = normalizeFilterBarGroupOptions(
+            normalizedDatasetRef === "primary"
+                ? ((Array.isArray(filterBarGroupOptions) && filterBarGroupOptions.length > 0) ? filterBarGroupOptions : primaryGroupFallback)
+                : primaryGroupFallback,
+        );
+        const allowedGroupIds = new Set(scopedGroupOptions.map((option) => option.value));
+        const visibleGroups = (() => {
+            const explicit = normalizeStringArray(draft?.visibleGroups);
+            if (explicit.length > 0) {
+                return explicit;
+            }
+            return normalizeStringArray(draft?.paramIds);
+        })();
+        const groupOrder = normalizeStringArray(draft?.groupOrder);
+        const collapsedGroups = normalizeStringArray(draft?.collapsedGroups);
+        const mode = normalizeFilterBarBlockMode(draft?.mode || "");
+        if (visibleGroups.length === 0 && scopedGroupOptions.length > 0) {
             errors.push({
-                field: "paramIds",
+                field: "visibleGroups",
                 code: "required",
-                message: "Select at least one report filter for the filter bar block.",
+                message: "Select at least one visible filter group for the filter bar block.",
             });
-        } else if ((normalizedScopeParamOptions.length === 0 && paramIds.length > 0) || paramIds.some((paramId) => !allowedParamIds.has(paramId))) {
+        } else if (visibleGroups.some((groupId) => !allowedGroupIds.has(groupId))) {
             errors.push({
-                field: "paramIds",
+                field: "visibleGroups",
                 code: "unknown",
-                message: "One or more filter bar filters are not available in the current builder.",
+                message: "One or more filter bar groups are not available in the current builder.",
             });
+        }
+        if (groupOrder.some((groupId) => !visibleGroups.includes(groupId))) {
+            errors.push({
+                field: "groupOrder",
+                code: "unknown",
+                message: "The filter group order can only include currently visible groups.",
+            });
+        }
+        if (collapsedGroups.some((groupId) => !visibleGroups.includes(groupId))) {
+            errors.push({
+                field: "collapsedGroups",
+                code: "unknown",
+                message: "Collapsed groups must also be included in visible groups.",
+            });
+        }
+        if (mode === "baseline") {
+            const nonScopeGroups = visibleGroups.filter((groupId) => {
+                const option = scopedGroupOptions.find((entry) => entry.value === groupId);
+                return normalizeString(option?.kind) !== "scopeParam";
+            });
+            if (nonScopeGroups.length > 0) {
+                errors.push({
+                    field: "mode",
+                    code: "invalid",
+                    message: "Baseline filter bars can only include baseline report filters.",
+                });
+            }
         }
         const datasetOptionIds = new Set(
             (Array.isArray(datasetOptions) ? datasetOptions : [])
@@ -2064,6 +2218,7 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
             secondaryFieldOptions: [],
             tableColumnOptions: [],
             scopeParamOptions: [],
+            filterBarGroupOptions: [],
             datasetOptions: [],
             chartFieldOptions: [],
             supportedChartTypes: [],
@@ -2151,6 +2306,23 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
         .filter((option) => option.value);
     const chartFieldOptions = buildReportBuilderChartFields(preparedConfig, buildAuthoringChartState(preparedConfig, normalizedState));
     const chartState = buildAuthoringChartState(preparedConfig, normalizedState);
+    const dynamicFilterFamilies = resolveReportBuilderDynamicFilterFamilies(preparedConfig);
+    const filterBarGroupOptions = [
+        ...scopeParamOptions.map((option) => ({
+            value: option.value,
+            label: option.label,
+            kind: "scopeParam",
+            description: option.description,
+            required: option.required === true,
+        })),
+        ...dynamicFilterFamilies.map((family) => ({
+            value: normalizeString(family?.id),
+            label: normalizeString(family?.label || family?.id),
+            kind: "filterFamily",
+            description: normalizeString(family?.description),
+            required: false,
+        })).filter((option) => option.value),
+    ];
     const datasetOptions = buildReportBuilderDatasetOptions({
         currentSourceRef: normalizeString(currentSourceRef || preparedConfig?.dataSourceRef),
         configuredSources: preparedConfig?.dataSources,
@@ -2161,12 +2333,14 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
         secondaryFieldOptions,
         chartFieldOptions,
         scopeParamOptions,
+        filterBarGroupOptions,
     });
     return {
         valueFieldOptions,
         secondaryFieldOptions,
         tableColumnOptions,
         scopeParamOptions,
+        filterBarGroupOptions,
         datasetOptions,
         chartFieldOptions,
         supportedChartTypes: getReportBuilderSupportedChartTypes(preparedConfig),
