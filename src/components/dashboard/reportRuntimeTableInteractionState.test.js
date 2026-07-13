@@ -99,7 +99,7 @@ assert.deepEqual(interactionState.actions[5].resolveExecution({
     value: 1,
     sourceBlockId: "comparisonTable",
     fieldLabel: "Channel",
-    label: "Channel = Display",
+    label: "Drill to Market: Channel = Display",
   },
 });
 
@@ -127,7 +127,7 @@ assert.deepEqual(resolveReportRuntimeTableInteractionExecution({
     value: 1,
     sourceBlockId: "comparisonTable",
     fieldLabel: "Channel",
-    label: "Channel = Display",
+    label: "Drill to Market: Channel = Display",
   },
 });
 
@@ -198,7 +198,7 @@ assert.deepEqual(authoredDerivedInteractionState.actions[2].resolveExecution({
     value: 1,
     sourceBlockId: "reachRateTable",
     fieldLabel: "Channel",
-    label: "Channel = Display",
+    label: "Drill to Publisher: Channel = Display",
   },
 });
 

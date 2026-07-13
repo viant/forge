@@ -167,6 +167,9 @@ function lookupLabelFallbackSelectors(selector = "", valueSelector = "") {
 }
 
 function coerceManualSelectionValue(filterDef = {}, rawValue = "") {
+    if (rawValue === undefined || rawValue === null || rawValue === "") {
+        return { ok: false };
+    }
     const normalized = String(rawValue ?? "").trim();
     if (!normalized) {
         return { ok: false };
@@ -181,6 +184,9 @@ function coerceManualSelectionValue(filterDef = {}, rawValue = "") {
             return { ok: true, value: Number(normalized), label: normalized };
         case "string":
         default:
+            if (typeof rawValue === "number" && Number.isFinite(rawValue)) {
+                return { ok: true, value: rawValue, label: normalized };
+            }
             return { ok: true, value: normalized, label: normalized };
     }
 }
@@ -189,12 +195,18 @@ export function projectLookupSelection(filterDef = {}, record = {}) {
     const valueSelector = String(filterDef.valueSelector || filterDef.valueField || filterDef.field || "id").trim();
     const labelSelector = String(filterDef.labelSelector || filterDef.previewSelector || filterDef.labelField || valueSelector).trim();
     const groupSelector = String(filterDef.groupSelector || "").trim();
-    const value = selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector));
+    const rawValue = selectFirstDefined(record, lookupValueFallbackSelectors(valueSelector));
+    const coerced = coerceManualSelectionValue(filterDef, rawValue);
+    if (!coerced.ok) {
+        return null;
+    }
+    const value = coerced.value;
     const label = selectFirstDefined(record, lookupLabelFallbackSelectors(labelSelector, valueSelector));
     const group = groupSelector ? resolveKey(record, groupSelector) : "";
+    const resolvedLabel = label == null || label === "" ? String(coerced.label || value || "") : String(label);
     return {
         value,
-        label: label == null || label === "" ? String(value ?? "") : String(label),
+        label: resolvedLabel,
         group: group == null ? "" : String(group),
         record: compactLookupRecord(filterDef, record),
     };
@@ -206,7 +218,8 @@ export function projectLookupSelections(filterDef = {}, payload = null) {
         : (payload == null ? [] : [payload]);
     return records
         .filter((record) => record && typeof record === "object")
-        .map((record) => projectLookupSelection(filterDef, record));
+        .map((record) => projectLookupSelection(filterDef, record))
+        .filter(Boolean);
 }
 
 export function projectManualSelection(filterDef = {}, rawValue = "") {

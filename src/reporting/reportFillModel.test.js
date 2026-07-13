@@ -494,6 +494,8 @@ const documentWithNarrative = buildReportBuilderReportDocument({
       secondaryLabel: "Channel",
       description: "Summarizes the first authored runtime row.",
       emptyLabel: "No headline KPI value available.",
+      presentationMode: "both",
+      bodyTemplate: "**${valueLabel}:** ${value}\nChannel ${secondaryValue}\nRaw ${row.totalSpend}\nFormatted ${format(row.totalSpend,currency)}",
     }),
     buildReportDocumentBadgesBlock({
       id: "statusPills",
@@ -576,9 +578,15 @@ assert.deepEqual(documentFill.refinements, [
 ]);
 assert.deepEqual(documentFill.blocks.find((block) => block.id === "sharedFilters").content, {
   title: "Shared Filters",
+  mode: "baseline",
+  placement: "inherit",
+  groupOrder: [],
+  visibleGroups: [],
+  collapsedGroups: [],
   params: [
     {
       id: "dateRange",
+      groupId: "dateRange",
       label: "dateRange",
       type: "dateRange",
       required: true,
@@ -636,8 +644,9 @@ const interactiveFilterFill = buildReportFillFromReportSpec(
   },
 );
 const interactiveFilterBlock = interactiveFilterFill.blocks.find((block) => block.id === "sharedFilters");
-assert.deepEqual(interactiveFilterBlock.content.params[1], {
+assert.deepEqual(interactiveFilterBlock.content.params.find((param) => param.id === "channelIds"), {
   id: "channelIds",
+  groupId: "channelIds",
   label: "Channels",
   type: "multiSelect",
   multiple: true,
@@ -681,6 +690,7 @@ const legacyEmbeddedConfigFill = buildReportFillFromReportSpec(legacyEmbeddedCon
 const legacyEmbeddedFilterBlock = legacyEmbeddedConfigFill.blocks.find((block) => block.id === "sharedFilters");
 assert.deepEqual(legacyEmbeddedFilterBlock.content.params[1], {
   id: "channelIds",
+  groupId: "channelIds",
   label: "Channels",
   type: "multiSelect",
   multiple: true,
@@ -722,6 +732,7 @@ assert.deepEqual(
   interactiveBuilderFill.blocks.find((block) => block.id === "sharedFilters").content.params[1],
   {
     id: "channelIds",
+    groupId: "channelIds",
     label: "Channels",
     type: "multiSelect",
     multiple: true,
@@ -761,6 +772,10 @@ assert.deepEqual(documentFill.blocks.find((block) => block.id === "headlineKpi")
   secondaryLabel: "Channel",
   secondaryValue: "Display",
   emptyLabel: "No headline KPI value available.",
+  presentationMode: "both",
+  bodyFormat: "markdown",
+  bodyTemplate: "**${valueLabel}:** ${value}\nChannel ${secondaryValue}\nRaw ${row.totalSpend}\nFormatted ${format(row.totalSpend,currency)}",
+  bodyMarkdown: "**Spend:** $40,400\nChannel Display\nRaw 40400\nFormatted $40,400",
 });
 assert.deepEqual(documentFill.blocks.find((block) => block.id === "statusPills").content, {
   title: "Status Pills",
@@ -1643,6 +1658,102 @@ const mappedKpiFill = buildReportFillFromReportSpec({
 });
 assert.equal(mappedKpiFill.blocks[0].content.value, 12);
 assert.equal(mappedKpiFill.blocks[0].content.secondaryValue, "Display");
+
+const kpiBodyMacroFill = buildReportFillFromReportSpec({
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "macroKpiRuntime",
+    stateKey: "macroKpiRuntime",
+    dataSourceRef: "forecasting_cube_report",
+  },
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "forecasting_cube_report",
+      request: {},
+    },
+    {
+      id: "ForecastingSnapshot",
+      dataSourceRef: "forecasting_cube_country_snapshot",
+      request: {},
+    },
+  ],
+  blocks: [
+    {
+      id: "headlineKpi",
+      kind: "kpiBlock",
+      title: "Top Channel Inventory",
+      datasetRef: "primary",
+      valueField: "avails",
+      valueLabel: "Avails",
+      secondaryField: "channelV2",
+      secondaryLabel: "Channel",
+      rowSelector: "maxbyvalue",
+      presentationMode: "both",
+      bodyFormat: "markdown",
+      bodyTemplate: "### Leading Inventory\\n**${secondaryLabel}:** ${secondaryValue}\\n\\n**${valueLabel}:** ${fmt.compact(value)}\\n**Primary:** ${fmt.compact(primary.avails)}\\n**Snapshot:** ${fmt.compact(ForecastingSnapshot.avails)}\\n**Dataset:** ${dataset.label}",
+    },
+  ],
+}, {
+  primary: {
+    rows: [
+      { channelV2: "Display", avails: 55100000000 },
+      { channelV2: "CTV", avails: 169000000000 },
+    ],
+  },
+  ForecastingSnapshot: {
+    rows: [
+      { avails: 77700000000 },
+    ],
+  },
+});
+assert.equal(kpiBodyMacroFill.blocks[0].content.value, 169000000000);
+assert.equal(kpiBodyMacroFill.blocks[0].content.secondaryValue, "CTV");
+assert.equal(kpiBodyMacroFill.blocks[0].content.rowSelector, "maxbyvalue");
+assert.equal(kpiBodyMacroFill.blocks[0].content.bodyFormat, "markdown");
+assert.equal(kpiBodyMacroFill.blocks[0].content.bodyMarkdown.includes("### Leading Inventory"), true);
+assert.equal(kpiBodyMacroFill.blocks[0].content.bodyMarkdown.includes("**Channel:** CTV"), true);
+assert.equal(kpiBodyMacroFill.blocks[0].content.bodyMarkdown.includes("**Avails:** 169B"), true);
+assert.equal(kpiBodyMacroFill.blocks[0].content.bodyMarkdown.includes("**Primary:** 55.1B"), true);
+assert.equal(kpiBodyMacroFill.blocks[0].content.bodyMarkdown.includes("**Snapshot:** 77.7B"), true);
+assert.equal(kpiBodyMacroFill.blocks[0].content.bodyMarkdown.includes("**Dataset:** forecasting_cube_report"), true);
+
+const markdownMacroFill = buildReportFillFromReportSpec({
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "macroMarkdownRuntime",
+    stateKey: "macroMarkdownRuntime",
+    dataSourceRef: "forecasting_cube_report",
+  },
+  datasets: [
+    {
+      id: "primary",
+      dataSourceRef: "forecasting_cube_report",
+      request: {},
+    },
+  ],
+  blocks: [
+    {
+      id: "narrativeIntro",
+      kind: "markdownBlock",
+      title: "Narrative",
+      datasetRef: "primary",
+      markdown: "## Inventory Outlook\\nLead channel is ${row.channelV2}.\\nAvails ${fmt.compact(primary.avails)}.",
+    },
+  ],
+}, {
+  primary: {
+    rows: [
+      { channelV2: "CTV", avails: 169000000000 },
+    ],
+  },
+});
+assert.equal(markdownMacroFill.blocks[0].content.markdown.includes("Lead channel is CTV."), true);
+assert.equal(markdownMacroFill.blocks[0].content.markdown.includes("Avails 169B."), true);
 
 const executionMetadataFill = buildReportFillFromReportSpec({
   version: 1,

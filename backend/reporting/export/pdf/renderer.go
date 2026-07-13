@@ -14,6 +14,22 @@ import (
 
 var deterministicCreationDate = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
+var pdfCoreFontTextSanitizer = strings.NewReplacer(
+	"\u00a0", " ",
+	"\u00b7", " - ",
+	"\u2010", "-",
+	"\u2011", "-",
+	"\u2012", "-",
+	"\u2013", "-",
+	"\u2014", "-",
+	"\u2018", "'",
+	"\u2019", "'",
+	"\u201c", "\"",
+	"\u201d", "\"",
+	"\u2022", "*",
+	"\u2026", "...",
+)
+
 type Options struct {
 	CreationDate time.Time
 }
@@ -215,7 +231,7 @@ func (r *renderer) renderTextOperation(operation textPaintOperation) {
 		r.renderWrappedTextOperation(operation)
 		return
 	}
-	r.pdf.CellFormat(operation.box.Width, operation.box.Height, operation.text, "", 0, align, false, 0, "")
+	r.pdf.CellFormat(operation.box.Width, operation.box.Height, sanitizePDFText(operation.text), "", 0, align, false, 0, "")
 }
 
 func (r *renderer) renderWrappedTextOperation(operation textPaintOperation) {
@@ -237,6 +253,7 @@ func (r *renderer) renderWrappedTextOperation(operation textPaintOperation) {
 }
 
 func (r *renderer) resolveWrappedTextLines(text string, width float64) []string {
+	text = sanitizePDFText(text)
 	if width <= 0 {
 		return []string{text}
 	}
@@ -309,7 +326,7 @@ func (r *renderer) renderLabelPillOperation(operation labelPillPaintOperation) {
 	}
 	r.applyTextStyle(operation.textStyle, 10)
 	r.pdf.SetXY(operation.box.X, operation.box.Y)
-	r.pdf.CellFormat(operation.box.Width, operation.box.Height, operation.label, "", 0, "CM", false, 0, "")
+	r.pdf.CellFormat(operation.box.Width, operation.box.Height, sanitizePDFText(operation.label), "", 0, "CM", false, 0, "")
 }
 
 func resolveTableCellLabelTextStyle(element reportprint.Element) reportprint.Element {
@@ -371,6 +388,10 @@ func fontStyle(weight string) string {
 		style.WriteString("B")
 	}
 	return style.String()
+}
+
+func sanitizePDFText(value string) string {
+	return pdfCoreFontTextSanitizer.Replace(value)
 }
 
 func resolveLineHeight(size float64, fallback float64) float64 {

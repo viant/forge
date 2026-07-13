@@ -969,17 +969,48 @@ function renderReportPrintGridRow(state = {}, entries = []) {
 
 function buildFilterBarLines(block = {}) {
   const params = Array.isArray(block?.content?.params) ? block.content.params : [];
-  if (params.length === 0) {
+  const criteria = Array.isArray(block?.content?.criteria) ? block.content.criteria : [];
+  if (params.length === 0 && criteria.length === 0) {
     return ["No active filter parameters."];
   }
-  return params.flatMap((param) => {
+  const linesByGroup = new Map();
+  const pushLines = (groupId = "", lines = []) => {
+    const normalizedGroupId = normalizeString(groupId || "__ungrouped__") || "__ungrouped__";
+    const current = linesByGroup.get(normalizedGroupId) || [];
+    current.push(...lines.filter(Boolean));
+    linesByGroup.set(normalizedGroupId, current);
+  };
+  params.forEach((param) => {
     const label = normalizeString(param?.label || param?.id) || "param";
     const description = normalizeString(param?.description);
-    return [
+    pushLines(param?.groupId || param?.id, [
       `${label}: ${formatReportPrintValue(param?.value)}`,
       ...(description ? [description] : []),
-    ];
+    ]);
   });
+  criteria.forEach((criterion) => {
+    const label = normalizeString(criterion?.label || criterion?.filterLabel || criterion?.id) || "criteria";
+    const displayValues = Array.isArray(criterion?.displayValues)
+      ? criterion.displayValues.map((value) => normalizeString(value)).filter(Boolean)
+      : [];
+    const rawValues = Array.isArray(criterion?.rawValues) ? criterion.rawValues : [];
+    const values = displayValues.length > 0
+      ? displayValues.join(", ")
+      : rawValues.map((value) => formatReportPrintValue(value)).join(", ");
+    const enabledSuffix = criterion?.enabled === false ? " (Off)" : "";
+    pushLines(criterion?.groupId || criterion?.id, [`${label}${enabledSuffix}: ${values || "—"}`]);
+  });
+  const orderedGroups = Array.isArray(block?.content?.groupOrder)
+    ? block.content.groupOrder.map((entry) => normalizeString(entry)).filter(Boolean)
+    : [];
+  const emitted = [];
+  orderedGroups.forEach((groupId) => {
+    const lines = linesByGroup.get(groupId) || [];
+    emitted.push(...lines);
+    linesByGroup.delete(groupId);
+  });
+  Array.from(linesByGroup.values()).forEach((lines) => emitted.push(...lines));
+  return emitted;
 }
 
 function buildRefinementBarLines(block = {}) {
@@ -1028,29 +1059,51 @@ function renderReportPrintRefinementBarBlock(state = {}, block = {}, options = {
   renderReportPrintTextSectionBlock(state, block, lines, options);
 }
 
+function normalizeReportPrintKpiPresentationMode(block = {}) {
+  return normalizeEnumValue(
+    block?.content?.presentationMode || block?.presentationMode,
+    ["card", "body", "both"],
+    "card",
+  );
+}
+
+function buildReportPrintKpiBodyLines(block = {}) {
+  const bodyMarkdown = normalizeMarkdownToPlainText(block?.content?.bodyMarkdown || "");
+  return bodyMarkdown ? bodyMarkdown.split("\n").filter((line) => normalizeString(line)) : [];
+}
+
 function renderReportPrintKpiBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const content = block?.content || {};
+  const presentationMode = normalizeReportPrintKpiPresentationMode(block);
+  const showCard = presentationMode !== "body";
+  const bodyLines = presentationMode !== "card" ? buildReportPrintKpiBodyLines(block) : [];
   const valueFormat = inferReportPrintNumericFormat(
     content?.value,
     content?.valueFormat || content?.format,
   );
-  renderReportPrintTextLines(state, {
-    idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__value`,
-    lines: [`${normalizeString(content?.valueLabel || content?.valueField || "Value")}: ${formatReportPrintValue(content?.value, valueFormat)}`],
-    fontSize: REPORT_PRINT_THEME.kpiValueFontSize,
-    lineHeight: REPORT_PRINT_THEME.kpiValueLineHeight,
-    fontWeight: "700",
-    color: REPORT_PRINT_THEME.titleColor,
-  });
+  if (showCard) {
+    renderReportPrintTextLines(state, {
+      idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__value`,
+      lines: [`${normalizeString(content?.valueLabel || content?.valueField || "Value")}: ${formatReportPrintValue(content?.value, valueFormat)}`],
+      fontSize: REPORT_PRINT_THEME.kpiValueFontSize,
+      lineHeight: REPORT_PRINT_THEME.kpiValueLineHeight,
+      fontWeight: "700",
+      color: REPORT_PRINT_THEME.titleColor,
+    });
+  }
   const detailLines = [];
-  if (normalizeString(content?.secondaryField || content?.secondaryLabel)) {
+  if (showCard && normalizeString(content?.secondaryField || content?.secondaryLabel)) {
     detailLines.push(`${normalizeString(content?.secondaryLabel || content?.secondaryField)}: ${formatReportPrintValue(content?.secondaryValue, normalizeString(content?.secondaryFormat))}`);
   }
-  if (normalizeString(content?.description)) {
+  if (showCard && normalizeString(content?.description)) {
     detailLines.push(normalizeString(content.description));
+  }
+  detailLines.push(...bodyLines);
+  if (!showCard && detailLines.length === 0) {
+    detailLines.push(`${normalizeString(content?.valueLabel || content?.valueField || "Value")}: ${formatReportPrintValue(content?.value, valueFormat)}`);
   }
   if (detailLines.length > 0) {
     renderReportPrintTextLines(state, {

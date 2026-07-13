@@ -37,6 +37,7 @@ import {
   normalizeReportBuilderStaticDatasets,
 } from "./reportBuilderStaticDatasets.js";
 import { resolvePreferredReportBuilderSemanticBindingViewState } from "./reportBuilderSemanticBindingViewPreference.js";
+import { buildReportBuilderUnifiedFilterContent } from "./reportBuilderUnifiedFilterContent.js";
 import {
   resolveReportRuntimeChartActionFields,
   resolveReportRuntimeRefinementFields,
@@ -642,6 +643,10 @@ export function buildReportBuilderRuntimePreviewModel({
     ...(previewContext?.document ? { document: cloneValue(previewContext.document) } : {}),
     ...(previewContext?.reportSpec ? { reportSpec: cloneValue(previewContext.reportSpec) } : {}),
     ...(semanticBindingViewState ? { semanticBindingViewState: cloneValue(semanticBindingViewState) } : {}),
+    unifiedFilterContent: buildReportBuilderUnifiedFilterContent({
+      config: effectiveConfig,
+      state: drilledState,
+    }),
     ...(staticDatasets.length > 0 ? { staticDatasetPayloads: buildReportBuilderStaticDatasetPayloadMap(staticDatasets) } : {}),
   };
 }
@@ -730,6 +735,8 @@ export function buildReportBuilderRuntimePreviewArtifacts({
       hasMore: hasMore === true,
       diagnostics: normalizeRuntimePreviewDiagnostics(error, additionalDiagnostics),
     },
+  }, {
+    unifiedFilterContent: cloneValue(model?.unifiedFilterContent || null),
   });
   const previewReportFill = cloneValue(reportFill);
   const reportPrint = buildReportPrintFromReportFill({

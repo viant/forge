@@ -143,23 +143,28 @@ type TableColumn struct {
 }
 
 type Block struct {
-	ID             string         `json:"id"`
-	Kind           string         `json:"kind"`
-	Title          string         `json:"title,omitempty"`
-	DatasetRef     string         `json:"datasetRef,omitempty"`
-	Columns        []TableColumn  `json:"columns,omitempty"`
-	ChartSpec      map[string]any `json:"chartSpec,omitempty"`
-	ChartModel     map[string]any `json:"chartModel,omitempty"`
-	ValueField     string         `json:"valueField,omitempty"`
-	ValueLabel     string         `json:"valueLabel,omitempty"`
-	SecondaryField string         `json:"secondaryField,omitempty"`
-	SecondaryLabel string         `json:"secondaryLabel,omitempty"`
-	Description    string         `json:"description,omitempty"`
-	EmptyLabel     string         `json:"emptyLabel,omitempty"`
-	ParamIDs       []string       `json:"paramIds,omitempty"`
-	ActionKinds    []string       `json:"actionKinds,omitempty"`
-	Markdown       string         `json:"markdown,omitempty"`
-	Geo            map[string]any `json:"geo,omitempty"`
+	ID              string         `json:"id"`
+	Kind            string         `json:"kind"`
+	Title           string         `json:"title,omitempty"`
+	DatasetRef      string         `json:"datasetRef,omitempty"`
+	Columns         []TableColumn  `json:"columns,omitempty"`
+	ChartSpec       map[string]any `json:"chartSpec,omitempty"`
+	ChartModel      map[string]any `json:"chartModel,omitempty"`
+	ValueField      string         `json:"valueField,omitempty"`
+	ValueLabel      string         `json:"valueLabel,omitempty"`
+	SecondaryField  string         `json:"secondaryField,omitempty"`
+	SecondaryLabel  string         `json:"secondaryLabel,omitempty"`
+	Description     string         `json:"description,omitempty"`
+	EmptyLabel      string         `json:"emptyLabel,omitempty"`
+	ParamIDs        []string       `json:"paramIds,omitempty"`
+	Mode            string         `json:"mode,omitempty"`
+	Placement       string         `json:"placement,omitempty"`
+	GroupOrder      []string       `json:"groupOrder,omitempty"`
+	VisibleGroups   []string       `json:"visibleGroups,omitempty"`
+	CollapsedGroups []string       `json:"collapsedGroups,omitempty"`
+	ActionKinds     []string       `json:"actionKinds,omitempty"`
+	Markdown        string         `json:"markdown,omitempty"`
+	Geo             map[string]any `json:"geo,omitempty"`
 }
 
 type rawReportSpec struct {
@@ -217,10 +222,15 @@ type rawKPIBlock struct {
 }
 
 type rawFilterBarBlock struct {
-	ID       string   `json:"id"`
-	Kind     string   `json:"kind"`
-	Title    string   `json:"title"`
-	ParamIDs []string `json:"paramIds"`
+	ID              string   `json:"id"`
+	Kind            string   `json:"kind"`
+	Title           string   `json:"title"`
+	ParamIDs        []string `json:"paramIds,omitempty"`
+	Mode            string   `json:"mode,omitempty"`
+	Placement       string   `json:"placement,omitempty"`
+	GroupOrder      []string `json:"groupOrder,omitempty"`
+	VisibleGroups   []string `json:"visibleGroups,omitempty"`
+	CollapsedGroups []string `json:"collapsedGroups,omitempty"`
 }
 
 type rawRefinementBarBlock struct {
@@ -439,7 +449,8 @@ func (r *ReportSpec) Validate() error {
 			if strings.TrimSpace(block.Title) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].title is required for filterBarBlock", index)
 			}
-			if len(block.ParamIDs) == 0 {
+			mode := strings.ToLower(strings.TrimSpace(block.Mode))
+			if len(block.ParamIDs) == 0 && !(mode == "unified" && len(block.VisibleGroups) > 0) {
 				return fmt.Errorf("reportSpec.blocks[%d].paramIds must not be empty for filterBarBlock", index)
 			}
 		case "refinementBarBlock":
@@ -554,10 +565,15 @@ func decodeBlock(payload json.RawMessage, index int) (Block, error) {
 			return Block{}, err
 		}
 		return Block{
-			ID:       block.ID,
-			Kind:     block.Kind,
-			Title:    block.Title,
-			ParamIDs: block.ParamIDs,
+			ID:              block.ID,
+			Kind:            block.Kind,
+			Title:           block.Title,
+			ParamIDs:        block.ParamIDs,
+			Mode:            block.Mode,
+			Placement:       block.Placement,
+			GroupOrder:      block.GroupOrder,
+			VisibleGroups:   block.VisibleGroups,
+			CollapsedGroups: block.CollapsedGroups,
 		}, nil
 	case "refinementBarBlock":
 		block := rawRefinementBarBlock{}

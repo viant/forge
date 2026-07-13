@@ -980,6 +980,10 @@ export const reportFillSchema = {
         },
         description: { type: "string" },
         emptyLabel: { type: "string" },
+        rowSelector: { enum: ["firstrow", "maxbyvalue", "minbyvalue"] },
+        presentationMode: { enum: ["card", "body", "both"] },
+        bodyFormat: { enum: ["markdown"] },
+        bodyTemplate: { type: "string" },
         content: {
           type: "object",
           additionalProperties: false,
@@ -1002,6 +1006,11 @@ export const reportFillSchema = {
             },
             secondaryValue: { $ref: "#/$defs/jsonValue" },
             emptyLabel: { type: "string" },
+            rowSelector: { enum: ["firstrow", "maxbyvalue", "minbyvalue"] },
+            presentationMode: { enum: ["card", "body", "both"] },
+            bodyFormat: { enum: ["markdown"] },
+            bodyTemplate: { type: "string" },
+            bodyMarkdown: { type: "string" },
           },
         },
       },
@@ -1015,7 +1024,21 @@ export const reportFillSchema = {
         kind: { const: "filterBarBlock" },
         title: { type: "string" },
         datasetRef: { type: "string" },
+        mode: { enum: ["baseline", "unified"] },
+        placement: { enum: ["inherit", "inline", "rail-left", "hidden"] },
         paramIds: {
+          type: "array",
+          items: { type: "string" },
+        },
+        groupOrder: {
+          type: "array",
+          items: { type: "string" },
+        },
+        visibleGroups: {
+          type: "array",
+          items: { type: "string" },
+        },
+        collapsedGroups: {
           type: "array",
           items: { type: "string" },
         },
@@ -1025,6 +1048,8 @@ export const reportFillSchema = {
           required: ["title", "params"],
           properties: {
             title: { type: "string" },
+            mode: { enum: ["baseline", "unified"] },
+            placement: { enum: ["inherit", "inline", "rail-left", "hidden"] },
             params: {
               type: "array",
               items: {
@@ -1033,6 +1058,7 @@ export const reportFillSchema = {
                 required: ["id", "value"],
                 properties: {
                   id: { type: "string" },
+                  groupId: { type: "string" },
                   label: { type: "string" },
                   type: { type: "string" },
                   description: { type: "string" },
@@ -1054,6 +1080,43 @@ export const reportFillSchema = {
                     },
                   },
                   value: {},
+                },
+              },
+            },
+            groupOrder: {
+              type: "array",
+              items: { type: "string" },
+            },
+            visibleGroups: {
+              type: "array",
+              items: { type: "string" },
+            },
+            collapsedGroups: {
+              type: "array",
+              items: { type: "string" },
+            },
+            criteria: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["id", "label", "enabled", "rawValues", "displayValues"],
+                properties: {
+                  id: { type: "string" },
+                  groupId: { type: "string" },
+                  label: { type: "string" },
+                  groupLabel: { type: "string" },
+                  filterLabel: { type: "string" },
+                  direction: { enum: ["include", "exclude"] },
+                  enabled: { type: "boolean" },
+                  rawValues: {
+                    type: "array",
+                    items: { $ref: "#/$defs/jsonValue" },
+                  },
+                  displayValues: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
                 },
               },
             },
@@ -1101,6 +1164,7 @@ export const reportFillSchema = {
         id: { type: "string" },
         kind: { const: "markdownBlock" },
         title: { type: "string" },
+        datasetRef: { type: "string" },
         markdown: { type: "string" },
         content: {
           type: "object",
@@ -1108,6 +1172,7 @@ export const reportFillSchema = {
           required: ["title", "markdown"],
           properties: {
             title: { type: "string" },
+            datasetRef: { type: "string" },
             markdown: { type: "string" },
           },
         },

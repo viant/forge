@@ -1895,6 +1895,10 @@
 }
 
 @media (max-width: 960px) {
+    .forge-report-builder__design-outline-tree {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .forge-report-builder__design-source-grid-header {
         display: none;
     }
@@ -1991,12 +1995,15 @@
 
 .forge-report-builder__design-outline-tree {
     display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
     gap: 10px;
+    align-items: start;
 }
 
 .forge-report-builder__design-outline-branch {
     display: grid;
     gap: 8px;
+    min-width: 0;
 }
 
 .forge-report-builder__design-outline-node-shell {
@@ -2004,6 +2011,8 @@
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 10px;
     align-items: center;
+    min-width: 0;
+    position: relative;
 }
 
 .forge-report-builder__design-outline-drag-handle {
@@ -2039,6 +2048,7 @@
     margin-left: 22px;
     padding-left: 10px;
     border-left: 1px dashed #d5e2f3;
+    grid-column: 1 / -1;
 }
 
 .forge-report-builder__design-outline-node {
@@ -2056,6 +2066,7 @@
     cursor: pointer;
     user-select: none;
     position: relative;
+    overflow: hidden;
 }
 
 .forge-report-builder__design-outline-node[data-outline-depth="1"] {
@@ -2064,6 +2075,53 @@
 
 .forge-report-builder__design-outline-node.is-dragging {
     opacity: 0.5;
+}
+
+.forge-report-builder__design-outline-node.is-drop-target {
+    border-color: #7ea8ea;
+    background: linear-gradient(180deg, #f5f9ff 0%, #edf4ff 100%);
+    box-shadow: 0 14px 28px rgba(47, 109, 225, 0.16);
+}
+
+.forge-report-builder__design-outline-side-target {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    width: 44%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    color: transparent;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+    pointer-events: auto;
+    z-index: 1;
+}
+
+.forge-report-builder__design-outline-side-target.is-before {
+    left: 40px;
+    justify-content: flex-start;
+    padding-left: 10px;
+}
+
+.forge-report-builder__design-outline-side-target.is-after {
+    right: 6px;
+    justify-content: flex-end;
+    padding-right: 10px;
+}
+
+.forge-report-builder__design-outline-side-target-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.forge-report-builder__design-outline-side-target.is-active {
+    background: rgba(47, 109, 225, 0.12);
+    color: #234b88;
+    border: 1px dashed rgba(47, 109, 225, 0.35);
 }
 
 .forge-report-builder__design-outline-node.is-drop-before::before,
@@ -2084,6 +2142,89 @@
 
 .forge-report-builder__design-outline-node.is-drop-after::after {
     bottom: -2px;
+}
+
+.forge-report-builder__design-outline-placeholder {
+    display: grid;
+    min-width: 0;
+}
+
+.forge-report-builder__design-outline-placeholder-shell {
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border: 2px dashed #7ea8ea;
+    border-radius: 16px;
+    background:
+        linear-gradient(180deg, rgba(47, 109, 225, 0.08) 0%, rgba(47, 109, 225, 0.03) 100%),
+        #ffffff;
+    color: #234b88;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.forge-report-builder__design-outline-placeholder-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.forge-report-builder__design-outline-placeholder-meta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid #bfd2ef;
+    background: rgba(255, 255, 255, 0.92);
+    color: #345d96;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.forge-report-builder__design-outline-gap-target {
+    min-height: 18px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 0 6px;
+    color: #7a8aa3;
+}
+
+.forge-report-builder__design-outline-gap-line {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(126, 168, 234, 0.15) 0%, rgba(126, 168, 234, 0.35) 100%);
+}
+
+.forge-report-builder__design-outline-gap-label,
+.forge-report-builder__design-outline-gap-meta {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.forge-report-builder__design-outline-gap-target.is-active {
+    min-height: 54px;
+    padding: 6px 10px;
+    border: 2px dashed #7ea8ea;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(47, 109, 225, 0.08) 0%, rgba(47, 109, 225, 0.03) 100%);
+    color: #234b88;
+}
+
+.forge-report-builder__design-outline-gap-target.is-active .forge-report-builder__design-outline-gap-line {
+    height: 3px;
+    background: #2f6de1;
 }
 
 .forge-report-builder__design-outline-node:hover {
@@ -2158,6 +2299,67 @@
     border-radius: 999px;
     background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
     box-shadow: 0 6px 14px rgba(47, 109, 225, 0.08);
+}
+
+.forge-report-builder__design-outline-width-control {
+    display: inline-grid;
+    gap: 4px;
+    min-width: 180px;
+    margin-right: 4px;
+}
+
+.forge-report-builder__design-outline-width-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #738694;
+}
+
+.forge-report-builder__design-outline-width-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid #d7e2ee;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    color: #345d96;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.forge-report-builder__design-outline-width-trigger:hover,
+.forge-report-builder__design-outline-width-trigger:focus-visible {
+    border-color: #bfd2ef;
+    background: #eef5ff;
+    color: #234b88;
+    outline: none;
+}
+
+.forge-report-builder__design-outline-width-popover {
+    display: grid;
+    gap: 10px;
+    min-width: 260px;
+    max-width: 320px;
+    padding: 10px 12px;
+}
+
+.forge-report-builder__design-outline-width-popover-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.forge-report-builder__design-outline-width-popover-copy {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
 }
 
 .forge-report-builder__design-outline-toolbar-button {
@@ -5168,6 +5370,100 @@ button.forge-report-builder__dialog-source-card:focus-visible {
     background: linear-gradient(180deg, #ffffff 0%, #eef4ff 100%);
     color: #24487e;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.forge-report-builder__document-block-width-control {
+    display: grid;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.forge-report-builder__document-block-width-copy {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.forge-report-builder__document-block-width-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #738694;
+}
+
+.forge-report-builder__document-block-width-hint {
+    font-size: 11px;
+    color: #5f6b7c;
+}
+
+.forge-report-builder__document-block-width-rail {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 20px;
+    padding: 3px;
+    border-radius: 999px;
+    border: 1px solid #d7e2ee;
+    background: linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+    cursor: ew-resize;
+    touch-action: none;
+    user-select: none;
+    outline: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.forge-report-builder__document-block-width-rail:focus-visible {
+    border-color: #2f6de1;
+    box-shadow: 0 0 0 3px rgba(47, 109, 225, 0.18);
+}
+
+.forge-report-builder__document-block-width-rail.is-dragging {
+    border-color: #2f6de1;
+    box-shadow: 0 0 0 3px rgba(47, 109, 225, 0.14);
+}
+
+.forge-report-builder__document-block-width-rail--compact {
+    height: 18px;
+    min-width: 180px;
+}
+
+.forge-report-builder__document-block-width-segments {
+    position: absolute;
+    inset: 3px;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 4px;
+    pointer-events: none;
+}
+
+.forge-report-builder__document-block-width-segment {
+    border-radius: 999px;
+    background: #e7edf5;
+    transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.forge-report-builder__document-block-width-segment.is-active {
+    background: linear-gradient(180deg, #8cb3ff 0%, #2f6de1 100%);
+}
+
+.forge-report-builder__document-block-width-segment.is-preset:not(.is-active) {
+    background: #d7e2ee;
+}
+
+.forge-report-builder__document-block-width-thumb {
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 2px solid #2f6de1;
+    box-shadow: 0 4px 10px rgba(15, 30, 50, 0.16);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
 }
 
 .forge-report-builder__category-chip:hover,

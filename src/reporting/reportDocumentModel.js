@@ -1315,12 +1315,14 @@ export function buildReportDocumentMarkdownBlock({
   id = "markdownBlock",
   title = "",
   markdown = "",
+  datasetRef = "",
 } = {}) {
   return {
     id: normalizeString(id || "markdownBlock"),
     kind: "markdownBlock",
     title: normalizeString(title),
     markdown: String(markdown || ""),
+    ...(normalizeString(datasetRef) ? { datasetRef: normalizeString(datasetRef) } : {}),
   };
 }
 
@@ -1329,10 +1331,26 @@ export function buildReportDocumentFilterBarBlock({
   title = "Filters",
   paramIds = [],
   datasetRef = "primary",
+  mode = "",
+  placement = "",
+  groupOrder = [],
+  visibleGroups = [],
+  collapsedGroups = [],
 } = {}) {
   const normalizedParamIds = (Array.isArray(paramIds) ? paramIds : [])
     .map((entry) => normalizeString(entry))
     .filter((entry) => !!entry && !isTruncatedPlaceholder(entry));
+  const normalizedMode = (() => {
+    const candidate = normalizeString(mode).toLowerCase();
+    return ["baseline", "unified"].includes(candidate) ? candidate : "";
+  })();
+  const normalizedPlacement = (() => {
+    const candidate = normalizeString(placement).toLowerCase();
+    return ["inherit", "inline", "rail-left", "hidden"].includes(candidate) ? candidate : "";
+  })();
+  const normalizeIdList = (values = []) => (Array.isArray(values) ? values : [])
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
   if (normalizedParamIds.length === 0 && (Array.isArray(paramIds) ? paramIds : []).some((entry) => isTruncatedPlaceholder(entry))) {
     return null;
   }
@@ -1341,7 +1359,12 @@ export function buildReportDocumentFilterBarBlock({
     kind: "filterBarBlock",
     title: normalizeFilterBarTitle(title || "Filters"),
     datasetRef: normalizeString(datasetRef || "primary") || "primary",
-    paramIds: normalizedParamIds,
+    ...(normalizedParamIds.length > 0 ? { paramIds: normalizedParamIds } : {}),
+    ...(normalizedMode ? { mode: normalizedMode } : {}),
+    ...(normalizedPlacement ? { placement: normalizedPlacement } : {}),
+    ...(normalizeIdList(groupOrder).length > 0 ? { groupOrder: normalizeIdList(groupOrder) } : {}),
+    ...(normalizeIdList(visibleGroups).length > 0 ? { visibleGroups: normalizeIdList(visibleGroups) } : {}),
+    ...(normalizeIdList(collapsedGroups).length > 0 ? { collapsedGroups: normalizeIdList(collapsedGroups) } : {}),
   };
 }
 
@@ -1365,6 +1388,17 @@ export function buildReportDocumentRefinementBarBlock({
 export function buildReportDocumentKpiBlock(block = {}) {
   const valueField = normalizeString(block?.valueField || "value");
   const secondaryField = normalizeString(block?.secondaryField);
+  const presentationMode = normalizeString(block?.presentationMode).toLowerCase();
+  const normalizedPresentationMode = ["card", "body", "both"].includes(presentationMode)
+    ? presentationMode
+    : "card";
+  const rowSelector = normalizeString(block?.rowSelector).toLowerCase();
+  const normalizedRowSelector = ["firstrow", "maxbyvalue", "minbyvalue"].includes(rowSelector)
+    ? rowSelector
+    : "firstrow";
+  const bodyFormat = normalizeString(block?.bodyFormat).toLowerCase();
+  const normalizedBodyFormat = bodyFormat === "markdown" ? "markdown" : "markdown";
+  const bodyTemplate = String(block?.bodyTemplate || "");
   return {
     id: normalizeString(block?.id || "kpiBlock"),
     kind: "kpiBlock",
@@ -1393,6 +1427,10 @@ export function buildReportDocumentKpiBlock(block = {}) {
     ...(normalizeString(block?.emptyLabel)
       ? { emptyLabel: normalizeString(block.emptyLabel) }
       : {}),
+    ...(normalizedRowSelector !== "firstrow" ? { rowSelector: normalizedRowSelector } : {}),
+    ...(normalizedPresentationMode !== "card" ? { presentationMode: normalizedPresentationMode } : {}),
+    ...((normalizedPresentationMode !== "card" || bodyTemplate.trim()) ? { bodyFormat: normalizedBodyFormat } : {}),
+    ...(bodyTemplate.trim() ? { bodyTemplate } : {}),
   };
 }
 

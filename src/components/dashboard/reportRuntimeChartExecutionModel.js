@@ -14,7 +14,10 @@ function formatExecutionValue(value) {
 function formatDrillExecutionLabel(field = {}, descriptor = {}, displayValue = undefined) {
   const sourceLabel = normalizeString(field?.label || descriptor?.fieldValueKey || "Selection");
   const valueLabel = formatExecutionValue(displayValue);
-  return `${sourceLabel} = ${valueLabel}`;
+  const drillLabel = normalizeString(descriptor?.label);
+  return drillLabel
+    ? `${drillLabel}: ${sourceLabel} = ${valueLabel}`
+    : `${sourceLabel} = ${valueLabel}`;
 }
 
 export function buildReportRuntimeChartActionExecutions({

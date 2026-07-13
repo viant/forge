@@ -1249,14 +1249,15 @@ func (r *renderer) renderSVGTextOperation(textNode svgTextPaintOperation) {
 		}, 10)
 		x := textNode.x
 		y := textNode.y
-		width := r.pdf.GetStringWidth(textNode.value)
+		safeText := sanitizePDFText(textNode.value)
+		width := r.pdf.GetStringWidth(safeText)
 		switch strings.ToLower(strings.TrimSpace(textNode.anchor)) {
 		case "middle":
 			x -= width / 2
 		case "end":
 			x -= width
 		}
-		r.pdf.Text(x, y, textNode.value)
+		r.pdf.Text(x, y, safeText)
 	})
 }
 

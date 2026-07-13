@@ -68,7 +68,7 @@ assert.deepEqual(executions, [
       value: 1,
       sourceBlockId: "comparisonTable",
       fieldLabel: "Channel",
-      label: "Channel = Display",
+      label: "Drill to Market: Channel = Display",
     },
   },
   {
@@ -175,7 +175,7 @@ assert.deepEqual(buildReportRuntimeTableActionExecutions({
       value: 1,
       sourceBlockId: "comparisonTable",
       fieldLabel: "Channel",
-      label: "Channel = Display",
+      label: "Drill Channel: Channel = Display",
     },
   },
 ]);

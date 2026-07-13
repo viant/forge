@@ -169,6 +169,79 @@ assert.ok(hiddenContextSummaryHtml.includes("Dimensions Delivery Date, Channel")
 assert.ok(hiddenContextSummaryHtml.includes("Measures Available Impressions"));
 assert.ok(hiddenContextSummaryHtml.includes("Runtime Diagnostics"));
 
+const unifiedCriteriaHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Unified Filters Runtime",
+      scope: {
+        params: [
+          {
+            id: "dateRange",
+            label: "Reporting Window",
+            value: { start: "2026-05-01", end: "2026-05-07" },
+          },
+        ],
+      },
+      layoutIntent: {
+        blockOrder: ["scopeFilters"],
+        items: [{ blockId: "scopeFilters" }],
+      },
+      blocks: [
+        {
+          id: "scopeFilters",
+          kind: "filterBarBlock",
+          title: "Filters",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "scopeFilters",
+          kind: "filterBarBlock",
+          title: "Filters",
+          content: {
+            title: "Filters",
+            params: [
+              {
+                id: "dateRange",
+                label: "Reporting Window",
+                value: { start: "2026-05-01", end: "2026-05-07" },
+              },
+            ],
+            criteria: [
+              {
+                id: "include:includeSiteType:1",
+                label: "Inventory · Include Site Type",
+                enabled: true,
+                rawValues: ["web"],
+                displayValues: ["web"],
+              },
+              {
+                id: "exclude:excludePostalCodeList:1",
+                label: "Location · Exclude Postal Code List",
+                enabled: false,
+                rawValues: [53279, 71462],
+                displayValues: ["53279", "71462"],
+              },
+            ],
+          },
+        },
+      ],
+    },
+    presentationMode: "report",
+  }),
+);
+assert.ok(unifiedCriteriaHtml.includes("Active Targeting"));
+assert.ok(unifiedCriteriaHtml.includes("Inventory · Include Site Type"));
+assert.ok(unifiedCriteriaHtml.includes("web"));
+assert.ok(unifiedCriteriaHtml.includes("Location · Exclude Postal Code List"));
+assert.ok(unifiedCriteriaHtml.includes("53279, 71462"));
+assert.ok(unifiedCriteriaHtml.includes("Off"));
+
 const kpiToneHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {
@@ -1090,7 +1163,7 @@ const scopeFilterWithDedicatedRefinementBarHtml = renderToStaticMarkup(
 );
 assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("Filters (baseline)"));
 assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("Active Drill Path"));
-assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("Channel = Audio"));
+assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("Drill: Channel = Audio"));
 assert.ok(scopeFilterWithDedicatedRefinementBarHtml.includes("This session — live keep, exclude, and drill changes layered on top of the baseline scope."));
 assert.ok(!scopeFilterWithDedicatedRefinementBarHtml.includes('data-report-runtime-active-scope-summary="true"'));
 
@@ -1136,8 +1209,7 @@ const scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml = renderToS
     title: "Runtime Preview",
   }),
 );
-assert.ok(scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml.includes("Channel = Audio"));
-assert.ok(!scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml.includes("Drill to Publisher: Channel = Audio"));
+assert.ok(scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml.includes("Drill to Publisher: Channel = Audio"));
 
 const scopeFilterWithoutActiveRefinementsHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -1508,6 +1580,49 @@ const wideHalfTableHtml = renderToStaticMarkup(
 );
 assert.ok(wideHalfTableHtml.includes('data-report-runtime-block-id="comparisonTable"'));
 assert.ok(wideHalfTableHtml.includes('data-report-runtime-layout-span="12"'));
+
+const previousRuntimeWindow = globalThis.window;
+globalThis.window = {
+  innerWidth: 800,
+  addEventListener() {},
+  removeEventListener() {},
+};
+const mobileNarrativeLayoutHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Mobile Runtime Layout",
+      layoutIntent: {
+        blockOrder: ["narrativeIntro"],
+        items: [{ blockId: "narrativeIntro", span: 5 }],
+      },
+      blocks: [
+        {
+          id: "narrativeIntro",
+          kind: "markdownBlock",
+          title: "Executive Summary",
+          markdown: "## Executive Summary\nNarrative body.",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "narrativeIntro",
+          kind: "markdownBlock",
+          content: {
+            markdown: "## Executive Summary\nNarrative body.",
+          },
+        },
+      ],
+    },
+  }),
+);
+globalThis.window = previousRuntimeWindow;
+assert.ok(mobileNarrativeLayoutHtml.includes('data-report-runtime-layout-columns="1"'));
+assert.ok(mobileNarrativeLayoutHtml.includes('data-report-runtime-layout-span="5"'));
 
 const datasetBackedBlockErrorHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {

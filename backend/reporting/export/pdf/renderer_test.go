@@ -372,6 +372,12 @@ func TestNormalizeSeverity_UnknownDefaultsToWarning(t *testing.T) {
 	require.Equal(t, "info", normalizeSeverity("INFO"))
 }
 
+func TestSanitizePDFText_NormalizesUnsafeUnicodePunctuation(t *testing.T) {
+	require.Equal(t, "Inventory - Include Site Type", sanitizePDFText("Inventory · Include Site Type"))
+	require.Equal(t, "\"Quoted\" - value", sanitizePDFText("“Quoted” – value"))
+	require.Equal(t, "Keep*Drop...", sanitizePDFText("Keep•Drop…"))
+}
+
 func TestParseHexColor_ExpandsThreeDigitHex(t *testing.T) {
 	red, green, blue := parseHexColor("#3af", 0, 0, 0)
 	require.Equal(t, 0x33, red)

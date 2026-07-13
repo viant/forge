@@ -55,17 +55,26 @@ assert.deepEqual(resolveReportBuilderDocumentWidthLabels(""), {
     nextSpan: 8,
     isHalfWidth: false,
     currentLabel: "Width: Full",
-    actionLabel: "Make 2/3",
-    actionTitle: "Resize block to 2/3 width",
+    actionLabel: "Make Two-thirds",
+    actionTitle: "Resize block to Two-thirds width",
     actionIcon: "minimize",
 });
 assert.deepEqual(resolveReportBuilderDocumentWidthLabels("half"), {
     span: 6,
     nextSpan: 4,
     isHalfWidth: true,
-    currentLabel: "Width: 1/2",
-    actionLabel: "Make 1/3",
-    actionTitle: "Resize block to 1/3 width",
+    currentLabel: "Width: Half",
+    actionLabel: "Make Third",
+    actionTitle: "Resize block to Third width",
+    actionIcon: "minimize",
+});
+assert.deepEqual(resolveReportBuilderDocumentWidthLabels({ span: 4 }), {
+    span: 4,
+    nextSpan: 3,
+    isHalfWidth: false,
+    currentLabel: "Width: Third",
+    actionLabel: "Make Quarter",
+    actionTitle: "Resize block to Quarter width",
     actionIcon: "minimize",
 });
 
@@ -78,6 +87,11 @@ assert.deepEqual(filterBarDraft, {
     title: "Filters",
     datasetRef: "primary",
     paramIds: ["dateRange"],
+    mode: "baseline",
+    placement: "inherit",
+    visibleGroups: ["dateRange"],
+    groupOrder: ["dateRange"],
+    collapsedGroups: [],
 });
 
 const scopedFilterBarDraft = buildReportBuilderDocumentBlockDraft("filterBarBlock", {
@@ -101,6 +115,11 @@ assert.deepEqual(scopedFilterBarDraft, {
     title: "Filters",
     datasetRef: "forecast_cube",
     paramIds: ["region"],
+    mode: "baseline",
+    placement: "inherit",
+    visibleGroups: ["region"],
+    groupOrder: ["region"],
+    collapsedGroups: [],
 });
 
 const unscopedDatasetFilterBarDraft = buildReportBuilderDocumentBlockDraft("filterBarBlock", {
@@ -124,6 +143,11 @@ assert.deepEqual(unscopedDatasetFilterBarDraft, {
     title: "Filters",
     datasetRef: "forecast_cube",
     paramIds: [],
+    mode: "baseline",
+    placement: "inherit",
+    visibleGroups: [],
+    groupOrder: [],
+    collapsedGroups: [],
 });
 
 const multiDatasetDefaultTableDraft = buildReportBuilderDocumentBlockDraft("tableBlock", null, {
@@ -347,6 +371,7 @@ assert.deepEqual(buildReportBuilderDatasetOptions({
         secondaryFieldOptions: [{ value: "country", label: "Country" }],
         chartFieldOptions: [{ key: "avails", label: "Avails", kind: "measure" }],
         scopeParamOptions: [{ value: "dateRange", label: "Date Range", kind: "dateRange", required: true }],
+        filterBarGroupOptions: [],
     },
     {
         value: "reach_summary",
@@ -388,6 +413,7 @@ assert.deepEqual(buildReportBuilderDatasetOptions({
             { key: "avails", aliases: ["avails"], label: "Avails", kind: "measure", format: "compactNumber", default: true },
         ],
         scopeParamOptions: [{ value: "reachCountry", label: "Reach Country" }],
+        filterBarGroupOptions: [],
     },
 ]);
 
@@ -597,6 +623,10 @@ assert.deepEqual(kpiStaticDatasetDraft, {
     secondaryLabel: "",
     description: "",
     emptyLabel: "No KPI value available.",
+    presentationMode: "card",
+    rowSelector: "firstRow",
+    bodyFormat: "markdown",
+    bodyTemplate: "",
 });
 
 const kpiDraft = buildReportBuilderDocumentBlockDraft("kpiBlock", null, {
@@ -614,6 +644,10 @@ assert.deepEqual(kpiDraft, {
     secondaryLabel: "",
     description: "",
     emptyLabel: "No KPI value available.",
+    presentationMode: "card",
+    rowSelector: "firstRow",
+    bodyFormat: "markdown",
+    bodyTemplate: "",
 });
 
 const badgesDraft = buildReportBuilderDocumentBlockDraft("badgesBlock");
@@ -739,6 +773,11 @@ assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
     title: "Filters",
     datasetRef: "forecast_cube",
     paramIds: ["region"],
+    mode: "baseline",
+    placement: "inherit",
+    visibleGroups: ["region"],
+    groupOrder: ["region"],
+    collapsedGroups: [],
 });
 
 assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
@@ -760,6 +799,11 @@ assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
     title: "Filters",
     datasetRef: "forecast_cube",
     paramIds: ["dateRange"],
+    mode: "baseline",
+    placement: "inherit",
+    visibleGroups: ["dateRange"],
+    groupOrder: ["dateRange"],
+    collapsedGroups: [],
 });
 
 assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
@@ -832,6 +876,8 @@ assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
     secondaryLabel: "",
     description: "",
     emptyLabel: "No KPI value available.",
+    rowSelector: "firstRow",
+    bodyFormat: "markdown",
 });
 
 assert.deepEqual(rebindReportBuilderDocumentBlockDraft({
@@ -939,16 +985,16 @@ assert.deepEqual(buildReportBuilderDocumentBlockDraft("badgesBlock", {
 assert.deepEqual(validateReportBuilderDocumentBlockDraft({
     kind: "filterBarBlock",
     id: "scopeFilters",
-    paramIds: [],
+    visibleGroups: [],
 }, {
     scopeParamOptions: [{ value: "dateRange", label: "Date Range" }],
 }), {
     valid: false,
     errors: [
         {
-            field: "paramIds",
+            field: "visibleGroups",
             code: "required",
-            message: "Select at least one report filter for the filter bar block.",
+            message: "Select at least one visible filter group for the filter bar block.",
         },
     ],
 });
@@ -1033,7 +1079,7 @@ assert.deepEqual(validateReportBuilderDocumentBlockDraft({
     kind: "filterBarBlock",
     id: "scopeFilters",
     datasetRef: "forecast_cube",
-    paramIds: ["dateRange"],
+    visibleGroups: ["dateRange"],
 }, {
     scopeParamOptions: [{ value: "dateRange", label: "Date Range" }],
     datasetOptions: [
@@ -1044,9 +1090,14 @@ assert.deepEqual(validateReportBuilderDocumentBlockDraft({
     valid: false,
     errors: [
         {
-            field: "paramIds",
+            field: "visibleGroups",
             code: "unknown",
-            message: "One or more filter bar filters are not available in the current builder.",
+            message: "One or more filter bar groups are not available in the current builder.",
+        },
+        {
+            field: "mode",
+            code: "invalid",
+            message: "Baseline filter bars can only include baseline report filters.",
         },
     ],
 });
@@ -1055,7 +1106,7 @@ assert.deepEqual(validateReportBuilderDocumentBlockDraft({
     kind: "filterBarBlock",
     id: "scopeFilters",
     datasetRef: "forecast_cube",
-    paramIds: ["dateRange"],
+    visibleGroups: ["dateRange"],
 }, {
     scopeParamOptions: [{ value: "dateRange", label: "Date Range" }],
     datasetOptions: [
@@ -1066,9 +1117,14 @@ assert.deepEqual(validateReportBuilderDocumentBlockDraft({
     valid: false,
     errors: [
         {
-            field: "paramIds",
+            field: "visibleGroups",
             code: "unknown",
-            message: "One or more filter bar filters are not available in the current builder.",
+            message: "One or more filter bar groups are not available in the current builder.",
+        },
+        {
+            field: "mode",
+            code: "invalid",
+            message: "Baseline filter bars can only include baseline report filters.",
         },
     ],
 });
@@ -1076,16 +1132,21 @@ assert.deepEqual(validateReportBuilderDocumentBlockDraft({
 assert.deepEqual(validateReportBuilderDocumentBlockDraft({
     kind: "filterBarBlock",
     id: "scopeFilters",
-    paramIds: ["missing"],
+    visibleGroups: ["missing"],
 }, {
     scopeParamOptions: [{ value: "dateRange", label: "Date Range" }],
 }), {
     valid: false,
     errors: [
         {
-            field: "paramIds",
+            field: "visibleGroups",
             code: "unknown",
-            message: "One or more filter bar filters are not available in the current builder.",
+            message: "One or more filter bar groups are not available in the current builder.",
+        },
+        {
+            field: "mode",
+            code: "invalid",
+            message: "Baseline filter bars can only include baseline report filters.",
         },
     ],
 });
@@ -1600,6 +1661,9 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
     scopeParamOptions: [
         { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "dateRange", required: true },
     ],
+    filterBarGroupOptions: [
+        { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "scopeParam", required: true },
+    ],
     datasetOptions: [
         {
             value: "primary",
@@ -1629,6 +1693,9 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
             ],
             scopeParamOptions: [
                 { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "dateRange", required: true },
+            ],
+            filterBarGroupOptions: [
+                { value: "dateRange", label: "Date Range", description: "Approved reporting window for semantic preview.", kind: "scopeParam", required: true },
             ],
         },
     ],
@@ -1800,6 +1867,7 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
         },
     ],
     scopeParamOptions: [],
+    filterBarGroupOptions: [],
     datasetOptions: [
         {
             value: "primary",
@@ -1866,6 +1934,7 @@ assert.deepEqual(buildReportBuilderDocumentBlockFieldOptions({
                 { key: "avails", aliases: ["avails"], label: "Available Impressions", kind: "measure", format: "compactNumber", align: "right" },
             ],
             scopeParamOptions: [],
+            filterBarGroupOptions: [],
         },
     ],
     chartFieldOptions: [
