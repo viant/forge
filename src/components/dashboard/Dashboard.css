@@ -2341,6 +2341,13 @@
     outline: none;
 }
 
+.forge-report-builder__result-meta-chip--button {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
 .forge-report-builder__design-outline-width-popover {
     display: grid;
     gap: 10px;

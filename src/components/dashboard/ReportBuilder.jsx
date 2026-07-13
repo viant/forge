@@ -14107,6 +14107,86 @@ export default function ReportBuilder({ container, context }) {
                         : (isPrimaryTableView
                             ? "th"
                             : (isDrillNode ? "git-branch" : reportBuilderDocumentBlockIcon(normalizedKind))));
+                const widthTrigger = outlineBlock ? (
+                    <Popover
+                        usePortal={!compactMode}
+                        placement="bottom-start"
+                        isOpen={openDocumentWidthControlId === entry.id}
+                        onInteraction={(nextOpen) => {
+                            setOpenDocumentWidthControlId(nextOpen ? entry.id : "");
+                        }}
+                        content={(
+                            <div className="forge-report-builder__design-outline-width-popover">
+                                <div className="forge-report-builder__design-outline-width-popover-header">
+                                    <div className="forge-report-builder__design-outline-width-popover-copy">
+                                        <span className="forge-report-builder__design-outline-width-label">{outlineWidthLabels.currentLabel}</span>
+                                        <span className="forge-report-builder__document-block-width-hint">Drag to snap across 12 columns</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__design-outline-toolbar-button"
+                                        aria-label={`Close width editor for ${entry.title}`}
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            setOpenDocumentWidthControlId("");
+                                        }}
+                                    >
+                                        <Icon icon="cross" size={12} />
+                                    </button>
+                                </div>
+                                <div
+                                    className={[
+                                        "forge-report-builder__document-block-width-rail",
+                                        "forge-report-builder__document-block-width-rail--compact",
+                                        documentBlockResizeDragState.active && documentBlockResizeDragState.blockId === entry.id ? "is-dragging" : "",
+                                    ].filter(Boolean).join(" ")}
+                                    role="slider"
+                                    tabIndex={0}
+                                    aria-label={`Width for ${entry.title}`}
+                                    aria-valuemin={1}
+                                    aria-valuemax={REPORT_LAYOUT_GRID_COLUMNS}
+                                    aria-valuenow={outlineEffectiveSpan}
+                                    aria-valuetext={outlineWidthLabels.currentLabel.replace(/^Width:\s*/, "")}
+                                    data-report-builder-layout-rail={entry.id}
+                                    data-report-builder-layout-span={outlineEffectiveSpan}
+                                    onPointerDown={(event) => startDocumentBlockResizeDrag(event, entry.id, outlineBaseWidthLabels.span)}
+                                    onKeyDown={(event) => handleDocumentBlockResizeKeyDown(event, entry.id, outlineEffectiveSpan)}
+                                >
+                                    <div className="forge-report-builder__document-block-width-segments" aria-hidden="true">
+                                        {Array.from({ length: REPORT_LAYOUT_GRID_COLUMNS }, (_, segmentIndex) => {
+                                            const span = segmentIndex + 1;
+                                            return (
+                                                <span
+                                                    key={`${entry.id}:outline-segment:${span}`}
+                                                    className={[
+                                                        "forge-report-builder__document-block-width-segment",
+                                                        span <= outlineEffectiveSpan ? "is-active" : "",
+                                                        REPORT_LAYOUT_PRESET_MARKERS.has(span) ? "is-preset" : "",
+                                                    ].filter(Boolean).join(" ")}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                    <span
+                                        className="forge-report-builder__document-block-width-thumb"
+                                        aria-hidden="true"
+                                        style={{ left: `${(outlineEffectiveSpan / REPORT_LAYOUT_GRID_COLUMNS) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    >
+                        <button
+                            type="button"
+                            className="forge-report-builder__result-meta-chip forge-report-builder__result-meta-chip--button"
+                            aria-label={`Edit width for ${entry.title}`}
+                            title={outlineWidthLabels.actionTitle}
+                        >
+                            {isPrimaryBuilder ? "Current data" : entry.widthLabel}
+                        </button>
+                    </Popover>
+                ) : null;
                 const branch = (
                     <div
                         key={entry.id}
@@ -14194,11 +14274,7 @@ export default function ReportBuilder({ container, context }) {
                                                 {entry.datasetLabel}
                                             </span>
                                         ) : null}
-                                        {entry.widthLabel ? (
-                                            <span className="forge-report-builder__result-meta-chip">
-                                                {isPrimaryBuilder ? "Current data" : entry.widthLabel}
-                                            </span>
-                                        ) : null}
+                                        {entry.widthLabel ? widthTrigger : null}
                                     </span>
                                     {entry.summary ? (
                                         <span className="forge-report-builder__design-outline-node-summary">{entry.summary}</span>
@@ -14210,86 +14286,6 @@ export default function ReportBuilder({ container, context }) {
                             </button>
                             {showInlineToolbar ? (
                                 <div className="forge-report-builder__design-outline-toolbar" aria-label={`${entry.title} actions`}>
-                                    {outlineBlock ? (
-                                        <Popover
-                                            usePortal={!compactMode}
-                                            placement="bottom-start"
-                                            isOpen={openDocumentWidthControlId === entry.id}
-                                            onInteraction={(nextOpen) => {
-                                                setOpenDocumentWidthControlId(nextOpen ? entry.id : "");
-                                            }}
-                                            content={(
-                                                <div className="forge-report-builder__design-outline-width-popover">
-                                                    <div className="forge-report-builder__design-outline-width-popover-header">
-                                                        <div className="forge-report-builder__design-outline-width-popover-copy">
-                                                            <span className="forge-report-builder__design-outline-width-label">{outlineWidthLabels.currentLabel}</span>
-                                                            <span className="forge-report-builder__document-block-width-hint">Drag to snap across 12 columns</span>
-                                                        </div>
-                                                        <button
-                                                            type="button"
-                                                            className="forge-report-builder__design-outline-toolbar-button"
-                                                            aria-label={`Close width editor for ${entry.title}`}
-                                                            onClick={(event) => {
-                                                                event.preventDefault();
-                                                                event.stopPropagation();
-                                                                setOpenDocumentWidthControlId("");
-                                                            }}
-                                                        >
-                                                            <Icon icon="cross" size={12} />
-                                                        </button>
-                                                    </div>
-                                                    <div
-                                                        className={[
-                                                            "forge-report-builder__document-block-width-rail",
-                                                            "forge-report-builder__document-block-width-rail--compact",
-                                                            documentBlockResizeDragState.active && documentBlockResizeDragState.blockId === entry.id ? "is-dragging" : "",
-                                                        ].filter(Boolean).join(" ")}
-                                                        role="slider"
-                                                        tabIndex={0}
-                                                        aria-label={`Width for ${entry.title}`}
-                                                        aria-valuemin={1}
-                                                        aria-valuemax={REPORT_LAYOUT_GRID_COLUMNS}
-                                                        aria-valuenow={outlineEffectiveSpan}
-                                                        aria-valuetext={outlineWidthLabels.currentLabel.replace(/^Width:\s*/, "")}
-                                                        data-report-builder-layout-rail={entry.id}
-                                                        data-report-builder-layout-span={outlineEffectiveSpan}
-                                                        onPointerDown={(event) => startDocumentBlockResizeDrag(event, entry.id, outlineBaseWidthLabels.span)}
-                                                        onKeyDown={(event) => handleDocumentBlockResizeKeyDown(event, entry.id, outlineEffectiveSpan)}
-                                                    >
-                                                        <div className="forge-report-builder__document-block-width-segments" aria-hidden="true">
-                                                            {Array.from({ length: REPORT_LAYOUT_GRID_COLUMNS }, (_, segmentIndex) => {
-                                                                const span = segmentIndex + 1;
-                                                                return (
-                                                                    <span
-                                                                        key={`${entry.id}:outline-segment:${span}`}
-                                                                        className={[
-                                                                            "forge-report-builder__document-block-width-segment",
-                                                                            span <= outlineEffectiveSpan ? "is-active" : "",
-                                                                            REPORT_LAYOUT_PRESET_MARKERS.has(span) ? "is-preset" : "",
-                                                                        ].filter(Boolean).join(" ")}
-                                                                    />
-                                                                );
-                                                            })}
-                                                        </div>
-                                                        <span
-                                                            className="forge-report-builder__document-block-width-thumb"
-                                                            aria-hidden="true"
-                                                            style={{ left: `${(outlineEffectiveSpan / REPORT_LAYOUT_GRID_COLUMNS) * 100}%` }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        >
-                                            <button
-                                                type="button"
-                                                className="forge-report-builder__design-outline-width-trigger"
-                                                aria-label={`Edit width for ${entry.title}`}
-                                                title={outlineWidthLabels.actionTitle}
-                                            >
-                                                {outlineWidthLabels.currentLabel}
-                                            </button>
-                                        </Popover>
-                                    ) : null}
                                     <button
                                         type="button"
                                         className="forge-report-builder__design-outline-toolbar-button"
