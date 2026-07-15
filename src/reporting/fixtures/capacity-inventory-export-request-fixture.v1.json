@@ -195,6 +195,39 @@
     },
     "refinements": [],
     "calculatedFields": [],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        },
+        {
+          "id": "channelsFilter",
+          "kind": "multiSelect",
+          "label": "Channels",
+          "required": false,
+          "multiple": true,
+          "options": [
+            {
+              "label": "Display",
+              "value": "Display"
+            },
+            {
+              "label": "CTV",
+              "value": "CTV"
+            }
+          ],
+          "value": []
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    },
     "datasets": [
       {
         "id": "primary",
@@ -208,9 +241,7 @@
           },
           "filters": {
             "From": "2026-05-01",
-            "To": "2026-05-04",
-            "from": "2026-05-01",
-            "to": "2026-05-04"
+            "To": "2026-05-04"
           },
           "semanticSelection": {
             "modelRef": "model://example/performance/delivery@v1",
@@ -238,7 +269,8 @@
       {
         "id": "scopeFilters",
         "kind": "filterBarBlock",
-        "title": "Scope",
+        "title": "Filters",
+        "datasetRef": "primary",
         "paramIds": [
           "dateRange",
           "channelsFilter"
@@ -339,37 +371,16 @@
         "secondaryField": "channelV2",
         "secondaryLabel": "Channel",
         "description": "Highlights the leading channel row before drilling deeper.",
-        "emptyLabel": "No inventory KPI value available."
+        "emptyLabel": "No inventory KPI value available.",
+        "valueFormat": "compactNumber"
       }
-    ],
-    "scope": {
-      "params": [
-        {
-          "id": "dateRange",
-          "kind": "dateRange",
-          "label": "dateRange",
-          "required": true,
-          "value": {
-            "start": "2026-05-01",
-            "end": "2026-05-04"
-          }
-        },
-        {
-          "id": "channelsFilter",
-          "kind": "multiSelect",
-          "label": "Channels",
-          "required": false,
-          "value": []
-        }
-      ],
-      "dataSourceRef": "demoReportSource"
-    }
+    ]
   },
   "reportFill": {
     "version": 1,
     "kind": "reportFill",
     "specVersion": 1,
-    "specHash": "fnv1a:135adb8d",
+    "specHash": "fnv1a:7fbf8edb",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -398,9 +409,7 @@
           },
           "filters": {
             "From": "2026-05-01",
-            "To": "2026-05-04",
-            "from": "2026-05-01",
-            "to": "2026-05-04"
+            "To": "2026-05-04"
           },
           "semanticSelection": {
             "modelRef": "model://example/performance/delivery@v1",
@@ -423,7 +432,7 @@
           ]
         },
         "provenance": {
-          "requestHash": "fnv1a:bd2ea18f",
+          "requestHash": "fnv1a:8e4bc16b",
           "rowCount": 2,
           "truncated": false,
           "hasMore": false,
@@ -445,16 +454,26 @@
       {
         "id": "scopeFilters",
         "kind": "filterBarBlock",
-        "title": "Scope",
+        "title": "Filters",
+        "datasetRef": "primary",
         "paramIds": [
           "dateRange",
           "channelsFilter"
         ],
         "content": {
-          "title": "Scope",
+          "title": "Filters",
+          "mode": "baseline",
+          "placement": "inherit",
+          "groupOrder": [],
+          "visibleGroups": [],
+          "collapsedGroups": [],
           "params": [
             {
               "id": "dateRange",
+              "groupId": "dateRange",
+              "label": "dateRange",
+              "type": "dateRange",
+              "required": true,
               "value": {
                 "start": "2026-05-01",
                 "end": "2026-05-04"
@@ -462,6 +481,20 @@
             },
             {
               "id": "channelsFilter",
+              "groupId": "channelsFilter",
+              "label": "Channels",
+              "type": "multiSelect",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Display",
+                  "value": "Display"
+                },
+                {
+                  "label": "CTV",
+                  "value": "CTV"
+                }
+              ],
               "value": []
             }
           ]
@@ -703,11 +736,13 @@
         "secondaryLabel": "Channel",
         "description": "Highlights the leading channel row before drilling deeper.",
         "emptyLabel": "No inventory KPI value available.",
+        "valueFormat": "compactNumber",
         "content": {
           "title": "Top Channel KPI",
           "description": "Highlights the leading channel row before drilling deeper.",
           "valueField": "avails",
           "valueLabel": "Avails",
+          "valueFormat": "compactNumber",
           "value": 158400,
           "rowCount": 2,
           "secondaryField": "channelV2",
@@ -723,9 +758,9 @@
     "version": 1,
     "kind": "reportPrint",
     "specVersion": 1,
-    "specHash": "fnv1a:135adb8d",
+    "specHash": "fnv1a:7fbf8edb",
     "fillVersion": 1,
-    "fillHash": "fnv1a:586d192a",
+    "fillHash": "fnv1a:3ca90b40",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -756,7 +791,7 @@
               "width": 720,
               "height": 20
             },
-            "text": "Scope",
+            "text": "Filters",
             "fontSize": 14,
             "fontWeight": "600",
             "color": "#101828"
@@ -783,7 +818,7 @@
               "width": 720,
               "height": 16
             },
-            "text": "channelsFilter:",
+            "text": "Channels:",
             "fontSize": 12,
             "color": "#344054"
           },
@@ -881,7 +916,7 @@
             },
             "rowKey": "row_1",
             "columnKey": "avails",
-            "text": "158400",
+            "text": "158 400",
             "format": "compactNumber",
             "align": "right"
           },
@@ -922,7 +957,7 @@
             },
             "rowKey": "row_2",
             "columnKey": "avails",
-            "text": "138200",
+            "text": "138 200",
             "format": "compactNumber",
             "align": "right"
           },
@@ -949,7 +984,7 @@
               "width": 720,
               "height": 164
             },
-            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138.2K</text>\n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
+            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158 400</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138 200</text>\n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
           },
           {
             "id": "narrativeIntro__title_0",
@@ -1027,7 +1062,7 @@
               "width": 348,
               "height": 24
             },
-            "text": "Avails: 158400",
+            "text": "Avails: 158 400",
             "fontSize": 20,
             "fontWeight": "700",
             "color": "#101828"
@@ -1194,7 +1229,7 @@
     "bookmarks": [
       {
         "id": "bookmark.scopeFilters",
-        "title": "Scope",
+        "title": "Filters",
         "pageNumber": 1,
         "level": 1,
         "elementId": "scopeFilters__title_0",

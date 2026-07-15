@@ -31,6 +31,27 @@ This keeps:
 Text templates are a presentation layer over already-resolved content, not the
 source of truth for data selection.
 
+## Report Persistence Boundary
+
+Forge does not own database or workspace bootstrapping.
+
+Forge's responsibility is:
+
+- authored report contracts
+- runtime rendering
+- export artifacts
+- host service contracts for save, list, lifecycle, and export actions
+
+Host/runtime responsibility is:
+
+- choosing whether persistence is file-backed, SQL-backed, or another store
+- resolving environment variables, secrets, and workspace defaults
+- instantiating report storage only at the host runtime boundary
+
+In the current Agently integration, that persistence wiring belongs in
+`agently-core`, not in Forge. Forge should only consume the already-resolved
+host services or backend contracts it is given.
+
 ## Layout Model
 
 Report document layout uses a shared internal `12`-column grid.
@@ -53,6 +74,42 @@ Current friendly width presets:
 Older authored payloads that still use legacy `size: "half"` remain valid and
 are normalized onto the same span model.
 
+## Theme Tokens
+
+The report builder now supports a constrained document theme model rather than
+raw CSS.
+
+Current supported document theme fields:
+
+- `theme.accentTone`
+- `theme.badgePalette`
+
+Supported `accentTone` values:
+
+- `blue`
+- `green`
+- `amber`
+- `rose`
+- `slate`
+
+Supported `badgePalette` values:
+
+- `soft`
+- `bold`
+
+Current usage:
+
+- runtime KPI accent bars
+- default/info callout + info-panel accents
+- runtime status/badge pill styling
+- print/export tone pill styling
+
+Theme tokens are intentionally small and opinionated:
+
+- they are metadata, not arbitrary CSS
+- they preserve safe defaults when omitted
+- they can influence runtime and PDF together from the same report contract
+
 ## Primitive Kinds
 
 Current authored report block kinds:
@@ -65,6 +122,15 @@ Current authored report block kinds:
 - `chartBlock`
 - `tableBlock`
 - `geoMapBlock`
+- `sectionBlock`
+- `tabGroupBlock`
+- `compositeBlock`
+- `stepperBlock`
+- `infoPanelBlock`
+- `calloutBlock`
+- `kanbanBlock`
+- `timelineBlock`
+- `collectionBlock`
 
 ## `markdownBlock`
 
@@ -312,6 +378,92 @@ Each item can bind:
 - optional `format`
 - optional `tone`
 
+## `sectionBlock`
+
+Purpose:
+
+- start a named authored report section
+- establish a visible navigation anchor for a later tab group
+
+Authoring fields:
+
+- `title`
+- optional `subtitle`
+- optional `description`
+- `navigationLabel`
+
+Runtime behavior:
+
+- sections split the authored runtime into named views
+- if no explicit tab group exists, multiple sections still produce section tabs
+
+## `tabGroupBlock`
+
+Purpose:
+
+- explicitly control section-tab navigation order and default section
+
+Authoring fields:
+
+- `title`
+- `sectionIds[]`
+- optional `defaultSectionId`
+
+Runtime behavior:
+
+- tabs are metadata-driven over existing `sectionBlock`s
+- the block is presentation/navigation only; it does not own child content
+- print/export flattens sections in authored order and does not render a tab UI
+
+## `compositeBlock`
+
+Purpose:
+
+- group existing authored blocks into one titled panel
+
+Authoring fields:
+
+- `title`
+- optional `description`
+- `childBlockIds[]`
+
+Runtime behavior:
+
+- child blocks render inside the grouped panel once
+- grouped child blocks are suppressed from the top-level document flow
+- print/export lowers the grouped children inside the composite panel in order
+
+## `collectionBlock`
+
+Purpose:
+
+- repeated card/list presentation from dataset rows
+
+Authoring fields:
+
+- `title`
+- `datasetRef`
+- `itemTitleField`
+- optional `itemTitleLabel`
+- optional `valueField`
+- optional `valueLabel`
+- optional `valueFormat`
+- optional `secondaryField`
+- optional `secondaryLabel`
+- optional `secondaryFormat`
+- optional `description`
+- optional `emptyLabel`
+- `layout`
+- `columns`
+- `rowLimit`
+- optional `bodyTemplate`
+
+Runtime behavior:
+
+- resolves rows in order from the assigned dataset
+- supports markdown body templates per repeated item
+- export preserves item order and resolved text
+
 ## `chartBlock`
 
 Purpose:
@@ -324,6 +476,36 @@ Authoring fields:
 - `datasetRef`
 - `chartSpec`
 - `chartModel`
+
+Current chart authoring coverage includes:
+
+- grouped and direct cartesian series
+- category pie/donut series
+- per-series render type overrides
+- per-series axis assignment
+- per-series stack groups
+- per-series data label rules via `dataLabels`
+- per-series conditional point/bar colors via `pointColorMode`
+- canonical chart annotations
+
+Supported per-series options in `chartSpec.seriesOptions`:
+
+- `type`
+- `axis`
+- `stackId`
+- `dataLabels`
+- `pointColorMode`
+
+Supported `dataLabels` values:
+
+- `auto`
+- `always`
+- `none`
+
+Supported `pointColorMode` values:
+
+- `series`
+- `bySign`
 
 Runtime behavior:
 
@@ -348,6 +530,75 @@ Runtime behavior:
   - badges
   - tone
   - data bars
+  - progress bars
+  - stacked share bars
+  - delta chips
+  - rank chips
+  - spark bars
+
+### Table Visual Kinds
+
+Current authored `cellVisual.kind` values:
+
+- `dataBar`
+- `progressBar`
+- `shareBar`
+- `delta`
+- `rank`
+- `badge`
+- `tone`
+
+`dataBar`
+
+- full-width in-cell quantitative bar
+- uses `valueField`
+- supports `range`
+- supports `palette`
+
+`progressBar`
+
+- compact horizontal progress treatment
+- uses `valueField`
+- supports `range`
+- supports `palette`
+
+`shareBar`
+
+- stacked share treatment across multiple measure fields
+- uses `segments[]`
+- each segment supports `valueField`, optional `label`, optional `color`
+
+`delta`
+
+- signed change chip for a single measure
+- uses `valueField`
+- optional `positiveIsGood: false`
+
+`rank`
+
+- dense-rank chip for a single numeric measure
+- uses `valueField`
+
+`badge` / `tone`
+
+- rule-driven pill styles for categorical values
+- support optional authored `label`
+- support optional authored `tone`
+- support optional authored `color` / `background`
+
+### Table Visual State
+
+Resolved runtime/export state uses one canonical `visualState` model:
+
+- bar-family visuals resolve numeric `value`, `percent`, and `palette`
+- share bars resolve `segments[]`
+- pill-family visuals resolve `tone`, `label`, and optional explicit colors
+
+That same resolved state is used by:
+
+- hosted runtime
+- authored runtime preview
+- PDF print lowering
 
 ## `geoMapBlock`
 
@@ -364,6 +615,98 @@ Authoring fields:
 Runtime behavior:
 
 - `content.resolvedGeo` drives runtime and export rendering
+
+## `stepperBlock`
+
+Purpose:
+
+- ordered process, journey, or explainer steps
+
+Authoring fields:
+
+- `title`
+- optional `description`
+- `steps[]`
+
+Each step supports:
+
+- `title`
+- `body`
+- optional `tone`
+
+## `infoPanelBlock`
+
+Purpose:
+
+- framed explainer panel with optional eyebrow and tone
+
+Authoring fields:
+
+- `title`
+- optional `eyebrow`
+- optional `description`
+- optional `tone`
+- `body`
+
+## `calloutBlock`
+
+Purpose:
+
+- business callout / alert / launch update with a stronger visual frame
+
+Authoring fields:
+
+- `title`
+- optional `icon`
+- optional `description`
+- optional `tone`
+- optional `badges[]`
+- `body`
+
+## `kanbanBlock`
+
+Purpose:
+
+- pipeline / stage board for authored business workflow summaries
+
+Authoring fields:
+
+- `title`
+- optional `description`
+- `columns[]`
+
+Each column supports:
+
+- `title`
+- optional `tone`
+- `cards[]`
+
+Each card supports:
+
+- `title`
+- optional `body`
+- optional `badge`
+- optional `tone`
+
+## `timelineBlock`
+
+Purpose:
+
+- milestone / event timeline
+
+Authoring fields:
+
+- `title`
+- optional `description`
+- `events[]`
+
+Each event supports:
+
+- `date`
+- `title`
+- optional `body`
+- optional `badge`
+- optional `tone`
 
 ## Unified Filters
 
@@ -383,6 +726,33 @@ This keeps the same visible criteria model across:
 - authored runtime preview
 - hosted report runtime
 - exported PDF
+
+## Request Mapping
+
+The request compiler follows authored param paths directly.
+
+Current behavior:
+
+- static filters write to the configured `startParamPath`, `endParamPath`, or
+  `paramPath`
+- dynamic filter groups write to each filter's configured `paramPath`
+- measure and dimension selections write to their configured `paramPath`
+  values when present, otherwise to canonical `measures.*` / `dimensions.*`
+  locations
+
+Important constraint:
+
+- the builder does **not** synthesize extra snake_case, camelCase, or lowercase
+  alias keys just because a related path exists elsewhere
+
+That means request shape should be treated as metadata-driven:
+
+- if a workspace needs `filters.order_id`, configure that exact `paramPath`
+- if a workspace needs `filters.orderIds`, configure that exact `paramPath`
+- if both are genuinely required, author both explicitly in workspace metadata
+
+This avoids fallback alias behavior leaking into the canonical report-builder
+request contract.
 
 ## Markdown Rendering
 

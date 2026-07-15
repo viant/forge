@@ -1,1 +1,924 @@
-{"version":1,"kind":"updateReportDocumentPayload","updatedAt":9502,"reportRef":{"reportId":"capacityLocationsTopMarketsQ3"},"expectedVersion":8,"title":"Capacity Locations Top Markets Q3","document":{"version":1,"kind":"reportDocument","id":"capacityLocationsTopMarketsQ3","title":"Capacity Locations Top Markets Q3","subtitle":"Q2 Market Ladder","description":"Capacity-first authored report starter seeded for Market -> Region -> Metro Area drill flows.","semanticSummary":{"kind":"semantic","modelRef":"model://example/performance/delivery@v1","modelLabel":"Ad Delivery","entity":"line_delivery","entityLabel":"Line Delivery","selectedDimensions":[{"id":"country_code","rawId":"country","label":"Market"}],"selectedMeasures":[{"id":"available_impressions","rawId":"avails","label":"Available Impressions","format":"compactNumber"}]},"refinements":[],"scope":{"params":[{"id":"dateRange","kind":"dateRange","label":"dateRange","required":true,"value":{"start":"2026-05-01","end":"2026-05-04"}},{"id":"channelsFilter","kind":"multiSelect","label":"Channels","required":false,"value":[]}],"dataSourceRef":"demoReportSource"},"layout":{"type":"stack","items":[{"blockId":"scopeFilters"},{"blockId":"activeDrillPath"},{"blockId":"primaryBuilder"},{"blockId":"narrativeIntro","size":"half"},{"blockId":"headlineKpi","size":"half"}]},"blocks":[{"id":"primaryBuilder","kind":"reportBuilderBlock","title":"Capacity Locations Top Markets Q3","source":{"kind":"dashboard.reportBuilder","containerId":"demoReportBuilder","stateKey":"demoReportBuilder","dataSourceRef":"demoReportSource"},"config":{"title":"Report Builder Demo","binding":{"mode":"semantic","modelRef":"model://example/performance/delivery@v1","entity":"line_delivery","selectedDimensions":["event_date","channel","country_code"],"selectedMeasures":["available_impressions"]},"measures":[{"id":"avails","key":"avails","semanticRef":"available_impressions","label":"Available Impressions","default":true,"format":"compactNumber","semanticDataType":"number"},{"id":"hhUniqs","key":"hhUniqs","semanticRef":"household_uniques","label":"Household Uniques","format":"compactNumber","semanticDataType":"number"}],"computedMeasures":[{"id":"reachRate","key":"reachRate","label":"Reach Rate","format":"percent","compute":{"type":"ratio","numerator":"hhUniqs","denominator":"avails","scale":100,"decimals":2}}],"dimensions":[{"id":"eventDate","key":"eventDate","semanticRef":"event_date","label":"Event Date","default":true,"chartAxis":true,"format":"date","semanticDataType":"date"},{"id":"channelV2","key":"channelV2","semanticRef":"channel","label":"Channel","default":true,"runtimeFilter":{"includeParamPath":"filters.includeChannelV2","excludeParamPath":"filters.excludeChannelV2"},"semanticDataType":"string"},{"id":"country","key":"country","semanticRef":"country_code","label":"Market","runtimeFilter":{"includeParamPath":"filters.includeCountry","excludeParamPath":"filters.excludeCountry"},"semanticDataType":"string"},{"id":"publisher","key":"publisher","semanticRef":"publisher","label":"Publisher","runtimeFilter":{"includeParamPath":"filters.includePublisher","excludeParamPath":"filters.excludePublisher"},"semanticDataType":"string"},{"id":"siteType","key":"siteType","semanticRef":"site_type","label":"Site Type","runtimeFilter":{"includeParamPath":"filters.includeSiteType","excludeParamPath":"filters.excludeSiteType"},"semanticDataType":"string"},{"id":"region","key":"region","semanticRef":"region","label":"Region","runtimeFilter":{"includeParamPath":"filters.includeLocationDim","excludeParamPath":"filters.excludeLocationDim","format":"locationTuple","parentField":"country"},"semanticDataType":"string"},{"id":"metrocode","key":"metrocode","semanticRef":"metro_code","label":"Metro Area","runtimeFilter":{"includeParamPath":"filters.includeMetrocode","excludeParamPath":"filters.excludeMetrocode"},"semanticDataType":"string"}],"staticFilters":[{"id":"dateRange","type":"dateRange","required":true,"startParamPath":"filters.From","endParamPath":"filters.To"},{"id":"channelsFilter","label":"Channels","multiple":true,"options":[{"label":"Display","value":"Display"},{"label":"CTV","value":"CTV"}]}],"drillMetadata":{"hierarchies":[{"id":"capacity_inventory","label":"Capacity Inventory","levels":[{"field":"channelV2","label":"Channel"},{"field":"publisher","label":"Publisher"},{"field":"siteType","label":"Site Type"}]},{"id":"capacity_location","label":"Capacity Location","levels":[{"field":"country","label":"Market"},{"field":"region","label":"Region"},{"field":"metrocode","label":"Metro Area"}]}],"fieldActions":[{"fieldRef":"channelV2","actions":[{"id":"drill_market","label":"Drill to Market","kind":"drill","nextFieldRef":"country"},{"id":"detail_channel","label":"Show channel details","kind":"detail","targetRef":"target://example/performance/channel-detail"}]},{"fieldRef":"country","actions":[{"id":"detail_market","label":"Show market details","kind":"detail","targetRef":"target://example/performance/market-detail"}]}],"detailTargets":[{"targetRef":"target://example/performance/channel-detail","navigationMode":"hostRoute","parameters":{"channel":"$value","campaign":"$row.campaign"}},{"targetRef":"target://example/performance/market-detail","navigationMode":"hostRoute","parameters":{"country":"$value"}}]},"result":{"chartCreationMode":"explicit","defaultMode":"chart","pageSize":50,"defaultTablePresets":[{"title":"Inventory Ladder","dimensions":["channelV2"],"measures":["avails","hhUniqs"],"primaryMeasure":"avails","orderField":"avails","orderDir":"desc","pageSize":12,"clearChart":true},{"title":"Location Ladder","dimensions":["country"],"measures":["avails","hhUniqs"],"primaryMeasure":"avails","orderField":"avails","orderDir":"desc","pageSize":12,"clearChart":true}],"orderFields":[{"value":"eventDate","field":"eventDate","default":true,"defaultDirection":"asc"},{"value":"avails","field":"avails","defaultDirection":"desc"},{"value":"hhUniqs","field":"hhUniqs","defaultDirection":"desc"}],"defaultChartSpecs":[{"title":"Inventory · Top Channels","type":"horizontal_bar","xField":"channelV2","yFields":["avails"]},{"title":"Locations · Top Markets","type":"horizontal_bar","xField":"country","yFields":["avails"]}]}},"state":{"selectedMeasures":["avails"],"primaryMeasure":"avails","selectedDimensions":["country"],"binding":{"mode":"semantic","modelRef":"model://example/performance/delivery@v1","entity":"line_delivery","selectedDimensions":["event_date","channel","country_code"],"selectedMeasures":["available_impressions"]},"localCalculatedFields":[],"localTableCalculations":[],"viewMode":"chart","chartSpec":{"title":"Locations · Top Markets","type":"horizontal_bar","xField":"country","yFields":["avails"]},"groupBy":"","page":1,"pageSize":12,"orderField":"avails","orderDir":"desc","staticFilters":{"dateRange":{"start":"2026-05-01","end":"2026-05-04"},"channelsFilter":[]},"dynamicGroups":{},"activeTablePreset":null,"lastTablePreset":null,"reportDocumentTitle":"Capacity Locations Top Markets Q3","reportDocumentSubtitle":"Q2 Market Ladder","reportDocumentDescription":"Capacity-first authored report starter seeded for Market -> Region -> Metro Area drill flows.","reportDocumentTemplateId":"capacity_location_brief","reportDocumentTemplateLabel":"Capacity Location Brief"},"scopeBindings":[{"paramId":"dateRange","target":"staticFilters.dateRange"},{"paramId":"channelsFilter","target":"staticFilters.channelsFilter"}]},{"id":"scopeFilters","kind":"filterBarBlock","title":"Scope","paramIds":["dateRange"]},{"id":"activeDrillPath","kind":"refinementBarBlock","title":"Active Drill Path","actionKinds":["remove","clearAll"],"emptyLabel":"No active location drill path"},{"id":"narrativeIntro","kind":"markdownBlock","title":"Location Outlook","markdown":"## Location Outlook\nStart at Market, then drill deeper through Region and Metro Area."},{"id":"headlineKpi","kind":"kpiBlock","title":"Top Market KPI","datasetRef":"primary","valueField":"avails","valueLabel":"Avails","secondaryField":"country","secondaryLabel":"Market","description":"Highlights the leading market row before drilling deeper.","emptyLabel":"No location KPI value available."}],"binding":{"mode":"semantic","modelRef":"model://example/performance/delivery@v1","entity":"line_delivery","selectedDimensions":["event_date","channel","country_code"],"selectedMeasures":["available_impressions"]}},"compileState":{"status":"clean","reportSpecVersion":1,"blockCount":6,"datasetCount":1},"source":{"kind":"reportBuilder.savedReportPayload","payloadId":"rbreport_capacity_q3_locations_top_markets","sourceArtifactId":"capacity_q3_locations_top_markets","sourceSession":{"sessionId":"rbexplore_capacityLocationsTopMarketsQ3","sourceRef":{"kind":"reportBuilder.reportTemplate","templateId":"capacity_location_brief","templateLabel":"Capacity Location Brief","contextLabel":"Capacity Locations Top Markets Q3 • Locations · Top Markets"}}}}
+{
+  "version": 1,
+  "kind": "updateReportDocumentPayload",
+  "updatedAt": 9502,
+  "reportRef": {
+    "reportId": "capacityLocationsTopMarketsQ3"
+  },
+  "expectedVersion": 8,
+  "title": "Capacity Locations Top Markets Q3",
+  "document": {
+    "version": 1,
+    "kind": "reportDocument",
+    "id": "capacityLocationsTopMarketsQ3",
+    "title": "Capacity Locations Top Markets Q3",
+    "subtitle": "Q2 Market Ladder",
+    "description": "Capacity-first authored report starter seeded for Market -> Region -> Metro Area drill flows.",
+    "templateId": "capacity_location_brief",
+    "templateLabel": "Capacity Location Brief",
+    "binding": {
+      "mode": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "entity": "line_delivery",
+      "selectedDimensions": [
+        "event_date",
+        "channel",
+        "country_code"
+      ],
+      "selectedMeasures": [
+        "available_impressions"
+      ]
+    },
+    "semanticSummary": {
+      "kind": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "modelLabel": "Ad Delivery",
+      "entity": "line_delivery",
+      "entityLabel": "Line Delivery",
+      "selectedDimensions": [
+        {
+          "id": "country_code",
+          "rawId": "country",
+          "label": "Market"
+        }
+      ],
+      "selectedMeasures": [
+        {
+          "id": "available_impressions",
+          "rawId": "avails",
+          "label": "Available Impressions",
+          "format": "compactNumber"
+        }
+      ]
+    },
+    "refinements": [],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        },
+        {
+          "id": "channelsFilter",
+          "kind": "multiSelect",
+          "label": "Channels",
+          "required": false,
+          "multiple": true,
+          "options": [
+            {
+              "label": "Display",
+              "value": "Display"
+            },
+            {
+              "label": "CTV",
+              "value": "CTV"
+            }
+          ],
+          "value": []
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    },
+    "presentation": {
+      "orderFields": [
+        {
+          "value": "eventDate",
+          "field": "eventDate",
+          "default": true,
+          "defaultDirection": "asc"
+        },
+        {
+          "value": "avails",
+          "field": "avails",
+          "defaultDirection": "desc"
+        },
+        {
+          "value": "hhUniqs",
+          "field": "hhUniqs",
+          "defaultDirection": "desc"
+        }
+      ],
+      "defaultTablePresets": [
+        {
+          "title": "Inventory Ladder",
+          "dimensions": [
+            "channelV2"
+          ],
+          "measures": [
+            "avails",
+            "hhUniqs"
+          ],
+          "primaryMeasure": "avails",
+          "orderField": "avails",
+          "orderDir": "desc",
+          "pageSize": 12,
+          "clearChart": true
+        },
+        {
+          "title": "Location Ladder",
+          "dimensions": [
+            "country"
+          ],
+          "measures": [
+            "avails",
+            "hhUniqs"
+          ],
+          "primaryMeasure": "avails",
+          "orderField": "avails",
+          "orderDir": "desc",
+          "pageSize": 12,
+          "clearChart": true
+        }
+      ],
+      "defaultMode": "chart",
+      "pageSize": 50,
+      "chartCreationMode": "explicit",
+      "defaultChartSpecs": [
+        {
+          "title": "Inventory · Top Channels",
+          "type": "horizontal_bar",
+          "xField": "channelV2",
+          "yFields": [
+            "avails"
+          ]
+        },
+        {
+          "title": "Locations · Top Markets",
+          "type": "horizontal_bar",
+          "xField": "country",
+          "yFields": [
+            "avails"
+          ]
+        }
+      ]
+    },
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "demoReportSource",
+        "label": "Report Builder Demo",
+        "description": "Primary report dataset",
+        "kindLabel": "primary",
+        "request": {
+          "measures": {
+            "avails": true
+          },
+          "dimensions": {
+            "country": true
+          },
+          "filters": {
+            "From": "2026-05-01",
+            "To": "2026-05-04"
+          },
+          "semanticSelection": {
+            "modelRef": "model://example/performance/delivery@v1",
+            "entity": "line_delivery",
+            "selection": {
+              "dimensions": [
+                "country_code"
+              ],
+              "measures": [
+                "available_impressions"
+              ]
+            },
+            "refinements": [],
+            "parameters": {}
+          },
+          "limit": 12,
+          "offset": 0,
+          "orderBy": [
+            "avails desc"
+          ]
+        },
+        "dimensions": [
+          {
+            "id": "eventDate",
+            "key": "eventDate",
+            "semanticRef": "event_date",
+            "label": "Event Date",
+            "default": true,
+            "chartAxis": true,
+            "format": "date",
+            "semanticDataType": "date"
+          },
+          {
+            "id": "channelV2",
+            "key": "channelV2",
+            "semanticRef": "channel",
+            "label": "Channel",
+            "default": true,
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelV2",
+              "excludeParamPath": "filters.excludeChannelV2"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "country",
+            "key": "country",
+            "semanticRef": "country_code",
+            "label": "Market",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "publisher",
+            "key": "publisher",
+            "semanticRef": "publisher",
+            "label": "Publisher",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includePublisher",
+              "excludeParamPath": "filters.excludePublisher"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "siteType",
+            "key": "siteType",
+            "semanticRef": "site_type",
+            "label": "Site Type",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeSiteType",
+              "excludeParamPath": "filters.excludeSiteType"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "region",
+            "key": "region",
+            "semanticRef": "region",
+            "label": "Region",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeLocationDim",
+              "excludeParamPath": "filters.excludeLocationDim",
+              "format": "locationTuple",
+              "parentField": "country"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "metrocode",
+            "key": "metrocode",
+            "semanticRef": "metro_code",
+            "label": "Metro Area",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeMetrocode",
+              "excludeParamPath": "filters.excludeMetrocode"
+            },
+            "semanticDataType": "string"
+          }
+        ],
+        "measures": [
+          {
+            "id": "avails",
+            "key": "avails",
+            "semanticRef": "available_impressions",
+            "label": "Available Impressions",
+            "default": true,
+            "format": "compactNumber",
+            "semanticDataType": "number"
+          },
+          {
+            "id": "hhUniqs",
+            "key": "hhUniqs",
+            "semanticRef": "household_uniques",
+            "label": "Household Uniques",
+            "format": "compactNumber",
+            "semanticDataType": "number"
+          }
+        ],
+        "computedMeasures": [
+          {
+            "id": "reachRate",
+            "key": "reachRate",
+            "label": "Reach Rate",
+            "format": "percent",
+            "compute": {
+              "type": "ratio",
+              "numerator": "hhUniqs",
+              "denominator": "avails",
+              "scale": 100,
+              "decimals": 2
+            }
+          }
+        ],
+        "columnOptions": [
+          {
+            "key": "eventDate",
+            "label": "Event Date",
+            "kind": "dimension",
+            "sourceKey": "eventDate",
+            "format": "date",
+            "semanticRef": "event_date",
+            "default": true,
+            "chartAxis": true
+          },
+          {
+            "key": "channelV2",
+            "label": "Channel",
+            "kind": "dimension",
+            "sourceKey": "channelV2",
+            "semanticRef": "channel",
+            "default": true,
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelV2",
+              "excludeParamPath": "filters.excludeChannelV2"
+            }
+          },
+          {
+            "key": "country",
+            "label": "Market",
+            "kind": "dimension",
+            "sourceKey": "country",
+            "semanticRef": "country_code",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          },
+          {
+            "key": "publisher",
+            "label": "Publisher",
+            "kind": "dimension",
+            "sourceKey": "publisher",
+            "semanticRef": "publisher",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includePublisher",
+              "excludeParamPath": "filters.excludePublisher"
+            }
+          },
+          {
+            "key": "siteType",
+            "label": "Site Type",
+            "kind": "dimension",
+            "sourceKey": "siteType",
+            "semanticRef": "site_type",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeSiteType",
+              "excludeParamPath": "filters.excludeSiteType"
+            }
+          },
+          {
+            "key": "region",
+            "label": "Region",
+            "kind": "dimension",
+            "sourceKey": "region",
+            "semanticRef": "region",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeLocationDim",
+              "excludeParamPath": "filters.excludeLocationDim",
+              "format": "locationTuple",
+              "parentField": "country"
+            }
+          },
+          {
+            "key": "metrocode",
+            "label": "Metro Area",
+            "kind": "dimension",
+            "sourceKey": "metrocode",
+            "semanticRef": "metro_code",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeMetrocode",
+              "excludeParamPath": "filters.excludeMetrocode"
+            }
+          },
+          {
+            "key": "avails",
+            "label": "Available Impressions",
+            "kind": "measure",
+            "sourceKey": "avails",
+            "format": "compactNumber",
+            "semanticRef": "available_impressions",
+            "default": true
+          },
+          {
+            "key": "hhUniqs",
+            "label": "Household Uniques",
+            "kind": "measure",
+            "sourceKey": "hhUniqs",
+            "format": "compactNumber",
+            "semanticRef": "household_uniques"
+          },
+          {
+            "key": "reachRate",
+            "label": "Reach Rate",
+            "kind": "measure",
+            "format": "percent"
+          }
+        ],
+        "valueFieldOptions": [
+          {
+            "value": "avails",
+            "label": "Available Impressions",
+            "format": "compactNumber",
+            "semanticRef": "available_impressions",
+            "default": true
+          },
+          {
+            "value": "hhUniqs",
+            "label": "Household Uniques",
+            "format": "compactNumber",
+            "semanticRef": "household_uniques"
+          },
+          {
+            "value": "reachRate",
+            "label": "Reach Rate",
+            "format": "percent"
+          }
+        ],
+        "secondaryFieldOptions": [
+          {
+            "value": "eventDate",
+            "label": "Event Date",
+            "format": "date",
+            "semanticRef": "event_date",
+            "default": true
+          },
+          {
+            "value": "channelV2",
+            "label": "Channel",
+            "semanticRef": "channel",
+            "default": true
+          },
+          {
+            "value": "country",
+            "label": "Market",
+            "semanticRef": "country_code"
+          },
+          {
+            "value": "publisher",
+            "label": "Publisher",
+            "semanticRef": "publisher"
+          },
+          {
+            "value": "siteType",
+            "label": "Site Type",
+            "semanticRef": "site_type"
+          },
+          {
+            "value": "region",
+            "label": "Region",
+            "semanticRef": "region"
+          },
+          {
+            "value": "metrocode",
+            "label": "Metro Area",
+            "semanticRef": "metro_code"
+          }
+        ],
+        "chartFieldOptions": [
+          {
+            "key": "eventDate",
+            "aliases": [
+              "eventDate"
+            ],
+            "label": "Event Date",
+            "kind": "dimension",
+            "format": "date",
+            "semanticRef": "event_date",
+            "default": true,
+            "chartAxis": true
+          },
+          {
+            "key": "channelV2",
+            "aliases": [
+              "channelV2"
+            ],
+            "label": "Channel",
+            "kind": "dimension",
+            "semanticRef": "channel",
+            "default": true
+          },
+          {
+            "key": "country",
+            "aliases": [
+              "country"
+            ],
+            "label": "Market",
+            "kind": "dimension",
+            "semanticRef": "country_code"
+          },
+          {
+            "key": "publisher",
+            "aliases": [
+              "publisher"
+            ],
+            "label": "Publisher",
+            "kind": "dimension",
+            "semanticRef": "publisher"
+          },
+          {
+            "key": "siteType",
+            "aliases": [
+              "siteType"
+            ],
+            "label": "Site Type",
+            "kind": "dimension",
+            "semanticRef": "site_type"
+          },
+          {
+            "key": "region",
+            "aliases": [
+              "region"
+            ],
+            "label": "Region",
+            "kind": "dimension",
+            "semanticRef": "region"
+          },
+          {
+            "key": "metrocode",
+            "aliases": [
+              "metrocode"
+            ],
+            "label": "Metro Area",
+            "kind": "dimension",
+            "semanticRef": "metro_code"
+          },
+          {
+            "key": "avails",
+            "aliases": [
+              "avails"
+            ],
+            "label": "Available Impressions",
+            "kind": "measure",
+            "format": "compactNumber",
+            "semanticRef": "available_impressions",
+            "default": true,
+            "align": "right"
+          },
+          {
+            "key": "hhUniqs",
+            "aliases": [
+              "hhUniqs"
+            ],
+            "label": "Household Uniques",
+            "kind": "measure",
+            "format": "compactNumber",
+            "semanticRef": "household_uniques",
+            "align": "right"
+          },
+          {
+            "key": "reachRate",
+            "aliases": [
+              "reachRate"
+            ],
+            "label": "Reach Rate",
+            "kind": "measure",
+            "format": "percent",
+            "align": "right"
+          }
+        ],
+        "scopeParamOptions": [
+          {
+            "value": "dateRange",
+            "label": "dateRange",
+            "kind": "dateRange",
+            "required": true,
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          },
+          {
+            "value": "channelsFilter",
+            "label": "Channels",
+            "kind": "multiSelect",
+            "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "layout": {
+      "type": "stack",
+      "items": [
+        {
+          "blockId": "scopeFilters"
+        },
+        {
+          "blockId": "activeDrillPath"
+        },
+        {
+          "blockId": "primaryBuilder"
+        },
+        {
+          "blockId": "narrativeIntro",
+          "size": "half"
+        },
+        {
+          "blockId": "headlineKpi",
+          "size": "half"
+        }
+      ]
+    },
+    "blocks": [
+      {
+        "id": "scopeFilters",
+        "kind": "filterBarBlock",
+        "title": "Filters",
+        "datasetRef": "primary",
+        "paramIds": [
+          "dateRange"
+        ]
+      },
+      {
+        "id": "activeDrillPath",
+        "kind": "refinementBarBlock",
+        "title": "Active Drill Path",
+        "actionKinds": [
+          "remove",
+          "clearAll"
+        ],
+        "emptyLabel": "No active location drill path"
+      },
+      {
+        "id": "narrativeIntro",
+        "kind": "markdownBlock",
+        "title": "Location Outlook",
+        "markdown": "## Location Outlook\nStart at Market, then drill deeper through Region and Metro Area."
+      },
+      {
+        "id": "headlineKpi",
+        "kind": "kpiBlock",
+        "title": "Top Market KPI",
+        "datasetRef": "primary",
+        "valueField": "avails",
+        "valueLabel": "Avails",
+        "secondaryField": "country",
+        "secondaryLabel": "Market",
+        "description": "Highlights the leading market row before drilling deeper.",
+        "emptyLabel": "No location KPI value available."
+      },
+      {
+        "id": "primaryBuilder",
+        "kind": "reportBuilderBlock",
+        "title": "Capacity Locations Top Markets Q3",
+        "source": {
+          "kind": "dashboard.reportBuilder",
+          "containerId": "demoReportBuilder",
+          "stateKey": "demoReportBuilder",
+          "dataSourceRef": "demoReportSource"
+        },
+        "config": {
+          "title": "Report Builder Demo",
+          "drillMetadata": {
+            "hierarchies": [
+              {
+                "id": "capacity_inventory",
+                "label": "Capacity Inventory",
+                "levels": [
+                  {
+                    "field": "channelV2",
+                    "label": "Channel"
+                  },
+                  {
+                    "field": "publisher",
+                    "label": "Publisher"
+                  },
+                  {
+                    "field": "siteType",
+                    "label": "Site Type"
+                  }
+                ]
+              },
+              {
+                "id": "capacity_location",
+                "label": "Capacity Location",
+                "levels": [
+                  {
+                    "field": "country",
+                    "label": "Market"
+                  },
+                  {
+                    "field": "region",
+                    "label": "Region"
+                  },
+                  {
+                    "field": "metrocode",
+                    "label": "Metro Area"
+                  }
+                ]
+              }
+            ],
+            "fieldActions": [
+              {
+                "fieldRef": "channelV2",
+                "actions": [
+                  {
+                    "id": "drill_market",
+                    "label": "Drill to Market",
+                    "kind": "drill",
+                    "nextFieldRef": "country"
+                  },
+                  {
+                    "id": "detail_channel",
+                    "label": "Show channel details",
+                    "kind": "detail",
+                    "targetRef": "target://example/performance/channel-detail"
+                  }
+                ]
+              },
+              {
+                "fieldRef": "country",
+                "actions": [
+                  {
+                    "id": "detail_market",
+                    "label": "Show market details",
+                    "kind": "detail",
+                    "targetRef": "target://example/performance/market-detail"
+                  }
+                ]
+              }
+            ],
+            "detailTargets": [
+              {
+                "targetRef": "target://example/performance/channel-detail",
+                "navigationMode": "hostRoute",
+                "parameters": {
+                  "channel": "$value",
+                  "campaign": "$row.campaign"
+                }
+              },
+              {
+                "targetRef": "target://example/performance/market-detail",
+                "navigationMode": "hostRoute",
+                "parameters": {
+                  "country": "$value"
+                }
+              }
+            ]
+          },
+          "semanticModel": {
+            "modelRef": "model://example/performance/delivery@v1",
+            "version": 1,
+            "label": "Ad Delivery",
+            "entities": [
+              {
+                "id": "line_delivery",
+                "label": "Line Delivery",
+                "dimensions": [
+                  {
+                    "id": "event_date",
+                    "key": "event_date",
+                    "label": "Event Date",
+                    "featureType": "dimension",
+                    "dataType": "date"
+                  },
+                  {
+                    "id": "channel",
+                    "key": "channel",
+                    "label": "Channel",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "country_code",
+                    "key": "country_code",
+                    "label": "Market",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "publisher",
+                    "key": "publisher",
+                    "label": "Publisher",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "site_type",
+                    "key": "site_type",
+                    "label": "Site Type",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "region",
+                    "key": "region",
+                    "label": "Region",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "metro_code",
+                    "key": "metro_code",
+                    "label": "Metro Area",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  }
+                ],
+                "measures": [
+                  {
+                    "id": "available_impressions",
+                    "key": "available_impressions",
+                    "label": "Available Impressions",
+                    "featureType": "measure",
+                    "dataType": "number",
+                    "format": "compactNumber",
+                    "aggregation": "sum"
+                  },
+                  {
+                    "id": "household_uniques",
+                    "key": "household_uniques",
+                    "label": "Household Uniques",
+                    "featureType": "measure",
+                    "dataType": "number",
+                    "format": "compactNumber",
+                    "aggregation": "sum"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "state": {
+          "selectedMeasures": [
+            "avails"
+          ],
+          "primaryMeasure": "avails",
+          "selectedDimensions": [
+            "country"
+          ],
+          "localCalculatedFields": [],
+          "localTableCalculations": [],
+          "viewMode": "chart",
+          "chartSpec": {
+            "title": "Locations · Top Markets",
+            "type": "horizontal_bar",
+            "xField": "country",
+            "yFields": [
+              "avails"
+            ]
+          },
+          "groupBy": "",
+          "page": 1,
+          "pageSize": 12,
+          "orderField": "avails",
+          "orderDir": "desc",
+          "scopeParams": {
+            "dateRange": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            },
+            "channelsFilter": []
+          },
+          "dynamicGroups": {},
+          "activeTablePreset": null,
+          "lastTablePreset": null,
+          "reportDocumentTitle": "Capacity Locations Top Markets Q3",
+          "reportDocumentSubtitle": "Q2 Market Ladder",
+          "reportDocumentDescription": "Capacity-first authored report starter seeded for Market -> Region -> Metro Area drill flows.",
+          "reportDocumentTemplateId": "capacity_location_brief",
+          "reportDocumentTemplateLabel": "Capacity Location Brief"
+        },
+        "scopeBindings": [
+          {
+            "paramId": "dateRange",
+            "target": "staticFilters.dateRange"
+          },
+          {
+            "paramId": "channelsFilter",
+            "target": "staticFilters.channelsFilter"
+          }
+        ]
+      }
+    ]
+  },
+  "compileState": {
+    "status": "clean",
+    "reportSpecVersion": 1,
+    "blockCount": 6,
+    "datasetCount": 1
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_capacity_q3_locations_top_markets",
+    "sourceArtifactId": "capacity_q3_locations_top_markets",
+    "sourceSession": {
+      "sessionId": "rbexplore_capacityLocationsTopMarketsQ3",
+      "sourceRef": {
+        "kind": "reportBuilder.reportTemplate",
+        "templateId": "capacity_location_brief",
+        "templateLabel": "Capacity Location Brief",
+        "contextLabel": "Capacity Locations Top Markets Q3 • Locations · Top Markets"
+      }
+    }
+  }
+}

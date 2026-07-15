@@ -137,6 +137,62 @@ function buildAuthoredCapabilityActions({
 } = {}) {
     return [
         {
+            id: "sectionBlock",
+            label: "Add section",
+            icon: "layout-auto",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "compositeBlock",
+            label: "Add grouped panel",
+            icon: "widget",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "tabGroupBlock",
+            label: "Add section tabs",
+            icon: "properties",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "stepperBlock",
+            label: "Add process",
+            icon: "flows",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "infoPanelBlock",
+            label: "Add info panel",
+            icon: "info-sign",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "calloutBlock",
+            label: "Add callout",
+            icon: "warning-sign",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "kanbanBlock",
+            label: "Add pipeline",
+            icon: "projects",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
+            id: "timelineBlock",
+            label: "Add timeline",
+            icon: "time",
+            disabled: false,
+            disabledReason: "",
+        },
+        {
             id: "markdownBlock",
             label: "Add narrative",
             icon: "annotation",
@@ -201,7 +257,7 @@ function buildAuthoredActionGroups() {
             id: "document",
             title: "Report Document",
             description: "Narrative, pill, chart, table, and KPI building blocks for the report canvas.",
-            actionIds: ["markdownBlock", "badgesBlock", "chartBlock", "tableBlock", "kpiBlock"],
+            actionIds: ["sectionBlock", "compositeBlock", "tabGroupBlock", "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock", "markdownBlock", "badgesBlock", "chartBlock", "tableBlock", "kpiBlock"],
         },
         {
             id: "runtime",

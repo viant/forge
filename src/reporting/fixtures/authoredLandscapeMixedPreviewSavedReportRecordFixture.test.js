@@ -70,7 +70,7 @@ assert.equal(kpi?.box?.y, 356);
 assert.equal(kpi?.box?.width, 348);
 assert.equal(record.exportRequest.reportFill.blocks.find((block) => block.id === "headlineKpi")?.content?.valueField, "spendPerImpression");
 assert.equal(record.exportRequest.reportFill.blocks.find((block) => block.id === "headlineKpi")?.content?.value, 2.45);
-assert.equal(pageTwoElements.find((element) => element?.id === "headlineKpi__value_0")?.text, "Spend / Impression: 2.45");
+assert.equal(pageTwoElements.find((element) => element?.id === "headlineKpi__value_0")?.text, "Spend / Impression: 2.45000");
 assert.equal(resolveReportBuilderReopenCompatibility(
   primaryBuilderBlock.source,
   {
@@ -127,7 +127,7 @@ const reopenedPreview = buildReportBuilderRuntimePreview({
   pageGeometry: record.exportRequest.reportPrint.pageGeometry,
 });
 assert.equal(reopenedPreview.reportFill.blocks.find((block) => block.id === "headlineKpi")?.content?.value, 2.45);
-assert.equal(reopenedPreview.reportPrint.pages.flatMap((page) => page.elements || []).find((element) => element?.id === "headlineKpi__value_0")?.text, "Spend / Impression: 2.45");
+assert.equal(reopenedPreview.reportPrint.pages.flatMap((page) => page.elements || []).find((element) => element?.id === "headlineKpi__value_0")?.text, "Spend / Impression: 2.45000");
 assert.equal(reopenedPreview.reportPrint.diagnostics.length, 0);
 assert.deepEqual(reopenedModel.reportSpec, record.exportRequest.reportSpec);
 assert.deepEqual(reopenedPreview.reportFill, record.exportRequest.reportFill);

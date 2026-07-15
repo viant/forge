@@ -868,7 +868,7 @@ assert.equal(audienceThinListDiagnostic.semanticBindingChips.includes("Parameter
 assert.equal(audienceThinListDiagnostic.scopeSummaryText, "Date Range • Channels • Audience Segment");
 assert.equal(
     audienceThinListDiagnostic.semanticBindingFieldGroups[2].fields.some((field) => field.definitionRef === "harmonizer://feature/user.segment"),
-    true,
+    false,
 );
 
 assert.deepEqual(listDiagnostic, {

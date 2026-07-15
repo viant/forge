@@ -554,7 +554,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("setSelectedBuilderChartSelection(null);\n            const nextPreparedState = applyQuickChartToAuthoredDocument"),
+  source.includes("setSelectedBuilderChartSelection(null);") && source.includes("const nextPreparedState = applyQuickChartToAuthoredDocument"),
   true,
   "ReportBuilder should also clear stale chart selections when applying quick-chart presets that bypass the explicit chart dialog path.",
 );

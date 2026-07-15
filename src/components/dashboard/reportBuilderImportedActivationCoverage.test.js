@@ -13,4 +13,14 @@ assert.ok(
     "expected imported saved-record activation to prefer targetIdentity",
 );
 
+assert.ok(
+    source.includes('activeImportedSemanticSessionMatchesCurrentArtifact'),
+    "expected activation cards to rely on the canonical hydrated-session signal",
+);
+
+assert.ok(
+    source.includes('useExplicitActivationState: true'),
+    "expected activation cards to avoid treating local import tracking as active state",
+);
+
 console.log("reportBuilderImportedActivationCoverage ✓ imported activation paths prefer stable targetIdentity");

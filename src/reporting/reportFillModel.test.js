@@ -9,6 +9,14 @@ import {
   buildReportBuilderReportDocument,
   buildReportDocumentBadgesBlock,
   buildReportDocumentChartBlock,
+  buildReportDocumentCollectionBlock,
+  buildReportDocumentSectionBlock,
+  buildReportDocumentCompositeBlock,
+  buildReportDocumentStepperBlock,
+  buildReportDocumentInfoPanelBlock,
+  buildReportDocumentCalloutBlock,
+  buildReportDocumentKanbanBlock,
+  buildReportDocumentTimelineBlock,
   buildReportDocumentFilterBarBlock,
   buildReportDocumentGeoMapBlock,
   buildReportDocumentKpiBlock,
@@ -301,6 +309,194 @@ assert.equal(
   authoredHelperFill.blocks.find((block) => block.kind === "kpiBlock" && block.id === "headlineKpi")?.content?.valueFormat,
   "currency",
 );
+
+const collectionFill = buildReportFillFromReportSpec({
+  title: "Collection Runtime",
+  datasets: [
+    {
+      id: "primary",
+      request: {},
+    },
+  ],
+  blocks: [
+    buildReportDocumentCollectionBlock({
+      id: "topChannels",
+      title: "Top Channels",
+      datasetRef: "primary",
+      itemTitleField: "channelId",
+      valueField: "totalSpend",
+      valueLabel: "Spend",
+      secondaryField: "eventDate",
+      secondaryLabel: "Date",
+      rowLimit: 2,
+      columns: 2,
+      bodyTemplate: "**${valueLabel}:** ${value}\n**${secondaryLabel}:** ${secondaryValue}",
+    }),
+  ],
+}, {
+  primary: {
+    rows: [
+      { eventDate: "2026-05-01", channelId: "Display", totalSpend: 40400 },
+      { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 34300 },
+      { eventDate: "2026-05-03", channelId: "Audio", totalSpend: 1200 },
+    ],
+    provenance: {
+      rowCount: 3,
+    },
+  },
+});
+
+assert.deepEqual(collectionFill.blocks[0].content.items.map((item) => item.title), ["Display", "CTV"]);
+assert.equal(collectionFill.blocks[0].content.layout, "grid");
+assert.equal(collectionFill.blocks[0].content.columns, 2);
+assert.equal(collectionFill.blocks[0].content.rowCount, 3);
+assert.equal(collectionFill.blocks[0].content.rowLimit, 2);
+assert.equal(collectionFill.blocks[0].content.items[0].bodyMarkdown.includes("Spend"), true);
+
+const sectionFill = buildReportFillFromReportSpec({
+  title: "Section Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentSectionBlock({
+      id: "overviewSection",
+      title: "Overview",
+      subtitle: "Supply outlook",
+      description: "Starts with the high-level executive view.",
+    }),
+  ],
+}, {
+  primary: { rows: [] },
+});
+assert.equal(sectionFill.blocks[0].kind, "sectionBlock");
+assert.equal(sectionFill.blocks[0].content.navigationLabel, "Overview");
+assert.equal(sectionFill.blocks[0].content.subtitle, "Supply outlook");
+
+const compositeFill = buildReportFillFromReportSpec({
+  title: "Composite Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentCompositeBlock({
+      id: "summaryPanel",
+      title: "Summary panel",
+      description: "Groups the opening narrative and KPI.",
+      childBlockIds: ["narrativeIntro", "headlineKpi"],
+    }),
+  ],
+}, {
+  primary: { rows: [] },
+});
+assert.equal(compositeFill.blocks[0].kind, "compositeBlock");
+assert.deepEqual(compositeFill.blocks[0].content.childBlockIds, ["narrativeIntro", "headlineKpi"]);
+assert.equal(compositeFill.blocks[0].content.description, "Groups the opening narrative and KPI.");
+
+const stepperFill = buildReportFillFromReportSpec({
+  title: "Stepper Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentStepperBlock({
+      id: "integrationFlow",
+      title: "Direct Integration Path",
+      description: "Three stages to define a direct path.",
+      steps: [
+        { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+        { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+      ],
+    }),
+  ],
+}, {
+  primary: { rows: [] },
+});
+assert.equal(stepperFill.blocks[0].kind, "stepperBlock");
+assert.equal(stepperFill.blocks[0].content.steps.length, 2);
+assert.equal(stepperFill.blocks[0].content.steps[0].title, "Bid directly");
+
+const infoPanelFill = buildReportFillFromReportSpec({
+  title: "Info Panel Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentInfoPanelBlock({
+      id: "directIntro",
+      title: "What is a Direct Integration Path?",
+      eyebrow: "What is it?",
+      description: "Explains the direct path concept.",
+      tone: "info",
+      body: "A direct integration connects bidding directly into the publisher ad server.",
+    }),
+  ],
+}, {
+  primary: { rows: [] },
+});
+assert.equal(infoPanelFill.blocks[0].kind, "infoPanelBlock");
+assert.equal(infoPanelFill.blocks[0].content.eyebrow, "What is it?");
+assert.equal(infoPanelFill.blocks[0].content.tone, "info");
+
+const calloutFill = buildReportFillFromReportSpec({
+  title: "Callout Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentCalloutBlock({
+      id: "launchCallout",
+      title: "Launch update",
+      icon: "warning-sign",
+      description: "Important rollout note.",
+      tone: "warning",
+      badges: ["Executive", "Launch Ready"],
+      body: "Publisher activation is staged for Friday.",
+    }),
+  ],
+}, {
+  primary: { rows: [] },
+});
+assert.equal(calloutFill.blocks[0].kind, "calloutBlock");
+assert.equal(calloutFill.blocks[0].content.icon, "warning-sign");
+assert.deepEqual(calloutFill.blocks[0].content.badges, ["Executive", "Launch Ready"]);
+assert.equal(calloutFill.blocks[0].content.tone, "warning");
+
+const kanbanFill = buildReportFillFromReportSpec({
+  title: "Kanban Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentKanbanBlock({
+      id: "publisherPipeline",
+      title: "Publisher Pipeline",
+      description: "Track publisher activations by stage.",
+      columns: [
+        {
+          id: "signed",
+          title: "Signed",
+          cards: [
+            { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+          ],
+        },
+      ],
+    }),
+  ],
+}, {
+  primary: { rows: [] },
+});
+assert.equal(kanbanFill.blocks[0].kind, "kanbanBlock");
+assert.equal(kanbanFill.blocks[0].content.columns.length, 1);
+assert.equal(kanbanFill.blocks[0].content.columns[0].cards[0].title, "Tubi");
+
+const timelineFill = buildReportFillFromReportSpec({
+  title: "Timeline Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentTimelineBlock({
+      id: "integrationTimeline",
+      title: "Integration Timeline",
+      description: "Track the rollout milestones.",
+      events: [
+        { id: "event_1", date: "2026-07-15", badge: "Target", title: "Roku signed", body: "Expected signature date." },
+      ],
+    }),
+  ],
+}, {
+  primary: { rows: [] },
+});
+assert.equal(timelineFill.blocks[0].kind, "timelineBlock");
+assert.equal(timelineFill.blocks[0].content.events.length, 1);
+assert.equal(timelineFill.blocks[0].content.events[0].title, "Roku signed");
 
 const singleDatasetDashboardFill = buildReportFillFromReportSpec({
   title: "Single Dataset Dashboard",
@@ -821,6 +1017,328 @@ assert.deepEqual(documentFill.blocks.find((block) => block.id === "comparisonTab
   value: null,
   displayValue: null,
   visualState: null,
+});
+const customBadgeFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "customBadgeRuntime",
+    stateKey: "customBadgeRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Custom Badge Runtime",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["badgeTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "badgeTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "status",
+          label: "Status",
+          cellVisual: {
+            kind: "badge",
+            rules: [
+              { value: "healthy", tone: "success", label: "Healthy", color: "#0f4c81", background: "#d9f2ff" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [{ status: "healthy" }],
+  },
+});
+assert.deepEqual(customBadgeFill.blocks[0].content.resolvedRows[0].cells[0].visualState, {
+  kind: "badge",
+  tone: "success",
+  label: "Healthy",
+  textColor: "#0f4c81",
+  borderColor: "#0f4c81",
+  backgroundColor: "#d9f2ff",
+});
+const customToneFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "customToneRuntime",
+    stateKey: "customToneRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Custom Tone Runtime",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["toneTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "toneTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "status",
+          label: "Status",
+          cellVisual: {
+            kind: "tone",
+            rules: [
+              { value: "watch", tone: "warning", label: "Watch", color: "#7a271a", background: "#fdecea" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [{ status: "watch" }],
+  },
+});
+assert.deepEqual(customToneFill.blocks[0].content.resolvedRows[0].cells[0].visualState, {
+  kind: "tone",
+  tone: "warning",
+  label: "Watch",
+  textColor: "#7a271a",
+  borderColor: "#7a271a",
+  backgroundColor: "#fdecea",
+});
+const deltaFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "deltaRuntime",
+    stateKey: "deltaRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Delta Runtime",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["deltaTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "deltaTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "wowDelta",
+          label: "WoW Delta",
+          format: "percentFraction",
+          cellVisual: {
+            kind: "delta",
+            valueField: "wowDelta",
+          },
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [{ wowDelta: 0.12 }],
+  },
+});
+assert.deepEqual(deltaFill.blocks[0].content.resolvedRows[0].cells[0].visualState, {
+  kind: "delta",
+  value: 0.12,
+  tone: "success",
+  label: "+12.0%",
+});
+const rankVisualFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "rankVisualRuntime",
+    stateKey: "rankVisualRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Rank Visual Runtime",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["rankTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "rankTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "spend",
+          label: "Spend Rank",
+          cellVisual: {
+            kind: "rank",
+            valueField: "spend",
+          },
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [{ spend: 120 }, { spend: 240 }],
+  },
+});
+assert.deepEqual(rankVisualFill.blocks[0].content.resolvedRows[0].cells[0].visualState, {
+  kind: "rank",
+  value: 2,
+  tone: "info",
+  label: "#2",
+});
+const sparkBarFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "sparkBarRuntime",
+    stateKey: "sparkBarRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Spark Bar Runtime",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["sparkTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "sparkTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "sparkValue",
+          label: "Spark",
+          cellVisual: {
+            kind: "sparkBar",
+            valueField: "sparkValue",
+            range: { mode: "columnMax" },
+            palette: ["#eef2f6", "#4c6fff"],
+          },
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [{ sparkValue: 30 }, { sparkValue: 90 }],
+  },
+});
+assert.deepEqual(sparkBarFill.blocks[0].content.resolvedRows[0].cells[0].visualState, {
+  kind: "sparkBar",
+  value: 30,
+  percent: 0,
+  palette: ["#eef2f6", "#4c6fff"],
+});
+const shareBarFill = buildReportFillFromReportSpec({
+  version: 1,
+  source: {
+    containerId: "shareBarRuntime",
+    stateKey: "shareBarRuntime",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Share Bar Runtime",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["shareTable"],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "shareTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "shareMix",
+          label: "Share Mix",
+          cellVisual: {
+            kind: "shareBar",
+            segments: [
+              { valueField: "ctvShare", label: "CTV", color: "#137cbd" },
+              { valueField: "displayShare", label: "Display", color: "#0f9960" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+}, {
+  primary: {
+    rows: [{ ctvShare: 0.6, displayShare: 0.4 }],
+  },
+});
+assert.deepEqual(shareBarFill.blocks[0].content.resolvedRows[0].cells[0].visualState, {
+  kind: "shareBar",
+  segments: [
+    { label: "CTV", color: "#137cbd", value: 0.6, percent: 0.6 },
+    { label: "Display", color: "#0f9960", value: 0.4, percent: 0.4 },
+  ],
+  label: "CTV 60.0% · Display 40.0%",
 });
 assert.deepEqual(documentFill.blocks.find((block) => block.id === "narrativeIntro").content, {
   title: "Executive Summary",

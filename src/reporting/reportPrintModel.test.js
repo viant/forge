@@ -5,6 +5,15 @@ import { buildReportFillFromReportSpec } from "./reportFillModel.js";
 import {
   buildReportBuilderReportDocument,
   buildReportDocumentChartBlock,
+  buildReportDocumentCollectionBlock,
+  buildReportDocumentSectionBlock,
+  buildReportDocumentCompositeBlock,
+  buildReportDocumentTabGroupBlock,
+  buildReportDocumentStepperBlock,
+  buildReportDocumentInfoPanelBlock,
+  buildReportDocumentCalloutBlock,
+  buildReportDocumentKanbanBlock,
+  buildReportDocumentTimelineBlock,
   buildReportDocumentFilterBarBlock,
   buildReportDocumentGeoMapBlock,
   buildReportDocumentKpiBlock,
@@ -390,7 +399,13 @@ const authoredDocument = buildReportBuilderReportDocument({
         { blockId: "primaryBuilder" },
         { blockId: "headlineKpi", size: "half" },
         { blockId: "comparisonTable" },
+        { blockId: "overviewSection" },
+        { blockId: "integrationFlow" },
+        { blockId: "directIntro" },
+        { blockId: "publisherPipeline" },
+        { blockId: "integrationTimeline" },
         { blockId: "channelTrend" },
+        { blockId: "topChannels" },
         { blockId: "stateGeo" },
         { blockId: "narrativeIntro" },
       ],
@@ -452,6 +467,51 @@ const authoredDocument = buildReportBuilderReportDocument({
         },
       ],
     }),
+    buildReportDocumentSectionBlock({
+      id: "overviewSection",
+      title: "Overview",
+      subtitle: "Supply outlook",
+      description: "Section summary for print.",
+    }),
+    buildReportDocumentStepperBlock({
+      id: "integrationFlow",
+      title: "Direct Integration Path",
+      description: "Three stages to define a direct path.",
+      steps: [
+        { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+        { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+      ],
+    }),
+    buildReportDocumentInfoPanelBlock({
+      id: "directIntro",
+      title: "What is a Direct Integration Path?",
+      eyebrow: "What is it?",
+      description: "Explains the direct path concept.",
+      tone: "info",
+      body: "A direct integration connects bidding directly into the publisher ad server.",
+    }),
+    buildReportDocumentKanbanBlock({
+      id: "publisherPipeline",
+      title: "Publisher Pipeline",
+      description: "Track publisher activations by stage.",
+      columns: [
+        {
+          id: "signed",
+          title: "Signed",
+          cards: [
+            { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+          ],
+        },
+      ],
+    }),
+    buildReportDocumentTimelineBlock({
+      id: "integrationTimeline",
+      title: "Integration Timeline",
+      description: "Track the rollout milestones.",
+      events: [
+        { id: "event_1", date: "2026-07-15", badge: "Target", title: "Roku signed", body: "Expected signature date." },
+      ],
+    }),
     buildReportDocumentChartBlock({
       id: "channelTrend",
       title: "Channel Trend",
@@ -462,6 +522,18 @@ const authoredDocument = buildReportBuilderReportDocument({
         yFields: ["totalSpend"],
         seriesField: "channelId",
       },
+    }),
+    buildReportDocumentCollectionBlock({
+      id: "topChannels",
+      title: "Top Channels",
+      datasetRef: "primary",
+      itemTitleField: "channelId",
+      valueField: "totalSpend",
+      valueLabel: "Spend",
+      secondaryField: "eventDate",
+      secondaryLabel: "Date",
+      rowLimit: 2,
+      bodyTemplate: "Print note ${format(row.totalSpend,currency)} for ${row.channelId}.",
     }),
     buildReportDocumentGeoMapBlock({
       id: "stateGeo",
@@ -519,10 +591,17 @@ assert.deepEqual(validateReportPrint(loweredPrint), {
 });
 assert.ok(loweredPrint.pages.length >= 2);
 assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.headlineKpi"));
+assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.overviewSection"));
+assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.integrationFlow"));
+assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.directIntro"));
+assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.publisherPipeline"));
+assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.integrationTimeline"));
+assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.topChannels"));
 assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.narrativeIntro"));
 assert.ok(loweredPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.stateGeo"));
 assert.equal(loweredPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintLayoutSize"), false);
 assert.equal(loweredPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintChartPayload"), false);
+assert.equal(loweredPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock" && /collectionBlock/.test(diagnostic.message)), false);
 assert.equal(loweredPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock" && /chartBlock/.test(diagnostic.message)), false);
 assert.equal(loweredPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock" && /geoMapBlock/.test(diagnostic.message)), false);
 
@@ -581,5 +660,531 @@ assert.deepEqual(headlineKpiTitle?.element?.box, {
   width: 258,
   height: 20,
 });
+
+const compositeDocument = buildReportBuilderReportDocument({
+  container,
+  config,
+  state: {
+    ...state,
+    reportDocumentBlocks: [
+      buildReportDocumentCompositeBlock({
+        id: "summaryPanel",
+        title: "Summary panel",
+        description: "Groups the opening narrative and KPI.",
+        childBlockIds: ["narrativeIntro", "headlineKpi"],
+      }),
+      buildReportDocumentMarkdownBlock({
+        id: "narrativeIntro",
+        title: "Narrative child",
+        markdown: "## Narrative child\nOverview context.",
+      }),
+      buildReportDocumentKpiBlock({
+        id: "headlineKpi",
+        title: "Headline child KPI",
+        valueField: "totalSpend",
+        valueLabel: "Spend",
+      }),
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "summaryPanel" },
+        { blockId: "narrativeIntro", span: 6 },
+        { blockId: "headlineKpi", span: 6 },
+      ],
+    },
+  },
+});
+const compositeSpec = lowerReportDocumentToReportSpec(compositeDocument);
+const compositeFill = buildReportFillFromReportSpec(compositeSpec, {
+  primary: {
+    rows: [{ totalSpend: 40400 }],
+  },
+});
+const compositePrint = buildReportPrintFromReportFill({
+  reportSpec: compositeSpec,
+  reportFill: compositeFill,
+});
+assert.deepEqual(validateReportPrint(compositePrint), {
+  valid: true,
+  errors: [],
+});
+assert.ok(compositePrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.summaryPanel"));
+assert.ok(compositePrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.narrativeIntro"));
+assert.ok(compositePrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.headlineKpi"));
+assert.equal(compositePrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock" && /compositeBlock/.test(diagnostic.message)), false);
+assert.equal(
+  compositePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && element.text === "Summary panel"),
+  true,
+);
+
+const tabGroupDocument = buildReportBuilderReportDocument({
+  container,
+  config,
+  state: {
+    ...state,
+    reportDocumentBlocks: [
+      buildReportDocumentTabGroupBlock({
+        id: "sectionTabs",
+        title: "Report Sections",
+        sectionIds: ["overviewSection", "executionSection"],
+        defaultSectionId: "overviewSection",
+      }),
+      buildReportDocumentSectionBlock({
+        id: "overviewSection",
+        title: "Overview",
+        navigationLabel: "Overview",
+        description: "Opening summary section.",
+      }),
+      buildReportDocumentSectionBlock({
+        id: "executionSection",
+        title: "Execution",
+        navigationLabel: "Execution",
+        description: "Execution section.",
+      }),
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "sectionTabs" },
+        { blockId: "overviewSection" },
+        { blockId: "executionSection" },
+      ],
+    },
+  },
+});
+const tabGroupSpec = lowerReportDocumentToReportSpec(tabGroupDocument);
+const tabGroupFill = buildReportFillFromReportSpec(tabGroupSpec, {
+  primary: {
+    rows: [],
+  },
+});
+const tabGroupPrint = buildReportPrintFromReportFill({
+  reportSpec: tabGroupSpec,
+  reportFill: tabGroupFill,
+});
+assert.deepEqual(validateReportPrint(tabGroupPrint), {
+  valid: true,
+  errors: [],
+});
+assert.ok(tabGroupPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.sectionTabs"));
+assert.equal(tabGroupPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock" && /tabGroupBlock/.test(diagnostic.message)), false);
+assert.equal(
+  tabGroupPrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && /Tabs: Overview • Execution/.test(element.text)),
+  true,
+);
+
+const calloutDocument = buildReportBuilderReportDocument({
+  container,
+  config,
+  state: {
+    ...state,
+    reportDocumentBlocks: [
+      buildReportDocumentCalloutBlock({
+        id: "launchCallout",
+        title: "Launch update",
+        icon: "warning-sign",
+        description: "Important rollout note.",
+        tone: "warning",
+        badges: ["Executive", "Launch Ready"],
+        body: "Publisher activation is staged for Friday.",
+      }),
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "launchCallout" },
+      ],
+    },
+  },
+});
+const calloutSpec = lowerReportDocumentToReportSpec(calloutDocument);
+const calloutFill = buildReportFillFromReportSpec(calloutSpec, {
+  primary: {
+    rows: [],
+  },
+});
+const calloutPrint = buildReportPrintFromReportFill({
+  reportSpec: calloutSpec,
+  reportFill: calloutFill,
+});
+assert.deepEqual(validateReportPrint(calloutPrint), {
+  valid: true,
+  errors: [],
+});
+assert.ok(calloutPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.launchCallout"));
+assert.equal(calloutPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock" && /calloutBlock/.test(diagnostic.message)), false);
+assert.equal(
+  calloutPrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && /Badges: Executive, Launch Ready/.test(element.text)),
+  true,
+);
+
+const deltaTableSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "deltaPrintBuilder",
+    stateKey: "deltaPrintBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Delta Table",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["deltaTable"],
+    items: [{ blockId: "deltaTable" }],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "deltaTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "wowDelta",
+          label: "WoW Delta",
+          format: "percentFraction",
+          cellVisual: {
+            kind: "delta",
+            valueField: "wowDelta",
+          },
+        },
+      ],
+    },
+  ],
+};
+const deltaTableFill = buildReportFillFromReportSpec(deltaTableSpec, {
+  primary: {
+    rows: [{ wowDelta: 0.12 }],
+  },
+});
+const deltaTablePrint = buildReportPrintFromReportFill({
+  reportSpec: deltaTableSpec,
+  reportFill: deltaTableFill,
+});
+assert.deepEqual(validateReportPrint(deltaTablePrint), {
+  valid: true,
+  errors: [],
+});
+assert.equal(deltaTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellTone" && element.label === "+12.0%"), true);
+
+const sparkTableSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "sparkPrintBuilder",
+    stateKey: "sparkPrintBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Spark Table",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["sparkTable"],
+    items: [{ blockId: "sparkTable" }],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "sparkTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "sparkValue",
+          label: "Spark",
+          cellVisual: {
+            kind: "sparkBar",
+            valueField: "sparkValue",
+            range: { mode: "columnMax" },
+            palette: ["#eef2f6", "#4c6fff"],
+          },
+        },
+      ],
+    },
+  ],
+};
+const sparkTableFill = buildReportFillFromReportSpec(sparkTableSpec, {
+  primary: {
+    rows: [{ sparkValue: 30 }, { sparkValue: 90 }],
+  },
+});
+const sparkTablePrint = buildReportPrintFromReportFill({
+  reportSpec: sparkTableSpec,
+  reportFill: sparkTableFill,
+});
+assert.deepEqual(validateReportPrint(sparkTablePrint), {
+  valid: true,
+  errors: [],
+});
+assert.equal(sparkTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellDataBar" && /__spark$/.test(element.id)), true);
+
+const rankTableSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "rankPrintBuilder",
+    stateKey: "rankPrintBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Rank Table",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["rankTable"],
+    items: [{ blockId: "rankTable" }],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "rankTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "spend",
+          label: "Spend Rank",
+          cellVisual: {
+            kind: "rank",
+            valueField: "spend",
+          },
+        },
+      ],
+    },
+  ],
+};
+const rankTableFill = buildReportFillFromReportSpec(rankTableSpec, {
+  primary: {
+    rows: [{ spend: 120 }, { spend: 240 }],
+  },
+});
+const rankTablePrint = buildReportPrintFromReportFill({
+  reportSpec: rankTableSpec,
+  reportFill: rankTableFill,
+});
+assert.deepEqual(validateReportPrint(rankTablePrint), {
+  valid: true,
+  errors: [],
+});
+assert.equal(rankTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellTone" && element.label === "#1"), true);
+
+const shareBarTableSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "shareBarPrintBuilder",
+    stateKey: "shareBarPrintBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Share Bar Table",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["shareTable"],
+    items: [{ blockId: "shareTable" }],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "shareTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "shareMix",
+          label: "Share Mix",
+          cellVisual: {
+            kind: "shareBar",
+            segments: [
+              { valueField: "ctvShare", label: "CTV", color: "#137cbd" },
+              { valueField: "displayShare", label: "Display", color: "#0f9960" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+};
+const shareBarTableFill = buildReportFillFromReportSpec(shareBarTableSpec, {
+  primary: {
+    rows: [{ ctvShare: 0.6, displayShare: 0.4 }],
+  },
+});
+const shareBarTablePrint = buildReportPrintFromReportFill({
+  reportSpec: shareBarTableSpec,
+  reportFill: shareBarTableFill,
+});
+assert.deepEqual(validateReportPrint(shareBarTablePrint), {
+  valid: true,
+  errors: [],
+});
+assert.equal(shareBarTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellText" && /CTV 60.0% · Display 40.0%/.test(element.text)), true);
+
+const customBadgeTableSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "customBadgePrintBuilder",
+    stateKey: "customBadgePrintBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Custom Badge Table",
+  theme: {
+    accentTone: "green",
+    badgePalette: "bold",
+  },
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["badgeTable"],
+    items: [{ blockId: "badgeTable" }],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "badgeTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "status",
+          label: "Status",
+          cellVisual: {
+            kind: "badge",
+            rules: [
+              { value: "healthy", tone: "info", label: "Healthy" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+};
+const customBadgeTableFill = buildReportFillFromReportSpec(customBadgeTableSpec, {
+  primary: {
+    rows: [{ status: "healthy" }],
+  },
+});
+const customBadgeTablePrint = buildReportPrintFromReportFill({
+  reportSpec: customBadgeTableSpec,
+  reportFill: customBadgeTableFill,
+});
+assert.deepEqual(validateReportPrint(customBadgeTablePrint), {
+  valid: true,
+  errors: [],
+});
+assert.equal(customBadgeTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellBadge" && element.backgroundColor === "#eef8f0" && element.borderColor === "#16a34a"), true);
+
+const customToneTableSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "customTonePrintBuilder",
+    stateKey: "customTonePrintBuilder",
+    dataSourceRef: "demoReportSource",
+  },
+  title: "Custom Tone Table",
+  parameters: {
+    viewMode: "table",
+    groupBy: "",
+    pageSize: 25,
+    orderField: "",
+    orderDir: "asc",
+  },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["toneTable"],
+    items: [{ blockId: "toneTable" }],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "primary", dataSourceRef: "demoReportSource", request: {} }],
+  blocks: [
+    {
+      id: "toneTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        {
+          key: "status",
+          label: "Status",
+          cellVisual: {
+            kind: "tone",
+            rules: [
+              { value: "watch", tone: "warning", label: "Watch", color: "#7a271a", background: "#fdecea" },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+};
+const customToneTableFill = buildReportFillFromReportSpec(customToneTableSpec, {
+  primary: {
+    rows: [{ status: "watch" }],
+  },
+});
+const customToneTablePrint = buildReportPrintFromReportFill({
+  reportSpec: customToneTableSpec,
+  reportFill: customToneTableFill,
+});
+assert.deepEqual(validateReportPrint(customToneTablePrint), {
+  valid: true,
+  errors: [],
+});
+assert.equal(customToneTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellTone" && element.backgroundColor === "#fdecea" && element.textColor === "#7a271a"), true);
 
 console.log("reportPrintModel ✓ builds the canonical ReportPrint contract and lowers authored ReportFill blocks into paginated print output");

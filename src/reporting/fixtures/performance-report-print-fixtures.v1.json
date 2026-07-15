@@ -4,9 +4,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:0546cf00",
+      "specHash": "fnv1a:da7bfcf6",
       "fillVersion": 1,
-      "fillHash": "fnv1a:37bc7b19",
+      "fillHash": "fnv1a:e8ecece2",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "performanceBuilder",
@@ -167,7 +167,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "totalSpend",
-              "text": "40400",
+              "text": "$40,400.00",
               "format": "currency",
               "align": "right"
             },
@@ -182,7 +182,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "impressions",
-              "text": "16500",
+              "text": "16 500",
               "format": "compactNumber",
               "align": "right"
             },
@@ -238,7 +238,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "totalSpend",
-              "text": "34300",
+              "text": "$34,300.00",
               "format": "currency",
               "align": "right"
             },
@@ -253,7 +253,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "impressions",
-              "text": "14700",
+              "text": "14 700",
               "format": "compactNumber",
               "align": "right"
             },
@@ -280,7 +280,7 @@
                 "width": 540,
                 "height": 264
               },
-              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">40.4K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">26.9K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">13.5K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M288,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"288\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n    \n\n      <path d=\"M288,43.17821782178218\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"288\" cy=\"43.17821782178218\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n    \n      \n      <text x=\"288\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">40,400</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">26,933.3</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">13,466.7</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M288,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"288\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M288,43.17821782178218\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"288\" cy=\"43.17821782178218\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"288\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
             }
           ],
           "headerElements": [
@@ -367,9 +367,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:8ac7ab54",
+      "specHash": "fnv1a:cd836be2",
       "fillVersion": 1,
-      "fillHash": "fnv1a:02c93f1e",
+      "fillHash": "fnv1a:45e69578",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "semanticPerformanceBuilder",
@@ -530,7 +530,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "totalSpend",
-              "text": "40400",
+              "text": "40 400",
               "format": "compactNumber",
               "align": "right"
             },
@@ -545,7 +545,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "impressions",
-              "text": "16500",
+              "text": "16 500",
               "format": "compactNumber",
               "align": "right"
             },
@@ -601,7 +601,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "totalSpend",
-              "text": "34300",
+              "text": "34 300",
               "format": "compactNumber",
               "align": "right"
             },
@@ -616,7 +616,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "impressions",
-              "text": "14700",
+              "text": "14 700",
               "format": "compactNumber",
               "align": "right"
             },
@@ -643,7 +643,7 @@
                 "width": 540,
                 "height": 264
               },
-              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">74.7K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">49.8K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">24.9K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M288,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"288\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n    \n      \n      <text x=\"288\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
+              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">74.7K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">49.8K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">24.9K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M288,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"288\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n      \n      \n      <text x=\"288\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
             }
           ],
           "headerElements": [
@@ -730,9 +730,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:481f8ec6",
+      "specHash": "fnv1a:a69be46a",
       "fillVersion": 1,
-      "fillHash": "fnv1a:c84f6c84",
+      "fillHash": "fnv1a:7fc7e363",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "performanceBuilder",
@@ -893,7 +893,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "totalSpend",
-              "text": "100",
+              "text": "$100.00",
               "format": "currency",
               "align": "right"
             },
@@ -964,7 +964,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "totalSpend",
-              "text": "40",
+              "text": "$40.00",
               "format": "currency",
               "align": "right"
             },
@@ -1035,7 +1035,7 @@
               },
               "rowKey": "row_3",
               "columnKey": "totalSpend",
-              "text": "80",
+              "text": "$80.00",
               "format": "currency",
               "align": "right"
             },
@@ -1077,7 +1077,7 @@
                 "width": 540,
                 "height": 264
               },
-              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">100</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">66.7</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">33.3</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,16 L524,124\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"524\" cy=\"124\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n    \n\n      <path d=\"M52,52\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"52\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n    \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"524\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">100</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">66.7</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">33.3</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,16 L524,124\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"524\" cy=\"124\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M52,52\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"52\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"524\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
             }
           ],
           "headerElements": [
@@ -1258,9 +1258,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:3e3c94e5",
+      "specHash": "fnv1a:73767375",
       "fillVersion": 1,
-      "fillHash": "fnv1a:367ab7c3",
+      "fillHash": "fnv1a:3a6eaae6",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "authoredPerformanceBuilder",
@@ -1421,7 +1421,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "totalSpend",
-              "text": "20000",
+              "text": "$20,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -1436,7 +1436,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "impressions",
-              "text": "10000",
+              "text": "10 000",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1492,7 +1492,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "totalSpend",
-              "text": "21750",
+              "text": "$21,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -1507,7 +1507,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "impressions",
-              "text": "10840",
+              "text": "10 840",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1563,7 +1563,7 @@
               },
               "rowKey": "row_3",
               "columnKey": "totalSpend",
-              "text": "23500",
+              "text": "$23,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -1578,7 +1578,7 @@
               },
               "rowKey": "row_3",
               "columnKey": "impressions",
-              "text": "11680",
+              "text": "11 680",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1634,7 +1634,7 @@
               },
               "rowKey": "row_4",
               "columnKey": "totalSpend",
-              "text": "25250",
+              "text": "$25,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -1649,7 +1649,7 @@
               },
               "rowKey": "row_4",
               "columnKey": "impressions",
-              "text": "12520",
+              "text": "12 520",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1705,7 +1705,7 @@
               },
               "rowKey": "row_5",
               "columnKey": "totalSpend",
-              "text": "27000",
+              "text": "$27,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -1720,7 +1720,7 @@
               },
               "rowKey": "row_5",
               "columnKey": "impressions",
-              "text": "13360",
+              "text": "13 360",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1776,7 +1776,7 @@
               },
               "rowKey": "row_6",
               "columnKey": "totalSpend",
-              "text": "28750",
+              "text": "$28,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -1791,7 +1791,7 @@
               },
               "rowKey": "row_6",
               "columnKey": "impressions",
-              "text": "14200",
+              "text": "14 200",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1847,7 +1847,7 @@
               },
               "rowKey": "row_7",
               "columnKey": "totalSpend",
-              "text": "30500",
+              "text": "$30,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -1862,7 +1862,7 @@
               },
               "rowKey": "row_7",
               "columnKey": "impressions",
-              "text": "15040",
+              "text": "15 040",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1918,7 +1918,7 @@
               },
               "rowKey": "row_8",
               "columnKey": "totalSpend",
-              "text": "32250",
+              "text": "$32,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -1933,7 +1933,7 @@
               },
               "rowKey": "row_8",
               "columnKey": "impressions",
-              "text": "15880",
+              "text": "15 880",
               "format": "compactNumber",
               "align": "right"
             },
@@ -1989,7 +1989,7 @@
               },
               "rowKey": "row_9",
               "columnKey": "totalSpend",
-              "text": "34000",
+              "text": "$34,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -2004,7 +2004,7 @@
               },
               "rowKey": "row_9",
               "columnKey": "impressions",
-              "text": "16720",
+              "text": "16 720",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2060,7 +2060,7 @@
               },
               "rowKey": "row_10",
               "columnKey": "totalSpend",
-              "text": "35750",
+              "text": "$35,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -2075,7 +2075,7 @@
               },
               "rowKey": "row_10",
               "columnKey": "impressions",
-              "text": "17560",
+              "text": "17 560",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2131,7 +2131,7 @@
               },
               "rowKey": "row_11",
               "columnKey": "totalSpend",
-              "text": "37500",
+              "text": "$37,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -2146,7 +2146,7 @@
               },
               "rowKey": "row_11",
               "columnKey": "impressions",
-              "text": "18400",
+              "text": "18 400",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2202,7 +2202,7 @@
               },
               "rowKey": "row_12",
               "columnKey": "totalSpend",
-              "text": "39250",
+              "text": "$39,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -2217,7 +2217,7 @@
               },
               "rowKey": "row_12",
               "columnKey": "impressions",
-              "text": "19240",
+              "text": "19 240",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2273,7 +2273,7 @@
               },
               "rowKey": "row_13",
               "columnKey": "totalSpend",
-              "text": "41000",
+              "text": "$41,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -2288,7 +2288,7 @@
               },
               "rowKey": "row_13",
               "columnKey": "impressions",
-              "text": "20080",
+              "text": "20 080",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2344,7 +2344,7 @@
               },
               "rowKey": "row_14",
               "columnKey": "totalSpend",
-              "text": "42750",
+              "text": "$42,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -2359,7 +2359,7 @@
               },
               "rowKey": "row_14",
               "columnKey": "impressions",
-              "text": "20920",
+              "text": "20 920",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2415,7 +2415,7 @@
               },
               "rowKey": "row_15",
               "columnKey": "totalSpend",
-              "text": "44500",
+              "text": "$44,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -2430,7 +2430,7 @@
               },
               "rowKey": "row_15",
               "columnKey": "impressions",
-              "text": "21760",
+              "text": "21 760",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2486,7 +2486,7 @@
               },
               "rowKey": "row_16",
               "columnKey": "totalSpend",
-              "text": "46250",
+              "text": "$46,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -2501,7 +2501,7 @@
               },
               "rowKey": "row_16",
               "columnKey": "impressions",
-              "text": "22600",
+              "text": "22 600",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2557,7 +2557,7 @@
               },
               "rowKey": "row_17",
               "columnKey": "totalSpend",
-              "text": "48000",
+              "text": "$48,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -2572,7 +2572,7 @@
               },
               "rowKey": "row_17",
               "columnKey": "impressions",
-              "text": "23440",
+              "text": "23 440",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2628,7 +2628,7 @@
               },
               "rowKey": "row_18",
               "columnKey": "totalSpend",
-              "text": "49750",
+              "text": "$49,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -2643,7 +2643,7 @@
               },
               "rowKey": "row_18",
               "columnKey": "impressions",
-              "text": "24280",
+              "text": "24 280",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2699,7 +2699,7 @@
               },
               "rowKey": "row_19",
               "columnKey": "totalSpend",
-              "text": "51500",
+              "text": "$51,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -2714,7 +2714,7 @@
               },
               "rowKey": "row_19",
               "columnKey": "impressions",
-              "text": "25120",
+              "text": "25 120",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2770,7 +2770,7 @@
               },
               "rowKey": "row_20",
               "columnKey": "totalSpend",
-              "text": "53250",
+              "text": "$53,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -2785,7 +2785,7 @@
               },
               "rowKey": "row_20",
               "columnKey": "impressions",
-              "text": "25960",
+              "text": "25 960",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2841,7 +2841,7 @@
               },
               "rowKey": "row_21",
               "columnKey": "totalSpend",
-              "text": "55000",
+              "text": "$55,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -2856,7 +2856,7 @@
               },
               "rowKey": "row_21",
               "columnKey": "impressions",
-              "text": "26800",
+              "text": "26 800",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2912,7 +2912,7 @@
               },
               "rowKey": "row_22",
               "columnKey": "totalSpend",
-              "text": "56750",
+              "text": "$56,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -2927,7 +2927,7 @@
               },
               "rowKey": "row_22",
               "columnKey": "impressions",
-              "text": "27640",
+              "text": "27 640",
               "format": "compactNumber",
               "align": "right"
             },
@@ -2983,7 +2983,7 @@
               },
               "rowKey": "row_23",
               "columnKey": "totalSpend",
-              "text": "58500",
+              "text": "$58,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -2998,7 +2998,7 @@
               },
               "rowKey": "row_23",
               "columnKey": "impressions",
-              "text": "28480",
+              "text": "28 480",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3054,7 +3054,7 @@
               },
               "rowKey": "row_24",
               "columnKey": "totalSpend",
-              "text": "60250",
+              "text": "$60,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -3069,7 +3069,7 @@
               },
               "rowKey": "row_24",
               "columnKey": "impressions",
-              "text": "29320",
+              "text": "29 320",
               "format": "compactNumber",
               "align": "right"
             }
@@ -3259,7 +3259,7 @@
               },
               "rowKey": "row_25",
               "columnKey": "totalSpend",
-              "text": "62000",
+              "text": "$62,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -3274,7 +3274,7 @@
               },
               "rowKey": "row_25",
               "columnKey": "impressions",
-              "text": "30160",
+              "text": "30 160",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3330,7 +3330,7 @@
               },
               "rowKey": "row_26",
               "columnKey": "totalSpend",
-              "text": "63750",
+              "text": "$63,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -3345,7 +3345,7 @@
               },
               "rowKey": "row_26",
               "columnKey": "impressions",
-              "text": "31000",
+              "text": "31 000",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3401,7 +3401,7 @@
               },
               "rowKey": "row_27",
               "columnKey": "totalSpend",
-              "text": "65500",
+              "text": "$65,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -3416,7 +3416,7 @@
               },
               "rowKey": "row_27",
               "columnKey": "impressions",
-              "text": "31840",
+              "text": "31 840",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3472,7 +3472,7 @@
               },
               "rowKey": "row_28",
               "columnKey": "totalSpend",
-              "text": "67250",
+              "text": "$67,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -3487,7 +3487,7 @@
               },
               "rowKey": "row_28",
               "columnKey": "impressions",
-              "text": "32680",
+              "text": "32 680",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3543,7 +3543,7 @@
               },
               "rowKey": "row_29",
               "columnKey": "totalSpend",
-              "text": "69000",
+              "text": "$69,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -3558,7 +3558,7 @@
               },
               "rowKey": "row_29",
               "columnKey": "impressions",
-              "text": "33520",
+              "text": "33 520",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3614,7 +3614,7 @@
               },
               "rowKey": "row_30",
               "columnKey": "totalSpend",
-              "text": "70750",
+              "text": "$70,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -3629,7 +3629,7 @@
               },
               "rowKey": "row_30",
               "columnKey": "impressions",
-              "text": "34360",
+              "text": "34 360",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3685,7 +3685,7 @@
               },
               "rowKey": "row_31",
               "columnKey": "totalSpend",
-              "text": "72500",
+              "text": "$72,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -3700,7 +3700,7 @@
               },
               "rowKey": "row_31",
               "columnKey": "impressions",
-              "text": "35200",
+              "text": "35 200",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3756,7 +3756,7 @@
               },
               "rowKey": "row_32",
               "columnKey": "totalSpend",
-              "text": "74250",
+              "text": "$74,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -3771,7 +3771,7 @@
               },
               "rowKey": "row_32",
               "columnKey": "impressions",
-              "text": "36040",
+              "text": "36 040",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3827,7 +3827,7 @@
               },
               "rowKey": "row_33",
               "columnKey": "totalSpend",
-              "text": "76000",
+              "text": "$76,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -3842,7 +3842,7 @@
               },
               "rowKey": "row_33",
               "columnKey": "impressions",
-              "text": "36880",
+              "text": "36 880",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3898,7 +3898,7 @@
               },
               "rowKey": "row_34",
               "columnKey": "totalSpend",
-              "text": "77750",
+              "text": "$77,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -3913,7 +3913,7 @@
               },
               "rowKey": "row_34",
               "columnKey": "impressions",
-              "text": "37720",
+              "text": "37 720",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3969,7 +3969,7 @@
               },
               "rowKey": "row_35",
               "columnKey": "totalSpend",
-              "text": "79500",
+              "text": "$79,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -3984,7 +3984,7 @@
               },
               "rowKey": "row_35",
               "columnKey": "impressions",
-              "text": "38560",
+              "text": "38 560",
               "format": "compactNumber",
               "align": "right"
             },
@@ -4040,7 +4040,7 @@
               },
               "rowKey": "row_36",
               "columnKey": "totalSpend",
-              "text": "81250",
+              "text": "$81,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -4055,7 +4055,7 @@
               },
               "rowKey": "row_36",
               "columnKey": "impressions",
-              "text": "39400",
+              "text": "39 400",
               "format": "compactNumber",
               "align": "right"
             },
@@ -4082,7 +4082,7 @@
                 "width": 258,
                 "height": 24
               },
-              "text": "Spend: 20000",
+              "text": "Spend: $20,000.00",
               "fontSize": 20,
               "fontWeight": "700",
               "color": "#101828"
@@ -4265,7 +4265,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "totalSpend",
-              "text": "20000",
+              "text": "$20,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -4353,7 +4353,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "totalSpend",
-              "text": "21750",
+              "text": "$21,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -4441,7 +4441,7 @@
               },
               "rowKey": "row_3",
               "columnKey": "totalSpend",
-              "text": "23500",
+              "text": "$23,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -4529,7 +4529,7 @@
               },
               "rowKey": "row_4",
               "columnKey": "totalSpend",
-              "text": "25250",
+              "text": "$25,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -4617,7 +4617,7 @@
               },
               "rowKey": "row_5",
               "columnKey": "totalSpend",
-              "text": "27000",
+              "text": "$27,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -4705,7 +4705,7 @@
               },
               "rowKey": "row_6",
               "columnKey": "totalSpend",
-              "text": "28750",
+              "text": "$28,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -4912,7 +4912,7 @@
               },
               "rowKey": "row_7",
               "columnKey": "totalSpend",
-              "text": "30500",
+              "text": "$30,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -5000,7 +5000,7 @@
               },
               "rowKey": "row_8",
               "columnKey": "totalSpend",
-              "text": "32250",
+              "text": "$32,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -5088,7 +5088,7 @@
               },
               "rowKey": "row_9",
               "columnKey": "totalSpend",
-              "text": "34000",
+              "text": "$34,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -5176,7 +5176,7 @@
               },
               "rowKey": "row_10",
               "columnKey": "totalSpend",
-              "text": "35750",
+              "text": "$35,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -5264,7 +5264,7 @@
               },
               "rowKey": "row_11",
               "columnKey": "totalSpend",
-              "text": "37500",
+              "text": "$37,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -5352,7 +5352,7 @@
               },
               "rowKey": "row_12",
               "columnKey": "totalSpend",
-              "text": "39250",
+              "text": "$39,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -5440,7 +5440,7 @@
               },
               "rowKey": "row_13",
               "columnKey": "totalSpend",
-              "text": "41000",
+              "text": "$41,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -5528,7 +5528,7 @@
               },
               "rowKey": "row_14",
               "columnKey": "totalSpend",
-              "text": "42750",
+              "text": "$42,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -5616,7 +5616,7 @@
               },
               "rowKey": "row_15",
               "columnKey": "totalSpend",
-              "text": "44500",
+              "text": "$44,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -5704,7 +5704,7 @@
               },
               "rowKey": "row_16",
               "columnKey": "totalSpend",
-              "text": "46250",
+              "text": "$46,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -5792,7 +5792,7 @@
               },
               "rowKey": "row_17",
               "columnKey": "totalSpend",
-              "text": "48000",
+              "text": "$48,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -5880,7 +5880,7 @@
               },
               "rowKey": "row_18",
               "columnKey": "totalSpend",
-              "text": "49750",
+              "text": "$49,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -5968,7 +5968,7 @@
               },
               "rowKey": "row_19",
               "columnKey": "totalSpend",
-              "text": "51500",
+              "text": "$51,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -6056,7 +6056,7 @@
               },
               "rowKey": "row_20",
               "columnKey": "totalSpend",
-              "text": "53250",
+              "text": "$53,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -6144,7 +6144,7 @@
               },
               "rowKey": "row_21",
               "columnKey": "totalSpend",
-              "text": "55000",
+              "text": "$55,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -6232,7 +6232,7 @@
               },
               "rowKey": "row_22",
               "columnKey": "totalSpend",
-              "text": "56750",
+              "text": "$56,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -6320,7 +6320,7 @@
               },
               "rowKey": "row_23",
               "columnKey": "totalSpend",
-              "text": "58500",
+              "text": "$58,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -6408,7 +6408,7 @@
               },
               "rowKey": "row_24",
               "columnKey": "totalSpend",
-              "text": "60250",
+              "text": "$60,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -6496,7 +6496,7 @@
               },
               "rowKey": "row_25",
               "columnKey": "totalSpend",
-              "text": "62000",
+              "text": "$62,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -6584,7 +6584,7 @@
               },
               "rowKey": "row_26",
               "columnKey": "totalSpend",
-              "text": "63750",
+              "text": "$63,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -6672,7 +6672,7 @@
               },
               "rowKey": "row_27",
               "columnKey": "totalSpend",
-              "text": "65500",
+              "text": "$65,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -6760,7 +6760,7 @@
               },
               "rowKey": "row_28",
               "columnKey": "totalSpend",
-              "text": "67250",
+              "text": "$67,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -6848,7 +6848,7 @@
               },
               "rowKey": "row_29",
               "columnKey": "totalSpend",
-              "text": "69000",
+              "text": "$69,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -6936,7 +6936,7 @@
               },
               "rowKey": "row_30",
               "columnKey": "totalSpend",
-              "text": "70750",
+              "text": "$70,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -7024,7 +7024,7 @@
               },
               "rowKey": "row_31",
               "columnKey": "totalSpend",
-              "text": "72500",
+              "text": "$72,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -7231,7 +7231,7 @@
               },
               "rowKey": "row_32",
               "columnKey": "totalSpend",
-              "text": "74250",
+              "text": "$74,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -7319,7 +7319,7 @@
               },
               "rowKey": "row_33",
               "columnKey": "totalSpend",
-              "text": "76000",
+              "text": "$76,000.00",
               "format": "currency",
               "align": "right"
             },
@@ -7407,7 +7407,7 @@
               },
               "rowKey": "row_34",
               "columnKey": "totalSpend",
-              "text": "77750",
+              "text": "$77,750.00",
               "format": "currency",
               "align": "right"
             },
@@ -7495,7 +7495,7 @@
               },
               "rowKey": "row_35",
               "columnKey": "totalSpend",
-              "text": "79500",
+              "text": "$79,500.00",
               "format": "currency",
               "align": "right"
             },
@@ -7583,7 +7583,7 @@
               },
               "rowKey": "row_36",
               "columnKey": "totalSpend",
-              "text": "81250",
+              "text": "$81,250.00",
               "format": "currency",
               "align": "right"
             },
@@ -7627,7 +7627,7 @@
                 "width": 540,
                 "height": 264
               },
-              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">81.3K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">54.2K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">27.1K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,81.90769230769232 L111,43.13846153846154 L170,74.15384615384616 L229,35.38461538461539 L288,66.4 L347,27.630769230769232 L406,58.64615384615385 L465,19.876923076923077 L524,50.89230769230769\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"81.90769230769232\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"111\" cy=\"43.13846153846154\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"170\" cy=\"74.15384615384616\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"229\" cy=\"35.38461538461539\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"288\" cy=\"66.4\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"347\" cy=\"27.630769230769232\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"406\" cy=\"58.64615384615385\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"465\" cy=\"19.876923076923077\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"524\" cy=\"50.89230769230769\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n    \n\n      <path d=\"M52,47.01538461538462 L111,78.03076923076924 L170,39.261538461538464 L229,70.27692307692308 L288,31.50769230769231 L347,62.52307692307692 L406,23.753846153846155 L465,54.769230769230774 L524,16\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"47.01538461538462\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"111\" cy=\"78.03076923076924\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"170\" cy=\"39.261538461538464\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"229\" cy=\"70.27692307692308\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"288\" cy=\"31.50769230769231\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"347\" cy=\"62.52307692307692\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"406\" cy=\"23.753846153846155\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"465\" cy=\"54.769230769230774\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"524\" cy=\"16\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n    \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n\n      <text x=\"170\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n\n      <text x=\"288\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-05</text>\n    \n\n\n      <text x=\"406\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-07</text>\n    \n\n\n      <text x=\"524\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-09</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 540 264\" width=\"540\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"524\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">81,250</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"524\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">54,166.7</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"524\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">27,083.3</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"524\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,81.90769230769232 L111,43.13846153846154 L170,74.15384615384616 L229,35.38461538461539 L288,66.4 L347,27.630769230769232 L406,58.64615384615385 L465,19.876923076923077 L524,50.89230769230769\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"81.90769230769232\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"111\" cy=\"43.13846153846154\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"170\" cy=\"74.15384615384616\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"229\" cy=\"35.38461538461539\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"288\" cy=\"66.4\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"347\" cy=\"27.630769230769232\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"406\" cy=\"58.64615384615385\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"465\" cy=\"19.876923076923077\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"524\" cy=\"50.89230769230769\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M52,47.01538461538462 L111,78.03076923076924 L170,39.261538461538464 L229,70.27692307692308 L288,31.50769230769231 L347,62.52307692307692 L406,23.753846153846155 L465,54.769230769230774 L524,16\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"47.01538461538462\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"111\" cy=\"78.03076923076924\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"170\" cy=\"39.261538461538464\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"229\" cy=\"70.27692307692308\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"288\" cy=\"31.50769230769231\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"347\" cy=\"62.52307692307692\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"406\" cy=\"23.753846153846155\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"465\" cy=\"54.769230769230774\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"524\" cy=\"16\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n\n      <text x=\"170\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n\n      <text x=\"288\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-05</text>\n    \n\n\n      <text x=\"406\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-07</text>\n    \n\n\n      <text x=\"524\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-09</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
             }
           ],
           "headerElements": [

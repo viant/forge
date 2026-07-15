@@ -76,8 +76,8 @@ assert.deepEqual(interactionState.actions.map((action) => ({
     { id: "keep:country", kind: "keep", label: "Keep Market" },
     { id: "exclude:country", kind: "exclude", label: "Exclude Market" },
     { id: "drill:eventDate:inventory_path", kind: "drill", label: "Drill to Channel" },
-    { id: "keep:channelId", kind: "keep", label: "Keep only" },
-    { id: "exclude:channelId", kind: "exclude", label: "Exclude" },
+    { id: "keep:channelId", kind: "keep", label: "Keep Channel" },
+    { id: "exclude:channelId", kind: "exclude", label: "Exclude Channel" },
     { id: "drill:channelId:inventory_path", kind: "drill", label: "Drill to Market" },
     { id: "detail_channel", kind: "detail", label: "Show channel details" },
 ]);
@@ -133,8 +133,8 @@ assert.deepEqual(duplicateDrillInteractionState.actions.map((action) => ({
     kind: action.kind,
     label: action.label,
 })), [
-    { id: "keep:channelId", kind: "keep", label: "Keep only" },
-    { id: "exclude:channelId", kind: "exclude", label: "Exclude" },
+    { id: "keep:channelId", kind: "keep", label: "Keep Channel" },
+    { id: "exclude:channelId", kind: "exclude", label: "Exclude Channel" },
     { id: "drill_publisher", kind: "drill", label: "Drill to Publisher" },
     { id: "detail_channel", kind: "detail", label: "Show channel details" },
 ]);
@@ -193,8 +193,8 @@ assert.deepEqual(liveProviderOverrideInteractionState.actions.map((action) => ({
     kind: action.kind,
     label: action.label,
 })), [
-    { id: "keep:channelId", kind: "keep", label: "Keep only" },
-    { id: "exclude:channelId", kind: "exclude", label: "Exclude" },
+    { id: "keep:channelId", kind: "keep", label: "Keep Channel" },
+    { id: "exclude:channelId", kind: "exclude", label: "Exclude Channel" },
     { id: "semantic_drill_channel", kind: "drill", label: "Drill to Publisher" },
 ]);
 

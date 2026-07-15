@@ -22,6 +22,7 @@ var allowedExportFormats = map[string]struct{}{
 
 var allowedExportSourceKinds = map[string]struct{}{
 	"draft":             {},
+	"preset":            {},
 	"savedPayload":      {},
 	"savedView":         {},
 	"publishedSnapshot": {},
@@ -55,6 +56,8 @@ type Source struct {
 	PayloadID        string `json:"payloadId,omitempty"`
 	SourceArtifactID string `json:"sourceArtifactId,omitempty"`
 	DocumentVersion  *int   `json:"documentVersion,omitempty"`
+	WindowKey        string `json:"windowKey,omitempty"`
+	TemplateLabel    string `json:"templateLabel,omitempty"`
 }
 
 type rawReportExportRequest struct {
@@ -224,6 +227,13 @@ func requiresRenderedReportPrint(format string) bool {
 func validateExportSourceContract(source Source) error {
 	from := strings.TrimSpace(source.From)
 	switch from {
+	case "preset":
+		if strings.TrimSpace(source.ArtifactKind) != "reportBuilder.reportTemplate" {
+			return fmt.Errorf("reportExportRequest.source.artifactKind must be reportBuilder.reportTemplate for preset sources")
+		}
+		if strings.TrimSpace(source.SourceArtifactID) == "" {
+			return fmt.Errorf("reportExportRequest.source.sourceArtifactId is required for preset sources")
+		}
 	case "savedPayload":
 		if strings.TrimSpace(source.ArtifactKind) != "reportBuilder.savedReportPayload" {
 			return fmt.Errorf("reportExportRequest.source.artifactKind must be reportBuilder.savedReportPayload for savedPayload sources")

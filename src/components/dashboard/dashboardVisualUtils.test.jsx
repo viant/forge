@@ -56,6 +56,27 @@ assert.ok(toneHtml.includes("forge-dashboard-table-cell-visual--warning"));
 assert.ok(toneHtml.includes("data-visual-kind=\"tone\""));
 assert.ok(toneHtml.includes("Watch"));
 
+const customBadgeHtml = renderToStaticMarkup(
+  renderExplicitReportTableCellVisual(
+    "healthy",
+    { status: "healthy" },
+    {
+      key: "status",
+      label: "Status",
+      cellVisual: {
+        kind: "badge",
+        rules: [
+          { value: "healthy", tone: "success", label: "Healthy", color: "#0f4c81", background: "#d9f2ff" },
+        ],
+      },
+    },
+    "en-US",
+  ),
+);
+
+assert.ok(customBadgeHtml.includes("#d9f2ff"));
+assert.ok(customBadgeHtml.includes("#0f4c81"));
+
 const dataBarHtml = renderToStaticMarkup(
   renderExplicitReportTableCellVisual(
     240,

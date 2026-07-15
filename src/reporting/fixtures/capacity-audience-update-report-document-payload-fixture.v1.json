@@ -14,6 +14,19 @@
     "title": "Capacity Audience Segment Index Q3",
     "subtitle": "",
     "description": "",
+    "binding": {
+      "mode": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "entity": "line_delivery",
+      "selectedDimensions": [
+        "event_date",
+        "channel",
+        "country_code"
+      ],
+      "selectedMeasures": [
+        "available_impressions"
+      ]
+    },
     "semanticSummary": {
       "kind": "semantic",
       "modelRef": "model://example/performance/delivery@v1",
@@ -86,6 +99,17 @@
           "kind": "multiSelect",
           "label": "Channels",
           "required": false,
+          "multiple": true,
+          "options": [
+            {
+              "label": "Display",
+              "value": "Display"
+            },
+            {
+              "label": "CTV",
+              "value": "CTV"
+            }
+          ],
           "value": null
         },
         {
@@ -93,6 +117,17 @@
           "kind": "multiSelect",
           "label": "Audience Segment",
           "required": false,
+          "multiple": true,
+          "options": [
+            {
+              "label": "Young Adults",
+              "value": "Young Adults"
+            },
+            {
+              "label": "Established Adults",
+              "value": "Established Adults"
+            }
+          ],
           "value": [
             "Young Adults"
           ]
@@ -100,6 +135,657 @@
       ],
       "dataSourceRef": "demoReportSource"
     },
+    "presentation": {
+      "orderFields": [
+        {
+          "value": "eventDate",
+          "field": "eventDate",
+          "default": true,
+          "defaultDirection": "asc"
+        },
+        {
+          "value": "audienceIndex",
+          "field": "audienceIndex",
+          "defaultDirection": "desc"
+        },
+        {
+          "value": "avails",
+          "field": "avails",
+          "defaultDirection": "desc"
+        },
+        {
+          "value": "hhUniqs",
+          "field": "hhUniqs",
+          "defaultDirection": "desc"
+        }
+      ],
+      "defaultTablePresets": [
+        {
+          "title": "Inventory Ladder",
+          "dimensions": [
+            "channelV2"
+          ],
+          "measures": [
+            "avails",
+            "hhUniqs"
+          ],
+          "primaryMeasure": "avails",
+          "orderField": "avails",
+          "orderDir": "desc",
+          "pageSize": 12,
+          "clearChart": true
+        },
+        {
+          "title": "Location Ladder",
+          "dimensions": [
+            "country"
+          ],
+          "measures": [
+            "avails",
+            "hhUniqs"
+          ],
+          "primaryMeasure": "avails",
+          "orderField": "avails",
+          "orderDir": "desc",
+          "pageSize": 12,
+          "clearChart": true
+        }
+      ],
+      "defaultMode": "chart",
+      "pageSize": 50,
+      "chartCreationMode": "explicit",
+      "defaultChartSpecs": [
+        {
+          "title": "Inventory · Top Channels",
+          "type": "horizontal_bar",
+          "xField": "channelV2",
+          "yFields": [
+            "avails"
+          ]
+        },
+        {
+          "title": "Locations · Top Markets",
+          "type": "horizontal_bar",
+          "xField": "country",
+          "yFields": [
+            "avails"
+          ]
+        }
+      ]
+    },
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "demoReportSource",
+        "label": "Report Builder Demo",
+        "description": "Primary report dataset",
+        "kindLabel": "primary",
+        "request": {
+          "measures": {
+            "audienceIndex": true
+          },
+          "dimensions": {
+            "country": true
+          },
+          "filters": {
+            "From": "2026-05-01",
+            "To": "2026-05-04",
+            "audienceSegmentFilter": [
+              "Young Adults"
+            ]
+          },
+          "semanticSelection": {
+            "modelRef": "model://example/performance/delivery@v1",
+            "entity": "line_delivery",
+            "selection": {
+              "dimensions": [
+                "country_code"
+              ],
+              "measures": [
+                "audience_index"
+              ]
+            },
+            "refinements": [],
+            "parameters": {
+              "reporting_window": {
+                "start": "2026-05-01",
+                "end": "2026-05-04"
+              },
+              "audience_segment": [
+                "Young Adults"
+              ]
+            }
+          },
+          "limit": 50,
+          "offset": 0,
+          "orderBy": [
+            "audienceIndex desc"
+          ]
+        },
+        "dimensions": [
+          {
+            "id": "eventDate",
+            "key": "eventDate",
+            "semanticRef": "event_date",
+            "label": "Event Date",
+            "default": true,
+            "chartAxis": true,
+            "format": "date",
+            "category": "Time",
+            "semanticDataType": "date"
+          },
+          {
+            "id": "channelV2",
+            "key": "channelV2",
+            "semanticRef": "channel",
+            "label": "Channel",
+            "default": true,
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelV2",
+              "excludeParamPath": "filters.excludeChannelV2"
+            },
+            "category": "Delivery",
+            "semanticDataType": "string"
+          },
+          {
+            "id": "country",
+            "key": "country",
+            "semanticRef": "country_code",
+            "label": "Market",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            },
+            "category": "Location",
+            "definitionRef": "harmonizer://feature/location",
+            "governance": {
+              "status": "approved",
+              "classification": "harmonizer.audience"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "publisher",
+            "key": "publisher",
+            "semanticRef": "publisher",
+            "label": "Publisher",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includePublisher",
+              "excludeParamPath": "filters.excludePublisher"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "siteType",
+            "key": "siteType",
+            "semanticRef": "site_type",
+            "label": "Site Type",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeSiteType",
+              "excludeParamPath": "filters.excludeSiteType"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "region",
+            "key": "region",
+            "semanticRef": "region",
+            "label": "Region",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeLocationDim",
+              "excludeParamPath": "filters.excludeLocationDim",
+              "format": "locationTuple",
+              "parentField": "country"
+            },
+            "semanticDataType": "string"
+          },
+          {
+            "id": "metrocode",
+            "key": "metrocode",
+            "semanticRef": "metro_code",
+            "label": "Metro Area",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeMetrocode",
+              "excludeParamPath": "filters.excludeMetrocode"
+            },
+            "semanticDataType": "string"
+          }
+        ],
+        "measures": [
+          {
+            "id": "avails",
+            "key": "avails",
+            "semanticRef": "available_impressions",
+            "label": "Available Impressions",
+            "default": true,
+            "format": "compactNumber",
+            "semanticDataType": "number"
+          },
+          {
+            "id": "hhUniqs",
+            "key": "hhUniqs",
+            "semanticRef": "household_uniques",
+            "label": "Household Uniques",
+            "format": "compactNumber",
+            "semanticDataType": "number"
+          },
+          {
+            "id": "audienceIndex",
+            "key": "audienceIndex",
+            "semanticRef": "audience_index",
+            "label": "Audience Index",
+            "format": "number",
+            "aggregation": "avg",
+            "category": "Audience",
+            "definitionRef": "harmonizer://feature/user.segment.index",
+            "governance": {
+              "status": "approved",
+              "certification": "reviewed",
+              "classification": "harmonizer.audience"
+            },
+            "semanticDataType": "number"
+          }
+        ],
+        "computedMeasures": [
+          {
+            "id": "reachRate",
+            "key": "reachRate",
+            "label": "Reach Rate",
+            "format": "percent",
+            "compute": {
+              "type": "ratio",
+              "numerator": "hhUniqs",
+              "denominator": "avails",
+              "scale": 100,
+              "decimals": 2
+            }
+          }
+        ],
+        "columnOptions": [
+          {
+            "key": "eventDate",
+            "label": "Event Date",
+            "kind": "dimension",
+            "sourceKey": "eventDate",
+            "format": "date",
+            "category": "Time",
+            "semanticRef": "event_date",
+            "default": true,
+            "chartAxis": true
+          },
+          {
+            "key": "channelV2",
+            "label": "Channel",
+            "kind": "dimension",
+            "sourceKey": "channelV2",
+            "category": "Delivery",
+            "semanticRef": "channel",
+            "default": true,
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelV2",
+              "excludeParamPath": "filters.excludeChannelV2"
+            }
+          },
+          {
+            "key": "country",
+            "label": "Market",
+            "kind": "dimension",
+            "sourceKey": "country",
+            "category": "Location",
+            "definitionRef": "harmonizer://feature/location",
+            "semanticRef": "country_code",
+            "governance": {
+              "status": "approved",
+              "classification": "harmonizer.audience"
+            },
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          },
+          {
+            "key": "publisher",
+            "label": "Publisher",
+            "kind": "dimension",
+            "sourceKey": "publisher",
+            "semanticRef": "publisher",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includePublisher",
+              "excludeParamPath": "filters.excludePublisher"
+            }
+          },
+          {
+            "key": "siteType",
+            "label": "Site Type",
+            "kind": "dimension",
+            "sourceKey": "siteType",
+            "semanticRef": "site_type",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeSiteType",
+              "excludeParamPath": "filters.excludeSiteType"
+            }
+          },
+          {
+            "key": "region",
+            "label": "Region",
+            "kind": "dimension",
+            "sourceKey": "region",
+            "semanticRef": "region",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeLocationDim",
+              "excludeParamPath": "filters.excludeLocationDim",
+              "format": "locationTuple",
+              "parentField": "country"
+            }
+          },
+          {
+            "key": "metrocode",
+            "label": "Metro Area",
+            "kind": "dimension",
+            "sourceKey": "metrocode",
+            "semanticRef": "metro_code",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeMetrocode",
+              "excludeParamPath": "filters.excludeMetrocode"
+            }
+          },
+          {
+            "key": "avails",
+            "label": "Available Impressions",
+            "kind": "measure",
+            "sourceKey": "avails",
+            "format": "compactNumber",
+            "semanticRef": "available_impressions",
+            "default": true
+          },
+          {
+            "key": "hhUniqs",
+            "label": "Household Uniques",
+            "kind": "measure",
+            "sourceKey": "hhUniqs",
+            "format": "compactNumber",
+            "semanticRef": "household_uniques"
+          },
+          {
+            "key": "audienceIndex",
+            "label": "Audience Index",
+            "kind": "measure",
+            "sourceKey": "audienceIndex",
+            "format": "number",
+            "category": "Audience",
+            "definitionRef": "harmonizer://feature/user.segment.index",
+            "semanticRef": "audience_index",
+            "governance": {
+              "status": "approved",
+              "certification": "reviewed",
+              "classification": "harmonizer.audience"
+            }
+          },
+          {
+            "key": "reachRate",
+            "label": "Reach Rate",
+            "kind": "measure",
+            "format": "percent"
+          }
+        ],
+        "valueFieldOptions": [
+          {
+            "value": "avails",
+            "label": "Available Impressions",
+            "format": "compactNumber",
+            "semanticRef": "available_impressions",
+            "default": true
+          },
+          {
+            "value": "hhUniqs",
+            "label": "Household Uniques",
+            "format": "compactNumber",
+            "semanticRef": "household_uniques"
+          },
+          {
+            "value": "audienceIndex",
+            "label": "Audience Index",
+            "format": "number",
+            "category": "Audience",
+            "definitionRef": "harmonizer://feature/user.segment.index",
+            "semanticRef": "audience_index",
+            "governance": {
+              "status": "approved",
+              "certification": "reviewed",
+              "classification": "harmonizer.audience"
+            }
+          },
+          {
+            "value": "reachRate",
+            "label": "Reach Rate",
+            "format": "percent"
+          }
+        ],
+        "secondaryFieldOptions": [
+          {
+            "value": "eventDate",
+            "label": "Event Date",
+            "format": "date",
+            "category": "Time",
+            "semanticRef": "event_date",
+            "default": true
+          },
+          {
+            "value": "channelV2",
+            "label": "Channel",
+            "category": "Delivery",
+            "semanticRef": "channel",
+            "default": true
+          },
+          {
+            "value": "country",
+            "label": "Market",
+            "category": "Location",
+            "definitionRef": "harmonizer://feature/location",
+            "semanticRef": "country_code",
+            "governance": {
+              "status": "approved",
+              "classification": "harmonizer.audience"
+            }
+          },
+          {
+            "value": "publisher",
+            "label": "Publisher",
+            "semanticRef": "publisher"
+          },
+          {
+            "value": "siteType",
+            "label": "Site Type",
+            "semanticRef": "site_type"
+          },
+          {
+            "value": "region",
+            "label": "Region",
+            "semanticRef": "region"
+          },
+          {
+            "value": "metrocode",
+            "label": "Metro Area",
+            "semanticRef": "metro_code"
+          }
+        ],
+        "chartFieldOptions": [
+          {
+            "key": "eventDate",
+            "aliases": [
+              "eventDate"
+            ],
+            "label": "Event Date",
+            "kind": "dimension",
+            "format": "date",
+            "category": "Time",
+            "semanticRef": "event_date",
+            "default": true,
+            "chartAxis": true
+          },
+          {
+            "key": "channelV2",
+            "aliases": [
+              "channelV2"
+            ],
+            "label": "Channel",
+            "kind": "dimension",
+            "category": "Delivery",
+            "semanticRef": "channel",
+            "default": true
+          },
+          {
+            "key": "country",
+            "aliases": [
+              "country"
+            ],
+            "label": "Market",
+            "kind": "dimension",
+            "category": "Location",
+            "definitionRef": "harmonizer://feature/location",
+            "semanticRef": "country_code",
+            "governance": {
+              "status": "approved",
+              "classification": "harmonizer.audience"
+            }
+          },
+          {
+            "key": "publisher",
+            "aliases": [
+              "publisher"
+            ],
+            "label": "Publisher",
+            "kind": "dimension",
+            "semanticRef": "publisher"
+          },
+          {
+            "key": "siteType",
+            "aliases": [
+              "siteType"
+            ],
+            "label": "Site Type",
+            "kind": "dimension",
+            "semanticRef": "site_type"
+          },
+          {
+            "key": "region",
+            "aliases": [
+              "region"
+            ],
+            "label": "Region",
+            "kind": "dimension",
+            "semanticRef": "region"
+          },
+          {
+            "key": "metrocode",
+            "aliases": [
+              "metrocode"
+            ],
+            "label": "Metro Area",
+            "kind": "dimension",
+            "semanticRef": "metro_code"
+          },
+          {
+            "key": "avails",
+            "aliases": [
+              "avails"
+            ],
+            "label": "Available Impressions",
+            "kind": "measure",
+            "format": "compactNumber",
+            "semanticRef": "available_impressions",
+            "default": true,
+            "align": "right"
+          },
+          {
+            "key": "hhUniqs",
+            "aliases": [
+              "hhUniqs"
+            ],
+            "label": "Household Uniques",
+            "kind": "measure",
+            "format": "compactNumber",
+            "semanticRef": "household_uniques",
+            "align": "right"
+          },
+          {
+            "key": "audienceIndex",
+            "aliases": [
+              "audienceIndex"
+            ],
+            "label": "Audience Index",
+            "kind": "measure",
+            "format": "number",
+            "category": "Audience",
+            "definitionRef": "harmonizer://feature/user.segment.index",
+            "semanticRef": "audience_index",
+            "governance": {
+              "status": "approved",
+              "certification": "reviewed",
+              "classification": "harmonizer.audience"
+            },
+            "align": "right"
+          },
+          {
+            "key": "reachRate",
+            "aliases": [
+              "reachRate"
+            ],
+            "label": "Reach Rate",
+            "kind": "measure",
+            "format": "percent",
+            "align": "right"
+          }
+        ],
+        "scopeParamOptions": [
+          {
+            "value": "dateRange",
+            "label": "Date Range",
+            "kind": "dateRange",
+            "required": true,
+            "semanticRef": "reporting_window",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          },
+          {
+            "value": "channelsFilter",
+            "label": "Channels",
+            "kind": "multiSelect",
+            "required": false,
+            "semanticRef": "delivery_channels_filter",
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ]
+          },
+          {
+            "value": "audienceSegmentFilter",
+            "label": "Audience Segment",
+            "kind": "multiSelect",
+            "required": false,
+            "semanticRef": "audience_segment",
+            "multiple": true,
+            "options": [
+              {
+                "label": "Young Adults",
+                "value": "Young Adults"
+              },
+              {
+                "label": "Established Adults",
+                "value": "Established Adults"
+              }
+            ]
+          }
+        ]
+      }
+    ],
     "layout": {
       "type": "stack",
       "items": [
@@ -122,446 +808,10 @@
     },
     "blocks": [
       {
-        "id": "primaryBuilder",
-        "kind": "reportBuilderBlock",
-        "title": "Capacity Audience Segment Index Q3",
-        "source": {
-          "kind": "dashboard.reportBuilder",
-          "containerId": "demoReportBuilder",
-          "stateKey": "demoReportBuilder",
-          "dataSourceRef": "demoReportSource"
-        },
-        "config": {
-          "title": "Report Builder Demo",
-          "binding": {
-            "mode": "semantic",
-            "modelRef": "model://example/performance/delivery@v1",
-            "entity": "line_delivery",
-            "selectedDimensions": [
-              "event_date",
-              "channel",
-              "country_code"
-            ],
-            "selectedMeasures": [
-              "available_impressions"
-            ]
-          },
-          "measures": [
-            {
-              "id": "avails",
-              "key": "avails",
-              "semanticRef": "available_impressions",
-              "label": "Available Impressions",
-              "default": true,
-              "format": "compactNumber",
-              "semanticDataType": "number"
-            },
-            {
-              "id": "hhUniqs",
-              "key": "hhUniqs",
-              "semanticRef": "household_uniques",
-              "label": "Household Uniques",
-              "format": "compactNumber",
-              "semanticDataType": "number"
-            },
-            {
-              "id": "audienceIndex",
-              "key": "audienceIndex",
-              "semanticRef": "audience_index",
-              "label": "Audience Index",
-              "format": "number",
-              "aggregation": "avg",
-              "category": "Audience",
-              "definitionRef": "harmonizer://feature/user.segment.index",
-              "governance": {
-                "status": "approved",
-                "certification": "reviewed",
-                "classification": "harmonizer.audience"
-              },
-              "semanticDataType": "number"
-            }
-          ],
-          "computedMeasures": [
-            {
-              "id": "reachRate",
-              "key": "reachRate",
-              "label": "Reach Rate",
-              "format": "percent",
-              "compute": {
-                "type": "ratio",
-                "numerator": "hhUniqs",
-                "denominator": "avails",
-                "scale": 100,
-                "decimals": 2
-              }
-            }
-          ],
-          "dimensions": [
-            {
-              "id": "eventDate",
-              "key": "eventDate",
-              "semanticRef": "event_date",
-              "label": "Event Date",
-              "default": true,
-              "chartAxis": true,
-              "format": "date",
-              "category": "Time",
-              "semanticDataType": "date"
-            },
-            {
-              "id": "channelV2",
-              "key": "channelV2",
-              "semanticRef": "channel",
-              "label": "Channel",
-              "default": true,
-              "runtimeFilter": {
-                "includeParamPath": "filters.includeChannelV2",
-                "excludeParamPath": "filters.excludeChannelV2"
-              },
-              "category": "Delivery",
-              "semanticDataType": "string"
-            },
-            {
-              "id": "country",
-              "key": "country",
-              "semanticRef": "country_code",
-              "label": "Market",
-              "runtimeFilter": {
-                "includeParamPath": "filters.includeCountry",
-                "excludeParamPath": "filters.excludeCountry"
-              },
-              "category": "Location",
-              "definitionRef": "harmonizer://feature/location",
-              "governance": {
-                "status": "approved",
-                "classification": "harmonizer.audience"
-              },
-              "semanticDataType": "string"
-            },
-            {
-              "id": "publisher",
-              "key": "publisher",
-              "semanticRef": "publisher",
-              "label": "Publisher",
-              "runtimeFilter": {
-                "includeParamPath": "filters.includePublisher",
-                "excludeParamPath": "filters.excludePublisher"
-              },
-              "semanticDataType": "string"
-            },
-            {
-              "id": "siteType",
-              "key": "siteType",
-              "semanticRef": "site_type",
-              "label": "Site Type",
-              "runtimeFilter": {
-                "includeParamPath": "filters.includeSiteType",
-                "excludeParamPath": "filters.excludeSiteType"
-              },
-              "semanticDataType": "string"
-            },
-            {
-              "id": "region",
-              "key": "region",
-              "semanticRef": "region",
-              "label": "Region",
-              "runtimeFilter": {
-                "includeParamPath": "filters.includeLocationDim",
-                "excludeParamPath": "filters.excludeLocationDim",
-                "format": "locationTuple",
-                "parentField": "country"
-              },
-              "semanticDataType": "string"
-            },
-            {
-              "id": "metrocode",
-              "key": "metrocode",
-              "semanticRef": "metro_code",
-              "label": "Metro Area",
-              "runtimeFilter": {
-                "includeParamPath": "filters.includeMetrocode",
-                "excludeParamPath": "filters.excludeMetrocode"
-              },
-              "semanticDataType": "string"
-            }
-          ],
-          "staticFilters": [
-            {
-              "id": "dateRange",
-              "semanticRef": "reporting_window",
-              "type": "dateRange",
-              "label": "Date Range",
-              "required": true,
-              "startParamPath": "filters.From",
-              "endParamPath": "filters.To",
-              "category": "Scope",
-              "semanticDataType": "date"
-            },
-            {
-              "id": "channelsFilter",
-              "semanticRef": "delivery_channels_filter",
-              "label": "Channels",
-              "multiple": true,
-              "options": [
-                {
-                  "label": "Display",
-                  "value": "Display"
-                },
-                {
-                  "label": "CTV",
-                  "value": "CTV"
-                }
-              ],
-              "category": "Scope",
-              "semanticDataType": "string"
-            },
-            {
-              "id": "audienceSegmentFilter",
-              "semanticRef": "audience_segment",
-              "label": "Audience Segment",
-              "multiple": true,
-              "options": [
-                {
-                  "label": "Young Adults",
-                  "value": "Young Adults"
-                },
-                {
-                  "label": "Established Adults",
-                  "value": "Established Adults"
-                }
-              ],
-              "category": "Audience",
-              "definitionRef": "harmonizer://feature/user.segment",
-              "governance": {
-                "status": "approved",
-                "classification": "harmonizer.audience"
-              },
-              "semanticDataType": "string"
-            }
-          ],
-          "drillMetadata": {
-            "hierarchies": [
-              {
-                "id": "capacity_inventory",
-                "label": "Capacity Inventory",
-                "levels": [
-                  {
-                    "field": "channelV2",
-                    "label": "Channel"
-                  },
-                  {
-                    "field": "publisher",
-                    "label": "Publisher"
-                  },
-                  {
-                    "field": "siteType",
-                    "label": "Site Type"
-                  }
-                ]
-              },
-              {
-                "id": "capacity_location",
-                "label": "Capacity Location",
-                "levels": [
-                  {
-                    "field": "country",
-                    "label": "Market"
-                  },
-                  {
-                    "field": "region",
-                    "label": "Region"
-                  },
-                  {
-                    "field": "metrocode",
-                    "label": "Metro Area"
-                  }
-                ]
-              }
-            ],
-            "fieldActions": [
-              {
-                "fieldRef": "channelV2",
-                "actions": [
-                  {
-                    "id": "drill_market",
-                    "label": "Drill to Market",
-                    "kind": "drill",
-                    "nextFieldRef": "country"
-                  },
-                  {
-                    "id": "detail_channel",
-                    "label": "Show channel details",
-                    "kind": "detail",
-                    "targetRef": "target://example/performance/channel-detail"
-                  }
-                ]
-              },
-              {
-                "fieldRef": "country",
-                "actions": [
-                  {
-                    "id": "detail_market",
-                    "label": "Show market details",
-                    "kind": "detail",
-                    "targetRef": "target://example/performance/market-detail"
-                  }
-                ]
-              }
-            ],
-            "detailTargets": [
-              {
-                "targetRef": "target://example/performance/channel-detail",
-                "navigationMode": "hostRoute",
-                "parameters": {
-                  "channel": "$value",
-                  "campaign": "$row.campaign"
-                }
-              },
-              {
-                "targetRef": "target://example/performance/market-detail",
-                "navigationMode": "hostRoute",
-                "parameters": {
-                  "country": "$value"
-                }
-              }
-            ]
-          },
-          "result": {
-            "chartCreationMode": "explicit",
-            "defaultMode": "chart",
-            "pageSize": 50,
-            "defaultTablePresets": [
-              {
-                "title": "Inventory Ladder",
-                "dimensions": [
-                  "channelV2"
-                ],
-                "measures": [
-                  "avails",
-                  "hhUniqs"
-                ],
-                "primaryMeasure": "avails",
-                "orderField": "avails",
-                "orderDir": "desc",
-                "pageSize": 12,
-                "clearChart": true
-              },
-              {
-                "title": "Location Ladder",
-                "dimensions": [
-                  "country"
-                ],
-                "measures": [
-                  "avails",
-                  "hhUniqs"
-                ],
-                "primaryMeasure": "avails",
-                "orderField": "avails",
-                "orderDir": "desc",
-                "pageSize": 12,
-                "clearChart": true
-              }
-            ],
-            "orderFields": [
-              {
-                "value": "eventDate",
-                "field": "eventDate",
-                "default": true,
-                "defaultDirection": "asc"
-              },
-              {
-                "value": "audienceIndex",
-                "field": "audienceIndex",
-                "defaultDirection": "desc"
-              },
-              {
-                "value": "avails",
-                "field": "avails",
-                "defaultDirection": "desc"
-              },
-              {
-                "value": "hhUniqs",
-                "field": "hhUniqs",
-                "defaultDirection": "desc"
-              }
-            ],
-            "defaultChartSpecs": [
-              {
-                "title": "Inventory · Top Channels",
-                "type": "horizontal_bar",
-                "xField": "channelV2",
-                "yFields": [
-                  "avails"
-                ]
-              },
-              {
-                "title": "Locations · Top Markets",
-                "type": "horizontal_bar",
-                "xField": "country",
-                "yFields": [
-                  "avails"
-                ]
-              }
-            ]
-          }
-        },
-        "state": {
-          "selectedMeasures": [
-            "audienceIndex"
-          ],
-          "primaryMeasure": "audienceIndex",
-          "selectedDimensions": [
-            "country"
-          ],
-          "viewMode": "table",
-          "chartSpec": null,
-          "orderField": "audienceIndex",
-          "orderDir": "desc",
-          "pageSize": 50,
-          "staticFilters": {
-            "dateRange": {
-              "start": "2026-05-01",
-              "end": "2026-05-04"
-            },
-            "audienceSegmentFilter": [
-              "Young Adults"
-            ]
-          },
-          "binding": {
-            "mode": "semantic",
-            "modelRef": "model://example/performance/delivery@v1",
-            "entity": "line_delivery",
-            "selectedDimensions": [
-              "event_date",
-              "channel",
-              "country_code"
-            ],
-            "selectedMeasures": [
-              "available_impressions"
-            ]
-          },
-          "groupBy": "",
-          "reportDocumentTitle": "Capacity Audience Segment Index Q3"
-        },
-        "scopeBindings": [
-          {
-            "paramId": "dateRange",
-            "target": "staticFilters.dateRange"
-          },
-          {
-            "paramId": "channelsFilter",
-            "target": "staticFilters.channelsFilter"
-          },
-          {
-            "paramId": "audienceSegmentFilter",
-            "target": "staticFilters.audienceSegmentFilter"
-          }
-        ]
-      },
-      {
         "id": "sharedFilters",
         "kind": "filterBarBlock",
         "title": "Filters",
+        "datasetRef": "primary",
         "paramIds": [
           "dateRange",
           "channelsFilter",
@@ -653,21 +903,285 @@
             }
           }
         ]
+      },
+      {
+        "id": "primaryBuilder",
+        "kind": "reportBuilderBlock",
+        "title": "Capacity Audience Segment Index Q3",
+        "source": {
+          "kind": "dashboard.reportBuilder",
+          "containerId": "demoReportBuilder",
+          "stateKey": "demoReportBuilder",
+          "dataSourceRef": "demoReportSource"
+        },
+        "config": {
+          "title": "Report Builder Demo",
+          "drillMetadata": {
+            "hierarchies": [
+              {
+                "id": "capacity_inventory",
+                "label": "Capacity Inventory",
+                "levels": [
+                  {
+                    "field": "channelV2",
+                    "label": "Channel"
+                  },
+                  {
+                    "field": "publisher",
+                    "label": "Publisher"
+                  },
+                  {
+                    "field": "siteType",
+                    "label": "Site Type"
+                  }
+                ]
+              },
+              {
+                "id": "capacity_location",
+                "label": "Capacity Location",
+                "levels": [
+                  {
+                    "field": "country",
+                    "label": "Market"
+                  },
+                  {
+                    "field": "region",
+                    "label": "Region"
+                  },
+                  {
+                    "field": "metrocode",
+                    "label": "Metro Area"
+                  }
+                ]
+              }
+            ],
+            "fieldActions": [
+              {
+                "fieldRef": "channelV2",
+                "actions": [
+                  {
+                    "id": "drill_market",
+                    "label": "Drill to Market",
+                    "kind": "drill",
+                    "nextFieldRef": "country"
+                  },
+                  {
+                    "id": "detail_channel",
+                    "label": "Show channel details",
+                    "kind": "detail",
+                    "targetRef": "target://example/performance/channel-detail"
+                  }
+                ]
+              },
+              {
+                "fieldRef": "country",
+                "actions": [
+                  {
+                    "id": "detail_market",
+                    "label": "Show market details",
+                    "kind": "detail",
+                    "targetRef": "target://example/performance/market-detail"
+                  }
+                ]
+              }
+            ],
+            "detailTargets": [
+              {
+                "targetRef": "target://example/performance/channel-detail",
+                "navigationMode": "hostRoute",
+                "parameters": {
+                  "channel": "$value",
+                  "campaign": "$row.campaign"
+                }
+              },
+              {
+                "targetRef": "target://example/performance/market-detail",
+                "navigationMode": "hostRoute",
+                "parameters": {
+                  "country": "$value"
+                }
+              }
+            ]
+          },
+          "semanticModel": {
+            "modelRef": "model://example/performance/delivery@v1",
+            "version": 1,
+            "label": "Ad Delivery",
+            "entities": [
+              {
+                "id": "line_delivery",
+                "label": "Line Delivery",
+                "dimensions": [
+                  {
+                    "id": "event_date",
+                    "key": "event_date",
+                    "label": "Event Date",
+                    "featureType": "dimension",
+                    "category": "Time",
+                    "dataType": "date"
+                  },
+                  {
+                    "id": "channel",
+                    "key": "channel",
+                    "label": "Channel",
+                    "featureType": "dimension",
+                    "category": "Delivery",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "country_code",
+                    "key": "country_code",
+                    "label": "Market",
+                    "featureType": "dimension",
+                    "category": "Location",
+                    "dataType": "string",
+                    "definitionRef": "harmonizer://feature/location",
+                    "governance": {
+                      "status": "approved",
+                      "classification": "harmonizer.audience"
+                    }
+                  },
+                  {
+                    "id": "publisher",
+                    "key": "publisher",
+                    "label": "Publisher",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "site_type",
+                    "key": "site_type",
+                    "label": "Site Type",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "region",
+                    "key": "region",
+                    "label": "Region",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "metro_code",
+                    "key": "metro_code",
+                    "label": "Metro Area",
+                    "featureType": "dimension",
+                    "dataType": "string"
+                  }
+                ],
+                "measures": [
+                  {
+                    "id": "available_impressions",
+                    "key": "available_impressions",
+                    "label": "Available Impressions",
+                    "featureType": "measure",
+                    "dataType": "number",
+                    "format": "compactNumber",
+                    "aggregation": "sum"
+                  },
+                  {
+                    "id": "household_uniques",
+                    "key": "household_uniques",
+                    "label": "Household Uniques",
+                    "featureType": "measure",
+                    "dataType": "number",
+                    "format": "compactNumber",
+                    "aggregation": "sum"
+                  },
+                  {
+                    "id": "audience_index",
+                    "key": "audience_index",
+                    "label": "Audience Index",
+                    "featureType": "measure",
+                    "category": "Audience",
+                    "dataType": "number",
+                    "format": "number",
+                    "aggregation": "avg",
+                    "definitionRef": "harmonizer://feature/user.segment.index",
+                    "governance": {
+                      "status": "approved",
+                      "certification": "reviewed",
+                      "classification": "harmonizer.audience"
+                    }
+                  }
+                ],
+                "parameters": [
+                  {
+                    "id": "reporting_window",
+                    "key": "reporting_window",
+                    "label": "Date Range",
+                    "featureType": "parameter",
+                    "category": "Scope",
+                    "dataType": "date"
+                  },
+                  {
+                    "id": "delivery_channels_filter",
+                    "key": "delivery_channels_filter",
+                    "label": "Channels",
+                    "featureType": "parameter",
+                    "category": "Scope",
+                    "dataType": "string"
+                  },
+                  {
+                    "id": "audience_segment",
+                    "key": "audience_segment",
+                    "label": "Audience Segment",
+                    "featureType": "parameter",
+                    "category": "Audience",
+                    "dataType": "string",
+                    "definitionRef": "harmonizer://feature/user.segment",
+                    "governance": {
+                      "status": "approved",
+                      "classification": "harmonizer.audience"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "state": {
+          "selectedMeasures": [
+            "audienceIndex"
+          ],
+          "primaryMeasure": "audienceIndex",
+          "selectedDimensions": [
+            "country"
+          ],
+          "viewMode": "table",
+          "chartSpec": null,
+          "orderField": "audienceIndex",
+          "orderDir": "desc",
+          "pageSize": 50,
+          "scopeParams": {
+            "dateRange": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            },
+            "audienceSegmentFilter": [
+              "Young Adults"
+            ]
+          },
+          "groupBy": "",
+          "reportDocumentTitle": "Capacity Audience Segment Index Q3"
+        },
+        "scopeBindings": [
+          {
+            "paramId": "dateRange",
+            "target": "staticFilters.dateRange"
+          },
+          {
+            "paramId": "channelsFilter",
+            "target": "staticFilters.channelsFilter"
+          },
+          {
+            "paramId": "audienceSegmentFilter",
+            "target": "staticFilters.audienceSegmentFilter"
+          }
+        ]
       }
-    ],
-    "binding": {
-      "mode": "semantic",
-      "modelRef": "model://example/performance/delivery@v1",
-      "entity": "line_delivery",
-      "selectedDimensions": [
-        "event_date",
-        "channel",
-        "country_code"
-      ],
-      "selectedMeasures": [
-        "available_impressions"
-      ]
-    }
+    ]
   },
   "compileState": {
     "status": "clean",

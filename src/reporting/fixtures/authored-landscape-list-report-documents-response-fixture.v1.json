@@ -34,7 +34,8 @@
           }
         ],
         "dataSourceRef": "demoReportSource"
-      }
+      },
+      "artifactId": "reportBuilder.savedReportPayload::rbreport_authored_landscape_report::authored_landscape_report::authoredLandscapeBuilder"
     }
   ],
   "cursor": "",

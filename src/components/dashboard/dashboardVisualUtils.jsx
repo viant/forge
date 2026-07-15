@@ -62,7 +62,7 @@ export function formatDashboardTableCellText(cell, row, column, locale) {
 }
 
 export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
-    const visualState = resolveReportTableCellVisualState(row, column);
+  const visualState = resolveReportTableCellVisualState(row, column);
     if (!visualState) {
         return null;
     }
@@ -104,7 +104,209 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
             </span>
         );
     }
+    if (visualState.kind === 'progressBar') {
+        const [background = '#e5edf5', foreground = '#2f6de1'] = visualState.palette || [];
+        return (
+            <span
+                className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--progress-bar"
+                data-visual-kind="progressBar"
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    minWidth: 96,
+                }}
+            >
+                <span
+                    aria-hidden="true"
+                    style={{
+                        position: 'relative',
+                        display: 'inline-flex',
+                        width: 64,
+                        minWidth: 64,
+                        height: 8,
+                        borderRadius: 999,
+                        background,
+                        overflow: 'hidden',
+                    }}
+                >
+                    <span
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: `${Math.round(visualState.percent * 100)}%`,
+                            minWidth: visualState.percent > 0 ? 6 : 0,
+                            borderRadius: 999,
+                            background: foreground,
+                        }}
+                    />
+                </span>
+                <span style={{fontSize: '11px', fontWeight: 600, color: '#30404d'}}>
+                    {text}
+                </span>
+            </span>
+        );
+    }
+    if (visualState.kind === 'sparkBar') {
+        const [background = '#eef2f6', foreground = '#4c6fff'] = visualState.palette || [];
+        return (
+            <span
+                className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--spark-bar"
+                data-visual-kind="sparkBar"
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    minWidth: 72,
+                }}
+            >
+                <span
+                    aria-hidden="true"
+                    style={{
+                        position: 'relative',
+                        display: 'inline-flex',
+                        width: 40,
+                        minWidth: 40,
+                        height: 10,
+                        alignItems: 'flex-end',
+                        justifyContent: 'flex-start',
+                        background: background,
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                        padding: '0 2px',
+                    }}
+                >
+                    <span
+                        style={{
+                            display: 'inline-flex',
+                            width: 8,
+                            minWidth: 8,
+                            height: `${Math.max(2, Math.round((visualState.percent || 0) * 10))}px`,
+                            background: foreground,
+                            borderRadius: 2,
+                        }}
+                    />
+                </span>
+                <span style={{fontSize: '11px', fontWeight: 600, color: '#30404d'}}>
+                    {text}
+                </span>
+            </span>
+        );
+    }
+    if (visualState.kind === 'shareBar') {
+        const segments = Array.isArray(visualState.segments) ? visualState.segments : [];
+        let left = 0;
+        return (
+            <span
+                className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--share-bar"
+                data-visual-kind="shareBar"
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    minWidth: 120,
+                }}
+            >
+                <span
+                    aria-hidden="true"
+                    style={{
+                        position: 'relative',
+                        display: 'inline-flex',
+                        width: 72,
+                        minWidth: 72,
+                        height: 8,
+                        borderRadius: 999,
+                        background: '#e5edf5',
+                        overflow: 'hidden',
+                    }}
+                >
+                    {segments.map((segment, index) => {
+                        const width = Math.round((segment.percent || 0) * 100);
+                        const element = (
+                            <span
+                                key={`${segment.label}-${index}`}
+                                style={{
+                                    position: 'absolute',
+                                    left: `${Math.round(left * 100)}%`,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: `${width}%`,
+                                    minWidth: segment.percent > 0 ? 4 : 0,
+                                    background: segment.color,
+                                }}
+                            />
+                        );
+                        left += segment.percent || 0;
+                        return element;
+                    })}
+                </span>
+                <span style={{fontSize: '11px', fontWeight: 600, color: '#30404d'}}>
+                    {segments.map((segment) => `${segment.label} ${formatDashboardValue(segment.percent || 0, 'percentFraction', locale)}`).join(' · ')}
+                </span>
+            </span>
+        );
+    }
     const tone = toneColors[visualState.tone] || toneColors.info;
+    const backgroundColor = visualState.backgroundColor || tone.background;
+    const borderColor = visualState.borderColor || tone.border;
+    const textColor = visualState.textColor || tone.text;
+    if (visualState.kind === 'delta') {
+        const numericValue = Number(visualState.value || 0);
+        const formattedValue = formatDashboardValue(numericValue, column?.format, locale);
+        const label = numericValue > 0 ? `+${formattedValue}` : String(formattedValue);
+        const icon = numericValue > 0 ? '▲' : (numericValue < 0 ? '▼' : '•');
+        return (
+            <span
+                className={`forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--delta forge-dashboard-table-cell-visual--${visualState.tone || 'info'}`}
+                data-visual-kind="delta"
+                data-visual-tone={visualState.tone || 'info'}
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    width: 'fit-content',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: textColor,
+                    background: backgroundColor,
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '999px',
+                    padding: '3px 8px',
+                }}
+            >
+                <span aria-hidden="true" style={{fontSize: '10px'}}>{icon}</span>
+                <span>{label}</span>
+            </span>
+        );
+    }
+    if (visualState.kind === 'rank') {
+        return (
+            <span
+                className="forge-dashboard-table-cell-visual forge-dashboard-table-cell-visual--rank"
+                data-visual-kind="rank"
+                style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    width: 'fit-content',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: textColor,
+                    background: backgroundColor,
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '999px',
+                    padding: '3px 8px',
+                }}
+            >
+                {visualState.label}
+            </span>
+        );
+    }
     const fontWeight = visualState.kind === 'badge' ? 700 : 600;
     const textTransform = visualState.kind === 'badge' ? 'uppercase' : 'none';
     const letterSpacing = visualState.kind === 'badge' ? '0.03em' : 'normal';
@@ -121,9 +323,9 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
                 fontWeight,
                 textTransform,
                 letterSpacing,
-                color: tone.text,
-                background: tone.background,
-                border: `1px solid ${tone.border}`,
+                color: textColor,
+                background: backgroundColor,
+                border: `1px solid ${borderColor}`,
                 borderRadius: '999px',
                 padding: '3px 8px',
             }}

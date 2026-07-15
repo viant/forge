@@ -242,7 +242,35 @@ function formatKpiValue(value, format = "", locale = "en-US") {
   return formatDashboardValue(value, format, locale);
 }
 
-function resolveRuntimeKpiToneStyles(tone = "") {
+function resolveRuntimeTheme(reportSpec = {}, reportDocument = null) {
+  const source = reportSpec?.theme && typeof reportSpec.theme === "object" && !Array.isArray(reportSpec.theme)
+    ? reportSpec.theme
+    : (reportDocument?.theme && typeof reportDocument.theme === "object" && !Array.isArray(reportDocument.theme) ? reportDocument.theme : {});
+  const accentTone = normalizeString(source?.accentTone).toLowerCase();
+  const badgePalette = normalizeString(source?.badgePalette).toLowerCase();
+  return {
+    accentTone: ["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? accentTone : "blue",
+    badgePalette: ["soft", "bold"].includes(badgePalette) ? badgePalette : "soft",
+  };
+}
+
+function resolveRuntimeAccentPalette(accentTone = "blue") {
+  switch (normalizeString(accentTone).toLowerCase()) {
+    case "green":
+      return { accent: "#16a34a", background: "#eef8f0", border: "#cfe7d6", text: "#0f6b3a", chipBackground: "#daf5e4" };
+    case "amber":
+      return { accent: "#d9822b", background: "#fff7e1", border: "#f5d28c", text: "#8a5d00", chipBackground: "#fff0c2" };
+    case "rose":
+      return { accent: "#d64545", background: "#fff1f0", border: "#f5c2c0", text: "#a82a2a", chipBackground: "#fde2df" };
+    case "slate":
+      return { accent: "#5f6b7c", background: "#f5f7fa", border: "#d8e2eb", text: "#486581", chipBackground: "#e9eef4" };
+    case "blue":
+    default:
+      return { accent: "#2f6de1", background: "#eef4ff", border: "#cddcfd", text: "#2457b8", chipBackground: "#e0edff" };
+  }
+}
+
+function resolveRuntimeKpiToneStyles(tone = "", theme = {}) {
   const normalizedTone = normalizeString(tone).toLowerCase();
   if (normalizedTone === "danger") {
     return {
@@ -269,55 +297,60 @@ function resolveRuntimeKpiToneStyles(tone = "") {
     };
   }
   if (normalizedTone === "info") {
+    const accent = resolveRuntimeAccentPalette(theme?.accentTone);
     return {
-      accent: "#2f6de1",
-      chipBackground: "#eef4ff",
-      chipBorder: "#cddcfd",
-      chipText: "#2457b8",
+      accent: accent.accent,
+      chipBackground: accent.background,
+      chipBorder: accent.border,
+      chipText: accent.text,
     };
   }
+  const accent = resolveRuntimeAccentPalette(theme?.accentTone);
   return {
-    accent: "#d8e2eb",
-    chipBackground: "#f7fafc",
-    chipBorder: "#d8e2eb",
-    chipText: "#486581",
+    accent: accent.border,
+    chipBackground: theme?.badgePalette === "bold" ? accent.chipBackground : "#f7fafc",
+    chipBorder: theme?.badgePalette === "bold" ? accent.border : "#d8e2eb",
+    chipText: theme?.badgePalette === "bold" ? accent.text : "#486581",
   };
 }
 
-function resolveRuntimeBadgeToneStyles(tone = "") {
+function resolveRuntimeBadgeToneStyles(tone = "", theme = {}) {
   const normalizedTone = normalizeString(tone).toLowerCase();
+  const bold = theme?.badgePalette === "bold";
   if (normalizedTone === "danger") {
     return {
-      background: "#fff1f0",
-      border: "#f5c2c0",
+      background: bold ? "#fdd8d5" : "#fff1f0",
+      border: bold ? "#d64545" : "#f5c2c0",
       text: "#a82a2a",
     };
   }
   if (normalizedTone === "warning") {
     return {
-      background: "#fff7e1",
-      border: "#f5d28c",
+      background: bold ? "#ffe2a8" : "#fff7e1",
+      border: bold ? "#d9822b" : "#f5d28c",
       text: "#8a5d00",
     };
   }
   if (normalizedTone === "success") {
     return {
-      background: "#eef8f0",
-      border: "#cfe7d6",
+      background: bold ? "#d5f0dc" : "#eef8f0",
+      border: bold ? "#16a34a" : "#cfe7d6",
       text: "#0f6b3a",
     };
   }
   if (normalizedTone === "info") {
+    const accent = resolveRuntimeAccentPalette(theme?.accentTone);
     return {
-      background: "#eef4ff",
-      border: "#cddcfd",
-      text: "#2457b8",
+      background: bold ? accent.chipBackground : accent.background,
+      border: bold ? accent.accent : accent.border,
+      text: accent.text,
     };
   }
+  const accent = resolveRuntimeAccentPalette(theme?.accentTone);
   return {
-    background: "#f7fafc",
-    border: "#d8e2eb",
-    text: "#486581",
+    background: bold ? accent.chipBackground : "#f7fafc",
+    border: bold ? accent.border : "#d8e2eb",
+    text: bold ? accent.text : "#486581",
   };
 }
 
@@ -1244,7 +1277,7 @@ function MarkdownBlock({ block = {} }) {
   );
 }
 
-function BadgesBlock({ block = {}, locale = "en-US" }) {
+function BadgesBlock({ block = {}, locale = "en-US", theme = {} }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -1281,7 +1314,7 @@ function BadgesBlock({ block = {}, locale = "en-US" }) {
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {items.map((item, index) => {
-            const toneStyles = resolveRuntimeBadgeToneStyles(item.tone);
+            const toneStyles = resolveRuntimeBadgeToneStyles(item.tone, theme);
             return (
               <span
                 key={item.id || `${item.label}_${index + 1}`}
@@ -1309,7 +1342,7 @@ function BadgesBlock({ block = {}, locale = "en-US" }) {
   );
 }
 
-function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false }) {
+function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, theme = {} }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
@@ -1318,7 +1351,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
   const hasSecondaryValue = !!content?.secondaryField
     && content?.secondaryValue !== undefined
     && content?.secondaryValue !== null;
-  const toneStyles = resolveRuntimeKpiToneStyles(content?.tone);
+  const toneStyles = resolveRuntimeKpiToneStyles(content?.tone, theme);
   const blockTitle = normalizeString(block?.title || content?.title || "KPI");
   const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
   const showValueLabel = !!valueLabel && valueLabel.toLowerCase() !== blockTitle.toLowerCase();
@@ -1395,6 +1428,523 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
       )}
     </RuntimePanel>
   );
+}
+
+function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
+    .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
+    || null;
+  const items = (Array.isArray(content?.items) ? content.items : [])
+    .filter((item) => item && typeof item === "object" && !Array.isArray(item));
+  const gridColumns = Math.max(1, Math.min(4, Math.trunc(Number(content?.columns || 2)) || 2));
+  const layout = normalizeString(content?.layout).toLowerCase() === "list" ? "list" : "grid";
+  return (
+    <RuntimePanel
+      className="forge-report-runtime-collection-panel"
+      title={normalizeString(block?.title || content?.title || "Collection")}
+      subtitle={normalizeString(content?.description)}
+    >
+      <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+      {invalidDiagnostic ? (
+        <BlockErrorCallout diagnostic={invalidDiagnostic} />
+      ) : items.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+          {normalizeString(content?.emptyLabel || "No collection items available.")}
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: layout === "list" ? "1fr" : `repeat(${gridColumns}, minmax(0, 1fr))`,
+            gap: 12,
+          }}
+        >
+          {items.map((item, index) => {
+            const title = normalizeString(item?.title || `Item ${index + 1}`);
+            const valueLabel = normalizeString(item?.valueLabel || item?.valueField || "");
+            const secondaryLabel = normalizeString(item?.secondaryLabel || item?.secondaryField || "");
+            const bodyMarkdown = String(item?.bodyMarkdown || "");
+            return (
+              <div
+                key={normalizeString(item?.id || title || `item_${index + 1}`)}
+                style={{
+                  border: "1px solid #dbe5ec",
+                  borderRadius: 12,
+                  background: "#fff",
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#182026" }}>{title}</div>
+                {valueLabel ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
+                      {valueLabel}
+                    </span>
+                    <span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
+                      {formatKpiValue(item?.value, normalizeString(item?.valueFormat || item?.format), locale)}
+                    </span>
+                  </div>
+                ) : null}
+                {secondaryLabel ? (
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "#30404d" }}>
+                    <strong style={{ color: "#182026" }}>{secondaryLabel}</strong>
+                    <span>{formatKpiValue(item?.secondaryValue, normalizeString(item?.secondaryFormat), locale)}</span>
+                  </div>
+                ) : null}
+                {bodyMarkdown.trim() ? <RuntimeMarkdownBody markdown={bodyMarkdown} /> : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </RuntimePanel>
+  );
+}
+
+function SectionHeaderBlock({ block = {} }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  return (
+    <RuntimePanel
+      className="forge-report-runtime-section-panel"
+      title={normalizeString(block?.title || content?.title || "Section")}
+      subtitle={normalizeString(content?.subtitle || block?.subtitle)}
+    >
+      {normalizeString(content?.description || block?.description) ? (
+        <div style={{ fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>
+          {normalizeString(content?.description || block?.description)}
+        </div>
+      ) : null}
+    </RuntimePanel>
+  );
+}
+
+function StepperBlock({ block = {} }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  const steps = (Array.isArray(content?.steps) ? content.steps : [])
+    .filter((step) => step && typeof step === "object" && !Array.isArray(step));
+  return (
+    <RuntimePanel
+      className="forge-report-runtime-stepper-panel"
+      title={normalizeString(block?.title || content?.title || "Process")}
+      subtitle={normalizeString(content?.description)}
+    >
+      {steps.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+          No process steps configured.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {steps.map((step, index) => (
+            <div
+              key={normalizeString(step?.id || `step_${index + 1}`)}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "40px minmax(0, 1fr)",
+                gap: 12,
+                alignItems: "start",
+                border: "1px solid #dbe5ec",
+                borderRadius: 12,
+                background: "#fff",
+                padding: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  background: "#1d4ed8",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 13,
+                  fontWeight: 800,
+                }}
+              >
+                {index + 1}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {normalizeString(step?.title) ? (
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#182026" }}>{normalizeString(step.title)}</div>
+                ) : null}
+                {String(step?.body || "").trim() ? (
+                  <RuntimeMarkdownBody markdown={String(step.body || "")} />
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </RuntimePanel>
+  );
+}
+
+function resolveInfoPanelToneStyles(tone = "", theme = {}) {
+  const normalized = normalizeString(tone).toLowerCase();
+  if (normalized === "warning") {
+    return { border: "#f5c542", background: "#fff9e6", eyebrow: "#8a5d00" };
+  }
+  if (normalized === "danger") {
+    return { border: "#f5c2c0", background: "#fff5f4", eyebrow: "#a82a2a" };
+  }
+  if (normalized === "success") {
+    return { border: "#b7e4c7", background: "#f1fbf5", eyebrow: "#0a6640" };
+  }
+  const accent = resolveRuntimeAccentPalette(theme?.accentTone);
+  return { border: accent.border, background: accent.background, eyebrow: accent.text };
+}
+
+function InfoPanelBlock({ block = {}, theme = {} }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  const tone = resolveInfoPanelToneStyles(content?.tone || block?.tone, theme);
+  return (
+    <section
+      style={{
+        border: `1px solid ${tone.border}`,
+        borderRadius: 16,
+        background: tone.background,
+        padding: 16,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+      data-report-runtime-info-panel-tone={normalizeString(content?.tone || block?.tone).toLowerCase() || "info"}
+    >
+      {normalizeString(content?.eyebrow || block?.eyebrow) ? (
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: tone.eyebrow }}>
+          {normalizeString(content?.eyebrow || block?.eyebrow)}
+        </div>
+      ) : null}
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#182026" }}>
+        {normalizeString(block?.title || content?.title || "Info Panel")}
+      </div>
+      {normalizeString(content?.description || block?.description) ? (
+        <div style={{ fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>
+          {normalizeString(content?.description || block?.description)}
+        </div>
+      ) : null}
+      {String(content?.body || block?.body || "").trim() ? (
+        <RuntimeMarkdownBody markdown={String(content?.body || block?.body || "")} />
+      ) : null}
+    </section>
+  );
+}
+
+function resolveCalloutToneStyles(tone = "", theme = {}) {
+  const normalized = normalizeString(tone).toLowerCase();
+  if (normalized === "warning") {
+    return { border: "#f5c542", background: "#fff9e6", accent: "#8a5d00", chipBackground: "#fff0c2" };
+  }
+  if (normalized === "danger") {
+    return { border: "#f5c2c0", background: "#fff5f4", accent: "#a82a2a", chipBackground: "#fde2df" };
+  }
+  if (normalized === "success") {
+    return { border: "#b7e4c7", background: "#f1fbf5", accent: "#0a6640", chipBackground: "#daf5e4" };
+  }
+  const accent = resolveRuntimeAccentPalette(theme?.accentTone);
+  return { border: accent.border, background: accent.background, accent: accent.accent, chipBackground: accent.chipBackground };
+}
+
+function CalloutBlock({ block = {}, theme = {} }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  const tone = resolveCalloutToneStyles(content?.tone || block?.tone, theme);
+  const badges = (Array.isArray(content?.badges) ? content.badges : Array.isArray(block?.badges) ? block.badges : [])
+    .map((badge) => normalizeString(badge))
+    .filter(Boolean);
+  const icon = normalizeString(content?.icon || block?.icon);
+  return (
+    <section
+      style={{
+        border: `1px solid ${tone.border}`,
+        borderLeft: `6px solid ${tone.accent}`,
+        borderRadius: 16,
+        background: tone.background,
+        padding: 16,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+      data-report-runtime-callout-tone={normalizeString(content?.tone || block?.tone).toLowerCase() || "info"}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        {icon ? (
+          <span style={{ fontSize: 18, lineHeight: 1, color: tone.accent }}>{icon}</span>
+        ) : null}
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#182026" }}>
+          {normalizeString(block?.title || content?.title || "Callout")}
+        </div>
+      </div>
+      {normalizeString(content?.description || block?.description) ? (
+        <div style={{ fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>
+          {normalizeString(content?.description || block?.description)}
+        </div>
+      ) : null}
+      {badges.length > 0 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {badges.map((badge, index) => (
+            <span
+              key={`${badge}-${index}`}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                borderRadius: 999,
+                padding: "4px 10px",
+                background: tone.chipBackground,
+                color: tone.accent,
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {badge}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {String(content?.body || block?.body || "").trim() ? (
+        <RuntimeMarkdownBody markdown={String(content?.body || block?.body || "")} />
+      ) : null}
+    </section>
+  );
+}
+
+function KanbanBlock({ block = {} }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  const columns = (Array.isArray(content?.columns) ? content.columns : [])
+    .filter((column) => column && typeof column === "object" && !Array.isArray(column));
+  return (
+    <RuntimePanel
+      className="forge-report-runtime-kanban-panel"
+      title={normalizeString(block?.title || content?.title || "Pipeline")}
+      subtitle={normalizeString(content?.description)}
+    >
+      {columns.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+          No pipeline columns configured.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${Math.max(1, columns.length)}, minmax(0, 1fr))`,
+            gap: 12,
+          }}
+        >
+          {columns.map((column, index) => (
+            <div
+              key={normalizeString(column?.id || `column_${index + 1}`)}
+              style={{
+                border: "1px solid #dbe5ec",
+                borderRadius: 14,
+                background: "#fbfdff",
+                padding: 12,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#182026" }}>
+                {normalizeString(column?.title || `Column ${index + 1}`)}
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                {(Array.isArray(column?.cards) ? column.cards : []).map((card, cardIndex) => (
+                  <div
+                    key={normalizeString(card?.id || `card_${cardIndex + 1}`)}
+                    style={{
+                      border: "1px solid #d7e2ee",
+                      borderRadius: 12,
+                      background: "#fff",
+                      padding: 12,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}
+                  >
+                    {normalizeString(card?.badge) ? (
+                      <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#486579" }}>
+                        {normalizeString(card.badge)}
+                      </span>
+                    ) : null}
+                    {normalizeString(card?.title) ? (
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#182026" }}>{normalizeString(card.title)}</div>
+                    ) : null}
+                    {String(card?.body || "").trim() ? <RuntimeMarkdownBody markdown={String(card.body || "")} /> : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </RuntimePanel>
+  );
+}
+
+function TimelineBlock({ block = {} }) {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  const events = (Array.isArray(content?.events) ? content.events : [])
+    .filter((event) => event && typeof event === "object" && !Array.isArray(event));
+  return (
+    <RuntimePanel
+      className="forge-report-runtime-timeline-panel"
+      title={normalizeString(block?.title || content?.title || "Timeline")}
+      subtitle={normalizeString(content?.description)}
+    >
+      {events.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+          No timeline events configured.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gap: 12 }}>
+          {events.map((event, index) => (
+            <div
+              key={normalizeString(event?.id || `event_${index + 1}`)}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "96px minmax(0, 1fr)",
+                gap: 12,
+                alignItems: "start",
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#486579", textTransform: "uppercase", letterSpacing: "0.04em", paddingTop: 4 }}>
+                {normalizeString(event?.date || event?.badge || `Event ${index + 1}`)}
+              </div>
+              <div
+                style={{
+                  border: "1px solid #dbe5ec",
+                  borderRadius: 12,
+                  background: "#fff",
+                  padding: 12,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {normalizeString(event?.badge) ? (
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#486579" }}>
+                      {normalizeString(event.badge)}
+                    </span>
+                  ) : null}
+                  {normalizeString(event?.title) ? (
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#182026" }}>{normalizeString(event.title)}</div>
+                  ) : null}
+                </div>
+                {String(event?.body || "").trim() ? <RuntimeMarkdownBody markdown={String(event.body || "")} /> : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </RuntimePanel>
+  );
+}
+
+function buildRuntimeSections(blocks = [], hiddenBlockIds = new Set()) {
+  const normalizedBlocks = Array.isArray(blocks) ? blocks : [];
+  const explicitTabGroup = normalizedBlocks.find((block) => normalizeString(block?.kind) === "tabGroupBlock") || null;
+  const explicitSectionIds = Array.isArray(explicitTabGroup?.content?.sectionIds)
+    ? explicitTabGroup.content.sectionIds.map((sectionId) => normalizeString(sectionId)).filter(Boolean)
+    : (Array.isArray(explicitTabGroup?.sectionIds) ? explicitTabGroup.sectionIds.map((sectionId) => normalizeString(sectionId)).filter(Boolean) : []);
+  const sections = [];
+  let current = null;
+  normalizedBlocks.forEach((block, index) => {
+    const kind = normalizeString(block?.kind);
+    if (kind === "tabGroupBlock") {
+      return;
+    }
+    if (hiddenBlockIds.has(normalizeString(block?.id))) {
+      return;
+    }
+    if (kind === "sectionBlock") {
+      current = {
+        id: normalizeString(block?.id || `section_${index + 1}`) || `section_${index + 1}`,
+        title: normalizeString(block?.title || block?.content?.title || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
+        navigationLabel: normalizeString(block?.content?.navigationLabel || block?.navigationLabel || block?.title || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
+        block,
+        items: [],
+      };
+      sections.push(current);
+      return;
+    }
+    if (!current) {
+      current = {
+        id: "overview",
+        title: "Overview",
+        navigationLabel: "Overview",
+        block: null,
+        items: [],
+      };
+      sections.push(current);
+    }
+    current.items.push(block);
+  });
+  const filteredSections = sections.filter((section) => section.block || section.items.length > 0);
+  if (explicitSectionIds.length === 0) {
+    return filteredSections;
+  }
+  const sectionById = new Map(filteredSections.map((section) => [normalizeString(section?.id), section]));
+  const orderedSections = explicitSectionIds
+    .map((sectionId) => sectionById.get(sectionId) || null)
+    .filter(Boolean);
+  const trailingSections = filteredSections.filter((section) => !explicitSectionIds.includes(normalizeString(section?.id)));
+  return [...orderedSections, ...trailingSections];
+}
+
+function resolveRuntimeTabGroupConfig(blocks = []) {
+  const tabGroupBlock = (Array.isArray(blocks) ? blocks : [])
+    .find((block) => normalizeString(block?.kind) === "tabGroupBlock")
+    || null;
+  if (!tabGroupBlock) {
+    return null;
+  }
+  const sectionIds = Array.isArray(tabGroupBlock?.content?.sectionIds)
+    ? tabGroupBlock.content.sectionIds.map((sectionId) => normalizeString(sectionId)).filter(Boolean)
+    : (Array.isArray(tabGroupBlock?.sectionIds) ? tabGroupBlock.sectionIds.map((sectionId) => normalizeString(sectionId)).filter(Boolean) : []);
+  return {
+    id: normalizeString(tabGroupBlock?.id || "tabGroupBlock") || "tabGroupBlock",
+    title: normalizeString(tabGroupBlock?.content?.title || tabGroupBlock?.title || "Sections") || "Sections",
+    sectionIds,
+    defaultSectionId: normalizeString(tabGroupBlock?.content?.defaultSectionId || tabGroupBlock?.defaultSectionId),
+  };
+}
+
+function resolveRuntimeCompositeConfig(blocks = []) {
+  const composites = (Array.isArray(blocks) ? blocks : [])
+    .filter((block) => normalizeString(block?.kind) === "compositeBlock");
+  const childBlockIdSet = new Set();
+  composites.forEach((block) => {
+    const childBlockIds = Array.isArray(block?.content?.childBlockIds)
+      ? block.content.childBlockIds
+      : (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
+    childBlockIds
+      .map((blockId) => normalizeString(blockId))
+      .filter(Boolean)
+      .forEach((blockId) => childBlockIdSet.add(blockId));
+  });
+  return {
+    composites,
+    childBlockIdSet,
+  };
 }
 
 function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false }) {
@@ -2084,6 +2634,7 @@ export default function ReportRuntime({
     [allRuntimeBlocks],
   );
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
+  const [activeSectionId, setActiveSectionId] = useState("");
   const [providerActionState, setProviderActionState] = useState(() => buildIdleReportRuntimeProviderActionsState());
   const [providerReloadSequence, setProviderReloadSequence] = useState(0);
   const drillMetadataProvider = useMemo(
@@ -2165,17 +2716,59 @@ export default function ReportRuntime({
     />
   );
 
+  const runtimeCompositeConfig = useMemo(
+    () => resolveRuntimeCompositeConfig(allRuntimeBlocks),
+    [allRuntimeBlocks],
+  );
+  const runtimeTheme = useMemo(
+    () => resolveRuntimeTheme(reportSpec, reportDocument),
+    [reportDocument, reportSpec],
+  );
+  const runtimeBlockIndex = useMemo(
+    () => new Map(
+      (Array.isArray(allRuntimeBlocks) ? allRuntimeBlocks : [])
+        .map((block) => [normalizeString(block?.id), block])
+        .filter(([id]) => !!id),
+    ),
+    [allRuntimeBlocks],
+  );
+
   const renderBlock = (block) => {
     const kind = normalizeString(block?.kind);
+    if (kind === "tabGroupBlock") {
+      return null;
+    }
+    if (kind === "sectionBlock") {
+      return <SectionHeaderBlock key={block.id} block={block} />;
+    }
+    if (kind === "stepperBlock") {
+      return <StepperBlock key={block.id} block={block} />;
+    }
+    if (kind === "infoPanelBlock") {
+      return <InfoPanelBlock key={block.id} block={block} theme={runtimeTheme} />;
+    }
+    if (kind === "calloutBlock") {
+      return <CalloutBlock key={block.id} block={block} theme={runtimeTheme} />;
+    }
+    if (kind === "kanbanBlock") {
+      return <KanbanBlock key={block.id} block={block} />;
+    }
+    if (kind === "timelineBlock") {
+      return <TimelineBlock key={block.id} block={block} />;
+    }
     if (kind === "markdownBlock") {
       return <MarkdownBlock key={block.id} block={block} />;
     }
     if (kind === "badgesBlock") {
-      return <BadgesBlock key={block.id} block={block} locale={locale} />;
+      return <BadgesBlock key={block.id} block={block} locale={locale} theme={runtimeTheme} />;
     }
     if (kind === "kpiBlock") {
       const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
-      return <KpiBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
+      return <KpiBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} theme={runtimeTheme} />;
+    }
+    if (kind === "collectionBlock") {
+      const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
+      return <CollectionBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     if (kind === "filterBarBlock") {
       const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
@@ -2309,8 +2902,67 @@ export default function ReportRuntime({
       const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
       return <GeoMapBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
+    if (kind === "compositeBlock") {
+      const childBlockIds = Array.isArray(block?.content?.childBlockIds)
+        ? block.content.childBlockIds
+        : (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
+      const childBlocks = childBlockIds
+        .map((blockId) => runtimeBlockIndex.get(normalizeString(blockId)) || null)
+        .filter(Boolean);
+      return (
+        <RuntimePanel
+          key={block.id}
+          title={normalizeString(block?.title || block?.content?.title || "Grouped Panel")}
+          subtitle={normalizeString(block?.content?.description || block?.description)}
+        >
+          {childBlocks.length > 0 ? (
+            renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
+          ) : (
+            <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+              Add one or more child blocks to this grouped panel.
+            </div>
+          )}
+        </RuntimePanel>
+      );
+    }
     return <UnsupportedBlock key={block?.id || kind} block={block} />;
   };
+
+  const runtimeSections = useMemo(
+    () => buildRuntimeSections(allRuntimeBlocks, runtimeCompositeConfig.childBlockIdSet),
+    [allRuntimeBlocks, runtimeCompositeConfig],
+  );
+  const runtimeTabGroup = useMemo(
+    () => resolveRuntimeTabGroupConfig(allRuntimeBlocks),
+    [allRuntimeBlocks],
+  );
+  const visibleRuntimeBlocks = useMemo(
+    () => (
+      Array.isArray(allRuntimeBlocks)
+        ? allRuntimeBlocks.filter((block) => {
+          const blockId = normalizeString(block?.id);
+          const kind = normalizeString(block?.kind);
+          if (kind === "tabGroupBlock") {
+            return false;
+          }
+          return !runtimeCompositeConfig.childBlockIdSet.has(blockId);
+        })
+        : []
+    ),
+    [allRuntimeBlocks, runtimeCompositeConfig],
+  );
+  const resolvedActiveSectionId = normalizeString(activeSectionId || runtimeTabGroup?.defaultSectionId || runtimeSections[0]?.id);
+
+  useEffect(() => {
+    if (!Array.isArray(runtimeSections) || runtimeSections.length === 0) {
+      setActiveSectionId("");
+      return;
+    }
+    if (runtimeSections.some((section) => normalizeString(section?.id) === resolvedActiveSectionId)) {
+      return;
+    }
+    setActiveSectionId(normalizeString(runtimeSections[0]?.id));
+  }, [runtimeSections, resolvedActiveSectionId]);
 
   const renderLayoutBlockGrid = (blocks = [], keyPrefix = "runtime") => {
     if (!Array.isArray(blocks) || blocks.length === 0) {
@@ -2378,7 +3030,62 @@ export default function ReportRuntime({
       <DiagnosticsPanel diagnostics={[
         ...runtimeDiagnostics,
       ]} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
-      {renderLayoutBlockGrid(allRuntimeBlocks, "runtime")}
+      {runtimeSections.length > 1 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {runtimeTabGroup?.title ? (
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#486579" }}>
+              {runtimeTabGroup.title}
+            </div>
+          ) : null}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              padding: 4,
+              borderRadius: 12,
+              background: "#f5f8fb",
+              border: "1px solid #dbe5ec",
+            }}
+          >
+            {runtimeSections.map((section) => {
+              const selected = normalizeString(section?.id) === resolvedActiveSectionId;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => setActiveSectionId(section.id)}
+                  style={{
+                    border: selected ? "1px solid #93c5fd" : "1px solid transparent",
+                    background: selected ? "#ffffff" : "transparent",
+                    color: selected ? "#1d4ed8" : "#486579",
+                    borderRadius: 10,
+                    padding: "8px 12px",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {section.navigationLabel}
+                </button>
+              );
+            })}
+          </div>
+          {runtimeSections.map((section) => {
+            if (normalizeString(section?.id) !== resolvedActiveSectionId) {
+              return null;
+            }
+            return (
+              <div key={section.id} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {section.block ? renderBlock(section.block) : null}
+                {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        renderLayoutBlockGrid(visibleRuntimeBlocks, "runtime")
+      )}
     </div>
   );
 }

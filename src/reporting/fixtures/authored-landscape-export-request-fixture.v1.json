@@ -49,6 +49,21 @@
     },
     "refinements": [],
     "calculatedFields": [],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    },
     "datasets": [
       {
         "id": "primary",
@@ -64,9 +79,7 @@
           },
           "filters": {
             "From": "2026-05-01",
-            "To": "2026-05-04",
-            "from": "2026-05-01",
-            "to": "2026-05-04"
+            "To": "2026-05-04"
           },
           "limit": 50,
           "offset": 0
@@ -162,28 +175,13 @@
           }
         }
       }
-    ],
-    "scope": {
-      "params": [
-        {
-          "id": "dateRange",
-          "kind": "dateRange",
-          "label": "dateRange",
-          "required": true,
-          "value": {
-            "start": "2026-05-01",
-            "end": "2026-05-04"
-          }
-        }
-      ],
-      "dataSourceRef": "demoReportSource"
-    }
+    ]
   },
   "reportFill": {
     "version": 1,
     "kind": "reportFill",
     "specVersion": 1,
-    "specHash": "fnv1a:56b0ded3",
+    "specHash": "fnv1a:02067797",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "authoredLandscapeBuilder",
@@ -214,15 +212,13 @@
           },
           "filters": {
             "From": "2026-05-01",
-            "To": "2026-05-04",
-            "from": "2026-05-01",
-            "to": "2026-05-04"
+            "To": "2026-05-04"
           },
           "limit": 50,
           "offset": 0
         },
         "provenance": {
-          "requestHash": "fnv1a:0548fc43",
+          "requestHash": "fnv1a:f8422bd7",
           "rowCount": 4,
           "truncated": false,
           "hasMore": false,
@@ -615,9 +611,9 @@
     "version": 1,
     "kind": "reportPrint",
     "specVersion": 1,
-    "specHash": "fnv1a:56b0ded3",
+    "specHash": "fnv1a:02067797",
     "fillVersion": 1,
-    "fillHash": "fnv1a:431d7391",
+    "fillHash": "fnv1a:88a32830",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "authoredLandscapeBuilder",
@@ -778,7 +774,7 @@
             },
             "rowKey": "row_1",
             "columnKey": "totalSpend",
-            "text": "40400",
+            "text": "$40,400.00",
             "format": "currency",
             "align": "right"
           },
@@ -793,7 +789,7 @@
             },
             "rowKey": "row_1",
             "columnKey": "impressions",
-            "text": "16500",
+            "text": "16 500",
             "format": "compactNumber",
             "align": "right"
           },
@@ -849,7 +845,7 @@
             },
             "rowKey": "row_2",
             "columnKey": "totalSpend",
-            "text": "34300",
+            "text": "$34,300.00",
             "format": "currency",
             "align": "right"
           },
@@ -864,7 +860,7 @@
             },
             "rowKey": "row_2",
             "columnKey": "impressions",
-            "text": "14700",
+            "text": "14 700",
             "format": "compactNumber",
             "align": "right"
           },
@@ -920,7 +916,7 @@
             },
             "rowKey": "row_3",
             "columnKey": "totalSpend",
-            "text": "55200",
+            "text": "$55,200.00",
             "format": "currency",
             "align": "right"
           },
@@ -935,7 +931,7 @@
             },
             "rowKey": "row_3",
             "columnKey": "impressions",
-            "text": "23100",
+            "text": "23 100",
             "format": "compactNumber",
             "align": "right"
           },
@@ -991,7 +987,7 @@
             },
             "rowKey": "row_4",
             "columnKey": "totalSpend",
-            "text": "48800",
+            "text": "$48,800.00",
             "format": "currency",
             "align": "right"
           },
@@ -1006,7 +1002,7 @@
             },
             "rowKey": "row_4",
             "columnKey": "impressions",
-            "text": "20800",
+            "text": "20 800",
             "format": "compactNumber",
             "align": "right"
           },
@@ -1033,7 +1029,7 @@
               "width": 720,
               "height": 264
             },
-            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">55.2K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">36.8K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">18.4K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,64.2608695652174 L486.6666666666667,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n    \n\n      <path d=\"M269.33333333333337,84.15217391304348 L704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"269.33333333333337\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n    \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">55,200</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">36,800</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">18,400</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,64.2608695652174 L486.6666666666667,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M269.33333333333337,84.15217391304348 L704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"269.33333333333337\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
           }
         ],
         "headerElements": [

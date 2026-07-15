@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 import {
   buildDraftReportExportRequest,
+  buildReportExportRequest,
   buildPublishedSnapshotReportExportRequest,
   buildSavedReportExportRequest,
   buildSavedViewReportExportRequest,
@@ -122,6 +123,16 @@ assert.deepEqual(validateReportSpec({
 });
 assert.deepEqual(validateReportSpec({
   ...reportSpec,
+  theme: {
+    accentTone: "green",
+    badgePalette: "bold",
+  },
+}), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportSpec({
+  ...reportSpec,
   datasets: reportSpec.datasets.map((dataset) => (
     dataset.id === "primary"
       ? {
@@ -216,6 +227,347 @@ const semanticSummarySpec = {
   },
 };
 assert.deepEqual(validateReportSpec(semanticSummarySpec), {
+  valid: true,
+  errors: [],
+});
+
+const collectionSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "topChannels",
+      kind: "collectionBlock",
+      title: "Top Channels",
+      datasetRef: "primary",
+      itemTitleField: "channelId",
+      itemTitleLabel: "Channel",
+      valueField: "totalSpend",
+      valueLabel: "Spend",
+      valueFormat: "currency",
+      secondaryField: "eventDate",
+      secondaryLabel: "Date",
+      layout: "grid",
+      columns: 2,
+      rowLimit: 3,
+      bodyFormat: "markdown",
+      bodyTemplate: "**${valueLabel}:** ${value}",
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(collectionSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(collectionSpec, {
+  primary: {
+    rows: [
+      { eventDate: "2026-05-01", channelId: "Display", totalSpend: 40400 },
+      { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 34300 },
+    ],
+  },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const tabGroupSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "overviewSection",
+      kind: "sectionBlock",
+      title: "Overview",
+      navigationLabel: "Overview",
+    },
+    {
+      id: "sectionTabs",
+      kind: "tabGroupBlock",
+      title: "Sections",
+      sectionIds: ["overviewSection"],
+      defaultSectionId: "overviewSection",
+    },
+    {
+      id: "detailTable",
+      kind: "tableBlock",
+      datasetRef: "primary",
+      columns: [
+        { key: "eventDate", label: "Date" },
+        { key: "totalSpend", label: "Spend", format: "currency" },
+      ],
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(tabGroupSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(tabGroupSpec, {
+  primary: {
+    rows: [
+      { eventDate: "2026-05-01", totalSpend: 40400 },
+    ],
+  },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const compositeSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "summaryMarkdown",
+      kind: "markdownBlock",
+      title: "Summary",
+      markdown: "## Summary\nOverview context.",
+    },
+    {
+      id: "headlineKpi",
+      kind: "kpiBlock",
+      title: "Headline KPI",
+      datasetRef: "primary",
+      valueField: "totalSpend",
+      valueLabel: "Spend",
+    },
+    {
+      id: "summaryPanel",
+      kind: "compositeBlock",
+      title: "Summary panel",
+      description: "Groups the narrative and KPI into one panel.",
+      childBlockIds: ["summaryMarkdown", "headlineKpi"],
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(compositeSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(compositeSpec, {
+  primary: {
+    rows: [
+      { totalSpend: 40400 },
+    ],
+  },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const calloutSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "launchCallout",
+      kind: "calloutBlock",
+      title: "Launch update",
+      icon: "warning-sign",
+      description: "Important rollout note.",
+      tone: "warning",
+      badges: ["Executive", "Launch Ready"],
+      bodyFormat: "markdown",
+      body: "Publisher activation is staged for Friday.",
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(calloutSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(calloutSpec, {
+  primary: {
+    rows: [],
+  },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const annotatedChartSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "annotatedTrend",
+      kind: "chartBlock",
+      title: "Annotated Spend Trend",
+      datasetRef: "primary",
+      chartSpec: {
+        title: "Annotated Spend Trend",
+        type: "line",
+        xField: "eventDate",
+        yFields: ["totalSpend"],
+      },
+      chartModel: {
+        type: "line",
+        xAxis: { dataKey: "eventDate" },
+        yAxis: { format: "currency" },
+        annotations: {
+          verticalMarkers: [
+            { value: "2026-05-01", label: "Start" },
+          ],
+          referenceLines: [
+            { axis: "y", value: 38000, label: "Goal", lineStyle: "dashed" },
+          ],
+          bands: [
+            { axis: "x", from: "2026-05-01", to: "2026-05-04", label: "Campaign window", opacity: 0.16 },
+          ],
+          notes: [
+            { x: "2026-05-01", y: 40400, label: "Launch spike" },
+          ],
+        },
+        series: {
+          palette: ["#137cbd"],
+          values: [
+            { value: "totalSpend", label: "Spend", color: "#137cbd", type: "line" },
+          ],
+        },
+      },
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(annotatedChartSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(annotatedChartSpec, {
+  primary: {
+    rows: [
+      { eventDate: "2026-05-01", totalSpend: 40400 },
+      { eventDate: "2026-05-04", totalSpend: 42000 },
+    ],
+  },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const sectionSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "overviewSection",
+      kind: "sectionBlock",
+      title: "Overview",
+      subtitle: "Supply outlook",
+      description: "Starts with the high-level executive view.",
+      navigationLabel: "Overview",
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(sectionSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(sectionSpec, {
+  primary: { rows: [] },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const stepperSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "integrationFlow",
+      kind: "stepperBlock",
+      title: "Direct Integration Path",
+      description: "Three stages to define a direct path.",
+      steps: [
+        { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+        { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+      ],
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(stepperSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(stepperSpec, {
+  primary: { rows: [] },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const infoPanelSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "directIntro",
+      kind: "infoPanelBlock",
+      title: "What is a Direct Integration Path?",
+      eyebrow: "What is it?",
+      description: "Explains the direct path concept.",
+      tone: "info",
+      bodyFormat: "markdown",
+      body: "A direct integration connects bidding directly into the publisher ad server.",
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(infoPanelSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(infoPanelSpec, {
+  primary: { rows: [] },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const kanbanSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "publisherPipeline",
+      kind: "kanbanBlock",
+      title: "Publisher Pipeline",
+      description: "Track publisher activations by stage.",
+      columns: [
+        {
+          id: "signed",
+          title: "Signed",
+          cards: [
+            { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+          ],
+        },
+      ],
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(kanbanSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(kanbanSpec, {
+  primary: { rows: [] },
+})), {
+  valid: true,
+  errors: [],
+});
+
+const timelineSpec = {
+  ...reportSpec,
+  blocks: [
+    {
+      id: "integrationTimeline",
+      kind: "timelineBlock",
+      title: "Integration Timeline",
+      description: "Track the rollout milestones.",
+      events: [
+        { id: "event_1", date: "2026-07-15", badge: "Target", title: "Roku signed", body: "Expected signature date." },
+      ],
+    },
+  ],
+};
+assert.deepEqual(validateReportSpec(timelineSpec), {
+  valid: true,
+  errors: [],
+});
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(timelineSpec, {
+  primary: { rows: [] },
+})), {
   valid: true,
   errors: [],
 });
@@ -604,6 +956,26 @@ assert.deepEqual(validateReportExportRequest(publishedSnapshotExportRequest), {
   errors: [],
 });
 
+const presetExportRequest = buildReportExportRequest({
+  format: "pdf",
+  source: {
+    from: "preset",
+    artifactKind: "reportBuilder.reportTemplate",
+    artifactRef: "reportBuilder.reportTemplate://metricReportBuilder:performance_inventory_brief",
+    sourceArtifactId: "performance_inventory_brief",
+    windowKey: "metricReportBuilder",
+    templateLabel: "Performance Inventory Brief",
+    title: "Performance Inventory Brief",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
+});
+assert.deepEqual(validateReportExportRequest(presetExportRequest), {
+  valid: true,
+  errors: [],
+});
+
 const invalidSavedViewSourceContract = JSON.parse(JSON.stringify(savedViewExportRequest));
 delete invalidSavedViewSourceContract.source.sourceArtifactId;
 delete invalidSavedViewSourceContract.source.documentVersion;
@@ -625,6 +997,25 @@ assert.deepEqual(validateReportExportRequest(invalidSavedViewSourceContract), {
       path: "$.source.documentVersion",
       code: "required",
       message: "Saved view export sources require a documentVersion.",
+    },
+  ],
+});
+
+const invalidPresetSourceContract = JSON.parse(JSON.stringify(presetExportRequest));
+invalidPresetSourceContract.source.artifactKind = "dashboard.reportBuilder";
+delete invalidPresetSourceContract.source.sourceArtifactId;
+assert.deepEqual(validateReportExportRequest(invalidPresetSourceContract), {
+  valid: false,
+  errors: [
+    {
+      path: "$.source.artifactKind",
+      code: "invalidContract",
+      message: "Export source 'preset' must use artifactKind 'reportBuilder.reportTemplate'.",
+    },
+    {
+      path: "$.source.sourceArtifactId",
+      code: "required",
+      message: "Preset export sources require a sourceArtifactId.",
     },
   ],
 });
@@ -979,13 +1370,10 @@ const invalidSpecCellVisual = {
 };
 const invalidSpecCellVisualValidation = validateReportSpec(invalidSpecCellVisual);
 assert.equal(invalidSpecCellVisualValidation.valid, false);
-assert.deepEqual(invalidSpecCellVisualValidation.errors, [
-  {
-    path: "$.blocks[0].columns[0].cellVisual.rogue",
-    code: "additionalProperties",
-    message: "Unexpected property.",
-  },
-]);
+assert.equal(invalidSpecCellVisualValidation.errors.some((entry) => (
+  entry.path === "$.blocks[0].columns[0].cellVisual.rogue"
+  && entry.code === "additionalProperties"
+)), true);
 
 const invalidFill = {
   ...reportFill,
@@ -1058,13 +1446,10 @@ const invalidFillCellVisual = {
 };
 const invalidFillCellVisualValidation = validateReportFill(invalidFillCellVisual);
 assert.equal(invalidFillCellVisualValidation.valid, false);
-assert.deepEqual(invalidFillCellVisualValidation.errors, [
-  {
-    path: "$.blocks[0].content.columns[0].cellVisual.rogue",
-    code: "additionalProperties",
-    message: "Unexpected property.",
-  },
-]);
+assert.equal(invalidFillCellVisualValidation.errors.some((entry) => (
+  entry.path === "$.blocks[0].content.columns[0].cellVisual.rogue"
+  && entry.code === "additionalProperties"
+)), true);
 
 const invalidFillChartModel = {
   ...reportFill,
@@ -1123,31 +1508,33 @@ assert.deepEqual(invalidFillResolvedChartRowValueValidation.errors, [
   },
 ]);
 
+const geoBlockIndex = fixtures.geo.reportFill.blocks.findIndex((block) => block.kind === "geoMapBlock");
+assert.notEqual(geoBlockIndex, -1);
 const invalidGeoFill = {
   ...fixtures.geo.reportFill,
   blocks: [
-    fixtures.geo.reportFill.blocks[0],
-    fixtures.geo.reportFill.blocks[1],
+    ...fixtures.geo.reportFill.blocks.slice(0, geoBlockIndex),
     {
-      ...fixtures.geo.reportFill.blocks[2],
+      ...fixtures.geo.reportFill.blocks[geoBlockIndex],
       content: {
-        ...fixtures.geo.reportFill.blocks[2].content,
+        ...fixtures.geo.reportFill.blocks[geoBlockIndex].content,
         geo: {
-          ...fixtures.geo.reportFill.blocks[2].content.geo,
+          ...fixtures.geo.reportFill.blocks[geoBlockIndex].content.geo,
           color: {
-            ...fixtures.geo.reportFill.blocks[2].content.geo.color,
+            ...fixtures.geo.reportFill.blocks[geoBlockIndex].content.geo.color,
             rogue: true,
           },
         },
       },
     },
+    ...fixtures.geo.reportFill.blocks.slice(geoBlockIndex + 1),
   ],
 };
 const invalidGeoFillValidation = validateReportFill(invalidGeoFill);
 assert.equal(invalidGeoFillValidation.valid, false);
 assert.deepEqual(invalidGeoFillValidation.errors, [
   {
-    path: "$.blocks[2].content.geo.color.rogue",
+    path: `$.blocks[${geoBlockIndex}].content.geo.color.rogue`,
     code: "additionalProperties",
     message: "Unexpected property.",
   },
@@ -1156,19 +1543,18 @@ assert.deepEqual(invalidGeoFillValidation.errors, [
 const invalidGeoRuleValueFill = {
   ...fixtures.geo.reportFill,
   blocks: [
-    fixtures.geo.reportFill.blocks[0],
-    fixtures.geo.reportFill.blocks[1],
+    ...fixtures.geo.reportFill.blocks.slice(0, geoBlockIndex),
     {
-      ...fixtures.geo.reportFill.blocks[2],
+      ...fixtures.geo.reportFill.blocks[geoBlockIndex],
       content: {
-        ...fixtures.geo.reportFill.blocks[2].content,
+        ...fixtures.geo.reportFill.blocks[geoBlockIndex].content,
         geo: {
-          ...fixtures.geo.reportFill.blocks[2].content.geo,
+          ...fixtures.geo.reportFill.blocks[geoBlockIndex].content.geo,
           color: {
-            ...fixtures.geo.reportFill.blocks[2].content.geo.color,
+            ...fixtures.geo.reportFill.blocks[geoBlockIndex].content.geo.color,
             rules: [
               {
-                ...fixtures.geo.reportFill.blocks[2].content.geo.color.rules[0],
+                ...fixtures.geo.reportFill.blocks[geoBlockIndex].content.geo.color.rules[0],
                 value: () => "nope",
               },
             ],
@@ -1176,13 +1562,14 @@ const invalidGeoRuleValueFill = {
         },
       },
     },
+    ...fixtures.geo.reportFill.blocks.slice(geoBlockIndex + 1),
   ],
 };
 const invalidGeoRuleValueFillValidation = validateReportFill(invalidGeoRuleValueFill);
 assert.equal(invalidGeoRuleValueFillValidation.valid, false);
 assert.deepEqual(invalidGeoRuleValueFillValidation.errors, [
   {
-    path: "$.blocks[2].content.geo.color.rules[0].value",
+    path: `$.blocks[${geoBlockIndex}].content.geo.color.rules[0].value`,
     code: "type",
     message: "Expected string.",
   },

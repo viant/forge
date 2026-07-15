@@ -78,6 +78,17 @@ function normalizeStringArray(values = []) {
     .filter(Boolean);
 }
 
+function normalizeReportDocumentTheme(theme = null) {
+  const source = theme && typeof theme === "object" && !Array.isArray(theme) ? theme : {};
+  const accentTone = normalizeString(source?.accentTone || source?.accent || "").toLowerCase();
+  const badgePalette = normalizeString(source?.badgePalette || "").toLowerCase();
+  const next = {
+    ...(["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {}),
+    ...(["soft", "bold"].includes(badgePalette) ? { badgePalette } : {}),
+  };
+  return Object.keys(next).length > 0 ? next : null;
+}
+
 function normalizeGeoFormat(value = "") {
   const normalized = normalizeString(value);
   if (normalized === "compactNumber") {
@@ -1434,6 +1445,282 @@ export function buildReportDocumentKpiBlock(block = {}) {
   };
 }
 
+function normalizeCollectionLayout(value = "") {
+  const normalized = normalizeString(value).toLowerCase();
+  return ["grid", "list"].includes(normalized) ? normalized : "grid";
+}
+
+function normalizeCollectionColumns(value = 0) {
+  const normalized = Math.trunc(Number(value));
+  return Number.isInteger(normalized) && normalized >= 1 && normalized <= 4 ? normalized : 2;
+}
+
+function normalizeCollectionRowLimit(value = 0) {
+  const normalized = Math.trunc(Number(value));
+  return Number.isInteger(normalized) && normalized > 0 ? normalized : 6;
+}
+
+export function buildReportDocumentCollectionBlock(block = {}) {
+  const itemTitleField = normalizeString(block?.itemTitleField);
+  const valueField = normalizeString(block?.valueField);
+  const secondaryField = normalizeString(block?.secondaryField);
+  const bodyTemplate = String(block?.bodyTemplate || "");
+  return {
+    id: normalizeString(block?.id || "collectionBlock"),
+    kind: "collectionBlock",
+    title: normalizeString(block?.title || "Collection") || "Collection",
+    datasetRef: normalizeString(block?.datasetRef || "primary"),
+    ...(itemTitleField ? { itemTitleField } : {}),
+    ...(normalizeString(block?.itemTitleLabel) ? { itemTitleLabel: normalizeString(block.itemTitleLabel) } : {}),
+    ...(valueField
+      ? {
+        valueField,
+        valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
+        ...(normalizeString(block?.valueFormat) ? { valueFormat: normalizeString(block.valueFormat) } : {}),
+      }
+      : {}),
+    ...(secondaryField
+      ? {
+        secondaryField,
+        secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
+        ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
+      }
+      : {}),
+    layout: normalizeCollectionLayout(block?.layout),
+    columns: normalizeCollectionColumns(block?.columns),
+    rowLimit: normalizeCollectionRowLimit(block?.rowLimit),
+    bodyFormat: "markdown",
+    ...(bodyTemplate.trim() ? { bodyTemplate } : {}),
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(normalizeString(block?.emptyLabel) ? { emptyLabel: normalizeString(block.emptyLabel) } : {}),
+  };
+}
+
+export function buildReportDocumentSectionBlock(block = {}) {
+  const navigationLabel = normalizeString(block?.navigationLabel || block?.title || "Section") || "Section";
+  return {
+    id: normalizeString(block?.id || "sectionBlock"),
+    kind: "sectionBlock",
+    title: normalizeString(block?.title || "Section") || "Section",
+    ...(normalizeString(block?.subtitle) ? { subtitle: normalizeString(block.subtitle) } : {}),
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    navigationLabel,
+  };
+}
+
+function normalizeReportDocumentTabGroupSectionIds(sectionIds = []) {
+  const seen = new Set();
+  return (Array.isArray(sectionIds) ? sectionIds : [])
+    .map((sectionId) => normalizeString(sectionId))
+    .filter((sectionId) => {
+      if (!sectionId || seen.has(sectionId)) {
+        return false;
+      }
+      seen.add(sectionId);
+      return true;
+    });
+}
+
+export function buildReportDocumentTabGroupBlock(block = {}) {
+  const sectionIds = normalizeReportDocumentTabGroupSectionIds(block?.sectionIds);
+  const defaultSectionId = normalizeString(block?.defaultSectionId);
+  return {
+    id: normalizeString(block?.id || "tabGroupBlock"),
+    kind: "tabGroupBlock",
+    title: normalizeString(block?.title || "Sections") || "Sections",
+    sectionIds,
+    ...(defaultSectionId && sectionIds.includes(defaultSectionId) ? { defaultSectionId } : {}),
+  };
+}
+
+function normalizeReportDocumentCompositeChildBlockIds(childBlockIds = []) {
+  const seen = new Set();
+  return (Array.isArray(childBlockIds) ? childBlockIds : [])
+    .map((blockId) => normalizeString(blockId))
+    .filter((blockId) => {
+      if (!blockId || seen.has(blockId)) {
+        return false;
+      }
+      seen.add(blockId);
+      return true;
+    });
+}
+
+export function buildReportDocumentCompositeBlock(block = {}) {
+  const childBlockIds = normalizeReportDocumentCompositeChildBlockIds(block?.childBlockIds);
+  return {
+    id: normalizeString(block?.id || "compositeBlock"),
+    kind: "compositeBlock",
+    title: normalizeString(block?.title || "Grouped Panel") || "Grouped Panel",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    childBlockIds,
+  };
+}
+
+function normalizeReportDocumentStepperSteps(steps = []) {
+  return (Array.isArray(steps) ? steps : [])
+    .map((step, index) => {
+      if (!step || typeof step !== "object" || Array.isArray(step)) {
+        return null;
+      }
+      const title = normalizeString(step?.title);
+      const body = String(step?.body || "");
+      const tone = normalizeString(step?.tone).toLowerCase();
+      if (!title && !body.trim()) {
+        return null;
+      }
+      return {
+        id: normalizeString(step?.id || `step_${index + 1}`) || `step_${index + 1}`,
+        title,
+        body,
+        ...(tone ? { tone } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
+export function buildReportDocumentStepperBlock(block = {}) {
+  const steps = normalizeReportDocumentStepperSteps(block?.steps);
+  return {
+    id: normalizeString(block?.id || "stepperBlock"),
+    kind: "stepperBlock",
+    title: normalizeString(block?.title || "Stepper") || "Stepper",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    steps,
+  };
+}
+
+export function buildReportDocumentInfoPanelBlock(block = {}) {
+  return {
+    id: normalizeString(block?.id || "infoPanelBlock"),
+    kind: "infoPanelBlock",
+    title: normalizeString(block?.title || "Info Panel") || "Info Panel",
+    ...(normalizeString(block?.eyebrow) ? { eyebrow: normalizeString(block.eyebrow) } : {}),
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(normalizeString(block?.tone) ? { tone: normalizeString(block.tone).toLowerCase() } : {}),
+    bodyFormat: "markdown",
+    body: String(block?.body || ""),
+  };
+}
+
+function normalizeReportDocumentCalloutBadges(badges = [], badgesText = "") {
+  const explicitBadges = normalizeStringArray(badges);
+  if (explicitBadges.length > 0) {
+    return explicitBadges;
+  }
+  return String(badgesText || "")
+    .split(/[\n,]/)
+    .map((entry) => normalizeString(entry))
+    .filter(Boolean);
+}
+
+export function buildReportDocumentCalloutBlock(block = {}) {
+  const badges = normalizeReportDocumentCalloutBadges(block?.badges, block?.badgesText);
+  return {
+    id: normalizeString(block?.id || "calloutBlock"),
+    kind: "calloutBlock",
+    title: normalizeString(block?.title || "Callout") || "Callout",
+    ...(normalizeString(block?.icon) ? { icon: normalizeString(block.icon) } : {}),
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(normalizeString(block?.tone) ? { tone: normalizeString(block.tone).toLowerCase() } : {}),
+    ...(badges.length > 0 ? { badges } : {}),
+    bodyFormat: "markdown",
+    body: String(block?.body || ""),
+  };
+}
+
+function normalizeReportDocumentKanbanCards(cards = []) {
+  return (Array.isArray(cards) ? cards : [])
+    .map((card, index) => {
+      if (!card || typeof card !== "object" || Array.isArray(card)) {
+        return null;
+      }
+      const title = normalizeString(card?.title);
+      const body = String(card?.body || "");
+      const badge = normalizeString(card?.badge);
+      const tone = normalizeString(card?.tone).toLowerCase();
+      if (!title && !body.trim() && !badge) {
+        return null;
+      }
+      return {
+        id: normalizeString(card?.id || `card_${index + 1}`) || `card_${index + 1}`,
+        title,
+        body,
+        ...(badge ? { badge } : {}),
+        ...(tone ? { tone } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
+function normalizeReportDocumentKanbanColumns(columns = []) {
+  return (Array.isArray(columns) ? columns : [])
+    .map((column, index) => {
+      if (!column || typeof column !== "object" || Array.isArray(column)) {
+        return null;
+      }
+      const title = normalizeString(column?.title);
+      const tone = normalizeString(column?.tone).toLowerCase();
+      const cards = normalizeReportDocumentKanbanCards(column?.cards);
+      if (!title && cards.length === 0) {
+        return null;
+      }
+      return {
+        id: normalizeString(column?.id || `column_${index + 1}`) || `column_${index + 1}`,
+        title,
+        ...(tone ? { tone } : {}),
+        cards,
+      };
+    })
+    .filter(Boolean);
+}
+
+export function buildReportDocumentKanbanBlock(block = {}) {
+  return {
+    id: normalizeString(block?.id || "kanbanBlock"),
+    kind: "kanbanBlock",
+    title: normalizeString(block?.title || "Pipeline") || "Pipeline",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    columns: normalizeReportDocumentKanbanColumns(block?.columns),
+  };
+}
+
+function normalizeReportDocumentTimelineEvents(events = []) {
+  return (Array.isArray(events) ? events : [])
+    .map((event, index) => {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        return null;
+      }
+      const title = normalizeString(event?.title);
+      const body = String(event?.body || "");
+      const date = normalizeString(event?.date);
+      const badge = normalizeString(event?.badge);
+      const tone = normalizeString(event?.tone).toLowerCase();
+      if (!title && !body.trim() && !date && !badge) {
+        return null;
+      }
+      return {
+        id: normalizeString(event?.id || `event_${index + 1}`) || `event_${index + 1}`,
+        ...(date ? { date } : {}),
+        title,
+        body,
+        ...(badge ? { badge } : {}),
+        ...(tone ? { tone } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
+export function buildReportDocumentTimelineBlock(block = {}) {
+  return {
+    id: normalizeString(block?.id || "timelineBlock"),
+    kind: "timelineBlock",
+    title: normalizeString(block?.title || "Timeline") || "Timeline",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    events: normalizeReportDocumentTimelineEvents(block?.events),
+  };
+}
+
 function normalizeReportDocumentBadgeItems(items = []) {
   return (Array.isArray(items) ? items : [])
     .map((item, index) => {
@@ -1566,6 +1853,33 @@ function normalizeReportBuilderDocumentBlock(block = {}) {
   if (normalizedKind === "kpiBlock") {
     return buildReportDocumentKpiBlock(block);
   }
+  if (normalizedKind === "collectionBlock") {
+    return buildReportDocumentCollectionBlock(block);
+  }
+  if (normalizedKind === "sectionBlock") {
+    return buildReportDocumentSectionBlock(block);
+  }
+  if (normalizedKind === "tabGroupBlock") {
+    return buildReportDocumentTabGroupBlock(block);
+  }
+  if (normalizedKind === "compositeBlock") {
+    return buildReportDocumentCompositeBlock(block);
+  }
+  if (normalizedKind === "stepperBlock") {
+    return buildReportDocumentStepperBlock(block);
+  }
+  if (normalizedKind === "infoPanelBlock") {
+    return buildReportDocumentInfoPanelBlock(block);
+  }
+  if (normalizedKind === "calloutBlock") {
+    return buildReportDocumentCalloutBlock(block);
+  }
+  if (normalizedKind === "kanbanBlock") {
+    return buildReportDocumentKanbanBlock(block);
+  }
+  if (normalizedKind === "timelineBlock") {
+    return buildReportDocumentTimelineBlock(block);
+  }
   if (normalizedKind === "badgesBlock") {
     return buildReportDocumentBadgesBlock(block);
   }
@@ -1629,20 +1943,23 @@ function normalizeReportBuilderDocumentLayoutItems(layout = null, blockIds = [])
     seen.add(blockId);
     normalized.push(normalizedItem);
   });
-  (Array.isArray(blockIds) ? blockIds : [])
+  const normalizedBlockIds = (Array.isArray(blockIds) ? blockIds : [])
     .map((entry) => normalizeString(entry))
-    .filter(Boolean)
-    .forEach((blockId) => {
-      if (seen.has(blockId)) {
-        return;
-      }
-      seen.add(blockId);
-      normalized.push({ blockId });
-    });
-  if (!seen.has("primaryBuilder")) {
-    normalized.push({ blockId: "primaryBuilder" });
-    seen.add("primaryBuilder");
-  }
+    .filter(Boolean);
+  const preludeBlockIds = normalizedBlockIds.filter((blockId) => (
+    blockId !== "primaryBuilder"
+      && ["scopeFilters", "sharedFilters", "activeRefinements", "activeDrillPath"].includes(blockId)
+  ));
+  const trailingBlockIds = normalizedBlockIds.filter((blockId) => (
+    blockId !== "primaryBuilder" && !preludeBlockIds.includes(blockId)
+  ));
+  [...preludeBlockIds, "primaryBuilder", ...trailingBlockIds].forEach((blockId) => {
+    if (seen.has(blockId)) {
+      return;
+    }
+    seen.add(blockId);
+    normalized.push({ blockId });
+  });
   return normalized;
 }
 
@@ -1679,6 +1996,13 @@ export function buildReportBuilderReportDocument({
     title: resolveDocumentMetadataValue(state?.reportDocumentTitle, resolveDocumentTitle(container, config)),
     subtitle: normalizeString(state?.reportDocumentSubtitle),
     description: normalizeString(state?.reportDocumentDescription),
+    ...(normalizeReportDocumentTheme({
+      accentTone: state?.reportDocumentThemeAccent,
+      badgePalette: state?.reportDocumentBadgePalette,
+    }) ? { theme: normalizeReportDocumentTheme({
+      accentTone: state?.reportDocumentThemeAccent,
+      badgePalette: state?.reportDocumentBadgePalette,
+    }) } : {}),
     ...(resolveDocumentTemplateIdentity(state) || {}),
     ...(binding ? { binding: cloneValue(binding) } : {}),
     ...(semanticSummary && typeof semanticSummary === "object" && !Array.isArray(semanticSummary)
@@ -2010,6 +2334,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
   });
   const nextSpec = {
     ...baseSpec,
+    ...(normalizeReportDocumentTheme(document?.theme) ? { theme: normalizeReportDocumentTheme(document.theme) } : {}),
     scope: {
       ...(loweredContextPreset ? { contextPreset: loweredContextPreset } : {}),
       params: loweredScopeParams,

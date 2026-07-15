@@ -5,6 +5,7 @@ import { buildReportFillFromReportSpec } from "./reportFillModel.js";
 import { buildReportPrintFromReportFill } from "./reportPrintModel.js";
 import {
   buildDraftReportExportRequest,
+  buildReportExportRequest,
   buildReportExportArtifactRef,
   buildPublishedSnapshotReportExportRequest,
   buildSavedReportExportRequest,
@@ -159,6 +160,28 @@ const hostedWindowDraftExportRequest = buildDraftReportExportRequest({
 assert.ok(hostedWindowDraftExportRequest);
 assert.equal(hostedWindowDraftExportRequest.source.artifactRef, "dashboard.reportBuilder://forecastingCubeBuilder");
 
+const presetDraftExportRequest = buildDraftReportExportRequest({
+  reportDocument: {
+    id: "forecastInventoryBrief",
+    title: "Forecast Inventory Brief",
+    templateId: "forecast_inventory_brief",
+    templateLabel: "Forecast Inventory Brief",
+  },
+  reportSpec: hostedWindowDraftSpec,
+  reportFill: hostedWindowDraftFill,
+  reportPrint: hostedWindowDraftPrint,
+  format: "pdf",
+});
+
+assert.ok(presetDraftExportRequest);
+assert.equal(presetDraftExportRequest.source.from, "preset");
+assert.equal(presetDraftExportRequest.source.artifactKind, "reportBuilder.reportTemplate");
+assert.equal(presetDraftExportRequest.source.artifactRef, "reportBuilder.reportTemplate://forecastingCubeBuilder:forecast_inventory_brief");
+assert.equal(presetDraftExportRequest.source.sourceArtifactId, "forecast_inventory_brief");
+assert.equal(presetDraftExportRequest.source.windowKey, "forecastingCubeBuilder");
+assert.equal(presetDraftExportRequest.source.templateLabel, "Forecast Inventory Brief");
+assert.equal(validateReportExportRequest(presetDraftExportRequest).valid, true);
+
 const staleDraftExportRequest = JSON.parse(JSON.stringify(draftExportRequest));
 staleDraftExportRequest.reportPrint.fillHash = "fnv1a:deadbeef";
 assert.equal(validateReportExportRequest(staleDraftExportRequest).valid, false);
@@ -243,6 +266,25 @@ assert.equal(publishedSnapshotExportRequest.source.reportId, "capacityQ3");
 assert.equal(publishedSnapshotExportRequest.source.documentVersion, 9);
 assert.equal(publishedSnapshotExportRequest.source.title, "Capacity Q3 Published Snapshot");
 assert.equal(validateReportExportRequest(publishedSnapshotExportRequest).valid, true);
+
+const explicitPresetExportRequest = buildReportExportRequest({
+  format: "pdf",
+  source: {
+    from: "preset",
+    artifactKind: "reportBuilder.reportTemplate",
+    artifactRef: "reportBuilder.reportTemplate://metricReportBuilder:performance_inventory_brief",
+    sourceArtifactId: "performance_inventory_brief",
+    windowKey: "metricReportBuilder",
+    templateLabel: "Performance Inventory Brief",
+    title: "Performance Inventory Brief",
+  },
+  reportSpec,
+  reportFill,
+  reportPrint,
+});
+
+assert.ok(explicitPresetExportRequest);
+assert.equal(validateReportExportRequest(explicitPresetExportRequest).valid, true);
 
 assert.equal(buildSavedReportExportRequest({
   savedReportPayload: {

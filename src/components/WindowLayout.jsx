@@ -16,6 +16,7 @@ export function resolveWindowLayoutContext(context) {
 const WindowLayout = ({
                           title,
                           context,
+                          contentOverride = null,
                           onClose,
                           isInTab = false,
                           fillParent = true,
@@ -25,7 +26,7 @@ const WindowLayout = ({
     if (!view) {
         return <div>No view defined.</div>;
     }
-    const {content} = view;
+    const content = contentOverride || view.content;
     if (!content) {
         return <div>No content defined in view.</div>;
     }

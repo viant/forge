@@ -159,6 +159,307 @@ func TestDecodeJSON_ReportFillFixtureWithChartAndKPIContent(t *testing.T) {
 	require.True(t, foundRefinementBar)
 }
 
+func TestDecodeJSON_ReportFillFixtureWithExtendedDashboardBlocks(t *testing.T) {
+	fixture := loadReportFillFromExportRequestFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	syncReportFillFixtureProvenance(fixture)
+	blocks := fixture["blocks"].([]any)
+	blocks = append(blocks,
+		map[string]any{
+			"id":    "overviewSection",
+			"kind":  "sectionBlock",
+			"title": "Overview",
+			"content": map[string]any{
+				"title":           "Overview",
+				"subtitle":        "Supply outlook",
+				"description":     "Starts with the high-level executive view.",
+				"navigationLabel": "Overview",
+			},
+		},
+		map[string]any{
+			"id":            "summaryPanel",
+			"kind":          "compositeBlock",
+			"title":         "Summary panel",
+			"description":   "Groups the opening narrative and KPI.",
+			"childBlockIds": []any{"directIntro", "integrationFlow"},
+			"content": map[string]any{
+				"title":         "Summary panel",
+				"description":   "Groups the opening narrative and KPI.",
+				"childBlockIds": []any{"directIntro", "integrationFlow"},
+			},
+		},
+		map[string]any{
+			"id":               "sectionTabs",
+			"kind":             "tabGroupBlock",
+			"title":            "Forecast views",
+			"sectionIds":       []any{"overviewSection"},
+			"defaultSectionId": "overviewSection",
+			"content": map[string]any{
+				"title":            "Forecast views",
+				"sectionIds":       []any{"overviewSection"},
+				"defaultSectionId": "overviewSection",
+				"tabs": []any{
+					map[string]any{"id": "overviewSection", "title": "Overview", "navigationLabel": "Overview"},
+				},
+			},
+		},
+		map[string]any{
+			"id":    "integrationFlow",
+			"kind":  "stepperBlock",
+			"title": "Direct Integration Path",
+			"content": map[string]any{
+				"title":       "Direct Integration Path",
+				"description": "Three stages to define a direct path.",
+				"steps": []any{
+					map[string]any{"id": "step_1", "title": "Bid directly", "body": "Connect bidding directly to the publisher ad server."},
+				},
+			},
+		},
+		map[string]any{
+			"id":    "directIntro",
+			"kind":  "infoPanelBlock",
+			"title": "What is a Direct Integration Path?",
+			"content": map[string]any{
+				"title":       "What is a Direct Integration Path?",
+				"eyebrow":     "What is it?",
+				"description": "Explains the direct path concept.",
+				"tone":        "info",
+				"bodyFormat":  "markdown",
+				"body":        "A direct integration connects bidding directly into the publisher ad server.",
+			},
+		},
+		map[string]any{
+			"id":          "launchCallout",
+			"kind":        "calloutBlock",
+			"title":       "Launch update",
+			"icon":        "warning-sign",
+			"description": "Important rollout note.",
+			"tone":        "warning",
+			"badges":      []any{"Executive", "Launch Ready"},
+			"bodyFormat":  "markdown",
+			"body":        "Publisher activation is staged for Friday.",
+			"content": map[string]any{
+				"title":       "Launch update",
+				"icon":        "warning-sign",
+				"description": "Important rollout note.",
+				"tone":        "warning",
+				"badges":      []any{"Executive", "Launch Ready"},
+				"bodyFormat":  "markdown",
+				"body":        "Publisher activation is staged for Friday.",
+			},
+		},
+		map[string]any{
+			"id":             "topChannels",
+			"kind":           "collectionBlock",
+			"title":          "Top Channels",
+			"datasetRef":     "primary",
+			"itemTitleField": "channelV2",
+			"valueField":     "avails",
+			"valueLabel":     "Avails",
+			"layout":         "grid",
+			"rowLimit":       2,
+			"content": map[string]any{
+				"title":    "Top Channels",
+				"layout":   "grid",
+				"columns":  2,
+				"rowCount": 2,
+				"rowLimit": 2,
+				"items": []any{
+					map[string]any{"title": "Display", "valueField": "avails", "valueLabel": "Avails", "value": 1200000},
+				},
+			},
+		},
+		map[string]any{
+			"id":    "publisherPipeline",
+			"kind":  "kanbanBlock",
+			"title": "Publisher Pipeline",
+			"content": map[string]any{
+				"title":       "Publisher Pipeline",
+				"description": "Track publisher activations by stage.",
+				"columns": []any{
+					map[string]any{
+						"id":    "signed",
+						"title": "Signed",
+						"cards": []any{
+							map[string]any{"id": "tubi", "title": "Tubi", "body": "SpringServe integration live.", "badge": "Live"},
+						},
+					},
+				},
+			},
+		},
+		map[string]any{
+			"id":    "integrationTimeline",
+			"kind":  "timelineBlock",
+			"title": "Integration Timeline",
+			"content": map[string]any{
+				"title":       "Integration Timeline",
+				"description": "Track the rollout milestones.",
+				"events": []any{
+					map[string]any{"id": "event_1", "date": "2026-07-15", "badge": "Target", "title": "Roku signed", "body": "Expected signature date."},
+				},
+			},
+		},
+	)
+	fixture["blocks"] = blocks
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	report, err := DecodeJSON(data)
+	require.NoError(t, err)
+	var foundSection, foundComposite, foundTabGroup, foundStepper, foundInfo, foundCallout, foundCollection, foundKanban, foundTimeline bool
+	for _, block := range report.Blocks {
+		switch block.Kind {
+		case "sectionBlock":
+			foundSection = true
+			require.NotNil(t, block.SectionContent)
+			require.Equal(t, "Overview", block.SectionContent.NavigationLabel)
+		case "compositeBlock":
+			foundComposite = true
+			require.NotNil(t, block.CompositeContent)
+			require.Equal(t, []string{"directIntro", "integrationFlow"}, block.ChildBlockIDs)
+			require.Equal(t, []string{"directIntro", "integrationFlow"}, block.CompositeContent.ChildBlockIDs)
+		case "tabGroupBlock":
+			foundTabGroup = true
+			require.NotNil(t, block.TabGroupContent)
+			require.Equal(t, []string{"overviewSection"}, block.SectionIDs)
+			require.Equal(t, "overviewSection", block.DefaultSectionID)
+			require.Len(t, block.TabGroupContent.Tabs, 1)
+		case "stepperBlock":
+			foundStepper = true
+			require.NotNil(t, block.StepperContent)
+			require.Len(t, block.StepperContent.Steps, 1)
+		case "infoPanelBlock":
+			foundInfo = true
+			require.NotNil(t, block.InfoPanelContent)
+			require.Equal(t, "info", block.InfoPanelContent.Tone)
+		case "calloutBlock":
+			foundCallout = true
+			require.NotNil(t, block.CalloutContent)
+			require.Equal(t, "warning-sign", block.CalloutContent.Icon)
+			require.Equal(t, []string{"Executive", "Launch Ready"}, block.CalloutContent.Badges)
+		case "collectionBlock":
+			foundCollection = true
+			require.NotNil(t, block.CollectionContent)
+			require.Equal(t, 2, block.CollectionContent.Columns)
+		case "kanbanBlock":
+			foundKanban = true
+			require.NotNil(t, block.KanbanContent)
+			require.Len(t, block.KanbanContent.Columns, 1)
+		case "timelineBlock":
+			foundTimeline = true
+			require.NotNil(t, block.TimelineContent)
+			require.Len(t, block.TimelineContent.Events, 1)
+		}
+	}
+	require.True(t, foundSection)
+	require.True(t, foundComposite)
+	require.True(t, foundTabGroup)
+	require.True(t, foundStepper)
+	require.True(t, foundInfo)
+	require.True(t, foundCallout)
+	require.True(t, foundCollection)
+	require.True(t, foundKanban)
+	require.True(t, foundTimeline)
+}
+
+func TestDecodeJSON_ReportFillAcceptsHybridKPIBlockFields(t *testing.T) {
+	fixture := loadReportFillFromExportRequestFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	syncReportFillFixtureProvenance(fixture)
+	blocks := fixture["blocks"].([]any)
+	for _, blockValue := range blocks {
+		block := blockValue.(map[string]any)
+		if block["kind"] != "kpiBlock" {
+			continue
+		}
+		block["valueFormat"] = "compact"
+		block["secondaryField"] = "channelV2"
+		block["secondaryLabel"] = "Channel"
+		block["secondaryFormat"] = "compactNumber"
+		block["secondaryDisplayKey"] = "channelLabel"
+		block["secondaryDisplayValueMap"] = map[string]any{
+			"CTV": "Connected TV",
+		}
+		block["rowSelector"] = "maxbyvalue"
+		block["presentationMode"] = "both"
+		block["bodyFormat"] = "markdown"
+		block["bodyTemplate"] = "### Leading inventory\n**${valueLabel}:** ${value}"
+		content := block["content"].(map[string]any)
+		content["valueFormat"] = "compact"
+		content["secondaryField"] = "channelV2"
+		content["secondaryLabel"] = "Channel"
+		content["secondaryFormat"] = "compactNumber"
+		content["secondaryDisplayKey"] = "channelLabel"
+		content["secondaryDisplayValueMap"] = map[string]any{
+			"CTV": "Connected TV",
+		}
+		content["secondaryValue"] = "Connected TV"
+		content["rowSelector"] = "maxbyvalue"
+		content["presentationMode"] = "both"
+		content["bodyFormat"] = "markdown"
+		content["bodyTemplate"] = "### Leading inventory\n**${valueLabel}:** ${value}"
+		content["bodyMarkdown"] = "### Leading inventory\n**Avails:** 82.8K"
+		break
+	}
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	report, err := DecodeJSON(data)
+	require.NoError(t, err)
+
+	var kpi Block
+	found := false
+	for _, block := range report.Blocks {
+		if block.Kind == "kpiBlock" {
+			kpi = block
+			found = true
+			break
+		}
+	}
+	require.True(t, found)
+	require.Equal(t, "compact", kpi.ValueFormat)
+	require.Equal(t, "compactNumber", kpi.SecondaryFormat)
+	require.Equal(t, "channelLabel", kpi.SecondaryDisplayKey)
+	require.Equal(t, map[string]any{"CTV": "Connected TV"}, kpi.SecondaryDisplayValueMap)
+	require.Equal(t, "maxbyvalue", kpi.RowSelector)
+	require.Equal(t, "both", kpi.PresentationMode)
+	require.Equal(t, "markdown", kpi.BodyFormat)
+	require.Equal(t, "### Leading inventory\n**${valueLabel}:** ${value}", kpi.BodyTemplate)
+	require.NotNil(t, kpi.KPIContent)
+	require.Equal(t, "compact", kpi.KPIContent.ValueFormat)
+	require.Equal(t, "compactNumber", kpi.KPIContent.SecondaryFormat)
+	require.Equal(t, "channelLabel", kpi.KPIContent.SecondaryDisplayKey)
+	require.Equal(t, map[string]any{"CTV": "Connected TV"}, kpi.KPIContent.SecondaryDisplayValueMap)
+	require.Equal(t, "maxbyvalue", kpi.KPIContent.RowSelector)
+	require.Equal(t, "both", kpi.KPIContent.PresentationMode)
+	require.Equal(t, "markdown", kpi.KPIContent.BodyFormat)
+	require.Equal(t, "### Leading inventory\n**${valueLabel}:** ${value}", kpi.KPIContent.BodyTemplate)
+	require.Equal(t, "### Leading inventory\n**Avails:** 82.8K", kpi.KPIContent.BodyMarkdown)
+}
+
+func TestDecodeJSON_ReportFillRejectsUnsupportedKPIPresentationMode(t *testing.T) {
+	fixture := loadReportFillFromExportRequestFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	syncReportFillFixtureProvenance(fixture)
+	blocks := fixture["blocks"].([]any)
+	for _, blockValue := range blocks {
+		block := blockValue.(map[string]any)
+		if block["kind"] != "kpiBlock" {
+			continue
+		}
+		block["presentationMode"] = "floating"
+		content := block["content"].(map[string]any)
+		content["presentationMode"] = "floating"
+		break
+	}
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	_, err = DecodeJSON(data)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `presentationMode "floating" is not supported for kpiBlock`)
+}
+
 func TestDecodeJSON_ReportFillAcceptsRichFilterBarParams(t *testing.T) {
 	report, err := DecodeJSON([]byte(`{
 		"version": 1,
@@ -517,6 +818,7 @@ func TestDecodeJSON_ReportFillRejectsGroupedSeriesChartBlockWithBlankSeriesKey(t
 func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutResolvedGeoContent(t *testing.T) {
 	fixture := loadReportFillFromPerformanceFixtureMap(t, "geo")
 	syncReportFillFixtureProvenance(fixture)
+	geoBlockIndex := findFixtureBlockIndexByKind(t, fixture, "geoMapBlock")
 	blocks := fixture["blocks"].([]any)
 	for _, blockValue := range blocks {
 		block := blockValue.(map[string]any)
@@ -532,12 +834,13 @@ func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutResolvedGeoContent(t *testin
 
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "reportFill.blocks[2].content.geo is required for geoMapBlock")
+	require.Contains(t, err.Error(), fmt.Sprintf("reportFill.blocks[%d].content.geo is required for geoMapBlock", geoBlockIndex))
 }
 
 func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutResolvedGeoPayload(t *testing.T) {
 	fixture := loadReportFillFromPerformanceFixtureMap(t, "geo")
 	syncReportFillFixtureProvenance(fixture)
+	geoBlockIndex := findFixtureBlockIndexByKind(t, fixture, "geoMapBlock")
 	blocks := fixture["blocks"].([]any)
 	for _, blockValue := range blocks {
 		block := blockValue.(map[string]any)
@@ -553,12 +856,13 @@ func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutResolvedGeoPayload(t *testin
 
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "reportFill.blocks[2].content.resolvedGeo is required for geoMapBlock")
+	require.Contains(t, err.Error(), fmt.Sprintf("reportFill.blocks[%d].content.resolvedGeo is required for geoMapBlock", geoBlockIndex))
 }
 
 func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutResolvedGeoLabelField(t *testing.T) {
 	fixture := loadReportFillFromPerformanceFixtureMap(t, "geo")
 	syncReportFillFixtureProvenance(fixture)
+	geoBlockIndex := findFixtureBlockIndexByKind(t, fixture, "geoMapBlock")
 	blocks := fixture["blocks"].([]any)
 	for _, blockValue := range blocks {
 		block := blockValue.(map[string]any)
@@ -575,12 +879,13 @@ func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutResolvedGeoLabelField(t *tes
 
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "reportFill.blocks[2].content.resolvedGeo.labelField is required for geoMapBlock")
+	require.Contains(t, err.Error(), fmt.Sprintf("reportFill.blocks[%d].content.resolvedGeo.labelField is required for geoMapBlock", geoBlockIndex))
 }
 
 func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutRegionLabel(t *testing.T) {
 	fixture := loadReportFillFromPerformanceFixtureMap(t, "geo")
 	syncReportFillFixtureProvenance(fixture)
+	geoBlockIndex := findFixtureBlockIndexByKind(t, fixture, "geoMapBlock")
 	blocks := fixture["blocks"].([]any)
 	for _, blockValue := range blocks {
 		block := blockValue.(map[string]any)
@@ -599,7 +904,7 @@ func TestDecodeJSON_ReportFillRejectsGeoBlockWithoutRegionLabel(t *testing.T) {
 
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "reportFill.blocks[2].content.resolvedGeo.regions[0].label is required for geoMapBlock")
+	require.Contains(t, err.Error(), fmt.Sprintf("reportFill.blocks[%d].content.resolvedGeo.regions[0].label is required for geoMapBlock", geoBlockIndex))
 }
 
 func TestDecodeJSON_ReportFillAcceptsGeoBlockWithRangeLegend(t *testing.T) {
@@ -644,6 +949,7 @@ func TestDecodeJSON_ReportFillAcceptsGeoBlockWithRangeLegend(t *testing.T) {
 func TestDecodeJSON_ReportFillRejectsGeoBlockLegendWithMixedRulesAndRange(t *testing.T) {
 	fixture := loadReportFillFromPerformanceFixtureMap(t, "geo")
 	syncReportFillFixtureProvenance(fixture)
+	geoBlockIndex := findFixtureBlockIndexByKind(t, fixture, "geoMapBlock")
 	blocks := fixture["blocks"].([]any)
 	for _, blockValue := range blocks {
 		block := blockValue.(map[string]any)
@@ -663,12 +969,13 @@ func TestDecodeJSON_ReportFillRejectsGeoBlockLegendWithMixedRulesAndRange(t *tes
 
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "reportFill.blocks[2].content.resolvedGeo.legend must use either rules or range for geoMapBlock")
+	require.Contains(t, err.Error(), fmt.Sprintf("reportFill.blocks[%d].content.resolvedGeo.legend must use either rules or range for geoMapBlock", geoBlockIndex))
 }
 
 func TestDecodeJSON_ReportFillRejectsGeoBlockLegendRangeWithoutMax(t *testing.T) {
 	fixture := loadReportFillFromPerformanceFixtureMap(t, "geo")
 	syncReportFillFixtureProvenance(fixture)
+	geoBlockIndex := findFixtureBlockIndexByKind(t, fixture, "geoMapBlock")
 	blocks := fixture["blocks"].([]any)
 	for _, blockValue := range blocks {
 		block := blockValue.(map[string]any)
@@ -688,7 +995,7 @@ func TestDecodeJSON_ReportFillRejectsGeoBlockLegendRangeWithoutMax(t *testing.T)
 
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "reportFill.blocks[2].content.resolvedGeo.legend.max is required for range geoMapBlock legend")
+	require.Contains(t, err.Error(), fmt.Sprintf("reportFill.blocks[%d].content.resolvedGeo.legend.max is required for range geoMapBlock legend", geoBlockIndex))
 }
 
 func TestDecodeJSON_ReportFillRejectsTrailingContent(t *testing.T) {
@@ -790,6 +1097,21 @@ func loadReportFillFromPerformanceFixtureMap(t *testing.T, variant string) map[s
 	var value map[string]any
 	require.NoError(t, json.Unmarshal(loadReportFillFromPerformanceFixtureBytes(t, variant), &value))
 	return value
+}
+
+func findFixtureBlockIndexByKind(t *testing.T, fixture map[string]any, kind string) int {
+	t.Helper()
+	blocks, ok := fixture["blocks"].([]any)
+	require.True(t, ok)
+	for index, blockValue := range blocks {
+		block, ok := blockValue.(map[string]any)
+		require.True(t, ok)
+		if block["kind"] == kind {
+			return index
+		}
+	}
+	t.Fatalf("expected to find %s block", kind)
+	return -1
 }
 
 func syncReportFillFixtureProvenance(fixture map[string]any) {

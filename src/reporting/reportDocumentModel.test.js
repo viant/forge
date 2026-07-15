@@ -6,6 +6,14 @@ import {
   buildReportDocumentBadgesBlock,
   buildReportBuilderBlockScopeBindings,
   buildReportDocumentChartBlock,
+  buildReportDocumentCollectionBlock,
+  buildReportDocumentSectionBlock,
+  buildReportDocumentCompositeBlock,
+  buildReportDocumentStepperBlock,
+  buildReportDocumentInfoPanelBlock,
+  buildReportDocumentCalloutBlock,
+  buildReportDocumentKanbanBlock,
+  buildReportDocumentTimelineBlock,
   extractReportDocumentTemplateIdentity,
   buildReportDocumentScopeParams,
   buildReportDocumentFilterBarBlock,
@@ -209,6 +217,153 @@ assert.deepEqual(buildReportDocumentKpiBlock({
   bodyFormat: "markdown",
   bodyTemplate: "**${valueLabel}:** ${value}",
 });
+assert.deepEqual(buildReportDocumentCollectionBlock({
+  id: "topChannels",
+  itemTitleField: "channelId",
+  itemTitleLabel: "Channel",
+  valueField: "totalSpend",
+  valueLabel: "Spend",
+  rowLimit: 4,
+  columns: 3,
+  bodyTemplate: "**Channel:** ${row.channelId}",
+}), {
+  id: "topChannels",
+  kind: "collectionBlock",
+  title: "Collection",
+  datasetRef: "primary",
+  itemTitleField: "channelId",
+  itemTitleLabel: "Channel",
+  valueField: "totalSpend",
+  valueLabel: "Spend",
+  layout: "grid",
+  columns: 3,
+  rowLimit: 4,
+  bodyFormat: "markdown",
+  bodyTemplate: "**Channel:** ${row.channelId}",
+});
+assert.deepEqual(buildReportDocumentSectionBlock({
+  id: "overviewSection",
+  title: "Overview",
+  subtitle: "Supply outlook",
+  description: "Starts with the high-level executive view.",
+}), {
+  id: "overviewSection",
+  kind: "sectionBlock",
+  title: "Overview",
+  subtitle: "Supply outlook",
+  description: "Starts with the high-level executive view.",
+  navigationLabel: "Overview",
+});
+assert.deepEqual(buildReportDocumentCompositeBlock({
+  id: "summaryPanel",
+  title: "Summary panel",
+  description: "Groups the opening narrative and KPI.",
+  childBlockIds: ["narrativeIntro", "headlineKpi", "headlineKpi"],
+}), {
+  id: "summaryPanel",
+  kind: "compositeBlock",
+  title: "Summary panel",
+  description: "Groups the opening narrative and KPI.",
+  childBlockIds: ["narrativeIntro", "headlineKpi"],
+});
+assert.deepEqual(buildReportDocumentStepperBlock({
+  id: "integrationFlow",
+  title: "Direct Integration Path",
+  description: "Three stages to define a direct path.",
+  steps: [
+    { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+    { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+  ],
+}), {
+  id: "integrationFlow",
+  kind: "stepperBlock",
+  title: "Direct Integration Path",
+  description: "Three stages to define a direct path.",
+  steps: [
+    { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+    { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+  ],
+});
+assert.deepEqual(buildReportDocumentInfoPanelBlock({
+  id: "directIntro",
+  title: "What is a Direct Integration Path?",
+  eyebrow: "What is it?",
+  description: "Explains the direct path concept.",
+  tone: "info",
+  body: "A direct integration connects bidding directly into the publisher ad server.",
+}), {
+  id: "directIntro",
+  kind: "infoPanelBlock",
+  title: "What is a Direct Integration Path?",
+  eyebrow: "What is it?",
+  description: "Explains the direct path concept.",
+  tone: "info",
+  bodyFormat: "markdown",
+  body: "A direct integration connects bidding directly into the publisher ad server.",
+});
+assert.deepEqual(buildReportDocumentCalloutBlock({
+  id: "launchCallout",
+  title: "Launch update",
+  icon: "warning-sign",
+  description: "Important rollout note.",
+  tone: "warning",
+  badgesText: "Executive, Launch Ready",
+  body: "Publisher activation is staged for Friday.",
+}), {
+  id: "launchCallout",
+  kind: "calloutBlock",
+  title: "Launch update",
+  icon: "warning-sign",
+  description: "Important rollout note.",
+  tone: "warning",
+  badges: ["Executive", "Launch Ready"],
+  bodyFormat: "markdown",
+  body: "Publisher activation is staged for Friday.",
+});
+assert.deepEqual(buildReportDocumentKanbanBlock({
+  id: "publisherPipeline",
+  title: "Publisher Pipeline",
+  description: "Track publisher activations by stage.",
+  columns: [
+    {
+      id: "signed",
+      title: "Signed",
+      cards: [
+        { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+      ],
+    },
+  ],
+}), {
+  id: "publisherPipeline",
+  kind: "kanbanBlock",
+  title: "Publisher Pipeline",
+  description: "Track publisher activations by stage.",
+  columns: [
+    {
+      id: "signed",
+      title: "Signed",
+      cards: [
+        { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+      ],
+    },
+  ],
+});
+assert.deepEqual(buildReportDocumentTimelineBlock({
+  id: "integrationTimeline",
+  title: "Integration Timeline",
+  description: "Track the rollout milestones.",
+  events: [
+    { id: "event_1", date: "2026-07-15", badge: "Target", title: "Roku signed", body: "Expected signature date." },
+  ],
+}), {
+  id: "integrationTimeline",
+  kind: "timelineBlock",
+  title: "Integration Timeline",
+  description: "Track the rollout milestones.",
+  events: [
+    { id: "event_1", date: "2026-07-15", title: "Roku signed", body: "Expected signature date.", badge: "Target" },
+  ],
+});
 assert.deepEqual(buildReportDocumentBadgesBlock(), {
   id: "badgesBlock",
   kind: "badgesBlock",
@@ -374,8 +529,6 @@ assert.deepEqual(document.datasets[0], {
     filters: {
       From: "2026-05-01",
       To: "2026-05-04",
-      from: "2026-05-01",
-      to: "2026-05-04",
     },
     limit: 25,
     offset: 0,
@@ -456,6 +609,9 @@ assert.deepEqual(document.layout, {
       blockId: "activeRefinements",
     },
     {
+      blockId: "primaryBuilder",
+    },
+    {
       blockId: "headlineKpi",
     },
     {
@@ -472,9 +628,6 @@ assert.deepEqual(document.layout, {
     },
     {
       blockId: "narrativeIntro",
-    },
-    {
-      blockId: "primaryBuilder",
     },
   ],
 });
@@ -616,6 +769,23 @@ assert.equal(lowered.semanticSummary.entityLabel, "Line Delivery");
 assert.equal(lowered.datasets.filter((dataset) => dataset.id === "primary").length, 1);
 assert.deepEqual(lowered.datasets.map((dataset) => dataset.id), baseSpec.datasets.map((dataset) => dataset.id));
 assert.deepEqual(applyReportDocumentDatasetCatalogToConfig(config, document), config);
+const themedDocument = buildReportBuilderReportDocument({
+  container,
+  config,
+  state: {
+    ...state,
+    reportDocumentThemeAccent: "green",
+    reportDocumentBadgePalette: "bold",
+  },
+});
+assert.deepEqual(themedDocument.theme, {
+  accentTone: "green",
+  badgePalette: "bold",
+});
+assert.deepEqual(lowerReportDocumentToReportSpec(themedDocument).theme, {
+  accentTone: "green",
+  badgePalette: "bold",
+});
 // older documents without a primary catalog entry but with the legacy embedded
 // config still lower identically
 assert.deepEqual(lowerReportDocumentToReportSpec({
@@ -757,14 +927,14 @@ assert.deepEqual(lowered.blocks.find((block) => block.id === "narrativeIntro"), 
 assert.deepEqual(lowered.layoutIntent.blockOrder, [
   "sharedFilters",
   "activeRefinements",
+  "primaryTable",
+  "primaryChart",
   "headlineKpi",
   "statusPills",
   "channelTrend",
   "comparisonTable",
   "stateGeo",
   "narrativeIntro",
-  "primaryTable",
-  "primaryChart",
 ]);
 
 const badgeDependencyDocument = buildReportBuilderReportDocument({
@@ -1341,7 +1511,7 @@ assert.deepEqual(
   {
     measures: { hhUniqs: true },
     dimensions: { country: true },
-    filters: {},
+    filters: { grain: "day" },
     limit: 12,
     offset: 0,
   },

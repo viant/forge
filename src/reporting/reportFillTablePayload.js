@@ -1,4 +1,5 @@
 import { resolveKey } from "../utils/selector.js";
+import { formatDashboardValue } from "../components/dashboard/dashboardUtils.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -68,6 +69,10 @@ function resolveCellVisualRules(column = {}) {
   return Array.isArray(column?.cellVisual?.rules) ? column.cellVisual.rules : [];
 }
 
+function resolveCellVisualSegments(column = {}) {
+  return Array.isArray(column?.cellVisual?.segments) ? column.cellVisual.segments : [];
+}
+
 function resolveRuleMatch(value, rules = []) {
   return (Array.isArray(rules) ? rules : []).find((rule) => JSON.stringify(rule?.value) === JSON.stringify(value)) || null;
 }
@@ -99,16 +104,50 @@ function resolveColumnRange(column = {}, rows = []) {
   };
 }
 
+function resolveColumnRankMap(column = {}, rows = []) {
+  if (normalizeString(column?.cellVisual?.kind) !== "rank") {
+    return null;
+  }
+  const values = (Array.isArray(rows) ? rows : [])
+    .map((row) => normalizeNumber(resolveCellVisualValue(row, column)))
+    .filter((value) => value != null)
+    .sort((left, right) => right - left);
+  if (values.length === 0) {
+    return null;
+  }
+  const ranks = new Map();
+  let currentRank = 0;
+  let lastValue = null;
+  values.forEach((value) => {
+    if (lastValue === null || value !== lastValue) {
+      currentRank += 1;
+      lastValue = value;
+    }
+    if (!ranks.has(value)) {
+      ranks.set(value, currentRank);
+    }
+  });
+  return ranks;
+}
+
 function buildRuntimeColumns(columns = [], rows = []) {
   return (Array.isArray(columns) ? columns : []).map((column) => {
-    if (normalizeString(column?.cellVisual?.kind) !== "dataBar") {
-      return cloneValue(column);
+    const kind = normalizeString(column?.cellVisual?.kind);
+    if (kind === "dataBar" || kind === "progressBar" || kind === "sparkBar") {
+      const range = resolveColumnRange(column, rows);
+      return {
+        ...cloneValue(column),
+        cellVisualRuntime: range ? { range } : null,
+      };
     }
-    const range = resolveColumnRange(column, rows);
-    return {
-      ...cloneValue(column),
-      cellVisualRuntime: range ? { range } : null,
-    };
+    if (kind === "rank") {
+      const ranks = resolveColumnRankMap(column, rows);
+      return {
+        ...cloneValue(column),
+        cellVisualRuntime: ranks ? { ranks } : null,
+      };
+    }
+    return cloneValue(column);
   });
 }
 
@@ -118,7 +157,7 @@ function resolveCellVisualState(row = {}, column = {}) {
     return null;
   }
   const rawValue = resolveCellVisualValue(row, column);
-  if (kind === "dataBar") {
+  if (kind === "dataBar" || kind === "progressBar" || kind === "sparkBar") {
     const numericValue = normalizeNumber(rawValue);
     if (numericValue == null) {
       return null;
@@ -137,6 +176,76 @@ function resolveCellVisualState(row = {}, column = {}) {
       palette: cloneValue(palette),
     };
   }
+  if (kind === "shareBar") {
+    const segments = resolveCellVisualSegments(column)
+      .map((segment, index) => {
+        const valueField = normalizeString(segment?.valueField);
+        if (!valueField) {
+          return null;
+        }
+        const numericValue = normalizeNumber(resolveKey(row, valueField));
+        if (numericValue == null || numericValue < 0) {
+          return null;
+        }
+        return {
+          valueField,
+          label: normalizeString(segment?.label || valueField) || valueField,
+          color: normalizeString(segment?.color) || (Array.isArray(column?.cellVisual?.palette) ? column.cellVisual.palette[index] : "") || "#137cbd",
+          value: numericValue,
+        };
+      })
+      .filter(Boolean);
+    if (segments.length === 0) {
+      return null;
+    }
+    const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+    return {
+      kind,
+      segments: segments.map((segment) => ({
+        label: segment.label,
+        color: segment.color,
+        value: segment.value,
+        percent: total > 0 ? clamp(segment.value / total, 0, 1) : 0,
+      })),
+      label: segments.map((segment) => `${segment.label} ${formatDashboardValue(total > 0 ? segment.value / total : 0, "percentFraction")}`).join(" · "),
+    };
+  }
+  if (kind === "delta") {
+    const numericValue = normalizeNumber(rawValue);
+    if (numericValue == null) {
+      return null;
+    }
+    const positiveIsGood = column?.cellVisual?.positiveIsGood !== false;
+    const tone = numericValue === 0
+      ? "info"
+      : ((numericValue > 0) === positiveIsGood ? "success" : "danger");
+    const formatted = formatDashboardValue(numericValue, column?.format);
+    const normalizedLabel = numericValue > 0
+      ? `+${formatted}`
+      : String(formatted);
+    return {
+      kind,
+      value: numericValue,
+      tone,
+      label: normalizedLabel,
+    };
+  }
+  if (kind === "rank") {
+    const numericValue = normalizeNumber(rawValue);
+    if (numericValue == null) {
+      return null;
+    }
+    const rank = column?.cellVisualRuntime?.ranks?.get?.(numericValue);
+    if (!Number.isFinite(rank)) {
+      return null;
+    }
+    return {
+      kind,
+      value: rank,
+      tone: "info",
+      label: `#${rank}`,
+    };
+  }
   const rule = resolveRuleMatch(rawValue, resolveCellVisualRules(column));
   if (!rule) {
     return null;
@@ -145,6 +254,8 @@ function resolveCellVisualState(row = {}, column = {}) {
     kind,
     tone: normalizeString(rule?.tone || "info") || "info",
     label: normalizeString(rule?.label) || String(rawValue ?? ""),
+    ...(normalizeString(rule?.background) ? { backgroundColor: normalizeString(rule.background) } : {}),
+    ...(normalizeString(rule?.color) ? { textColor: normalizeString(rule.color), borderColor: normalizeString(rule.color) } : {}),
   };
 }
 

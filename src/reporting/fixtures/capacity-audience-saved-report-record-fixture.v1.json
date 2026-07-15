@@ -5,7 +5,7 @@
     "version": 1,
     "kind": "reportFill",
     "specVersion": 1,
-    "specHash": "fnv1a:6c7cc6f9",
+    "specHash": "fnv1a:b1e2e4cd",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -41,11 +41,6 @@
             "To": "2026-05-04",
             "audienceSegmentFilter": [
               "Young Adults"
-            ],
-            "from": "2026-05-01",
-            "to": "2026-05-04",
-            "audience_segment_filter": [
-              "Young Adults"
             ]
           },
           "semanticSelection": {
@@ -77,7 +72,7 @@
           ]
         },
         "provenance": {
-          "requestHash": "fnv1a:6480cc09",
+          "requestHash": "fnv1a:ac693af7",
           "rowCount": 8,
           "truncated": false,
           "hasMore": false,
@@ -88,65 +83,65 @@
             "country": "US",
             "channelV2": "Display",
             "eventDate": "2026-05-01",
-            "audienceIndex": 118,
-            "avails": 18000,
-            "hhUniqs": 7400
+            "audienceIndex": 0,
+            "avails": 40400,
+            "hhUniqs": 16500
           },
           {
             "country": "US",
             "channelV2": "CTV",
             "eventDate": "2026-05-01",
-            "audienceIndex": 118,
-            "avails": 14200,
-            "hhUniqs": 6100
+            "audienceIndex": 0,
+            "avails": 34300,
+            "hhUniqs": 14700
           },
           {
             "country": "US",
             "channelV2": "Display",
             "eventDate": "2026-05-02",
-            "audienceIndex": 118,
-            "avails": 19100,
-            "hhUniqs": 7800
+            "audienceIndex": 0,
+            "avails": 42400,
+            "hhUniqs": 17300
           },
           {
             "country": "US",
             "channelV2": "CTV",
             "eventDate": "2026-05-02",
-            "audienceIndex": 118,
-            "avails": 15100,
-            "hhUniqs": 6400
+            "audienceIndex": 0,
+            "avails": 36000,
+            "hhUniqs": 15300
           },
           {
             "country": "CA",
             "channelV2": "Display",
             "eventDate": "2026-05-03",
-            "audienceIndex": 112,
-            "avails": 16200,
-            "hhUniqs": 6800
+            "audienceIndex": 0,
+            "avails": 36600,
+            "hhUniqs": 15200
           },
           {
             "country": "CA",
             "channelV2": "CTV",
             "eventDate": "2026-05-03",
-            "audienceIndex": 112,
-            "avails": 13700,
-            "hhUniqs": 5700
+            "audienceIndex": 0,
+            "avails": 33100,
+            "hhUniqs": 13800
           },
           {
             "country": "CA",
             "channelV2": "Display",
             "eventDate": "2026-05-04",
-            "audienceIndex": 112,
-            "avails": 17500,
-            "hhUniqs": 7100
+            "audienceIndex": 0,
+            "avails": 39000,
+            "hhUniqs": 15900
           },
           {
             "country": "CA",
             "channelV2": "CTV",
             "eventDate": "2026-05-04",
-            "audienceIndex": 112,
-            "avails": 14500,
-            "hhUniqs": 6000
+            "audienceIndex": 0,
+            "avails": 34800,
+            "hhUniqs": 14500
           }
         ]
       }
@@ -156,6 +151,7 @@
         "id": "sharedFilters",
         "kind": "filterBarBlock",
         "title": "Filters",
+        "datasetRef": "primary",
         "paramIds": [
           "dateRange",
           "channelsFilter",
@@ -163,9 +159,18 @@
         ],
         "content": {
           "title": "Filters",
+          "mode": "baseline",
+          "placement": "inherit",
+          "groupOrder": [],
+          "visibleGroups": [],
+          "collapsedGroups": [],
           "params": [
             {
               "id": "dateRange",
+              "groupId": "dateRange",
+              "label": "Date Range",
+              "type": "dateRange",
+              "required": true,
               "value": {
                 "start": "2026-05-01",
                 "end": "2026-05-04"
@@ -173,10 +178,38 @@
             },
             {
               "id": "channelsFilter",
+              "groupId": "channelsFilter",
+              "label": "Channels",
+              "type": "multiSelect",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Display",
+                  "value": "Display"
+                },
+                {
+                  "label": "CTV",
+                  "value": "CTV"
+                }
+              ],
               "value": null
             },
             {
               "id": "audienceSegmentFilter",
+              "groupId": "audienceSegmentFilter",
+              "label": "Audience Segment",
+              "type": "multiSelect",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Young Adults",
+                  "value": "Young Adults"
+                },
+                {
+                  "label": "Established Adults",
+                  "value": "Established Adults"
+                }
+              ],
               "value": [
                 "Young Adults"
               ]
@@ -263,8 +296,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 118,
-                  "displayValue": 118,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -284,8 +317,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 118,
-                  "displayValue": 118,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -305,8 +338,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 118,
-                  "displayValue": 118,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -326,8 +359,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 118,
-                  "displayValue": 118,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -347,8 +380,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 112,
-                  "displayValue": 112,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -368,8 +401,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 112,
-                  "displayValue": 112,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -389,8 +422,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 112,
-                  "displayValue": 112,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -410,8 +443,8 @@
                   "key": "audienceIndex",
                   "sourceKey": "audienceIndex",
                   "displayKey": "audienceIndex",
-                  "value": 112,
-                  "displayValue": 112,
+                  "value": 0,
+                  "displayValue": 0,
                   "visualState": null
                 }
               ]
@@ -430,12 +463,14 @@
         "secondaryLabel": "Channel",
         "description": "Generic KPI block resolved from the first authored runtime row.",
         "emptyLabel": "No headline KPI value available.",
+        "valueFormat": "compactNumber",
         "content": {
           "title": "Headline KPI",
           "description": "Generic KPI block resolved from the first authored runtime row.",
           "valueField": "avails",
           "valueLabel": "Available Impressions",
-          "value": 18000,
+          "valueFormat": "compactNumber",
+          "value": 40400,
           "rowCount": 8,
           "secondaryField": "channelV2",
           "secondaryLabel": "Channel",
@@ -612,12 +647,12 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 18000,
-                  "displayValue": 18000,
+                  "value": 40400,
+                  "displayValue": 40400,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 18000,
-                    "percent": 0.7962962962962963,
+                    "value": 40400,
+                    "percent": 0.7849462365591398,
                     "palette": [
                       "#dbeafe",
                       "#2563eb"
@@ -628,12 +663,12 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 7400,
-                  "displayValue": 7400,
+                  "value": 16500,
+                  "displayValue": 16500,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 7400,
-                    "percent": 0.8095238095238095,
+                    "value": 16500,
+                    "percent": 0.7714285714285715,
                     "palette": [
                       "#dcfce7",
                       "#16a34a"
@@ -669,12 +704,12 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 14200,
-                  "displayValue": 14200,
+                  "value": 34300,
+                  "displayValue": 34300,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 14200,
-                    "percent": 0.09259259259259259,
+                    "value": 34300,
+                    "percent": 0.12903225806451613,
                     "palette": [
                       "#dbeafe",
                       "#2563eb"
@@ -685,12 +720,12 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 6100,
-                  "displayValue": 6100,
+                  "value": 14700,
+                  "displayValue": 14700,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 6100,
-                    "percent": 0.19047619047619047,
+                    "value": 14700,
+                    "percent": 0.2571428571428571,
                     "palette": [
                       "#dcfce7",
                       "#16a34a"
@@ -726,11 +761,11 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 19100,
-                  "displayValue": 19100,
+                  "value": 42400,
+                  "displayValue": 42400,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 19100,
+                    "value": 42400,
                     "percent": 1,
                     "palette": [
                       "#dbeafe",
@@ -742,11 +777,11 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 7800,
-                  "displayValue": 7800,
+                  "value": 17300,
+                  "displayValue": 17300,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 7800,
+                    "value": 17300,
                     "percent": 1,
                     "palette": [
                       "#dcfce7",
@@ -783,12 +818,12 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 15100,
-                  "displayValue": 15100,
+                  "value": 36000,
+                  "displayValue": 36000,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 15100,
-                    "percent": 0.25925925925925924,
+                    "value": 36000,
+                    "percent": 0.3118279569892473,
                     "palette": [
                       "#dbeafe",
                       "#2563eb"
@@ -799,12 +834,12 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 6400,
-                  "displayValue": 6400,
+                  "value": 15300,
+                  "displayValue": 15300,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 6400,
-                    "percent": 0.3333333333333333,
+                    "value": 15300,
+                    "percent": 0.42857142857142855,
                     "palette": [
                       "#dcfce7",
                       "#16a34a"
@@ -840,12 +875,12 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 16200,
-                  "displayValue": 16200,
+                  "value": 36600,
+                  "displayValue": 36600,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 16200,
-                    "percent": 0.46296296296296297,
+                    "value": 36600,
+                    "percent": 0.3763440860215054,
                     "palette": [
                       "#dbeafe",
                       "#2563eb"
@@ -856,12 +891,12 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 6800,
-                  "displayValue": 6800,
+                  "value": 15200,
+                  "displayValue": 15200,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 6800,
-                    "percent": 0.5238095238095238,
+                    "value": 15200,
+                    "percent": 0.4,
                     "palette": [
                       "#dcfce7",
                       "#16a34a"
@@ -897,11 +932,11 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 13700,
-                  "displayValue": 13700,
+                  "value": 33100,
+                  "displayValue": 33100,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 13700,
+                    "value": 33100,
                     "percent": 0,
                     "palette": [
                       "#dbeafe",
@@ -913,11 +948,11 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 5700,
-                  "displayValue": 5700,
+                  "value": 13800,
+                  "displayValue": 13800,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 5700,
+                    "value": 13800,
                     "percent": 0,
                     "palette": [
                       "#dcfce7",
@@ -954,12 +989,12 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 17500,
-                  "displayValue": 17500,
+                  "value": 39000,
+                  "displayValue": 39000,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 17500,
-                    "percent": 0.7037037037037037,
+                    "value": 39000,
+                    "percent": 0.6344086021505376,
                     "palette": [
                       "#dbeafe",
                       "#2563eb"
@@ -970,12 +1005,12 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 7100,
-                  "displayValue": 7100,
+                  "value": 15900,
+                  "displayValue": 15900,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 7100,
-                    "percent": 0.6666666666666666,
+                    "value": 15900,
+                    "percent": 0.6,
                     "palette": [
                       "#dcfce7",
                       "#16a34a"
@@ -1011,12 +1046,12 @@
                   "key": "avails",
                   "sourceKey": "avails",
                   "displayKey": "avails",
-                  "value": 14500,
-                  "displayValue": 14500,
+                  "value": 34800,
+                  "displayValue": 34800,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 14500,
-                    "percent": 0.14814814814814814,
+                    "value": 34800,
+                    "percent": 0.1827956989247312,
                     "palette": [
                       "#dbeafe",
                       "#2563eb"
@@ -1027,12 +1062,12 @@
                   "key": "hhUniqs",
                   "sourceKey": "hhUniqs",
                   "displayKey": "hhUniqs",
-                  "value": 6000,
-                  "displayValue": 6000,
+                  "value": 14500,
+                  "displayValue": 14500,
                   "visualState": {
                     "kind": "dataBar",
-                    "value": 6000,
-                    "percent": 0.14285714285714285,
+                    "value": 14500,
+                    "percent": 0.2,
                     "palette": [
                       "#dcfce7",
                       "#16a34a"
@@ -1051,9 +1086,9 @@
     "version": 1,
     "kind": "reportPrint",
     "specVersion": 1,
-    "specHash": "fnv1a:6c7cc6f9",
+    "specHash": "fnv1a:b1e2e4cd",
     "fillVersion": 1,
-    "fillHash": "fnv1a:f3d9629c",
+    "fillHash": "fnv1a:a42f5693",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -1098,7 +1133,7 @@
               "width": 720,
               "height": 16
             },
-            "text": "dateRange: 2026-05-01 to 2026-05-04",
+            "text": "Date Range: 2026-05-01 to 2026-05-04",
             "fontSize": 12,
             "color": "#344054"
           },
@@ -1111,7 +1146,7 @@
               "width": 720,
               "height": 16
             },
-            "text": "channelsFilter: —",
+            "text": "Channels: —",
             "fontSize": 12,
             "color": "#344054"
           },
@@ -1124,7 +1159,7 @@
               "width": 720,
               "height": 16
             },
-            "text": "audienceSegmentFilter: Young Adults",
+            "text": "Audience Segment: Young Adults",
             "fontSize": 12,
             "color": "#344054"
           },
@@ -1222,7 +1257,7 @@
             },
             "rowKey": "row_1",
             "columnKey": "audienceIndex",
-            "text": "118",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1263,7 +1298,7 @@
             },
             "rowKey": "row_2",
             "columnKey": "audienceIndex",
-            "text": "118",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1304,7 +1339,7 @@
             },
             "rowKey": "row_3",
             "columnKey": "audienceIndex",
-            "text": "118",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1345,7 +1380,7 @@
             },
             "rowKey": "row_4",
             "columnKey": "audienceIndex",
-            "text": "118",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1386,7 +1421,7 @@
             },
             "rowKey": "row_5",
             "columnKey": "audienceIndex",
-            "text": "112",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1427,7 +1462,7 @@
             },
             "rowKey": "row_6",
             "columnKey": "audienceIndex",
-            "text": "112",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1468,7 +1503,7 @@
             },
             "rowKey": "row_7",
             "columnKey": "audienceIndex",
-            "text": "112",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1509,7 +1544,7 @@
             },
             "rowKey": "row_8",
             "columnKey": "audienceIndex",
-            "text": "112",
+            "text": "0.00000",
             "format": "number",
             "align": "right"
           },
@@ -1536,7 +1571,7 @@
               "width": 720,
               "height": 24
             },
-            "text": "Available Impressions: 18000",
+            "text": "Available Impressions: 40 400",
             "fontSize": 20,
             "fontWeight": "700",
             "color": "#101828"
@@ -1755,9 +1790,9 @@
             "columnKey": "channelV2",
             "label": "Display",
             "tone": "info",
-            "backgroundColor": "#ebf1f5",
-            "borderColor": "#ced9e0",
-            "textColor": "#30404d"
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
           },
           {
             "id": "comparisonTable__row_1__avails__bar_track",
@@ -1777,14 +1812,14 @@
             "box": {
               "x": 402,
               "y": 112,
-              "width": 133.77777777777777,
+              "width": 131.8709677419355,
               "height": 16
             },
             "rowKey": "row_1",
             "columnKey": "avails",
-            "value": 18000,
-            "min": 13700,
-            "max": 19100,
+            "value": 40400,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -1799,7 +1834,7 @@
             },
             "rowKey": "row_1",
             "columnKey": "avails",
-            "text": "18000",
+            "text": "40 400",
             "format": "compactNumber",
             "align": "right"
           },
@@ -1821,14 +1856,14 @@
             "box": {
               "x": 582,
               "y": 112,
-              "width": 136,
+              "width": 129.6,
               "height": 16
             },
             "rowKey": "row_1",
             "columnKey": "hhUniqs",
-            "value": 7400,
-            "min": 5700,
-            "max": 7800,
+            "value": 16500,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -1843,7 +1878,7 @@
             },
             "rowKey": "row_1",
             "columnKey": "hhUniqs",
-            "text": "7400",
+            "text": "16 500",
             "format": "compactNumber",
             "align": "right"
           },
@@ -1909,14 +1944,14 @@
             "box": {
               "x": 402,
               "y": 136,
-              "width": 15.555555555555555,
+              "width": 21.677419354838708,
               "height": 16
             },
             "rowKey": "row_2",
             "columnKey": "avails",
-            "value": 14200,
-            "min": 13700,
-            "max": 19100,
+            "value": 34300,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -1931,7 +1966,7 @@
             },
             "rowKey": "row_2",
             "columnKey": "avails",
-            "text": "14200",
+            "text": "34 300",
             "format": "compactNumber",
             "align": "right"
           },
@@ -1953,14 +1988,14 @@
             "box": {
               "x": 582,
               "y": 136,
-              "width": 32,
+              "width": 43.199999999999996,
               "height": 16
             },
             "rowKey": "row_2",
             "columnKey": "hhUniqs",
-            "value": 6100,
-            "min": 5700,
-            "max": 7800,
+            "value": 14700,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -1975,7 +2010,7 @@
             },
             "rowKey": "row_2",
             "columnKey": "hhUniqs",
-            "text": "6100",
+            "text": "14 700",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2019,9 +2054,9 @@
             "columnKey": "channelV2",
             "label": "Display",
             "tone": "info",
-            "backgroundColor": "#ebf1f5",
-            "borderColor": "#ced9e0",
-            "textColor": "#30404d"
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
           },
           {
             "id": "comparisonTable__row_3__avails__bar_track",
@@ -2046,9 +2081,9 @@
             },
             "rowKey": "row_3",
             "columnKey": "avails",
-            "value": 19100,
-            "min": 13700,
-            "max": 19100,
+            "value": 42400,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -2063,7 +2098,7 @@
             },
             "rowKey": "row_3",
             "columnKey": "avails",
-            "text": "19100",
+            "text": "42 400",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2090,9 +2125,9 @@
             },
             "rowKey": "row_3",
             "columnKey": "hhUniqs",
-            "value": 7800,
-            "min": 5700,
-            "max": 7800,
+            "value": 17300,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -2107,7 +2142,7 @@
             },
             "rowKey": "row_3",
             "columnKey": "hhUniqs",
-            "text": "7800",
+            "text": "17 300",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2173,14 +2208,14 @@
             "box": {
               "x": 402,
               "y": 184,
-              "width": 43.55555555555555,
+              "width": 52.38709677419355,
               "height": 16
             },
             "rowKey": "row_4",
             "columnKey": "avails",
-            "value": 15100,
-            "min": 13700,
-            "max": 19100,
+            "value": 36000,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -2195,7 +2230,7 @@
             },
             "rowKey": "row_4",
             "columnKey": "avails",
-            "text": "15100",
+            "text": "36 000",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2217,14 +2252,14 @@
             "box": {
               "x": 582,
               "y": 184,
-              "width": 56,
+              "width": 72,
               "height": 16
             },
             "rowKey": "row_4",
             "columnKey": "hhUniqs",
-            "value": 6400,
-            "min": 5700,
-            "max": 7800,
+            "value": 15300,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -2239,7 +2274,7 @@
             },
             "rowKey": "row_4",
             "columnKey": "hhUniqs",
-            "text": "6400",
+            "text": "15 300",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2283,9 +2318,9 @@
             "columnKey": "channelV2",
             "label": "Display",
             "tone": "info",
-            "backgroundColor": "#ebf1f5",
-            "borderColor": "#ced9e0",
-            "textColor": "#30404d"
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
           },
           {
             "id": "comparisonTable__row_5__avails__bar_track",
@@ -2305,14 +2340,14 @@
             "box": {
               "x": 402,
               "y": 208,
-              "width": 77.77777777777777,
+              "width": 63.225806451612904,
               "height": 16
             },
             "rowKey": "row_5",
             "columnKey": "avails",
-            "value": 16200,
-            "min": 13700,
-            "max": 19100,
+            "value": 36600,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -2327,7 +2362,7 @@
             },
             "rowKey": "row_5",
             "columnKey": "avails",
-            "text": "16200",
+            "text": "36 600",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2349,14 +2384,14 @@
             "box": {
               "x": 582,
               "y": 208,
-              "width": 88,
+              "width": 67.2,
               "height": 16
             },
             "rowKey": "row_5",
             "columnKey": "hhUniqs",
-            "value": 6800,
-            "min": 5700,
-            "max": 7800,
+            "value": 15200,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -2371,7 +2406,7 @@
             },
             "rowKey": "row_5",
             "columnKey": "hhUniqs",
-            "text": "6800",
+            "text": "15 200",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2442,9 +2477,9 @@
             },
             "rowKey": "row_6",
             "columnKey": "avails",
-            "value": 13700,
-            "min": 13700,
-            "max": 19100,
+            "value": 33100,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -2459,7 +2494,7 @@
             },
             "rowKey": "row_6",
             "columnKey": "avails",
-            "text": "13700",
+            "text": "33 100",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2486,9 +2521,9 @@
             },
             "rowKey": "row_6",
             "columnKey": "hhUniqs",
-            "value": 5700,
-            "min": 5700,
-            "max": 7800,
+            "value": 13800,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -2503,7 +2538,7 @@
             },
             "rowKey": "row_6",
             "columnKey": "hhUniqs",
-            "text": "5700",
+            "text": "13 800",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2547,9 +2582,9 @@
             "columnKey": "channelV2",
             "label": "Display",
             "tone": "info",
-            "backgroundColor": "#ebf1f5",
-            "borderColor": "#ced9e0",
-            "textColor": "#30404d"
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
           },
           {
             "id": "comparisonTable__row_7__avails__bar_track",
@@ -2569,14 +2604,14 @@
             "box": {
               "x": 402,
               "y": 256,
-              "width": 118.22222222222223,
+              "width": 106.58064516129032,
               "height": 16
             },
             "rowKey": "row_7",
             "columnKey": "avails",
-            "value": 17500,
-            "min": 13700,
-            "max": 19100,
+            "value": 39000,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -2591,7 +2626,7 @@
             },
             "rowKey": "row_7",
             "columnKey": "avails",
-            "text": "17500",
+            "text": "39 000",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2613,14 +2648,14 @@
             "box": {
               "x": 582,
               "y": 256,
-              "width": 112,
+              "width": 100.8,
               "height": 16
             },
             "rowKey": "row_7",
             "columnKey": "hhUniqs",
-            "value": 7100,
-            "min": 5700,
-            "max": 7800,
+            "value": 15900,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -2635,7 +2670,7 @@
             },
             "rowKey": "row_7",
             "columnKey": "hhUniqs",
-            "text": "7100",
+            "text": "15 900",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2701,14 +2736,14 @@
             "box": {
               "x": 402,
               "y": 280,
-              "width": 24.888888888888886,
+              "width": 30.70967741935484,
               "height": 16
             },
             "rowKey": "row_8",
             "columnKey": "avails",
-            "value": 14500,
-            "min": 13700,
-            "max": 19100,
+            "value": 34800,
+            "min": 33100,
+            "max": 42400,
             "fillColor": "#2563eb",
             "backgroundColor": "#dbeafe"
           },
@@ -2723,7 +2758,7 @@
             },
             "rowKey": "row_8",
             "columnKey": "avails",
-            "text": "14500",
+            "text": "34 800",
             "format": "compactNumber",
             "align": "right"
           },
@@ -2745,14 +2780,14 @@
             "box": {
               "x": 582,
               "y": 280,
-              "width": 24,
+              "width": 33.6,
               "height": 16
             },
             "rowKey": "row_8",
             "columnKey": "hhUniqs",
-            "value": 6000,
-            "min": 5700,
-            "max": 7800,
+            "value": 14500,
+            "min": 13800,
+            "max": 17300,
             "fillColor": "#16a34a",
             "backgroundColor": "#dcfce7"
           },
@@ -2767,7 +2802,7 @@
             },
             "rowKey": "row_8",
             "columnKey": "hhUniqs",
-            "text": "6000",
+            "text": "14 500",
             "format": "compactNumber",
             "align": "right"
           }
@@ -3080,6 +3115,59 @@
           },
           "refinements": [],
           "calculatedFields": [],
+          "scope": {
+            "params": [
+              {
+                "id": "dateRange",
+                "kind": "dateRange",
+                "label": "Date Range",
+                "required": true,
+                "value": {
+                  "start": "2026-05-01",
+                  "end": "2026-05-04"
+                }
+              },
+              {
+                "id": "channelsFilter",
+                "kind": "multiSelect",
+                "label": "Channels",
+                "required": false,
+                "multiple": true,
+                "options": [
+                  {
+                    "label": "Display",
+                    "value": "Display"
+                  },
+                  {
+                    "label": "CTV",
+                    "value": "CTV"
+                  }
+                ],
+                "value": null
+              },
+              {
+                "id": "audienceSegmentFilter",
+                "kind": "multiSelect",
+                "label": "Audience Segment",
+                "required": false,
+                "multiple": true,
+                "options": [
+                  {
+                    "label": "Young Adults",
+                    "value": "Young Adults"
+                  },
+                  {
+                    "label": "Established Adults",
+                    "value": "Established Adults"
+                  }
+                ],
+                "value": [
+                  "Young Adults"
+                ]
+              }
+            ],
+            "dataSourceRef": "demoReportSource"
+          },
           "datasets": [
             {
               "id": "primary",
@@ -3099,11 +3187,6 @@
                   "From": "2026-05-01",
                   "To": "2026-05-04",
                   "audienceSegmentFilter": [
-                    "Young Adults"
-                  ],
-                  "from": "2026-05-01",
-                  "to": "2026-05-04",
-                  "audience_segment_filter": [
                     "Young Adults"
                   ]
                 },
@@ -3142,6 +3225,7 @@
               "id": "sharedFilters",
               "kind": "filterBarBlock",
               "title": "Filters",
+              "datasetRef": "primary",
               "paramIds": [
                 "dateRange",
                 "channelsFilter",
@@ -3192,7 +3276,8 @@
               "secondaryField": "channelV2",
               "secondaryLabel": "Channel",
               "description": "Generic KPI block resolved from the first authored runtime row.",
-              "emptyLabel": "No headline KPI value available."
+              "emptyLabel": "No headline KPI value available.",
+              "valueFormat": "compactNumber"
             },
             {
               "id": "comparisonTable",
@@ -3267,44 +3352,13 @@
                 }
               ]
             }
-          ],
-          "scope": {
-            "params": [
-              {
-                "id": "dateRange",
-                "kind": "dateRange",
-                "label": "Date Range",
-                "required": true,
-                "value": {
-                  "start": "2026-05-01",
-                  "end": "2026-05-04"
-                }
-              },
-              {
-                "id": "channelsFilter",
-                "kind": "multiSelect",
-                "label": "Channels",
-                "required": false,
-                "value": null
-              },
-              {
-                "id": "audienceSegmentFilter",
-                "kind": "multiSelect",
-                "label": "Audience Segment",
-                "required": false,
-                "value": [
-                  "Young Adults"
-                ]
-              }
-            ],
-            "dataSourceRef": "demoReportSource"
-          }
+          ]
         },
         "reportFill": {
           "version": 1,
           "kind": "reportFill",
           "specVersion": 1,
-          "specHash": "fnv1a:6c7cc6f9",
+          "specHash": "fnv1a:b1e2e4cd",
           "source": {
             "kind": "dashboard.reportBuilder",
             "containerId": "demoReportBuilder",
@@ -3340,11 +3394,6 @@
                   "To": "2026-05-04",
                   "audienceSegmentFilter": [
                     "Young Adults"
-                  ],
-                  "from": "2026-05-01",
-                  "to": "2026-05-04",
-                  "audience_segment_filter": [
-                    "Young Adults"
                   ]
                 },
                 "semanticSelection": {
@@ -3376,7 +3425,7 @@
                 ]
               },
               "provenance": {
-                "requestHash": "fnv1a:6480cc09",
+                "requestHash": "fnv1a:ac693af7",
                 "rowCount": 8,
                 "truncated": false,
                 "hasMore": false,
@@ -3387,65 +3436,65 @@
                   "country": "US",
                   "channelV2": "Display",
                   "eventDate": "2026-05-01",
-                  "audienceIndex": 118,
-                  "avails": 18000,
-                  "hhUniqs": 7400
+                  "audienceIndex": 0,
+                  "avails": 40400,
+                  "hhUniqs": 16500
                 },
                 {
                   "country": "US",
                   "channelV2": "CTV",
                   "eventDate": "2026-05-01",
-                  "audienceIndex": 118,
-                  "avails": 14200,
-                  "hhUniqs": 6100
+                  "audienceIndex": 0,
+                  "avails": 34300,
+                  "hhUniqs": 14700
                 },
                 {
                   "country": "US",
                   "channelV2": "Display",
                   "eventDate": "2026-05-02",
-                  "audienceIndex": 118,
-                  "avails": 19100,
-                  "hhUniqs": 7800
+                  "audienceIndex": 0,
+                  "avails": 42400,
+                  "hhUniqs": 17300
                 },
                 {
                   "country": "US",
                   "channelV2": "CTV",
                   "eventDate": "2026-05-02",
-                  "audienceIndex": 118,
-                  "avails": 15100,
-                  "hhUniqs": 6400
+                  "audienceIndex": 0,
+                  "avails": 36000,
+                  "hhUniqs": 15300
                 },
                 {
                   "country": "CA",
                   "channelV2": "Display",
                   "eventDate": "2026-05-03",
-                  "audienceIndex": 112,
-                  "avails": 16200,
-                  "hhUniqs": 6800
+                  "audienceIndex": 0,
+                  "avails": 36600,
+                  "hhUniqs": 15200
                 },
                 {
                   "country": "CA",
                   "channelV2": "CTV",
                   "eventDate": "2026-05-03",
-                  "audienceIndex": 112,
-                  "avails": 13700,
-                  "hhUniqs": 5700
+                  "audienceIndex": 0,
+                  "avails": 33100,
+                  "hhUniqs": 13800
                 },
                 {
                   "country": "CA",
                   "channelV2": "Display",
                   "eventDate": "2026-05-04",
-                  "audienceIndex": 112,
-                  "avails": 17500,
-                  "hhUniqs": 7100
+                  "audienceIndex": 0,
+                  "avails": 39000,
+                  "hhUniqs": 15900
                 },
                 {
                   "country": "CA",
                   "channelV2": "CTV",
                   "eventDate": "2026-05-04",
-                  "audienceIndex": 112,
-                  "avails": 14500,
-                  "hhUniqs": 6000
+                  "audienceIndex": 0,
+                  "avails": 34800,
+                  "hhUniqs": 14500
                 }
               ]
             }
@@ -3455,6 +3504,7 @@
               "id": "sharedFilters",
               "kind": "filterBarBlock",
               "title": "Filters",
+              "datasetRef": "primary",
               "paramIds": [
                 "dateRange",
                 "channelsFilter",
@@ -3462,9 +3512,18 @@
               ],
               "content": {
                 "title": "Filters",
+                "mode": "baseline",
+                "placement": "inherit",
+                "groupOrder": [],
+                "visibleGroups": [],
+                "collapsedGroups": [],
                 "params": [
                   {
                     "id": "dateRange",
+                    "groupId": "dateRange",
+                    "label": "Date Range",
+                    "type": "dateRange",
+                    "required": true,
                     "value": {
                       "start": "2026-05-01",
                       "end": "2026-05-04"
@@ -3472,10 +3531,38 @@
                   },
                   {
                     "id": "channelsFilter",
+                    "groupId": "channelsFilter",
+                    "label": "Channels",
+                    "type": "multiSelect",
+                    "multiple": true,
+                    "options": [
+                      {
+                        "label": "Display",
+                        "value": "Display"
+                      },
+                      {
+                        "label": "CTV",
+                        "value": "CTV"
+                      }
+                    ],
                     "value": null
                   },
                   {
                     "id": "audienceSegmentFilter",
+                    "groupId": "audienceSegmentFilter",
+                    "label": "Audience Segment",
+                    "type": "multiSelect",
+                    "multiple": true,
+                    "options": [
+                      {
+                        "label": "Young Adults",
+                        "value": "Young Adults"
+                      },
+                      {
+                        "label": "Established Adults",
+                        "value": "Established Adults"
+                      }
+                    ],
                     "value": [
                       "Young Adults"
                     ]
@@ -3562,8 +3649,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 118,
-                        "displayValue": 118,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3583,8 +3670,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 118,
-                        "displayValue": 118,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3604,8 +3691,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 118,
-                        "displayValue": 118,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3625,8 +3712,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 118,
-                        "displayValue": 118,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3646,8 +3733,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 112,
-                        "displayValue": 112,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3667,8 +3754,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 112,
-                        "displayValue": 112,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3688,8 +3775,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 112,
-                        "displayValue": 112,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3709,8 +3796,8 @@
                         "key": "audienceIndex",
                         "sourceKey": "audienceIndex",
                         "displayKey": "audienceIndex",
-                        "value": 112,
-                        "displayValue": 112,
+                        "value": 0,
+                        "displayValue": 0,
                         "visualState": null
                       }
                     ]
@@ -3729,12 +3816,14 @@
               "secondaryLabel": "Channel",
               "description": "Generic KPI block resolved from the first authored runtime row.",
               "emptyLabel": "No headline KPI value available.",
+              "valueFormat": "compactNumber",
               "content": {
                 "title": "Headline KPI",
                 "description": "Generic KPI block resolved from the first authored runtime row.",
                 "valueField": "avails",
                 "valueLabel": "Available Impressions",
-                "value": 18000,
+                "valueFormat": "compactNumber",
+                "value": 40400,
                 "rowCount": 8,
                 "secondaryField": "channelV2",
                 "secondaryLabel": "Channel",
@@ -3911,12 +4000,12 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 18000,
-                        "displayValue": 18000,
+                        "value": 40400,
+                        "displayValue": 40400,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 18000,
-                          "percent": 0.7962962962962963,
+                          "value": 40400,
+                          "percent": 0.7849462365591398,
                           "palette": [
                             "#dbeafe",
                             "#2563eb"
@@ -3927,12 +4016,12 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 7400,
-                        "displayValue": 7400,
+                        "value": 16500,
+                        "displayValue": 16500,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 7400,
-                          "percent": 0.8095238095238095,
+                          "value": 16500,
+                          "percent": 0.7714285714285715,
                           "palette": [
                             "#dcfce7",
                             "#16a34a"
@@ -3968,12 +4057,12 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 14200,
-                        "displayValue": 14200,
+                        "value": 34300,
+                        "displayValue": 34300,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 14200,
-                          "percent": 0.09259259259259259,
+                          "value": 34300,
+                          "percent": 0.12903225806451613,
                           "palette": [
                             "#dbeafe",
                             "#2563eb"
@@ -3984,12 +4073,12 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 6100,
-                        "displayValue": 6100,
+                        "value": 14700,
+                        "displayValue": 14700,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 6100,
-                          "percent": 0.19047619047619047,
+                          "value": 14700,
+                          "percent": 0.2571428571428571,
                           "palette": [
                             "#dcfce7",
                             "#16a34a"
@@ -4025,11 +4114,11 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 19100,
-                        "displayValue": 19100,
+                        "value": 42400,
+                        "displayValue": 42400,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 19100,
+                          "value": 42400,
                           "percent": 1,
                           "palette": [
                             "#dbeafe",
@@ -4041,11 +4130,11 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 7800,
-                        "displayValue": 7800,
+                        "value": 17300,
+                        "displayValue": 17300,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 7800,
+                          "value": 17300,
                           "percent": 1,
                           "palette": [
                             "#dcfce7",
@@ -4082,12 +4171,12 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 15100,
-                        "displayValue": 15100,
+                        "value": 36000,
+                        "displayValue": 36000,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 15100,
-                          "percent": 0.25925925925925924,
+                          "value": 36000,
+                          "percent": 0.3118279569892473,
                           "palette": [
                             "#dbeafe",
                             "#2563eb"
@@ -4098,12 +4187,12 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 6400,
-                        "displayValue": 6400,
+                        "value": 15300,
+                        "displayValue": 15300,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 6400,
-                          "percent": 0.3333333333333333,
+                          "value": 15300,
+                          "percent": 0.42857142857142855,
                           "palette": [
                             "#dcfce7",
                             "#16a34a"
@@ -4139,12 +4228,12 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 16200,
-                        "displayValue": 16200,
+                        "value": 36600,
+                        "displayValue": 36600,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 16200,
-                          "percent": 0.46296296296296297,
+                          "value": 36600,
+                          "percent": 0.3763440860215054,
                           "palette": [
                             "#dbeafe",
                             "#2563eb"
@@ -4155,12 +4244,12 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 6800,
-                        "displayValue": 6800,
+                        "value": 15200,
+                        "displayValue": 15200,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 6800,
-                          "percent": 0.5238095238095238,
+                          "value": 15200,
+                          "percent": 0.4,
                           "palette": [
                             "#dcfce7",
                             "#16a34a"
@@ -4196,11 +4285,11 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 13700,
-                        "displayValue": 13700,
+                        "value": 33100,
+                        "displayValue": 33100,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 13700,
+                          "value": 33100,
                           "percent": 0,
                           "palette": [
                             "#dbeafe",
@@ -4212,11 +4301,11 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 5700,
-                        "displayValue": 5700,
+                        "value": 13800,
+                        "displayValue": 13800,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 5700,
+                          "value": 13800,
                           "percent": 0,
                           "palette": [
                             "#dcfce7",
@@ -4253,12 +4342,12 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 17500,
-                        "displayValue": 17500,
+                        "value": 39000,
+                        "displayValue": 39000,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 17500,
-                          "percent": 0.7037037037037037,
+                          "value": 39000,
+                          "percent": 0.6344086021505376,
                           "palette": [
                             "#dbeafe",
                             "#2563eb"
@@ -4269,12 +4358,12 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 7100,
-                        "displayValue": 7100,
+                        "value": 15900,
+                        "displayValue": 15900,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 7100,
-                          "percent": 0.6666666666666666,
+                          "value": 15900,
+                          "percent": 0.6,
                           "palette": [
                             "#dcfce7",
                             "#16a34a"
@@ -4310,12 +4399,12 @@
                         "key": "avails",
                         "sourceKey": "avails",
                         "displayKey": "avails",
-                        "value": 14500,
-                        "displayValue": 14500,
+                        "value": 34800,
+                        "displayValue": 34800,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 14500,
-                          "percent": 0.14814814814814814,
+                          "value": 34800,
+                          "percent": 0.1827956989247312,
                           "palette": [
                             "#dbeafe",
                             "#2563eb"
@@ -4326,12 +4415,12 @@
                         "key": "hhUniqs",
                         "sourceKey": "hhUniqs",
                         "displayKey": "hhUniqs",
-                        "value": 6000,
-                        "displayValue": 6000,
+                        "value": 14500,
+                        "displayValue": 14500,
                         "visualState": {
                           "kind": "dataBar",
-                          "value": 6000,
-                          "percent": 0.14285714285714285,
+                          "value": 14500,
+                          "percent": 0.2,
                           "palette": [
                             "#dcfce7",
                             "#16a34a"
@@ -4350,9 +4439,9 @@
           "version": 1,
           "kind": "reportPrint",
           "specVersion": 1,
-          "specHash": "fnv1a:6c7cc6f9",
+          "specHash": "fnv1a:b1e2e4cd",
           "fillVersion": 1,
-          "fillHash": "fnv1a:f3d9629c",
+          "fillHash": "fnv1a:a42f5693",
           "source": {
             "kind": "dashboard.reportBuilder",
             "containerId": "demoReportBuilder",
@@ -4397,7 +4486,7 @@
                     "width": 720,
                     "height": 16
                   },
-                  "text": "dateRange: 2026-05-01 to 2026-05-04",
+                  "text": "Date Range: 2026-05-01 to 2026-05-04",
                   "fontSize": 12,
                   "color": "#344054"
                 },
@@ -4410,7 +4499,7 @@
                     "width": 720,
                     "height": 16
                   },
-                  "text": "channelsFilter: —",
+                  "text": "Channels: —",
                   "fontSize": 12,
                   "color": "#344054"
                 },
@@ -4423,7 +4512,7 @@
                     "width": 720,
                     "height": 16
                   },
-                  "text": "audienceSegmentFilter: Young Adults",
+                  "text": "Audience Segment: Young Adults",
                   "fontSize": 12,
                   "color": "#344054"
                 },
@@ -4521,7 +4610,7 @@
                   },
                   "rowKey": "row_1",
                   "columnKey": "audienceIndex",
-                  "text": "118",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4562,7 +4651,7 @@
                   },
                   "rowKey": "row_2",
                   "columnKey": "audienceIndex",
-                  "text": "118",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4603,7 +4692,7 @@
                   },
                   "rowKey": "row_3",
                   "columnKey": "audienceIndex",
-                  "text": "118",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4644,7 +4733,7 @@
                   },
                   "rowKey": "row_4",
                   "columnKey": "audienceIndex",
-                  "text": "118",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4685,7 +4774,7 @@
                   },
                   "rowKey": "row_5",
                   "columnKey": "audienceIndex",
-                  "text": "112",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4726,7 +4815,7 @@
                   },
                   "rowKey": "row_6",
                   "columnKey": "audienceIndex",
-                  "text": "112",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4767,7 +4856,7 @@
                   },
                   "rowKey": "row_7",
                   "columnKey": "audienceIndex",
-                  "text": "112",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4808,7 +4897,7 @@
                   },
                   "rowKey": "row_8",
                   "columnKey": "audienceIndex",
-                  "text": "112",
+                  "text": "0.00000",
                   "format": "number",
                   "align": "right"
                 },
@@ -4835,7 +4924,7 @@
                     "width": 720,
                     "height": 24
                   },
-                  "text": "Available Impressions: 18000",
+                  "text": "Available Impressions: 40 400",
                   "fontSize": 20,
                   "fontWeight": "700",
                   "color": "#101828"
@@ -5054,9 +5143,9 @@
                   "columnKey": "channelV2",
                   "label": "Display",
                   "tone": "info",
-                  "backgroundColor": "#ebf1f5",
-                  "borderColor": "#ced9e0",
-                  "textColor": "#30404d"
+                  "backgroundColor": "#eef4ff",
+                  "borderColor": "#2f6de1",
+                  "textColor": "#2457b8"
                 },
                 {
                   "id": "comparisonTable__row_1__avails__bar_track",
@@ -5076,14 +5165,14 @@
                   "box": {
                     "x": 402,
                     "y": 112,
-                    "width": 133.77777777777777,
+                    "width": 131.8709677419355,
                     "height": 16
                   },
                   "rowKey": "row_1",
                   "columnKey": "avails",
-                  "value": 18000,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 40400,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -5098,7 +5187,7 @@
                   },
                   "rowKey": "row_1",
                   "columnKey": "avails",
-                  "text": "18000",
+                  "text": "40 400",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5120,14 +5209,14 @@
                   "box": {
                     "x": 582,
                     "y": 112,
-                    "width": 136,
+                    "width": 129.6,
                     "height": 16
                   },
                   "rowKey": "row_1",
                   "columnKey": "hhUniqs",
-                  "value": 7400,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 16500,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -5142,7 +5231,7 @@
                   },
                   "rowKey": "row_1",
                   "columnKey": "hhUniqs",
-                  "text": "7400",
+                  "text": "16 500",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5208,14 +5297,14 @@
                   "box": {
                     "x": 402,
                     "y": 136,
-                    "width": 15.555555555555555,
+                    "width": 21.677419354838708,
                     "height": 16
                   },
                   "rowKey": "row_2",
                   "columnKey": "avails",
-                  "value": 14200,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 34300,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -5230,7 +5319,7 @@
                   },
                   "rowKey": "row_2",
                   "columnKey": "avails",
-                  "text": "14200",
+                  "text": "34 300",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5252,14 +5341,14 @@
                   "box": {
                     "x": 582,
                     "y": 136,
-                    "width": 32,
+                    "width": 43.199999999999996,
                     "height": 16
                   },
                   "rowKey": "row_2",
                   "columnKey": "hhUniqs",
-                  "value": 6100,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 14700,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -5274,7 +5363,7 @@
                   },
                   "rowKey": "row_2",
                   "columnKey": "hhUniqs",
-                  "text": "6100",
+                  "text": "14 700",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5318,9 +5407,9 @@
                   "columnKey": "channelV2",
                   "label": "Display",
                   "tone": "info",
-                  "backgroundColor": "#ebf1f5",
-                  "borderColor": "#ced9e0",
-                  "textColor": "#30404d"
+                  "backgroundColor": "#eef4ff",
+                  "borderColor": "#2f6de1",
+                  "textColor": "#2457b8"
                 },
                 {
                   "id": "comparisonTable__row_3__avails__bar_track",
@@ -5345,9 +5434,9 @@
                   },
                   "rowKey": "row_3",
                   "columnKey": "avails",
-                  "value": 19100,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 42400,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -5362,7 +5451,7 @@
                   },
                   "rowKey": "row_3",
                   "columnKey": "avails",
-                  "text": "19100",
+                  "text": "42 400",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5389,9 +5478,9 @@
                   },
                   "rowKey": "row_3",
                   "columnKey": "hhUniqs",
-                  "value": 7800,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 17300,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -5406,7 +5495,7 @@
                   },
                   "rowKey": "row_3",
                   "columnKey": "hhUniqs",
-                  "text": "7800",
+                  "text": "17 300",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5472,14 +5561,14 @@
                   "box": {
                     "x": 402,
                     "y": 184,
-                    "width": 43.55555555555555,
+                    "width": 52.38709677419355,
                     "height": 16
                   },
                   "rowKey": "row_4",
                   "columnKey": "avails",
-                  "value": 15100,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 36000,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -5494,7 +5583,7 @@
                   },
                   "rowKey": "row_4",
                   "columnKey": "avails",
-                  "text": "15100",
+                  "text": "36 000",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5516,14 +5605,14 @@
                   "box": {
                     "x": 582,
                     "y": 184,
-                    "width": 56,
+                    "width": 72,
                     "height": 16
                   },
                   "rowKey": "row_4",
                   "columnKey": "hhUniqs",
-                  "value": 6400,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 15300,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -5538,7 +5627,7 @@
                   },
                   "rowKey": "row_4",
                   "columnKey": "hhUniqs",
-                  "text": "6400",
+                  "text": "15 300",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5582,9 +5671,9 @@
                   "columnKey": "channelV2",
                   "label": "Display",
                   "tone": "info",
-                  "backgroundColor": "#ebf1f5",
-                  "borderColor": "#ced9e0",
-                  "textColor": "#30404d"
+                  "backgroundColor": "#eef4ff",
+                  "borderColor": "#2f6de1",
+                  "textColor": "#2457b8"
                 },
                 {
                   "id": "comparisonTable__row_5__avails__bar_track",
@@ -5604,14 +5693,14 @@
                   "box": {
                     "x": 402,
                     "y": 208,
-                    "width": 77.77777777777777,
+                    "width": 63.225806451612904,
                     "height": 16
                   },
                   "rowKey": "row_5",
                   "columnKey": "avails",
-                  "value": 16200,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 36600,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -5626,7 +5715,7 @@
                   },
                   "rowKey": "row_5",
                   "columnKey": "avails",
-                  "text": "16200",
+                  "text": "36 600",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5648,14 +5737,14 @@
                   "box": {
                     "x": 582,
                     "y": 208,
-                    "width": 88,
+                    "width": 67.2,
                     "height": 16
                   },
                   "rowKey": "row_5",
                   "columnKey": "hhUniqs",
-                  "value": 6800,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 15200,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -5670,7 +5759,7 @@
                   },
                   "rowKey": "row_5",
                   "columnKey": "hhUniqs",
-                  "text": "6800",
+                  "text": "15 200",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5741,9 +5830,9 @@
                   },
                   "rowKey": "row_6",
                   "columnKey": "avails",
-                  "value": 13700,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 33100,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -5758,7 +5847,7 @@
                   },
                   "rowKey": "row_6",
                   "columnKey": "avails",
-                  "text": "13700",
+                  "text": "33 100",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5785,9 +5874,9 @@
                   },
                   "rowKey": "row_6",
                   "columnKey": "hhUniqs",
-                  "value": 5700,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 13800,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -5802,7 +5891,7 @@
                   },
                   "rowKey": "row_6",
                   "columnKey": "hhUniqs",
-                  "text": "5700",
+                  "text": "13 800",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5846,9 +5935,9 @@
                   "columnKey": "channelV2",
                   "label": "Display",
                   "tone": "info",
-                  "backgroundColor": "#ebf1f5",
-                  "borderColor": "#ced9e0",
-                  "textColor": "#30404d"
+                  "backgroundColor": "#eef4ff",
+                  "borderColor": "#2f6de1",
+                  "textColor": "#2457b8"
                 },
                 {
                   "id": "comparisonTable__row_7__avails__bar_track",
@@ -5868,14 +5957,14 @@
                   "box": {
                     "x": 402,
                     "y": 256,
-                    "width": 118.22222222222223,
+                    "width": 106.58064516129032,
                     "height": 16
                   },
                   "rowKey": "row_7",
                   "columnKey": "avails",
-                  "value": 17500,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 39000,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -5890,7 +5979,7 @@
                   },
                   "rowKey": "row_7",
                   "columnKey": "avails",
-                  "text": "17500",
+                  "text": "39 000",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -5912,14 +6001,14 @@
                   "box": {
                     "x": 582,
                     "y": 256,
-                    "width": 112,
+                    "width": 100.8,
                     "height": 16
                   },
                   "rowKey": "row_7",
                   "columnKey": "hhUniqs",
-                  "value": 7100,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 15900,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -5934,7 +6023,7 @@
                   },
                   "rowKey": "row_7",
                   "columnKey": "hhUniqs",
-                  "text": "7100",
+                  "text": "15 900",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -6000,14 +6089,14 @@
                   "box": {
                     "x": 402,
                     "y": 280,
-                    "width": 24.888888888888886,
+                    "width": 30.70967741935484,
                     "height": 16
                   },
                   "rowKey": "row_8",
                   "columnKey": "avails",
-                  "value": 14500,
-                  "min": 13700,
-                  "max": 19100,
+                  "value": 34800,
+                  "min": 33100,
+                  "max": 42400,
                   "fillColor": "#2563eb",
                   "backgroundColor": "#dbeafe"
                 },
@@ -6022,7 +6111,7 @@
                   },
                   "rowKey": "row_8",
                   "columnKey": "avails",
-                  "text": "14500",
+                  "text": "34 800",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -6044,14 +6133,14 @@
                   "box": {
                     "x": 582,
                     "y": 280,
-                    "width": 24,
+                    "width": 33.6,
                     "height": 16
                   },
                   "rowKey": "row_8",
                   "columnKey": "hhUniqs",
-                  "value": 6000,
-                  "min": 5700,
-                  "max": 7800,
+                  "value": 14500,
+                  "min": 13800,
+                  "max": 17300,
                   "fillColor": "#16a34a",
                   "backgroundColor": "#dcfce7"
                 },
@@ -6066,7 +6155,7 @@
                   },
                   "rowKey": "row_8",
                   "columnKey": "hhUniqs",
-                  "text": "6000",
+                  "text": "14 500",
                   "format": "compactNumber",
                   "align": "right"
                 }
@@ -6164,6 +6253,81 @@
             }
           ],
           "diagnostics": []
+        },
+        "semanticBindingViewState": {
+          "title": "Semantic Binding",
+          "chips": [
+            "Model Ad Delivery",
+            "Entity Line Delivery",
+            "Dimensions Market",
+            "Measures Audience Index",
+            "Parameters Date Range, Audience Segment",
+            "Categories Location, Audience +1",
+            "Lineage harmonizer://feature/location +2"
+          ],
+          "modelLabel": "Ad Delivery",
+          "entityLabel": "Line Delivery",
+          "fieldGroups": [
+            {
+              "id": "dimensions",
+              "title": "Selected dimensions (1)",
+              "fields": [
+                {
+                  "id": "country_code",
+                  "label": "Market",
+                  "rawId": "country",
+                  "category": "Location",
+                  "definitionRef": "harmonizer://feature/location",
+                  "governance": {
+                    "status": "approved",
+                    "classification": "harmonizer.audience"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "measures",
+              "title": "Selected measures (1)",
+              "fields": [
+                {
+                  "id": "audience_index",
+                  "label": "Audience Index",
+                  "rawId": "audienceIndex",
+                  "format": "number",
+                  "category": "Audience",
+                  "definitionRef": "harmonizer://feature/user.segment.index",
+                  "governance": {
+                    "status": "approved",
+                    "certification": "reviewed",
+                    "classification": "harmonizer.audience"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "parameters",
+              "title": "Selected parameters (2)",
+              "fields": [
+                {
+                  "id": "reporting_window",
+                  "label": "Date Range",
+                  "rawId": "dateRange",
+                  "category": "Scope"
+                },
+                {
+                  "id": "audience_segment",
+                  "label": "Audience Segment",
+                  "rawId": "audienceSegmentFilter",
+                  "category": "Audience",
+                  "definitionRef": "harmonizer://feature/user.segment",
+                  "governance": {
+                    "status": "approved",
+                    "classification": "harmonizer.audience"
+                  }
+                }
+              ]
+            }
+          ]
         }
       }
     }
@@ -6391,6 +6555,59 @@
       },
       "refinements": [],
       "calculatedFields": [],
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "Date Range",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          {
+            "id": "channelsFilter",
+            "kind": "multiSelect",
+            "label": "Channels",
+            "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
+            "value": null
+          },
+          {
+            "id": "audienceSegmentFilter",
+            "kind": "multiSelect",
+            "label": "Audience Segment",
+            "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Young Adults",
+                "value": "Young Adults"
+              },
+              {
+                "label": "Established Adults",
+                "value": "Established Adults"
+              }
+            ],
+            "value": [
+              "Young Adults"
+            ]
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      },
       "datasets": [
         {
           "id": "primary",
@@ -6410,11 +6627,6 @@
               "From": "2026-05-01",
               "To": "2026-05-04",
               "audienceSegmentFilter": [
-                "Young Adults"
-              ],
-              "from": "2026-05-01",
-              "to": "2026-05-04",
-              "audience_segment_filter": [
                 "Young Adults"
               ]
             },
@@ -6453,6 +6665,7 @@
           "id": "sharedFilters",
           "kind": "filterBarBlock",
           "title": "Filters",
+          "datasetRef": "primary",
           "paramIds": [
             "dateRange",
             "channelsFilter",
@@ -6503,7 +6716,8 @@
           "secondaryField": "channelV2",
           "secondaryLabel": "Channel",
           "description": "Generic KPI block resolved from the first authored runtime row.",
-          "emptyLabel": "No headline KPI value available."
+          "emptyLabel": "No headline KPI value available.",
+          "valueFormat": "compactNumber"
         },
         {
           "id": "comparisonTable",
@@ -6578,44 +6792,13 @@
             }
           ]
         }
-      ],
-      "scope": {
-        "params": [
-          {
-            "id": "dateRange",
-            "kind": "dateRange",
-            "label": "Date Range",
-            "required": true,
-            "value": {
-              "start": "2026-05-01",
-              "end": "2026-05-04"
-            }
-          },
-          {
-            "id": "channelsFilter",
-            "kind": "multiSelect",
-            "label": "Channels",
-            "required": false,
-            "value": null
-          },
-          {
-            "id": "audienceSegmentFilter",
-            "kind": "multiSelect",
-            "label": "Audience Segment",
-            "required": false,
-            "value": [
-              "Young Adults"
-            ]
-          }
-        ],
-        "dataSourceRef": "demoReportSource"
-      }
+      ]
     },
     "reportFill": {
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:6c7cc6f9",
+      "specHash": "fnv1a:b1e2e4cd",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "demoReportBuilder",
@@ -6651,11 +6834,6 @@
               "To": "2026-05-04",
               "audienceSegmentFilter": [
                 "Young Adults"
-              ],
-              "from": "2026-05-01",
-              "to": "2026-05-04",
-              "audience_segment_filter": [
-                "Young Adults"
               ]
             },
             "semanticSelection": {
@@ -6687,7 +6865,7 @@
             ]
           },
           "provenance": {
-            "requestHash": "fnv1a:6480cc09",
+            "requestHash": "fnv1a:ac693af7",
             "rowCount": 8,
             "truncated": false,
             "hasMore": false,
@@ -6698,65 +6876,65 @@
               "country": "US",
               "channelV2": "Display",
               "eventDate": "2026-05-01",
-              "audienceIndex": 118,
-              "avails": 18000,
-              "hhUniqs": 7400
+              "audienceIndex": 0,
+              "avails": 40400,
+              "hhUniqs": 16500
             },
             {
               "country": "US",
               "channelV2": "CTV",
               "eventDate": "2026-05-01",
-              "audienceIndex": 118,
-              "avails": 14200,
-              "hhUniqs": 6100
+              "audienceIndex": 0,
+              "avails": 34300,
+              "hhUniqs": 14700
             },
             {
               "country": "US",
               "channelV2": "Display",
               "eventDate": "2026-05-02",
-              "audienceIndex": 118,
-              "avails": 19100,
-              "hhUniqs": 7800
+              "audienceIndex": 0,
+              "avails": 42400,
+              "hhUniqs": 17300
             },
             {
               "country": "US",
               "channelV2": "CTV",
               "eventDate": "2026-05-02",
-              "audienceIndex": 118,
-              "avails": 15100,
-              "hhUniqs": 6400
+              "audienceIndex": 0,
+              "avails": 36000,
+              "hhUniqs": 15300
             },
             {
               "country": "CA",
               "channelV2": "Display",
               "eventDate": "2026-05-03",
-              "audienceIndex": 112,
-              "avails": 16200,
-              "hhUniqs": 6800
+              "audienceIndex": 0,
+              "avails": 36600,
+              "hhUniqs": 15200
             },
             {
               "country": "CA",
               "channelV2": "CTV",
               "eventDate": "2026-05-03",
-              "audienceIndex": 112,
-              "avails": 13700,
-              "hhUniqs": 5700
+              "audienceIndex": 0,
+              "avails": 33100,
+              "hhUniqs": 13800
             },
             {
               "country": "CA",
               "channelV2": "Display",
               "eventDate": "2026-05-04",
-              "audienceIndex": 112,
-              "avails": 17500,
-              "hhUniqs": 7100
+              "audienceIndex": 0,
+              "avails": 39000,
+              "hhUniqs": 15900
             },
             {
               "country": "CA",
               "channelV2": "CTV",
               "eventDate": "2026-05-04",
-              "audienceIndex": 112,
-              "avails": 14500,
-              "hhUniqs": 6000
+              "audienceIndex": 0,
+              "avails": 34800,
+              "hhUniqs": 14500
             }
           ]
         }
@@ -6766,6 +6944,7 @@
           "id": "sharedFilters",
           "kind": "filterBarBlock",
           "title": "Filters",
+          "datasetRef": "primary",
           "paramIds": [
             "dateRange",
             "channelsFilter",
@@ -6773,9 +6952,18 @@
           ],
           "content": {
             "title": "Filters",
+            "mode": "baseline",
+            "placement": "inherit",
+            "groupOrder": [],
+            "visibleGroups": [],
+            "collapsedGroups": [],
             "params": [
               {
                 "id": "dateRange",
+                "groupId": "dateRange",
+                "label": "Date Range",
+                "type": "dateRange",
+                "required": true,
                 "value": {
                   "start": "2026-05-01",
                   "end": "2026-05-04"
@@ -6783,10 +6971,38 @@
               },
               {
                 "id": "channelsFilter",
+                "groupId": "channelsFilter",
+                "label": "Channels",
+                "type": "multiSelect",
+                "multiple": true,
+                "options": [
+                  {
+                    "label": "Display",
+                    "value": "Display"
+                  },
+                  {
+                    "label": "CTV",
+                    "value": "CTV"
+                  }
+                ],
                 "value": null
               },
               {
                 "id": "audienceSegmentFilter",
+                "groupId": "audienceSegmentFilter",
+                "label": "Audience Segment",
+                "type": "multiSelect",
+                "multiple": true,
+                "options": [
+                  {
+                    "label": "Young Adults",
+                    "value": "Young Adults"
+                  },
+                  {
+                    "label": "Established Adults",
+                    "value": "Established Adults"
+                  }
+                ],
                 "value": [
                   "Young Adults"
                 ]
@@ -6873,8 +7089,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 118,
-                    "displayValue": 118,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -6894,8 +7110,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 118,
-                    "displayValue": 118,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -6915,8 +7131,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 118,
-                    "displayValue": 118,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -6936,8 +7152,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 118,
-                    "displayValue": 118,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -6957,8 +7173,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 112,
-                    "displayValue": 112,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -6978,8 +7194,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 112,
-                    "displayValue": 112,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -6999,8 +7215,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 112,
-                    "displayValue": 112,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -7020,8 +7236,8 @@
                     "key": "audienceIndex",
                     "sourceKey": "audienceIndex",
                     "displayKey": "audienceIndex",
-                    "value": 112,
-                    "displayValue": 112,
+                    "value": 0,
+                    "displayValue": 0,
                     "visualState": null
                   }
                 ]
@@ -7040,12 +7256,14 @@
           "secondaryLabel": "Channel",
           "description": "Generic KPI block resolved from the first authored runtime row.",
           "emptyLabel": "No headline KPI value available.",
+          "valueFormat": "compactNumber",
           "content": {
             "title": "Headline KPI",
             "description": "Generic KPI block resolved from the first authored runtime row.",
             "valueField": "avails",
             "valueLabel": "Available Impressions",
-            "value": 18000,
+            "valueFormat": "compactNumber",
+            "value": 40400,
             "rowCount": 8,
             "secondaryField": "channelV2",
             "secondaryLabel": "Channel",
@@ -7222,12 +7440,12 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 18000,
-                    "displayValue": 18000,
+                    "value": 40400,
+                    "displayValue": 40400,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 18000,
-                      "percent": 0.7962962962962963,
+                      "value": 40400,
+                      "percent": 0.7849462365591398,
                       "palette": [
                         "#dbeafe",
                         "#2563eb"
@@ -7238,12 +7456,12 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 7400,
-                    "displayValue": 7400,
+                    "value": 16500,
+                    "displayValue": 16500,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 7400,
-                      "percent": 0.8095238095238095,
+                      "value": 16500,
+                      "percent": 0.7714285714285715,
                       "palette": [
                         "#dcfce7",
                         "#16a34a"
@@ -7279,12 +7497,12 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 14200,
-                    "displayValue": 14200,
+                    "value": 34300,
+                    "displayValue": 34300,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 14200,
-                      "percent": 0.09259259259259259,
+                      "value": 34300,
+                      "percent": 0.12903225806451613,
                       "palette": [
                         "#dbeafe",
                         "#2563eb"
@@ -7295,12 +7513,12 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 6100,
-                    "displayValue": 6100,
+                    "value": 14700,
+                    "displayValue": 14700,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 6100,
-                      "percent": 0.19047619047619047,
+                      "value": 14700,
+                      "percent": 0.2571428571428571,
                       "palette": [
                         "#dcfce7",
                         "#16a34a"
@@ -7336,11 +7554,11 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 19100,
-                    "displayValue": 19100,
+                    "value": 42400,
+                    "displayValue": 42400,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 19100,
+                      "value": 42400,
                       "percent": 1,
                       "palette": [
                         "#dbeafe",
@@ -7352,11 +7570,11 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 7800,
-                    "displayValue": 7800,
+                    "value": 17300,
+                    "displayValue": 17300,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 7800,
+                      "value": 17300,
                       "percent": 1,
                       "palette": [
                         "#dcfce7",
@@ -7393,12 +7611,12 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 15100,
-                    "displayValue": 15100,
+                    "value": 36000,
+                    "displayValue": 36000,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 15100,
-                      "percent": 0.25925925925925924,
+                      "value": 36000,
+                      "percent": 0.3118279569892473,
                       "palette": [
                         "#dbeafe",
                         "#2563eb"
@@ -7409,12 +7627,12 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 6400,
-                    "displayValue": 6400,
+                    "value": 15300,
+                    "displayValue": 15300,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 6400,
-                      "percent": 0.3333333333333333,
+                      "value": 15300,
+                      "percent": 0.42857142857142855,
                       "palette": [
                         "#dcfce7",
                         "#16a34a"
@@ -7450,12 +7668,12 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 16200,
-                    "displayValue": 16200,
+                    "value": 36600,
+                    "displayValue": 36600,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 16200,
-                      "percent": 0.46296296296296297,
+                      "value": 36600,
+                      "percent": 0.3763440860215054,
                       "palette": [
                         "#dbeafe",
                         "#2563eb"
@@ -7466,12 +7684,12 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 6800,
-                    "displayValue": 6800,
+                    "value": 15200,
+                    "displayValue": 15200,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 6800,
-                      "percent": 0.5238095238095238,
+                      "value": 15200,
+                      "percent": 0.4,
                       "palette": [
                         "#dcfce7",
                         "#16a34a"
@@ -7507,11 +7725,11 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 13700,
-                    "displayValue": 13700,
+                    "value": 33100,
+                    "displayValue": 33100,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 13700,
+                      "value": 33100,
                       "percent": 0,
                       "palette": [
                         "#dbeafe",
@@ -7523,11 +7741,11 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 5700,
-                    "displayValue": 5700,
+                    "value": 13800,
+                    "displayValue": 13800,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 5700,
+                      "value": 13800,
                       "percent": 0,
                       "palette": [
                         "#dcfce7",
@@ -7564,12 +7782,12 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 17500,
-                    "displayValue": 17500,
+                    "value": 39000,
+                    "displayValue": 39000,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 17500,
-                      "percent": 0.7037037037037037,
+                      "value": 39000,
+                      "percent": 0.6344086021505376,
                       "palette": [
                         "#dbeafe",
                         "#2563eb"
@@ -7580,12 +7798,12 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 7100,
-                    "displayValue": 7100,
+                    "value": 15900,
+                    "displayValue": 15900,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 7100,
-                      "percent": 0.6666666666666666,
+                      "value": 15900,
+                      "percent": 0.6,
                       "palette": [
                         "#dcfce7",
                         "#16a34a"
@@ -7621,12 +7839,12 @@
                     "key": "avails",
                     "sourceKey": "avails",
                     "displayKey": "avails",
-                    "value": 14500,
-                    "displayValue": 14500,
+                    "value": 34800,
+                    "displayValue": 34800,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 14500,
-                      "percent": 0.14814814814814814,
+                      "value": 34800,
+                      "percent": 0.1827956989247312,
                       "palette": [
                         "#dbeafe",
                         "#2563eb"
@@ -7637,12 +7855,12 @@
                     "key": "hhUniqs",
                     "sourceKey": "hhUniqs",
                     "displayKey": "hhUniqs",
-                    "value": 6000,
-                    "displayValue": 6000,
+                    "value": 14500,
+                    "displayValue": 14500,
                     "visualState": {
                       "kind": "dataBar",
-                      "value": 6000,
-                      "percent": 0.14285714285714285,
+                      "value": 14500,
+                      "percent": 0.2,
                       "palette": [
                         "#dcfce7",
                         "#16a34a"
@@ -7661,9 +7879,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:6c7cc6f9",
+      "specHash": "fnv1a:b1e2e4cd",
       "fillVersion": 1,
-      "fillHash": "fnv1a:f3d9629c",
+      "fillHash": "fnv1a:a42f5693",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "demoReportBuilder",
@@ -7708,7 +7926,7 @@
                 "width": 720,
                 "height": 16
               },
-              "text": "dateRange: 2026-05-01 to 2026-05-04",
+              "text": "Date Range: 2026-05-01 to 2026-05-04",
               "fontSize": 12,
               "color": "#344054"
             },
@@ -7721,7 +7939,7 @@
                 "width": 720,
                 "height": 16
               },
-              "text": "channelsFilter: —",
+              "text": "Channels: —",
               "fontSize": 12,
               "color": "#344054"
             },
@@ -7734,7 +7952,7 @@
                 "width": 720,
                 "height": 16
               },
-              "text": "audienceSegmentFilter: Young Adults",
+              "text": "Audience Segment: Young Adults",
               "fontSize": 12,
               "color": "#344054"
             },
@@ -7832,7 +8050,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "audienceIndex",
-              "text": "118",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -7873,7 +8091,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "audienceIndex",
-              "text": "118",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -7914,7 +8132,7 @@
               },
               "rowKey": "row_3",
               "columnKey": "audienceIndex",
-              "text": "118",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -7955,7 +8173,7 @@
               },
               "rowKey": "row_4",
               "columnKey": "audienceIndex",
-              "text": "118",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -7996,7 +8214,7 @@
               },
               "rowKey": "row_5",
               "columnKey": "audienceIndex",
-              "text": "112",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -8037,7 +8255,7 @@
               },
               "rowKey": "row_6",
               "columnKey": "audienceIndex",
-              "text": "112",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -8078,7 +8296,7 @@
               },
               "rowKey": "row_7",
               "columnKey": "audienceIndex",
-              "text": "112",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -8119,7 +8337,7 @@
               },
               "rowKey": "row_8",
               "columnKey": "audienceIndex",
-              "text": "112",
+              "text": "0.00000",
               "format": "number",
               "align": "right"
             },
@@ -8146,7 +8364,7 @@
                 "width": 720,
                 "height": 24
               },
-              "text": "Available Impressions: 18000",
+              "text": "Available Impressions: 40 400",
               "fontSize": 20,
               "fontWeight": "700",
               "color": "#101828"
@@ -8365,9 +8583,9 @@
               "columnKey": "channelV2",
               "label": "Display",
               "tone": "info",
-              "backgroundColor": "#ebf1f5",
-              "borderColor": "#ced9e0",
-              "textColor": "#30404d"
+              "backgroundColor": "#eef4ff",
+              "borderColor": "#2f6de1",
+              "textColor": "#2457b8"
             },
             {
               "id": "comparisonTable__row_1__avails__bar_track",
@@ -8387,14 +8605,14 @@
               "box": {
                 "x": 402,
                 "y": 112,
-                "width": 133.77777777777777,
+                "width": 131.8709677419355,
                 "height": 16
               },
               "rowKey": "row_1",
               "columnKey": "avails",
-              "value": 18000,
-              "min": 13700,
-              "max": 19100,
+              "value": 40400,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -8409,7 +8627,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "avails",
-              "text": "18000",
+              "text": "40 400",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8431,14 +8649,14 @@
               "box": {
                 "x": 582,
                 "y": 112,
-                "width": 136,
+                "width": 129.6,
                 "height": 16
               },
               "rowKey": "row_1",
               "columnKey": "hhUniqs",
-              "value": 7400,
-              "min": 5700,
-              "max": 7800,
+              "value": 16500,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -8453,7 +8671,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "hhUniqs",
-              "text": "7400",
+              "text": "16 500",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8519,14 +8737,14 @@
               "box": {
                 "x": 402,
                 "y": 136,
-                "width": 15.555555555555555,
+                "width": 21.677419354838708,
                 "height": 16
               },
               "rowKey": "row_2",
               "columnKey": "avails",
-              "value": 14200,
-              "min": 13700,
-              "max": 19100,
+              "value": 34300,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -8541,7 +8759,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "avails",
-              "text": "14200",
+              "text": "34 300",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8563,14 +8781,14 @@
               "box": {
                 "x": 582,
                 "y": 136,
-                "width": 32,
+                "width": 43.199999999999996,
                 "height": 16
               },
               "rowKey": "row_2",
               "columnKey": "hhUniqs",
-              "value": 6100,
-              "min": 5700,
-              "max": 7800,
+              "value": 14700,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -8585,7 +8803,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "hhUniqs",
-              "text": "6100",
+              "text": "14 700",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8629,9 +8847,9 @@
               "columnKey": "channelV2",
               "label": "Display",
               "tone": "info",
-              "backgroundColor": "#ebf1f5",
-              "borderColor": "#ced9e0",
-              "textColor": "#30404d"
+              "backgroundColor": "#eef4ff",
+              "borderColor": "#2f6de1",
+              "textColor": "#2457b8"
             },
             {
               "id": "comparisonTable__row_3__avails__bar_track",
@@ -8656,9 +8874,9 @@
               },
               "rowKey": "row_3",
               "columnKey": "avails",
-              "value": 19100,
-              "min": 13700,
-              "max": 19100,
+              "value": 42400,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -8673,7 +8891,7 @@
               },
               "rowKey": "row_3",
               "columnKey": "avails",
-              "text": "19100",
+              "text": "42 400",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8700,9 +8918,9 @@
               },
               "rowKey": "row_3",
               "columnKey": "hhUniqs",
-              "value": 7800,
-              "min": 5700,
-              "max": 7800,
+              "value": 17300,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -8717,7 +8935,7 @@
               },
               "rowKey": "row_3",
               "columnKey": "hhUniqs",
-              "text": "7800",
+              "text": "17 300",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8783,14 +9001,14 @@
               "box": {
                 "x": 402,
                 "y": 184,
-                "width": 43.55555555555555,
+                "width": 52.38709677419355,
                 "height": 16
               },
               "rowKey": "row_4",
               "columnKey": "avails",
-              "value": 15100,
-              "min": 13700,
-              "max": 19100,
+              "value": 36000,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -8805,7 +9023,7 @@
               },
               "rowKey": "row_4",
               "columnKey": "avails",
-              "text": "15100",
+              "text": "36 000",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8827,14 +9045,14 @@
               "box": {
                 "x": 582,
                 "y": 184,
-                "width": 56,
+                "width": 72,
                 "height": 16
               },
               "rowKey": "row_4",
               "columnKey": "hhUniqs",
-              "value": 6400,
-              "min": 5700,
-              "max": 7800,
+              "value": 15300,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -8849,7 +9067,7 @@
               },
               "rowKey": "row_4",
               "columnKey": "hhUniqs",
-              "text": "6400",
+              "text": "15 300",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8893,9 +9111,9 @@
               "columnKey": "channelV2",
               "label": "Display",
               "tone": "info",
-              "backgroundColor": "#ebf1f5",
-              "borderColor": "#ced9e0",
-              "textColor": "#30404d"
+              "backgroundColor": "#eef4ff",
+              "borderColor": "#2f6de1",
+              "textColor": "#2457b8"
             },
             {
               "id": "comparisonTable__row_5__avails__bar_track",
@@ -8915,14 +9133,14 @@
               "box": {
                 "x": 402,
                 "y": 208,
-                "width": 77.77777777777777,
+                "width": 63.225806451612904,
                 "height": 16
               },
               "rowKey": "row_5",
               "columnKey": "avails",
-              "value": 16200,
-              "min": 13700,
-              "max": 19100,
+              "value": 36600,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -8937,7 +9155,7 @@
               },
               "rowKey": "row_5",
               "columnKey": "avails",
-              "text": "16200",
+              "text": "36 600",
               "format": "compactNumber",
               "align": "right"
             },
@@ -8959,14 +9177,14 @@
               "box": {
                 "x": 582,
                 "y": 208,
-                "width": 88,
+                "width": 67.2,
                 "height": 16
               },
               "rowKey": "row_5",
               "columnKey": "hhUniqs",
-              "value": 6800,
-              "min": 5700,
-              "max": 7800,
+              "value": 15200,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -8981,7 +9199,7 @@
               },
               "rowKey": "row_5",
               "columnKey": "hhUniqs",
-              "text": "6800",
+              "text": "15 200",
               "format": "compactNumber",
               "align": "right"
             },
@@ -9052,9 +9270,9 @@
               },
               "rowKey": "row_6",
               "columnKey": "avails",
-              "value": 13700,
-              "min": 13700,
-              "max": 19100,
+              "value": 33100,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -9069,7 +9287,7 @@
               },
               "rowKey": "row_6",
               "columnKey": "avails",
-              "text": "13700",
+              "text": "33 100",
               "format": "compactNumber",
               "align": "right"
             },
@@ -9096,9 +9314,9 @@
               },
               "rowKey": "row_6",
               "columnKey": "hhUniqs",
-              "value": 5700,
-              "min": 5700,
-              "max": 7800,
+              "value": 13800,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -9113,7 +9331,7 @@
               },
               "rowKey": "row_6",
               "columnKey": "hhUniqs",
-              "text": "5700",
+              "text": "13 800",
               "format": "compactNumber",
               "align": "right"
             },
@@ -9157,9 +9375,9 @@
               "columnKey": "channelV2",
               "label": "Display",
               "tone": "info",
-              "backgroundColor": "#ebf1f5",
-              "borderColor": "#ced9e0",
-              "textColor": "#30404d"
+              "backgroundColor": "#eef4ff",
+              "borderColor": "#2f6de1",
+              "textColor": "#2457b8"
             },
             {
               "id": "comparisonTable__row_7__avails__bar_track",
@@ -9179,14 +9397,14 @@
               "box": {
                 "x": 402,
                 "y": 256,
-                "width": 118.22222222222223,
+                "width": 106.58064516129032,
                 "height": 16
               },
               "rowKey": "row_7",
               "columnKey": "avails",
-              "value": 17500,
-              "min": 13700,
-              "max": 19100,
+              "value": 39000,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -9201,7 +9419,7 @@
               },
               "rowKey": "row_7",
               "columnKey": "avails",
-              "text": "17500",
+              "text": "39 000",
               "format": "compactNumber",
               "align": "right"
             },
@@ -9223,14 +9441,14 @@
               "box": {
                 "x": 582,
                 "y": 256,
-                "width": 112,
+                "width": 100.8,
                 "height": 16
               },
               "rowKey": "row_7",
               "columnKey": "hhUniqs",
-              "value": 7100,
-              "min": 5700,
-              "max": 7800,
+              "value": 15900,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -9245,7 +9463,7 @@
               },
               "rowKey": "row_7",
               "columnKey": "hhUniqs",
-              "text": "7100",
+              "text": "15 900",
               "format": "compactNumber",
               "align": "right"
             },
@@ -9311,14 +9529,14 @@
               "box": {
                 "x": 402,
                 "y": 280,
-                "width": 24.888888888888886,
+                "width": 30.70967741935484,
                 "height": 16
               },
               "rowKey": "row_8",
               "columnKey": "avails",
-              "value": 14500,
-              "min": 13700,
-              "max": 19100,
+              "value": 34800,
+              "min": 33100,
+              "max": 42400,
               "fillColor": "#2563eb",
               "backgroundColor": "#dbeafe"
             },
@@ -9333,7 +9551,7 @@
               },
               "rowKey": "row_8",
               "columnKey": "avails",
-              "text": "14500",
+              "text": "34 800",
               "format": "compactNumber",
               "align": "right"
             },
@@ -9355,14 +9573,14 @@
               "box": {
                 "x": 582,
                 "y": 280,
-                "width": 24,
+                "width": 33.6,
                 "height": 16
               },
               "rowKey": "row_8",
               "columnKey": "hhUniqs",
-              "value": 6000,
-              "min": 5700,
-              "max": 7800,
+              "value": 14500,
+              "min": 13800,
+              "max": 17300,
               "fillColor": "#16a34a",
               "backgroundColor": "#dcfce7"
             },
@@ -9377,7 +9595,7 @@
               },
               "rowKey": "row_8",
               "columnKey": "hhUniqs",
-              "text": "6000",
+              "text": "14 500",
               "format": "compactNumber",
               "align": "right"
             }
@@ -9498,6 +9716,19 @@
       "title": "Capacity Audience Segment Index Q3",
       "subtitle": "",
       "description": "",
+      "binding": {
+        "mode": "semantic",
+        "modelRef": "model://example/performance/delivery@v1",
+        "entity": "line_delivery",
+        "selectedDimensions": [
+          "event_date",
+          "channel",
+          "country_code"
+        ],
+        "selectedMeasures": [
+          "available_impressions"
+        ]
+      },
       "semanticSummary": {
         "kind": "semantic",
         "modelRef": "model://example/performance/delivery@v1",
@@ -9570,6 +9801,17 @@
             "kind": "multiSelect",
             "label": "Channels",
             "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
             "value": null
           },
           {
@@ -9577,6 +9819,17 @@
             "kind": "multiSelect",
             "label": "Audience Segment",
             "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Young Adults",
+                "value": "Young Adults"
+              },
+              {
+                "label": "Established Adults",
+                "value": "Established Adults"
+              }
+            ],
             "value": [
               "Young Adults"
             ]
@@ -9584,6 +9837,657 @@
         ],
         "dataSourceRef": "demoReportSource"
       },
+      "presentation": {
+        "orderFields": [
+          {
+            "value": "eventDate",
+            "field": "eventDate",
+            "default": true,
+            "defaultDirection": "asc"
+          },
+          {
+            "value": "audienceIndex",
+            "field": "audienceIndex",
+            "defaultDirection": "desc"
+          },
+          {
+            "value": "avails",
+            "field": "avails",
+            "defaultDirection": "desc"
+          },
+          {
+            "value": "hhUniqs",
+            "field": "hhUniqs",
+            "defaultDirection": "desc"
+          }
+        ],
+        "defaultTablePresets": [
+          {
+            "title": "Inventory Ladder",
+            "dimensions": [
+              "channelV2"
+            ],
+            "measures": [
+              "avails",
+              "hhUniqs"
+            ],
+            "primaryMeasure": "avails",
+            "orderField": "avails",
+            "orderDir": "desc",
+            "pageSize": 12,
+            "clearChart": true
+          },
+          {
+            "title": "Location Ladder",
+            "dimensions": [
+              "country"
+            ],
+            "measures": [
+              "avails",
+              "hhUniqs"
+            ],
+            "primaryMeasure": "avails",
+            "orderField": "avails",
+            "orderDir": "desc",
+            "pageSize": 12,
+            "clearChart": true
+          }
+        ],
+        "defaultMode": "chart",
+        "pageSize": 50,
+        "chartCreationMode": "explicit",
+        "defaultChartSpecs": [
+          {
+            "title": "Inventory · Top Channels",
+            "type": "horizontal_bar",
+            "xField": "channelV2",
+            "yFields": [
+              "avails"
+            ]
+          },
+          {
+            "title": "Locations · Top Markets",
+            "type": "horizontal_bar",
+            "xField": "country",
+            "yFields": [
+              "avails"
+            ]
+          }
+        ]
+      },
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "label": "Report Builder Demo",
+          "description": "Primary report dataset",
+          "kindLabel": "primary",
+          "request": {
+            "measures": {
+              "audienceIndex": true
+            },
+            "dimensions": {
+              "country": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04",
+              "audienceSegmentFilter": [
+                "Young Adults"
+              ]
+            },
+            "semanticSelection": {
+              "modelRef": "model://example/performance/delivery@v1",
+              "entity": "line_delivery",
+              "selection": {
+                "dimensions": [
+                  "country_code"
+                ],
+                "measures": [
+                  "audience_index"
+                ]
+              },
+              "refinements": [],
+              "parameters": {
+                "reporting_window": {
+                  "start": "2026-05-01",
+                  "end": "2026-05-04"
+                },
+                "audience_segment": [
+                  "Young Adults"
+                ]
+              }
+            },
+            "limit": 50,
+            "offset": 0,
+            "orderBy": [
+              "audienceIndex desc"
+            ]
+          },
+          "dimensions": [
+            {
+              "id": "eventDate",
+              "key": "eventDate",
+              "semanticRef": "event_date",
+              "label": "Event Date",
+              "default": true,
+              "chartAxis": true,
+              "format": "date",
+              "category": "Time",
+              "semanticDataType": "date"
+            },
+            {
+              "id": "channelV2",
+              "key": "channelV2",
+              "semanticRef": "channel",
+              "label": "Channel",
+              "default": true,
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              },
+              "category": "Delivery",
+              "semanticDataType": "string"
+            },
+            {
+              "id": "country",
+              "key": "country",
+              "semanticRef": "country_code",
+              "label": "Market",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              },
+              "category": "Location",
+              "definitionRef": "harmonizer://feature/location",
+              "governance": {
+                "status": "approved",
+                "classification": "harmonizer.audience"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "publisher",
+              "key": "publisher",
+              "semanticRef": "publisher",
+              "label": "Publisher",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includePublisher",
+                "excludeParamPath": "filters.excludePublisher"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "siteType",
+              "key": "siteType",
+              "semanticRef": "site_type",
+              "label": "Site Type",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeSiteType",
+                "excludeParamPath": "filters.excludeSiteType"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "region",
+              "key": "region",
+              "semanticRef": "region",
+              "label": "Region",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeLocationDim",
+                "excludeParamPath": "filters.excludeLocationDim",
+                "format": "locationTuple",
+                "parentField": "country"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "metrocode",
+              "key": "metrocode",
+              "semanticRef": "metro_code",
+              "label": "Metro Area",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeMetrocode",
+                "excludeParamPath": "filters.excludeMetrocode"
+              },
+              "semanticDataType": "string"
+            }
+          ],
+          "measures": [
+            {
+              "id": "avails",
+              "key": "avails",
+              "semanticRef": "available_impressions",
+              "label": "Available Impressions",
+              "default": true,
+              "format": "compactNumber",
+              "semanticDataType": "number"
+            },
+            {
+              "id": "hhUniqs",
+              "key": "hhUniqs",
+              "semanticRef": "household_uniques",
+              "label": "Household Uniques",
+              "format": "compactNumber",
+              "semanticDataType": "number"
+            },
+            {
+              "id": "audienceIndex",
+              "key": "audienceIndex",
+              "semanticRef": "audience_index",
+              "label": "Audience Index",
+              "format": "number",
+              "aggregation": "avg",
+              "category": "Audience",
+              "definitionRef": "harmonizer://feature/user.segment.index",
+              "governance": {
+                "status": "approved",
+                "certification": "reviewed",
+                "classification": "harmonizer.audience"
+              },
+              "semanticDataType": "number"
+            }
+          ],
+          "computedMeasures": [
+            {
+              "id": "reachRate",
+              "key": "reachRate",
+              "label": "Reach Rate",
+              "format": "percent",
+              "compute": {
+                "type": "ratio",
+                "numerator": "hhUniqs",
+                "denominator": "avails",
+                "scale": 100,
+                "decimals": 2
+              }
+            }
+          ],
+          "columnOptions": [
+            {
+              "key": "eventDate",
+              "label": "Event Date",
+              "kind": "dimension",
+              "sourceKey": "eventDate",
+              "format": "date",
+              "category": "Time",
+              "semanticRef": "event_date",
+              "default": true,
+              "chartAxis": true
+            },
+            {
+              "key": "channelV2",
+              "label": "Channel",
+              "kind": "dimension",
+              "sourceKey": "channelV2",
+              "category": "Delivery",
+              "semanticRef": "channel",
+              "default": true,
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            },
+            {
+              "key": "country",
+              "label": "Market",
+              "kind": "dimension",
+              "sourceKey": "country",
+              "category": "Location",
+              "definitionRef": "harmonizer://feature/location",
+              "semanticRef": "country_code",
+              "governance": {
+                "status": "approved",
+                "classification": "harmonizer.audience"
+              },
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              }
+            },
+            {
+              "key": "publisher",
+              "label": "Publisher",
+              "kind": "dimension",
+              "sourceKey": "publisher",
+              "semanticRef": "publisher",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includePublisher",
+                "excludeParamPath": "filters.excludePublisher"
+              }
+            },
+            {
+              "key": "siteType",
+              "label": "Site Type",
+              "kind": "dimension",
+              "sourceKey": "siteType",
+              "semanticRef": "site_type",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeSiteType",
+                "excludeParamPath": "filters.excludeSiteType"
+              }
+            },
+            {
+              "key": "region",
+              "label": "Region",
+              "kind": "dimension",
+              "sourceKey": "region",
+              "semanticRef": "region",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeLocationDim",
+                "excludeParamPath": "filters.excludeLocationDim",
+                "format": "locationTuple",
+                "parentField": "country"
+              }
+            },
+            {
+              "key": "metrocode",
+              "label": "Metro Area",
+              "kind": "dimension",
+              "sourceKey": "metrocode",
+              "semanticRef": "metro_code",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeMetrocode",
+                "excludeParamPath": "filters.excludeMetrocode"
+              }
+            },
+            {
+              "key": "avails",
+              "label": "Available Impressions",
+              "kind": "measure",
+              "sourceKey": "avails",
+              "format": "compactNumber",
+              "semanticRef": "available_impressions",
+              "default": true
+            },
+            {
+              "key": "hhUniqs",
+              "label": "Household Uniques",
+              "kind": "measure",
+              "sourceKey": "hhUniqs",
+              "format": "compactNumber",
+              "semanticRef": "household_uniques"
+            },
+            {
+              "key": "audienceIndex",
+              "label": "Audience Index",
+              "kind": "measure",
+              "sourceKey": "audienceIndex",
+              "format": "number",
+              "category": "Audience",
+              "definitionRef": "harmonizer://feature/user.segment.index",
+              "semanticRef": "audience_index",
+              "governance": {
+                "status": "approved",
+                "certification": "reviewed",
+                "classification": "harmonizer.audience"
+              }
+            },
+            {
+              "key": "reachRate",
+              "label": "Reach Rate",
+              "kind": "measure",
+              "format": "percent"
+            }
+          ],
+          "valueFieldOptions": [
+            {
+              "value": "avails",
+              "label": "Available Impressions",
+              "format": "compactNumber",
+              "semanticRef": "available_impressions",
+              "default": true
+            },
+            {
+              "value": "hhUniqs",
+              "label": "Household Uniques",
+              "format": "compactNumber",
+              "semanticRef": "household_uniques"
+            },
+            {
+              "value": "audienceIndex",
+              "label": "Audience Index",
+              "format": "number",
+              "category": "Audience",
+              "definitionRef": "harmonizer://feature/user.segment.index",
+              "semanticRef": "audience_index",
+              "governance": {
+                "status": "approved",
+                "certification": "reviewed",
+                "classification": "harmonizer.audience"
+              }
+            },
+            {
+              "value": "reachRate",
+              "label": "Reach Rate",
+              "format": "percent"
+            }
+          ],
+          "secondaryFieldOptions": [
+            {
+              "value": "eventDate",
+              "label": "Event Date",
+              "format": "date",
+              "category": "Time",
+              "semanticRef": "event_date",
+              "default": true
+            },
+            {
+              "value": "channelV2",
+              "label": "Channel",
+              "category": "Delivery",
+              "semanticRef": "channel",
+              "default": true
+            },
+            {
+              "value": "country",
+              "label": "Market",
+              "category": "Location",
+              "definitionRef": "harmonizer://feature/location",
+              "semanticRef": "country_code",
+              "governance": {
+                "status": "approved",
+                "classification": "harmonizer.audience"
+              }
+            },
+            {
+              "value": "publisher",
+              "label": "Publisher",
+              "semanticRef": "publisher"
+            },
+            {
+              "value": "siteType",
+              "label": "Site Type",
+              "semanticRef": "site_type"
+            },
+            {
+              "value": "region",
+              "label": "Region",
+              "semanticRef": "region"
+            },
+            {
+              "value": "metrocode",
+              "label": "Metro Area",
+              "semanticRef": "metro_code"
+            }
+          ],
+          "chartFieldOptions": [
+            {
+              "key": "eventDate",
+              "aliases": [
+                "eventDate"
+              ],
+              "label": "Event Date",
+              "kind": "dimension",
+              "format": "date",
+              "category": "Time",
+              "semanticRef": "event_date",
+              "default": true,
+              "chartAxis": true
+            },
+            {
+              "key": "channelV2",
+              "aliases": [
+                "channelV2"
+              ],
+              "label": "Channel",
+              "kind": "dimension",
+              "category": "Delivery",
+              "semanticRef": "channel",
+              "default": true
+            },
+            {
+              "key": "country",
+              "aliases": [
+                "country"
+              ],
+              "label": "Market",
+              "kind": "dimension",
+              "category": "Location",
+              "definitionRef": "harmonizer://feature/location",
+              "semanticRef": "country_code",
+              "governance": {
+                "status": "approved",
+                "classification": "harmonizer.audience"
+              }
+            },
+            {
+              "key": "publisher",
+              "aliases": [
+                "publisher"
+              ],
+              "label": "Publisher",
+              "kind": "dimension",
+              "semanticRef": "publisher"
+            },
+            {
+              "key": "siteType",
+              "aliases": [
+                "siteType"
+              ],
+              "label": "Site Type",
+              "kind": "dimension",
+              "semanticRef": "site_type"
+            },
+            {
+              "key": "region",
+              "aliases": [
+                "region"
+              ],
+              "label": "Region",
+              "kind": "dimension",
+              "semanticRef": "region"
+            },
+            {
+              "key": "metrocode",
+              "aliases": [
+                "metrocode"
+              ],
+              "label": "Metro Area",
+              "kind": "dimension",
+              "semanticRef": "metro_code"
+            },
+            {
+              "key": "avails",
+              "aliases": [
+                "avails"
+              ],
+              "label": "Available Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "semanticRef": "available_impressions",
+              "default": true,
+              "align": "right"
+            },
+            {
+              "key": "hhUniqs",
+              "aliases": [
+                "hhUniqs"
+              ],
+              "label": "Household Uniques",
+              "kind": "measure",
+              "format": "compactNumber",
+              "semanticRef": "household_uniques",
+              "align": "right"
+            },
+            {
+              "key": "audienceIndex",
+              "aliases": [
+                "audienceIndex"
+              ],
+              "label": "Audience Index",
+              "kind": "measure",
+              "format": "number",
+              "category": "Audience",
+              "definitionRef": "harmonizer://feature/user.segment.index",
+              "semanticRef": "audience_index",
+              "governance": {
+                "status": "approved",
+                "certification": "reviewed",
+                "classification": "harmonizer.audience"
+              },
+              "align": "right"
+            },
+            {
+              "key": "reachRate",
+              "aliases": [
+                "reachRate"
+              ],
+              "label": "Reach Rate",
+              "kind": "measure",
+              "format": "percent",
+              "align": "right"
+            }
+          ],
+          "scopeParamOptions": [
+            {
+              "value": "dateRange",
+              "label": "Date Range",
+              "kind": "dateRange",
+              "required": true,
+              "semanticRef": "reporting_window",
+              "startParamPath": "filters.From",
+              "endParamPath": "filters.To"
+            },
+            {
+              "value": "channelsFilter",
+              "label": "Channels",
+              "kind": "multiSelect",
+              "required": false,
+              "semanticRef": "delivery_channels_filter",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Display",
+                  "value": "Display"
+                },
+                {
+                  "label": "CTV",
+                  "value": "CTV"
+                }
+              ]
+            },
+            {
+              "value": "audienceSegmentFilter",
+              "label": "Audience Segment",
+              "kind": "multiSelect",
+              "required": false,
+              "semanticRef": "audience_segment",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Young Adults",
+                  "value": "Young Adults"
+                },
+                {
+                  "label": "Established Adults",
+                  "value": "Established Adults"
+                }
+              ]
+            }
+          ]
+        }
+      ],
       "layout": {
         "type": "stack",
         "items": [
@@ -9606,446 +10510,10 @@
       },
       "blocks": [
         {
-          "id": "primaryBuilder",
-          "kind": "reportBuilderBlock",
-          "title": "Capacity Audience Segment Index Q3",
-          "source": {
-            "kind": "dashboard.reportBuilder",
-            "containerId": "demoReportBuilder",
-            "stateKey": "demoReportBuilder",
-            "dataSourceRef": "demoReportSource"
-          },
-          "config": {
-            "title": "Report Builder Demo",
-            "binding": {
-              "mode": "semantic",
-              "modelRef": "model://example/performance/delivery@v1",
-              "entity": "line_delivery",
-              "selectedDimensions": [
-                "event_date",
-                "channel",
-                "country_code"
-              ],
-              "selectedMeasures": [
-                "available_impressions"
-              ]
-            },
-            "measures": [
-              {
-                "id": "avails",
-                "key": "avails",
-                "semanticRef": "available_impressions",
-                "label": "Available Impressions",
-                "default": true,
-                "format": "compactNumber",
-                "semanticDataType": "number"
-              },
-              {
-                "id": "hhUniqs",
-                "key": "hhUniqs",
-                "semanticRef": "household_uniques",
-                "label": "Household Uniques",
-                "format": "compactNumber",
-                "semanticDataType": "number"
-              },
-              {
-                "id": "audienceIndex",
-                "key": "audienceIndex",
-                "semanticRef": "audience_index",
-                "label": "Audience Index",
-                "format": "number",
-                "aggregation": "avg",
-                "category": "Audience",
-                "definitionRef": "harmonizer://feature/user.segment.index",
-                "governance": {
-                  "status": "approved",
-                  "certification": "reviewed",
-                  "classification": "harmonizer.audience"
-                },
-                "semanticDataType": "number"
-              }
-            ],
-            "computedMeasures": [
-              {
-                "id": "reachRate",
-                "key": "reachRate",
-                "label": "Reach Rate",
-                "format": "percent",
-                "compute": {
-                  "type": "ratio",
-                  "numerator": "hhUniqs",
-                  "denominator": "avails",
-                  "scale": 100,
-                  "decimals": 2
-                }
-              }
-            ],
-            "dimensions": [
-              {
-                "id": "eventDate",
-                "key": "eventDate",
-                "semanticRef": "event_date",
-                "label": "Event Date",
-                "default": true,
-                "chartAxis": true,
-                "format": "date",
-                "category": "Time",
-                "semanticDataType": "date"
-              },
-              {
-                "id": "channelV2",
-                "key": "channelV2",
-                "semanticRef": "channel",
-                "label": "Channel",
-                "default": true,
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeChannelV2",
-                  "excludeParamPath": "filters.excludeChannelV2"
-                },
-                "category": "Delivery",
-                "semanticDataType": "string"
-              },
-              {
-                "id": "country",
-                "key": "country",
-                "semanticRef": "country_code",
-                "label": "Market",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeCountry",
-                  "excludeParamPath": "filters.excludeCountry"
-                },
-                "category": "Location",
-                "definitionRef": "harmonizer://feature/location",
-                "governance": {
-                  "status": "approved",
-                  "classification": "harmonizer.audience"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "publisher",
-                "key": "publisher",
-                "semanticRef": "publisher",
-                "label": "Publisher",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includePublisher",
-                  "excludeParamPath": "filters.excludePublisher"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "siteType",
-                "key": "siteType",
-                "semanticRef": "site_type",
-                "label": "Site Type",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeSiteType",
-                  "excludeParamPath": "filters.excludeSiteType"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "region",
-                "key": "region",
-                "semanticRef": "region",
-                "label": "Region",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeLocationDim",
-                  "excludeParamPath": "filters.excludeLocationDim",
-                  "format": "locationTuple",
-                  "parentField": "country"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "metrocode",
-                "key": "metrocode",
-                "semanticRef": "metro_code",
-                "label": "Metro Area",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeMetrocode",
-                  "excludeParamPath": "filters.excludeMetrocode"
-                },
-                "semanticDataType": "string"
-              }
-            ],
-            "staticFilters": [
-              {
-                "id": "dateRange",
-                "semanticRef": "reporting_window",
-                "type": "dateRange",
-                "label": "Date Range",
-                "required": true,
-                "startParamPath": "filters.From",
-                "endParamPath": "filters.To",
-                "category": "Scope",
-                "semanticDataType": "date"
-              },
-              {
-                "id": "channelsFilter",
-                "semanticRef": "delivery_channels_filter",
-                "label": "Channels",
-                "multiple": true,
-                "options": [
-                  {
-                    "label": "Display",
-                    "value": "Display"
-                  },
-                  {
-                    "label": "CTV",
-                    "value": "CTV"
-                  }
-                ],
-                "category": "Scope",
-                "semanticDataType": "string"
-              },
-              {
-                "id": "audienceSegmentFilter",
-                "semanticRef": "audience_segment",
-                "label": "Audience Segment",
-                "multiple": true,
-                "options": [
-                  {
-                    "label": "Young Adults",
-                    "value": "Young Adults"
-                  },
-                  {
-                    "label": "Established Adults",
-                    "value": "Established Adults"
-                  }
-                ],
-                "category": "Audience",
-                "definitionRef": "harmonizer://feature/user.segment",
-                "governance": {
-                  "status": "approved",
-                  "classification": "harmonizer.audience"
-                },
-                "semanticDataType": "string"
-              }
-            ],
-            "drillMetadata": {
-              "hierarchies": [
-                {
-                  "id": "capacity_inventory",
-                  "label": "Capacity Inventory",
-                  "levels": [
-                    {
-                      "field": "channelV2",
-                      "label": "Channel"
-                    },
-                    {
-                      "field": "publisher",
-                      "label": "Publisher"
-                    },
-                    {
-                      "field": "siteType",
-                      "label": "Site Type"
-                    }
-                  ]
-                },
-                {
-                  "id": "capacity_location",
-                  "label": "Capacity Location",
-                  "levels": [
-                    {
-                      "field": "country",
-                      "label": "Market"
-                    },
-                    {
-                      "field": "region",
-                      "label": "Region"
-                    },
-                    {
-                      "field": "metrocode",
-                      "label": "Metro Area"
-                    }
-                  ]
-                }
-              ],
-              "fieldActions": [
-                {
-                  "fieldRef": "channelV2",
-                  "actions": [
-                    {
-                      "id": "drill_market",
-                      "label": "Drill to Market",
-                      "kind": "drill",
-                      "nextFieldRef": "country"
-                    },
-                    {
-                      "id": "detail_channel",
-                      "label": "Show channel details",
-                      "kind": "detail",
-                      "targetRef": "target://example/performance/channel-detail"
-                    }
-                  ]
-                },
-                {
-                  "fieldRef": "country",
-                  "actions": [
-                    {
-                      "id": "detail_market",
-                      "label": "Show market details",
-                      "kind": "detail",
-                      "targetRef": "target://example/performance/market-detail"
-                    }
-                  ]
-                }
-              ],
-              "detailTargets": [
-                {
-                  "targetRef": "target://example/performance/channel-detail",
-                  "navigationMode": "hostRoute",
-                  "parameters": {
-                    "channel": "$value",
-                    "campaign": "$row.campaign"
-                  }
-                },
-                {
-                  "targetRef": "target://example/performance/market-detail",
-                  "navigationMode": "hostRoute",
-                  "parameters": {
-                    "country": "$value"
-                  }
-                }
-              ]
-            },
-            "result": {
-              "chartCreationMode": "explicit",
-              "defaultMode": "chart",
-              "pageSize": 50,
-              "defaultTablePresets": [
-                {
-                  "title": "Inventory Ladder",
-                  "dimensions": [
-                    "channelV2"
-                  ],
-                  "measures": [
-                    "avails",
-                    "hhUniqs"
-                  ],
-                  "primaryMeasure": "avails",
-                  "orderField": "avails",
-                  "orderDir": "desc",
-                  "pageSize": 12,
-                  "clearChart": true
-                },
-                {
-                  "title": "Location Ladder",
-                  "dimensions": [
-                    "country"
-                  ],
-                  "measures": [
-                    "avails",
-                    "hhUniqs"
-                  ],
-                  "primaryMeasure": "avails",
-                  "orderField": "avails",
-                  "orderDir": "desc",
-                  "pageSize": 12,
-                  "clearChart": true
-                }
-              ],
-              "orderFields": [
-                {
-                  "value": "eventDate",
-                  "field": "eventDate",
-                  "default": true,
-                  "defaultDirection": "asc"
-                },
-                {
-                  "value": "audienceIndex",
-                  "field": "audienceIndex",
-                  "defaultDirection": "desc"
-                },
-                {
-                  "value": "avails",
-                  "field": "avails",
-                  "defaultDirection": "desc"
-                },
-                {
-                  "value": "hhUniqs",
-                  "field": "hhUniqs",
-                  "defaultDirection": "desc"
-                }
-              ],
-              "defaultChartSpecs": [
-                {
-                  "title": "Inventory · Top Channels",
-                  "type": "horizontal_bar",
-                  "xField": "channelV2",
-                  "yFields": [
-                    "avails"
-                  ]
-                },
-                {
-                  "title": "Locations · Top Markets",
-                  "type": "horizontal_bar",
-                  "xField": "country",
-                  "yFields": [
-                    "avails"
-                  ]
-                }
-              ]
-            }
-          },
-          "state": {
-            "selectedMeasures": [
-              "audienceIndex"
-            ],
-            "primaryMeasure": "audienceIndex",
-            "selectedDimensions": [
-              "country"
-            ],
-            "viewMode": "table",
-            "chartSpec": null,
-            "orderField": "audienceIndex",
-            "orderDir": "desc",
-            "pageSize": 50,
-            "staticFilters": {
-              "dateRange": {
-                "start": "2026-05-01",
-                "end": "2026-05-04"
-              },
-              "audienceSegmentFilter": [
-                "Young Adults"
-              ]
-            },
-            "binding": {
-              "mode": "semantic",
-              "modelRef": "model://example/performance/delivery@v1",
-              "entity": "line_delivery",
-              "selectedDimensions": [
-                "event_date",
-                "channel",
-                "country_code"
-              ],
-              "selectedMeasures": [
-                "available_impressions"
-              ]
-            },
-            "groupBy": "",
-            "reportDocumentTitle": "Capacity Audience Segment Index Q3"
-          },
-          "scopeBindings": [
-            {
-              "paramId": "dateRange",
-              "target": "staticFilters.dateRange"
-            },
-            {
-              "paramId": "channelsFilter",
-              "target": "staticFilters.channelsFilter"
-            },
-            {
-              "paramId": "audienceSegmentFilter",
-              "target": "staticFilters.audienceSegmentFilter"
-            }
-          ]
-        },
-        {
           "id": "sharedFilters",
           "kind": "filterBarBlock",
           "title": "Filters",
+          "datasetRef": "primary",
           "paramIds": [
             "dateRange",
             "channelsFilter",
@@ -10135,6 +10603,283 @@
                   "#16a34a"
                 ]
               }
+            }
+          ]
+        },
+        {
+          "id": "primaryBuilder",
+          "kind": "reportBuilderBlock",
+          "title": "Capacity Audience Segment Index Q3",
+          "source": {
+            "kind": "dashboard.reportBuilder",
+            "containerId": "demoReportBuilder",
+            "stateKey": "demoReportBuilder",
+            "dataSourceRef": "demoReportSource"
+          },
+          "config": {
+            "title": "Report Builder Demo",
+            "drillMetadata": {
+              "hierarchies": [
+                {
+                  "id": "capacity_inventory",
+                  "label": "Capacity Inventory",
+                  "levels": [
+                    {
+                      "field": "channelV2",
+                      "label": "Channel"
+                    },
+                    {
+                      "field": "publisher",
+                      "label": "Publisher"
+                    },
+                    {
+                      "field": "siteType",
+                      "label": "Site Type"
+                    }
+                  ]
+                },
+                {
+                  "id": "capacity_location",
+                  "label": "Capacity Location",
+                  "levels": [
+                    {
+                      "field": "country",
+                      "label": "Market"
+                    },
+                    {
+                      "field": "region",
+                      "label": "Region"
+                    },
+                    {
+                      "field": "metrocode",
+                      "label": "Metro Area"
+                    }
+                  ]
+                }
+              ],
+              "fieldActions": [
+                {
+                  "fieldRef": "channelV2",
+                  "actions": [
+                    {
+                      "id": "drill_market",
+                      "label": "Drill to Market",
+                      "kind": "drill",
+                      "nextFieldRef": "country"
+                    },
+                    {
+                      "id": "detail_channel",
+                      "label": "Show channel details",
+                      "kind": "detail",
+                      "targetRef": "target://example/performance/channel-detail"
+                    }
+                  ]
+                },
+                {
+                  "fieldRef": "country",
+                  "actions": [
+                    {
+                      "id": "detail_market",
+                      "label": "Show market details",
+                      "kind": "detail",
+                      "targetRef": "target://example/performance/market-detail"
+                    }
+                  ]
+                }
+              ],
+              "detailTargets": [
+                {
+                  "targetRef": "target://example/performance/channel-detail",
+                  "navigationMode": "hostRoute",
+                  "parameters": {
+                    "channel": "$value",
+                    "campaign": "$row.campaign"
+                  }
+                },
+                {
+                  "targetRef": "target://example/performance/market-detail",
+                  "navigationMode": "hostRoute",
+                  "parameters": {
+                    "country": "$value"
+                  }
+                }
+              ]
+            },
+            "semanticModel": {
+              "modelRef": "model://example/performance/delivery@v1",
+              "version": 1,
+              "label": "Ad Delivery",
+              "entities": [
+                {
+                  "id": "line_delivery",
+                  "label": "Line Delivery",
+                  "dimensions": [
+                    {
+                      "id": "event_date",
+                      "key": "event_date",
+                      "label": "Event Date",
+                      "featureType": "dimension",
+                      "category": "Time",
+                      "dataType": "date"
+                    },
+                    {
+                      "id": "channel",
+                      "key": "channel",
+                      "label": "Channel",
+                      "featureType": "dimension",
+                      "category": "Delivery",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "country_code",
+                      "key": "country_code",
+                      "label": "Market",
+                      "featureType": "dimension",
+                      "category": "Location",
+                      "dataType": "string",
+                      "definitionRef": "harmonizer://feature/location",
+                      "governance": {
+                        "status": "approved",
+                        "classification": "harmonizer.audience"
+                      }
+                    },
+                    {
+                      "id": "publisher",
+                      "key": "publisher",
+                      "label": "Publisher",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "site_type",
+                      "key": "site_type",
+                      "label": "Site Type",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "region",
+                      "key": "region",
+                      "label": "Region",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "metro_code",
+                      "key": "metro_code",
+                      "label": "Metro Area",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    }
+                  ],
+                  "measures": [
+                    {
+                      "id": "available_impressions",
+                      "key": "available_impressions",
+                      "label": "Available Impressions",
+                      "featureType": "measure",
+                      "dataType": "number",
+                      "format": "compactNumber",
+                      "aggregation": "sum"
+                    },
+                    {
+                      "id": "household_uniques",
+                      "key": "household_uniques",
+                      "label": "Household Uniques",
+                      "featureType": "measure",
+                      "dataType": "number",
+                      "format": "compactNumber",
+                      "aggregation": "sum"
+                    },
+                    {
+                      "id": "audience_index",
+                      "key": "audience_index",
+                      "label": "Audience Index",
+                      "featureType": "measure",
+                      "category": "Audience",
+                      "dataType": "number",
+                      "format": "number",
+                      "aggregation": "avg",
+                      "definitionRef": "harmonizer://feature/user.segment.index",
+                      "governance": {
+                        "status": "approved",
+                        "certification": "reviewed",
+                        "classification": "harmonizer.audience"
+                      }
+                    }
+                  ],
+                  "parameters": [
+                    {
+                      "id": "reporting_window",
+                      "key": "reporting_window",
+                      "label": "Date Range",
+                      "featureType": "parameter",
+                      "category": "Scope",
+                      "dataType": "date"
+                    },
+                    {
+                      "id": "delivery_channels_filter",
+                      "key": "delivery_channels_filter",
+                      "label": "Channels",
+                      "featureType": "parameter",
+                      "category": "Scope",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "audience_segment",
+                      "key": "audience_segment",
+                      "label": "Audience Segment",
+                      "featureType": "parameter",
+                      "category": "Audience",
+                      "dataType": "string",
+                      "definitionRef": "harmonizer://feature/user.segment",
+                      "governance": {
+                        "status": "approved",
+                        "classification": "harmonizer.audience"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "state": {
+            "selectedMeasures": [
+              "audienceIndex"
+            ],
+            "primaryMeasure": "audienceIndex",
+            "selectedDimensions": [
+              "country"
+            ],
+            "viewMode": "table",
+            "chartSpec": null,
+            "orderField": "audienceIndex",
+            "orderDir": "desc",
+            "pageSize": 50,
+            "scopeParams": {
+              "dateRange": {
+                "start": "2026-05-01",
+                "end": "2026-05-04"
+              },
+              "audienceSegmentFilter": [
+                "Young Adults"
+              ]
+            },
+            "groupBy": "",
+            "reportDocumentTitle": "Capacity Audience Segment Index Q3"
+          },
+          "scopeBindings": [
+            {
+              "paramId": "dateRange",
+              "target": "staticFilters.dateRange"
+            },
+            {
+              "paramId": "channelsFilter",
+              "target": "staticFilters.channelsFilter"
+            },
+            {
+              "paramId": "audienceSegmentFilter",
+              "target": "staticFilters.audienceSegmentFilter"
             }
           ]
         }
@@ -10347,6 +11092,59 @@
       },
       "refinements": [],
       "calculatedFields": [],
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "Date Range",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          {
+            "id": "channelsFilter",
+            "kind": "multiSelect",
+            "label": "Channels",
+            "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
+            "value": null
+          },
+          {
+            "id": "audienceSegmentFilter",
+            "kind": "multiSelect",
+            "label": "Audience Segment",
+            "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Young Adults",
+                "value": "Young Adults"
+              },
+              {
+                "label": "Established Adults",
+                "value": "Established Adults"
+              }
+            ],
+            "value": [
+              "Young Adults"
+            ]
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      },
       "datasets": [
         {
           "id": "primary",
@@ -10366,11 +11164,6 @@
               "From": "2026-05-01",
               "To": "2026-05-04",
               "audienceSegmentFilter": [
-                "Young Adults"
-              ],
-              "from": "2026-05-01",
-              "to": "2026-05-04",
-              "audience_segment_filter": [
                 "Young Adults"
               ]
             },
@@ -10409,6 +11202,7 @@
           "id": "sharedFilters",
           "kind": "filterBarBlock",
           "title": "Filters",
+          "datasetRef": "primary",
           "paramIds": [
             "dateRange",
             "channelsFilter",
@@ -10459,7 +11253,8 @@
           "secondaryField": "channelV2",
           "secondaryLabel": "Channel",
           "description": "Generic KPI block resolved from the first authored runtime row.",
-          "emptyLabel": "No headline KPI value available."
+          "emptyLabel": "No headline KPI value available.",
+          "valueFormat": "compactNumber"
         },
         {
           "id": "comparisonTable",
@@ -10534,38 +11329,7 @@
             }
           ]
         }
-      ],
-      "scope": {
-        "params": [
-          {
-            "id": "dateRange",
-            "kind": "dateRange",
-            "label": "Date Range",
-            "required": true,
-            "value": {
-              "start": "2026-05-01",
-              "end": "2026-05-04"
-            }
-          },
-          {
-            "id": "channelsFilter",
-            "kind": "multiSelect",
-            "label": "Channels",
-            "required": false,
-            "value": null
-          },
-          {
-            "id": "audienceSegmentFilter",
-            "kind": "multiSelect",
-            "label": "Audience Segment",
-            "required": false,
-            "value": [
-              "Young Adults"
-            ]
-          }
-        ],
-        "dataSourceRef": "demoReportSource"
-      }
+      ]
     },
     "compileState": {
       "status": "clean",

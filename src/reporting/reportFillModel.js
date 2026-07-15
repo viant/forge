@@ -473,6 +473,278 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
   };
 }
 
+function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex = 0, dataset = {}, {
+  datasetsByAlias = new Map(),
+} = {}) {
+  const itemTitleField = normalizeString(block?.itemTitleField);
+  const valueField = normalizeString(block?.valueField);
+  const secondaryField = normalizeString(block?.secondaryField);
+  const value = valueField && row ? row[valueField] ?? null : null;
+  const secondaryValue = secondaryField && row
+    ? resolveReportFillFieldDisplayValue(row, { sourceField: secondaryField })
+    : null;
+  const content = {
+    index: rowIndex,
+    title: itemTitleField && row
+      ? resolveReportFillFieldDisplayValue(row, { sourceField: itemTitleField })
+      : `Item ${rowIndex + 1}`,
+    ...(itemTitleField ? { itemTitleField } : {}),
+    ...(normalizeString(block?.itemTitleLabel) ? { itemTitleLabel: normalizeString(block.itemTitleLabel) } : {}),
+    ...(valueField
+      ? {
+        valueField,
+        valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
+        ...(normalizeString(block?.valueFormat) ? { valueFormat: normalizeString(block.valueFormat) } : {}),
+        value,
+      }
+      : {}),
+    ...(secondaryField
+      ? {
+        secondaryField,
+        secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
+        ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
+        secondaryValue,
+      }
+      : {}),
+  };
+  const bodyMarkdown = String(block?.bodyTemplate || "").trim()
+    ? resolveReportFillTemplateMarkdown(String(block.bodyTemplate || ""), {
+      content,
+      row,
+      dataset,
+      datasetRef: block?.datasetRef,
+      datasetsByAlias,
+    })
+    : "";
+  return {
+    ...content,
+    ...(bodyMarkdown ? { bodyMarkdown } : {}),
+  };
+}
+
+function buildReportFillCollectionContent(block = {}, dataset = {}, {
+  datasetsByAlias = new Map(),
+} = {}) {
+  const rows = Array.isArray(dataset?.rows) ? dataset.rows : [];
+  const rowLimit = Math.max(1, Math.trunc(Number(block?.rowLimit || 6)) || 6);
+  const visibleRows = rows
+    .filter((row) => row && typeof row === "object" && !Array.isArray(row))
+    .slice(0, rowLimit);
+  return {
+    title: normalizeString(block?.title || "Collection") || "Collection",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(normalizeString(block?.emptyLabel) ? { emptyLabel: normalizeString(block.emptyLabel) } : {}),
+    layout: ["list"].includes(normalizeString(block?.layout).toLowerCase()) ? "list" : "grid",
+    columns: (() => {
+      const normalized = Math.trunc(Number(block?.columns || 2));
+      return Number.isInteger(normalized) && normalized >= 1 && normalized <= 4 ? normalized : 2;
+    })(),
+    rowCount: Number(dataset?.provenance?.rowCount || rows.length || 0),
+    rowLimit,
+    items: visibleRows.map((row, index) => buildReportFillCollectionItemContent(block, row, index, dataset, {
+      datasetsByAlias,
+    })),
+  };
+}
+
+function buildReportFillSectionContent(block = {}) {
+  return {
+    title: normalizeString(block?.title || "Section") || "Section",
+    ...(normalizeString(block?.subtitle) ? { subtitle: normalizeString(block.subtitle) } : {}),
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    navigationLabel: normalizeString(block?.navigationLabel || block?.title || "Section") || "Section",
+  };
+}
+
+function normalizeReportFillCompositeChildBlockIds(childBlockIds = []) {
+  const seen = new Set();
+  return (Array.isArray(childBlockIds) ? childBlockIds : [])
+    .map((blockId) => normalizeString(blockId))
+    .filter((blockId) => {
+      if (!blockId || seen.has(blockId)) {
+        return false;
+      }
+      seen.add(blockId);
+      return true;
+    });
+}
+
+function buildReportFillCompositeContent(block = {}) {
+  return {
+    title: normalizeString(block?.title || "Grouped Panel") || "Grouped Panel",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    childBlockIds: normalizeReportFillCompositeChildBlockIds(block?.childBlockIds),
+  };
+}
+
+function normalizeReportFillTabGroupSectionIds(sectionIds = []) {
+  const seen = new Set();
+  return (Array.isArray(sectionIds) ? sectionIds : [])
+    .map((sectionId) => normalizeString(sectionId))
+    .filter((sectionId) => {
+      if (!sectionId || seen.has(sectionId)) {
+        return false;
+      }
+      seen.add(sectionId);
+      return true;
+    });
+}
+
+function buildReportFillTabGroupContent(block = {}, reportSpec = {}) {
+  const requestedSectionIds = normalizeReportFillTabGroupSectionIds(block?.sectionIds);
+  const availableSections = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
+    .filter((entry) => normalizeString(entry?.kind) === "sectionBlock")
+    .map((section, index) => ({
+      id: normalizeString(section?.id || `section_${index + 1}`) || `section_${index + 1}`,
+      title: normalizeString(section?.title || `Section ${index + 1}`) || `Section ${index + 1}`,
+      navigationLabel: normalizeString(section?.navigationLabel || section?.title || `Section ${index + 1}`) || `Section ${index + 1}`,
+    }));
+  const sectionById = new Map(availableSections.map((section) => [section.id, section]));
+  const orderedTabs = requestedSectionIds
+    .map((sectionId) => sectionById.get(sectionId) || null)
+    .filter(Boolean);
+  const trailingTabs = availableSections.filter((section) => !requestedSectionIds.includes(section.id));
+  const tabs = [...orderedTabs, ...trailingTabs];
+  const defaultSectionId = normalizeString(block?.defaultSectionId);
+  return {
+    title: normalizeString(block?.title || "Sections") || "Sections",
+    sectionIds: tabs.map((tab) => tab.id),
+    ...(defaultSectionId && tabs.some((tab) => tab.id === defaultSectionId) ? { defaultSectionId } : {}),
+    tabs,
+  };
+}
+
+function buildReportFillStepperContent(block = {}) {
+  const steps = (Array.isArray(block?.steps) ? block.steps : [])
+    .map((step, index) => {
+      if (!step || typeof step !== "object" || Array.isArray(step)) {
+        return null;
+      }
+      const title = normalizeString(step?.title);
+      const body = String(step?.body || "");
+      const tone = normalizeString(step?.tone).toLowerCase();
+      if (!title && !body.trim()) {
+        return null;
+      }
+      return {
+        id: normalizeString(step?.id || `step_${index + 1}`) || `step_${index + 1}`,
+        title,
+        body,
+        ...(tone ? { tone } : {}),
+      };
+    })
+    .filter(Boolean);
+  return {
+    title: normalizeString(block?.title || "Stepper") || "Stepper",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    steps,
+  };
+}
+
+function buildReportFillInfoPanelContent(block = {}) {
+  return {
+    title: normalizeString(block?.title || "Info Panel") || "Info Panel",
+    ...(normalizeString(block?.eyebrow) ? { eyebrow: normalizeString(block.eyebrow) } : {}),
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(normalizeString(block?.tone) ? { tone: normalizeString(block.tone).toLowerCase() } : {}),
+    bodyFormat: "markdown",
+    body: String(block?.body || ""),
+  };
+}
+
+function buildReportFillCalloutContent(block = {}) {
+  const badges = Array.isArray(block?.badges)
+    ? block.badges.map((badge) => normalizeString(badge)).filter(Boolean)
+    : [];
+  return {
+    title: normalizeString(block?.title || "Callout") || "Callout",
+    ...(normalizeString(block?.icon) ? { icon: normalizeString(block.icon) } : {}),
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(normalizeString(block?.tone) ? { tone: normalizeString(block.tone).toLowerCase() } : {}),
+    ...(badges.length > 0 ? { badges } : {}),
+    bodyFormat: "markdown",
+    body: String(block?.body || ""),
+  };
+}
+
+function buildReportFillKanbanContent(block = {}) {
+  const columns = (Array.isArray(block?.columns) ? block.columns : [])
+    .map((column, columnIndex) => {
+      if (!column || typeof column !== "object" || Array.isArray(column)) {
+        return null;
+      }
+      const cards = (Array.isArray(column?.cards) ? column.cards : [])
+        .map((card, cardIndex) => {
+          if (!card || typeof card !== "object" || Array.isArray(card)) {
+            return null;
+          }
+          const title = normalizeString(card?.title);
+          const body = String(card?.body || "");
+          const badge = normalizeString(card?.badge);
+          const tone = normalizeString(card?.tone).toLowerCase();
+          if (!title && !body.trim() && !badge) {
+            return null;
+          }
+          return {
+            id: normalizeString(card?.id || `card_${cardIndex + 1}`) || `card_${cardIndex + 1}`,
+            title,
+            body,
+            ...(badge ? { badge } : {}),
+            ...(tone ? { tone } : {}),
+          };
+        })
+        .filter(Boolean);
+      const title = normalizeString(column?.title);
+      const tone = normalizeString(column?.tone).toLowerCase();
+      if (!title && cards.length === 0) {
+        return null;
+      }
+      return {
+        id: normalizeString(column?.id || `column_${columnIndex + 1}`) || `column_${columnIndex + 1}`,
+        title,
+        ...(tone ? { tone } : {}),
+        cards,
+      };
+    })
+    .filter(Boolean);
+  return {
+    title: normalizeString(block?.title || "Pipeline") || "Pipeline",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    columns,
+  };
+}
+
+function buildReportFillTimelineContent(block = {}) {
+  const events = (Array.isArray(block?.events) ? block.events : [])
+    .map((event, index) => {
+      if (!event || typeof event !== "object" || Array.isArray(event)) {
+        return null;
+      }
+      const title = normalizeString(event?.title);
+      const body = String(event?.body || "");
+      const date = normalizeString(event?.date);
+      const badge = normalizeString(event?.badge);
+      const tone = normalizeString(event?.tone).toLowerCase();
+      if (!title && !body.trim() && !date && !badge) {
+        return null;
+      }
+      return {
+        id: normalizeString(event?.id || `event_${index + 1}`) || `event_${index + 1}`,
+        ...(date ? { date } : {}),
+        title,
+        body,
+        ...(badge ? { badge } : {}),
+        ...(tone ? { tone } : {}),
+      };
+    })
+    .filter(Boolean);
+  return {
+    title: normalizeString(block?.title || "Timeline") || "Timeline",
+    ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    events,
+  };
+}
+
 function buildReportFillBadgesContent(block = {}, dataset = {}) {
   const rows = Array.isArray(dataset?.rows) ? dataset.rows : [];
   const firstRow = rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0]) ? rows[0] : null;
@@ -667,6 +939,62 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
         content: buildReportFillKpiContent(block, dataset, {
           datasetsByAlias,
         }),
+      };
+    }
+    if (normalizeString(block?.kind) === "collectionBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillCollectionContent(block, dataset, {
+          datasetsByAlias,
+        }),
+      };
+    }
+    if (normalizeString(block?.kind) === "sectionBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillSectionContent(block),
+      };
+    }
+    if (normalizeString(block?.kind) === "compositeBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillCompositeContent(block),
+      };
+    }
+    if (normalizeString(block?.kind) === "tabGroupBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillTabGroupContent(block, reportSpec),
+      };
+    }
+    if (normalizeString(block?.kind) === "stepperBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillStepperContent(block),
+      };
+    }
+    if (normalizeString(block?.kind) === "infoPanelBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillInfoPanelContent(block),
+      };
+    }
+    if (normalizeString(block?.kind) === "calloutBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillCalloutContent(block),
+      };
+    }
+    if (normalizeString(block?.kind) === "kanbanBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillKanbanContent(block),
+      };
+    }
+    if (normalizeString(block?.kind) === "timelineBlock") {
+      return {
+        ...normalizedBlock,
+        content: buildReportFillTimelineContent(block),
       };
     }
     if (normalizeString(block?.kind) === "badgesBlock") {

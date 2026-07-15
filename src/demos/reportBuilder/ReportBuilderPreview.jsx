@@ -71,6 +71,7 @@ import {
   buildPreviewSavedReportPayloadRecord,
 } from './previewSavedReportPayload.js';
 import { mergeReportBuilderReopenedConfig } from '../../components/dashboard/reportBuilderConfigMerge.js';
+import { applyPreviewExportBehavior } from './previewExportBehaviors.js';
 
 const DEMO_SEMANTIC_MODEL = {
   modelRef: 'model://steward/performance/ad_delivery@v1',
@@ -468,18 +469,30 @@ function createDemoContext() {
     reportExport: {
       async submitRequest({ request, source } = {}) {
         const metrics = ensurePreviewMetrics();
+        const normalizedSource = String(request?.source?.from || source || '').trim();
+        const formatName = String(request?.target?.format || 'export').trim().toLowerCase() || 'export';
+        const title = String(request?.source?.title || request?.reportSpec?.title || 'Report').trim() || 'Report';
+        const artifactRef = String(request?.source?.artifactRef || '').trim();
+        const overridden = await applyPreviewExportBehavior(metrics, {
+          phase: 'submit',
+          source: normalizedSource,
+          format: formatName,
+          artifactRef,
+          title,
+        });
+        if (overridden) {
+          return overridden;
+        }
         exportSequence += 1;
         const jobId = `demo-export-job-${exportSequence}`;
         const artifactId = `demo-export-artifact-${exportSequence}`;
-        const formatName = String(request?.target?.format || 'export').trim().toLowerCase() || 'export';
-        const title = String(request?.source?.title || request?.reportSpec?.title || 'Report').trim() || 'Report';
         exportJobs.set(jobId, {
           jobId,
           status: 'queued',
           artifactId,
-          artifactRef: String(request?.source?.artifactRef || '').trim(),
+          artifactRef,
           format: formatName,
-          scope: String(request?.source?.from || source || '').trim(),
+          scope: normalizedSource,
           title,
           pollCount: 0,
         });
@@ -496,8 +509,9 @@ function createDemoContext() {
           incrementReportBuilderPreviewMetric(metrics, 'exportRequestCount');
           const exportRecord = {
             source: String(source || '').trim(),
+            scope: normalizedSource,
             format: formatName,
-            artifactRef: String(request?.source?.artifactRef || '').trim(),
+            artifactRef,
             title,
             jobId,
             artifactId,
@@ -513,7 +527,7 @@ function createDemoContext() {
           jobId,
           status: 'queued',
           artifactId: '',
-          artifactRef: String(request?.source?.artifactRef || '').trim(),
+          artifactRef,
           format: formatName,
           message: `Accepted ${formatName.toUpperCase()} export for ${title}.`,
         };
@@ -521,6 +535,13 @@ function createDemoContext() {
       async getStatus({ jobId } = {}) {
         const metrics = ensurePreviewMetrics();
         const normalizedJobId = String(jobId || '').trim();
+        const overridden = await applyPreviewExportBehavior(metrics, {
+          phase: 'status',
+          jobId: normalizedJobId,
+        });
+        if (overridden) {
+          return overridden;
+        }
         const job = exportJobs.get(normalizedJobId);
         if (!job) {
           throw new Error(`Unknown export job ${normalizedJobId}.`);
@@ -549,6 +570,13 @@ function createDemoContext() {
       },
       async getArtifact({ artifactId } = {}) {
         const normalizedArtifactId = String(artifactId || '').trim();
+        const overridden = await applyPreviewExportBehavior(ensurePreviewMetrics(), {
+          phase: 'artifact',
+          artifactId: normalizedArtifactId,
+        });
+        if (overridden) {
+          return overridden;
+        }
         const artifact = exportArtifacts.get(normalizedArtifactId);
         if (!artifact) {
           throw new Error(`Unknown export artifact ${normalizedArtifactId}.`);

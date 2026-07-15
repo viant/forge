@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import {
   buildPreviewBootstrapSteps,
   buildReopenedHydratedSessionVerificationSteps,
@@ -5,61 +6,20 @@ import {
   buildSelectedReportDocumentPreparationSteps,
 } from "./report-builder-preview-scenario-builders.mjs";
 
+const exportRequestFixture = JSON.parse(readFileSync(
+  new URL("../src/reporting/fixtures/authored-landscape-export-request-fixture.v1.json", import.meta.url),
+  "utf8",
+));
+
 const expectedReportPrintSignature = {
-  pageGeometry: {
-    width: 792,
-    height: 612,
-    marginTop: 36,
-    marginRight: 36,
-    marginBottom: 36,
-    marginLeft: 36,
-    headerHeight: 36,
-    footerHeight: 24,
-  },
-  pages: [
-    {
-      number: 1,
-      elements: [
-        { id: "primaryTable__title_0", kind: "text", box: { x: 36, y: 84, width: 720, height: 20 }, text: "Table" },
-        { id: "primaryTable__header_bg__page_1", kind: "rect", box: { x: 36, y: 108, width: 720, height: 24 }, text: null },
-        { id: "primaryTable__header__eventDate__page_1", kind: "text", box: { x: 42, y: 112, width: 168, height: 16 }, text: "Date" },
-        { id: "primaryTable__header__channelId__page_1", kind: "text", box: { x: 222, y: 112, width: 168, height: 16 }, text: "Channel" },
-        { id: "primaryTable__header__totalSpend__page_1", kind: "text", box: { x: 402, y: 112, width: 168, height: 16 }, text: "Spend" },
-        { id: "primaryTable__header__impressions__page_1", kind: "text", box: { x: 582, y: 112, width: 168, height: 16 }, text: "Impressions" },
-        { id: "primaryTable__row_rule_0", kind: "line", box: { x: 36, y: 156, width: 720, height: 0 }, text: null },
-        { id: "primaryTable__row_1__eventDate__text", kind: "tableCellText", box: { x: 42, y: 136, width: 168, height: 16 }, text: "2026-05-01" },
-        { id: "primaryTable__row_1__channelId__text", kind: "tableCellText", box: { x: 222, y: 136, width: 168, height: 16 }, text: "Display" },
-        { id: "primaryTable__row_1__totalSpend__text", kind: "tableCellText", box: { x: 402, y: 136, width: 168, height: 16 }, text: "40400" },
-        { id: "primaryTable__row_1__impressions__text", kind: "tableCellText", box: { x: 582, y: 136, width: 168, height: 16 }, text: "16500" },
-        { id: "primaryTable__row_rule_1", kind: "line", box: { x: 36, y: 180, width: 720, height: 0 }, text: null },
-        { id: "primaryTable__row_2__eventDate__text", kind: "tableCellText", box: { x: 42, y: 160, width: 168, height: 16 }, text: "2026-05-02" },
-        { id: "primaryTable__row_2__channelId__text", kind: "tableCellText", box: { x: 222, y: 160, width: 168, height: 16 }, text: "CTV" },
-        { id: "primaryTable__row_2__totalSpend__text", kind: "tableCellText", box: { x: 402, y: 160, width: 168, height: 16 }, text: "34300" },
-        { id: "primaryTable__row_2__impressions__text", kind: "tableCellText", box: { x: 582, y: 160, width: 168, height: 16 }, text: "14700" },
-        { id: "primaryTable__row_rule_2", kind: "line", box: { x: 36, y: 204, width: 720, height: 0 }, text: null },
-        { id: "primaryTable__row_3__eventDate__text", kind: "tableCellText", box: { x: 42, y: 184, width: 168, height: 16 }, text: "2026-05-03" },
-        { id: "primaryTable__row_3__channelId__text", kind: "tableCellText", box: { x: 222, y: 184, width: 168, height: 16 }, text: "Display" },
-        { id: "primaryTable__row_3__totalSpend__text", kind: "tableCellText", box: { x: 402, y: 184, width: 168, height: 16 }, text: "55200" },
-        { id: "primaryTable__row_3__impressions__text", kind: "tableCellText", box: { x: 582, y: 184, width: 168, height: 16 }, text: "23100" },
-        { id: "primaryTable__row_rule_3", kind: "line", box: { x: 36, y: 228, width: 720, height: 0 }, text: null },
-        { id: "primaryTable__row_4__eventDate__text", kind: "tableCellText", box: { x: 42, y: 208, width: 168, height: 16 }, text: "2026-05-04" },
-        { id: "primaryTable__row_4__channelId__text", kind: "tableCellText", box: { x: 222, y: 208, width: 168, height: 16 }, text: "CTV" },
-        { id: "primaryTable__row_4__totalSpend__text", kind: "tableCellText", box: { x: 402, y: 208, width: 168, height: 16 }, text: "48800" },
-        { id: "primaryTable__row_4__impressions__text", kind: "tableCellText", box: { x: 582, y: 208, width: 168, height: 16 }, text: "20800" },
-        { id: "channelTrend__title_0", kind: "text", box: { x: 36, y: 244, width: 720, height: 20 }, text: "Channel Trend" },
-        { id: "channelTrend__svg_page_1", kind: "svg", box: { x: 36, y: 268, width: 720, height: 264 }, text: null },
-      ],
-      headerElements: [
-        { id: "page_1__header_title", kind: "text", box: { x: 36, y: 36, width: 720, height: 28 }, text: "Authored Landscape Report" },
-        { id: "page_1__header_rule", kind: "line", box: { x: 36, y: 70, width: 720, height: 0 }, text: null },
-      ],
-      footerElements: [
-        { id: "page_1__footer_rule", kind: "line", box: { x: 36, y: 554, width: 720, height: 0 }, text: null },
-        { id: "page_1__footer_page_number", kind: "text", box: { x: 36, y: 558, width: 720, height: 16 }, text: "Page 1" },
-      ],
-    },
-  ],
-  diagnostics: [],
+  pageGeometry: exportRequestFixture.reportPrint.pageGeometry,
+  pages: (exportRequestFixture.reportPrint.pages || []).map((page) => ({
+    number: page.number,
+    elements: (page.elements || []).map(({ id, kind, box, text = null }) => ({ id, kind, box, text })),
+    headerElements: (page.headerElements || []).map(({ id, kind, box, text = null }) => ({ id, kind, box, text })),
+    footerElements: (page.footerElements || []).map(({ id, kind, box, text = null }) => ({ id, kind, box, text })),
+  })),
+  diagnostics: exportRequestFixture.reportPrint.diagnostics || [],
 };
 
 export default {

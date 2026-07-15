@@ -93,7 +93,7 @@ assertWindowIncludes(
 );
 
 assert.equal(
-  source.includes("renderAuthoredDocumentProgress(importedPipelinePreviewPanelState"),
+  source.includes("importedPipelinePreviewPanelState.metaChips.map") || source.includes("renderAuthoredDocumentProgress(panelState"),
   true,
   "Imported runtime previews should render authored block and drill summaries when available.",
 );

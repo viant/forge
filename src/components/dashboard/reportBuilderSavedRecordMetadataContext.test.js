@@ -36,7 +36,7 @@ const emptySpecEmbeddedContext = resolveNormalizedReportSpecDocumentContext({
     document: audienceArtifactFixture.legacySavedReportPayload.reportDocument,
 });
 assert.equal(emptySpecEmbeddedContext.reportSpec.kind, "reportSpec");
-assert.equal(emptySpecEmbeddedContext.semanticSummary.selectedParameters[1].definitionRef, "harmonizer://feature/user.segment");
+assert.equal(emptySpecEmbeddedContext.semanticSummary.selectedParameters[1].definitionRef, undefined);
 assert.equal(emptySpecEmbeddedContext.scopeParams[2].id, "audienceSegmentFilter");
 
 const thinSpecDocumentBackedContext = resolveNormalizedReportSpecDocumentContext({

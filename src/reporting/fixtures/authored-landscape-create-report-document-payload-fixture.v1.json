@@ -29,6 +29,178 @@
       ],
       "dataSourceRef": "demoReportSource"
     },
+    "presentation": {
+      "defaultMode": "table",
+      "pageSize": 50
+    },
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "demoReportSource",
+        "label": "Authored Landscape Report",
+        "description": "Primary report dataset",
+        "kindLabel": "primary",
+        "request": {
+          "measures": {
+            "totalSpend": true,
+            "impressions": true
+          },
+          "dimensions": {
+            "eventDate": true,
+            "channelId": true
+          },
+          "filters": {
+            "From": "2026-05-01",
+            "To": "2026-05-04"
+          },
+          "limit": 50,
+          "offset": 0
+        },
+        "dimensions": [
+          {
+            "id": "eventDate",
+            "key": "eventDate",
+            "label": "Date",
+            "default": true,
+            "chartAxis": true,
+            "format": "date"
+          },
+          {
+            "id": "channelId",
+            "key": "channelId",
+            "label": "Channel",
+            "default": true
+          }
+        ],
+        "measures": [
+          {
+            "id": "totalSpend",
+            "key": "totalSpend",
+            "label": "Spend",
+            "default": true,
+            "format": "currency"
+          },
+          {
+            "id": "impressions",
+            "key": "impressions",
+            "label": "Impressions",
+            "format": "compactNumber"
+          }
+        ],
+        "columnOptions": [
+          {
+            "key": "eventDate",
+            "label": "Date",
+            "kind": "dimension",
+            "sourceKey": "eventDate",
+            "format": "date",
+            "default": true,
+            "chartAxis": true
+          },
+          {
+            "key": "channelId",
+            "label": "Channel",
+            "kind": "dimension",
+            "sourceKey": "channelId",
+            "default": true
+          },
+          {
+            "key": "totalSpend",
+            "label": "Spend",
+            "kind": "measure",
+            "sourceKey": "totalSpend",
+            "format": "currency",
+            "default": true
+          },
+          {
+            "key": "impressions",
+            "label": "Impressions",
+            "kind": "measure",
+            "sourceKey": "impressions",
+            "format": "compactNumber"
+          }
+        ],
+        "valueFieldOptions": [
+          {
+            "value": "totalSpend",
+            "label": "Spend",
+            "format": "currency",
+            "default": true
+          },
+          {
+            "value": "impressions",
+            "label": "Impressions",
+            "format": "compactNumber"
+          }
+        ],
+        "secondaryFieldOptions": [
+          {
+            "value": "eventDate",
+            "label": "Date",
+            "format": "date",
+            "default": true
+          },
+          {
+            "value": "channelId",
+            "label": "Channel",
+            "default": true
+          }
+        ],
+        "chartFieldOptions": [
+          {
+            "key": "eventDate",
+            "aliases": [
+              "eventDate"
+            ],
+            "label": "Date",
+            "kind": "dimension",
+            "format": "date",
+            "default": true,
+            "chartAxis": true
+          },
+          {
+            "key": "channelId",
+            "aliases": [
+              "channelId"
+            ],
+            "label": "Channel",
+            "kind": "dimension",
+            "default": true
+          },
+          {
+            "key": "totalSpend",
+            "aliases": [
+              "totalSpend"
+            ],
+            "label": "Spend",
+            "kind": "measure",
+            "format": "currency",
+            "default": true,
+            "align": "right"
+          },
+          {
+            "key": "impressions",
+            "aliases": [
+              "impressions"
+            ],
+            "label": "Impressions",
+            "kind": "measure",
+            "format": "compactNumber",
+            "align": "right"
+          }
+        ],
+        "scopeParamOptions": [
+          {
+            "value": "dateRange",
+            "label": "dateRange",
+            "kind": "dateRange",
+            "required": true,
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ]
+      }
+    ],
     "layout": {
       "type": "stack",
       "items": [
@@ -42,6 +214,21 @@
     },
     "blocks": [
       {
+        "id": "channelTrend",
+        "kind": "chartBlock",
+        "title": "Channel Trend",
+        "datasetRef": "primary",
+        "chartSpec": {
+          "title": "Channel Trend",
+          "type": "line",
+          "xField": "eventDate",
+          "yFields": [
+            "totalSpend"
+          ],
+          "seriesField": "channelId"
+        }
+      },
+      {
         "id": "primaryBuilder",
         "kind": "reportBuilderBlock",
         "title": "Authored Landscape Report",
@@ -52,55 +239,7 @@
           "dataSourceRef": "demoReportSource"
         },
         "config": {
-          "title": "Authored Landscape Report",
-          "measures": [
-            {
-              "id": "totalSpend",
-              "key": "totalSpend",
-              "label": "Spend",
-              "default": true,
-              "format": "currency"
-            },
-            {
-              "id": "impressions",
-              "key": "impressions",
-              "label": "Impressions",
-              "format": "compactNumber"
-            }
-          ],
-          "dimensions": [
-            {
-              "id": "eventDate",
-              "key": "eventDate",
-              "label": "Date",
-              "default": true,
-              "chartAxis": true,
-              "format": "date"
-            },
-            {
-              "id": "channelId",
-              "key": "channelId",
-              "label": "Channel",
-              "default": true
-            }
-          ],
-          "staticFilters": [
-            {
-              "id": "dateRange",
-              "type": "dateRange",
-              "required": true,
-              "startParamPath": "filters.From",
-              "endParamPath": "filters.To",
-              "default": {
-                "start": "2026-05-01",
-                "end": "2026-05-04"
-              }
-            }
-          ],
-          "result": {
-            "defaultMode": "table",
-            "pageSize": 50
-          }
+          "title": "Authored Landscape Report"
         },
         "state": {
           "selectedMeasures": [
@@ -128,21 +267,6 @@
             "target": "staticFilters.dateRange"
           }
         ]
-      },
-      {
-        "id": "channelTrend",
-        "kind": "chartBlock",
-        "title": "Channel Trend",
-        "datasetRef": "primary",
-        "chartSpec": {
-          "title": "Channel Trend",
-          "type": "line",
-          "xField": "eventDate",
-          "yFields": [
-            "totalSpend"
-          ],
-          "seriesField": "channelId"
-        }
       }
     ]
   },

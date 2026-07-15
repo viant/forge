@@ -650,6 +650,133 @@ assert.deepEqual(kpiDraft, {
     bodyTemplate: "",
 });
 
+const collectionDraft = buildReportBuilderDocumentBlockDraft("collectionBlock", null, {
+    valueFieldOptions: [{ value: "avails", label: "Avails" }],
+    secondaryFieldOptions: [{ value: "channelV2", label: "Channel" }, { value: "eventDate", label: "Date" }],
+});
+assert.deepEqual(collectionDraft, {
+    kind: "collectionBlock",
+    id: "collectionBlock",
+    title: "Collection",
+    datasetRef: "primary",
+    itemTitleField: "channelV2",
+    itemTitleLabel: "Channel",
+    valueField: "avails",
+    valueLabel: "Avails",
+    secondaryField: "",
+    secondaryLabel: "",
+    description: "",
+    emptyLabel: "No collection items available.",
+    layout: "grid",
+    columns: 2,
+    rowLimit: 6,
+    bodyFormat: "markdown",
+    bodyTemplate: "",
+});
+
+const sectionDraft = buildReportBuilderDocumentBlockDraft("sectionBlock");
+assert.deepEqual(sectionDraft, {
+    kind: "sectionBlock",
+    id: "sectionBlock",
+    title: "Section",
+    subtitle: "",
+    description: "",
+    navigationLabel: "Section",
+});
+
+const compositeDraft = buildReportBuilderDocumentBlockDraft("compositeBlock", null, {
+    childBlockOptions: [
+        { value: "summaryMarkdown", label: "Summary" },
+        { value: "headlineKpi", label: "Headline KPI" },
+    ],
+});
+assert.deepEqual(compositeDraft, {
+    kind: "compositeBlock",
+    id: "compositeBlock",
+    title: "Grouped Panel",
+    description: "",
+    childBlockIds: [],
+});
+
+const tabGroupDraft = buildReportBuilderDocumentBlockDraft("tabGroupBlock", null, {
+    existingBlocks: [
+        { id: "overviewSection", kind: "sectionBlock", title: "Overview", navigationLabel: "Overview" },
+        { id: "publisherSection", kind: "sectionBlock", title: "Publishers", navigationLabel: "Publishers" },
+    ],
+});
+assert.deepEqual(tabGroupDraft, {
+    kind: "tabGroupBlock",
+    id: "tabGroupBlock",
+    title: "Sections",
+    sectionIds: ["overviewSection", "publisherSection"],
+    defaultSectionId: "overviewSection",
+});
+
+const stepperDraft = buildReportBuilderDocumentBlockDraft("stepperBlock");
+assert.deepEqual(stepperDraft, {
+    kind: "stepperBlock",
+    id: "stepperBlock",
+    title: "Process",
+    description: "",
+    steps: [
+        { id: "step_1", title: "", body: "", tone: "" },
+    ],
+});
+
+const infoPanelDraft = buildReportBuilderDocumentBlockDraft("infoPanelBlock");
+assert.deepEqual(infoPanelDraft, {
+    kind: "infoPanelBlock",
+    id: "infoPanelBlock",
+    title: "Info Panel",
+    eyebrow: "",
+    description: "",
+    tone: "",
+    bodyFormat: "markdown",
+    body: "",
+});
+
+const calloutDraft = buildReportBuilderDocumentBlockDraft("calloutBlock");
+assert.deepEqual(calloutDraft, {
+    kind: "calloutBlock",
+    id: "calloutBlock",
+    title: "Callout",
+    icon: "",
+    description: "",
+    tone: "",
+    badgesText: "",
+    bodyFormat: "markdown",
+    body: "",
+});
+
+const kanbanDraft = buildReportBuilderDocumentBlockDraft("kanbanBlock");
+assert.deepEqual(kanbanDraft, {
+    kind: "kanbanBlock",
+    id: "kanbanBlock",
+    title: "Pipeline",
+    description: "",
+    columns: [
+        {
+            id: "column_1",
+            title: "",
+            tone: "",
+            cards: [
+                { id: "card_1", title: "", body: "", badge: "", tone: "" },
+            ],
+        },
+    ],
+});
+
+const timelineDraft = buildReportBuilderDocumentBlockDraft("timelineBlock");
+assert.deepEqual(timelineDraft, {
+    kind: "timelineBlock",
+    id: "timelineBlock",
+    title: "Timeline",
+    description: "",
+    events: [
+        { id: "event_1", date: "", title: "", body: "", badge: "", tone: "" },
+    ],
+});
+
 const badgesDraft = buildReportBuilderDocumentBlockDraft("badgesBlock");
 assert.deepEqual(badgesDraft, {
     kind: "badgesBlock",

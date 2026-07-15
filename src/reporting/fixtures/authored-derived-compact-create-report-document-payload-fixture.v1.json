@@ -1,1 +1,381 @@
-{"version":1,"kind":"createReportDocumentPayload","createdAt":10051,"reportRef":{"reportId":"authoredDerivedCompactBuilder"},"title":"Authored Derived Compact Report","document":{"version":1,"kind":"reportDocument","id":"authoredDerivedCompactBuilder","title":"Authored Derived Compact Report","subtitle":"","description":"","refinements":[],"scope":{"params":[{"id":"dateRange","kind":"dateRange","label":"dateRange","required":true,"value":{"start":"2026-05-01","end":"2026-05-04"}}],"dataSourceRef":"demoReportSource"},"layout":{"type":"stack","items":[{"blockId":"primaryBuilder"},{"blockId":"reachRateTrend"},{"blockId":"reachRateTable"}]},"blocks":[{"id":"primaryBuilder","kind":"reportBuilderBlock","title":"Authored Derived Compact Report","source":{"kind":"dashboard.reportBuilder","containerId":"authoredDerivedCompactBuilder","stateKey":"authoredDerivedCompactBuilder","dataSourceRef":"demoReportSource"},"config":{"title":"Authored Derived Compact Report","measures":[{"id":"totalSpend","key":"totalSpend","label":"Spend","default":true,"format":"currency"},{"id":"hhUniqs","key":"hhUniqs","label":"HH Uniques","format":"compactNumber"}],"dimensions":[{"id":"country","key":"country","label":"Market","default":true,"runtimeFilter":{"includeParamPath":"filters.includeCountry","excludeParamPath":"filters.excludeCountry"}},{"id":"channelId","key":"channelId","label":"Channel","runtimeFilter":{"includeParamPath":"filters.includeChannelId","excludeParamPath":"filters.excludeChannelId"}}],"staticFilters":[{"id":"dateRange","type":"dateRange","required":true,"startParamPath":"filters.From","endParamPath":"filters.To","default":{"start":"2026-05-01","end":"2026-05-04"}}],"result":{"defaultMode":"table","pageSize":50},"calculatedFields":[{"id":"reachRate","key":"reachRate","kind":"rowCalc","label":"Reach Rate","dataType":"number","format":"percent","datasetRef":"primary","dependencies":["hhUniqs","totalSpend"],"expr":"if(totalSpend = 0, null, round((hhUniqs / totalSpend) * 100, 2))","section":"calculated","authoringScope":"builderState.localCalculatedFields","authoringEditable":true,"authoringKind":"rowCalc"}],"tableCalculations":[],"measureSections":[{"id":"calculated","label":"Calculated","order":9007199254740991}]},"state":{"selectedMeasures":["totalSpend"],"primaryMeasure":"totalSpend","selectedDimensions":["country"],"viewMode":"table","orderField":"country","orderDir":"asc","scopeParams":{"dateRange":{"start":"2026-05-01","end":"2026-05-04"}},"localCalculatedFields":[{"id":"reachRate","key":"reachRate","kind":"rowCalc","label":"Reach Rate","dataType":"number","format":"percent","datasetRef":"primary","dependencies":["hhUniqs","totalSpend"],"expr":"if(totalSpend = 0, null, round((hhUniqs / totalSpend) * 100, 2))"}],"groupBy":""},"scopeBindings":[{"paramId":"dateRange","target":"staticFilters.dateRange"}]},{"id":"reachRateTrend","kind":"chartBlock","title":"Reach Rate by Market","datasetRef":"primary","chartSpec":{"title":"Reach Rate by Market","type":"line","xField":"country","yFields":["reachRate"],"seriesField":"channelId"}},{"id":"reachRateTable","kind":"tableBlock","title":"Reach Rate Table","datasetRef":"primary","columns":[{"key":"country","label":"Market"},{"key":"channelId","label":"Channel"},{"key":"reachRate","label":"Reach Rate","format":"percent"}]}]},"compileState":{"status":"clean","reportSpecVersion":1,"blockCount":3,"datasetCount":1},"source":{"kind":"reportBuilder.savedReportPayload","payloadId":"rbreport_authored_derived_compact_report","sourceArtifactId":"authored_derived_compact_report","sourceSession":{"sessionId":"rbexplore_authoredDerivedCompactBuilder","sourceRef":{"kind":"reportBuilder.result","contextLabel":"Authored Derived Compact Report • Reach Rate by Market"}}}}
+{
+  "version": 1,
+  "kind": "createReportDocumentPayload",
+  "createdAt": 10051,
+  "reportRef": {
+    "reportId": "authoredDerivedCompactBuilder"
+  },
+  "title": "Authored Derived Compact Report",
+  "document": {
+    "version": 1,
+    "kind": "reportDocument",
+    "id": "authoredDerivedCompactBuilder",
+    "title": "Authored Derived Compact Report",
+    "subtitle": "",
+    "description": "",
+    "refinements": [],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    },
+    "presentation": {
+      "defaultMode": "table",
+      "pageSize": 50
+    },
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "demoReportSource",
+        "label": "Authored Derived Compact Report",
+        "description": "Primary report dataset",
+        "kindLabel": "primary",
+        "request": {
+          "measures": {
+            "totalSpend": true
+          },
+          "dimensions": {
+            "country": true
+          },
+          "filters": {
+            "From": "2026-05-01",
+            "To": "2026-05-04"
+          },
+          "limit": 50,
+          "offset": 0
+        },
+        "dimensions": [
+          {
+            "id": "country",
+            "key": "country",
+            "label": "Market",
+            "default": true,
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          },
+          {
+            "id": "channelId",
+            "key": "channelId",
+            "label": "Channel",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelId",
+              "excludeParamPath": "filters.excludeChannelId"
+            }
+          }
+        ],
+        "measures": [
+          {
+            "id": "totalSpend",
+            "key": "totalSpend",
+            "label": "Spend",
+            "default": true,
+            "format": "currency"
+          },
+          {
+            "id": "hhUniqs",
+            "key": "hhUniqs",
+            "label": "HH Uniques",
+            "format": "compactNumber"
+          }
+        ],
+        "calculatedFields": [
+          {
+            "id": "reachRate",
+            "key": "reachRate",
+            "kind": "rowCalc",
+            "label": "Reach Rate",
+            "dataType": "number",
+            "format": "percent",
+            "datasetRef": "primary",
+            "dependencies": [
+              "hhUniqs",
+              "totalSpend"
+            ],
+            "expr": "if(totalSpend = 0, null, round((hhUniqs / totalSpend) * 100, 2))",
+            "section": "calculated",
+            "authoringScope": "builderState.localCalculatedFields",
+            "authoringEditable": true,
+            "authoringKind": "rowCalc"
+          }
+        ],
+        "columnOptions": [
+          {
+            "key": "country",
+            "label": "Market",
+            "kind": "dimension",
+            "sourceKey": "country",
+            "default": true,
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeCountry",
+              "excludeParamPath": "filters.excludeCountry"
+            }
+          },
+          {
+            "key": "channelId",
+            "label": "Channel",
+            "kind": "dimension",
+            "sourceKey": "channelId",
+            "runtimeFilter": {
+              "includeParamPath": "filters.includeChannelId",
+              "excludeParamPath": "filters.excludeChannelId"
+            }
+          },
+          {
+            "key": "totalSpend",
+            "label": "Spend",
+            "kind": "measure",
+            "sourceKey": "totalSpend",
+            "format": "currency",
+            "default": true
+          },
+          {
+            "key": "hhUniqs",
+            "label": "HH Uniques",
+            "kind": "measure",
+            "sourceKey": "hhUniqs",
+            "format": "compactNumber"
+          },
+          {
+            "key": "reachRate",
+            "label": "Reach Rate",
+            "kind": "measure",
+            "format": "percent"
+          }
+        ],
+        "valueFieldOptions": [
+          {
+            "value": "totalSpend",
+            "label": "Spend",
+            "format": "currency",
+            "default": true
+          },
+          {
+            "value": "hhUniqs",
+            "label": "HH Uniques",
+            "format": "compactNumber"
+          },
+          {
+            "value": "reachRate",
+            "label": "Reach Rate",
+            "format": "percent"
+          }
+        ],
+        "secondaryFieldOptions": [
+          {
+            "value": "country",
+            "label": "Market",
+            "default": true
+          },
+          {
+            "value": "channelId",
+            "label": "Channel"
+          }
+        ],
+        "chartFieldOptions": [
+          {
+            "key": "country",
+            "aliases": [
+              "country"
+            ],
+            "label": "Market",
+            "kind": "dimension",
+            "default": true
+          },
+          {
+            "key": "channelId",
+            "aliases": [
+              "channelId"
+            ],
+            "label": "Channel",
+            "kind": "dimension"
+          },
+          {
+            "key": "totalSpend",
+            "aliases": [
+              "totalSpend"
+            ],
+            "label": "Spend",
+            "kind": "measure",
+            "format": "currency",
+            "default": true,
+            "align": "right"
+          },
+          {
+            "key": "hhUniqs",
+            "aliases": [
+              "hhUniqs"
+            ],
+            "label": "HH Uniques",
+            "kind": "measure",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "key": "reachRate",
+            "aliases": [
+              "reachRate"
+            ],
+            "label": "Reach Rate",
+            "kind": "measure",
+            "format": "percent",
+            "align": "right"
+          }
+        ],
+        "scopeParamOptions": [
+          {
+            "value": "dateRange",
+            "label": "dateRange",
+            "kind": "dateRange",
+            "required": true,
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ]
+      }
+    ],
+    "layout": {
+      "type": "stack",
+      "items": [
+        {
+          "blockId": "primaryBuilder"
+        },
+        {
+          "blockId": "reachRateTrend"
+        },
+        {
+          "blockId": "reachRateTable"
+        }
+      ]
+    },
+    "blocks": [
+      {
+        "id": "reachRateTrend",
+        "kind": "chartBlock",
+        "title": "Reach Rate by Market",
+        "datasetRef": "primary",
+        "chartSpec": {
+          "title": "Reach Rate by Market",
+          "type": "line",
+          "xField": "country",
+          "yFields": [
+            "reachRate"
+          ],
+          "seriesField": "channelId"
+        }
+      },
+      {
+        "id": "reachRateTable",
+        "kind": "tableBlock",
+        "title": "Reach Rate Table",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "country",
+            "label": "Market"
+          },
+          {
+            "key": "channelId",
+            "label": "Channel"
+          },
+          {
+            "key": "reachRate",
+            "label": "Reach Rate",
+            "format": "percent"
+          }
+        ]
+      },
+      {
+        "id": "primaryBuilder",
+        "kind": "reportBuilderBlock",
+        "title": "Authored Derived Compact Report",
+        "source": {
+          "kind": "dashboard.reportBuilder",
+          "containerId": "authoredDerivedCompactBuilder",
+          "stateKey": "authoredDerivedCompactBuilder",
+          "dataSourceRef": "demoReportSource"
+        },
+        "config": {
+          "title": "Authored Derived Compact Report",
+          "measureSections": [
+            {
+              "id": "calculated",
+              "label": "Calculated",
+              "order": 9007199254740991
+            }
+          ]
+        },
+        "state": {
+          "selectedMeasures": [
+            "totalSpend"
+          ],
+          "primaryMeasure": "totalSpend",
+          "selectedDimensions": [
+            "country"
+          ],
+          "viewMode": "table",
+          "orderField": "country",
+          "orderDir": "asc",
+          "scopeParams": {
+            "dateRange": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          "localCalculatedFields": [
+            {
+              "id": "reachRate",
+              "key": "reachRate",
+              "kind": "rowCalc",
+              "label": "Reach Rate",
+              "dataType": "number",
+              "format": "percent",
+              "datasetRef": "primary",
+              "dependencies": [
+                "hhUniqs",
+                "totalSpend"
+              ],
+              "expr": "if(totalSpend = 0, null, round((hhUniqs / totalSpend) * 100, 2))"
+            }
+          ],
+          "groupBy": ""
+        },
+        "scopeBindings": [
+          {
+            "paramId": "dateRange",
+            "target": "staticFilters.dateRange"
+          }
+        ]
+      }
+    ]
+  },
+  "compileState": {
+    "status": "clean",
+    "reportSpecVersion": 1,
+    "blockCount": 3,
+    "datasetCount": 1
+  },
+  "source": {
+    "kind": "reportBuilder.savedReportPayload",
+    "payloadId": "rbreport_authored_derived_compact_report",
+    "sourceArtifactId": "authored_derived_compact_report",
+    "sourceSession": {
+      "sessionId": "rbexplore_authoredDerivedCompactBuilder",
+      "sourceRef": {
+        "kind": "reportBuilder.result",
+        "contextLabel": "Authored Derived Compact Report • Reach Rate by Market"
+      }
+    }
+  }
+}
